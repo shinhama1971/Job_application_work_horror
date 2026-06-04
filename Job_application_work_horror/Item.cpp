@@ -1,6 +1,4 @@
 #include "Item.h"
-#include "Game.h"
-#include "Player.h"
 
 using namespace DirectX::SimpleMath;
 
@@ -75,13 +73,15 @@ void Item::Update()
     Vector3 diff = player->GetPosition() - m_Position;
     float distance = diff.Length();
 
-    if (distance <= m_GetDistance)
+   /* if (distance <= m_GetDistance)
     {
-        m_IsCollected = true;
-
-        Game::GetInstance()->DeleteObject(this);
-        return;
-    }
+        if (Input::GetKeyTrigger(VK_E))
+        {
+            m_IsCollected = true;
+            Game::GetInstance()->DeleteObject(this);
+            return;
+        }
+    }*/
 }
 
 void Item::Draw(Camera* cam)

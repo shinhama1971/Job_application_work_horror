@@ -1,11 +1,8 @@
 #pragma once
 
-#include "Object.h"
-#include "Texture.h"
-#include "StaticMesh.h"
-#include "MeshRenderer.h"
-#include "Material.h"
-
+#include "Game.h"
+#include "Player.h"
+#include "Input.h"
 class Item : public Object
 {
 private:
@@ -18,7 +15,7 @@ private:
     bool m_IsCollected = false;
 
     // プレイヤーに触れた判定用の距離
-    float m_GetDistance = 2.0f;
+    float m_GetDistance = 50.0f;
 
 public:
     void Init() override;
