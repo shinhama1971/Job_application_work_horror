@@ -131,16 +131,16 @@ void Player::Update()
         light.Enable = true;
         light.Direction = DirectX::SimpleMath::Vector4(0.5f, -1.0f, 0.8f, 0.0f);
         light.Direction.Normalize();
-        light.Diffuse = DirectX::SimpleMath::Color(1.2f, 1.2f, 1.2f, 1.0f);
-        light.Ambient = DirectX::SimpleMath::Color(0.15f, 0.15f, 0.15f, 1.0f);
+        light.Diffuse = Color(1.5f, 1.5f, 1.4f, 1.0f);
+        light.Ambient = Color(0.18f, 0.18f, 0.18f, 1.0f);
     }
     else
     {
         light.Enable = true;
         light.Direction = DirectX::SimpleMath::Vector4(0.5f, -1.0f, 0.8f, 0.0f);
         light.Direction.Normalize();
-        light.Diffuse = DirectX::SimpleMath::Color(0.2f, 0.2f, 0.2f, 1.0f);
-        light.Ambient = DirectX::SimpleMath::Color(0.02f, 0.02f, 0.02f, 1.0f);
+        light.Diffuse = Color(0.4f, 0.4f, 0.45f, 1.0f);
+        light.Ambient = Color(0.12f, 0.12f, 0.12f, 1.0f);
     }
 
     Renderer::SetLight(light);

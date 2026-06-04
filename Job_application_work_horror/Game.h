@@ -23,7 +23,7 @@ private:
 	Camera  m_Camera;
 	//オブジェクト配列
 	std::vector <std::unique_ptr<Object>>m_Objects;
-
+	int m_ItemCount = 0;
 public:
 	Game(); // コンストラクタ
 	~Game(); // デストラクタ
@@ -58,6 +58,17 @@ template<typename T>std::vector<T*>GetObjects()
 		}
 	}
 	return res;
+}
+
+
+void AddItemCount()
+{
+	m_ItemCount++;
+}
+
+int GetItemCount() const
+{
+	return m_ItemCount;
 }
 
 public:

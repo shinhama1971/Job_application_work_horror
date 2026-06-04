@@ -54,14 +54,8 @@ void Item::Update()
 {
     if (m_IsCollected) return;
 
-    // 見つけやすいように回転
+    // 回転
     m_Rotation.y += 0.03f;
-
-    // m_GetDistanceが0以下なら、確認中なので取得判定しない
-    if (m_GetDistance <= 0.0f)
-    {
-        return;
-    }
 
     std::vector<Player*> players =
         Game::GetInstance()->GetObjects<Player>();
@@ -73,12 +67,13 @@ void Item::Update()
     Vector3 diff = player->GetPosition() - m_Position;
     float distance = diff.Length();
 
+    // 近くにいてEキーを押したら取得
     if (distance <= m_GetDistance)
     {
         if (Input::GetKeyTrigger(VK_E))
         {
             m_IsCollected = true;
-            Game::GetInstance()->DeleteObject(this);
+            Game::GetInstance()->AddItemCount();
             return;
         }
     }

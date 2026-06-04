@@ -198,8 +198,9 @@ HRESULT Renderer::Init()
 	light.Enable = true;
 	light.Direction = Vector4(0.5f, -1.0f, 0.8f, 0.0f);
 	light.Direction.Normalize();
-	light.Diffuse = Color(1.5f, 1.5f, 1.5f, 1.0f);
-	light.Ambient = Color(0.2f, 0.2f, 0.2f, 1.0f);
+	light.Diffuse = Color(1.5f, 1.5f, 1.4f, 1.0f);
+	light.Ambient = Color(0.18f, 0.18f, 0.18f, 1.0f);
+
 	SetLight(light);
 	bufferDesc.ByteWidth = sizeof(MATERIAL);
 	hr = m_pDevice->CreateBuffer(&bufferDesc, NULL, &m_pMaterialBuffer);
