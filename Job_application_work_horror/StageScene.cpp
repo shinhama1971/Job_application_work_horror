@@ -7,7 +7,7 @@
 #include "Texture2D.h"
 #include "Item.h"
 #include "Renderer.h"
-
+#include "Door.h"
 StageScene::StageScene()
 {
     Init();
@@ -57,6 +57,14 @@ void StageScene::Init()
     ui->SetPosition(-475.0f, -300.0f, 0.0f);
     ui->SetScale(250.0f, 120.0f, 0.0f);
     m_MySceneObjects.emplace_back(ui);
+
+    Door* door =
+        Game::GetInstance()->AddObject<Door>();
+
+    door->SetPosition(
+        0.0f,
+       -100.0f,
+        40.0f);
 }
 
 void StageScene::Update()
