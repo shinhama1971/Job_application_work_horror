@@ -1,6 +1,4 @@
 #include "Item.h"
-#include "Game.h"
-#include "Player.h"
 
 using namespace DirectX::SimpleMath;
 
@@ -77,10 +75,12 @@ void Item::Update()
 
     if (distance <= m_GetDistance)
     {
-        m_IsCollected = true;
-
-        Game::GetInstance()->DeleteObject(this);
-        return;
+        if (Input::GetKeyTrigger(VK_E))
+        {
+            m_IsCollected = true;
+            Game::GetInstance()->DeleteObject(this);
+            return;
+        }
     }
 }
 

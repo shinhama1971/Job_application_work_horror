@@ -1,8 +1,8 @@
 #include "Player.h"
-#include "Player.h"
 #include "Game.h"
 #include "Input.h"
 #include "Camera.h"
+#include "Renderer.h"
 
 using namespace DirectX::SimpleMath;
 
@@ -100,9 +100,50 @@ void Player::Update()
         m_IsFPS = false;
     }
 
+
+    // Fキーで懐中電灯ON/OFF
+    if (Input::GetKeyTrigger(VK_F))
+    {
+        m_FlashLightOn = !m_FlashLightOn;
+    }
+
     // カメラ処理
     Vector3 eyePos = m_Position;
     eyePos.y += 2.0f;
+
+
+    // 懐中電灯ONなら電池を減らす
+    if (m_FlashLightOn)
+    {
+        m_Battery -= 0.02f;
+
+        if (m_Battery <= 0.0f)
+        {
+            m_Battery = 0.0f;
+            m_FlashLightOn = false;
+        }
+    }
+
+    LIGHT light{};
+
+    if (m_FlashLightOn)
+    {
+        light.Enable = true;
+        light.Direction = DirectX::SimpleMath::Vector4(0.5f, -1.0f, 0.8f, 0.0f);
+        light.Direction.Normalize();
+        light.Diffuse = DirectX::SimpleMath::Color(1.2f, 1.2f, 1.2f, 1.0f);
+        light.Ambient = DirectX::SimpleMath::Color(0.15f, 0.15f, 0.15f, 1.0f);
+    }
+    else
+    {
+        light.Enable = true;
+        light.Direction = DirectX::SimpleMath::Vector4(0.5f, -1.0f, 0.8f, 0.0f);
+        light.Direction.Normalize();
+        light.Diffuse = DirectX::SimpleMath::Color(0.2f, 0.2f, 0.2f, 1.0f);
+        light.Ambient = DirectX::SimpleMath::Color(0.02f, 0.02f, 0.02f, 1.0f);
+    }
+
+    Renderer::SetLight(light);
 
     if (m_IsFPS)
     {

@@ -12,6 +12,10 @@ private:
     DirectX::SimpleMath::Vector3 m_Velocity =
         DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
 
+    //懐中電灯作成
+    bool m_FlashLightOn = true;
+    float m_Battery = 100.0f;
+
     MeshRenderer m_MeshRenderer;
 
     std::vector<std::unique_ptr<Material>> m_Materials;
@@ -24,11 +28,14 @@ private:
     float m_MoveSpeed = 0.5f;
     float m_Radius = 1.0f;
 
+   
 public:
     void Init() override;
     void Update() override;
     void Draw(Camera* cam) override;
     void Uninit() override;
+
+    
 
     void SetPosition(DirectX::SimpleMath::Vector3 pos)
     {
