@@ -27,7 +27,7 @@ private:
 
     float m_MoveSpeed = 0.5f;
     float m_Radius = 1.0f;
-
+    int m_FlickerTimer = 0;
    
 public:
     void Init() override;
@@ -35,12 +35,28 @@ public:
     void Draw(Camera* cam) override;
     void Uninit() override;
 
-    
 
+
+    void AddBattery(float value)
+    {
+        m_Battery += value;
+
+        if (m_Battery > 100.0f)
+        {
+            m_Battery = 100.0f;
+        }
+    }
+	// バッテリー残量の取得
+    float GetBattery() const
+    {
+        return m_Battery;
+    }
+ 
+	// プレイヤーの位置を設定
     void SetPosition(DirectX::SimpleMath::Vector3 pos)
     {
         m_Position = pos;
     }
-
+    
     bool IsFPS() const { return m_IsFPS; }
 };

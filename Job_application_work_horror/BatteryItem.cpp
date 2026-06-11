@@ -1,18 +1,18 @@
-#include "Door.h"
+#include "BatteryItem.h"
 #include "Game.h"
 #include "Player.h"
 #include "Input.h"
 
 using namespace DirectX::SimpleMath;
 
-void Door::Init()
+void BatteryItem::Init()
 {
     StaticMesh staticmesh;
 
-    // 仮モデル
-    // 後でドアモデルに変更
-    std::u8string modelFile = u8"assets/model/golf_ball/golf_ball.obj";
-    std::string texDirectory = "assets/model/golf_ball";
+    // 仮でゴルフボールモデルを使用
+    // 後で電池モデルに変更
+    std::u8string modelFile = u8"assets/model/cylinder/cylinder.obj";
+    std::string texDirectory = "assets/model/cylinder";
 
     std::string tmpStr(
         reinterpret_cast<const char*>(modelFile.c_str()),
@@ -35,50 +35,27 @@ void Door::Init()
 
     for (int i = 0; i < materials.size(); i++)
     {
-        std::unique_ptr<Material> m =
-            std::make_unique<Material>();
-
+        std::unique_ptr<Material> m = std::make_unique<Material>();
         m->Create(materials[i]);
         m->SetShader(&m_Shader);
-
         m_Materials.push_back(std::move(m));
     }
 
-    size_t count =
-        (std::min)(m_Materials.size(), m_Textures.size());
+    size_t count = (std::min)(m_Materials.size(), m_Textures.size());
 
     for (size_t i = 0; i < count; i++)
     {
         m_Materials[i]->SetTexture(m_Textures[i].get());
     }
 
-    // 仮でドアっぽく縦長にする
-    m_Scale = Vector3(10.0f, 30.0f, 5.0f);
+    m_Scale = Vector3(15.0f, 15.0f, 15.0f);
 }
 
-void Door::Update()
+void BatteryItem::Update()
 {
-    // 開いている途中
-    if (m_IsOpening)
-    {
-        Vector3 dir = m_OpenPosition - m_Position;
+    if (m_IsCollected) return;
 
-        if (dir.Length() <= m_OpenSpeed)
-        {
-            m_Position = m_OpenPosition;
-            m_IsOpen = true;
-
-            // 開ききったらリザルトへ
-            Game::GetInstance()->ChangeScene(RESULT);
-            return;
-        }
-
-        dir.Normalize();
-        m_Position += dir * m_OpenSpeed;
-        return;
-    }
-
-    if (m_IsOpen) return;
+    m_Rotation.y += 0.03f;
 
     std::vector<Player*> players =
         Game::GetInstance()->GetObjects<Player>();
@@ -90,23 +67,20 @@ void Door::Update()
     Vector3 diff = player->GetPosition() - m_Position;
     float distance = diff.Length();
 
-    // ドアの近く
-    if (distance <= m_OpenDistance)
+    if (distance <= m_GetDistance)
     {
-        // アイテム3個以上持っていたら開けられる
-        if (Game::GetInstance()->GetItemCount() >= 3)
+        if (Input::GetKeyTrigger(VK_E))
         {
-            if (Input::GetKeyTrigger(VK_E))
-            {
-                m_IsOpening = true;
-            }
+            player->AddBattery(m_RecoverValue);
+            m_IsCollected = true;
+            return;
         }
     }
 }
 
-void Door::Draw(Camera* cam)
+void BatteryItem::Draw(Camera* cam)
 {
-    if (m_IsOpen) return;
+    if (m_IsCollected) return;
 
     cam->SetCamera();
 
@@ -118,11 +92,7 @@ void Door::Draw(Camera* cam)
 
     Matrix t = Matrix::CreateTranslation(m_Position);
 
-    Matrix s = Matrix::CreateScale(
-        m_Scale.x,
-        m_Scale.y,
-        m_Scale.z
-    );
+    Matrix s = Matrix::CreateScale(m_Scale);
 
     Matrix worldmtx = s * r * t;
 
@@ -155,5 +125,5 @@ void Door::Draw(Camera* cam)
     }
 }
 
-void Door::Uninit()
+void BatteryItem::Uninit()
 {}

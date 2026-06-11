@@ -9,20 +9,29 @@ protected:
 	Vector3 m_Position = DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
 	Vector3 m_Rotation = DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
 	Vector3 m_Scale = DirectX::SimpleMath::Vector3(1.0f, 1.0f, 1.0f);
+	bool m_IsDestroy = false;
 
 	// 描画の為の情報（見た目に関わる部分）
 	Shader m_Shader; // シェーダー
 	Texture m_Texture;//テクスチャ
 	bool m_IsFPS = true;
 public:
+	Object() {}
 	virtual ~Object() {}
+
 	virtual void Init()=0;
 	virtual void Update() = 0;
 	virtual void Draw(Camera* cam) = 0;
 	virtual void Uninit() = 0;
 
+	void SetPosition(DirectX::SimpleMath::Vector3 pos) { m_Position = pos; }
+	void SetRotation(DirectX::SimpleMath::Vector3 rot) { m_Rotation = rot; }
+	void SetScale(DirectX::SimpleMath::Vector3 scl) { m_Scale = scl; }
 	// 位置の取得
 	DirectX::SimpleMath::Vector3 GetPosition() const { return m_Position; }
+	DirectX::SimpleMath::Vector3 GetRotation() { return m_Rotation; }
+	DirectX::SimpleMath::Vector3 GetScale() { return m_Scale; }
 
-
+	void Destroy() { m_IsDestroy = true; }
+	bool IsDestroy() const { return m_IsDestroy; }
 };

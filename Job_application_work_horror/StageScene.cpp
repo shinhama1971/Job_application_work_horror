@@ -8,6 +8,7 @@
 #include "Item.h"
 #include "Renderer.h"
 #include "Door.h"
+#include "BatteryItem.h"
 StageScene::StageScene()
 {
     Init();
@@ -65,6 +66,14 @@ void StageScene::Init()
         0.0f,
        -100.0f,
         40.0f);
+
+   
+    BatteryItem* battery =
+        Game::GetInstance()->AddObject<BatteryItem>();
+
+    battery->SetPosition(100.0f, -95.0f, 100.0f);
+
+    m_MySceneObjects.emplace_back(battery);
 }
 
 void StageScene::Update()

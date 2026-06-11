@@ -43,9 +43,20 @@ void Game::Update()
 	// オブジェクト更新
 	for (auto& o : m_Instance->m_Objects)
 	{
-		o->Update();
+		if (!o->IsDestroy()) 
+		{
+			o->Update();
+		}
 	}
 	
+	// 死活フラグが立っているオブジェクトを一括削除
+	std::erase_if(m_Instance->m_Objects, [](const std::unique_ptr<Object>& o) {
+		if (o->IsDestroy()) {
+			o->Uninit();
+			return true;
+		}
+		return false;
+	});
 }
 
 // 描画
@@ -117,13 +128,8 @@ void Game::ChangeScene(SceneName sName)
 
 void Game::DeleteObject(Object* pt)
 {
-	if (pt == NULL)return;
-	pt->Uninit();
-
-	erase_if(m_Instance->m_Objects, [pt](const std::unique_ptr<Object>& element) {
-		return element.get() == pt; 
-		});
-	m_Instance->m_Objects.shrink_to_fit();
+	if (pt == NULL) return;
+	pt->Destroy();
 }
 
 void Game::DeleteAllObject()

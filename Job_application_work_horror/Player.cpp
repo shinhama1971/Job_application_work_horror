@@ -175,6 +175,12 @@ void Player::Update()
         target.y += 1.5f;
         cam->SetTarget(target);
     }
+
+	// BƒL[‚Å“d’r‚ğ30‰ñ•œ
+    if (Input::GetKeyTrigger(VK_B))
+    {
+        AddBattery(30.0f);
+    }
 }
 
 void Player::Draw(Camera* cam)
