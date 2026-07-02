@@ -214,9 +214,16 @@ LRESULT CALLBACK Application::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 
     case WM_CLOSE:  // 「x」ボタンが押されたら
     {
+        // マウスカーソルを一時的に表示
+        ShowCursor(TRUE);
+
         int res = MessageBoxA(NULL, "終了しますか？", "確認", MB_OKCANCEL);
         if (res == IDOK) {
             DestroyWindow(hWnd);  // 「WM_DESTROY」メッセージを送る
+        }
+        else {
+            // キャンセルされたらカーソルを隠す
+            ShowCursor(FALSE);
         }
     }
     break;

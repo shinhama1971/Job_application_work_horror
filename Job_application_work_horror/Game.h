@@ -109,6 +109,8 @@ namespace Core
             return m_ItemCount;
         }
 
+
+
         Camera* GetCamera()
         {
             return &m_Camera;

@@ -1,9 +1,11 @@
-#pragma once
+ï»¿#pragma once
 
 #include	<SimpleMath.h>
 
 class Camera {
 private:
+	POINT m_LastMousePos{};
+	bool m_FirstMouse = true;
 	DirectX::SimpleMath::Vector3	m_Position = DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
 	DirectX::SimpleMath::Vector3	m_Rotation = DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
 	DirectX::SimpleMath::Vector3	m_Scale = DirectX::SimpleMath::Vector3(1.0f, 1.0f, 1.0f);
@@ -11,17 +13,18 @@ private:
 	DirectX::SimpleMath::Vector3	m_Target{};
 	DirectX::SimpleMath::Matrix		m_ViewMatrix{};
 
-	float m_CameraDirection = 0; // ƒJƒƒ‰‚Ì•ûŒüiYawj
-	float m_CameraPitch = 0.0f;  // ã‰ºŠpiPitchj
+	float m_CameraDirection = 0; // ï¿½Jï¿½ï¿½ï¿½ï¿½ï¿½Ì•ï¿½ï¿½ï¿½ï¿½iYawï¿½j
+	float m_CameraPitch = 0.0f;  // ï¿½ã‰ºï¿½pï¿½iPitchï¿½j
 
 public:
 	void Init();
 	void Update();
+	void UpdateMouseLook();
 	void SetCamera(int mode = 0);
 	void Uninit();
 	void SetTarget(DirectX::SimpleMath::Vector3 target);
 
 	void SetPosition(DirectX::SimpleMath::Vector3 pos) { m_Position = pos; }
 	float GetCameraDirection() const { return m_CameraDirection; }
-	float GetCameraPitch() const { return m_CameraPitch; } // š’Ç‰Á
+	float GetCameraPitch() const { return m_CameraPitch; } // ï¿½ï¿½ï¿½Ç‰ï¿½
 };

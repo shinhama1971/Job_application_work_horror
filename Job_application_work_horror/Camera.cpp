@@ -10,12 +10,54 @@ void Camera::Init()
 	m_Position = Vector3(0.0f, 20.0f, -50.0f);
 	m_Target = Vector3(0.0f, 0.0f, 0.0f);
 	m_CameraDirection = 3.14f;
-	m_CameraPitch = 0.0f; // ’Ç‰Á
+	m_CameraPitch = 0.0f;
+
+	// ãƒžã‚¦ã‚¹ã‚«ãƒ¼ã‚½ãƒ«ã‚’éžè¡¨ç¤ºã«ã™ã‚‹
+	ShowCursor(FALSE);
 }
 
 void Camera::Update()
 {
-	// ¶‰EƒL[‚ÅƒJƒƒ‰‰ñ“]iYawj
+	// ãƒžã‚¦ã‚¹ç§»å‹•ã§è¦–ç·šåˆ¶å¾¡
+	POINT mousePos;
+	GetCursorPos(&mousePos);
+
+	if (m_FirstMouse)
+	{
+		m_LastMousePos = mousePos;
+		m_FirstMouse = false;
+	}
+	else
+	{
+		float dx = (float)(mousePos.x - m_LastMousePos.x);
+		float dy = (float)(mousePos.y - m_LastMousePos.y);
+
+		float sensitivity = 0.003f;
+
+		m_CameraDirection += dx * sensitivity;
+		m_CameraPitch += dy * sensitivity;
+
+		const float maxPitch = 1.2f;
+		const float minPitch = -1.2f;
+		if (m_CameraPitch > maxPitch) m_CameraPitch = maxPitch;
+		if (m_CameraPitch < minPitch) m_CameraPitch = minPitch;
+	}
+
+	// ãƒžã‚¦ã‚¹ã‚«ãƒ¼ã‚½ãƒ«ã‚’ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®ä¸­å¤®ã«æˆ»ã™
+	int screenWidth = Application::GetWidth();
+	int screenHeight = Application::GetHeight();
+	POINT screenCenter = { screenWidth / 2, screenHeight / 2 };
+
+	// ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®åº§æ¨™ã«å¤‰æ›
+	HWND hWnd = GetActiveWindow();
+	if (hWnd)
+	{
+		ClientToScreen(hWnd, &screenCenter);
+		SetCursorPos(screenCenter.x, screenCenter.y);
+		m_LastMousePos = screenCenter;
+	}
+
+	// å·¦å³ã‚­ãƒ¼ã§ã‚«ãƒ¡ãƒ©å›žè»¢ï¼ˆYawï¼‰
 	if (Input::GetKeyPress(VK_LEFT))
 	{
 		m_CameraDirection += 0.05f;
@@ -25,7 +67,7 @@ void Camera::Update()
 		m_CameraDirection -= 0.05f;
 	}
 
-	// ã‰ºƒL[‚ÅƒJƒƒ‰ã‰ºiPitchj
+	// ä¸Šä¸‹ã‚­ãƒ¼ã§ã‚«ãƒ¡ãƒ©ä¸Šä¸‹ï¼ˆPitchï¼‰
 	const float pitchStep = 0.03f;
 	if (Input::GetKeyPress(VK_UP))
 	{
@@ -35,23 +77,22 @@ void Camera::Update()
 	{
 		m_CameraPitch -= pitchStep;
 	}
-
-	// ƒsƒbƒ`§ŒÀiŒ©ã‚°/Œ©‰º‚ë‚µ‚µ‚·‚¬–hŽ~j
-	const float maxPitch = 1.2f;
-	const float minPitch = -1.2f;
-	if (m_CameraPitch > maxPitch) m_CameraPitch = maxPitch;
-	if (m_CameraPitch < minPitch) m_CameraPitch = minPitch;
-	
-	// FPSŽ‹“_‚Å‚ÍAˆÊ’u(m_Position)‚Æ’Ž‹“_(m_Target)‚ÌXV‚Í
-	// GolfBall::Update() ‚Ì’†‚Ås‚¤
 }
-
 
 void Camera::SetCamera(int mode)
 {
 	//3D
 	if (mode == 0)
 	{
+		// ã‚«ãƒ¡ãƒ©ã®å‘ãã‹ã‚‰ã‚¿ãƒ¼ã‚²ãƒƒãƒˆä½ç½®ã‚’è¨ˆç®—
+		Vector3 forward;
+		forward.x = cosf(m_CameraPitch) * sinf(m_CameraDirection);
+		forward.y = -sinf(m_CameraPitch);
+		forward.z = cosf(m_CameraPitch) * cosf(m_CameraDirection);
+		forward.Normalize();
+
+		m_Target = m_Position + forward;
+
 		Vector3 up = Vector3(0.0f, 1.0f, 0.0f);
 		m_ViewMatrix = DirectX::XMMatrixLookAtLH(m_Position, m_Target, up);
 
@@ -86,6 +127,10 @@ void Camera::SetCamera(int mode)
 	}*/
 }
 
-void Camera::Uninit() {}
+void Camera::Uninit() 
+{
+	// ãƒžã‚¦ã‚¹ã‚«ãƒ¼ã‚½ãƒ«ã‚’å†è¡¨ç¤º
+	ShowCursor(TRUE);
+}
 
 void Camera::SetTarget(Vector3 target) { m_Target = target; }

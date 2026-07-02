@@ -164,7 +164,6 @@ void Ground::Init()
 	mtrl.Diffuse = Color(1, 1, 1, 1);
 	mtrl.TextureEnable = true;//テクスチャを使うか否かのフラグ
 	m_Material->Create(mtrl);
-
 	//Groundの位置や大きさを調整
 	m_Position.y = -100.0f;
 	m_Scale.x = 20.0f;

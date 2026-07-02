@@ -43,10 +43,7 @@ namespace Effect
     {
         if (m_EnableNoise)
         {
-            m_FullScreenQuad.Draw(
-                m_RenderTexture.GetSRV(),
-                m_Time
-            );
+            m_FullScreenQuad.Draw(nullptr, m_Time);
         }
     }
 }

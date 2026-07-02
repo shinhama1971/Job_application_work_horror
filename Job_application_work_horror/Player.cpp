@@ -1,4 +1,4 @@
-#include "Player.h"
+ï»¿#include "Player.h"
 #include "Game.h"
 #include "Input.h"
 #include "Camera.h"
@@ -10,7 +10,7 @@ void Player::Init()
 {
     StaticMesh staticmesh;
 
-    // ‰¼ƒ‚ƒfƒ‹B‚ ‚Æ‚ÅlŒ^‚â‰ù’†“d“”‚¿ƒ‚ƒfƒ‹‚É•ÏX
+	//ä»Šã¯ã‚´ãƒ«ãƒ•ãƒœãƒ¼ãƒ«ã®ãƒ¢ãƒ‡ãƒ«ã‚’èª­ã¿è¾¼ã‚€
     std::u8string modelFile = u8"assets/model/golf_ball/golf_ball.obj";
     std::string texDirectory = "assets/model/golf_ball";
 
@@ -77,41 +77,41 @@ void Player::Update()
         m_Velocity.z = 0.0f;
     }
 
-    // d—Í
+    // ï¿½dï¿½ï¿½
     m_Velocity.y -= 0.01f;
 
     m_Position += m_Velocity;
 
-    // ‰¼‚Ì—‰º–h~
+    // ï¿½ï¿½ï¿½Ì—ï¿½ï¿½ï¿½ï¿½hï¿½~
     if (m_Position.y < -99.0f)
     {
         m_Position.y = -99.0f;
         m_Velocity.y = 0.0f;
     }
 
-    // RƒL[‚ÅˆêlÌ
+    // Rï¿½Lï¿½[ï¿½Åˆï¿½lï¿½ï¿½
     if (Input::GetKeyTrigger(VK_R))
     {
         m_IsFPS = true;
     }
 
-    // JƒL[‚ÅOlÌ
-    if (Input::GetKeyTrigger(VK_J))
+    // Jï¿½Lï¿½[ï¿½ÅOï¿½lï¿½ï¿½
+    if (Input::GetKeyTrigger(VK_T))
     {
         m_IsFPS = false;
     }
 
-    // FƒL[‚Å‰ù’†“d“”ON/OFF
+    // Fï¿½Lï¿½[ï¿½Å‰ï¿½ï¿½ï¿½ï¿½dï¿½ï¿½ON/OFF
     if (Input::GetKeyTrigger(VK_F))
     {
-        // “d’r‚ª‚ ‚é‚¾‚¯ON/OFF‚Å‚«‚é
+        // ï¿½dï¿½rï¿½ï¿½ï¿½ï¿½ï¿½éï¿½ï¿½ï¿½ï¿½ON/OFFï¿½Å‚ï¿½ï¿½ï¿½
         if (m_Battery > 0.0f)
         {
             m_FlashLightOn = !m_FlashLightOn;
         }
     }
 
-    // ‰ù’†“d“”ON‚È‚ç“d’r‚ğŒ¸‚ç‚·
+    // ï¿½ï¿½ï¿½ï¿½ï¿½dï¿½ï¿½ONï¿½È‚ï¿½dï¿½rï¿½ï¿½ï¿½ï¿½ç‚·
     if (m_FlashLightOn)
     {
         m_Battery -= 0.02f;
@@ -123,14 +123,14 @@ void Player::Update()
         }
     }
 
-    // ƒ`ƒJƒ`ƒJ—p
+    // ï¿½`ï¿½Jï¿½`ï¿½Jï¿½p
     bool visibleLight = m_FlashLightOn;
 
     if (m_FlashLightOn && m_Battery <= 20.0f)
     {
         m_FlickerTimer++;
 
-        // 10ƒtƒŒ[ƒ€‚²‚Æ‚É–¾‚é‚¢/ˆÃ‚¢‚ğØ‚è‘Ö‚¦
+        // 10ï¿½tï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½Æ‚É–ï¿½ï¿½é‚¢/ï¿½Ã‚ï¿½ï¿½ï¿½Ø‚ï¿½Ö‚ï¿½
         if ((m_FlickerTimer / 10) % 2 == 0)
         {
             visibleLight = true;
@@ -153,22 +153,22 @@ void Player::Update()
 
     if (visibleLight)
     {
-        // ƒ‰ƒCƒgON
-        light.Diffuse = Color(1.5f, 1.5f, 1.4f, 1.0f);
-        light.Ambient = Color(0.18f, 0.18f, 0.18f, 1.0f);
+        // ï¿½ï¿½ï¿½Cï¿½gONï¿½ï¿½
+        light.Diffuse = Color(m_LightDiffuseR, m_LightDiffuseG, m_LightDiffuseB, 1.0f);
+        light.Ambient = Color(m_LightAmbientR, m_LightAmbientG, m_LightAmbientB, 1.0f);
     }
     else
     {
-        // ƒ‰ƒCƒgOFFEƒ`ƒJƒ`ƒJ’†‚ÌˆÃ‚¢ó‘Ô
-        light.Diffuse = Color(0.4f, 0.4f, 0.45f, 1.0f);
-        light.Ambient = Color(0.12f, 0.12f, 0.12f, 1.0f);
+        // ï¿½ï¿½ï¿½Cï¿½gOFFï¿½ï¿½ï¿½Eï¿½`ï¿½Jï¿½`ï¿½Jï¿½ï¿½ï¿½ÌˆÃ‚ï¿½ï¿½ï¿½ï¿½
+        light.Diffuse = Color(m_DarkDiffuseR, m_DarkDiffuseG, m_DarkDiffuseB, 1.0f);
+        light.Ambient = Color(m_DarkAmbientR, m_DarkAmbientG, m_DarkAmbientB, 1.0f);
     }
 
     Renderer::SetLight(light);
 
-    // ƒJƒƒ‰ˆ—
+    // ï¿½Jï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     Vector3 eyePos = m_Position;
-    eyePos.y += 2.0f;
+    eyePos.y += m_CameraHeightOffset;
 
     if (m_IsFPS)
     {
@@ -201,7 +201,7 @@ void Player::Update()
         cam->SetTarget(target);
     }
 
-    // BƒL[‚Å“d’r‚ğ30‰ñ•œiƒeƒXƒg—pj
+	// ãƒãƒƒãƒ†ãƒªãƒ¼ã‚’å›å¾©ã™ã‚‹ãŸã‚ã®ãƒ‡ãƒãƒƒã‚°ç”¨ã®ã‚­ãƒ¼å…¥åŠ›
     if (Input::GetKeyTrigger(VK_B))
     {
         AddBattery(50.0f);
@@ -212,7 +212,7 @@ void Player::Draw(Camera* cam)
 {
     cam->SetCamera();
 
-    // ˆêlÌ‚Ì‚Æ‚«‚Í©•ª‚Ìƒ‚ƒfƒ‹‚ğ•`‰æ‚µ‚È‚¢
+    // ï¿½ï¿½lï¿½Ì‚Ì‚Æ‚ï¿½ï¿½Íï¿½ï¿½ï¿½ï¿½Ìƒï¿½ï¿½fï¿½ï¿½ï¿½ï¿½`ï¿½æ‚µï¿½È‚ï¿½
     if (m_IsFPS) return;
 
     Matrix r = Matrix::CreateFromYawPitchRoll(

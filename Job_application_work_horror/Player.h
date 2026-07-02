@@ -28,6 +28,21 @@ private:
     float m_MoveSpeed = 0.5f;
     float m_Radius = 1.0f;
     int m_FlickerTimer = 0;
+
+    // ライト調整用（バイオハザード風）
+    float m_LightDiffuseR = 1.8f;
+    float m_LightDiffuseG = 1.6f;
+    float m_LightDiffuseB = 1.2f;
+    float m_LightAmbientR = 0.1f;
+    float m_LightAmbientG = 0.1f;
+    float m_LightAmbientB = 0.12f;
+    float m_DarkDiffuseR = 0.3f;
+    float m_DarkDiffuseG = 0.3f;
+    float m_DarkDiffuseB = 0.35f;
+    float m_DarkAmbientR = 0.06f;
+    float m_DarkAmbientG = 0.06f;
+    float m_DarkAmbientB = 0.08f;
+    float m_CameraHeightOffset = 1.8f;
    
 public:
     void Init() override;

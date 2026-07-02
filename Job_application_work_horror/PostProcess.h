@@ -21,6 +21,7 @@ namespace Effect
         void Update();
 
         void Begin();
+		void SetRenderTarget();
         void End();
         void Draw();
 

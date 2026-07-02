@@ -66,7 +66,6 @@ namespace Graphics
         ID3D11DeviceContext* context =
             Renderer::GetDeviceContext();
 
-        Renderer::SetBackBufferRenderTarget();
         Renderer::SetWorldViewProjection2D();
         Renderer::SetDepthEnable(false);
 
@@ -90,17 +89,11 @@ namespace Graphics
         m_IndexBuffer.SetGPU();
         m_Material->SetGPU();
 
-        context->PSSetShaderResources(0, 1, &srv);
-        context->PSSetConstantBuffers(0, 1, &m_TimeBuffer);
-
         context->IASetPrimitiveTopology(
             D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP
         );
 
         context->DrawIndexed(4, 0, 0);
-
-        ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
-        context->PSSetShaderResources(0, 1, nullSRV);
 
         Renderer::SetDepthEnable(true);
     }
