@@ -35,8 +35,7 @@ public:
     void Draw(Camera* cam) override;
     void Uninit() override;
 
-
-
+    DirectX::SimpleMath::Vector3 GetForward() const;
     void AddBattery(float value)
     {
         m_Battery += value;

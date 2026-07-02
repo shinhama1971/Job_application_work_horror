@@ -38,6 +38,7 @@ void Player::Init()
     }
 
     size_t count = (std::min)(m_Materials.size(), m_Textures.size());
+
     for (size_t i = 0; i < count; i++)
     {
         m_Materials[i]->SetTexture(m_Textures[i].get());
@@ -50,7 +51,7 @@ void Player::Init()
 
 void Player::Update()
 {
-    Camera* cam = Game::GetInstance()->GetCamera();
+    Camera* cam = Core::Game::GetInstance()->GetCamera();
 
     float yaw = cam->GetCameraDirection();
 
@@ -94,23 +95,21 @@ void Player::Update()
         m_IsFPS = true;
     }
 
-    // Lキーで三人称
+    // Jキーで三人称
     if (Input::GetKeyTrigger(VK_J))
     {
         m_IsFPS = false;
     }
 
-
     // Fキーで懐中電灯ON/OFF
     if (Input::GetKeyTrigger(VK_F))
     {
-        m_FlashLightOn = !m_FlashLightOn;
+        // 電池がある時だけON/OFFできる
+        if (m_Battery > 0.0f)
+        {
+            m_FlashLightOn = !m_FlashLightOn;
+        }
     }
-
-    // カメラ処理
-    Vector3 eyePos = m_Position;
-    eyePos.y += 2.0f;
-
 
     // 懐中電灯ONなら電池を減らす
     if (m_FlashLightOn)
@@ -124,26 +123,52 @@ void Player::Update()
         }
     }
 
+    // チカチカ用
+    bool visibleLight = m_FlashLightOn;
+
+    if (m_FlashLightOn && m_Battery <= 20.0f)
+    {
+        m_FlickerTimer++;
+
+        // 10フレームごとに明るい/暗いを切り替え
+        if ((m_FlickerTimer / 10) % 2 == 0)
+        {
+            visibleLight = true;
+        }
+        else
+        {
+            visibleLight = false;
+        }
+    }
+    else
+    {
+        m_FlickerTimer = 0;
+    }
+
     LIGHT light{};
 
-    if (m_FlashLightOn)
+    light.Enable = true;
+    light.Direction = DirectX::SimpleMath::Vector4(0.5f, -1.0f, 0.8f, 0.0f);
+    light.Direction.Normalize();
+
+    if (visibleLight)
     {
-        light.Enable = true;
-        light.Direction = DirectX::SimpleMath::Vector4(0.5f, -1.0f, 0.8f, 0.0f);
-        light.Direction.Normalize();
+        // ライトON時
         light.Diffuse = Color(1.5f, 1.5f, 1.4f, 1.0f);
         light.Ambient = Color(0.18f, 0.18f, 0.18f, 1.0f);
     }
     else
     {
-        light.Enable = true;
-        light.Direction = DirectX::SimpleMath::Vector4(0.5f, -1.0f, 0.8f, 0.0f);
-        light.Direction.Normalize();
+        // ライトOFF時・チカチカ中の暗い状態
         light.Diffuse = Color(0.4f, 0.4f, 0.45f, 1.0f);
         light.Ambient = Color(0.12f, 0.12f, 0.12f, 1.0f);
     }
 
     Renderer::SetLight(light);
+
+    // カメラ処理
+    Vector3 eyePos = m_Position;
+    eyePos.y += 2.0f;
 
     if (m_IsFPS)
     {
@@ -176,10 +201,10 @@ void Player::Update()
         cam->SetTarget(target);
     }
 
-	// Bキーで電池を30回復
+    // Bキーで電池を30回復（テスト用）
     if (Input::GetKeyTrigger(VK_B))
     {
-        AddBattery(30.0f);
+        AddBattery(50.0f);
     }
 }
 
@@ -217,5 +242,17 @@ void Player::Draw(Camera* cam)
 }
 
 void Player::Uninit()
+{}
+
+DirectX::SimpleMath::Vector3 Player::GetForward() const
 {
+    Camera* cam = Core::Game::GetInstance()->GetCamera();
+
+    float yaw = cam->GetCameraDirection();
+
+    return DirectX::SimpleMath::Vector3(
+        sinf(yaw),
+        0.0f,
+        cosf(yaw)
+    );
 }

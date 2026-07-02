@@ -1,14 +1,20 @@
 #include "StageScene.h"
 #include "Game.h"
 #include "Input.h"
+
 #include "Player.h"
 #include "Ground.h"
 #include "Wall.h"
 #include "Texture2D.h"
 #include "Item.h"
-#include "Renderer.h"
 #include "Door.h"
+#include "ExitTrigger.h"
 #include "BatteryItem.h"
+
+#include <SimpleMath.h>
+
+using namespace DirectX::SimpleMath;
+
 StageScene::StageScene()
 {
     Init();
@@ -21,76 +27,87 @@ StageScene::~StageScene()
 
 void StageScene::Init()
 {
-    // プレイヤー
-    Player* player = Game::GetInstance()->AddObject<Player>();
-    m_MySceneObjects.emplace_back(player);
+    Core::Game* game = Core::Game::GetInstance();
 
-    // 床
-    Ground* ground = Game::GetInstance()->AddObject<Ground>();
+    // プレイヤー
+    Player* player = game->CreateObj<Player>("Player");
+    player->SetPosition(Vector3(0.0f, -80.0f, 0.0f));
+
+    // 地面
+    Ground* ground = game->CreateObj<Ground>("Ground");
     ground->SetPosition(0.0f, -100.0f, 0.0f);
     ground->SetScale(20.0f, 1.0f, 20.0f);
-    m_MySceneObjects.emplace_back(ground);
 
-    // 壁：仮配置
-    Wall* wall1 = Game::GetInstance()->AddObject<Wall>();
+    // 壁
+    Wall* wall1 = game->CreateObj<Wall>("Wall1");
     wall1->SetPosition(0.0f, -90.0f, 200.0f);
-    m_MySceneObjects.emplace_back(wall1);
 
-    Wall* wall2 = Game::GetInstance()->AddObject<Wall>();
+    Wall* wall2 = game->CreateObj<Wall>("Wall2");
     wall2->SetPosition(200.0f, -90.0f, 0.0f);
-    m_MySceneObjects.emplace_back(wall2);
 
-    Item* item1 = Game::GetInstance()->AddObject<Item>();
+    // アイテム
+    Item* item1 = game->CreateObj<Item>("Item1");
     item1->SetPosition(0.0f, -70.0f, -100.0f);
-    m_MySceneObjects.emplace_back(item1);
 
-    Item* item2 = Game::GetInstance()->AddObject<Item>();
+    Item* item2 = game->CreateObj<Item>("Item2");
     item2->SetPosition(60.0f, -95.0f, 140.0f);
-    m_MySceneObjects.emplace_back(item2);
 
-    Item* item3 = Game::GetInstance()->AddObject<Item>();
+    Item* item3 = game->CreateObj<Item>("Item3");
     item3->SetPosition(-60.0f, -95.0f, 200.0f);
-    m_MySceneObjects.emplace_back(item3);
 
-    // UI例
-    Texture2D* ui = Game::GetInstance()->AddObject<Texture2D>();
+    // UI
+    Texture2D* ui = game->CreateObj<Texture2D>("UI_Back");
     ui->SetTexture("assets/texture/ui_back.png");
     ui->SetPosition(-475.0f, -300.0f, 0.0f);
     ui->SetScale(250.0f, 120.0f, 0.0f);
-    m_MySceneObjects.emplace_back(ui);
 
-    Door* door =
-        Game::GetInstance()->AddObject<Door>();
+    // ドア
+    Door* door = game->CreateObj<Door>("Door");
+    door->SetPosition(0.0f, -100.0f, 40.0f);
 
-    door->SetPosition(
-        0.0f,
-       -100.0f,
-        40.0f);
+    // ゴール
+    ExitTrigger* exit = game->CreateObj<ExitTrigger>("ExitTrigger");
+    exit->SetPosition(150.0f, -80.0f, 300.0f);
 
-   
-    BatteryItem* battery =
-        Game::GetInstance()->AddObject<BatteryItem>();
-
+    // バッテリー
+    BatteryItem* battery = game->CreateObj<BatteryItem>("BatteryItem");
     battery->SetPosition(100.0f, -95.0f, 100.0f);
-
-    m_MySceneObjects.emplace_back(battery);
 }
 
 void StageScene::Update()
 {
-    // テスト用：Enterでタイトルへ戻る
     if (Input::GetKeyTrigger(VK_RETURN))
     {
-        Game::GetInstance()->ChangeScene(RESULT);
+        Core::Game::GetInstance()->ChangeScene(RESULT);
+        return;
+    }
+
+    Player* player =
+        Core::Game::GetInstance()->GetObj<Player>("Player");
+
+    if (player != nullptr)
+    {
+        // ここでプレイヤー情報を使える
     }
 }
 
 void StageScene::Uninit()
 {
-    for (auto& o : m_MySceneObjects)
-    {
-        Game::GetInstance()->DeleteObject(o);
-    }
+    Core::Game* game = Core::Game::GetInstance();
 
-    m_MySceneObjects.clear();
+    game->DestroyObj("Player");
+    game->DestroyObj("Ground");
+
+    game->DestroyObj("Wall1");
+    game->DestroyObj("Wall2");
+
+    game->DestroyObj("Item1");
+    game->DestroyObj("Item2");
+    game->DestroyObj("Item3");
+
+    game->DestroyObj("UI_Back");
+
+    game->DestroyObj("Door");
+    game->DestroyObj("ExitTrigger");
+    game->DestroyObj("BatteryItem");
 }

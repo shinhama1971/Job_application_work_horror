@@ -58,7 +58,7 @@ void BatteryItem::Update()
     m_Rotation.y += 0.03f;
 
     std::vector<Player*> players =
-        Game::GetInstance()->GetObjects<Player>();
+Core::Game::GetInstance()->GetObjects<Player>();
 
     if (players.empty()) return;
 

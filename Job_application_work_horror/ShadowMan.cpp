@@ -1,13 +1,13 @@
-#include "Item.h"
 #include "ShadowMan.h"
-
+#include "Game.h"
+#include"Player.h"
 using namespace DirectX::SimpleMath;
 
-void Item::Init()
+void ShadowMan::Init()
 {
     StaticMesh staticmesh;
 
-    // 今はゴルフボールで代用
+    // 莉ｮ繝｢繝�繝ｫ縲ゅ≠縺ｨ縺ｧ莠ｺ蠖ｱ繝｢繝�繝ｫ縺ｫ螟画峩
     std::u8string modelFile = u8"assets/model/golf_ball/golf_ball.obj";
     std::string texDirectory = "assets/model/golf_ball";
 
@@ -32,7 +32,8 @@ void Item::Init()
 
     for (int i = 0; i < materials.size(); i++)
     {
-        std::unique_ptr<Material> m = std::make_unique<Material>();
+        std::unique_ptr<Material> m =
+            std::make_unique<Material>();
 
         m->Create(materials[i]);
         m->SetShader(&m_Shader);
@@ -40,63 +41,41 @@ void Item::Init()
         m_Materials.push_back(std::move(m));
     }
 
-    size_t count = (std::min)(m_Materials.size(), m_Textures.size());
+    size_t count =
+        (std::min)(m_Materials.size(), m_Textures.size());
 
     for (size_t i = 0; i < count; i++)
     {
         m_Materials[i]->SetTexture(m_Textures[i].get());
     }
 
-    // 確認用に大きくする
-    m_Scale = Vector3(20.0f, 20.0f, 20.0f);
+    // 莠ｺ蠖ｱ縺｣縺ｽ縺冗ｸｦ髟ｷ縺ｫ縺吶ｋ
+    m_Scale = Vector3(8.0f, 35.0f, 8.0f);
 }
 
-void Item::Update()
+void ShadowMan::Update()
 {
-    if (m_IsCollected) return;
+    m_LifeTimer--;
 
-    // 回転
-    m_Rotation.y += 0.03f;
+    Player* player = Core::Game::GetInstance()->GetObjects<Player>()[0];
 
-    std::vector<Player*> players =
-        Core::Game::GetInstance()->GetObjects<Player>();
+    Vector3 toShadow =
+        m_Position - player->GetPosition();
 
-    if (players.size() == 0) return;
+    toShadow.Normalize();
 
-    Player* player = players[0];
+    float dot =
+        player->GetForward().Dot(toShadow);
 
-    Vector3 diff = player->GetPosition() - m_Position;
-    float distance = diff.Length();
-
-    // 近くにいてEキーを押したら取得
-    if (distance <= m_GetDistance)
-    {
-        if (Input::GetKeyTrigger(VK_E))
-        {
-            m_IsCollected = true;
-            Core::Game::GetInstance()->AddItemCount();
-
-            // 1個目のアイテム取得時だけ人影を出す
-            if (Core::Game::GetInstance()->GetItemCount() == 1)
-            {
-                ShadowMan* shadow =
-                    Core::Game::GetInstance()->AddObject<ShadowMan>();
-
-                shadow->SetPosition(
-                    player->GetPosition().x,
-                    player->GetPosition().y,
-                    player->GetPosition().z - 80.0f
-                );
-            }
-
-            return;
-        }
-    }
+   // if (dot > 0.8f)
+    //{
+     //   m_LifeTimer = 0;
+    //}
 }
 
-void Item::Draw(Camera* cam)
+void ShadowMan::Draw(Camera* cam)
 {
-    if (m_IsCollected) return;
+    if (m_LifeTimer <= 0) return;
 
     cam->SetCamera();
 
@@ -108,11 +87,7 @@ void Item::Draw(Camera* cam)
 
     Matrix t = Matrix::CreateTranslation(m_Position);
 
-    Matrix s = Matrix::CreateScale(
-        m_Scale.x,
-        m_Scale.y,
-        m_Scale.z
-    );
+    Matrix s = Matrix::CreateScale(m_Scale);
 
     Matrix worldmtx = s * r * t;
 
@@ -145,5 +120,5 @@ void Item::Draw(Camera* cam)
     }
 }
 
-void Item::Uninit()
+void ShadowMan::Uninit()
 {}

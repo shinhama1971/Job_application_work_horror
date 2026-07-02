@@ -62,14 +62,15 @@ void Door::Update()
     if (m_IsOpening)
     {
         Vector3 dir = m_OpenPosition - m_Position;
+        Vector3 open = m_OpenPosition - m_Position;//
+
 
         if (dir.Length() <= m_OpenSpeed)
         {
             m_Position = m_OpenPosition;
             m_IsOpen = true;
+            m_IsOpening = false;
 
-            // 開ききったらリザルトへ
-            Game::GetInstance()->ChangeScene(RESULT);
             return;
         }
 
@@ -81,20 +82,20 @@ void Door::Update()
     if (m_IsOpen) return;
 
     std::vector<Player*> players =
-        Game::GetInstance()->GetObjects<Player>();
+        Core::Game::GetInstance()->GetObjects<Player>();
 
     if (players.empty()) return;
 
     Player* player = players[0];
-
+   
     Vector3 diff = player->GetPosition() - m_Position;
     float distance = diff.Length();
 
     // ドアの近く
     if (distance <= m_OpenDistance)
     {
-        // アイテム3個以上持っていたら開けられる
-        if (Game::GetInstance()->GetItemCount() >= 3)
+        // アイテム3個以上持っていたらドアを開けることができる
+        if (Core::Game::GetInstance()->GetItemCount() >= 3)
         {
             if (Input::GetKeyTrigger(VK_E))
             {
@@ -106,7 +107,7 @@ void Door::Update()
 
 void Door::Draw(Camera* cam)
 {
-    if (m_IsOpen) return;
+    //if (m_IsOpen) return;
 
     cam->SetCamera();
 

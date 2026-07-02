@@ -139,6 +139,23 @@ public:
 	static bool GetLightEnable();
 	static void SetMaterial(MATERIAL Material);
 	static void SetUV(float u, float v, float uw, float vh);
+
+	static ID3D11RenderTargetView* GetBackBufferRTV()
+	{
+		return m_pRenderTargetView;
+	}
+
+	static ID3D11DepthStencilView* GetDepthStencilView()
+	{
+		return m_pDepthStencilView;
+	}
+
+	static void SetBackBufferRenderTarget();
+
+	static void ClearBackBuffer(float r, float g, float b, float a);
+
+	static void ClearDepth();
+
 	//=============================================================================
 	// ブレンド ステート設定
 	//=============================================================================

@@ -20,13 +20,13 @@ ResultScene::~ResultScene()
 void ResultScene::Init()
 {
 	//背景画像オブジェクトを作成
-	Texture2D* pt = Game::GetInstance()->AddObject<Texture2D>();
+	Texture2D* pt = Core::Game::GetInstance()->AddObject<Texture2D>();
 	pt->SetTexture("assets/texture/background2.png");//画像を指定
 	pt->SetScale(1280.0f, 720.0f, 0.0f);//大きさを指定
 	m_MySceneObjects.emplace_back(pt);
 	
 	//リザルト文字列オブジェクト作成
-	Texture2D* pt2 = Game::GetInstance()->AddObject<Texture2D>();
+	Texture2D* pt2 = Core::Game::GetInstance()->AddObject<Texture2D>();
 	pt2->SetTexture("assets/texture/resultString.png");//画像を指定
 	pt2->SetPosition(300.0f, 0.0f, 0.0f);//位置を指定
 	pt2->SetScale(700.0f, 100.0f, 0.0f);//大きさを指定
@@ -34,7 +34,7 @@ void ResultScene::Init()
 	m_MySceneObjects.emplace_back(pt2);
 
 	//人オブジェクトを作成
-	Texture2D* pt3 = Game::GetInstance()->AddObject<Texture2D>();
+	Texture2D* pt3 = Core::Game::GetInstance()->AddObject<Texture2D>();
 	pt3->SetTexture("assets/texture/golf_jou_man.png");//画像を指定
 	pt3->SetPosition(-300.0f, 0.0f, 0.0f);//位置を指定
 	pt3->SetScale(361.0f, 400.0f, 0.0f);//大きさを指定
@@ -50,8 +50,8 @@ void ResultScene::Update()
 	// エンターキーを押してタイトルへ
 	if (Input::GetKeyTrigger(VK_RETURN))
 	{
-		//Game::GetInstance()->ChangeScene(TITLE);
-		Game::GetInstance()->ChangeScene((SceneName)s_NextScene);
+		//Core::Game::GetInstance()->ChangeScene(TITLE);
+		Core::Game::GetInstance()->ChangeScene((SceneName)s_NextScene);
 	}
 }
 
@@ -60,7 +60,7 @@ void ResultScene::Uninit()
 {
 	// このシーンのオブジェクトを削除する
 	for (auto& o : m_MySceneObjects) {
-		Game::GetInstance()->DeleteObject(o);
+		Core::Game::GetInstance()->DeleteObject(o);
 	}
 	m_MySceneObjects.clear();
 }

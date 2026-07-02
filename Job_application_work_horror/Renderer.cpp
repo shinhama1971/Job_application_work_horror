@@ -801,6 +801,35 @@ bool Renderer::CreateConstantBuffer(
 	return true;
 }
 
+void Renderer::SetBackBufferRenderTarget()
+{
+	m_pDeviceContext->OMSetRenderTargets(
+		1,
+		&m_pRenderTargetView,
+		m_pDepthStencilView
+	);
+}
+
+void Renderer::ClearBackBuffer(float r, float g, float b, float a)
+{
+	float clearColor[4] = { r, g, b, a };
+
+	m_pDeviceContext->ClearRenderTargetView(
+		m_pRenderTargetView,
+		clearColor
+	);
+}
+
+void Renderer::ClearDepth()
+{
+	m_pDeviceContext->ClearDepthStencilView(
+		m_pDepthStencilView,
+		D3D11_CLEAR_DEPTH,
+		1.0f,
+		0
+	);
+}
+
 //--------------------------------------------------------------------------------------
 //コンスタントバッファを作成(CPU書き込み可能)
 //--------------------------------------------------------------------------------------

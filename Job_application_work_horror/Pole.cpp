@@ -126,7 +126,7 @@ void Pole::SetPosition(Vector3 pos)
 	// Y座標を地形に合わせて変更
 
 	// Groundの頂点データを取得
-	vector<Ground*> grounds = Game::GetInstance()->GetObjects<Ground>();
+	vector<Ground*> grounds = Core::Game::GetInstance()->GetObjects<Ground>();
 	vector<VERTEX_3D> vertices;
 	for (auto& g : grounds) // Groundオブジェクトの数ループ
 	{
