@@ -1,4 +1,4 @@
-#include "sound.h"
+ï»¿#include "sound.h"
 
 #ifdef _XBOX //Big-Endian
 #define fourccRIFF 'RIFF'
@@ -8,6 +8,11 @@
 #define fourccXWMA 'XWMA'
 #define fourccDPDS 'dpds'
 #endif
+
+Sound::~Sound()
+{
+	Uninit();
+}
 #ifndef _XBOX //Little-Endian
 #define fourccRIFF 'FFIR'
 #define fourccDATA 'atad'
@@ -18,7 +23,7 @@
 #endif
 
 //=============================================================================
-// ‰Šú‰»
+// åˆæœŸåŒ–
 //=============================================================================
 HRESULT Sound::Init()
 {
@@ -29,28 +34,27 @@ HRESULT Sound::Init()
 	DWORD  dwChunkPosition;
 	DWORD  filetype;
 
-	// COM‚Ì‰Šú‰»
+	// COMã®åˆæœŸåŒ–
 	hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
 	if (FAILED(hr)) {
-		CoUninitialize();
-		return -1;
+		return hr;
 	}
+	m_IsComInitialized = true;
 
 	/**** Create XAudio2 ****/
-	hr = XAudio2Create(&m_pXAudio2, 0);		// ‘æ“ñˆø”‚Í¤“®ìƒtƒ‰ƒO ƒfƒoƒbƒOƒ‚[ƒh‚Ìw’è(Œ»İ‚Í–¢g—p‚È‚Ì‚Å0‚É‚·‚é)
-	//hr=XAudio2Create(&g_pXAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);		// ‘æOˆø”‚ÍAwindows‚Å‚Í–³‹
+	hr = XAudio2Create(&m_pXAudio2, 0);		// ç¬¬äºŒå¼•æ•°ã¯ï½¤å‹•ä½œãƒ•ãƒ©ã‚° ãƒ‡ãƒãƒƒã‚°ãƒ¢ãƒ¼ãƒ‰ã®æŒ‡å®š(ç¾åœ¨ã¯æœªä½¿ç”¨ãªã®ã§0ã«ã™ã‚‹)
+	//hr=XAudio2Create(&g_pXAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);		// ç¬¬ä¸‰å¼•æ•°ã¯ã€windowsã§ã¯ç„¡è¦–
 	if (FAILED(hr)) {
-		CoUninitialize();
-		return -1;
+		Uninit();
+		return hr;
 	}
 
 	/**** Create Mastering Voice ****/
-	hr = m_pXAudio2->CreateMasteringVoice(&m_pMasteringVoice);			// ¡‰ñ‚Í‚o‚b‚ÌƒfƒtƒHƒ‹ƒgİ’è‚É”C‚¹‚Ä‚¢‚é
-	/*, XAUDIO2_DEFAULT_CHANNELS, XAUDIO2_DEFAULT_SAMPLERATE, 0, 0, NULL*/		// –{“–‚UŒÂ‚Ìˆø”‚ğ‚Á‚Ä‚¢‚é
+	hr = m_pXAudio2->CreateMasteringVoice(&m_pMasteringVoice);			// ä»Šå›ã¯ï¼°ï¼£ã®ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆè¨­å®šã«ä»»ã›ã¦ã„ã‚‹
+	/*, XAUDIO2_DEFAULT_CHANNELS, XAUDIO2_DEFAULT_SAMPLERATE, 0, 0, NULL*/		// æœ¬å½“ï¼–å€‹ã®å¼•æ•°ã‚’æŒã£ã¦ã„ã‚‹
 	if (FAILED(hr)) {
-		if (m_pXAudio2)	m_pXAudio2->Release();
-		CoUninitialize();
-		return -1;
+		Uninit();
+		return hr;
 	}
 
 	/**** Initalize Sound ****/
@@ -62,16 +66,25 @@ HRESULT Sound::Init()
 		hFile = CreateFileA(m_param[i].filename, GENERIC_READ, FILE_SHARE_READ, NULL,
 			OPEN_EXISTING, 0, NULL);
 		if (hFile == INVALID_HANDLE_VALUE) {
-			return HRESULT_FROM_WIN32(GetLastError());
+			hr = HRESULT_FROM_WIN32(GetLastError());
+			Uninit();
+			return hr;
 		}
 		if (SetFilePointer(hFile, 0, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER) {
-			return HRESULT_FROM_WIN32(GetLastError());
+			hr = HRESULT_FROM_WIN32(GetLastError());
+			CloseHandle(hFile);
+			Uninit();
+			return hr;
 		}
 
 		//check the file type, should be fourccWAVE or 'XWMA'
 		FindChunk(hFile, fourccRIFF, dwChunkSize, dwChunkPosition);
 		ReadChunkData(hFile, &filetype, sizeof(DWORD), dwChunkPosition);
-		if (filetype != fourccWAVE)		return S_FALSE;
+		if (filetype != fourccWAVE) {
+			CloseHandle(hFile);
+			Uninit();
+			return S_FALSE;
+		}
 
 		FindChunk(hFile, fourccFMT, dwChunkSize, dwChunkPosition);
 		ReadChunkData(hFile, &m_wfx[i], dwChunkSize, dwChunkPosition);
@@ -83,7 +96,7 @@ HRESULT Sound::Init()
 
 		CloseHandle(hFile);
 
-		// 	ƒTƒuƒ~ƒbƒgƒ{ƒCƒX‚Å—˜—p‚·‚éƒTƒuƒ~ƒbƒgƒoƒbƒtƒ@‚Ìİ’è
+		// 	ã‚µãƒ–ãƒŸãƒƒãƒˆãƒœã‚¤ã‚¹ã§åˆ©ç”¨ã™ã‚‹ã‚µãƒ–ãƒŸãƒƒãƒˆãƒãƒƒãƒ•ã‚¡ã®è¨­å®š
 		m_buffer[i].AudioBytes = dwChunkSize;
 		m_buffer[i].pAudioData = m_DataBuffer[i];
 		m_buffer[i].Flags = XAUDIO2_END_OF_STREAM;
@@ -92,14 +105,21 @@ HRESULT Sound::Init()
 		else
 			m_buffer[i].LoopCount = 0;
 
-		m_pXAudio2->CreateSourceVoice(&m_pSourceVoice[i], &(m_wfx[i].Format));
+		hr = m_pXAudio2->CreateSourceVoice(
+			&m_pSourceVoice[i],
+			&(m_wfx[i].Format)
+		);
+		if (FAILED(hr)) {
+			Uninit();
+			return hr;
+		}
 	}
 
 	return hr;
 }
 
 //=============================================================================
-// ŠJ•úˆ—
+// é–‹æ”¾å‡¦ç†
 //=============================================================================
 void Sound::Uninit(void)
 {
@@ -109,24 +129,44 @@ void Sound::Uninit(void)
 		{
 			m_pSourceVoice[i]->Stop(0);
 			m_pSourceVoice[i]->FlushSourceBuffers();
-			m_pSourceVoice[i]->DestroyVoice();			// ƒI[ƒfƒBƒIƒOƒ‰ƒt‚©‚çƒ\[ƒXƒ{ƒCƒX‚ğíœ
-			delete[]  m_DataBuffer[i];
+			m_pSourceVoice[i]->DestroyVoice();			// ã‚ªãƒ¼ãƒ‡ã‚£ã‚ªã‚°ãƒ©ãƒ•ã‹ã‚‰ã‚½ãƒ¼ã‚¹ãƒœã‚¤ã‚¹ã‚’å‰Šé™¤
+			m_pSourceVoice[i] = nullptr;
 		}
+
+		delete[] m_DataBuffer[i];
+		m_DataBuffer[i] = nullptr;
 	}
 
-	m_pMasteringVoice->DestroyVoice();
+	if (m_pMasteringVoice)
+	{
+		m_pMasteringVoice->DestroyVoice();
+		m_pMasteringVoice = nullptr;
+	}
 
-	if (m_pXAudio2) m_pXAudio2->Release();
+	if (m_pXAudio2)
+	{
+		m_pXAudio2->Release();
+		m_pXAudio2 = nullptr;
+	}
 
-	// COM‚Ì”jŠü
-	CoUninitialize();
+	// COMã®ç ´æ£„
+	if (m_IsComInitialized)
+	{
+		CoUninitialize();
+		m_IsComInitialized = false;
+	}
 }
 
 //=============================================================================
-// Ä¶
+// å†ç”Ÿ
 //=============================================================================
 void Sound::Play(SOUND_LABEL label)
 {
+	if (m_pXAudio2 == nullptr)
+	{
+		return;
+	}
+
 	IXAudio2SourceVoice*& pSV = m_pSourceVoice[(int)label];
 
 	if (pSV != nullptr)
@@ -135,17 +175,32 @@ void Sound::Play(SOUND_LABEL label)
 		pSV = nullptr;
 	}
 
-	// ƒ\[ƒXƒ{ƒCƒXì¬
-	m_pXAudio2->CreateSourceVoice(&pSV, &(m_wfx[(int)label].Format));
-	pSV->SubmitSourceBuffer(&(m_buffer[(int)label]));	// ƒ{ƒCƒXƒLƒ…[‚ÉV‚µ‚¢ƒI[ƒfƒBƒIƒoƒbƒtƒ@[‚ğ’Ç‰Á
+	// ã‚½ãƒ¼ã‚¹ãƒœã‚¤ã‚¹ä½œæˆ
+	HRESULT hr = m_pXAudio2->CreateSourceVoice(
+		&pSV,
+		&(m_wfx[(int)label].Format)
+	);
+	if (FAILED(hr) || pSV == nullptr)
+	{
+		pSV = nullptr;
+		return;
+	}
 
-	// Ä¶
+	hr = pSV->SubmitSourceBuffer(&(m_buffer[(int)label]));
+	if (FAILED(hr))
+	{
+		pSV->DestroyVoice();
+		pSV = nullptr;
+		return;
+	}
+
+	// å†ç”Ÿ
 	pSV->Start(0);
 
 }
 
 //=============================================================================
-// ’â~
+// åœæ­¢
 //=============================================================================
 void Sound::Stop(SOUND_LABEL label)
 {
@@ -160,18 +215,21 @@ void Sound::Stop(SOUND_LABEL label)
 }
 
 //=============================================================================
-// ˆê’â~
+// ä¸€æ™‚åœæ­¢
 //=============================================================================
 void Sound::Resume(SOUND_LABEL label)
 {
 	IXAudio2SourceVoice*& pSV = m_pSourceVoice[(int)label];
-	pSV->Start();
+	if (pSV != nullptr)
+	{
+		pSV->Start();
+	}
 }
 
 
 
 //=============================================================================
-// ƒ†[ƒeƒBƒŠƒeƒBŠÖ”ŒQ
+// ãƒ¦ãƒ¼ãƒ†ã‚£ãƒªãƒ†ã‚£é–¢æ•°ç¾¤
 //=============================================================================
 HRESULT Sound::FindChunk(HANDLE hFile, DWORD fourcc, DWORD& dwChunkSize, DWORD& dwChunkDataPosition)
 {

@@ -1,57 +1,64 @@
-#pragma once
+ï»¿#pragma once
 
 #include <xaudio2.h>
 
-// ƒTƒEƒ“ƒhƒtƒ@ƒCƒ‹
+// ã‚µã‚¦ãƒ³ãƒ‰ãƒ•ã‚¡ã‚¤ãƒ«
 typedef enum
 {
-	SOUND_LABEL_BGM000 = 0,		// ƒTƒ“ƒvƒ‹BGM
-	SOUND_LABEL_SE000,		// ƒTƒ“ƒvƒ‹SE
-	SOUND_LABEL_SE001,		// ƒTƒ“ƒvƒ‹SE
+	SOUND_LABEL_BGM000 = 0,		// ã‚µãƒ³ãƒ—ãƒ«BGM
+	SOUND_LABEL_SE000,		// ã‚µãƒ³ãƒ—ãƒ«SE
+	SOUND_LABEL_SE001,		// ã‚µãƒ³ãƒ—ãƒ«SE
 
 	SOUND_LABEL_MAX,
 } SOUND_LABEL;
 
 class Sound {
 private:
-	// ƒpƒ‰ƒ[ƒ^\‘¢‘Ì
+	// ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿æ§‹é€ ä½“
 	typedef struct
 	{
-		LPCSTR filename;	// ‰¹ºƒtƒ@ƒCƒ‹‚Ü‚Å‚ÌƒpƒX‚ðÝ’è
-		bool bLoop;			// true‚Åƒ‹[ƒvB’ÊíBGM‚ÍtureASE‚ÍfalseB
+		LPCSTR filename;	// éŸ³å£°ãƒ•ã‚¡ã‚¤ãƒ«ã¾ã§ã®ãƒ‘ã‚¹ã‚’è¨­å®š
+		bool bLoop;			// trueã§ãƒ«ãƒ¼ãƒ—ã€‚é€šå¸¸BGMã¯tureã€SEã¯falseã€‚
 	} PARAM;
 
 	PARAM m_param[SOUND_LABEL_MAX] =
 	{
-		{"assets/BGM/BGM.wav", true},	// ƒTƒ“ƒvƒ‹BGMiƒ‹[ƒv‚³‚¹‚é‚Ì‚ÅtrueÝ’èj
+		{"assets/BGM/BGM.wav", true},	// ã‚µãƒ³ãƒ—ãƒ«BGMï¼ˆãƒ«ãƒ¼ãƒ—ã•ã›ã‚‹ã®ã§trueè¨­å®šï¼‰
 		{"assets/SE/shot.wav", false},
 		{"assets/SE/Cup_In.wav", false},
 	};
 
 	IXAudio2* m_pXAudio2 = NULL;
 	IXAudio2MasteringVoice* m_pMasteringVoice = NULL;
-	IXAudio2SourceVoice* m_pSourceVoice[SOUND_LABEL_MAX];
-	WAVEFORMATEXTENSIBLE m_wfx[SOUND_LABEL_MAX]; // WAVƒtƒH[ƒ}ƒbƒg
+	IXAudio2SourceVoice* m_pSourceVoice[SOUND_LABEL_MAX]{};
+	WAVEFORMATEXTENSIBLE m_wfx[SOUND_LABEL_MAX]; // WAVãƒ•ã‚©ãƒ¼ãƒžãƒƒãƒˆ
 	XAUDIO2_BUFFER m_buffer[SOUND_LABEL_MAX];
-	BYTE* m_DataBuffer[SOUND_LABEL_MAX];
+	BYTE* m_DataBuffer[SOUND_LABEL_MAX]{};
+	bool m_IsComInitialized = false;
 
 	HRESULT FindChunk(HANDLE, DWORD, DWORD&, DWORD&);
 	HRESULT ReadChunkData(HANDLE, void*, DWORD, DWORD);
 
 public:
-	// ƒQ[ƒ€ƒ‹[ƒvŠJŽn‘O‚ÉŒÄ‚Ño‚·ƒTƒEƒ“ƒh‚Ì‰Šú‰»ˆ—
+	Sound() = default;
+	~Sound();
+
+	Sound(const Sound&) = delete;
+	Sound& operator=(const Sound&) = delete;
+
+	// ã‚²ãƒ¼ãƒ ãƒ«ãƒ¼ãƒ—é–‹å§‹å‰ã«å‘¼ã³å‡ºã™ã‚µã‚¦ãƒ³ãƒ‰ã®åˆæœŸåŒ–å‡¦ç†
 	HRESULT Init(void);
 
-	// ƒQ[ƒ€ƒ‹[ƒvI—¹Œã‚ÉŒÄ‚Ño‚·ƒTƒEƒ“ƒh‚Ì‰ð•úˆ—
+	// ã‚²ãƒ¼ãƒ ãƒ«ãƒ¼ãƒ—çµ‚äº†å¾Œã«å‘¼ã³å‡ºã™ã‚µã‚¦ãƒ³ãƒ‰ã®è§£æ”¾å‡¦ç†
 	void Uninit(void);
 
-	// ˆø”‚ÅŽw’è‚µ‚½ƒTƒEƒ“ƒh‚ðÄ¶‚·‚é
+	// å¼•æ•°ã§æŒ‡å®šã—ãŸã‚µã‚¦ãƒ³ãƒ‰ã‚’å†ç”Ÿã™ã‚‹
 	void Play(SOUND_LABEL label);
 
-	// ˆø”‚ÅŽw’è‚µ‚½ƒTƒEƒ“ƒh‚ð’âŽ~‚·‚é
+	// å¼•æ•°ã§æŒ‡å®šã—ãŸã‚µã‚¦ãƒ³ãƒ‰ã‚’åœæ­¢ã™ã‚‹
 	void Stop(SOUND_LABEL label);
 
-	// ˆø”‚ÅŽw’è‚µ‚½ƒTƒEƒ“ƒh‚ÌÄ¶‚ðÄŠJ‚·‚é
+	// å¼•æ•°ã§æŒ‡å®šã—ãŸã‚µã‚¦ãƒ³ãƒ‰ã®å†ç”Ÿã‚’å†é–‹ã™ã‚‹
 	void Resume(SOUND_LABEL label);
 
 };

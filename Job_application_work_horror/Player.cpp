@@ -51,6 +51,11 @@ void Player::Init()
 
 void Player::Update()
 {
+    if (!m_CanControl)
+    {
+        return;
+    }
+
     Camera* cam = Core::Game::GetInstance()->GetCamera();
 
     float yaw = cam->GetCameraDirection();
@@ -111,7 +116,7 @@ void Player::Update()
         }
     }
 
-    // �����d��ON�Ȃ�d�r����炷
+   
     if (m_FlashLightOn)
     {
         m_Battery -= 0.02f;
@@ -123,14 +128,14 @@ void Player::Update()
         }
     }
 
-    // �`�J�`�J�p
+	// バッテリー残量が20%以下の時に点滅するようにする
     bool visibleLight = m_FlashLightOn;
 
     if (m_FlashLightOn && m_Battery <= 20.0f)
     {
         m_FlickerTimer++;
 
-        // 10�t���[�����Ƃɖ��邢/�Â���؂�ւ�
+		// 10フレームごとに点滅するようにする
         if ((m_FlickerTimer / 10) % 2 == 0)
         {
             visibleLight = true;
@@ -153,20 +158,20 @@ void Player::Update()
 
     if (visibleLight)
     {
-        // ���C�gON��
+        // ライトをつける時の設定
         light.Diffuse = Color(m_LightDiffuseR, m_LightDiffuseG, m_LightDiffuseB, 1.0f);
         light.Ambient = Color(m_LightAmbientR, m_LightAmbientG, m_LightAmbientB, 1.0f);
     }
     else
     {
-        // ���C�gOFF���E�`�J�`�J���̈Â����
+		// ライトを消す時の設定（暗くする）
         light.Diffuse = Color(m_DarkDiffuseR, m_DarkDiffuseG, m_DarkDiffuseB, 1.0f);
         light.Ambient = Color(m_DarkAmbientR, m_DarkAmbientG, m_DarkAmbientB, 1.0f);
     }
 
     Renderer::SetLight(light);
 
-    // �J��������
+	// カメラの位置と向きを更新
     Vector3 eyePos = m_Position;
     eyePos.y += m_CameraHeightOffset;
 
@@ -201,18 +206,19 @@ void Player::Update()
         cam->SetTarget(target);
     }
 
+    /*
 	// バッテリーを回復するためのデバッグ用のキー入力
     if (Input::GetKeyTrigger(VK_B))
     {
         AddBattery(50.0f);
-    }
+    }*/
 }
 
 void Player::Draw(Camera* cam)
 {
     cam->SetCamera();
 
-    // ��l�̂̂Ƃ��͎����̃��f����`�悵�Ȃ�
+	// FPSモードの時はプレイヤーのモデルを描画しない(仮作成）
     if (m_IsFPS) return;
 
     Matrix r = Matrix::CreateFromYawPitchRoll(

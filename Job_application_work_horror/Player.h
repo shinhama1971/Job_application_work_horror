@@ -57,7 +57,7 @@ private:
     // ===== カメラモード =====
     bool m_IsFPS = true;                    // true: 一人称, false: 三人称
     bool m_SpawnAdjusted = false;           // スポーン位置調整フラグ
-   
+    bool m_CanControl = true;
 public:
     void Init() override;
     void Update() override;
@@ -87,4 +87,14 @@ public:
     }
     
     bool IsFPS() const { return m_IsFPS; }
+
+    void SetCanControl(bool enable)
+    {
+        m_CanControl = enable;
+    }
+
+    bool CanControl() const
+    {
+        return m_CanControl;
+    }
 };

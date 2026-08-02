@@ -1,100 +1,103 @@
-#include "ResultScene.h"
+ï»¿#include "ResultScene.h"
 #include "Game.h"
 #include "Input.h"
 #include"Texture2D.h"
 int ResultScene::s_Score = 0;
-int ResultScene::s_NextScene = TITLE; // ƒfƒtƒHƒ‹ƒg‚Íƒ^ƒCƒgƒ‹
-// ƒRƒ“ƒXƒgƒ‰ƒNƒ^
+int ResultScene::s_NextScene = TITLE; // ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã¯ã‚¿ã‚¤ãƒˆãƒ«
+// ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
 ResultScene::ResultScene()
 {
 	Init();
 }
 
-// ƒfƒXƒgƒ‰ƒNƒ^
+// ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
 ResultScene::~ResultScene()
 {
 	Uninit();
 }
 
-// ‰Šú‰»
+// åˆæœŸåŒ–
 void ResultScene::Init()
 {
-	//”wŒi‰æ‘œƒIƒuƒWƒFƒNƒg‚ğì¬
+	//èƒŒæ™¯ç”»åƒã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã‚’ä½œæˆ
 	Texture2D* pt = Core::Game::GetInstance()->AddObject<Texture2D>();
-	pt->SetTexture("assets/texture/background2.png");//‰æ‘œ‚ğw’è
-	pt->SetScale(1280.0f, 720.0f, 0.0f);//‘å‚«‚³‚ğw’è
+	pt->SetTexture("assets/texture/background2.png");//ç”»åƒã‚’æŒ‡å®š
+	pt->SetScale(1280.0f, 720.0f, 0.0f);//å¤§ãã•ã‚’æŒ‡å®š
 	m_MySceneObjects.emplace_back(pt);
 	
-	//ƒŠƒUƒ‹ƒg•¶š—ñƒIƒuƒWƒFƒNƒgì¬
+	//ãƒªã‚¶ãƒ«ãƒˆæ–‡å­—åˆ—ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆä½œæˆ
 	Texture2D* pt2 = Core::Game::GetInstance()->AddObject<Texture2D>();
-	pt2->SetTexture("assets/texture/resultString.png");//‰æ‘œ‚ğw’è
-	pt2->SetPosition(300.0f, 0.0f, 0.0f);//ˆÊ’u‚ğw’è
-	pt2->SetScale(700.0f, 100.0f, 0.0f);//‘å‚«‚³‚ğw’è
-	pt2->SetUV(1, 1, 1, 13);//UV‚ğw’è
+	pt2->SetTexture("assets/texture/resultString.png");//ç”»åƒã‚’æŒ‡å®š
+	pt2->SetPosition(300.0f, 0.0f, 0.0f);//ä½ç½®ã‚’æŒ‡å®š
+	pt2->SetScale(700.0f, 100.0f, 0.0f);//å¤§ãã•ã‚’æŒ‡å®š
+	pt2->SetUV(1, 1, 1, 13);//UVã‚’æŒ‡å®š
 	m_MySceneObjects.emplace_back(pt2);
 
-	//lƒIƒuƒWƒFƒNƒg‚ğì¬
+	//äººã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã‚’ä½œæˆ
 	Texture2D* pt3 = Core::Game::GetInstance()->AddObject<Texture2D>();
-	pt3->SetTexture("assets/texture/golf_jou_man.png");//‰æ‘œ‚ğw’è
-	pt3->SetPosition(-300.0f, 0.0f, 0.0f);//ˆÊ’u‚ğw’è
-	pt3->SetScale(361.0f, 400.0f, 0.0f);//‘å‚«‚³‚ğw’è
+	pt3->SetTexture("assets/texture/golf_jou_man.png");//ç”»åƒã‚’æŒ‡å®š
+	pt3->SetPosition(-300.0f, 0.0f, 0.0f);//ä½ç½®ã‚’æŒ‡å®š
+	pt3->SetScale(361.0f, 400.0f, 0.0f);//å¤§ãã•ã‚’æŒ‡å®š
 	m_MySceneObjects.emplace_back(pt3);
 	SetScore(s_Score);
 	m_Sound.Init();
 	m_Sound.Play(SOUND_LABEL_SE001);
 }
 
-// XV
+// æ›´æ–°
 void ResultScene::Update()
 {
-	// ƒGƒ“ƒ^[ƒL[‚ğ‰Ÿ‚µ‚Äƒ^ƒCƒgƒ‹‚Ö
+	// ã‚¨ãƒ³ã‚¿ãƒ¼ã‚­ãƒ¼ã‚’æŠ¼ã—ã¦ã‚¿ã‚¤ãƒˆãƒ«ã¸
 	if (Input::GetKeyTrigger(VK_RETURN))
 	{
-		//Core::Game::GetInstance()->ChangeScene(TITLE);
-		Core::Game::GetInstance()->ChangeScene((SceneName)s_NextScene);
+		Core::Game::GetInstance()->RequestSceneChange(
+			static_cast<SceneName>(s_NextScene)
+		);
 	}
 }
 
-// I—¹ˆ—
+// çµ‚äº†å‡¦ç†
 void ResultScene::Uninit()
 {
-	// ‚±‚ÌƒV[ƒ“‚ÌƒIƒuƒWƒFƒNƒg‚ğíœ‚·‚é
+	m_Sound.Uninit();
+
+	// ã“ã®ã‚·ãƒ¼ãƒ³ã®ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã‚’å‰Šé™¤ã™ã‚‹
 	for (auto& o : m_MySceneObjects) {
 		Core::Game::GetInstance()->DeleteObject(o);
 	}
 	m_MySceneObjects.clear();
 }
 
-// ƒXƒRƒAİ’è
+// ã‚¹ã‚³ã‚¢è¨­å®š
 void ResultScene::SetScore(int c)
 {
-	//ƒŠƒUƒ‹ƒg•¶š—ñƒIƒuƒWƒFƒNƒg
+	//ãƒªã‚¶ãƒ«ãƒˆæ–‡å­—åˆ—ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆ
 	Texture2D* stringObj = dynamic_cast<Texture2D*>(m_MySceneObjects[1]);
 	switch (c)
 	{
 	case -4:
-			stringObj->SetUV(1, 2, 1, 13);//-4 ƒRƒ“ƒhƒ‹
+			stringObj->SetUV(1, 2, 1, 13);//-4 ã‚³ãƒ³ãƒ‰ãƒ«
 			break;
 	case -3:
-		stringObj->SetUV(1, 3, 1, 13);//-3 ƒAƒ‹ƒoƒgƒƒX
+		stringObj->SetUV(1, 3, 1, 13);//-3 ã‚¢ãƒ«ãƒãƒˆãƒ­ã‚¹
 		break;
 	case -2:
-		stringObj->SetUV(1, 4, 1, 13);//-2 ƒC[ƒOƒ‹
+		stringObj->SetUV(1, 4, 1, 13);//-2 ã‚¤ãƒ¼ã‚°ãƒ«
 		break;
 	case -1:
-		stringObj->SetUV(1, 5, 1, 13);//-1 ƒo[ƒfƒB
+		stringObj->SetUV(1, 5, 1, 13);//-1 ãƒãƒ¼ãƒ‡ã‚£
 		break;
 	case 0:
-		stringObj->SetUV(1, 6, 1, 13);//0 ƒp[
+		stringObj->SetUV(1, 6, 1, 13);//0 ãƒ‘ãƒ¼
 		break;
 	case 1:
-		stringObj->SetUV(1, 7, 1, 13);//+1 ƒ{ƒM[
+		stringObj->SetUV(1, 7, 1, 13);//+1 ãƒœã‚®ãƒ¼
 		break;
 	case 2:
-		stringObj->SetUV(1, 8, 1, 13);//+2 ƒ_ƒuƒ‹ƒ{ƒM[
+		stringObj->SetUV(1, 8, 1, 13);//+2 ãƒ€ãƒ–ãƒ«ãƒœã‚®ãƒ¼
 		break;
 	case 3:
-		stringObj->SetUV(1, 9, 1, 13);//+3 ƒgƒŠƒvƒ‹ƒ{ƒM[
+		stringObj->SetUV(1, 9, 1, 13);//+3 ãƒˆãƒªãƒ—ãƒ«ãƒœã‚®ãƒ¼
 		break;
 	case 4:
 		stringObj->SetUV(1, 10, 1, 13);//+4

@@ -175,6 +175,7 @@
     <ClCompile Include="inputManager.cpp" />
     <ClCompile Include="Item.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MovieTrigger.cpp" />
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="Pole.cpp" />
@@ -183,6 +184,7 @@
     <ClCompile Include="RenderTexture.cpp" />
     <ClCompile Include="ResultScene.cpp" />
     <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="ScreenDustOverlay.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="ShadowMan.cpp" />
     <ClCompile Include="sound.cpp" />
@@ -216,6 +218,7 @@
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="MeshRenderer.h" />
+    <ClInclude Include="MovieTrigger.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="Pole.h" />
@@ -224,6 +227,7 @@
     <ClInclude Include="RenderTexture.h" />
     <ClInclude Include="ResultScene.h" />
     <ClInclude Include="Scene.h" />
+    <ClInclude Include="ScreenDustOverlay.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="ShadowMan.h" />
     <ClInclude Include="sound.h" />
@@ -242,8 +246,8 @@
     <FxCompile Include="PS_HorrorDust.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\common.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>

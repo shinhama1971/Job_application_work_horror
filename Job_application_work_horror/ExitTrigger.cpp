@@ -1,4 +1,4 @@
-#include "ExitTrigger.h"
+﻿#include "ExitTrigger.h"
 #include "Game.h"
 #include "Player.h"
 
@@ -23,13 +23,13 @@ void ExitTrigger::Update()
 
     if (distance <= m_Radius)
     {
-        Core::Game::GetInstance()->ChangeScene(RESULT);
+        Core::Game::GetInstance()->RequestSceneChange(RESULT);
     }
 }
 
 void ExitTrigger::Draw(Camera* cam)
 {
-    // 今は何も描画しない
+    // 莉翫・菴輔ｂ謠冗判縺励↑縺・
 }
 
 void ExitTrigger::Uninit()

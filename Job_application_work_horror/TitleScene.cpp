@@ -1,51 +1,51 @@
-#include "TitleScene.h"
+ï»¿#include "TitleScene.h"
 #include "Game.h"
 #include "Input.h"
 #include "Texture2D.h"
-// ƒRƒ“ƒXƒgƒ‰ƒNƒ^
+// ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
 TitleScene::TitleScene()
 {
 	Init();
 }
 
-// ƒfƒXƒgƒ‰ƒNƒ^
+// ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
 TitleScene::~TitleScene()
 {
 	Uninit();
 }
 
-// ‰Šú‰»
+// åˆæœŸåŒ–
 void TitleScene::Init()
 {
 	Texture2D* pt = Core::Game::GetInstance()->AddObject<Texture2D>();
-	pt->SetTexture("assets/texture/background1.png");//‰æ‘œ‚ðŽw’è
-	pt->SetPosition(0.0f, 0.0f, 1.0f);//ˆÊ’u‚ðŽw’è
-	pt->SetRotation(0.0f, 0.0f, 0.0f);//Šp“x‚ðŽw’è
-	pt->SetScale(1280.0f, 720.0f, 0.0f);//‘å‚«‚³‚ðŽw’è
+	pt->SetTexture("assets/texture/background1.png");//ç”»åƒã‚’æŒ‡å®š
+	pt->SetPosition(0.0f, 0.0f, 1.0f);//ä½ç½®ã‚’æŒ‡å®š
+	pt->SetRotation(0.0f, 0.0f, 0.0f);//è§’åº¦ã‚’æŒ‡å®š
+	pt->SetScale(1280.0f, 720.0f, 0.0f);//å¤§ãã•ã‚’æŒ‡å®š
 	m_MySceneObjects.emplace_back(pt);
 
 	Texture2D* pt1 = Core::Game::GetInstance()->AddObject<Texture2D>();
-	pt1->SetTexture("assets/texture/titlerogo.png");//‰æ‘œ‚ðŽw’è
-	pt1->SetPosition(0.0f, 0.0f, 0.0f);//ˆÊ’u‚ðŽw’è
-	pt1->SetRotation(0.0f, 0.0f, 0.0f);//Šp“x‚ðŽw’è
-	pt1->SetScale(580.0f, 360.0f, 0.0f);//‘å‚«‚³‚ðŽw’è
+	pt1->SetTexture("assets/texture/titlerogo.png");//ç”»åƒã‚’æŒ‡å®š
+	pt1->SetPosition(0.0f, 0.0f, 0.0f);//ä½ç½®ã‚’æŒ‡å®š
+	pt1->SetRotation(0.0f, 0.0f, 0.0f);//è§’åº¦ã‚’æŒ‡å®š
+	pt1->SetScale(580.0f, 360.0f, 0.0f);//å¤§ãã•ã‚’æŒ‡å®š
 	m_MySceneObjects.emplace_back(pt1);
 }
 
-// XV
+// æ›´æ–°
 void TitleScene::Update()
 {
-	// ƒGƒ“ƒ^[ƒL[‚ð‰Ÿ‚µ‚ÄƒXƒe[ƒW1‚Ö
+	// ã‚¨ãƒ³ã‚¿ãƒ¼ã‚­ãƒ¼ã‚’æŠ¼ã—ã¦ã‚¹ãƒ†ãƒ¼ã‚¸1ã¸
 	if (Input::GetKeyTrigger(VK_RETURN))
 	{
-		Core::Game::GetInstance()->ChangeScene(STAGE);
+		Core::Game::GetInstance()->RequestSceneChange(STAGE);
 	}
 }
 
-// I—¹ˆ—
+// çµ‚äº†å‡¦ç†
 void TitleScene::Uninit()
 {
-	// ‚±‚ÌƒV[ƒ“‚ÌƒIƒuƒWƒFƒNƒg‚ðíœ‚·‚é
+	// ã“ã®ã‚·ãƒ¼ãƒ³ã®ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã‚’å‰Šé™¤ã™ã‚‹
 	for (auto& o : m_MySceneObjects) {
 		Core::Game::GetInstance()->DeleteObject(o);
 	}

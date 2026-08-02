@@ -43,7 +43,7 @@ void Input::Release()
 	vibration.wLeftMotorSpeed = 0;
 	vibration.wRightMotorSpeed = 0;
 	XInputSetState(0, &vibration);
-
+	XInputSetState(1, &vibration);
 	//‰ð•ú
 	if (m_Instance)
 	{

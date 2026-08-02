@@ -26,6 +26,17 @@ private:
     float m_CameraDirection = 0.0f;
     float m_CameraPitch = 0.0f;
 
+    bool m_IsMovie = false;
+    float m_MovieTimer = 0.0f;
+    float m_MovieDuration = 2.0f;
+
+    DirectX::SimpleMath::Vector3 m_MovieStartPos;
+    DirectX::SimpleMath::Vector3 m_MovieEndPos;
+
+    DirectX::SimpleMath::Vector3 m_MovieStartTarget;
+    DirectX::SimpleMath::Vector3 m_MovieEndTarget;
+
+
 public:
     void Init();
     void Update();
@@ -52,6 +63,17 @@ public:
     float GetCameraPitch() const
     {
         return m_CameraPitch;
+    }
+
+    void StartMovieLook(
+        const DirectX::SimpleMath::Vector3& endPos,
+        const DirectX::SimpleMath::Vector3& endTarget,
+        float duration
+    );
+
+    bool IsMovie() const
+    {
+        return m_IsMovie;
     }
 
     DirectX::SimpleMath::Vector3 GetForward() const;

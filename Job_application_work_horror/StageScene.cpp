@@ -1,4 +1,4 @@
-#include "StageScene.h"
+ï»¿#include "StageScene.h"
 #include "Game.h"
 #include "Input.h"
 
@@ -10,7 +10,8 @@
 #include "Door.h"
 #include "ExitTrigger.h"
 #include "BatteryItem.h"
-
+#include "MovieTrigger.h"
+#include "ScreenDustOverlay.h"
 #include <SimpleMath.h>
 
 using namespace DirectX::SimpleMath;
@@ -29,23 +30,23 @@ void StageScene::Init()
 {
     Core::Game* game = Core::Game::GetInstance();
 
-    // ƒvƒŒƒCƒ„[
+    // ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼
     Player* player = game->CreateObj<Player>("Player");
     player->SetPosition(Vector3(0.0f, -80.0f, 0.0f));
 
-    // ’n–Ê
+    // åœ°é¢
     Ground* ground = game->CreateObj<Ground>("Ground");
     ground->SetPosition(0.0f, -100.0f, 0.0f);
     ground->SetScale(20.0f, 1.0f, 20.0f);
 
-    // •Ç
+    // å£
     Wall* wall1 = game->CreateObj<Wall>("Wall1");
     wall1->SetPosition(0.0f, -90.0f, 200.0f);
 
     Wall* wall2 = game->CreateObj<Wall>("Wall2");
     wall2->SetPosition(200.0f, -90.0f, 0.0f);
 
-    // ƒAƒCƒeƒ€
+    // ã‚¢ã‚¤ãƒ†ãƒ 
     Item* item1 = game->CreateObj<Item>("Item1");
     item1->SetPosition(0.0f, -70.0f, -100.0f);
 
@@ -55,30 +56,66 @@ void StageScene::Init()
     Item* item3 = game->CreateObj<Item>("Item3");
     item3->SetPosition(-60.0f, -95.0f, 200.0f);
 
+    m_movieTrigger = std::make_unique<MovieTrigger>();
+    m_movieTrigger->SetPosition(DirectX::SimpleMath::Vector3(0, 0, 30));
+    m_movieTrigger->SetSize(DirectX::SimpleMath::Vector3(0.0f, -85.0f, 0.0f));
     // UI
     Texture2D* ui = game->CreateObj<Texture2D>("UI_Back");
     ui->SetTexture("assets/texture/ui_back.png");
     ui->SetPosition(-475.0f, -300.0f, 0.0f);
     ui->SetScale(250.0f, 120.0f, 0.0f);
 
-    // ƒhƒA
+    // ãƒ‰ã‚¢
     Door* door = game->CreateObj<Door>("Door");
     door->SetPosition(0.0f, -100.0f, 40.0f);
 
-    // ƒS[ƒ‹
+    // ã‚´ãƒ¼ãƒ«
     ExitTrigger* exit = game->CreateObj<ExitTrigger>("ExitTrigger");
     exit->SetPosition(150.0f, -80.0f, 300.0f);
 
-    // ƒoƒbƒeƒŠ[
+    // ãƒãƒƒãƒ†ãƒªãƒ¼
     BatteryItem* battery = game->CreateObj<BatteryItem>("BatteryItem");
     battery->SetPosition(100.0f, -95.0f, 100.0f);
+
+    MovieTrigger* movie =
+        game->CreateObj<MovieTrigger>("MovieTrigger_01");
+    ScreenDustOverlay* crt =
+        game->CreateObj<ScreenDustOverlay>("CRTNoise");
+
+    crt->SetPower(0.7f);
+    crt->SetActive(false);
+
+    movie->SetPosition(DirectX::SimpleMath::Vector3(
+        0.0f,
+        -99.0f,
+        80.0f
+    ));
+
+    movie->SetSize(
+        DirectX::SimpleMath::Vector3(10.0f, 10.0f, 10.0f)
+    );
+
+    movie->SetPosition(Vector3(0.0f, -80.0f, 20.0f));
+    movie->SetSize(Vector3(20.0f, 30.0f, 20.0f));
+
+    movie->SetDuration(2.0f);
+    Texture2D* triggerMark =
+        game->CreateObj<Texture2D>("MovieTriggerMark");
+
+    triggerMark->SetTexture("assets/texture/ui_back.png");
+
+    // ã‚»ãƒ³ã‚µãƒ¼ã¨åŒã˜ä½ç½®
+    triggerMark->SetPosition(0.0f, -90.0f, 80.0f);
+
+    // å¤§ãã‚ã«è¡¨ç¤º
+    triggerMark->SetScale(50.0f, 50.0f, 1.0f);
 }
 
 void StageScene::Update()
 {
     if (Input::GetKeyTrigger(VK_RETURN))
     {
-        Core::Game::GetInstance()->ChangeScene(RESULT);
+        Core::Game::GetInstance()->RequestSceneChange(RESULT);
         return;
     }
 
@@ -87,7 +124,7 @@ void StageScene::Update()
 
     if (player != nullptr)
     {
-        // ‚±‚±‚ÅƒvƒŒƒCƒ„[î•ñ‚ðŽg‚¦‚é
+        // ã“ã“ã§ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼æƒ…å ±ã‚’ä½¿ãˆã‚‹
     }
 }
 
@@ -110,4 +147,5 @@ void StageScene::Uninit()
     game->DestroyObj("Door");
     game->DestroyObj("ExitTrigger");
     game->DestroyObj("BatteryItem");
+    game->DestroyObj("MovieTriggerMark");
 }

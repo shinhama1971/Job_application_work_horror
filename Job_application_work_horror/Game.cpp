@@ -72,6 +72,28 @@ namespace Core
                 return false;
             }
         );
+
+        if (m_Instance->m_PendingScene.has_value())
+        {
+            m_Instance->m_PendingObjectCommands.clear();
+
+            const SceneName nextScene =
+                m_Instance->m_PendingScene.value();
+
+            m_Instance->m_PendingScene.reset();
+            m_Instance->ChangeScene(nextScene);
+            return;
+        }
+
+        auto pendingCommands =
+            std::move(m_Instance->m_PendingObjectCommands);
+
+        m_Instance->m_PendingObjectCommands.clear();
+
+        for (auto& command : pendingCommands)
+        {
+            command();
+        }
     }
 
     void Game::Draw()
@@ -120,6 +142,16 @@ namespace Core
     Game* Core::Game::GetInstance()
     {
         return m_Instance;
+    }
+
+    void Game::RequestSceneChange(SceneName sName)
+    {
+        if (m_PendingScene.has_value())
+        {
+            return;
+        }
+
+        m_PendingScene = sName;
     }
 
     void Game::ChangeScene(SceneName sName)

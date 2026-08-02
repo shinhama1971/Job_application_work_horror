@@ -5,6 +5,9 @@
 #include <memory>
 #include <unordered_map>
 #include <string>
+#include <optional>
+#include <functional>
+#include <utility>
 
 #include "Camera.h"
 #include "Renderer.h"
@@ -33,7 +36,12 @@ namespace Core
         std::vector<std::unique_ptr<Object>> m_Objects;
         std::unordered_map<std::string, Object*> m_NamedObjects;
 
+        std::optional<SceneName> m_PendingScene;
+        std::vector<std::function<void()>> m_PendingObjectCommands;
+
         int m_ItemCount = 0;
+
+        void ChangeScene(SceneName sName);
 
     public:
         Game();
@@ -46,7 +54,7 @@ namespace Core
 
         static Game* GetInstance();
 
-        void ChangeScene(SceneName sName);
+        void RequestSceneChange(SceneName sName);
 
         void DeleteObject(Object* pt);
         void DestroyObj(const std::string& name);
@@ -59,6 +67,18 @@ namespace Core
             m_Objects.emplace_back(pt);
             pt->Init();
             return pt;
+        }
+
+        template<typename T, typename Setup>
+        void RequestAddObject(Setup&& setup)
+        {
+            m_PendingObjectCommands.emplace_back(
+                [this, setup = std::forward<Setup>(setup)]() mutable
+                {
+                    T* object = AddObject<T>();
+                    setup(*object);
+                }
+            );
         }
 
         template<typename T>

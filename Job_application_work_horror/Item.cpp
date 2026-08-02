@@ -1,4 +1,4 @@
-#include "Item.h"
+ï»¿#include "Item.h"
 #include "ShadowMan.h"
 
 using namespace DirectX::SimpleMath;
@@ -7,7 +7,7 @@ void Item::Init()
 {
     StaticMesh staticmesh;
 
-    // ¡‚ÍƒSƒ‹ƒtƒ{[ƒ‹‚Å‘ã—p
+    // ä»Šã¯ã‚´ãƒ«ãƒ•ãƒœãƒ¼ãƒ«ã§ä»£ç”¨
     std::u8string modelFile = u8"assets/model/golf_ball/golf_ball.obj";
     std::string texDirectory = "assets/model/golf_ball";
 
@@ -47,7 +47,7 @@ void Item::Init()
         m_Materials[i]->SetTexture(m_Textures[i].get());
     }
 
-    // Šm”F—p‚É‘å‚«‚­‚·‚é
+    // ç¢ºèªç”¨ã«å¤§ããã™ã‚‹
     m_Scale = Vector3(20.0f, 20.0f, 20.0f);
 }
 
@@ -55,7 +55,7 @@ void Item::Update()
 {
     if (m_IsCollected) return;
 
-    // ‰ñ“]
+    // å›è»¢
     m_Rotation.y += 0.03f;
 
     std::vector<Player*> players =
@@ -68,7 +68,7 @@ void Item::Update()
     Vector3 diff = player->GetPosition() - m_Position;
     float distance = diff.Length();
 
-    // ‹ß‚­‚É‚¢‚ÄEƒL[‚ğ‰Ÿ‚µ‚½‚çæ“¾
+    // è¿‘ãã«ã„ã¦Eã‚­ãƒ¼ã‚’æŠ¼ã—ãŸã‚‰å–å¾—
     if (distance <= m_GetDistance)
     {
         if (Input::GetKeyTrigger(VK_E))
@@ -76,17 +76,26 @@ void Item::Update()
             m_IsCollected = true;
             Core::Game::GetInstance()->AddItemCount();
 
-            // 1ŒÂ–Ú‚ÌƒAƒCƒeƒ€æ“¾‚¾‚¯l‰e‚ğo‚·
+            // 1å€‹ç›®ã®ã‚¢ã‚¤ãƒ†ãƒ å–å¾—æ™‚ã ã‘äººå½±ã‚’å‡ºã™
             if (Core::Game::GetInstance()->GetItemCount() == 1)
             {
-                ShadowMan* shadow =
-                    Core::Game::GetInstance()->AddObject<ShadowMan>();
-
-                shadow->SetPosition(
+                const Vector3 shadowPosition(
                     player->GetPosition().x,
                     player->GetPosition().y,
                     player->GetPosition().z - 80.0f
                 );
+
+                Core::Game::GetInstance()
+                    ->RequestAddObject<ShadowMan>(
+                        [shadowPosition](ShadowMan& shadow)
+                        {
+                            shadow.SetPosition(
+                                shadowPosition.x,
+                                shadowPosition.y,
+                                shadowPosition.z
+                            );
+                        }
+                    );
             }
 
             return;
