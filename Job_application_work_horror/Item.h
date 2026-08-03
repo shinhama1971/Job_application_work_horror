@@ -3,7 +3,9 @@
 #include "Game.h"
 #include "Player.h"
 #include "Input.h"
-class Item : public Object
+#include "Interactable.h"
+
+class Item : public Object, public Interactable
 {
 private:
     MeshRenderer m_MeshRenderer;
@@ -15,13 +17,17 @@ private:
     bool m_IsCollected = false;
 
     // プレイヤーに触れた判定用の距離
-    float m_GetDistance = 50.0f;
 
 public:
     void Init() override;
     void Update() override;
     void Draw(Camera* cam) override;
     void Uninit() override;
+
+    bool IsInteractionEnabled() const override { return !m_IsCollected; }
+    DirectX::SimpleMath::Vector3 GetInteractionPosition() const override { return m_Position; }
+    const char* GetInteractionPrompt() const override { return "Collect fuse"; }
+    void Interact(Player& player) override;
 
     void SetPosition(float x, float y, float z)
     {

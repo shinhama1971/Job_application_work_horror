@@ -1,15 +1,14 @@
 #pragma once
 
 #include "Scene.h"
-#include <memory>
-#include "MovieTrigger.h"
+#include "InteractionSystem.h"
 
 class StageScene : public Scene
 {
 private:
     void Init();
     void Uninit();
-    std::unique_ptr<MovieTrigger> m_movieTrigger;
+    InteractionSystem m_InteractionSystem;
 public:
     StageScene();
     ~StageScene();

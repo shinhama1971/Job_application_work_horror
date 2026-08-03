@@ -1,157 +1,118 @@
 #include "Door.h"
+
 #include "Game.h"
 #include "Player.h"
-#include "Input.h"
 
 using namespace DirectX::SimpleMath;
 
 void Door::Init()
 {
-    StaticMesh staticmesh;
+    StaticMesh staticMesh;
 
-    // 仮モデル
-    // 後でドアモデルに変更
-    std::u8string modelFile = u8"assets/model/golf_ball/golf_ball.obj";
-    std::string texDirectory = "assets/model/golf_ball";
-
-    std::string tmpStr(
+    const std::u8string modelFile = u8"assets/model/golf_ball/golf_ball.obj";
+    const std::string textureDirectory = "assets/model/golf_ball";
+    const std::string modelPath(
         reinterpret_cast<const char*>(modelFile.c_str()),
         modelFile.size()
     );
 
-    staticmesh.Load(tmpStr, texDirectory);
+    staticMesh.Load(modelPath, textureDirectory);
+    m_MeshRenderer.Init(staticMesh);
+    m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
-    m_MeshRenderer.Init(staticmesh);
+    m_subsets = staticMesh.GetSubsets();
+    m_Textures = staticMesh.GetTextures();
 
-    m_Shader.Create(
-        "shader/litTextureVS.hlsl",
-        "shader/litTexturePS.hlsl"
-    );
-
-    m_subsets = staticmesh.GetSubsets();
-    m_Textures = staticmesh.GetTextures();
-
-    std::vector<MATERIAL> materials = staticmesh.GetMaterials();
-
-    for (int i = 0; i < materials.size(); i++)
+    for (const MATERIAL& material : staticMesh.GetMaterials())
     {
-        std::unique_ptr<Material> m =
-            std::make_unique<Material>();
-
-        m->Create(materials[i]);
-        m->SetShader(&m_Shader);
-
-        m_Materials.push_back(std::move(m));
+        auto instance = std::make_unique<Material>();
+        instance->Create(material);
+        instance->SetShader(&m_Shader);
+        m_Materials.push_back(std::move(instance));
     }
 
-    size_t count =
-        (std::min)(m_Materials.size(), m_Textures.size());
-
-    for (size_t i = 0; i < count; i++)
+    const size_t count = (std::min)(m_Materials.size(), m_Textures.size());
+    for (size_t i = 0; i < count; ++i)
     {
         m_Materials[i]->SetTexture(m_Textures[i].get());
     }
 
-    // 仮でドアっぽく縦長にする
     m_Scale = Vector3(10.0f, 30.0f, 5.0f);
 }
 
 void Door::Update()
 {
-    // 開いている途中
-    if (m_IsOpening)
+    if (!m_IsOpening)
     {
-        Vector3 dir = m_OpenPosition - m_Position;
-        Vector3 open = m_OpenPosition - m_Position;//
-
-
-        if (dir.Length() <= m_OpenSpeed)
-        {
-            m_Position = m_OpenPosition;
-            m_IsOpen = true;
-            m_IsOpening = false;
-
-            return;
-        }
-
-        dir.Normalize();
-        m_Position += dir * m_OpenSpeed;
         return;
     }
 
-    if (m_IsOpen) return;
-
-    std::vector<Player*> players =
-        Core::Game::GetInstance()->GetObjects<Player>();
-
-    if (players.empty()) return;
-
-    Player* player = players[0];
-   
-    Vector3 diff = player->GetPosition() - m_Position;
-    float distance = diff.Length();
-
-    // ドアの近く
-    if (distance <= m_OpenDistance)
+    Vector3 direction = m_OpenPosition - m_Position;
+    if (direction.Length() <= m_OpenSpeed)
     {
-        // アイテム3個以上持っていたらドアを開けることができる
-        if (Core::Game::GetInstance()->GetItemCount() >= 3)
-        {
-            if (Input::GetKeyTrigger(VK_E))
-            {
-                m_IsOpening = true;
-            }
-        }
+        m_Position = m_OpenPosition;
+        m_IsOpen = true;
+        m_IsOpening = false;
+        return;
+    }
+
+    direction.Normalize();
+    m_Position += direction * m_OpenSpeed;
+}
+
+const char* Door::GetInteractionPrompt() const
+{
+    return Core::Game::GetInstance()->GetItemCount() < 3
+        ? "Requires 3 fuses"
+        : "Open door";
+}
+
+void Door::Interact(Player& player)
+{
+    (void)player;
+
+    if (!m_IsOpen && !m_IsOpening &&
+        Core::Game::GetInstance()->GetItemCount() >= 3)
+    {
+        m_IsOpening = true;
     }
 }
 
-void Door::Draw(Camera* cam)
+void Door::Draw(Camera* camera)
 {
-    //if (m_IsOpen) return;
+    camera->SetCamera();
 
-    cam->SetCamera();
-
-    Matrix r = Matrix::CreateFromYawPitchRoll(
+    const Matrix rotation = Matrix::CreateFromYawPitchRoll(
         m_Rotation.y,
         m_Rotation.x,
         m_Rotation.z
     );
+    const Matrix translation = Matrix::CreateTranslation(m_Position);
+    const Matrix scale = Matrix::CreateScale(m_Scale);
+    Matrix world = scale * rotation * translation;
 
-    Matrix t = Matrix::CreateTranslation(m_Position);
-
-    Matrix s = Matrix::CreateScale(
-        m_Scale.x,
-        m_Scale.y,
-        m_Scale.z
-    );
-
-    Matrix worldmtx = s * r * t;
-
-    Renderer::SetWorldMatrix(&worldmtx);
-
+    Renderer::SetWorldMatrix(&world);
     m_MeshRenderer.BeforeDraw();
 
-    for (int i = 0; i < m_subsets.size(); i++)
+    for (const SUBSET& subset : m_subsets)
     {
-        int matIdx = m_subsets[i].MaterialIdx;
-
-        if (matIdx < 0 || matIdx >= m_Materials.size())
+        const size_t materialIndex = subset.MaterialIdx;
+        if (materialIndex >= m_Materials.size())
         {
             continue;
         }
 
-        m_Materials[matIdx]->SetGPU();
+        m_Materials[materialIndex]->SetGPU();
 
-        if (matIdx < m_Textures.size() &&
-            m_Textures[matIdx] != nullptr)
+        if (materialIndex < m_Textures.size() && m_Textures[materialIndex] != nullptr)
         {
-            m_Textures[matIdx]->SetGPU();
+            m_Textures[materialIndex]->SetGPU();
         }
 
         m_MeshRenderer.DrawSubset(
-            m_subsets[i].IndexNum,
-            m_subsets[i].IndexBase,
-            m_subsets[i].VertexBase
+            subset.IndexNum,
+            subset.IndexBase,
+            subset.VertexBase
         );
     }
 }

@@ -3,8 +3,13 @@
 #include "Application.h"
 #include "Game.h"
 
-const auto ClassName = TEXT("2025 framework ひな型");     //ウィンドウクラス名
-const auto WindowName = TEXT("2025 framework ひな型");    //ウィンドウ名
+namespace
+{
+    constexpr auto ClassName = TEXT("SignalLostWindowClass");
+    constexpr auto WindowName = TEXT("SIGNAL LOST");
+    constexpr auto FixedTimeStep = std::chrono::duration<double>(1.0 / 60.0);
+    constexpr auto MaximumFrameTime = std::chrono::duration<double>(0.25);
+}
 
 HINSTANCE  Application::m_hInst;   // インスタンスハンドル
 HWND       Application::m_hWnd;    // ウィンドウハンドル
@@ -141,62 +146,62 @@ void Application::MainLoop()
 {
     MSG msg = {};
 
-   
-    // ゲーム初期化処理
-  Core::Game::Init();
-    
-    // FPS計測用変数
-   int fpsCounter = 0;
-   long long oldTick = GetTickCount64(); // 前回計測時の時間
-   long long nowTick = oldTick; // 今回計測時の時間
+    Core::Game::Init();
 
-   // FPS固定用変数
-   LARGE_INTEGER liWork; // workがつく変数は作業用変数
-   long long frequency;// どれくらい細かく時間をカウントできるか
-   QueryPerformanceFrequency(&liWork);
-   frequency = liWork.QuadPart;
-   // 時間（単位：カウント）取得
-   QueryPerformanceCounter(&liWork);
-   long long oldCount = liWork.QuadPart;// 前回計測時の時間
-   long long nowCount = oldCount;// 今回計測時の時間
+    using Clock = std::chrono::steady_clock;
+    auto previousTime = Clock::now();
+    std::chrono::duration<double> accumulator = std::chrono::duration<double>::zero();
+    bool running = true;
 
+    while (running)
+    {
+        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+        {
+            if (msg.message == WM_QUIT)
+            {
+                running = false;
+                break;
+            }
 
-   // ゲームループ
-   while (1)
-   {
-       // 新たにメッセージがあれば
-       if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-       {
-           // ウィンドウプロシージャにメッセージを送る
-           TranslateMessage(&msg);
-           DispatchMessage(&msg);
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
 
-           // 「WM_QUIT」メッセージを受け取ったらループを抜ける
-           if (msg.message == WM_QUIT) {
-               break;
-           }
-       }
+        if (!running)
+        {
+            break;
+        }
+
+        const auto currentTime = Clock::now();
+        auto frameTime = std::chrono::duration<double>(currentTime - previousTime);
+        previousTime = currentTime;
+
+        if (frameTime > MaximumFrameTime)
+        {
+            frameTime = MaximumFrameTime;
+        }
+
+        accumulator += frameTime;
+
+        bool updated = false;
+        while (accumulator >= FixedTimeStep)
+        {
+            Core::Game::Update();
+            accumulator -= FixedTimeStep;
+            updated = true;
+        }
+
+        if (updated)
+        {
+            Core::Game::Draw();
+        }
         else
-       {
-           QueryPerformanceCounter(&liWork);// 現在時間を取得
-           nowCount = liWork.QuadPart;
-           // 1/60秒が経過したか？
-           if (nowCount >= oldCount + frequency / 60) {
-
-               // ゲーム更新
-               Core::Game::Update();
-
-               // ゲーム描画
-               Core::Game::Draw();
-
-               fpsCounter++; // ゲーム処理を実行したら＋１する
-               oldCount = nowCount;
-           }
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
 
-   // ゲーム終了処理
-   Core::Game::Uninit();
+    Core::Game::Uninit();
 }
 
 //-----------------------------------------------------------------------------

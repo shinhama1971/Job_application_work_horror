@@ -13,11 +13,11 @@
 #include "Renderer.h"
 #include "Object.h"
 #include"PostProcess.h"
-enum SceneName
+enum class SceneName
 {
-    TITLE,
-    STAGE,
-    RESULT
+    Title,
+    Stage,
+    Result
 };
 
 class Scene;
@@ -29,7 +29,7 @@ namespace Core
     private:
         static Game* m_Instance;
 
-        Scene* m_Scene;
+        std::unique_ptr<Scene> m_Scene;
         Camera m_Camera;
         Effect::PostProcess m_PostProcess;
 

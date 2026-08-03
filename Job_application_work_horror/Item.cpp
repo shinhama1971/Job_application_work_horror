@@ -57,49 +57,36 @@ void Item::Update()
 
     // 回転
     m_Rotation.y += 0.03f;
+}
 
-    std::vector<Player*> players =
-        Core::Game::GetInstance()->GetObjects<Player>();
-
-    if (players.size() == 0) return;
-
-    Player* player = players[0];
-
-    Vector3 diff = player->GetPosition() - m_Position;
-    float distance = diff.Length();
-
-    // 近くにいてEキーを押したら取得
-    if (distance <= m_GetDistance)
+void Item::Interact(Player& player)
+{
+    if (m_IsCollected)
     {
-        if (Input::GetKeyTrigger(VK_E))
-        {
-            m_IsCollected = true;
-            Core::Game::GetInstance()->AddItemCount();
+        return;
+    }
 
-            // 1個目のアイテム取得時だけ人影を出す
-            if (Core::Game::GetInstance()->GetItemCount() == 1)
+    m_IsCollected = true;
+    Core::Game::GetInstance()->AddItemCount();
+
+    if (Core::Game::GetInstance()->GetItemCount() == 1)
+    {
+        const Vector3 shadowPosition(
+            player.GetPosition().x,
+            player.GetPosition().y,
+            player.GetPosition().z - 80.0f
+        );
+
+        Core::Game::GetInstance()->RequestAddObject<ShadowMan>(
+            [shadowPosition](ShadowMan& shadow)
             {
-                const Vector3 shadowPosition(
-                    player->GetPosition().x,
-                    player->GetPosition().y,
-                    player->GetPosition().z - 80.0f
+                shadow.SetPosition(
+                    shadowPosition.x,
+                    shadowPosition.y,
+                    shadowPosition.z
                 );
-
-                Core::Game::GetInstance()
-                    ->RequestAddObject<ShadowMan>(
-                        [shadowPosition](ShadowMan& shadow)
-                        {
-                            shadow.SetPosition(
-                                shadowPosition.x,
-                                shadowPosition.y,
-                                shadowPosition.z
-                            );
-                        }
-                    );
             }
-
-            return;
-        }
+        );
     }
 }
 

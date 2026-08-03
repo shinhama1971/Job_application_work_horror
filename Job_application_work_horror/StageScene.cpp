@@ -56,9 +56,6 @@ void StageScene::Init()
     Item* item3 = game->CreateObj<Item>("Item3");
     item3->SetPosition(-60.0f, -95.0f, 200.0f);
 
-    m_movieTrigger = std::make_unique<MovieTrigger>();
-    m_movieTrigger->SetPosition(DirectX::SimpleMath::Vector3(0, 0, 30));
-    m_movieTrigger->SetSize(DirectX::SimpleMath::Vector3(0.0f, -85.0f, 0.0f));
     // UI
     Texture2D* ui = game->CreateObj<Texture2D>("UI_Back");
     ui->SetTexture("assets/texture/ui_back.png");
@@ -113,19 +110,15 @@ void StageScene::Init()
 
 void StageScene::Update()
 {
-    if (Input::GetKeyTrigger(VK_RETURN))
-    {
-        Core::Game::GetInstance()->RequestSceneChange(RESULT);
-        return;
-    }
-
     Player* player =
         Core::Game::GetInstance()->GetObj<Player>("Player");
 
-    if (player != nullptr)
+    if (player == nullptr || !player->CanControl())
     {
-        // ここでプレイヤー情報を使える
+        return;
     }
+
+    m_InteractionSystem.Update(*player);
 }
 
 void StageScene::Uninit()

@@ -5,8 +5,9 @@
 #include "StaticMesh.h"
 #include "MeshRenderer.h"
 #include "Material.h"
+#include "Interactable.h"
 
-class BatteryItem : public Object
+class BatteryItem : public Object, public Interactable
 {
 private:
     MeshRenderer m_MeshRenderer;
@@ -16,7 +17,6 @@ private:
     std::vector<std::unique_ptr<Texture>> m_Textures;
 
     bool m_IsCollected = false;
-    float m_GetDistance = 50.0f;
     float m_RecoverValue = 30.0f;
 
 public:
@@ -24,6 +24,11 @@ public:
     void Update() override;
     void Draw(Camera* cam) override;
     void Uninit() override;
+
+    bool IsInteractionEnabled() const override { return !m_IsCollected; }
+    DirectX::SimpleMath::Vector3 GetInteractionPosition() const override { return m_Position; }
+    const char* GetInteractionPrompt() const override { return "Take battery"; }
+    void Interact(Player& player) override;
 
     void SetPosition(float x, float y, float z)
     {

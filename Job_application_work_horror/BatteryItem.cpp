@@ -1,7 +1,6 @@
 #include "BatteryItem.h"
 #include "Game.h"
 #include "Player.h"
-#include "Input.h"
 
 using namespace DirectX::SimpleMath;
 
@@ -56,26 +55,17 @@ void BatteryItem::Update()
     if (m_IsCollected) return;
 
     m_Rotation.y += 0.03f;
+}
 
-    std::vector<Player*> players =
-Core::Game::GetInstance()->GetObjects<Player>();
-
-    if (players.empty()) return;
-
-    Player* player = players[0];
-
-    Vector3 diff = player->GetPosition() - m_Position;
-    float distance = diff.Length();
-
-    if (distance <= m_GetDistance)
+void BatteryItem::Interact(Player& player)
+{
+    if (m_IsCollected || player.GetBattery() >= 100.0f)
     {
-        if (Input::GetKeyTrigger(VK_E))
-        {
-            player->AddBattery(m_RecoverValue);
-            m_IsCollected = true;
-            return;
-        }
+        return;
     }
+
+    player.AddBattery(m_RecoverValue);
+    m_IsCollected = true;
 }
 
 void BatteryItem::Draw(Camera* cam)

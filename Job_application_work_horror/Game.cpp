@@ -13,14 +13,10 @@ namespace Core
 
     Game::Game()
     {
-        m_Scene = nullptr;
     }
 
     Game::~Game()
     {
-        delete m_Scene;
-        m_Scene = nullptr;
-
         DeleteAllObject();
     }
 
@@ -34,15 +30,15 @@ namespace Core
 
         m_Instance->m_Camera.Init();
 
-        m_Instance->m_Scene = new StageScene;
         m_Instance->m_PostProcess.Init();
+        m_Instance->ChangeScene(SceneName::Title);
     }
 
     void Game::Update()
     {
         Input::Update();
 
-        if (m_Instance->m_Scene != nullptr)
+        if (m_Instance->m_Scene)
         {
             m_Instance->m_Scene->Update();
         }
@@ -116,11 +112,7 @@ namespace Core
 
         m_Instance->m_Camera.Uninit();
 
-        if (m_Instance->m_Scene != nullptr)
-        {
-            delete m_Instance->m_Scene;
-            m_Instance->m_Scene = nullptr;
-        }
+        m_Instance->m_Scene.reset();
 
         for (auto& o : m_Instance->m_Objects)
         {
@@ -156,26 +148,23 @@ namespace Core
 
     void Game::ChangeScene(SceneName sName)
     {
-        if (m_Scene != nullptr)
-        {
-            delete m_Scene;
-            m_Scene = nullptr;
-        }
+        m_Scene.reset();
 
         DeleteAllObject();
 
         switch (sName)
         {
-        case TITLE:
-            m_Scene = new TitleScene;
+        case SceneName::Title:
+            m_Scene = std::make_unique<TitleScene>();
             break;
 
-        case STAGE:
-            m_Scene = new StageScene;
+        case SceneName::Stage:
+            m_ItemCount = 0;
+            m_Scene = std::make_unique<StageScene>();
             break;
 
-        case RESULT:
-            m_Scene = new ResultScene;
+        case SceneName::Result:
+            m_Scene = std::make_unique<ResultScene>();
             break;
         }
     }

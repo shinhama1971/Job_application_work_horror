@@ -38,7 +38,7 @@ void TitleScene::Update()
 	// エンターキーを押してステージ1へ
 	if (Input::GetKeyTrigger(VK_RETURN))
 	{
-		Core::Game::GetInstance()->RequestSceneChange(STAGE);
+		Core::Game::GetInstance()->RequestSceneChange(SceneName::Stage);
 	}
 }
 

@@ -3,7 +3,7 @@
 #include "Input.h"
 #include"Texture2D.h"
 int ResultScene::s_Score = 0;
-int ResultScene::s_NextScene = TITLE; // デフォルトはタイトル
+int ResultScene::s_NextScene = static_cast<int>(SceneName::Title); // デフォルトはタイトル
 // コンストラクタ
 ResultScene::ResultScene()
 {

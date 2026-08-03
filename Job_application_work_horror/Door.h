@@ -5,8 +5,9 @@
 #include "StaticMesh.h"
 #include "MeshRenderer.h"
 #include "Material.h"
+#include "Interactable.h"
 
-class Door : public Object
+class Door : public Object, public Interactable
 {
 private:
     MeshRenderer m_MeshRenderer;
@@ -21,7 +22,6 @@ private:
     DirectX::SimpleMath::Vector3 m_StartPosition;
     DirectX::SimpleMath::Vector3 m_OpenPosition;
 
-    float m_OpenDistance = 50.0f;
     float m_OpenSpeed = 1.0f;
 
 public:
@@ -29,6 +29,11 @@ public:
     void Update() override;
     void Draw(Camera* cam) override;
     void Uninit() override;
+
+    bool IsInteractionEnabled() const override { return !m_IsOpen && !m_IsOpening; }
+    DirectX::SimpleMath::Vector3 GetInteractionPosition() const override { return m_Position; }
+    const char* GetInteractionPrompt() const override;
+    void Interact(Player& player) override;
 
     void SetPosition(float x, float y, float z)
     {

@@ -2,29 +2,16 @@
 #include "Game.h"
 #include "Player.h"
 
-using namespace DirectX::SimpleMath;
-
 void ExitTrigger::Init()
 {}
 
 void ExitTrigger::Update()
+{}
+
+void ExitTrigger::Interact(Player& player)
 {
-    std::vector<Player*> players =
-        Core::Game::GetInstance()->GetObjects<Player>();
-
-    if (players.empty()) return;
-
-    Player* player = players[0];
-
-    Vector3 diff =
-        player->GetPosition() - m_Position;
-
-    float distance = diff.Length();
-
-    if (distance <= m_Radius)
-    {
-        Core::Game::GetInstance()->RequestSceneChange(RESULT);
-    }
+    (void)player;
+    Core::Game::GetInstance()->RequestSceneChange(SceneName::Result);
 }
 
 void ExitTrigger::Draw(Camera* cam)

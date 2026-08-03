@@ -23,7 +23,7 @@
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{764a1f43-2e96-499f-8de9-96db96d3fa9f}</ProjectGuid>
     <RootNamespace>Jobapplicationworkhorror</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -173,6 +173,7 @@
     <ClCompile Include="Ground.cpp" />
     <ClCompile Include="input.cpp" />
     <ClCompile Include="inputManager.cpp" />
+    <ClCompile Include="InteractionSystem.cpp" />
     <ClCompile Include="Item.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MovieTrigger.cpp" />
@@ -213,6 +214,8 @@
     <ClInclude Include="IndexBuffer.h" />
     <ClInclude Include="input.h" />
     <ClInclude Include="inputManager.h" />
+    <ClInclude Include="Interactable.h" />
+    <ClInclude Include="InteractionSystem.h" />
     <ClInclude Include="Item.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="Material.h" />
