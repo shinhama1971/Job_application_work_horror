@@ -107,6 +107,20 @@ void Camera::Update()
     }
 
     // デバッグ用：矢印キーでも視点操作
+    const DirectX::XMFLOAT2 rightStick = Input::GetRightAnalogStick();
+    float controllerLookX = rightStick.x;
+    float controllerLookY = rightStick.y;
+
+    if (Input::GetButtonPress(XINPUT_LEFT)) controllerLookX = -1.0f;
+    if (Input::GetButtonPress(XINPUT_RIGHT)) controllerLookX = 1.0f;
+    if (Input::GetButtonPress(XINPUT_UP)) controllerLookY = 1.0f;
+    if (Input::GetButtonPress(XINPUT_DOWN)) controllerLookY = -1.0f;
+
+    constexpr float controllerYawSpeed = 0.065f;
+    constexpr float controllerPitchSpeed = 0.050f;
+    m_CameraDirection += controllerLookX * controllerYawSpeed;
+    m_CameraPitch += controllerLookY * controllerPitchSpeed;
+
     if (Input::GetKeyPress(VK_LEFT))
     {
         m_CameraDirection += 0.05f;
@@ -156,7 +170,7 @@ void Camera::SetCamera(int mode)
         Renderer::SetViewMatrix(&m_ViewMatrix);
 
         constexpr float fieldOfView =
-            DirectX::XMConvertToRadians(45.0f);
+            DirectX::XMConvertToRadians(60.0f);
 
         float aspectRatio =
             static_cast<float>(Application::GetWidth()) /
@@ -173,6 +187,24 @@ void Camera::SetCamera(int mode)
                 farPlane
             );
 
+        Renderer::SetProjectionMatrix(&projectionMatrix);
+    }
+    else
+    {
+        Matrix viewMatrix = Matrix::Identity;
+        Renderer::SetViewMatrix(&viewMatrix);
+
+        const float halfWidth = static_cast<float>(Application::GetWidth()) * 0.5f;
+        const float halfHeight = static_cast<float>(Application::GetHeight()) * 0.5f;
+
+        Matrix projectionMatrix = DirectX::XMMatrixOrthographicOffCenterLH(
+            -halfWidth,
+            halfWidth,
+            -halfHeight,
+            halfHeight,
+            0.0f,
+            1.0f
+        );
         Renderer::SetProjectionMatrix(&projectionMatrix);
     }
 }

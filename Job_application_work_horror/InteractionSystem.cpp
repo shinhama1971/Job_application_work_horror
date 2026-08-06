@@ -53,7 +53,9 @@ void InteractionSystem::Update(Player& player)
         }
     }
 
-    if (m_FocusedInteractable != nullptr && Input::GetKeyTrigger(VK_E))
+    if (m_FocusedInteractable != nullptr &&
+        (Input::GetKeyTrigger(VK_E) ||
+         Input::GetButtonTrigger(XINPUT_A)))
     {
         m_FocusedInteractable->Interact(player);
     }

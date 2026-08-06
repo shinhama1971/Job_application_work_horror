@@ -36,7 +36,9 @@ void TitleScene::Init()
 void TitleScene::Update()
 {
 	// エンターキーを押してステージ1へ
-	if (Input::GetKeyTrigger(VK_RETURN))
+	if (Input::GetKeyTrigger(VK_RETURN) ||
+	Input::GetButtonTrigger(XINPUT_A) ||
+	Input::GetButtonTrigger(XINPUT_START))
 	{
 		Core::Game::GetInstance()->RequestSceneChange(SceneName::Stage);
 	}

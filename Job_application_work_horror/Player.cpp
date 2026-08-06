@@ -3,6 +3,9 @@
 #include "Input.h"
 #include "Camera.h"
 #include "Renderer.h"
+#include "Wall.h"
+#include "Door.h"
+#include "CeilingLight.h"
 
 using namespace DirectX::SimpleMath;
 
@@ -70,11 +73,27 @@ void Player::Update()
     if (Input::GetKeyPress(VK_A)) moveDir -= right;
     if (Input::GetKeyPress(VK_D)) moveDir += right;
 
-    if (moveDir.LengthSquared() > 0.0f)
+    const DirectX::XMFLOAT2 leftStick = Input::GetLeftAnalogStick();
+    moveDir += right * leftStick.x;
+    moveDir += forward * leftStick.y;
+
+    const float moveLengthSquared = moveDir.LengthSquared();
+    const bool isMoving = moveLengthSquared > 0.0001f;
+    const bool isSprinting = isMoving &&
+        (Input::GetKeyPress(VK_SHIFT) ||
+         Input::GetButtonPress(XINPUT_LEFT_THUMB));
+    const float currentMoveSpeed = m_MoveSpeed *
+        (isSprinting ? SPRINT_SPEED_MULTIPLIER : 1.0f);
+
+    if (isMoving)
     {
-        moveDir.Normalize();
-        m_Velocity.x = moveDir.x * m_MoveSpeed;
-        m_Velocity.z = moveDir.z * m_MoveSpeed;
+        if (moveLengthSquared > 1.0f)
+        {
+            moveDir.Normalize();
+        }
+
+        m_Velocity.x = moveDir.x * currentMoveSpeed;
+        m_Velocity.z = moveDir.z * currentMoveSpeed;
     }
     else
     {
@@ -94,6 +113,25 @@ void Player::Update()
         m_Velocity.y = 0.0f;
     }
 
+    const std::vector<Wall*> walls =
+        Core::Game::GetInstance()->GetObjects<Wall>();
+    const std::vector<Door*> doors =
+        Core::Game::GetInstance()->GetObjects<Door>();
+
+    // Resolve twice so a push from one wall is also checked against the
+    // neighbouring wall at room corners.
+    for (int pass = 0; pass < 2; ++pass)
+    {
+        for (const Wall* wall : walls)
+        {
+            wall->ResolveCollision(m_Position, m_Radius);
+        }
+        for (const Door* door : doors)
+        {
+            door->ResolveCollision(m_Position, m_Radius);
+        }
+    }
+
     // R�L�[�ň�l��
     if (Input::GetKeyTrigger(VK_R))
     {
@@ -106,8 +144,14 @@ void Player::Update()
         m_IsFPS = false;
     }
 
+    if (Input::GetButtonTrigger(XINPUT_RIGHT_THUMB))
+    {
+        m_IsFPS = !m_IsFPS;
+    }
+
     // F�L�[�ŉ����d��ON/OFF
-    if (Input::GetKeyTrigger(VK_F))
+    if (Input::GetKeyTrigger(VK_F) ||
+        Input::GetButtonTrigger(XINPUT_Y))
     {
         // �d�r�����鎞����ON/OFF�ł���
         if (m_Battery > 0.0f)
@@ -152,28 +196,97 @@ void Player::Update()
 
     LIGHT light{};
 
-    light.Enable = true;
-    light.Direction = DirectX::SimpleMath::Vector4(0.5f, -1.0f, 0.8f, 0.0f);
-    light.Direction.Normalize();
+    light.Enable = TRUE;
+    light.FlashlightEnabled = visibleLight ? TRUE : FALSE;
+    light.Intensity = visibleLight ? 1.6f : 0.0f;
+    light.Range = 260.0f;
+    light.Direction = Vector4(0.0f, 0.0f, 1.0f, 0.0f);
+    light.SpotParams = Vector4(
+        cosf(DirectX::XMConvertToRadians(16.0f)),
+        cosf(DirectX::XMConvertToRadians(32.0f)),
+        1.35f,
+        0.0f
+    );
 
     if (visibleLight)
     {
-        // ライトをつける時の設定
         light.Diffuse = Color(m_LightDiffuseR, m_LightDiffuseG, m_LightDiffuseB, 1.0f);
-        light.Ambient = Color(m_LightAmbientR, m_LightAmbientG, m_LightAmbientB, 1.0f);
+        light.Ambient = Color(0.074f, 0.071f, 0.065f, 1.0f);
     }
     else
     {
-		// ライトを消す時の設定（暗くする）
-        light.Diffuse = Color(m_DarkDiffuseR, m_DarkDiffuseG, m_DarkDiffuseB, 1.0f);
-        light.Ambient = Color(m_DarkAmbientR, m_DarkAmbientG, m_DarkAmbientB, 1.0f);
+        light.Diffuse = Color(0.0f, 0.0f, 0.0f, 1.0f);
+        light.Ambient = Color(
+            0.074f, // Readable baseline even without the flashlight.
+            0.071f,
+            0.065f,
+            1.0f
+        );
+    }
+
+    if (Core::Game::GetInstance()->IsPowerRestored())
+    {
+        light.Ambient = Color(0.105f, 0.098f, 0.082f, 1.0f);
     }
 
     Renderer::SetLight(light);
 
+    // Turn the visible ceiling fixtures into real lights for the room geometry.
+    ENVIRONMENT_LIGHTS environmentLights{};
+    const bool powerRestored = Core::Game::GetInstance()->IsPowerRestored();
+    for (CeilingLight* fixture : Core::Game::GetInstance()->GetObjects<CeilingLight>())
+    {
+        if (environmentLights.Count >= MAX_ENVIRONMENT_LIGHTS)
+        {
+            break;
+        }
+
+        const float brightness = fixture->GetBrightness();
+        if (brightness <= 0.01f)
+        {
+            continue;
+        }
+
+        const Vector3 fixturePosition = fixture->GetPosition();
+        ENVIRONMENT_POINT_LIGHT& pointLight =
+            environmentLights.Lights[environmentLights.Count++];
+
+        // Move the light slightly below the glowing panel to illuminate the room.
+        pointLight.PositionRange = Vector4(
+            fixturePosition.x, fixturePosition.y - 3.0f, fixturePosition.z,
+            powerRestored ? 145.0f : 82.0f);
+
+        if (powerRestored)
+        {
+            pointLight.ColorIntensity = Vector4(
+                1.0f, 0.78f, 0.52f, brightness * 1.40f);
+        }
+        else
+        {
+            pointLight.ColorIntensity = Vector4(
+                1.0f, 0.055f, 0.025f, brightness * 0.58f);
+        }
+    }
+    Renderer::SetEnvironmentLights(environmentLights);
 	// カメラの位置と向きを更新
+    if (isMoving)
+    {
+        m_HeadBobTimer += isSprinting ? 0.22f : 0.14f;
+        const float amplitude = isSprinting ? 0.55f : 0.35f;
+        const float targetOffset = sinf(m_HeadBobTimer) * amplitude;
+        m_HeadBobOffset += (targetOffset - m_HeadBobOffset) * 0.35f;
+    }
+    else
+    {
+        m_HeadBobOffset *= 0.82f;
+    }
+
     Vector3 eyePos = m_Position;
     eyePos.y += m_CameraHeightOffset;
+    if (m_IsFPS)
+    {
+        eyePos.y += m_HeadBobOffset;
+    }
 
     if (m_IsFPS)
     {
@@ -192,8 +305,8 @@ void Player::Update()
     }
     else
     {
-        float distance = 8.0f;
-        float height = 3.0f;
+        float distance = 45.0f;
+        float height = 28.0f;
 
         Vector3 camPos = m_Position;
         camPos -= forward * distance;
@@ -202,7 +315,7 @@ void Player::Update()
         cam->SetPosition(camPos);
 
         Vector3 target = m_Position;
-        target.y += 1.5f;
+        target.y += 18.0f;
         cam->SetTarget(target);
     }
 

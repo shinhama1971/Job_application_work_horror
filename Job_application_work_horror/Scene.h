@@ -1,13 +1,13 @@
 #pragma once
-#include <memory>
 
-//Scene クラス
+class Camera;
+
 class Scene
 {
 public:
+    Scene();
+    virtual ~Scene();
 
-	Scene(); // コンストラクタ
-	virtual ~Scene(); // デストラクタ(virtualが必要)
-
-	virtual void Update() = 0; // 更新（純粋仮想関数）
+    virtual void Update() = 0;
+    virtual void Draw(Camera* camera) { (void)camera; }
 };

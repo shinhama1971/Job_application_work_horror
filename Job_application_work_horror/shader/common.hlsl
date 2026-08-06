@@ -26,16 +26,22 @@ struct PS_IN
 	float4 col : COLOR0;
 	float2 tex : TEXCOORD0;
     float depth : TEXCOORD1;
-    float3 viewPos : TEXCOORD2; //カメラから見たx,y,z座標 懐中伝統
+    float3 viewPos : TEXCOORD2;
+    float3 viewNormal : TEXCOORD3;
+    float3 worldPos : TEXCOORD4;
+    float3 worldNormal : TEXCOORD5;
 };
 
 struct LIGHT
 {
     bool Enable;
-    bool3 Dummy;
+    bool FlashlightEnabled;
+    float Intensity;
+    float Range;
     float4 Direction;
     float4 Diffuse;
     float4 Ambient;
+    float4 SpotParams;
 };
 
 cbuffer LightBuffer : register(b3)
@@ -53,12 +59,25 @@ struct MATERIAL
     bool TextureEnable;
     bool2 Dummy;
 };
+struct ENVIRONMENT_POINT_LIGHT
+{
+    float4 PositionRange;
+    float4 ColorIntensity;
+};
+
+cbuffer EnvironmentLightBuffer : register(b6)
+{
+    ENVIRONMENT_POINT_LIGHT EnvironmentLights[8];
+    int EnvironmentLightCount;
+    float3 EnvironmentLightPadding;
+};
+
 cbuffer MaterialBuffer : register(b4)
 {
   MATERIAL Material;
 }
 
-//UV座標移動行列
+//UV蠎ｧ讓咏ｧｻ蜍戊｡悟��
 cbuffer TextureBuffer : register(b5)
 {
     matrix matrixTex;

@@ -48,7 +48,7 @@ void Item::Init()
     }
 
     // 確認用に大きくする
-    m_Scale = Vector3(20.0f, 20.0f, 20.0f);
+    m_Scale = Vector3(5.0f, 5.0f, 5.0f);
 }
 
 void Item::Update()

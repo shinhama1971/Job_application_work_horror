@@ -14,12 +14,15 @@ private:
         DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
     static constexpr float DEFAULT_MOVE_SPEED = 0.5f;
     static constexpr float GRAVITY = 0.01f;
-    static constexpr float PLAYER_RADIUS = 1.0f;
-    static constexpr float PLAYER_HEIGHT = 2.0f;
+    static constexpr float PLAYER_RADIUS = 4.0f;
+    static constexpr float PLAYER_HEIGHT = 34.0f;
     static constexpr float MIN_Y_POSITION = -99.0f;
 
     float m_MoveSpeed = DEFAULT_MOVE_SPEED;
     float m_Radius = PLAYER_RADIUS;
+    static constexpr float SPRINT_SPEED_MULTIPLIER = 1.65f;
+    float m_HeadBobTimer = 0.0f;
+    float m_HeadBobOffset = 0.0f;
 
     // ===== 懐中電灯システム =====
     bool m_FlashLightOn = true;
@@ -46,7 +49,7 @@ private:
     float m_DarkAmbientR = 0.06f;
     float m_DarkAmbientG = 0.06f;
     float m_DarkAmbientB = 0.08f;
-    float m_CameraHeightOffset = 1.8f;
+    float m_CameraHeightOffset = 30.0f;
 
     // ===== メッシュ・レンダリング =====
     MeshRenderer m_MeshRenderer;

@@ -48,7 +48,9 @@ void ResultScene::Init()
 void ResultScene::Update()
 {
 	// エンターキーを押してタイトルへ
-	if (Input::GetKeyTrigger(VK_RETURN))
+	if (Input::GetKeyTrigger(VK_RETURN) ||
+	Input::GetButtonTrigger(XINPUT_A) ||
+	Input::GetButtonTrigger(XINPUT_START))
 	{
 		Core::Game::GetInstance()->RequestSceneChange(
 			static_cast<SceneName>(s_NextScene)

@@ -1,5 +1,28 @@
 #include "input.h"
 
+#include <algorithm>
+#include <cmath>
+
+namespace
+{
+	float NormalizeStickAxis(SHORT value, SHORT deadZone)
+	{
+		const float normalized = value < 0
+			? static_cast<float>(value) / 32768.0f
+			: static_cast<float>(value) / 32767.0f;
+		const float magnitude = std::abs(normalized);
+		const float deadZoneRate = static_cast<float>(deadZone) / 32767.0f;
+
+		if (magnitude <= deadZoneRate)
+		{
+			return 0.0f;
+		}
+
+		const float scaled = (magnitude - deadZoneRate) / (1.0f - deadZoneRate);
+		return std::copysign((std::min)(scaled, 1.0f), normalized);
+	}
+}
+
 Input* Input::m_Instance = {};
 
 void Input::Create()
@@ -7,6 +30,12 @@ void Input::Create()
 	if (m_Instance)return;
 	m_Instance = new Input;
 
+	ZeroMemory(m_Instance->keyState, sizeof(m_Instance->keyState));
+	ZeroMemory(m_Instance->keyState_old, sizeof(m_Instance->keyState_old));
+	ZeroMemory(&m_Instance->controllerState, sizeof(XINPUT_STATE));
+	ZeroMemory(&m_Instance->controllerState_old, sizeof(XINPUT_STATE));
+	m_Instance->controllerConnected = false;
+	m_Instance->controllerIndex = XUSER_MAX_COUNT;
 	m_Instance->VibrationTime = 0;
 }
 
@@ -20,7 +49,39 @@ void Input::Update()
 	BOOL hr = GetKeyboardState(m_Instance->keyState);
 
 	//コントローラー入力を更新(XInput)
-	XInputGetState(0, &(m_Instance->controllerState));
+	XINPUT_STATE nextControllerState{};
+	DWORD connectedIndex = XUSER_MAX_COUNT;
+
+	if (m_Instance->controllerIndex < XUSER_MAX_COUNT &&
+		XInputGetState(
+			m_Instance->controllerIndex,
+			&nextControllerState) == ERROR_SUCCESS)
+	{
+		connectedIndex = m_Instance->controllerIndex;
+	}
+	else
+	{
+		for (DWORD index = 0; index < XUSER_MAX_COUNT; ++index)
+		{
+			ZeroMemory(&nextControllerState, sizeof(XINPUT_STATE));
+			if (XInputGetState(index, &nextControllerState) == ERROR_SUCCESS)
+			{
+				connectedIndex = index;
+				break;
+			}
+		}
+	}
+
+	m_Instance->controllerConnected = connectedIndex < XUSER_MAX_COUNT;
+	m_Instance->controllerIndex = connectedIndex;
+	if (m_Instance->controllerConnected)
+	{
+		m_Instance->controllerState = nextControllerState;
+	}
+	else
+	{
+		ZeroMemory(&m_Instance->controllerState, sizeof(XINPUT_STATE));
+	}
 
 	//振動継続時間をカウント
 	if (m_Instance->VibrationTime > 0) {
@@ -30,9 +91,17 @@ void Input::Update()
 			ZeroMemory(&vibration, sizeof(XINPUT_VIBRATION));
 			vibration.wLeftMotorSpeed = 0;
 			vibration.wRightMotorSpeed = 0;
-			XInputSetState(0, &vibration);
+			if (m_Instance->controllerConnected)
+			{
+				XInputSetState(m_Instance->controllerIndex, &vibration);
+			}
 		}
 	}
+}
+
+bool Input::IsControllerConnected()
+{
+	return m_Instance != nullptr && m_Instance->controllerConnected;
 }
 
 void Input::Release()
@@ -42,8 +111,10 @@ void Input::Release()
 	ZeroMemory(&vibration, sizeof(XINPUT_VIBRATION));
 	vibration.wLeftMotorSpeed = 0;
 	vibration.wRightMotorSpeed = 0;
-	XInputSetState(0, &vibration);
-	XInputSetState(1, &vibration);
+	for (DWORD index = 0; index < XUSER_MAX_COUNT; ++index)
+	{
+		XInputSetState(index, &vibration);
+	}
 	//解放
 	if (m_Instance)
 	{
@@ -69,24 +140,26 @@ bool Input::GetKeyRelease(int key) //リリース
 //左アナログスティック
 DirectX::XMFLOAT2 Input::GetLeftAnalogStick(void)
 {
-	SHORT x = m_Instance->controllerState.Gamepad.sThumbLX; // -32768～32767
-	SHORT y = m_Instance->controllerState.Gamepad.sThumbLY; // -32768～32767
-
-	DirectX::XMFLOAT2 res;
-	res.x = x / 32767.0f; //-1～1
-	res.y = y / 32767.0f; //-1～1
-	return res;
+	return DirectX::XMFLOAT2(
+		NormalizeStickAxis(
+			m_Instance->controllerState.Gamepad.sThumbLX,
+			XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE),
+		NormalizeStickAxis(
+			m_Instance->controllerState.Gamepad.sThumbLY,
+			XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)
+	);
 }
 //右アナログスティック
 DirectX::XMFLOAT2 Input::GetRightAnalogStick(void)
 {
-	SHORT x = m_Instance->controllerState.Gamepad.sThumbRX; // -32768～32767
-	SHORT y = m_Instance->controllerState.Gamepad.sThumbRY; // -32768～32767
-
-	DirectX::XMFLOAT2 res;
-	res.x = x / 32767.0f; //-1～1
-	res.y = y / 32767.0f; //-1～1
-	return res;
+	return DirectX::XMFLOAT2(
+		NormalizeStickAxis(
+			m_Instance->controllerState.Gamepad.sThumbRX,
+			XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE),
+		NormalizeStickAxis(
+			m_Instance->controllerState.Gamepad.sThumbRY,
+			XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE)
+	);
 }
 
 //左トリガー
@@ -126,7 +199,10 @@ void Input::SetVibration(int frame, float powor)
 	// モーターの強度を設定（0～65535）
 	vibration.wLeftMotorSpeed = (WORD)(powor * 65535.0f);
 	vibration.wRightMotorSpeed = (WORD)(powor * 65535.0f);
-	XInputSetState(0, &vibration);
+	if (m_Instance->controllerConnected)
+	{
+		XInputSetState(m_Instance->controllerIndex, &vibration);
+	}
 
 	//振動継続時間を代入
 	m_Instance->VibrationTime = frame;

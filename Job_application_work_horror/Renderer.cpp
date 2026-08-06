@@ -23,9 +23,11 @@ ID3D11Buffer* Renderer::m_pWorldBuffer{}; // ワールド行列
 ID3D11Buffer* Renderer::m_pViewBuffer{}; // ビュー行列
 ID3D11Buffer* Renderer::m_pProjectionBuffer{}; // プロジェクション行列
 
-ID3D11Buffer* Renderer::m_pLightBuffer{};//ライト設定（平行光源）
+ID3D11Buffer* Renderer::m_pLightBuffer{};
+ID3D11Buffer* Renderer::m_pEnvironmentLightBuffer{};//ライト設定（平行光源）
 ID3D11Buffer* Renderer::m_pMaterialBuffer;//マテリアル設定
 LIGHT Renderer::m_Light{};
+ENVIRONMENT_LIGHTS Renderer::m_EnvironmentLights{};
 bool Renderer::m_LightEnable = true;
 ID3D11Buffer* Renderer::m_pTextureBuffer{};//UV設定
 // デプスステンシルステート
@@ -192,16 +194,29 @@ HRESULT Renderer::Init()
 	bufferDesc.ByteWidth = sizeof(LIGHT);
 	hr = m_pDevice->CreateBuffer(&bufferDesc, NULL, &m_pLightBuffer);
 	m_pDeviceContext->VSSetConstantBuffers(3, 1, &m_pLightBuffer);
+	m_pDeviceContext->PSSetConstantBuffers(3, 1, &m_pLightBuffer);
 	if (FAILED(hr)) return hr;
 	//ライト初期化　
 	LIGHT light{};
-	light.Enable = true;
-	light.Direction = Vector4(0.5f, -1.0f, 0.8f, 0.0f);
-	light.Direction.Normalize();
-	light.Diffuse = Color(1.5f, 1.5f, 1.4f, 1.0f);
-	light.Ambient = Color(0.18f, 0.18f, 0.18f, 1.0f);
+	light.Enable = TRUE;
+	light.FlashlightEnabled = TRUE;
+	light.Intensity = 1.6f;
+	light.Range = 260.0f;
+	light.Direction = Vector4(0.0f, 0.0f, 1.0f, 0.0f);
+	light.Diffuse = Color(1.4f, 1.25f, 1.0f, 1.0f);
+	light.Ambient = Color(0.055f, 0.055f, 0.065f, 1.0f);
+	light.SpotParams = Vector4(
+		cosf(DirectX::XMConvertToRadians(16.0f)),
+		cosf(DirectX::XMConvertToRadians(32.0f)), 1.35f, 0.0f);
 
 	SetLight(light);
+
+	bufferDesc.ByteWidth = sizeof(ENVIRONMENT_LIGHTS);
+	hr = m_pDevice->CreateBuffer(&bufferDesc, NULL, &m_pEnvironmentLightBuffer);
+	if (FAILED(hr)) return hr;
+	m_pDeviceContext->PSSetConstantBuffers(6, 1, &m_pEnvironmentLightBuffer);
+	SetEnvironmentLights(ENVIRONMENT_LIGHTS{});
+
 	bufferDesc.ByteWidth = sizeof(MATERIAL);
 	hr = m_pDevice->CreateBuffer(&bufferDesc, NULL, &m_pMaterialBuffer);
 	m_pDeviceContext->VSSetConstantBuffers(4, 1, &m_pMaterialBuffer);
@@ -275,6 +290,7 @@ void Renderer::Uninit()
 	m_pDeviceContext->ClearState();
 
 	SAFE_RELEASE(m_pLightBuffer);
+	SAFE_RELEASE(m_pEnvironmentLightBuffer);
 	SAFE_RELEASE(m_pMaterialBuffer);
 	SAFE_RELEASE(m_pTextureBuffer);
 
@@ -301,7 +317,7 @@ void Renderer::Uninit()
 void Renderer::DrawStart()
 {
 	// 画面塗りつぶし色
-	float clearColor[4] = { 0.0f, 0.0f, 1.0f, 1.0f }; //red,green,blue,alpha
+	float clearColor[4] = { 0.003f, 0.005f, 0.008f, 1.0f }; // dark background
 
 	// 描画先のキャンバスと使用する深度バッファを指定する
 	m_pDeviceContext->OMSetRenderTargets(1, &m_pRenderTargetView, m_pDepthStencilView);
@@ -329,6 +345,13 @@ void Renderer::SetLight(LIGHT Light)
 	m_Light.Enable = m_LightEnable;
 	m_pDeviceContext->UpdateSubresource(m_pLightBuffer, 0, NULL, &m_Light, 0, 0);
 
+}
+
+void Renderer::SetEnvironmentLights(const ENVIRONMENT_LIGHTS& lights)
+{
+	m_EnvironmentLights = lights;
+	m_pDeviceContext->UpdateSubresource(
+		m_pEnvironmentLightBuffer, 0, NULL, &m_EnvironmentLights, 0, 0);
 }
 
 //--------------------------------------------------------------------------------------

@@ -1,22 +1,22 @@
 #include "Game.h"
-#include "ShadowMan.h"
+#include "FuseBox.h"
+#include "Input.h"
 #include "Player.h"
+#include "ScreenDustOverlay.h"
 
 #include <array>
-#include <cmath>
 
 using namespace DirectX::SimpleMath;
 
-void ShadowMan::Init()
+void FuseBox::BuildGeometry()
 {
-    m_Vertices.reserve(144);
-    m_Indices.reserve(432);
+    m_Vertices.clear();
+    m_Indices.clear();
 
-    const Color shadowColor(0.025f, 0.03f, 0.027f, 1.0f);
-
-    const auto addFace = [this, &shadowColor](
+    const auto addFace = [this](
         const std::array<Vector3, 4>& positions,
-        const Vector3& normal)
+        const Vector3& normal,
+        const Color& color)
     {
         const unsigned int base = static_cast<unsigned int>(m_Vertices.size());
         const std::array<Vector2, 4> uvs =
@@ -30,7 +30,7 @@ void ShadowMan::Init()
             VERTEX_3D vertex{};
             vertex.position = positions[index];
             vertex.normal = normal;
-            vertex.color = shadowColor;
+            vertex.color = color;
             vertex.uv = uvs[index];
             m_Vertices.push_back(vertex);
         }
@@ -45,7 +45,10 @@ void ShadowMan::Init()
         m_Indices.insert(m_Indices.end(), indices, indices + 12);
     };
 
-    const auto addBox = [&addFace](const Vector3& center, const Vector3& half)
+    const auto addBox = [&addFace](
+        const Vector3& center,
+        const Vector3& half,
+        const Color& color)
     {
         const float left = center.x - half.x;
         const float right = center.x + half.x;
@@ -56,76 +59,106 @@ void ShadowMan::Init()
 
         addFace({ Vector3(left, bottom, front), Vector3(left, top, front),
                   Vector3(right, bottom, front), Vector3(right, top, front) },
-                Vector3(0.0f, 0.0f, 1.0f));
+                Vector3(0.0f, 0.0f, 1.0f), color);
         addFace({ Vector3(right, bottom, back), Vector3(right, top, back),
                   Vector3(left, bottom, back), Vector3(left, top, back) },
-                Vector3(0.0f, 0.0f, -1.0f));
+                Vector3(0.0f, 0.0f, -1.0f), color);
         addFace({ Vector3(right, bottom, front), Vector3(right, top, front),
                   Vector3(right, bottom, back), Vector3(right, top, back) },
-                Vector3(1.0f, 0.0f, 0.0f));
+                Vector3(1.0f, 0.0f, 0.0f), color);
         addFace({ Vector3(left, bottom, back), Vector3(left, top, back),
                   Vector3(left, bottom, front), Vector3(left, top, front) },
-                Vector3(-1.0f, 0.0f, 0.0f));
+                Vector3(-1.0f, 0.0f, 0.0f), color);
         addFace({ Vector3(left, top, front), Vector3(left, top, back),
                   Vector3(right, top, front), Vector3(right, top, back) },
-                Vector3(0.0f, 1.0f, 0.0f));
+                Vector3(0.0f, 1.0f, 0.0f), color);
         addFace({ Vector3(left, bottom, back), Vector3(left, bottom, front),
                   Vector3(right, bottom, back), Vector3(right, bottom, front) },
-                Vector3(0.0f, -1.0f, 0.0f));
+                Vector3(0.0f, -1.0f, 0.0f), color);
     };
 
-    addBox(Vector3(-0.18f, 0.45f, 0.0f), Vector3(0.12f, 0.45f, 0.12f));
-    addBox(Vector3(0.18f, 0.45f, 0.0f), Vector3(0.12f, 0.45f, 0.12f));
-    addBox(Vector3(0.0f, 1.25f, 0.0f), Vector3(0.36f, 0.42f, 0.16f));
-    addBox(Vector3(-0.48f, 1.24f, 0.0f), Vector3(0.10f, 0.45f, 0.10f));
-    addBox(Vector3(0.48f, 1.24f, 0.0f), Vector3(0.10f, 0.45f, 0.10f));
-    addBox(Vector3(0.0f, 1.86f, 0.0f), Vector3(0.22f, 0.22f, 0.20f));
+    addBox(Vector3::Zero, Vector3(0.50f, 0.50f, 0.20f),
+           Color(0.16f, 0.18f, 0.17f, 1.0f));
+    addBox(Vector3(0.0f, 0.0f, -0.23f), Vector3(0.42f, 0.42f, 0.045f),
+           Color(0.035f, 0.045f, 0.04f, 1.0f));
+
+    const Color fuseColor = m_IsPowered
+        ? Color(0.68f, 0.82f, 0.64f, 1.0f)
+        : Color(0.11f, 0.13f, 0.12f, 1.0f);
+    addBox(Vector3(-0.25f, -0.06f, -0.30f), Vector3(0.075f, 0.25f, 0.04f), fuseColor);
+    addBox(Vector3(0.0f, -0.06f, -0.30f), Vector3(0.075f, 0.25f, 0.04f), fuseColor);
+    addBox(Vector3(0.25f, -0.06f, -0.30f), Vector3(0.075f, 0.25f, 0.04f), fuseColor);
+
+    const Color indicatorColor = m_IsPowered
+        ? Color(0.12f, 1.0f, 0.24f, 1.0f)
+        : Color(0.85f, 0.04f, 0.025f, 1.0f);
+    addBox(Vector3(0.0f, 0.33f, -0.31f), Vector3(0.12f, 0.055f, 0.045f),
+           indicatorColor);
+
+    addBox(Vector3(0.46f, 0.0f, -0.30f), Vector3(0.025f, 0.16f, 0.04f),
+           Color(0.52f, 0.39f, 0.12f, 1.0f));
+}
+
+void FuseBox::Init()
+{
+    m_Vertices.reserve(168);
+    m_Indices.reserve(504);
+    BuildGeometry();
 
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
     m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
-    MATERIAL material{};
-    material.Diffuse = Color(0.70f, 0.74f, 0.70f, 1.0f);
-    material.Specular = Color(0.0f, 0.0f, 0.0f, 1.0f);
-    material.Shininess = 1.0f;
-    material.TextureEnable = FALSE;
     m_Material = std::make_unique<Material>();
+    MATERIAL material{};
+    material.Diffuse = Color(1.0f, 1.0f, 1.0f, 1.0f);
+    material.Specular = Color(0.14f, 0.14f, 0.12f, 1.0f);
+    material.Shininess = 18.0f;
+    material.TextureEnable = FALSE;
     m_Material->Create(material);
 
-    m_Scale = Vector3(8.0f, 16.0f, 8.0f);
+    m_Scale = Vector3(12.0f, 18.0f, 4.0f);
 }
 
-void ShadowMan::Update()
+void FuseBox::Update()
 {
-    --m_LifeTimer;
-    if (m_LifeTimer <= 0)
+}
+
+const char* FuseBox::GetInteractionPrompt() const
+{
+    return Core::Game::GetInstance()->GetItemCount() < 3
+        ? "Requires 3 fuses"
+        : "Restore power";
+}
+
+void FuseBox::Interact(Player& player)
+{
+    (void)player;
+
+    Core::Game* game = Core::Game::GetInstance();
+    if (m_IsPowered || game->GetItemCount() < 3)
     {
-        Destroy();
         return;
     }
 
-    const std::vector<Player*> players =
-        Core::Game::GetInstance()->GetObjects<Player>();
-    if (players.empty() || players.front() == nullptr)
-    {
-        return;
-    }
+    m_IsPowered = true;
+    game->SetPowerRestored(true);
+    BuildGeometry();
+    m_VertexBuffer.Modify(m_Vertices);
+    Input::SetVibration(18, 0.28f);
 
-    const Vector3 toPlayer = players.front()->GetPosition() - m_Position;
-    if (toPlayer.LengthSquared() > 0.0001f)
+    ScreenDustOverlay* crt =
+        game->GetObj<ScreenDustOverlay>("CRTNoise");
+    if (crt != nullptr)
     {
-        m_Rotation.y = std::atan2(toPlayer.x, toPlayer.z);
+        crt->SetPower(0.9f);
+        crt->SetActive(true);
+        crt->SetTimer(0.7f);
     }
 }
 
-void ShadowMan::Draw(Camera* camera)
+void FuseBox::Draw(Camera* camera)
 {
-    if (m_LifeTimer <= 0)
-    {
-        return;
-    }
-
     camera->SetCamera();
 
     const Matrix rotation = Matrix::CreateFromYawPitchRoll(
@@ -137,6 +170,7 @@ void ShadowMan::Draw(Camera* camera)
 
     ID3D11DeviceContext* context = Renderer::GetDeviceContext();
     context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
     m_Shader.SetGPU();
     m_VertexBuffer.SetGPU();
     m_IndexBuffer.SetGPU();
@@ -144,7 +178,7 @@ void ShadowMan::Draw(Camera* camera)
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
 }
 
-void ShadowMan::Uninit()
+void FuseBox::Uninit()
 {
     m_Vertices.clear();
     m_Indices.clear();

@@ -37,9 +37,14 @@ namespace Graphics
 
         m_IndexBuffer.Create(m_Indices);
 
-        m_Shader.Create(
+        m_BloomShader.Create(
             "shader/unlitTextureVS.hlsl",
-            "shader/PS_HorrorDust.hlsl"
+            "shader/bloomCompositePS.hlsl"
+        );
+
+        m_OverlayShader.Create(
+            "shader/unlitTextureVS.hlsl",
+            "shader/crtOverlayPS.hlsl"
         );
 
         m_Material = std::make_unique<Material>();
@@ -61,19 +66,24 @@ namespace Graphics
         SAFE_RELEASE(m_TimeBuffer);
     }
 
-    void FullScreenQuad::Draw(ID3D11ShaderResourceView* srv, float time)
+    void FullScreenQuad::Draw(
+        ID3D11ShaderResourceView* bloomSRV,
+        float time,
+        float bloomIntensity,
+        float noiseAmount)
     {
         ID3D11DeviceContext* context =
             Renderer::GetDeviceContext();
 
         Renderer::SetWorldViewProjection2D();
         Renderer::SetDepthEnable(false);
+        Renderer::SetUV(0.0f, 0.0f, 1.0f, 1.0f);
 
         TimeBuffer tb{};
         tb.time = time;
-        tb.dummy1 = 0.0f;
-        tb.dummy2 = 0.0f;
-        tb.dummy3 = 0.0f;
+        tb.bloomIntensity = bloomIntensity;
+        tb.noiseAmount = noiseAmount;
+        tb.padding = 0.0f;
 
         context->UpdateSubresource(
             m_TimeBuffer,
@@ -84,17 +94,34 @@ namespace Graphics
             0
         );
 
-        m_Shader.SetGPU();
         m_VertexBuffer.SetGPU();
         m_IndexBuffer.SetGPU();
         m_Material->SetGPU();
+
+        context->PSSetConstantBuffers(0, 1, &m_TimeBuffer);
 
         context->IASetPrimitiveTopology(
             D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP
         );
 
+        // The original scene is already on the back buffer. Add only bloom.
+        m_BloomShader.SetGPU();
+        Renderer::SetBlendState(BS_ADDITIVE);
+        context->PSSetShaderResources(0, 1, &bloomSRV);
         context->DrawIndexed(4, 0, 0);
 
+        ID3D11ShaderResourceView* nullResource = nullptr;
+        context->PSSetShaderResources(0, 1, &nullResource);
+
+        // CRT is a transparent overlay and can never replace the scene with black.
+        if (noiseAmount > 0.0f)
+        {
+            m_OverlayShader.SetGPU();
+            Renderer::SetBlendState(BS_ALPHABLEND);
+            context->DrawIndexed(4, 0, 0);
+        }
+
+        Renderer::SetBlendState(BS_NONE);
         Renderer::SetDepthEnable(true);
     }
 }

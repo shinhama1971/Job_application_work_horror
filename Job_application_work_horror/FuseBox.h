@@ -4,36 +4,35 @@
 #include "VertexBuffer.h"
 #include "IndexBuffer.h"
 #include "Shader.h"
-#include "Texture.h"
 #include "Material.h"
+#include "Interactable.h"
 
-class Camera;
-
-class Wall : public Object
+class FuseBox : public Object, public Interactable
 {
 private:
     std::vector<VERTEX_3D> m_Vertices;
     std::vector<unsigned int> m_Indices;
-
-    IndexBuffer m_IndexBuffer;
     VertexBuffer<VERTEX_3D> m_VertexBuffer;
-
+    IndexBuffer m_IndexBuffer;
     std::unique_ptr<Material> m_Material;
+
+    bool m_IsPowered = false;
+
+    void BuildGeometry();
 
 public:
     void Init() override;
     void Update() override;
-    void Draw(Camera* cam) override;
+    void Draw(Camera* camera) override;
     void Uninit() override;
 
-    void ResolveCollision(
-        DirectX::SimpleMath::Vector3& position,
-        float radius) const;
-
-    void SetScale(float x, float y, float z)
+    bool IsInteractionEnabled() const override { return !m_IsPowered; }
+    DirectX::SimpleMath::Vector3 GetInteractionPosition() const override
     {
-        m_Scale = DirectX::SimpleMath::Vector3(x, y, z);
+        return m_Position;
     }
+    const char* GetInteractionPrompt() const override;
+    void Interact(Player& player) override;
 
     void SetPosition(float x, float y, float z)
     {

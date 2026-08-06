@@ -104,6 +104,15 @@ namespace Core
             }
         }
 
+        m_Instance->m_PostProcess.CaptureBackBuffer();
+        m_Instance->m_PostProcess.Draw();
+
+        // Draw HUD and scene overlays after bloom so text stays sharp.
+        if (m_Instance->m_Scene)
+        {
+            m_Instance->m_Scene->Draw(&m_Instance->m_Camera);
+        }
+
         Renderer::DrawEnd();
     }
     void Game::Uninit()
@@ -160,6 +169,7 @@ namespace Core
 
         case SceneName::Stage:
             m_ItemCount = 0;
+            m_PowerRestored = false;
             m_Scene = std::make_unique<StageScene>();
             break;
 

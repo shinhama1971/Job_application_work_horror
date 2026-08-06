@@ -40,6 +40,7 @@ namespace Core
         std::vector<std::function<void()>> m_PendingObjectCommands;
 
         int m_ItemCount = 0;
+        bool m_PowerRestored = false;
 
         void ChangeScene(SceneName sName);
 
@@ -127,6 +128,16 @@ namespace Core
         int GetItemCount() const
         {
             return m_ItemCount;
+        }
+
+        void SetPowerRestored(bool restored)
+        {
+            m_PowerRestored = restored;
+        }
+
+        bool IsPowerRestored() const
+        {
+            return m_PowerRestored;
         }
 
 

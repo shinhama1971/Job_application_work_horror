@@ -69,6 +69,8 @@ private:
 	//コントローラー入力情報を保存する変数
 	XINPUT_STATE controllerState;
 	XINPUT_STATE controllerState_old;
+	bool controllerConnected;
+	DWORD controllerIndex;
 
 	int VibrationTime; //振動継続時間をカウントする変数
 
@@ -78,6 +80,7 @@ public:
 	//~Input(); //デストラクタ
 	static void Create(); //作成
 	static void Update(); //更新
+	static bool IsControllerConnected();
 	static void Release(); //解放
 
 	//キー入力

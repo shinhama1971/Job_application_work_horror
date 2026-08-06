@@ -47,7 +47,7 @@ void BatteryItem::Init()
         m_Materials[i]->SetTexture(m_Textures[i].get());
     }
 
-    m_Scale = Vector3(15.0f, 15.0f, 15.0f);
+    m_Scale = Vector3(5.0f, 5.0f, 5.0f);
 }
 
 void BatteryItem::Update()

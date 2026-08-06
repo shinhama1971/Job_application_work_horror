@@ -19,7 +19,10 @@ PS_IN main(in VS_IN input)
     output.col = input.col;
     
     output.depth = 0.0f; // カメラ空間のz座標を出力に格納
-    output.viewPos = float3(0.0f, 0.0f, 0.0f); // カメラから見たx,y,z座標を出力に格納
+    output.viewPos = float3(0.0f, 0.0f, 0.0f);
+    output.viewNormal = float3(0.0f, 0.0f, 0.0f);
+    output.worldPos = float3(0.0f, 0.0f, 0.0f);
+    output.worldNormal = float3(0.0f, 0.0f, 0.0f); // カメラから見たx,y,z座標を出力に格納
 	
     return output;
 }

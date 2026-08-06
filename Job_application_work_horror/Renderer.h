@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #define _CRT_SECURE_NO_WARNINGS
 #include	<d3d11.h>
 #include	<DirectXMath.h>
@@ -9,15 +9,15 @@
 #include	<d3dcompiler.h>
 #include	<locale.h>
 
-//ŠO•”ƒ‰ƒCƒuƒ‰ƒŠ
+//å¤–éƒ¨ãƒ©ã‚¤ãƒ–ãƒ©ãƒª
 #pragma comment(lib,"directxtk.lib")
 #pragma comment(lib,"d3d11.lib")
 #pragma comment(lib,"d3dcompiler.lib")
 
-// Direct3D‰ğ•ú‚ÌŠÈ—ª‰»ƒ}ƒNƒ
+// Direct3Dè§£æ”¾ã®ç°¡ç•¥åŒ–ãƒã‚¯ãƒ­
 #define SAFE_RELEASE(p) { if( NULL != p ) { p->Release(); p = NULL; } }
 
-// ‚R‚c’¸“_ƒf[ƒ^
+// ï¼“ï¼¤é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿
 struct VERTEX_3D
 {
 	DirectX::SimpleMath::Vector3 position;
@@ -26,26 +26,51 @@ struct VERTEX_3D
 	DirectX::SimpleMath::Vector2 uv;
 };
 
-// ƒuƒŒƒ“ƒhƒXƒe[ƒg
+// ãƒ–ãƒ¬ãƒ³ãƒ‰ã‚¹ãƒ†ãƒ¼ãƒˆ
 enum EBlendState {
-	BS_NONE = 0,							// ”¼“§–¾‡¬–³‚µ
-	BS_ALPHABLEND,							// ”¼“§–¾‡¬
-	BS_ADDITIVE,							// ‰ÁZ‡¬
-	BS_SUBTRACTION,							// Œ¸Z‡¬
+	BS_NONE = 0,							// åŠé€æ˜åˆæˆç„¡ã—
+	BS_ALPHABLEND,							// åŠé€æ˜åˆæˆ
+	BS_ADDITIVE,							// åŠ ç®—åˆæˆ
+	BS_SUBTRACTION,							// æ¸›ç®—åˆæˆ
 	MAX_BLENDSTATE
 };
 
-//•½sŒõŒ¹
+//å¹³è¡Œå…‰æº
 struct LIGHT
 {
-	BOOL Enable;//Œõ‚ğg‚¤‚©”Û‚©‚Ìƒtƒ‰ƒO
-	BOOL Dummy[3];
-	DirectX::SimpleMath::Vector4 Direction;//•ÀsŒõŒ¹‚Ì•ûŒü
-	DirectX::SimpleMath::Color Diffuse;//•½sŒõŒ¹‚Ì‹­‚³‚ÆF
-	DirectX::SimpleMath::Color Ambient;//ŠÂ‹«Z‚Ì‹­‚³‚ÆF
+	BOOL Enable;
+	BOOL FlashlightEnabled;
+	float Intensity;
+	float Range;
+	DirectX::SimpleMath::Vector4 Direction;
+	DirectX::SimpleMath::Color Diffuse;
+	DirectX::SimpleMath::Color Ambient;
+	DirectX::SimpleMath::Vector4 SpotParams; // inner cosine, outer cosine, edge exponent, unused
 };
 
-//ƒTƒuƒZƒbƒg
+static_assert(sizeof(LIGHT) == 80, "LIGHT must match the HLSL constant-buffer layout");
+
+static constexpr int MAX_ENVIRONMENT_LIGHTS = 8;
+
+struct ENVIRONMENT_POINT_LIGHT
+{
+	DirectX::SimpleMath::Vector4 PositionRange;
+	DirectX::SimpleMath::Vector4 ColorIntensity;
+};
+
+struct ENVIRONMENT_LIGHTS
+{
+	ENVIRONMENT_POINT_LIGHT Lights[MAX_ENVIRONMENT_LIGHTS];
+	int Count;
+	float Padding[3];
+};
+
+static_assert(sizeof(ENVIRONMENT_POINT_LIGHT) == 32,
+	"Environment point light must match HLSL layout");
+static_assert(sizeof(ENVIRONMENT_LIGHTS) == 272,
+	"Environment light buffer must match HLSL layout");
+
+//ã‚µãƒ–ã‚»ãƒƒãƒˆ
 struct SUBSET{
 	std::string MtrlName;
 	unsigned int IndexNum = 0;
@@ -55,7 +80,7 @@ struct SUBSET{
 	unsigned int MaterialIdx= 0;
 };
 
-//ƒ}ƒeƒŠƒAƒ‹
+//ãƒãƒ†ãƒªã‚¢ãƒ«
 struct MATERIAL
 {
 	DirectX::SimpleMath::Color Ambient;
@@ -69,7 +94,7 @@ struct MATERIAL
 
 };
 //-----------------------------------------------------------------------------
-//RendererƒNƒ‰ƒX
+//Rendererã‚¯ãƒ©ã‚¹
 //-----------------------------------------------------------------------------
 class Renderer
 {
@@ -88,8 +113,10 @@ private:
 	static ID3D11Buffer*			m_pProjectionBuffer;
 
 	static ID3D11Buffer* m_pLightBuffer;
+	static ID3D11Buffer* m_pEnvironmentLightBuffer;
 	static ID3D11Buffer* m_pMaterialBuffer;
 	static LIGHT m_Light;
+	static ENVIRONMENT_LIGHTS m_EnvironmentLights;
 	static bool m_LightEnable;
 
 	static ID3D11Buffer* m_pTextureBuffer;
@@ -97,7 +124,7 @@ private:
 	static ID3D11DepthStencilState* m_pDepthStateEnable;
 	static ID3D11DepthStencilState* m_pDepthStateDisable;
 
-	static ID3D11BlendState*		m_pBlendState[MAX_BLENDSTATE]; // ƒuƒŒƒ“ƒh ƒXƒe[ƒg;
+	static ID3D11BlendState*		m_pBlendState[MAX_BLENDSTATE]; // ãƒ–ãƒ¬ãƒ³ãƒ‰ ã‚¹ãƒ†ãƒ¼ãƒˆ;
 	static ID3D11BlendState*		m_pBlendStateATC;
 
 	static HRESULT CreateRenderAndDepthResources();
@@ -135,6 +162,7 @@ public:
 	static bool CreateConstantBufferWrite(unsigned int bytesize, ID3D11Buffer** pConstantBuffer);
 
 	static void SetLight(LIGHT Light);
+	static void SetEnvironmentLights(const ENVIRONMENT_LIGHTS& lights);
 	static void SetLightEnable(bool Enable);
 	static bool GetLightEnable();
 	static void SetMaterial(MATERIAL Material);
@@ -157,7 +185,7 @@ public:
 	static void ClearDepth();
 
 	//=============================================================================
-	// ƒuƒŒƒ“ƒh ƒXƒe[ƒgİ’è
+	// ãƒ–ãƒ¬ãƒ³ãƒ‰ ã‚¹ãƒ†ãƒ¼ãƒˆè¨­å®š
 	//=============================================================================
 	static void SetBlendState(int nBlendState)
 	{

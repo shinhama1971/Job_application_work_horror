@@ -1,26 +1,26 @@
 #pragma once
 
 #include "Object.h"
-#include "Texture.h"
-#include "StaticMesh.h"
-#include "MeshRenderer.h"
+#include "VertexBuffer.h"
+#include "IndexBuffer.h"
+#include "Shader.h"
 #include "Material.h"
 
 class ShadowMan : public Object
 {
 private:
-    MeshRenderer m_MeshRenderer;
+    std::vector<VERTEX_3D> m_Vertices;
+    std::vector<unsigned int> m_Indices;
+    VertexBuffer<VERTEX_3D> m_VertexBuffer;
+    IndexBuffer m_IndexBuffer;
+    std::unique_ptr<Material> m_Material;
 
-    std::vector<std::unique_ptr<Material>> m_Materials;
-    std::vector<SUBSET> m_subsets;
-    std::vector<std::unique_ptr<Texture>> m_Textures;
-
-    int m_LifeTimer = 120; // 60FPSなら約2秒
+    int m_LifeTimer = 120;
 
 public:
     void Init() override;
     void Update() override;
-    void Draw(Camera* cam) override;
+    void Draw(Camera* camera) override;
     void Uninit() override;
 
     void SetPosition(float x, float y, float z)
