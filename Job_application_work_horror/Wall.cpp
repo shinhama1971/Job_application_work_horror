@@ -1,5 +1,6 @@
 #include "Wall.h"
 #include "Camera.h"
+#include "Game.h"
 #include "Renderer.h"
 
 #include <algorithm>
@@ -127,6 +128,24 @@ void Wall::Draw(Camera* cam)
     m_IndexBuffer.SetGPU();
     m_Material->SetGPU();
 
+    context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
+}
+
+void Wall::DrawShadow()
+{
+    const Matrix rotation = Matrix::CreateFromYawPitchRoll(
+        m_Rotation.y,
+        m_Rotation.x,
+        m_Rotation.z);
+    Matrix world = Matrix::CreateScale(m_Scale) * rotation *
+        Matrix::CreateTranslation(m_Position);
+    Renderer::SetWorldMatrix(&world);
+
+    ID3D11DeviceContext* context = Renderer::GetDeviceContext();
+    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    Core::Game::GetInstance()->GetShadowMap()->SetShader();
+    m_VertexBuffer.SetGPU();
+    m_IndexBuffer.SetGPU();
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
 }
 

@@ -2,6 +2,8 @@
 #include "Renderer.h"
 #include "Application.h"
 
+#include <algorithm>
+
 namespace Effect
 {
     void PostProcess::Init()
@@ -44,6 +46,36 @@ namespace Effect
     void PostProcess::Update()
     {
         m_Time += 1.0f / 60.0f;
+
+        // Smooth changes so sprinting and battery warnings never pop on screen.
+        m_NoiseAmount +=
+            (m_TargetNoiseAmount - m_NoiseAmount) * 0.075f;
+        m_VignetteStrength +=
+            (m_TargetVignetteStrength - m_VignetteStrength) * 0.075f;
+
+        if (m_BloomPulseTimer > 0.0f && m_BloomPulseDuration > 0.0f)
+        {
+            m_BloomPulseTimer =
+                (std::max)(0.0f, m_BloomPulseTimer - 1.0f / 60.0f);
+            const float remaining =
+                m_BloomPulseTimer / m_BloomPulseDuration;
+            m_BloomIntensity = m_BloomBaseIntensity +
+                m_BloomPulseStrength * remaining * remaining;
+        }
+        else
+        {
+            m_BloomIntensity +=
+                (m_BloomBaseIntensity - m_BloomIntensity) * 0.12f;
+        }
+    }
+
+    void PostProcess::TriggerBloomPulse(float peakIntensity, float duration)
+    {
+        m_BloomPulseDuration = (std::max)(duration, 0.01f);
+        m_BloomPulseTimer = m_BloomPulseDuration;
+        m_BloomPulseStrength =
+            (std::max)(0.0f, peakIntensity - m_BloomBaseIntensity);
+        m_BloomIntensity = m_BloomBaseIntensity + m_BloomPulseStrength;
     }
 
     void PostProcess::Begin()
@@ -131,6 +163,7 @@ namespace Effect
             m_BloomVerticalTexture.GetSRV(),
             m_Time,
             m_BloomIntensity,
-            m_EnableNoise ? 1.0f : 0.0f);
+            m_EnableNoise ? m_NoiseAmount : 0.0f,
+            m_VignetteStrength);
     }
 }

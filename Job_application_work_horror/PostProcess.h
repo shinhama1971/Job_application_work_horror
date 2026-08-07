@@ -12,7 +12,15 @@ namespace Effect
         bool m_EnableNoise = true;
 
         float m_Time = 0.0f;
+        float m_BloomBaseIntensity = 0.72f;
         float m_BloomIntensity = 0.72f;
+        float m_BloomPulseStrength = 0.0f;
+        float m_BloomPulseTimer = 0.0f;
+        float m_BloomPulseDuration = 0.0f;
+        float m_NoiseAmount = 1.0f;
+        float m_TargetNoiseAmount = 1.0f;
+        float m_VignetteStrength = 1.0f;
+        float m_TargetVignetteStrength = 1.0f;
 
         Graphics::RenderTexture m_RenderTexture;
         Graphics::RenderTexture m_BloomExtractTexture;
@@ -36,6 +44,14 @@ namespace Effect
         void CaptureBackBuffer();
         void Draw();
 
+        void TriggerBloomPulse(float peakIntensity, float duration);
+
+        void SetAtmosphere(float noiseAmount, float vignetteStrength)
+        {
+            m_TargetNoiseAmount = noiseAmount;
+            m_TargetVignetteStrength = vignetteStrength;
+        }
+
         void SetNoise(bool enable)
         {
             m_EnableNoise = enable;
@@ -48,6 +64,7 @@ namespace Effect
 
         void SetBloomIntensity(float intensity)
         {
+            m_BloomBaseIntensity = intensity;
             m_BloomIntensity = intensity;
         }
     };

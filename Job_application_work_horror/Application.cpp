@@ -80,24 +80,27 @@ bool Application::InitApp()
     // インスタンスハンドル設定
     m_hInst = hInst;
 
+    // Use the desktop resolution before Direct3D and post-process textures are
+    // created. This keeps every render target the same size in fullscreen.
+    m_Width = static_cast<uint32_t>(GetSystemMetrics(SM_CXSCREEN));
+    m_Height = static_cast<uint32_t>(GetSystemMetrics(SM_CYSCREEN));
+
     // ウィンドウのサイズを設定
     RECT rc = {};
     rc.right = static_cast<LONG>(m_Width);
     rc.bottom = static_cast<LONG>(m_Height);
 
     // ウィンドウサイズを調整
-    auto style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU;
-    AdjustWindowRect(&rc, style, FALSE);
+    auto style = WS_POPUP | WS_MINIMIZEBOX;
 
     // ウィンドウを生成
     m_hWnd = CreateWindowEx(
-        0,
-        //        WS_EX_TOPMOST,
+        WS_EX_APPWINDOW,
         ClassName,
         WindowName,
         style,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
+        0,
+        0,
         rc.right - rc.left,
         rc.bottom - rc.top,
         nullptr,
@@ -111,7 +114,7 @@ bool Application::InitApp()
     }
 
     // ウィンドウを表示
-    ShowWindow(m_hWnd, SW_SHOWNORMAL);
+    ShowWindow(m_hWnd, SW_SHOW);
 
     // ウィンドウを更新
     UpdateWindow(m_hWnd);
@@ -209,7 +212,7 @@ void Application::MainLoop()
 //-----------------------------------------------------------------------------
 LRESULT CALLBACK Application::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-    static bool isFullscreen = false;
+    static bool isFullscreen = true;
     static bool isMessageBoxShowed = false;
     switch (uMsg)
     {
@@ -239,31 +242,6 @@ LRESULT CALLBACK Application::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
             PostMessage(hWnd, WM_CLOSE, wParam, lParam);//「WM_CLOSE」を送る
         }
 
-        else if (LOWORD(wParam) == VK_F11)
-        {
-            isFullscreen = !isFullscreen;
-            if (isFullscreen) {
-                //フルスクリーンに切り替え
-                //g_pSwapChain->SetFullscreenState(TRUE, NULL);
-                //ShowWindow(hWnd, SW_MAXIMIZE);
-
-                // 疑似フルスクリーンモードに変更
-                SetWindowLongPtr(hWnd, GWL_STYLE, WS_POPUP | WS_MINIMIZEBOX); // ウィンドウ枠を削除
-                // ディスプレイ解像度を取得
-                int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-                int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-                SetWindowPos(hWnd, HWND_TOP, 0, 0, screenWidth, screenHeight, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
-            }
-            else {
-                //ウィンドウモードに戻す
-                //g_pSwapChain->SetFullscreenState(FALSE, NULL);
-                //ShowWindow(hWnd, SW_RESTORE);
-
-                // 通常ウィンドウに戻す
-                SetWindowLongPtr(hWnd, GWL_STYLE, WS_OVERLAPPEDWINDOW); // ウィンドウ枠を戻す
-                SetWindowPos(hWnd, HWND_TOP, 100, 100, m_Width, m_Height, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
-            }
-        }
         break;
 
     case WM_ACTIVATE:

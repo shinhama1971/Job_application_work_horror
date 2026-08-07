@@ -61,6 +61,7 @@ private:
     bool m_IsFPS = true;                    // true: 一人称, false: 三人称
     bool m_SpawnAdjusted = false;           // スポーン位置調整フラグ
     bool m_CanControl = true;
+    bool m_IsSprinting = false;
 public:
     void Init() override;
     void Update() override;
@@ -99,5 +100,10 @@ public:
     bool CanControl() const
     {
         return m_CanControl;
+    }
+
+    bool IsSprinting() const
+    {
+        return m_IsSprinting;
     }
 };

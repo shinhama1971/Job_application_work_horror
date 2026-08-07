@@ -13,6 +13,7 @@
 #include "Renderer.h"
 #include "Object.h"
 #include"PostProcess.h"
+#include "ShadowMap.h"
 enum class SceneName
 {
     Title,
@@ -32,6 +33,7 @@ namespace Core
         std::unique_ptr<Scene> m_Scene;
         Camera m_Camera;
         Effect::PostProcess m_PostProcess;
+        Effect::ShadowMap m_ShadowMap;
 
         std::vector<std::unique_ptr<Object>> m_Objects;
         std::unordered_map<std::string, Object*> m_NamedObjects;
@@ -150,6 +152,11 @@ namespace Core
         Effect::PostProcess* GetPostProcess()
         {
             return &m_PostProcess;
+        }
+
+        Effect::ShadowMap* GetShadowMap()
+        {
+            return &m_ShadowMap;
         }
     };
 }

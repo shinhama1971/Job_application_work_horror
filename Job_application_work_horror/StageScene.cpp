@@ -153,12 +153,6 @@ void StageScene::Init()
     Item* item3 = game->CreateObj<Item>("Item3");
     item3->SetPosition(150.0f, -95.0f, -140.0f);
 
-    // UI
-    Texture2D* ui = game->CreateObj<Texture2D>("UI_Back");
-    ui->SetTexture("assets/texture/ui_back.png");
-    ui->SetPosition(-475.0f, -300.0f, 0.0f);
-    ui->SetScale(250.0f, 120.0f, 0.0f);
-
     // ドア
     Door* door = game->CreateObj<Door>("Door");
     door->SetPosition(0.0f, -74.0f, 40.0f);
@@ -221,6 +215,22 @@ void StageScene::Update()
         return;
     }
 
+    Core::Game* game = Core::Game::GetInstance();
+    float lowBattery = (25.0f - player->GetBattery()) / 25.0f;
+    if (lowBattery < 0.0f) lowBattery = 0.0f;
+    if (lowBattery > 1.0f) lowBattery = 1.0f;
+
+    const float powerCalm = game->IsPowerRestored() ? 0.12f : 0.0f;
+    const float sprintStress = player->IsSprinting() ? 1.0f : 0.0f;
+    const float noiseAmount =
+        0.82f - powerCalm + lowBattery * 0.42f + sprintStress * 0.20f;
+    const float vignetteStrength =
+        0.88f - powerCalm + lowBattery * 0.34f + sprintStress * 0.14f;
+
+    game->GetPostProcess()->SetAtmosphere(
+        noiseAmount,
+        vignetteStrength);
+
     m_InteractionSystem.Update(*player);
 }
 
@@ -255,6 +265,7 @@ void StageScene::Draw(Camera* camera)
 
 void StageScene::Uninit()
 {
+    Core::Game::GetInstance()->GetPostProcess()->SetAtmosphere(1.0f, 1.0f);
     m_Hud.Uninit();
 
     Core::Game* game = Core::Game::GetInstance();
@@ -289,8 +300,6 @@ void StageScene::Uninit()
     game->DestroyObj("Item1");
     game->DestroyObj("Item2");
     game->DestroyObj("Item3");
-
-    game->DestroyObj("UI_Back");
 
     game->DestroyObj("Door");
     game->DestroyObj("FuseBox");

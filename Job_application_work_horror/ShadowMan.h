@@ -15,6 +15,17 @@ private:
     IndexBuffer m_IndexBuffer;
     std::unique_ptr<Material> m_Material;
 
+    struct DissolveBuffer
+    {
+        float Time;
+        float Visibility;
+        float EdgeWidth;
+        float Padding;
+    };
+
+    ID3D11Buffer* m_DissolveBuffer = nullptr;
+    float m_Age = 0.0f;
+
     int m_LifeTimer = 120;
 
 public:

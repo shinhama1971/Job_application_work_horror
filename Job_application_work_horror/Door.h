@@ -28,6 +28,7 @@ public:
     void Init() override;
     void Update() override;
     void Draw(Camera* cam) override;
+    void DrawShadow() override;
     void Uninit() override;
 
     bool IsInteractionEnabled() const override { return !m_IsOpen && !m_IsOpening; }

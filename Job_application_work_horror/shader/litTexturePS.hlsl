@@ -2,8 +2,66 @@
 
 Texture2D g_Texture : register(t0);
 SamplerState g_SamplerState : register(s0);
+Texture2D<float> g_FlashlightShadowMap : register(t5);
+SamplerComparisonState g_ShadowSampler : register(s1);
 
-float4 main(in PS_IN input) : SV_Target
+cbuffer ShadowBuffer : register(b8)
+{
+    matrix ShadowViewProjection;
+    float4 ShadowParameters;
+}
+
+struct LIT_PS_IN
+{
+    float4 pos : SV_POSITION;
+    float4 col : COLOR0;
+    float2 tex : TEXCOORD0;
+    float depth : TEXCOORD1;
+    float3 viewPos : TEXCOORD2;
+    float3 viewNormal : TEXCOORD3;
+    float3 worldPos : TEXCOORD4;
+    float3 worldNormal : TEXCOORD5;
+    float4 shadowPos : TEXCOORD6;
+};
+
+float GetFlashlightShadow(float4 shadowPosition)
+{
+    if (shadowPosition.w <= 0.0f)
+    {
+        return 1.0f;
+    }
+
+    const float3 projected = shadowPosition.xyz / shadowPosition.w;
+    const float2 shadowUV = float2(
+        projected.x * 0.5f + 0.5f,
+        -projected.y * 0.5f + 0.5f);
+
+    if (shadowUV.x <= 0.0f || shadowUV.x >= 1.0f ||
+        shadowUV.y <= 0.0f || shadowUV.y >= 1.0f ||
+        projected.z <= 0.0f || projected.z >= 1.0f)
+    {
+        return 1.0f;
+    }
+
+    float visibility = 0.0f;
+    [unroll]
+    for (int y = -1; y <= 1; ++y)
+    {
+        [unroll]
+        for (int x = -1; x <= 1; ++x)
+        {
+            const float2 offset = float2(x, y) * ShadowParameters.x;
+            visibility += g_FlashlightShadowMap.SampleCmpLevelZero(
+                g_ShadowSampler,
+                shadowUV + offset,
+                projected.z - ShadowParameters.y);
+        }
+    }
+
+    return visibility / 9.0f;
+}
+
+float4 main(in LIT_PS_IN input) : SV_Target
 {
     float4 color = input.col;
 
@@ -70,7 +128,8 @@ float4 main(in PS_IN input) : SV_Target
             * Light.Intensity
             * shapedCone
             * attenuation
-            * softenedLambert;
+            * softenedLambert
+            * GetFlashlightShadow(input.shadowPos);
     }
 
     color.rgb *= lighting;

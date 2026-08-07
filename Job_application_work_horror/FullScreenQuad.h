@@ -39,6 +39,7 @@ namespace Graphics
             ID3D11ShaderResourceView* bloomSRV,
             float time,
             float bloomIntensity,
-            float noiseAmount);
+            float noiseAmount,
+            float vignetteStrength);
     };
 }

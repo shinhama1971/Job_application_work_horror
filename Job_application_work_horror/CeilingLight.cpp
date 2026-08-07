@@ -103,12 +103,52 @@ void CeilingLight::Init()
 
 void CeilingLight::Update()
 {
-    m_Time += 1.0f / 60.0f;
+    constexpr float deltaTime = 1.0f / 60.0f;
+    m_Time += deltaTime;
+
+    const bool powerRestored =
+        Core::Game::GetInstance()->IsPowerRestored();
+
+    if (powerRestored && !m_WasPowerRestored)
+    {
+        m_PowerOnTimer = 0.0f;
+    }
+    else if (powerRestored)
+    {
+        m_PowerOnTimer += deltaTime;
+    }
+    else
+    {
+        m_PowerOnTimer = 0.0f;
+    }
+
+    m_WasPowerRestored = powerRestored;
 
     float targetBrightness = 0.0f;
-    if (Core::Game::GetInstance()->IsPowerRestored())
+    if (powerRestored)
     {
-        targetBrightness = 1.0f;
+        // Start fixtures one after another, then make each fluorescent tube
+        // stutter briefly before it reaches full output.
+        const float startupDelay =
+            std::fmod(std::fabs(m_FlickerOffset), 5.0f) * 0.10f;
+        const float startupTime = m_PowerOnTimer - startupDelay;
+
+        if (startupTime >= 0.0f && startupTime < 0.58f)
+        {
+            const int pulse = static_cast<int>(startupTime * 24.0f);
+            const bool tubeIsOn =
+                (pulse == 0) || (pulse == 3) || (pulse == 4) ||
+                (pulse >= 7 && (pulse % 3) != 1);
+            const float warmup =
+                0.40f + (startupTime / 0.58f) * 0.60f;
+            targetBrightness = tubeIsOn ? warmup : 0.025f;
+        }
+        else if (startupTime >= 0.58f)
+        {
+            const float electricalHum =
+                std::sin((m_Time + m_FlickerOffset) * 16.0f) * 0.012f;
+            targetBrightness = 1.0f + electricalHum;
+        }
     }
     else if (m_IsEmergencyLight)
     {
@@ -123,8 +163,9 @@ void CeilingLight::Update()
             : 0.22f + (unstable + 1.0f) * 0.08f;
     }
 
-    const float response = Core::Game::GetInstance()->IsPowerRestored()
-        ? 0.08f
+    const bool startingUp = powerRestored && m_PowerOnTimer < 1.1f;
+    const float response = powerRestored
+        ? (startingUp ? 0.48f : 0.08f)
         : 0.32f;
     m_Brightness += (targetBrightness - m_Brightness) * response;
 }

@@ -56,6 +56,7 @@ void Player::Update()
 {
     if (!m_CanControl)
     {
+        m_IsSprinting = false;
         return;
     }
 
@@ -79,11 +80,11 @@ void Player::Update()
 
     const float moveLengthSquared = moveDir.LengthSquared();
     const bool isMoving = moveLengthSquared > 0.0001f;
-    const bool isSprinting = isMoving &&
+    m_IsSprinting = isMoving &&
         (Input::GetKeyPress(VK_SHIFT) ||
          Input::GetButtonPress(XINPUT_LEFT_THUMB));
     const float currentMoveSpeed = m_MoveSpeed *
-        (isSprinting ? SPRINT_SPEED_MULTIPLIER : 1.0f);
+        (m_IsSprinting ? SPRINT_SPEED_MULTIPLIER : 1.0f);
 
     if (isMoving)
     {
@@ -271,8 +272,8 @@ void Player::Update()
 	// カメラの位置と向きを更新
     if (isMoving)
     {
-        m_HeadBobTimer += isSprinting ? 0.22f : 0.14f;
-        const float amplitude = isSprinting ? 0.55f : 0.35f;
+        m_HeadBobTimer += m_IsSprinting ? 0.22f : 0.14f;
+        const float amplitude = m_IsSprinting ? 0.55f : 0.35f;
         const float targetOffset = sinf(m_HeadBobTimer) * amplitude;
         m_HeadBobOffset += (targetOffset - m_HeadBobOffset) * 0.35f;
     }

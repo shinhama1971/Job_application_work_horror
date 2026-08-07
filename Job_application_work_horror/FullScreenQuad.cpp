@@ -70,7 +70,8 @@ namespace Graphics
         ID3D11ShaderResourceView* bloomSRV,
         float time,
         float bloomIntensity,
-        float noiseAmount)
+        float noiseAmount,
+        float vignetteStrength)
     {
         ID3D11DeviceContext* context =
             Renderer::GetDeviceContext();
@@ -83,7 +84,7 @@ namespace Graphics
         tb.time = time;
         tb.bloomIntensity = bloomIntensity;
         tb.noiseAmount = noiseAmount;
-        tb.padding = 0.0f;
+        tb.padding = vignetteStrength;
 
         context->UpdateSubresource(
             m_TimeBuffer,

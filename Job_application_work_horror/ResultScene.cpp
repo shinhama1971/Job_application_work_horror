@@ -2,6 +2,7 @@
 #include "Game.h"
 #include "Input.h"
 #include"Texture2D.h"
+#include "Application.h"
 int ResultScene::s_Score = 0;
 int ResultScene::s_NextScene = static_cast<int>(SceneName::Title); // デフォルトはタイトル
 // コンストラクタ
@@ -22,7 +23,10 @@ void ResultScene::Init()
 	//背景画像オブジェクトを作成
 	Texture2D* pt = Core::Game::GetInstance()->AddObject<Texture2D>();
 	pt->SetTexture("assets/texture/background2.png");//画像を指定
-	pt->SetScale(1280.0f, 720.0f, 0.0f);//大きさを指定
+	pt->SetScale(
+		static_cast<float>(Application::GetWidth()),
+		static_cast<float>(Application::GetHeight()),
+		0.0f);//大きさを指定
 	m_MySceneObjects.emplace_back(pt);
 	
 	//リザルト文字列オブジェクト作成

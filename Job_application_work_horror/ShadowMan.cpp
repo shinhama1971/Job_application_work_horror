@@ -2,6 +2,7 @@
 #include "ShadowMan.h"
 #include "Player.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 
@@ -83,7 +84,13 @@ void ShadowMan::Init()
 
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
-    m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+    m_Shader.Create(
+        "shader/litTextureVS.hlsl",
+        "shader/shadowDissolvePS.hlsl");
+
+    Renderer::CreateConstantBuffer(
+        sizeof(DissolveBuffer),
+        &m_DissolveBuffer);
 
     MATERIAL material{};
     material.Diffuse = Color(0.70f, 0.74f, 0.70f, 1.0f);
@@ -98,6 +105,7 @@ void ShadowMan::Init()
 
 void ShadowMan::Update()
 {
+    m_Age += 1.0f / 60.0f;
     --m_LifeTimer;
     if (m_LifeTimer <= 0)
     {
@@ -141,11 +149,30 @@ void ShadowMan::Draw(Camera* camera)
     m_VertexBuffer.SetGPU();
     m_IndexBuffer.SetGPU();
     m_Material->SetGPU();
+
+    const float appear = (std::min)(m_Age / 0.35f, 1.0f);
+    const float disappear = (std::min)(
+        static_cast<float>(m_LifeTimer) / 30.0f,
+        1.0f);
+
+    DissolveBuffer dissolve{};
+    dissolve.Time = m_Age;
+    dissolve.Visibility = (std::min)(appear, disappear);
+    dissolve.EdgeWidth = 0.085f;
+    context->UpdateSubresource(
+        m_DissolveBuffer,
+        0,
+        nullptr,
+        &dissolve,
+        0,
+        0);
+    context->PSSetConstantBuffers(7, 1, &m_DissolveBuffer);
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
 }
 
 void ShadowMan::Uninit()
 {
+    SAFE_RELEASE(m_DissolveBuffer);
     m_Vertices.clear();
     m_Indices.clear();
 }

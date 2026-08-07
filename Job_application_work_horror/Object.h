@@ -22,6 +22,7 @@ public:
 	virtual void Init()=0;
 	virtual void Update() = 0;
 	virtual void Draw(Camera* cam) = 0;
+	virtual void DrawShadow() {}
 	virtual void Uninit() = 0;
 
 	void SetPosition(DirectX::SimpleMath::Vector3 pos) { m_Position = pos; }

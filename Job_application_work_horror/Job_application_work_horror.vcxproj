@@ -196,6 +196,7 @@
     <ClCompile Include="ScreenDustOverlay.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="ShadowMan.cpp" />
+    <ClCompile Include="ShadowMap.cpp" />
     <ClCompile Include="sound.cpp" />
     <ClCompile Include="SpriteRenderer.cpp" />
     <ClCompile Include="StageScene.cpp" />
@@ -246,6 +247,7 @@
     <ClInclude Include="ScreenDustOverlay.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="ShadowMan.h" />
+    <ClInclude Include="ShadowMap.h" />
     <ClInclude Include="sound.h" />
     <ClInclude Include="SpriteRenderer.h" />
     <ClInclude Include="StageScene.h" />
@@ -259,6 +261,15 @@
     <ClInclude Include="Wall.h" />
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="shader\shadowDepthPS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\shadowDepthVS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\shadowDissolvePS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="shader\bloomBlurHorizontalCS.hlsl">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>

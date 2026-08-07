@@ -20,7 +20,9 @@ private:
     float m_Time = 0.0f;
     float m_FlickerOffset = 0.0f;
     float m_Brightness = 0.0f;
+    float m_PowerOnTimer = 0.0f;
     bool m_IsEmergencyLight = false;
+    bool m_WasPowerRestored = false;
 
 public:
     void Init() override;

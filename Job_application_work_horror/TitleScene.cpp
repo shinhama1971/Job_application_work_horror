@@ -2,6 +2,7 @@
 #include "Game.h"
 #include "Input.h"
 #include "Texture2D.h"
+#include "Application.h"
 // コンストラクタ
 TitleScene::TitleScene()
 {
@@ -21,14 +22,18 @@ void TitleScene::Init()
 	pt->SetTexture("assets/texture/background1.png");//画像を指定
 	pt->SetPosition(0.0f, 0.0f, 1.0f);//位置を指定
 	pt->SetRotation(0.0f, 0.0f, 0.0f);//角度を指定
-	pt->SetScale(1280.0f, 720.0f, 0.0f);//大きさを指定
+	pt->SetScale(
+		static_cast<float>(Application::GetWidth()),
+		static_cast<float>(Application::GetHeight()),
+		0.0f);//大きさを指定
 	m_MySceneObjects.emplace_back(pt);
 
 	Texture2D* pt1 = Core::Game::GetInstance()->AddObject<Texture2D>();
 	pt1->SetTexture("assets/texture/titlerogo.png");//画像を指定
 	pt1->SetPosition(0.0f, 0.0f, 0.0f);//位置を指定
 	pt1->SetRotation(0.0f, 0.0f, 0.0f);//角度を指定
-	pt1->SetScale(580.0f, 360.0f, 0.0f);//大きさを指定
+	const float titleScale = static_cast<float>(Application::GetHeight()) / 720.0f;
+	pt1->SetScale(580.0f * titleScale, 360.0f * titleScale, 0.0f);//大きさを指定
 	m_MySceneObjects.emplace_back(pt1);
 }
 

@@ -30,6 +30,7 @@ namespace Core
 
         m_Instance->m_Camera.Init();
 
+        m_Instance->m_ShadowMap.Init();
         m_Instance->m_PostProcess.Init();
         m_Instance->ChangeScene(SceneName::Title);
     }
@@ -94,6 +95,16 @@ namespace Core
 
     void Game::Draw()
     {
+        m_Instance->m_ShadowMap.Begin(m_Instance->m_Camera);
+        for (auto& o : m_Instance->m_Objects)
+        {
+            if (!o->IsDestroy())
+            {
+                o->DrawShadow();
+            }
+        }
+        m_Instance->m_ShadowMap.End();
+
         Renderer::DrawStart();
 
         for (auto& o : m_Instance->m_Objects)
@@ -131,6 +142,7 @@ namespace Core
         m_Instance->m_Objects.clear();
         m_Instance->m_NamedObjects.clear();
         m_Instance->m_PostProcess.Uninit();
+        m_Instance->m_ShadowMap.Uninit();
 
         Input::Release();
 
