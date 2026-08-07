@@ -154,6 +154,13 @@ void Camera::SetCamera(int mode)
 {
     if (mode == 0)
     {
+        if (m_UseOverrideMatrices)
+        {
+            Renderer::SetViewMatrix(&m_OverrideView);
+            Renderer::SetProjectionMatrix(&m_OverrideProjection);
+            return;
+        }
+
         Vector3 forward = GetForward();
 
         m_Target = m_Position + forward;
@@ -217,6 +224,20 @@ void Camera::Uninit()
 void Camera::SetTarget(Vector3 target)
 {
     m_Target = target;
+}
+
+void Camera::SetOverrideMatrices(
+    const Matrix& view,
+    const Matrix& projection)
+{
+    m_OverrideView = view;
+    m_OverrideProjection = projection;
+    m_UseOverrideMatrices = true;
+}
+
+void Camera::ClearOverrideMatrices()
+{
+    m_UseOverrideMatrices = false;
 }
 
 Vector3 Camera::GetForward() const

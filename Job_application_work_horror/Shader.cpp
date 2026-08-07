@@ -19,8 +19,8 @@ void Shader::Create(std::string vs, std::string ps)
 
 	// 頂点シェーダーオブジェクトを生成、同時に頂点レイアウトも生成
 	HRESULT hr = Renderer::CreateVertexShader(
-		m_pVertexShader.GetAddressOf(),		// 頂点シェーダーオブジェクト
-		m_pVertexLayout.GetAddressOf(),			// 頂点レイアウトオブジェクト
+		m_pVertexShader.ReleaseAndGetAddressOf(),		// 頂点シェーダーオブジェクト
+		m_pVertexLayout.ReleaseAndGetAddressOf(),			// 頂点レイアウトオブジェクト
 		layout,
 		numElements,
 		vs.c_str()
@@ -33,7 +33,7 @@ void Shader::Create(std::string vs, std::string ps)
 	// ピクセルシェーダーを生成
 
 	hr = Renderer::CreatePixelShader(			// ピクセルシェーダーオブジェクトを生成
-		m_pPixelShader.GetAddressOf(),
+		m_pPixelShader.ReleaseAndGetAddressOf(),
 		ps.c_str()
 		);
 	if (FAILED(hr)) {

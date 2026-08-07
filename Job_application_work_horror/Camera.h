@@ -23,6 +23,12 @@ private:
     DirectX::SimpleMath::Vector3 m_Target{};
     DirectX::SimpleMath::Matrix m_ViewMatrix{};
 
+    bool m_UseOverrideMatrices = false;
+    DirectX::SimpleMath::Matrix m_OverrideView =
+        DirectX::SimpleMath::Matrix::Identity;
+    DirectX::SimpleMath::Matrix m_OverrideProjection =
+        DirectX::SimpleMath::Matrix::Identity;
+
     float m_CameraDirection = 0.0f;
     float m_CameraPitch = 0.0f;
 
@@ -44,6 +50,11 @@ public:
     void Uninit();
 
     void SetTarget(DirectX::SimpleMath::Vector3 target);
+
+    void SetOverrideMatrices(
+        const DirectX::SimpleMath::Matrix& view,
+        const DirectX::SimpleMath::Matrix& projection);
+    void ClearOverrideMatrices();
 
     void SetPosition(DirectX::SimpleMath::Vector3 pos)
     {

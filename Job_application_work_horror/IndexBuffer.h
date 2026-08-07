@@ -25,7 +25,7 @@ public:
 		bool sts = Renderer::CreateIndexBuffer(
 			(unsigned int)(indices.size()),				// インデックス数
 			(void*)indices.data(),						// インデックスデータ先頭アドレス
-			&m_IndexBuffer);							// インデックスバッファ
+			m_IndexBuffer.ReleaseAndGetAddressOf());							// インデックスバッファ
 
 		assert(sts == true); //結果を確認
 	}

@@ -11,6 +11,10 @@ cbuffer TimeBuffer : register(b0)
     float bloomIntensity;
     float noiseAmount;
     float vignetteStrength;
+    float screenAspect;
+    float volumeIntensity;
+    float lensDistortionStrength;
+    float horrorPulseStrength;
 };
 
 float Hash(float2 value)
@@ -47,13 +51,29 @@ float4 main(PS_IN input) : SV_TARGET
 
     float darkAlpha = saturate(vignette + scanline + darkGrain + rolling);
     float dustAlpha = dust * 0.045f * noiseAmount;
-    float alpha = saturate(darkAlpha + dustAlpha);
+
+    // Scare events add transparent synchronization tears. This pass never
+    // replaces the scene, so a missing texture can no longer make it black.
+    float bandId = floor(input.uv.y * 38.0f);
+    float bandNoise = Hash(float2(bandId, floor(time * 24.0f)));
+    float tear = step(0.86f, bandNoise) * horrorPulseStrength;
+    float thinLine = 1.0f - smoothstep(
+        0.02f,
+        0.12f,
+        abs(frac(input.uv.y * 38.0f) - 0.5f));
+    float tearAlpha = tear * thinLine * 0.16f;
+    float alpha = saturate(darkAlpha + dustAlpha + tearAlpha);
 
     float3 overlayColor = lerp(
         float3(0.0f, 0.0f, 0.0f),
         float3(0.70f, 0.74f, 0.70f),
         dust
     );
+    float channelChoice = Hash(float2(bandId + 13.0f, floor(time * 24.0f)));
+    float3 tearColor = channelChoice < 0.5f
+        ? float3(0.12f, 0.72f, 0.80f)
+        : float3(0.82f, 0.12f, 0.20f);
+    overlayColor = lerp(overlayColor, tearColor, saturate(tear));
 
     return float4(overlayColor, alpha);
 }

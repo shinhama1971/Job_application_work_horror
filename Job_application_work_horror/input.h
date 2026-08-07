@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include <d3d11.h>  // DirectX11を使うためのヘッダーファイル
 #include <DirectXMath.h> // DirextXの数学関連のヘッダーファイル
 
@@ -60,7 +61,7 @@
 class Input {
 private:
 	//自身のインスタンス
-	static Input* m_Instance;
+	static std::unique_ptr<Input> m_Instance;
 
 	//キー入力情報を保存する変数
 	BYTE keyState[256];
@@ -75,6 +76,9 @@ private:
 	int VibrationTime; //振動継続時間をカウントする変数
 
 public:
+	Input() = default;
+	Input(const Input&) = delete;
+	Input& operator=(const Input&) = delete;
 
 	//Input(); //コンストラクタ
 	//~Input(); //デストラクタ

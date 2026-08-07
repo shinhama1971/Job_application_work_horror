@@ -46,7 +46,7 @@ void ScreenDustOverlay::Init()
 
     Renderer::CreateConstantBuffer(
         sizeof(TimeBuffer),
-        &m_TimeBuffer
+        m_TimeBuffer.ReleaseAndGetAddressOf()
     );
 }
 
@@ -84,7 +84,7 @@ void ScreenDustOverlay::Draw(Camera* cam)
     tb.dummy2 = 0.0f;
 
     context->UpdateSubresource(
-        m_TimeBuffer,
+        m_TimeBuffer.Get(),
         0,
         nullptr,
         &tb,
@@ -97,7 +97,8 @@ void ScreenDustOverlay::Draw(Camera* cam)
     m_IndexBuffer.SetGPU();
     m_Material->SetGPU();
 
-    context->PSSetConstantBuffers(0, 1, &m_TimeBuffer);
+    ID3D11Buffer* timeBuffer = m_TimeBuffer.Get();
+    context->PSSetConstantBuffers(0, 1, &timeBuffer);
 
     context->IASetPrimitiveTopology(
         D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP
@@ -110,5 +111,5 @@ void ScreenDustOverlay::Draw(Camera* cam)
 
 void ScreenDustOverlay::Uninit()
 {
-    SAFE_RELEASE(m_TimeBuffer);
+    m_TimeBuffer.Reset();
 }

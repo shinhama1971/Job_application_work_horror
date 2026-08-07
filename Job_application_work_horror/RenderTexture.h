@@ -1,4 +1,5 @@
 #pragma once
+#include <wrl/client.h>
 #include "Renderer.h"
 
 namespace Graphics
@@ -6,10 +7,10 @@ namespace Graphics
     class RenderTexture
     {
     private:
-        ID3D11Texture2D* m_Texture = nullptr;
-        ID3D11RenderTargetView* m_RTV = nullptr;
-        ID3D11ShaderResourceView* m_SRV = nullptr;
-        ID3D11UnorderedAccessView* m_UAV = nullptr;
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_Texture;
+        Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_RTV;
+        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_SRV;
+        Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_UAV;
         int m_Width = 0;
         int m_Height = 0;
 
@@ -26,11 +27,11 @@ namespace Graphics
 
         ID3D11ShaderResourceView* GetSRV()
         {
-            return m_SRV;
+            return m_SRV.Get();
         }
 
-        ID3D11UnorderedAccessView* GetUAV() { return m_UAV; }
-        ID3D11Texture2D* GetTexture() { return m_Texture; }
+        ID3D11UnorderedAccessView* GetUAV() { return m_UAV.Get(); }
+        ID3D11Texture2D* GetTexture() { return m_Texture.Get(); }
         int GetWidth() const { return m_Width; }
         int GetHeight() const { return m_Height; }
     };

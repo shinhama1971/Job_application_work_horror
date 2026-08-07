@@ -4,23 +4,21 @@
 
 bool ComputeShader::Create(const char* fileName)
 {
-    void* shaderObject = nullptr;
-    int shaderObjectSize = 0;
+    std::vector<unsigned char> shaderObject;
 
     const HRESULT compileResult = Renderer::CompileShader(
-        fileName, "main", "cs_5_0", &shaderObject, &shaderObjectSize);
+        fileName, "main", "cs_5_0", shaderObject);
     if (FAILED(compileResult))
     {
         return false;
     }
 
     const HRESULT createResult = Renderer::GetDevice()->CreateComputeShader(
-        shaderObject,
-        static_cast<SIZE_T>(shaderObjectSize),
+        shaderObject.data(),
+        shaderObject.size(),
         nullptr,
         m_Shader.ReleaseAndGetAddressOf());
 
-    delete[] static_cast<unsigned char*>(shaderObject);
     return SUCCEEDED(createResult);
 }
 

@@ -6,6 +6,11 @@ cbuffer ShadowBuffer : register(b8)
     float4 ShadowParameters;
 }
 
+cbuffer ReflectionBuffer : register(b9)
+{
+    matrix ReflectionViewProjection;
+}
+
 struct LIT_PS_IN
 {
     float4 pos : SV_POSITION;
@@ -17,6 +22,7 @@ struct LIT_PS_IN
     float3 worldPos : TEXCOORD4;
     float3 worldNormal : TEXCOORD5;
     float4 shadowPos : TEXCOORD6;
+    float4 reflectionPos : TEXCOORD7;
 };
 
 LIT_PS_IN main(in VS_IN input)
@@ -36,6 +42,7 @@ LIT_PS_IN main(in VS_IN input)
     output.worldPos = worldPosition.xyz;
     output.worldNormal = normalize(mul(input.nrm.xyz, (float3x3)World));
     output.shadowPos = mul(worldPosition, ShadowViewProjection);
+    output.reflectionPos = mul(worldPosition, ReflectionViewProjection);
 
     float3x3 normalMatrix = (float3x3)wv;
     output.viewNormal = normalize(mul(input.nrm.xyz, normalMatrix));

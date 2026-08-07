@@ -8,6 +8,7 @@
 #include	<vector>
 #include	<d3dcompiler.h>
 #include	<locale.h>
+#include	<wrl/client.h>
 
 //外部ライブラリ
 #pragma comment(lib,"directxtk.lib")
@@ -102,30 +103,31 @@ private:
 
 	static D3D_FEATURE_LEVEL       m_FeatureLevel;
 
-	static ID3D11Device*           m_pDevice;
-	static ID3D11DeviceContext*    m_pDeviceContext;
-	static IDXGISwapChain*         m_pSwapChain;
-	static ID3D11RenderTargetView* m_pRenderTargetView;
-	static ID3D11DepthStencilView* m_pDepthStencilView;
+	static Microsoft::WRL::ComPtr<ID3D11Device> m_pDevice;
+	static Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_pDeviceContext;
+	static Microsoft::WRL::ComPtr<IDXGISwapChain> m_pSwapChain;
+	static Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_pRenderTargetView;
+	static Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_pDepthStencilView;
 
-	static ID3D11Buffer*			m_pWorldBuffer;
-	static ID3D11Buffer*			m_pViewBuffer;
-	static ID3D11Buffer*			m_pProjectionBuffer;
+	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pWorldBuffer;
+	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pViewBuffer;
+	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pProjectionBuffer;
 
-	static ID3D11Buffer* m_pLightBuffer;
-	static ID3D11Buffer* m_pEnvironmentLightBuffer;
-	static ID3D11Buffer* m_pMaterialBuffer;
+	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pLightBuffer;
+	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pEnvironmentLightBuffer;
+	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pMaterialBuffer;
 	static LIGHT m_Light;
 	static ENVIRONMENT_LIGHTS m_EnvironmentLights;
 	static bool m_LightEnable;
 
-	static ID3D11Buffer* m_pTextureBuffer;
+	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pTextureBuffer;
 
-	static ID3D11DepthStencilState* m_pDepthStateEnable;
-	static ID3D11DepthStencilState* m_pDepthStateDisable;
+	static Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_pDepthStateEnable;
+	static Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_pDepthStateDisable;
 
-	static ID3D11BlendState*		m_pBlendState[MAX_BLENDSTATE]; // ブレンド ステート;
-	static ID3D11BlendState*		m_pBlendStateATC;
+	static Microsoft::WRL::ComPtr<ID3D11BlendState>
+		m_pBlendState[MAX_BLENDSTATE];
+	static Microsoft::WRL::ComPtr<ID3D11BlendState> m_pBlendStateATC;
 
 	static HRESULT CreateRenderAndDepthResources();
 
@@ -147,10 +149,14 @@ public:
 	static void SetViewMatrix(DirectX::SimpleMath::Matrix* ViewMatrix);
 	static void SetProjectionMatrix(DirectX::SimpleMath::Matrix* ProjectionMatrix);
 
-	static ID3D11Device* GetDevice( void ){ return m_pDevice; }
-	static ID3D11DeviceContext* GetDeviceContext( void ){ return m_pDeviceContext; }
+	static ID3D11Device* GetDevice( void ){ return m_pDevice.Get(); }
+	static ID3D11DeviceContext* GetDeviceContext( void ){ return m_pDeviceContext.Get(); }
 
-	static HRESULT CompileShader(const char* szFileName, LPCSTR szEntryPoint, LPCSTR szShaderModel, void** ppShaderObject, int* pShaderObjectSize);
+	static HRESULT CompileShader(
+		const char* szFileName,
+		LPCSTR szEntryPoint,
+		LPCSTR szShaderModel,
+		std::vector<unsigned char>& shaderObject);
 	static HRESULT CreateVertexShader(ID3D11VertexShader** ppVertexShader, ID3D11InputLayout** ppVertexLayout, D3D11_INPUT_ELEMENT_DESC* pLayout, unsigned int numElements, const char* szFileName);
 	static HRESULT CreatePixelShader(ID3D11PixelShader** PixelShader, const char* FileName);
 
@@ -170,12 +176,12 @@ public:
 
 	static ID3D11RenderTargetView* GetBackBufferRTV()
 	{
-		return m_pRenderTargetView;
+		return m_pRenderTargetView.Get();
 	}
 
 	static ID3D11DepthStencilView* GetDepthStencilView()
 	{
-		return m_pDepthStencilView;
+		return m_pDepthStencilView.Get();
 	}
 
 	static void SetBackBufferRenderTarget();
@@ -191,7 +197,8 @@ public:
 	{
 		if (nBlendState >= 0 && nBlendState < MAX_BLENDSTATE) {
 			float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-			m_pDeviceContext->OMSetBlendState(m_pBlendState[nBlendState], blendFactor, 0xffffffff);
+			m_pDeviceContext->OMSetBlendState(
+				m_pBlendState[nBlendState].Get(), blendFactor, 0xffffffff);
 		}
 	}
 	

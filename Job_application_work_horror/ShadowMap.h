@@ -1,5 +1,6 @@
 #pragma once
 
+#include <wrl/client.h>
 #include "Renderer.h"
 #include "Shader.h"
 
@@ -18,13 +19,13 @@ namespace Effect
 
         static constexpr UINT ShadowResolution = 1024;
 
-        ID3D11Texture2D* m_Texture = nullptr;
-        ID3D11DepthStencilView* m_DepthView = nullptr;
-        ID3D11ShaderResourceView* m_ShaderResourceView = nullptr;
-        ID3D11SamplerState* m_ComparisonSampler = nullptr;
-        ID3D11RasterizerState* m_ShadowRasterizer = nullptr;
-        ID3D11RasterizerState* m_PreviousRasterizer = nullptr;
-        ID3D11Buffer* m_ShadowBuffer = nullptr;
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_Texture;
+        Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_DepthView;
+        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_ShaderResourceView;
+        Microsoft::WRL::ComPtr<ID3D11SamplerState> m_ComparisonSampler;
+        Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_ShadowRasterizer;
+        Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_PreviousRasterizer;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> m_ShadowBuffer;
 
         D3D11_VIEWPORT m_PreviousViewport{};
         UINT m_PreviousViewportCount = 1;

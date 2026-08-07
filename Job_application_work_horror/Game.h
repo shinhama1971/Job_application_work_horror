@@ -14,6 +14,7 @@
 #include "Object.h"
 #include"PostProcess.h"
 #include "ShadowMap.h"
+#include "PlanarReflection.h"
 enum class SceneName
 {
     Title,
@@ -28,12 +29,13 @@ namespace Core
     class Game
     {
     private:
-        static Game* m_Instance;
+        static std::unique_ptr<Game> m_Instance;
 
         std::unique_ptr<Scene> m_Scene;
         Camera m_Camera;
         Effect::PostProcess m_PostProcess;
         Effect::ShadowMap m_ShadowMap;
+        Effect::PlanarReflection m_PlanarReflection;
 
         std::vector<std::unique_ptr<Object>> m_Objects;
         std::unordered_map<std::string, Object*> m_NamedObjects;
@@ -43,6 +45,7 @@ namespace Core
 
         int m_ItemCount = 0;
         bool m_PowerRestored = false;
+        SceneName m_CurrentScene = SceneName::Title;
 
         void ChangeScene(SceneName sName);
 
@@ -66,8 +69,9 @@ namespace Core
         template<typename T>
         T* AddObject()
         {
-            T* pt = new T;
-            m_Objects.emplace_back(pt);
+            auto object = std::make_unique<T>();
+            T* pt = object.get();
+            m_Objects.emplace_back(std::move(object));
             pt->Init();
             return pt;
         }

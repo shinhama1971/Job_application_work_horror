@@ -10,6 +10,7 @@ namespace Effect
     {
     private:
         bool m_EnableNoise = true;
+        bool m_EnableVolumetricLight = false;
 
         float m_Time = 0.0f;
         float m_BloomBaseIntensity = 0.72f;
@@ -21,6 +22,11 @@ namespace Effect
         float m_TargetNoiseAmount = 1.0f;
         float m_VignetteStrength = 1.0f;
         float m_TargetVignetteStrength = 1.0f;
+        float m_LensDistortionStrength = 0.32f;
+        float m_HorrorPulseStrength = 0.0f;
+        float m_HorrorPulsePeak = 0.0f;
+        float m_HorrorPulseTimer = 0.0f;
+        float m_HorrorPulseDuration = 0.0f;
 
         Graphics::RenderTexture m_RenderTexture;
         Graphics::RenderTexture m_BloomExtractTexture;
@@ -45,11 +51,17 @@ namespace Effect
         void Draw();
 
         void TriggerBloomPulse(float peakIntensity, float duration);
+        void TriggerHorrorPulse(float strength, float duration);
 
         void SetAtmosphere(float noiseAmount, float vignetteStrength)
         {
             m_TargetNoiseAmount = noiseAmount;
             m_TargetVignetteStrength = vignetteStrength;
+        }
+
+        void SetVolumetricLight(bool enable)
+        {
+            m_EnableVolumetricLight = enable;
         }
 
         void SetNoise(bool enable)

@@ -145,9 +145,27 @@ void CeilingLight::Update()
         }
         else if (startupTime >= 0.58f)
         {
+            // Each old fluorescent fixture has a slightly different ballast.
+            // A rare voltage dip breaks the perfectly constant game-light look.
+            const float fixtureWear = std::fmod(
+                std::fabs(m_FlickerOffset) * 0.371f + 0.17f,
+                1.0f);
             const float electricalHum =
-                std::sin((m_Time + m_FlickerOffset) * 16.0f) * 0.012f;
-            targetBrightness = 1.0f + electricalHum;
+                std::sin((m_Time + m_FlickerOffset) *
+                    (15.0f + fixtureWear * 4.0f)) * 0.012f;
+            const float highFrequencyBuzz =
+                std::sin((m_Time * 43.0f) + m_FlickerOffset * 7.0f) * 0.004f;
+            const float dipCycle = 8.5f + fixtureWear * 5.5f;
+            const float dipPhase = std::fmod(
+                m_Time + std::fabs(m_FlickerOffset) * 1.91f,
+                dipCycle);
+            const bool rareVoltageDip =
+                dipPhase < 0.045f + fixtureWear * 0.035f;
+            const float voltage = rareVoltageDip
+                ? 0.28f + fixtureWear * 0.18f
+                : 1.0f;
+            targetBrightness =
+                (1.0f + electricalHum + highFrequencyBuzz) * voltage;
         }
     }
     else if (m_IsEmergencyLight)
@@ -164,8 +182,10 @@ void CeilingLight::Update()
     }
 
     const bool startingUp = powerRestored && m_PowerOnTimer < 1.1f;
+    const bool voltageDip =
+        powerRestored && !startingUp && targetBrightness < 0.75f;
     const float response = powerRestored
-        ? (startingUp ? 0.48f : 0.08f)
+        ? (startingUp ? 0.48f : (voltageDip ? 0.24f : 0.08f))
         : 0.32f;
     m_Brightness += (targetBrightness - m_Brightness) * response;
 }
@@ -195,9 +215,9 @@ void CeilingLight::Draw(Camera* camera)
     if (Core::Game::GetInstance()->IsPowerRestored())
     {
         panel.Emission = Color(
-            0.78f * m_Brightness,
-            0.66f * m_Brightness,
-            0.44f * m_Brightness,
+            0.68f * m_Brightness,
+            0.76f * m_Brightness,
+            0.88f * m_Brightness,
             1.0f);
     }
     else

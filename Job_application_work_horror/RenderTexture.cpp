@@ -30,36 +30,40 @@ namespace Graphics
             texDesc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
         }
 
-        device->CreateTexture2D(&texDesc, nullptr, &m_Texture);
+        m_UAV.Reset();
+        device->CreateTexture2D(
+            &texDesc,
+            nullptr,
+            m_Texture.ReleaseAndGetAddressOf());
 
         device->CreateRenderTargetView(
-            m_Texture,
+            m_Texture.Get(),
             nullptr,
-            &m_RTV
+            m_RTV.ReleaseAndGetAddressOf()
         );
 
         device->CreateShaderResourceView(
-            m_Texture,
+            m_Texture.Get(),
             nullptr,
-            &m_SRV
+            m_SRV.ReleaseAndGetAddressOf()
         );
 
         if (enableUnorderedAccess)
         {
             device->CreateUnorderedAccessView(
-                m_Texture,
+                m_Texture.Get(),
                 nullptr,
-                &m_UAV
+                m_UAV.ReleaseAndGetAddressOf()
             );
         }
     }
 
     void RenderTexture::Uninit()
     {
-        SAFE_RELEASE(m_UAV);
-        SAFE_RELEASE(m_SRV);
-        SAFE_RELEASE(m_RTV);
-        SAFE_RELEASE(m_Texture);
+        m_UAV.Reset();
+        m_SRV.Reset();
+        m_RTV.Reset();
+        m_Texture.Reset();
         m_Width = 0;
         m_Height = 0;
     }
@@ -72,7 +76,7 @@ namespace Graphics
         ID3D11ShaderResourceView* nullSRVs[2] = { nullptr, nullptr };
         context->PSSetShaderResources(0, 2, nullSRVs);
 
-        ID3D11RenderTargetView* rtv = m_RTV;
+        ID3D11RenderTargetView* rtv = m_RTV.Get();
 
         // まずは深度なしで確認
         context->OMSetRenderTargets(
@@ -89,7 +93,7 @@ namespace Graphics
         float clearColor[4] = { r, g, b, a };
 
         Renderer::GetDeviceContext()->ClearRenderTargetView(
-            m_RTV,
+            m_RTV.Get(),
             clearColor
         );
     }

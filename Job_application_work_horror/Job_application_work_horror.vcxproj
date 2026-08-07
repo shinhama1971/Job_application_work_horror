@@ -179,7 +179,6 @@
     <ClCompile Include="Ground.cpp" />
     <ClCompile Include="Hud.cpp" />
     <ClCompile Include="input.cpp" />
-    <ClCompile Include="inputManager.cpp" />
     <ClCompile Include="InteractionSystem.cpp" />
     <ClCompile Include="Item.cpp" />
     <ClCompile Include="main.cpp" />
@@ -187,6 +186,7 @@
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="Pole.cpp" />
+    <ClCompile Include="PlanarReflection.cpp" />
     <ClCompile Include="PostProcess.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="RenderTexture.cpp" />
@@ -226,7 +226,6 @@
     <ClInclude Include="Hud.h" />
     <ClInclude Include="IndexBuffer.h" />
     <ClInclude Include="input.h" />
-    <ClInclude Include="inputManager.h" />
     <ClInclude Include="Interactable.h" />
     <ClInclude Include="InteractionSystem.h" />
     <ClInclude Include="Item.h" />
@@ -238,6 +237,7 @@
     <ClInclude Include="Object.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="Pole.h" />
+    <ClInclude Include="PlanarReflection.h" />
     <ClInclude Include="PostProcess.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="RenderTexture.h" />
@@ -261,6 +261,12 @@
     <ClInclude Include="Wall.h" />
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="shader\wetFloorPS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\volumetricFlashlightPS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="shader\shadowDepthPS.hlsl">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>

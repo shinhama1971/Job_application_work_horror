@@ -67,6 +67,21 @@ namespace Effect
             m_BloomIntensity +=
                 (m_BloomBaseIntensity - m_BloomIntensity) * 0.12f;
         }
+
+        if (m_HorrorPulseTimer > 0.0f && m_HorrorPulseDuration > 0.0f)
+        {
+            m_HorrorPulseTimer =
+                (std::max)(0.0f, m_HorrorPulseTimer - 1.0f / 60.0f);
+            const float remaining =
+                m_HorrorPulseTimer / m_HorrorPulseDuration;
+            m_HorrorPulseStrength =
+                m_HorrorPulsePeak * remaining * remaining;
+        }
+        else
+        {
+            m_HorrorPulseStrength +=
+                (0.0f - m_HorrorPulseStrength) * 0.18f;
+        }
     }
 
     void PostProcess::TriggerBloomPulse(float peakIntensity, float duration)
@@ -76,6 +91,14 @@ namespace Effect
         m_BloomPulseStrength =
             (std::max)(0.0f, peakIntensity - m_BloomBaseIntensity);
         m_BloomIntensity = m_BloomBaseIntensity + m_BloomPulseStrength;
+    }
+
+    void PostProcess::TriggerHorrorPulse(float strength, float duration)
+    {
+        m_HorrorPulseDuration = (std::max)(duration, 0.01f);
+        m_HorrorPulseTimer = m_HorrorPulseDuration;
+        m_HorrorPulsePeak = (std::max)(strength, 0.0f);
+        m_HorrorPulseStrength = m_HorrorPulsePeak;
     }
 
     void PostProcess::Begin()
@@ -164,6 +187,9 @@ namespace Effect
             m_Time,
             m_BloomIntensity,
             m_EnableNoise ? m_NoiseAmount : 0.0f,
-            m_VignetteStrength);
+            m_VignetteStrength,
+            m_EnableVolumetricLight ? 1.0f : 0.0f,
+            m_LensDistortionStrength,
+            m_HorrorPulseStrength);
     }
 }

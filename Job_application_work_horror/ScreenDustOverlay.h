@@ -1,5 +1,6 @@
 #pragma once
 
+#include <wrl/client.h>
 #include "Object.h"
 #include "VertexBuffer.h"
 #include "IndexBuffer.h"
@@ -26,7 +27,7 @@ private:
     Shader m_Shader;
     std::unique_ptr<Material> m_Material;
 
-    ID3D11Buffer* m_TimeBuffer = nullptr;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> m_TimeBuffer;
 
     float m_Time = 0.0f;
     float m_Power = 0.7f;

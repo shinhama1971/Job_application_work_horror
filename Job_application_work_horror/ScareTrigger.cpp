@@ -33,6 +33,7 @@ void ScareTrigger::Update()
         });
 
     Input::SetVibration(14, 0.34f);
+    game->GetPostProcess()->TriggerHorrorPulse(1.0f, 0.65f);
 
     ScreenDustOverlay* crt =
         game->GetObj<ScreenDustOverlay>("CRTNoise");

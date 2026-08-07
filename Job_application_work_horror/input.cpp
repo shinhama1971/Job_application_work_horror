@@ -23,12 +23,12 @@ namespace
 	}
 }
 
-Input* Input::m_Instance = {};
+std::unique_ptr<Input> Input::m_Instance;
 
 void Input::Create()
 {
 	if (m_Instance)return;
-	m_Instance = new Input;
+	m_Instance = std::make_unique<Input>();
 
 	ZeroMemory(m_Instance->keyState, sizeof(m_Instance->keyState));
 	ZeroMemory(m_Instance->keyState_old, sizeof(m_Instance->keyState_old));
@@ -116,11 +116,7 @@ void Input::Release()
 		XInputSetState(index, &vibration);
 	}
 	//‰ğ•ú
-	if (m_Instance)
-	{
-		delete m_Instance;
-		m_Instance = NULL;
-	}
+	m_Instance.reset();
 }
 
 //ƒL[“ü—Í

@@ -55,7 +55,7 @@ bool Texture::Load(const std::string& filename)
 	}
 
 	// SRV¶¬
-	hr = device->CreateShaderResourceView(pTexture.Get(), nullptr, m_srv.GetAddressOf());
+	hr = device->CreateShaderResourceView(pTexture.Get(), nullptr, m_srv.ReleaseAndGetAddressOf());
 	if (FAILED(hr)) {
 		stbi_image_free(pixels);
 		return false;
@@ -110,7 +110,7 @@ bool Texture::LoadFromMemory(const unsigned char* Data,int len) {
 	}
 
 	// SRV¶¬
-	hr = device->CreateShaderResourceView(pTexture.Get(), nullptr, m_srv.GetAddressOf());
+	hr = device->CreateShaderResourceView(pTexture.Get(), nullptr, m_srv.ReleaseAndGetAddressOf());
 	if (FAILED(hr)) {
 		stbi_image_free(pixels);
 		return false;

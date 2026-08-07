@@ -173,21 +173,36 @@ void Player::Update()
         }
     }
 
-	// バッテリー残量が20%以下の時に点滅するようにする
     bool visibleLight = m_FlashLightOn;
+    float lightOutput = visibleLight ? 1.0f : 0.0f;
+    float batteryStress = 0.0f;
 
     if (m_FlashLightOn && m_Battery <= 20.0f)
     {
         m_FlickerTimer++;
+        batteryStress = (20.0f - m_Battery) / 20.0f;
 
-		// 10フレームごとに点滅するようにする
-        if ((m_FlickerTimer / 10) % 2 == 0)
+        // Combine unrelated frequencies so low-battery flicker never becomes
+        // a predictable square wave. The beam normally stays usable.
+        const float flickerTime =
+            static_cast<float>(m_FlickerTimer) / 60.0f;
+        const float slowVoltage = sinf(
+            flickerTime * 7.1f + sinf(flickerTime * 1.7f) * 1.8f);
+        const float ballastNoise =
+            sinf(flickerTime * 13.7f) * sinf(flickerTime * 4.3f);
+        const float unstableOutput =
+            0.84f + slowVoltage * 0.075f + ballastNoise * 0.055f;
+        lightOutput =
+            1.0f + (unstableOutput - 1.0f) * batteryStress;
+
+        // Very short voltage drops become more frequent near empty, but do
+        // not hold the player in complete darkness for regular intervals.
+        const float dropCycle = 3.7f - batteryStress * 1.45f;
+        const float dropPhase = fmodf(flickerTime, dropCycle);
+        const float dropDuration = 0.025f + batteryStress * 0.060f;
+        if (dropPhase < dropDuration)
         {
-            visibleLight = true;
-        }
-        else
-        {
-            visibleLight = false;
+            lightOutput *= 0.46f - batteryStress * 0.23f;
         }
     }
     else
@@ -199,7 +214,7 @@ void Player::Update()
 
     light.Enable = TRUE;
     light.FlashlightEnabled = visibleLight ? TRUE : FALSE;
-    light.Intensity = visibleLight ? 1.6f : 0.0f;
+    light.Intensity = visibleLight ? 1.6f * lightOutput : 0.0f;
     light.Range = 260.0f;
     light.Direction = Vector4(0.0f, 0.0f, 1.0f, 0.0f);
     light.SpotParams = Vector4(
@@ -211,23 +226,28 @@ void Player::Update()
 
     if (visibleLight)
     {
-        light.Diffuse = Color(m_LightDiffuseR, m_LightDiffuseG, m_LightDiffuseB, 1.0f);
-        light.Ambient = Color(0.074f, 0.071f, 0.065f, 1.0f);
+        // A struggling battery shifts the lamp slightly toward warm yellow.
+        light.Diffuse = Color(
+            m_LightDiffuseR * (1.0f + batteryStress * 0.04f),
+            m_LightDiffuseG * (1.0f - batteryStress * 0.06f),
+            m_LightDiffuseB * (1.0f - batteryStress * 0.18f),
+            1.0f);
+        light.Ambient = Color(0.225f, 0.218f, 0.205f, 1.0f);
     }
     else
     {
         light.Diffuse = Color(0.0f, 0.0f, 0.0f, 1.0f);
         light.Ambient = Color(
-            0.074f, // Readable baseline even without the flashlight.
-            0.071f,
-            0.065f,
+            0.225f, // Readable darkness without flattening the flashlight contrast.
+            0.218f,
+            0.205f,
             1.0f
         );
     }
 
     if (Core::Game::GetInstance()->IsPowerRestored())
     {
-        light.Ambient = Color(0.105f, 0.098f, 0.082f, 1.0f);
+        light.Ambient = Color(0.255f, 0.262f, 0.272f, 1.0f);
     }
 
     Renderer::SetLight(light);
@@ -255,17 +275,17 @@ void Player::Update()
         // Move the light slightly below the glowing panel to illuminate the room.
         pointLight.PositionRange = Vector4(
             fixturePosition.x, fixturePosition.y - 3.0f, fixturePosition.z,
-            powerRestored ? 145.0f : 82.0f);
+            powerRestored ? 165.0f : 115.0f);
 
         if (powerRestored)
         {
             pointLight.ColorIntensity = Vector4(
-                1.0f, 0.78f, 0.52f, brightness * 1.40f);
+                0.84f, 0.91f, 1.0f, brightness * 1.32f);
         }
         else
         {
             pointLight.ColorIntensity = Vector4(
-                1.0f, 0.055f, 0.025f, brightness * 0.58f);
+                1.0f, 0.055f, 0.025f, brightness * 1.05f);
         }
     }
     Renderer::SetEnvironmentLights(environmentLights);

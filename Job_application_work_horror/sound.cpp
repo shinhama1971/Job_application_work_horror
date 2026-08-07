@@ -91,14 +91,14 @@ HRESULT Sound::Init()
 
 		//fill out the audio data buffer with the contents of the fourccDATA chunk
 		FindChunk(hFile, fourccDATA, dwChunkSize, dwChunkPosition);
-		m_DataBuffer[i] = new BYTE[dwChunkSize];
-		ReadChunkData(hFile, m_DataBuffer[i], dwChunkSize, dwChunkPosition);
+		m_DataBuffer[i] = std::make_unique<BYTE[]>(dwChunkSize);
+		ReadChunkData(hFile, m_DataBuffer[i].get(), dwChunkSize, dwChunkPosition);
 
 		CloseHandle(hFile);
 
 		// 	サブミットボイスで利用するサブミットバッファの設定
 		m_buffer[i].AudioBytes = dwChunkSize;
-		m_buffer[i].pAudioData = m_DataBuffer[i];
+		m_buffer[i].pAudioData = m_DataBuffer[i].get();
 		m_buffer[i].Flags = XAUDIO2_END_OF_STREAM;
 		if (m_param[i].bLoop)
 			m_buffer[i].LoopCount = XAUDIO2_LOOP_INFINITE;
@@ -133,8 +133,7 @@ void Sound::Uninit(void)
 			m_pSourceVoice[i] = nullptr;
 		}
 
-		delete[] m_DataBuffer[i];
-		m_DataBuffer[i] = nullptr;
+		m_DataBuffer[i].reset();
 	}
 
 	if (m_pMasteringVoice)

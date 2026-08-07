@@ -90,7 +90,7 @@ void ShadowMan::Init()
 
     Renderer::CreateConstantBuffer(
         sizeof(DissolveBuffer),
-        &m_DissolveBuffer);
+        m_DissolveBuffer.ReleaseAndGetAddressOf());
 
     MATERIAL material{};
     material.Diffuse = Color(0.70f, 0.74f, 0.70f, 1.0f);
@@ -160,19 +160,20 @@ void ShadowMan::Draw(Camera* camera)
     dissolve.Visibility = (std::min)(appear, disappear);
     dissolve.EdgeWidth = 0.085f;
     context->UpdateSubresource(
-        m_DissolveBuffer,
+        m_DissolveBuffer.Get(),
         0,
         nullptr,
         &dissolve,
         0,
         0);
-    context->PSSetConstantBuffers(7, 1, &m_DissolveBuffer);
+    ID3D11Buffer* dissolveBuffer = m_DissolveBuffer.Get();
+    context->PSSetConstantBuffers(7, 1, &dissolveBuffer);
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
 }
 
 void ShadowMan::Uninit()
 {
-    SAFE_RELEASE(m_DissolveBuffer);
+    m_DissolveBuffer.Reset();
     m_Vertices.clear();
     m_Indices.clear();
 }

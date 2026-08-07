@@ -32,6 +32,7 @@ StageScene::~StageScene()
 void StageScene::Init()
 {
     Core::Game* game = Core::Game::GetInstance();
+    game->GetPostProcess()->SetVolumetricLight(true);
 
     // プレイヤー
     Player* player = game->CreateObj<Player>("Player");
@@ -266,6 +267,7 @@ void StageScene::Draw(Camera* camera)
 void StageScene::Uninit()
 {
     Core::Game::GetInstance()->GetPostProcess()->SetAtmosphere(1.0f, 1.0f);
+    Core::Game::GetInstance()->GetPostProcess()->SetVolumetricLight(false);
     m_Hud.Uninit();
 
     Core::Game* game = Core::Game::GetInstance();

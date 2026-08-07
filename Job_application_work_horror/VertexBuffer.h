@@ -25,7 +25,7 @@ public:
 			sizeof(T),						// 1頂点当たりバイト数
 			(unsigned int)vertices.size(),	// 頂点数
 			(void*)vertices.data(),			// 頂点データ格納メモリ先頭アドレス
-			&m_VertexBuffer);				// 頂点バッファ
+			m_VertexBuffer.ReleaseAndGetAddressOf());				// 頂点バッファ
 
 		assert(sts == true); //結果を確認
 	}

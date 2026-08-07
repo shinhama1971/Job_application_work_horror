@@ -21,24 +21,27 @@ namespace Effect
         textureDesc.BindFlags =
             D3D11_BIND_DEPTH_STENCIL |
             D3D11_BIND_SHADER_RESOURCE;
-        device->CreateTexture2D(&textureDesc, nullptr, &m_Texture);
+        device->CreateTexture2D(
+            &textureDesc,
+            nullptr,
+            m_Texture.ReleaseAndGetAddressOf());
 
         D3D11_DEPTH_STENCIL_VIEW_DESC depthViewDesc{};
         depthViewDesc.Format = DXGI_FORMAT_D32_FLOAT;
         depthViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
         device->CreateDepthStencilView(
-            m_Texture,
+            m_Texture.Get(),
             &depthViewDesc,
-            &m_DepthView);
+            m_DepthView.ReleaseAndGetAddressOf());
 
         D3D11_SHADER_RESOURCE_VIEW_DESC resourceViewDesc{};
         resourceViewDesc.Format = DXGI_FORMAT_R32_FLOAT;
         resourceViewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
         resourceViewDesc.Texture2D.MipLevels = 1;
         device->CreateShaderResourceView(
-            m_Texture,
+            m_Texture.Get(),
             &resourceViewDesc,
-            &m_ShaderResourceView);
+            m_ShaderResourceView.ReleaseAndGetAddressOf());
 
         D3D11_SAMPLER_DESC samplerDesc{};
         samplerDesc.Filter = D3D11_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
@@ -51,7 +54,9 @@ namespace Effect
         samplerDesc.BorderColor[2] = 1.0f;
         samplerDesc.BorderColor[3] = 1.0f;
         samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
-        device->CreateSamplerState(&samplerDesc, &m_ComparisonSampler);
+        device->CreateSamplerState(
+            &samplerDesc,
+            m_ComparisonSampler.ReleaseAndGetAddressOf());
 
         D3D11_RASTERIZER_DESC rasterizerDesc{};
         rasterizerDesc.FillMode = D3D11_FILL_SOLID;
@@ -62,11 +67,11 @@ namespace Effect
         rasterizerDesc.DepthBiasClamp = 0.01f;
         device->CreateRasterizerState(
             &rasterizerDesc,
-            &m_ShadowRasterizer);
+            m_ShadowRasterizer.ReleaseAndGetAddressOf());
 
         Renderer::CreateConstantBuffer(
             sizeof(ShadowBuffer),
-            &m_ShadowBuffer);
+            m_ShadowBuffer.ReleaseAndGetAddressOf());
 
         m_DepthShader.Create(
             "shader/shadowDepthVS.hlsl",
@@ -75,13 +80,13 @@ namespace Effect
 
     void ShadowMap::Uninit()
     {
-        SAFE_RELEASE(m_PreviousRasterizer);
-        SAFE_RELEASE(m_ShadowBuffer);
-        SAFE_RELEASE(m_ShadowRasterizer);
-        SAFE_RELEASE(m_ComparisonSampler);
-        SAFE_RELEASE(m_ShaderResourceView);
-        SAFE_RELEASE(m_DepthView);
-        SAFE_RELEASE(m_Texture);
+        m_PreviousRasterizer.Reset();
+        m_ShadowBuffer.Reset();
+        m_ShadowRasterizer.Reset();
+        m_ComparisonSampler.Reset();
+        m_ShaderResourceView.Reset();
+        m_DepthView.Reset();
+        m_Texture.Reset();
     }
 
     void ShadowMap::Begin(const Camera& camera)
@@ -94,7 +99,7 @@ namespace Effect
         context->RSGetViewports(
             &m_PreviousViewportCount,
             &m_PreviousViewport);
-        context->RSGetState(&m_PreviousRasterizer);
+        context->RSGetState(m_PreviousRasterizer.ReleaseAndGetAddressOf());
 
         D3D11_VIEWPORT viewport{};
         viewport.Width = static_cast<float>(ShadowResolution);
@@ -102,11 +107,11 @@ namespace Effect
         viewport.MinDepth = 0.0f;
         viewport.MaxDepth = 1.0f;
         context->RSSetViewports(1, &viewport);
-        context->RSSetState(m_ShadowRasterizer);
+        context->RSSetState(m_ShadowRasterizer.Get());
 
-        context->OMSetRenderTargets(0, nullptr, m_DepthView);
+        context->OMSetRenderTargets(0, nullptr, m_DepthView.Get());
         context->ClearDepthStencilView(
-            m_DepthView,
+            m_DepthView.Get(),
             D3D11_CLEAR_DEPTH,
             1.0f,
             0);
@@ -128,17 +133,18 @@ namespace Effect
         buffer.Parameters = Vector4(
             1.0f / static_cast<float>(ShadowResolution),
             0.0012f,
-            0.0f,
-            0.0f);
+            2.0f,
+            280.0f);
         context->UpdateSubresource(
-            m_ShadowBuffer,
+            m_ShadowBuffer.Get(),
             0,
             nullptr,
             &buffer,
             0,
             0);
-        context->VSSetConstantBuffers(8, 1, &m_ShadowBuffer);
-        context->PSSetConstantBuffers(8, 1, &m_ShadowBuffer);
+        ID3D11Buffer* shadowBuffer = m_ShadowBuffer.Get();
+        context->VSSetConstantBuffers(8, 1, &shadowBuffer);
+        context->PSSetConstantBuffers(8, 1, &shadowBuffer);
     }
 
     void ShadowMap::End()
@@ -149,11 +155,15 @@ namespace Effect
         context->RSSetViewports(
             m_PreviousViewportCount,
             &m_PreviousViewport);
-        context->RSSetState(m_PreviousRasterizer);
-        SAFE_RELEASE(m_PreviousRasterizer);
+        context->RSSetState(m_PreviousRasterizer.Get());
+        m_PreviousRasterizer.Reset();
 
-        context->PSSetShaderResources(5, 1, &m_ShaderResourceView);
-        context->PSSetSamplers(1, 1, &m_ComparisonSampler);
+        ID3D11ShaderResourceView* shadowResource =
+            m_ShaderResourceView.Get();
+        ID3D11SamplerState* comparisonSampler =
+            m_ComparisonSampler.Get();
+        context->PSSetShaderResources(5, 1, &shadowResource);
+        context->PSSetSamplers(1, 1, &comparisonSampler);
     }
 
     void ShadowMap::SetShader()

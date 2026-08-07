@@ -46,7 +46,7 @@ public:
 		// コンスタントバッファ作成
 		bool sts = Renderer::CreateConstantBuffer(
 			sizeof(ConstantBufferMaterial),		// サイズ
-			m_pConstantBufferMaterial.GetAddressOf());		// コンスタントバッファ４
+			m_pConstantBufferMaterial.ReleaseAndGetAddressOf());		// コンスタントバッファ４
 		if (!sts) {
 			MessageBox(NULL, "CreateBuffer(constant buffer Material) error", "Error", MB_OK);
 			return false;

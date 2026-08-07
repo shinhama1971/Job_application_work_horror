@@ -35,9 +35,9 @@ private:
 
     // ===== ライティング（バイオハザード風） =====
     // ライトON時の設定
-    float m_LightDiffuseR = 1.8f;
-    float m_LightDiffuseG = 1.6f;
-    float m_LightDiffuseB = 1.2f;
+    float m_LightDiffuseR = 1.72f;
+    float m_LightDiffuseG = 1.62f;
+    float m_LightDiffuseB = 1.42f;
     float m_LightAmbientR = 0.1f;
     float m_LightAmbientG = 0.1f;
     float m_LightAmbientB = 0.12f;

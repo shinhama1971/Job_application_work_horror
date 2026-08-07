@@ -1,5 +1,6 @@
 #pragma once
 
+#include <wrl/client.h>
 #include "Object.h"
 #include "VertexBuffer.h"
 #include "IndexBuffer.h"
@@ -23,7 +24,7 @@ private:
         float Padding;
     };
 
-    ID3D11Buffer* m_DissolveBuffer = nullptr;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> m_DissolveBuffer;
     float m_Age = 0.0f;
 
     int m_LifeTimer = 120;

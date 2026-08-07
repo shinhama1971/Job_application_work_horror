@@ -1,4 +1,5 @@
 #pragma once
+#include <wrl/client.h>
 
 #include "VertexBuffer.h"
 #include "IndexBuffer.h"
@@ -13,6 +14,13 @@ class Camera;
 //-----------------------------------------------------------------------------
 class Ground :public Object 
 {
+	struct WetFloorBuffer
+	{
+		float Time;
+		float RippleStrength;
+		float ReflectionStrength;
+		float Padding;
+	};
 	
 	// 頂点データ
 	std::vector<VERTEX_3D> m_Vertices;
@@ -27,7 +35,8 @@ class Ground :public Object
 	std::unique_ptr<Material>m_Material;
 	int m_SizeX = 0;//横サイズ
 	int m_SizeZ = 0;//縦サイズ
-	
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_WetFloorBuffer;
+	float m_WetTime = 0.0f;
 
 public:
 	

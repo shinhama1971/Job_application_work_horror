@@ -5,11 +5,14 @@
 #include "TitleScene.h"
 #include "StageScene.h"
 #include "ResultScene.h"
+#include "Ground.h"
+#include "Texture2D.h"
+#include "ScreenDustOverlay.h"
 
 
 namespace Core
 {
-    Game* Game::m_Instance = nullptr;
+    std::unique_ptr<Game> Game::m_Instance;
 
     Game::Game()
     {
@@ -22,7 +25,12 @@ namespace Core
 
     void Game::Init()
     {
-        m_Instance = new Game;
+        if (m_Instance)
+        {
+            return;
+        }
+
+        m_Instance = std::make_unique<Game>();
 
         Renderer::Init();
 
@@ -30,6 +38,7 @@ namespace Core
 
         m_Instance->m_Camera.Init();
 
+        m_Instance->m_PlanarReflection.Init();
         m_Instance->m_ShadowMap.Init();
         m_Instance->m_PostProcess.Init();
         m_Instance->ChangeScene(SceneName::Title);
@@ -105,6 +114,29 @@ namespace Core
         }
         m_Instance->m_ShadowMap.End();
 
+        if (m_Instance->m_CurrentScene == SceneName::Stage)
+        {
+            m_Instance->m_PlanarReflection.Begin(
+                m_Instance->m_Camera,
+                -99.5f);
+
+            for (auto& o : m_Instance->m_Objects)
+            {
+                if (o->IsDestroy() ||
+                    dynamic_cast<Ground*>(o.get()) != nullptr ||
+                    dynamic_cast<Texture2D*>(o.get()) != nullptr ||
+                    dynamic_cast<ScreenDustOverlay*>(o.get()) != nullptr)
+                {
+                    continue;
+                }
+
+                o->Draw(&m_Instance->m_Camera);
+            }
+
+            m_Instance->m_PlanarReflection.End(
+                m_Instance->m_Camera);
+        }
+
         Renderer::DrawStart();
 
         for (auto& o : m_Instance->m_Objects)
@@ -143,18 +175,18 @@ namespace Core
         m_Instance->m_NamedObjects.clear();
         m_Instance->m_PostProcess.Uninit();
         m_Instance->m_ShadowMap.Uninit();
+        m_Instance->m_PlanarReflection.Uninit();
 
         Input::Release();
 
         Renderer::Uninit();
 
-        delete m_Instance;
-        m_Instance = nullptr;
+        m_Instance.reset();
     }
 
     Game* Core::Game::GetInstance()
     {
-        return m_Instance;
+        return m_Instance.get();
     }
 
     void Game::RequestSceneChange(SceneName sName)
@@ -169,6 +201,7 @@ namespace Core
 
     void Game::ChangeScene(SceneName sName)
     {
+        m_CurrentScene = sName;
         m_Scene.reset();
 
         DeleteAllObject();

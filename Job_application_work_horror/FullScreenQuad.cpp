@@ -42,6 +42,11 @@ namespace Graphics
             "shader/bloomCompositePS.hlsl"
         );
 
+        m_VolumeShader.Create(
+            "shader/unlitTextureVS.hlsl",
+            "shader/volumetricFlashlightPS.hlsl"
+        );
+
         m_OverlayShader.Create(
             "shader/unlitTextureVS.hlsl",
             "shader/crtOverlayPS.hlsl"
@@ -57,13 +62,13 @@ namespace Graphics
 
         Renderer::CreateConstantBuffer(
             sizeof(TimeBuffer),
-            &m_TimeBuffer
+            m_TimeBuffer.ReleaseAndGetAddressOf()
         );
     }
 
     void FullScreenQuad::Uninit()
     {
-        SAFE_RELEASE(m_TimeBuffer);
+        m_TimeBuffer.Reset();
     }
 
     void FullScreenQuad::Draw(
@@ -71,7 +76,10 @@ namespace Graphics
         float time,
         float bloomIntensity,
         float noiseAmount,
-        float vignetteStrength)
+        float vignetteStrength,
+        float volumeIntensity,
+        float lensDistortionStrength,
+        float horrorPulseStrength)
     {
         ID3D11DeviceContext* context =
             Renderer::GetDeviceContext();
@@ -84,10 +92,15 @@ namespace Graphics
         tb.time = time;
         tb.bloomIntensity = bloomIntensity;
         tb.noiseAmount = noiseAmount;
-        tb.padding = vignetteStrength;
+        tb.vignetteStrength = vignetteStrength;
+        tb.screenAspect = static_cast<float>(Application::GetWidth()) /
+            static_cast<float>(Application::GetHeight());
+        tb.volumeIntensity = volumeIntensity;
+        tb.lensDistortionStrength = lensDistortionStrength;
+        tb.horrorPulseStrength = horrorPulseStrength;
 
         context->UpdateSubresource(
-            m_TimeBuffer,
+            m_TimeBuffer.Get(),
             0,
             nullptr,
             &tb,
@@ -99,23 +112,34 @@ namespace Graphics
         m_IndexBuffer.SetGPU();
         m_Material->SetGPU();
 
-        context->PSSetConstantBuffers(0, 1, &m_TimeBuffer);
+        ID3D11Buffer* timeBuffer = m_TimeBuffer.Get();
+        context->PSSetConstantBuffers(0, 1, &timeBuffer);
 
         context->IASetPrimitiveTopology(
             D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP
         );
 
-        // The original scene is already on the back buffer. Add only bloom.
+        ID3D11ShaderResourceView* nullResource = nullptr;
+
+        // The original scene stays on the back buffer. Add only bloom.
         m_BloomShader.SetGPU();
         Renderer::SetBlendState(BS_ADDITIVE);
         context->PSSetShaderResources(0, 1, &bloomSRV);
         context->DrawIndexed(4, 0, 0);
 
-        ID3D11ShaderResourceView* nullResource = nullptr;
         context->PSSetShaderResources(0, 1, &nullResource);
 
+        // Integrate a short section of atmospheric scattering along the
+        // flashlight ray. The shadow depth map stops the beam at walls.
+        if (volumeIntensity > 0.0f)
+        {
+            m_VolumeShader.SetGPU();
+            Renderer::SetBlendState(BS_ADDITIVE);
+            context->DrawIndexed(4, 0, 0);
+        }
+
         // CRT is a transparent overlay and can never replace the scene with black.
-        if (noiseAmount > 0.0f)
+        if (noiseAmount > 0.0f || horrorPulseStrength > 0.001f)
         {
             m_OverlayShader.SetGPU();
             Renderer::SetBlendState(BS_ALPHABLEND);

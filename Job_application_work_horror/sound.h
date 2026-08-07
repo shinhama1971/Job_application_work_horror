@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include <memory>
 
 #include <xaudio2.h>
 
@@ -33,7 +34,7 @@ private:
 	IXAudio2SourceVoice* m_pSourceVoice[SOUND_LABEL_MAX]{};
 	WAVEFORMATEXTENSIBLE m_wfx[SOUND_LABEL_MAX]; // WAVフォーマット
 	XAUDIO2_BUFFER m_buffer[SOUND_LABEL_MAX];
-	BYTE* m_DataBuffer[SOUND_LABEL_MAX]{};
+	std::unique_ptr<BYTE[]> m_DataBuffer[SOUND_LABEL_MAX];
 	bool m_IsComInitialized = false;
 
 	HRESULT FindChunk(HANDLE, DWORD, DWORD&, DWORD&);

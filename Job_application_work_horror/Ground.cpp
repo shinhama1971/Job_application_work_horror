@@ -152,7 +152,11 @@ void Ground::Init()
 	m_IndexBuffer.Create(m_Indices);
 
 	// シェーダオブジェクト生成
-	m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+	m_Shader.Create("shader/litTextureVS.hlsl", "shader/wetFloorPS.hlsl");
+
+	Renderer::CreateConstantBuffer(
+		sizeof(WetFloorBuffer),
+		m_WetFloorBuffer.ReleaseAndGetAddressOf());
 
 	//テクスチャロード
 	bool sts = m_Texture.Load("assets/texture/field.jpg");
@@ -175,6 +179,11 @@ void Ground::Init()
 //=======================================
 void Ground::Update()
 {
+	m_WetTime += 1.0f / 60.0f;
+	if (m_WetTime > 10000.0f)
+	{
+		m_WetTime = 0.0f;
+	}
 }
 
 //=======================================
@@ -208,6 +217,15 @@ void Ground::Draw(Camera* cam)
 	m_Texture.SetGPU();
 	m_Material->SetGPU();
 
+	WetFloorBuffer wetFloor{};
+	wetFloor.Time = m_WetTime;
+	wetFloor.RippleStrength = 1.0f;
+	wetFloor.ReflectionStrength = 1.0f;
+	devicecontext->UpdateSubresource(
+		m_WetFloorBuffer.Get(), 0, nullptr, &wetFloor, 0, 0);
+	ID3D11Buffer* wetFloorBuffer = m_WetFloorBuffer.Get();
+	devicecontext->PSSetConstantBuffers(10, 1, &wetFloorBuffer);
+
 	devicecontext->DrawIndexed(
 		(UINT)m_Indices.size(),	// 描画するインデックス数
 		0,					// 最初のインデックスバッファの位置
@@ -219,7 +237,7 @@ void Ground::Draw(Camera* cam)
 //=======================================
 void Ground::Uninit()
 {
-
+	m_WetFloorBuffer.Reset();
 }
 
 //=======================================

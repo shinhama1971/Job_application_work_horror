@@ -1,6 +1,7 @@
 ﻿
 #include "Renderer.h"
 #include "Application.h"
+#include <wrl/client.h>
 
 
 using namespace DirectX::SimpleMath;
@@ -9,33 +10,34 @@ using namespace DirectX::SimpleMath;
 D3D_FEATURE_LEVEL Renderer::m_FeatureLevel = D3D_FEATURE_LEVEL_11_0;
 
 // デバイス＝DirectXの各種機能を作る ※ID3D11で始まるポインタ型の変数は、解放する必要がある
-ID3D11Device* Renderer::m_pDevice{};
+Microsoft::WRL::ComPtr<ID3D11Device> Renderer::m_pDevice;
 // コンテキスト＝描画関連を司る機能
-ID3D11DeviceContext* Renderer::m_pDeviceContext{};
+Microsoft::WRL::ComPtr<ID3D11DeviceContext> Renderer::m_pDeviceContext;
 // スワップチェイン＝ダブルバッファ機能
-IDXGISwapChain* Renderer::m_pSwapChain{};
+Microsoft::WRL::ComPtr<IDXGISwapChain> Renderer::m_pSwapChain;
 // レンダーターゲット＝描画先を表す機能
-ID3D11RenderTargetView* Renderer::m_pRenderTargetView{};
+Microsoft::WRL::ComPtr<ID3D11RenderTargetView> Renderer::m_pRenderTargetView;
 // デプスバッファ
-ID3D11DepthStencilView* Renderer::m_pDepthStencilView{};
+Microsoft::WRL::ComPtr<ID3D11DepthStencilView> Renderer::m_pDepthStencilView;
 
-ID3D11Buffer* Renderer::m_pWorldBuffer{}; // ワールド行列
-ID3D11Buffer* Renderer::m_pViewBuffer{}; // ビュー行列
-ID3D11Buffer* Renderer::m_pProjectionBuffer{}; // プロジェクション行列
+Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pWorldBuffer;
+Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pViewBuffer;
+Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pProjectionBuffer;
 
-ID3D11Buffer* Renderer::m_pLightBuffer{};
-ID3D11Buffer* Renderer::m_pEnvironmentLightBuffer{};//ライト設定（平行光源）
-ID3D11Buffer* Renderer::m_pMaterialBuffer;//マテリアル設定
+Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pLightBuffer;
+Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pEnvironmentLightBuffer;
+Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pMaterialBuffer;
 LIGHT Renderer::m_Light{};
 ENVIRONMENT_LIGHTS Renderer::m_EnvironmentLights{};
 bool Renderer::m_LightEnable = true;
-ID3D11Buffer* Renderer::m_pTextureBuffer{};//UV設定
+Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pTextureBuffer;
 // デプスステンシルステート
-ID3D11DepthStencilState* Renderer::m_pDepthStateEnable{};
-ID3D11DepthStencilState* Renderer::m_pDepthStateDisable{};
+Microsoft::WRL::ComPtr<ID3D11DepthStencilState> Renderer::m_pDepthStateEnable;
+Microsoft::WRL::ComPtr<ID3D11DepthStencilState> Renderer::m_pDepthStateDisable;
 
-ID3D11BlendState* Renderer::m_pBlendState[MAX_BLENDSTATE]; // ブレンドステート配列
-ID3D11BlendState* Renderer::m_pBlendStateATC{}; // 特定のアルファテストとカバレッジ（ATC）用のブレンドステート
+Microsoft::WRL::ComPtr<ID3D11BlendState>
+	Renderer::m_pBlendState[MAX_BLENDSTATE];
+Microsoft::WRL::ComPtr<ID3D11BlendState> Renderer::m_pBlendStateATC;
 
 
 
@@ -60,20 +62,45 @@ HRESULT Renderer::Init()
 	swapChainDesc.SampleDesc.Quality = 0; //同上
 	swapChainDesc.Windowed = TRUE; // ウィンドウモード（フルスクリーンではなく、ウィンドウモードで実行）
 
-	// デバイスとスワップチェインを同時に作成する関数の呼び出し
-	hr = D3D11CreateDeviceAndSwapChain(NULL,
+    UINT deviceCreationFlags = 0;
+#if defined(DEBUG) || defined(_DEBUG)
+    deviceCreationFlags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+
+    // デバイスとスワップチェインを同時に作成する関数の呼び出し
+    hr = D3D11CreateDeviceAndSwapChain(NULL,
 		D3D_DRIVER_TYPE_HARDWARE, // ドライバータイプ(ハードウェアGPUを使用)
 		NULL,               // ソフトウェアラスタライザを指定しないのでNULL
-		0,                  // フラグ（D3D11_CREATE_DEVICE_DEBUGなど） 0は何も指定しない
+        deviceCreationFlags,
 		NULL,               // 機能レベルの配列。NULLならデフォルトの機能レベルセットが使われる
 		0,                  // 機能レベルの配列の要素数(NULLなら0でOK)
 		D3D11_SDK_VERSION,  // SDKのバージョン 常に「D3D11_SDK_VERSION」を指定
 		&swapChainDesc,     // スワップチェーンの設定構造体へのポインタ
-		&m_pSwapChain,      // 作成されたスワップチェーンを受け取るポインタ
-		&m_pDevice,	        // 作成されたデバイスを受け取るポインタ
-		&m_FeatureLevel,    // 作成されたデバイスの機能レベルを受け取る変数へのポインタ
-		&m_pDeviceContext); // 作成されたデバイスコンテキストを受け取るポインタ
-	if (FAILED(hr)) return hr;
+		m_pSwapChain.ReleaseAndGetAddressOf(),
+		m_pDevice.ReleaseAndGetAddressOf(),
+        &m_FeatureLevel,    // 作成されたデバイスの機能レベルを受け取る変数へのポインタ
+		m_pDeviceContext.ReleaseAndGetAddressOf());
+
+#if defined(DEBUG) || defined(_DEBUG)
+    // The game must still start on PCs without the optional graphics tools.
+    if (hr == DXGI_ERROR_SDK_COMPONENT_MISSING)
+    {
+        hr = D3D11CreateDeviceAndSwapChain(
+            NULL,
+            D3D_DRIVER_TYPE_HARDWARE,
+            NULL,
+            0,
+            NULL,
+            0,
+            D3D11_SDK_VERSION,
+            &swapChainDesc,
+			m_pSwapChain.ReleaseAndGetAddressOf(),
+			m_pDevice.ReleaseAndGetAddressOf(),
+            &m_FeatureLevel,
+			m_pDeviceContext.ReleaseAndGetAddressOf());
+    }
+#endif
+    if (FAILED(hr)) return hr;
 
 	// レンダーターゲットビュー・デプスステンシルバッファ・デプスステンシルビュー作成
 	hr = CreateRenderAndDepthResources();
@@ -116,23 +143,27 @@ HRESULT Renderer::Init()
 	BlendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO; // デスティネーションのアルファ値を無視
 	BlendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD; // アルファ値に対して加算操作を行う
 	BlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL; // レンダーターゲットのカラーチャンネル書き込みマスク
-	hr = m_pDevice->CreateBlendState(&BlendDesc, &m_pBlendState[0]);
+	hr = m_pDevice->CreateBlendState(
+		&BlendDesc, m_pBlendState[0].ReleaseAndGetAddressOf());
 	if (FAILED(hr)) return hr;
 
 	// ブレンド ステート生成 (アルファ ブレンド用)
 	//BlendDesc.AlphaToCoverageEnable = TRUE;
 	BlendDesc.RenderTarget[0].BlendEnable = TRUE;
-	hr = m_pDevice->CreateBlendState(&BlendDesc, &m_pBlendState[1]);
+	hr = m_pDevice->CreateBlendState(
+		&BlendDesc, m_pBlendState[1].ReleaseAndGetAddressOf());
 	if (FAILED(hr)) return hr;
 
 	// ブレンド ステート生成 (加算合成用)
 	BlendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
-	hr = m_pDevice->CreateBlendState(&BlendDesc, &m_pBlendState[2]);
+	hr = m_pDevice->CreateBlendState(
+		&BlendDesc, m_pBlendState[2].ReleaseAndGetAddressOf());
 	if (FAILED(hr)) return hr;
 
 	// ブレンド ステート生成 (減算合成用)
 	BlendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_REV_SUBTRACT;
-	hr = m_pDevice->CreateBlendState(&BlendDesc, &m_pBlendState[3]);
+	hr = m_pDevice->CreateBlendState(
+		&BlendDesc, m_pBlendState[3].ReleaseAndGetAddressOf());
 	if (FAILED(hr)) return hr;
 
 	SetBlendState(BS_ALPHABLEND);
@@ -144,14 +175,16 @@ HRESULT Renderer::Init()
 	depthStencilDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
 	depthStencilDesc.StencilEnable = FALSE;
 
-	hr = m_pDevice->CreateDepthStencilState(&depthStencilDesc, &m_pDepthStateEnable); //深度有効ステート
+	hr = m_pDevice->CreateDepthStencilState(
+		&depthStencilDesc, m_pDepthStateEnable.ReleaseAndGetAddressOf());
 	if (FAILED(hr)) return hr;
 
 	depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
-	hr = m_pDevice->CreateDepthStencilState(&depthStencilDesc, &m_pDepthStateDisable); //深度無効ステート
+	hr = m_pDevice->CreateDepthStencilState(
+		&depthStencilDesc, m_pDepthStateDisable.ReleaseAndGetAddressOf());
 	if (FAILED(hr)) return hr;
 
-	m_pDeviceContext->OMSetDepthStencilState(m_pDepthStateEnable, NULL);
+	m_pDeviceContext->OMSetDepthStencilState(m_pDepthStateEnable.Get(), NULL);
 
 	// サンプラーステート設定
 	D3D11_SAMPLER_DESC smpDesc{};
@@ -178,23 +211,27 @@ HRESULT Renderer::Init()
 	bufferDesc.MiscFlags = 0;
 	bufferDesc.StructureByteStride = sizeof(float);
 
-	hr = m_pDevice->CreateBuffer(&bufferDesc, NULL, &m_pWorldBuffer);
-	m_pDeviceContext->VSSetConstantBuffers(0, 1, &m_pWorldBuffer);
+	hr = m_pDevice->CreateBuffer(
+		&bufferDesc, NULL, m_pWorldBuffer.ReleaseAndGetAddressOf());
+	m_pDeviceContext->VSSetConstantBuffers(0, 1, m_pWorldBuffer.GetAddressOf());
 	if (FAILED(hr)) return hr;
 
-	hr = m_pDevice->CreateBuffer(&bufferDesc, NULL, &m_pViewBuffer);
-	m_pDeviceContext->VSSetConstantBuffers(1, 1, &m_pViewBuffer);
+	hr = m_pDevice->CreateBuffer(
+		&bufferDesc, NULL, m_pViewBuffer.ReleaseAndGetAddressOf());
+	m_pDeviceContext->VSSetConstantBuffers(1, 1, m_pViewBuffer.GetAddressOf());
 	if (FAILED(hr)) return hr;
 
-	hr = m_pDevice->CreateBuffer(&bufferDesc, NULL, &m_pProjectionBuffer);
-	m_pDeviceContext->VSSetConstantBuffers(2, 1, &m_pProjectionBuffer);
+	hr = m_pDevice->CreateBuffer(
+		&bufferDesc, NULL, m_pProjectionBuffer.ReleaseAndGetAddressOf());
+	m_pDeviceContext->VSSetConstantBuffers(2, 1, m_pProjectionBuffer.GetAddressOf());
 	if (FAILED(hr)) return hr;
 
 
 	bufferDesc.ByteWidth = sizeof(LIGHT);
-	hr = m_pDevice->CreateBuffer(&bufferDesc, NULL, &m_pLightBuffer);
-	m_pDeviceContext->VSSetConstantBuffers(3, 1, &m_pLightBuffer);
-	m_pDeviceContext->PSSetConstantBuffers(3, 1, &m_pLightBuffer);
+	hr = m_pDevice->CreateBuffer(
+		&bufferDesc, NULL, m_pLightBuffer.ReleaseAndGetAddressOf());
+	m_pDeviceContext->VSSetConstantBuffers(3, 1, m_pLightBuffer.GetAddressOf());
+	m_pDeviceContext->PSSetConstantBuffers(3, 1, m_pLightBuffer.GetAddressOf());
 	if (FAILED(hr)) return hr;
 	//ライト初期化　
 	LIGHT light{};
@@ -212,15 +249,18 @@ HRESULT Renderer::Init()
 	SetLight(light);
 
 	bufferDesc.ByteWidth = sizeof(ENVIRONMENT_LIGHTS);
-	hr = m_pDevice->CreateBuffer(&bufferDesc, NULL, &m_pEnvironmentLightBuffer);
+	hr = m_pDevice->CreateBuffer(
+		&bufferDesc, NULL, m_pEnvironmentLightBuffer.ReleaseAndGetAddressOf());
 	if (FAILED(hr)) return hr;
-	m_pDeviceContext->PSSetConstantBuffers(6, 1, &m_pEnvironmentLightBuffer);
+	m_pDeviceContext->PSSetConstantBuffers(
+		6, 1, m_pEnvironmentLightBuffer.GetAddressOf());
 	SetEnvironmentLights(ENVIRONMENT_LIGHTS{});
 
 	bufferDesc.ByteWidth = sizeof(MATERIAL);
-	hr = m_pDevice->CreateBuffer(&bufferDesc, NULL, &m_pMaterialBuffer);
-	m_pDeviceContext->VSSetConstantBuffers(4, 1, &m_pMaterialBuffer);
-	m_pDeviceContext->PSSetConstantBuffers(4, 1, &m_pMaterialBuffer);
+	hr = m_pDevice->CreateBuffer(
+		&bufferDesc, NULL, m_pMaterialBuffer.ReleaseAndGetAddressOf());
+	m_pDeviceContext->VSSetConstantBuffers(4, 1, m_pMaterialBuffer.GetAddressOf());
+	m_pDeviceContext->PSSetConstantBuffers(4, 1, m_pMaterialBuffer.GetAddressOf());
 	if (FAILED(hr)) return hr;
 
 	//マテリアル初期化
@@ -230,8 +270,9 @@ HRESULT Renderer::Init()
 	SetMaterial(material);
 
 	bufferDesc.ByteWidth = sizeof(Matrix);
-	hr = m_pDevice->CreateBuffer(&bufferDesc, NULL, &m_pTextureBuffer);
-	m_pDeviceContext->VSSetConstantBuffers(5, 1, &m_pTextureBuffer);
+	hr = m_pDevice->CreateBuffer(
+		&bufferDesc, NULL, m_pTextureBuffer.ReleaseAndGetAddressOf());
+	m_pDeviceContext->VSSetConstantBuffers(5, 1, m_pTextureBuffer.GetAddressOf());
 	if (FAILED(hr))return hr;
 
 	//UV初期化
@@ -244,17 +285,21 @@ HRESULT Renderer::Init()
 //--------------------------------------------------------------------------------------
 HRESULT Renderer::CreateRenderAndDepthResources()
 {
-	// レンダーターゲットビュー作成
-	ID3D11Texture2D* renderTarget{};
-	HRESULT hr = m_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&renderTarget);
-	if (FAILED(hr)) return hr;
-	if (renderTarget != nullptr) hr = m_pDevice->CreateRenderTargetView(renderTarget, NULL, &m_pRenderTargetView);
-	renderTarget->Release();
-	if (FAILED(hr)) return hr;
+    // レンダーターゲットビュー作成
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> renderTarget;
+    HRESULT hr = m_pSwapChain->GetBuffer(
+        0,
+        IID_PPV_ARGS(renderTarget.ReleaseAndGetAddressOf()));
+    if (FAILED(hr)) return hr;
+    hr = m_pDevice->CreateRenderTargetView(
+        renderTarget.Get(),
+        NULL,
+		m_pRenderTargetView.ReleaseAndGetAddressOf());
+    if (FAILED(hr)) return hr;
 
 	// デプスステンシルバッファ作成
 	// ※（デプスバッファ = 深度バッファ = Zバッファ）→奥行を判定して前後関係を正しく描画できる
-	ID3D11Texture2D* depthStencile{};
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> depthStencil;
 	D3D11_TEXTURE2D_DESC textureDesc{};
 	textureDesc.Width = Application::GetWidth();   // バッファの幅をスワップチェーンに合わせる
 	textureDesc.Height = Application::GetHeight(); // バッファの高さをスワップチェーンに合わせる
@@ -267,19 +312,24 @@ HRESULT Renderer::CreateRenderAndDepthResources()
 	textureDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;     // 深度ステンシルバッファとして使用
 	textureDesc.CPUAccessFlags = 0;                       // CPUからのアクセスは不要
 	textureDesc.MiscFlags = 0;                            // その他のフラグは設定なし
-	hr = m_pDevice->CreateTexture2D(&textureDesc, NULL, &depthStencile);
-	if (FAILED(hr)) return hr;
+    hr = m_pDevice->CreateTexture2D(
+        &textureDesc,
+        NULL,
+        depthStencil.ReleaseAndGetAddressOf());
+    if (FAILED(hr)) return hr;
 
 	// デプスステンシルビュー作成
 	D3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc{};
 	depthStencilViewDesc.Format = textureDesc.Format; // デプスステンシルバッファのフォーマットを設定
 	depthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D; // ビューの次元を2Dテクスチャとして設定（2Dテクスチャ用のデプスステンシルビュー）
 	depthStencilViewDesc.Flags = 0; // 特別なフラグは設定しない（デフォルトの動作）
-	if (depthStencile != nullptr)m_pDevice->CreateDepthStencilView(depthStencile, &depthStencilViewDesc, &m_pDepthStencilView);
-	if (FAILED(hr)) return hr;
-	depthStencile->Release();
+    hr = m_pDevice->CreateDepthStencilView(
+        depthStencil.Get(),
+        &depthStencilViewDesc,
+		m_pDepthStencilView.ReleaseAndGetAddressOf());
+    if (FAILED(hr)) return hr;
 
-	return S_OK;
+    return S_OK;
 }
 
 //--------------------------------------------------------------------------------------
@@ -287,28 +337,50 @@ HRESULT Renderer::CreateRenderAndDepthResources()
 //--------------------------------------------------------------------------------------
 void Renderer::Uninit()
 {
-	m_pDeviceContext->ClearState();
+    Microsoft::WRL::ComPtr<ID3D11Debug> debugInterface;
+#if defined(DEBUG) || defined(_DEBUG)
+    if (m_pDevice != nullptr)
+    {
+        m_pDevice->QueryInterface(
+            IID_PPV_ARGS(debugInterface.ReleaseAndGetAddressOf()));
+    }
+#endif
 
-	SAFE_RELEASE(m_pLightBuffer);
-	SAFE_RELEASE(m_pEnvironmentLightBuffer);
-	SAFE_RELEASE(m_pMaterialBuffer);
-	SAFE_RELEASE(m_pTextureBuffer);
+    if (m_pDeviceContext != nullptr)
+    {
+        m_pDeviceContext->ClearState();
+        m_pDeviceContext->Flush();
+    }
 
-	SAFE_RELEASE(m_pWorldBuffer);
-	SAFE_RELEASE(m_pViewBuffer);
-	SAFE_RELEASE(m_pProjectionBuffer);
+	m_pLightBuffer.Reset();
+	m_pEnvironmentLightBuffer.Reset();
+	m_pMaterialBuffer.Reset();
+	m_pTextureBuffer.Reset();
 
-	SAFE_RELEASE(m_pDepthStateEnable);
-	SAFE_RELEASE(m_pDepthStateDisable);
+	m_pWorldBuffer.Reset();
+	m_pViewBuffer.Reset();
+	m_pProjectionBuffer.Reset();
+
+	m_pDepthStateEnable.Reset();
+	m_pDepthStateDisable.Reset();
 	for (int i = 0; i < MAX_BLENDSTATE; i++)
 	{
-		SAFE_RELEASE(m_pBlendState[i]);
+		m_pBlendState[i].Reset();
 	}
-	SAFE_RELEASE(m_pDepthStencilView);
-	SAFE_RELEASE(m_pRenderTargetView);
-	SAFE_RELEASE(m_pSwapChain);
-	SAFE_RELEASE(m_pDeviceContext);
-	SAFE_RELEASE(m_pDevice);
+	m_pBlendStateATC.Reset();
+	m_pDepthStencilView.Reset();
+	m_pRenderTargetView.Reset();
+	m_pSwapChain.Reset();
+	m_pDeviceContext.Reset();
+	m_pDevice.Reset();
+
+#if defined(DEBUG) || defined(_DEBUG)
+    if (debugInterface)
+    {
+        debugInterface->ReportLiveDeviceObjects(
+            D3D11_RLDO_DETAIL | D3D11_RLDO_IGNORE_INTERNAL);
+    }
+#endif
 }
 
 //--------------------------------------------------------------------------------------
@@ -320,11 +392,14 @@ void Renderer::DrawStart()
 	float clearColor[4] = { 0.003f, 0.005f, 0.008f, 1.0f }; // dark background
 
 	// 描画先のキャンバスと使用する深度バッファを指定する
-	m_pDeviceContext->OMSetRenderTargets(1, &m_pRenderTargetView, m_pDepthStencilView);
+	m_pDeviceContext->OMSetRenderTargets(
+		1, m_pRenderTargetView.GetAddressOf(), m_pDepthStencilView.Get());
 	// 描画先キャンバスを塗りつぶす
-	m_pDeviceContext->ClearRenderTargetView(m_pRenderTargetView, clearColor);
+	m_pDeviceContext->ClearRenderTargetView(
+		m_pRenderTargetView.Get(), clearColor);
 	// 深度バッファをリセットする
-	m_pDeviceContext->ClearDepthStencilView(m_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
+	m_pDeviceContext->ClearDepthStencilView(
+		m_pDepthStencilView.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
 }
 
 //--------------------------------------------------------------------------------------
@@ -343,7 +418,8 @@ void Renderer::SetLight(LIGHT Light)
 {
 	m_Light = Light;
 	m_Light.Enable = m_LightEnable;
-	m_pDeviceContext->UpdateSubresource(m_pLightBuffer, 0, NULL, &m_Light, 0, 0);
+	m_pDeviceContext->UpdateSubresource(
+		m_pLightBuffer.Get(), 0, NULL, &m_Light, 0, 0);
 
 }
 
@@ -351,7 +427,8 @@ void Renderer::SetEnvironmentLights(const ENVIRONMENT_LIGHTS& lights)
 {
 	m_EnvironmentLights = lights;
 	m_pDeviceContext->UpdateSubresource(
-		m_pEnvironmentLightBuffer, 0, NULL, &m_EnvironmentLights, 0, 0);
+		m_pEnvironmentLightBuffer.Get(),
+		0, NULL, &m_EnvironmentLights, 0, 0);
 }
 
 //--------------------------------------------------------------------------------------
@@ -361,7 +438,8 @@ void Renderer::SetLightEnable(bool Enable)
 {
 	m_LightEnable = Enable;
 	m_Light.Enable = Enable;
-	m_pDeviceContext->UpdateSubresource(m_pLightBuffer, 0, NULL, &m_Light, 0, 0);
+	m_pDeviceContext->UpdateSubresource(
+		m_pLightBuffer.Get(), 0, NULL, &m_Light, 0, 0);
 }
 
 //--------------------------------------------------------------------------------------
@@ -377,7 +455,8 @@ bool Renderer::GetLightEnable()
 //--------------------------------------------------------------------------------------
 void Renderer::SetMaterial(MATERIAL Material)
 {
-	m_pDeviceContext->UpdateSubresource(m_pMaterialBuffer, 0, NULL, &Material, 0, 0);
+	m_pDeviceContext->UpdateSubresource(
+		m_pMaterialBuffer.Get(), 0, NULL, &Material, 0, 0);
 }
 
 //--------------------------------------------------------------------------------------
@@ -388,7 +467,8 @@ void Renderer::SetUV(float u, float v, float uw, float vh)
 	//UVの行列作成
 	Matrix mat = Matrix::CreateScale(uw, vh, 1.0f);
 	mat *= Matrix::CreateTranslation(u, v, 0.0f).Transpose();
-	m_pDeviceContext->UpdateSubresource(m_pTextureBuffer, 0, NULL, &mat, 0, 0);
+	m_pDeviceContext->UpdateSubresource(
+		m_pTextureBuffer.Get(), 0, NULL, &mat, 0, 0);
 }
 
 //--------------------------------------------------------------------------------------
@@ -399,12 +479,14 @@ void Renderer::SetDepthEnable(bool Enable)
 	if (Enable) 
 	{
 		// 深度テストを有効にするステンシルステートをセット
-		m_pDeviceContext->OMSetDepthStencilState(m_pDepthStateEnable, NULL);
+		m_pDeviceContext->OMSetDepthStencilState(
+			m_pDepthStateEnable.Get(), NULL);
 	}
 	else
 	{
 		// 深度テストを無効にするステンシルステートをセット
-		m_pDeviceContext->OMSetDepthStencilState(m_pDepthStateDisable, NULL);
+		m_pDeviceContext->OMSetDepthStencilState(
+			m_pDepthStateDisable.Get(), NULL);
 	}
 }
 
@@ -419,12 +501,14 @@ void Renderer::SetATCEnable(bool Enable)
 	if (Enable)
 	{
 		// アルファテストとカバレッジ (ATC) を有効にするブレンドステートをセット
-		m_pDeviceContext->OMSetBlendState(m_pBlendStateATC, blendFactor, 0xffffffff);
+		m_pDeviceContext->OMSetBlendState(
+			m_pBlendStateATC.Get(), blendFactor, 0xffffffff);
 	}
 	else 
 	{
 		// 通常のブレンドステートをセット
-		m_pDeviceContext->OMSetBlendState(m_pBlendState[0], blendFactor, 0xffffffff);
+		m_pDeviceContext->OMSetBlendState(
+			m_pBlendState[0].Get(), blendFactor, 0xffffffff);
 	}
 }
 
@@ -435,11 +519,13 @@ void Renderer::SetWorldViewProjection2D()
 {
 	Matrix world = Matrix::Identity;			// 単位行列にする
 	world = world.Transpose();			// 転置
-	m_pDeviceContext->UpdateSubresource(m_pWorldBuffer, 0, NULL, &world, 0, 0);
+	m_pDeviceContext->UpdateSubresource(
+		m_pWorldBuffer.Get(), 0, NULL, &world, 0, 0);
 
 	Matrix view = Matrix::Identity;			// 単位行列にする
 	view = view.Transpose();			// 転置
-	m_pDeviceContext->UpdateSubresource(m_pViewBuffer, 0, NULL, &view, 0, 0);
+	m_pDeviceContext->UpdateSubresource(
+		m_pViewBuffer.Get(), 0, NULL, &view, 0, 0);
 
 	// 2D描画を左上原点にする
 	Matrix projection = DirectX::XMMatrixOrthographicOffCenterLH(
@@ -452,7 +538,8 @@ void Renderer::SetWorldViewProjection2D()
 
 	projection = projection.Transpose();
 
-	m_pDeviceContext->UpdateSubresource(m_pProjectionBuffer, 0, NULL, &projection, 0, 0);
+	m_pDeviceContext->UpdateSubresource(
+		m_pProjectionBuffer.Get(), 0, NULL, &projection, 0, 0);
 }
 
 //--------------------------------------------------------------------------------------
@@ -464,7 +551,8 @@ void Renderer::SetWorldMatrix(Matrix* WorldMatrix)
 	world = WorldMatrix->Transpose(); // 転置
 
 	// ワールド行列をGPU側へ送る
-	m_pDeviceContext->UpdateSubresource(m_pWorldBuffer, 0, NULL, &world, 0, 0);
+	m_pDeviceContext->UpdateSubresource(
+		m_pWorldBuffer.Get(), 0, NULL, &world, 0, 0);
 }
 
 //--------------------------------------------------------------------------------------
@@ -476,7 +564,8 @@ void Renderer::SetViewMatrix(Matrix* ViewMatrix)
 	view = ViewMatrix->Transpose(); // 転置
 
 	// ビュー行列をGPU側へ送る
-	m_pDeviceContext->UpdateSubresource(m_pViewBuffer, 0, NULL, &view, 0, 0);
+	m_pDeviceContext->UpdateSubresource(
+		m_pViewBuffer.Get(), 0, NULL, &view, 0, 0);
 }
 
 //--------------------------------------------------------------------------------------
@@ -488,7 +577,8 @@ void Renderer::SetProjectionMatrix(Matrix* ProjectionMatrix)
 	projection = ProjectionMatrix->Transpose(); // 転置
 
 	// プロジェクション行列をGPU側へ送る
-	m_pDeviceContext->UpdateSubresource(m_pProjectionBuffer, 0, NULL, &projection, 0, 0);
+	m_pDeviceContext->UpdateSubresource(
+		m_pProjectionBuffer.Get(), 0, NULL, &projection, 0, 0);
 }
 
 //--------------------------------------------------------------------------------------
@@ -499,23 +589,24 @@ HRESULT Renderer::ResizeWindow(int width, int height)
 	// スワップチェインが存在しない場合は処理しない
 	if (!m_pSwapChain)return S_FALSE;
 
+	// The device context also owns a reference to the current back buffer.
+	// Unbind it before ResizeBuffers so every reference is released.
+	m_pDeviceContext->OMSetRenderTargets(0, nullptr, nullptr);
+	m_pDeviceContext->Flush();
+
 	// 既存のレンダーターゲットビューを解放
-	if (m_pRenderTargetView) {
-		m_pRenderTargetView->Release();
-		m_pRenderTargetView = nullptr;
-	}
+	m_pRenderTargetView.Reset();
 
 	// 既存のデプスステンシルビューを解放
-	if (m_pDepthStencilView) {
-		m_pDepthStencilView->Release();
-		m_pDepthStencilView = nullptr;
-	}
+	m_pDepthStencilView.Reset();
 
 	// スワップチェインのバッファサイズを新しいウィンドウサイズに合わせて変更
-	m_pSwapChain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
+	HRESULT hr = m_pSwapChain->ResizeBuffers(
+		0, width, height, DXGI_FORMAT_UNKNOWN, 0);
+	if (FAILED(hr)) return hr;
 
 	// レンダーターゲットビュー・デプスステンシルバッファ・デプスステンシルビュー作成
-	HRESULT hr = CreateRenderAndDepthResources();
+	hr = CreateRenderAndDepthResources();
 	if (FAILED(hr)) return hr;
 
 	// ウィンドウとターゲットのアスペクト比を比較してビューポートを調整
@@ -550,8 +641,13 @@ HRESULT Renderer::ResizeWindow(int width, int height)
 //--------------------------------------------------------------------------------------
 // シェーダーをファイル拡張子に合わせてコンパイル
 //--------------------------------------------------------------------------------------
-HRESULT Renderer::CompileShader(const char* szFileName, LPCSTR szEntryPoint, LPCSTR szShaderModel, void** ppShaderObject, int* pShaderObjectSize)
+HRESULT Renderer::CompileShader(
+	const char* szFileName,
+	LPCSTR szEntryPoint,
+	LPCSTR szShaderModel,
+	std::vector<unsigned char>& shaderObject)
 {
+	shaderObject.clear();
 	//拡張子csoのファイル名を作成
 	char csoFileName[256];
 	const char* dot = strrchr(szFileName, '.');  // 最後の '.' を探す
@@ -575,14 +671,22 @@ HRESULT Renderer::CompileShader(const char* szFileName, LPCSTR szEntryPoint, LPC
 		int size = ftell(fp);
 		fseek(fp, 0, SEEK_SET);
 
-		// バイナリデータを読み込み用にメモリ確保
-		unsigned char* byteArray = new unsigned char[size];
-		fread(byteArray, size, 1, fp);
+		if (size <= 0)
+		{
+			fclose(fp);
+			return E_FAIL;
+		}
+
+		shaderObject.resize(static_cast<size_t>(size));
+		const size_t readSize = fread(
+			shaderObject.data(), 1, shaderObject.size(), fp);
 		fclose(fp);
 
-		// 呼び出し元にポインタとサイズを渡す
-		*ppShaderObject = byteArray;
-		*pShaderObjectSize = size;
+		if (readSize != shaderObject.size())
+		{
+			shaderObject.clear();
+			return E_FAIL;
+		}
 	}
 	//csoファイルがなければhlslファイルをコンパイルする
 	else
@@ -635,10 +739,11 @@ HRESULT Renderer::CompileShader(const char* szFileName, LPCSTR szEntryPoint, LPC
 
 		// コンパイル成功時のバイナリデータコピーして呼び出し元に渡す
 		
-		*pShaderObjectSize = (int)(pBlob)->GetBufferSize();
-		unsigned char* byteArray = new unsigned char[*pShaderObjectSize];
-		memcpy(byteArray, pBlob->GetBufferPointer(), *pShaderObjectSize);
-		*ppShaderObject = byteArray;
+		shaderObject.resize(pBlob->GetBufferSize());
+		memcpy(
+			shaderObject.data(),
+			pBlob->GetBufferPointer(),
+			shaderObject.size());
 		SAFE_RELEASE(pBlob);
 	}
 
@@ -650,31 +755,33 @@ HRESULT Renderer::CompileShader(const char* szFileName, LPCSTR szEntryPoint, LPC
 //--------------------------------------------------------------------------------------
 HRESULT Renderer::CreateVertexShader(ID3D11VertexShader** ppVertexShader, ID3D11InputLayout** ppVertexLayout, D3D11_INPUT_ELEMENT_DESC* pLayout, unsigned int numElements, const char* szFileName)
 {
-	void* ShaderObject=nullptr;
-	int	ShaderObjectSize=0;
+	std::vector<unsigned char> shaderObject;
 
 	// ファイルの拡張子に合わせてコンパイル
-	HRESULT hr = CompileShader(szFileName, "main", "vs_5_0", &ShaderObject, &ShaderObjectSize);
+	HRESULT hr = CompileShader(
+		szFileName, "main", "vs_5_0", shaderObject);
 	if (FAILED(hr)) return hr;
 
 	// デバイスを使って頂点シェーダーを作成
-	hr = m_pDevice->CreateVertexShader(ShaderObject, ShaderObjectSize, NULL, ppVertexShader);
+	hr = m_pDevice->CreateVertexShader(
+		shaderObject.data(), shaderObject.size(), NULL, ppVertexShader);
 
 	if (FAILED(hr))
 	{
-		delete[]static_cast<unsigned char*> (ShaderObject);
 		return hr;
 	}
 	// デバイスを使って頂点レイアウトを作成
-	hr=m_pDevice->CreateInputLayout(pLayout, numElements, ShaderObject, ShaderObjectSize, ppVertexLayout);
+	hr = m_pDevice->CreateInputLayout(
+		pLayout,
+		numElements,
+		shaderObject.data(),
+		shaderObject.size(),
+		ppVertexLayout);
 	
 	if (FAILED(hr))
 	{
-		delete[]static_cast<unsigned char*> (ShaderObject);
 		return hr;
 	}
-	// シェーダーオブジェクトのメモリを解放
-	delete[]static_cast<unsigned char*> (ShaderObject);
 
 	return S_OK;
 }
@@ -684,22 +791,20 @@ HRESULT Renderer::CreateVertexShader(ID3D11VertexShader** ppVertexShader, ID3D11
 //--------------------------------------------------------------------------------------
 HRESULT Renderer::CreatePixelShader(ID3D11PixelShader** ppPixelShader, const char* szFileName)
 {
-	void* ShaderObject=nullptr;
-	int	ShaderObjectSize=0;
+	std::vector<unsigned char> shaderObject;
 
 	// ファイルの拡張子に合わせてコンパイル
-	HRESULT hr = CompileShader(szFileName, "main", "ps_5_0", &ShaderObject, &ShaderObjectSize);
+	HRESULT hr = CompileShader(
+		szFileName, "main", "ps_5_0", shaderObject);
 	if (FAILED(hr)) return hr;
 
 	// ピクセルシェーダーを生成
-	hr = m_pDevice->CreatePixelShader(ShaderObject, ShaderObjectSize, nullptr, ppPixelShader);
+	hr = m_pDevice->CreatePixelShader(
+		shaderObject.data(), shaderObject.size(), nullptr, ppPixelShader);
 	if (FAILED(hr))
 	{
-		delete[]static_cast<unsigned char*> (ShaderObject);
 		return hr;
 	}
-	// シェーダーオブジェクトのメモリを解放
-	delete[]static_cast<unsigned char*> (ShaderObject);	
 	return S_OK;
 }
 
@@ -826,8 +931,8 @@ void Renderer::SetBackBufferRenderTarget()
 {
 	m_pDeviceContext->OMSetRenderTargets(
 		1,
-		&m_pRenderTargetView,
-		m_pDepthStencilView
+		m_pRenderTargetView.GetAddressOf(),
+		m_pDepthStencilView.Get()
 	);
 }
 
@@ -836,7 +941,7 @@ void Renderer::ClearBackBuffer(float r, float g, float b, float a)
 	float clearColor[4] = { r, g, b, a };
 
 	m_pDeviceContext->ClearRenderTargetView(
-		m_pRenderTargetView,
+		m_pRenderTargetView.Get(),
 		clearColor
 	);
 }
@@ -844,7 +949,7 @@ void Renderer::ClearBackBuffer(float r, float g, float b, float a)
 void Renderer::ClearDepth()
 {
 	m_pDeviceContext->ClearDepthStencilView(
-		m_pDepthStencilView,
+		m_pDepthStencilView.Get(),
 		D3D11_CLEAR_DEPTH,
 		1.0f,
 		0
