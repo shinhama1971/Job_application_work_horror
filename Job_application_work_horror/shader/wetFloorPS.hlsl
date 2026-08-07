@@ -147,6 +147,33 @@ float GetFlashlightLensPattern(float3 pixelDirection)
         0.91f + centerHotspot * 0.13f + softRing * 0.035f + lensDirt);
 }
 
+float3 ApplyFilmicHorrorGrade(float3 color)
+{
+    color = max(color, 0.0f);
+    const float3 acesColor = saturate(
+        (color * (2.51f * color + 0.03f)) /
+        (color * (2.43f * color + 0.59f) + 0.14f));
+    color = lerp(color, acesColor, 0.28f);
+
+    const float luminance = dot(
+        color,
+        float3(0.2126f, 0.7152f, 0.0722f));
+    color = lerp(luminance.xxx, color, 0.86f);
+    const float shadowWeight =
+        1.0f - smoothstep(0.08f, 0.42f, luminance);
+    const float highlightWeight =
+        smoothstep(0.38f, 0.90f, luminance);
+    color *= lerp(
+        1.0f.xxx,
+        float3(0.91f, 0.96f, 1.035f),
+        shadowWeight * 0.48f);
+    color *= lerp(
+        1.0f.xxx,
+        float3(1.025f, 0.995f, 0.955f),
+        highlightWeight * 0.36f);
+    return saturate(color);
+}
+
 float2 Hash22(float2 value)
 {
     const float first = Hash21(value + float2(17.3f, 41.7f));
@@ -290,12 +317,15 @@ float4 main(in LIT_PS_IN input) : SV_Target
     const float baseLuminance = dot(
         color.rgb,
         float3(0.2126f, 0.7152f, 0.0722f));
+    // Shallow indoor water should reveal the floor when viewed from above.
+    // Darkening it too much makes the puddle read as a painted black decal.
     const float3 wetColor = lerp(
-        color.rgb * 0.58f,
-        float3(0.22f, 0.27f, 0.285f) + baseLuminance.xxx * 0.10f,
-        0.72f);
-    color.rgb = lerp(color.rgb, wetColor, puddle * 0.92f);
-    color.rgb *= 1.0f - shore * 0.10f;
+        color.rgb * 0.76f,
+        color.rgb * 0.58f +
+            float3(0.018f, 0.030f, 0.034f) + baseLuminance.xxx * 0.035f,
+        0.38f);
+    color.rgb = lerp(color.rgb, wetColor, puddle * 0.84f);
+    color.rgb *= 1.0f - shore * 0.035f;
 
     float3 lighting = Light.Ambient.rgb;
     float3 specularLighting = 0.0f;
@@ -416,7 +446,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     specularLighting += float3(0.12f, 0.16f, 0.17f) * rippleHighlight * 0.16f;
     specularLighting += float3(0.28f, 0.34f, 0.35f)
         * dripRing * 0.20f * RippleStrength;
-    specularLighting += float3(0.10f, 0.13f, 0.125f) * shore;
+    specularLighting += float3(0.10f, 0.13f, 0.125f)
+        * shore * (0.24f + fresnel * 0.46f);
     color.rgb += specularLighting;
     color.rgb += Material.Emission.rgb;
 
@@ -439,17 +470,19 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
     const float2 waterDistortion =
         detailWorldNormal.xz *
-        (0.010f + abs(ripplePattern) * 0.0045f) *
+        (0.0045f + abs(ripplePattern) * 0.0022f) *
         puddle * RippleStrength;
     reflectionUV = saturate(reflectionUV + waterDistortion);
 
     const float3 reflectedScene =
         g_PlanarReflection.Sample(g_SamplerState, reflectionUV).rgb;
+    // Fresnel behavior: looking down mostly shows the floor beneath the
+    // water; grazing angles strongly show the mirrored room and fixtures.
     const float reflectionStrength = puddle * reflectionInside *
-        lerp(0.62f, 0.90f, fresnel) * ReflectionStrength;
+        lerp(0.14f, 0.82f, fresnel) * ReflectionStrength;
     color.rgb = lerp(
         color.rgb,
-        reflectedScene * 0.94f + float3(0.012f, 0.018f, 0.022f),
+        reflectedScene * 0.96f + float3(0.018f, 0.026f, 0.030f),
         reflectionStrength);
 
     // Layered height fog keeps nearby navigation readable while separating
@@ -470,6 +503,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         Light.Ambient.rgb * 0.38f,
         float3(0.070f, 0.078f, 0.084f));
     color.rgb = lerp(color.rgb, fogColor, fogFactor);
+    color.rgb = ApplyFilmicHorrorGrade(color.rgb);
 
     return color;
 }

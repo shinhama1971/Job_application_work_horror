@@ -138,6 +138,71 @@ float GetProceduralGrime(float3 worldPosition, float3 worldNormal)
          drip * 0.17f + fineDust * 0.055f));
 }
 
+float GetProceduralSurfaceHeight(float3 worldPosition, float3 worldNormal)
+{
+    const float3 normal = abs(normalize(worldNormal));
+    const float wallCoordinate = normal.x > normal.z
+        ? worldPosition.z
+        : worldPosition.x;
+    const float2 wallUV = float2(wallCoordinate, worldPosition.y);
+
+    const float broad = FlashlightNoise(wallUV * 0.19f + 3.7f);
+    const float plaster = FlashlightNoise(wallUV * 0.63f - 12.4f);
+    const float fine = FlashlightNoise(wallUV * 1.45f + 27.1f);
+    return broad * 0.52f + plaster * 0.33f + fine * 0.15f;
+}
+
+float3 GetBumpedWorldNormal(float3 worldPosition, float3 worldNormal)
+{
+    const float3 normal = normalize(worldNormal);
+    const float height = GetProceduralSurfaceHeight(
+        worldPosition,
+        worldNormal);
+    const float heightDx = ddx(height);
+    const float heightDy = ddy(height);
+    const float3 positionDx = ddx(worldPosition);
+    const float3 positionDy = ddy(worldPosition);
+    const float3 gradientX = cross(positionDy, normal);
+    const float3 gradientY = cross(normal, positionDx);
+    const float determinant = dot(positionDx, gradientX);
+    const float inverseDeterminant =
+        (determinant < 0.0f ? -1.0f : 1.0f) /
+        max(abs(determinant), 0.0001f);
+    const float3 surfaceGradient =
+        (gradientX * heightDx + gradientY * heightDy) *
+        inverseDeterminant;
+    return normalize(normal - surfaceGradient * 0.72f);
+}
+
+float3 ApplyFilmicHorrorGrade(float3 color)
+{
+    color = max(color, 0.0f);
+
+    // Blend a restrained filmic shoulder instead of crushing the shadows.
+    const float3 acesColor = saturate(
+        (color * (2.51f * color + 0.03f)) /
+        (color * (2.43f * color + 0.59f) + 0.14f));
+    color = lerp(color, acesColor, 0.28f);
+
+    const float luminance = dot(
+        color,
+        float3(0.2126f, 0.7152f, 0.0722f));
+    color = lerp(luminance.xxx, color, 0.86f);
+    const float shadowWeight =
+        1.0f - smoothstep(0.08f, 0.42f, luminance);
+    const float highlightWeight =
+        smoothstep(0.38f, 0.90f, luminance);
+    color *= lerp(
+        1.0f.xxx,
+        float3(0.91f, 0.96f, 1.035f),
+        shadowWeight * 0.48f);
+    color *= lerp(
+        1.0f.xxx,
+        float3(1.025f, 0.995f, 0.955f),
+        highlightWeight * 0.36f);
+    return saturate(color);
+}
+
 float GetFlashlightLensPattern(float3 pixelDirection)
 {
     const float outerCosine = max(Light.SpotParams.y, 0.05f);
@@ -176,6 +241,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     const float emissionEnergy = dot(
         abs(Material.Emission.rgb),
         float3(0.3333f, 0.3333f, 0.3333f));
+    float3 detailWorldNormal = normalize(input.worldNormal);
     if (!Material.TextureEnable && emissionEnergy < 0.001f)
     {
         const float grime = GetProceduralGrime(
@@ -186,7 +252,13 @@ float4 main(in LIT_PS_IN input) : SV_Target
             color.rgb,
             color.rgb * float3(0.72f, 0.80f, 0.69f),
             grime * 0.20f);
+        detailWorldNormal = GetBumpedWorldNormal(
+            input.worldPos,
+            input.worldNormal);
     }
+    const float3 detailViewNormal = normalize(mul(
+        float4(detailWorldNormal, 0.0f),
+        View).xyz);
 
     float3 lighting = Light.Ambient.rgb;
     const float distanceFromCamera = length(input.viewPos);
@@ -210,7 +282,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         pointAttenuation *= pointAttenuation;
 
         const float pointLambert = saturate(dot(
-            normalize(input.worldNormal), directionToPointLight));
+            detailWorldNormal, directionToPointLight));
         const float softPointLambert = 0.20f + pointLambert * 0.80f;
         // Ceiling panels are broad downward emitters, not bare point bulbs.
         // Keep a little sideways spill while concentrating energy on the floor.
@@ -246,7 +318,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         const float naturalAttenuation = attenuation *
             lerp(1.0f, physicalFalloff, 0.32f);
 
-        const float3 normal = normalize(input.viewNormal);
+        const float3 normal = detailViewNormal;
         const float3 directionToLight = -pixelDirection;
         const float lambert = saturate(dot(normal, directionToLight));
         const float softenedLambert = 0.25f + lambert * 0.75f;
@@ -281,6 +353,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         Light.Ambient.rgb * 0.38f,
         float3(0.070f, 0.078f, 0.084f));
     color.rgb = lerp(color.rgb, fogColor, fogFactor);
+    color.rgb = ApplyFilmicHorrorGrade(color.rgb);
 
     return color;
 }
