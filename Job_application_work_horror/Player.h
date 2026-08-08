@@ -106,4 +106,9 @@ public:
     {
         return m_IsSprinting;
     }
+
+    bool IsFlashlightOn() const
+    {
+        return m_FlashLightOn;
+    }
 };

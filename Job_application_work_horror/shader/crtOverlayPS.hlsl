@@ -26,31 +26,35 @@ float4 main(PS_IN input) : SV_TARGET
 {
     const float2 center = float2(0.5f, 0.5f);
     float2 centered = input.uv - center;
+    const float eventNoise = saturate(
+        noiseAmount + horrorPulseStrength * 1.20f);
+    const float eventVignette =
+        vignetteStrength + horrorPulseStrength * 0.52f;
 
     // Soft edge darkening that does not hide gameplay information.
     float edgeDistance = length(centered * float2(1.15f, 1.0f));
     float vignette = smoothstep(0.30f, 0.72f, edgeDistance) *
-        0.30f * vignetteStrength;
+        0.25f * eventVignette;
 
     // Alternating CRT rows. SV_POSITION is used so the line width remains
     // stable at different window resolutions.
     float scanWave = sin(input.pos.y * 3.14159265f) * 0.5f + 0.5f;
-    float scanline = (1.0f - scanWave) * 0.030f * noiseAmount;
+    float scanline = (1.0f - scanWave) * 0.018f * eventNoise;
 
     float frame = floor(time * 30.0f);
     float noise = Hash(floor(input.pos.xy) + frame * float2(17.0f, 31.0f));
     float darkGrain = smoothstep(0.68f, 1.0f, noise) *
-        0.020f * noiseAmount;
+        0.012f * eventNoise;
 
     // A very faint rolling band gives the image analogue motion.
     float rolling = sin(input.uv.y * 10.0f - time * 1.8f) * 0.5f + 0.5f;
-    rolling = pow(rolling, 12.0f) * 0.018f * noiseAmount;
+    rolling = pow(rolling, 12.0f) * 0.012f * eventNoise;
 
     // Rare dust pixels are bright but use very low opacity.
     float dust = step(0.9985f, noise);
 
     float darkAlpha = saturate(vignette + scanline + darkGrain + rolling);
-    float dustAlpha = dust * 0.045f * noiseAmount;
+    float dustAlpha = dust * 0.030f * eventNoise;
 
     // Scare events add transparent synchronization tears. This pass never
     // replaces the scene, so a missing texture can no longer make it black.

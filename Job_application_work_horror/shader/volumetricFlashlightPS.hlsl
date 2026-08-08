@@ -13,8 +13,10 @@ cbuffer PostProcessBuffer : register(b0)
     float vignetteStrength;
     float screenAspect;
     float volumeIntensity;
-    float padding0;
-    float padding1;
+    float lensDistortionStrength;
+    float horrorPulseStrength;
+    float exposure;
+    float3 exposurePadding;
 };
 
 struct LIGHT
@@ -45,7 +47,26 @@ SamplerState LinearSampler : register(s0);
 
 float Hash(float2 value)
 {
-    return frac(sin(dot(value, float2(12.9898f, 78.233f))) * 43758.5453f);
+    float3 value3 = frac(float3(value.x, value.y, value.x) * 0.1031f);
+    value3 += dot(value3, value3.yzx + 33.33f);
+    return frac((value3.x + value3.y) * value3.z);
+}
+
+float ValueNoise(float2 value)
+{
+    const float2 cell = floor(value);
+    float2 local = frac(value);
+    local = local * local * (3.0f - 2.0f * local);
+
+    const float bottom = lerp(
+        Hash(cell),
+        Hash(cell + float2(1.0f, 0.0f)),
+        local.x);
+    const float top = lerp(
+        Hash(cell + float2(0.0f, 1.0f)),
+        Hash(cell + float2(1.0f, 1.0f)),
+        local.x);
+    return lerp(bottom, top, local.y);
 }
 
 float LinearizeDepth(float depth, float nearPlane, float farPlane)
@@ -96,15 +117,26 @@ float4 main(PS_IN input) : SV_Target
         (occluderDistance - 2.0f) / 120.0f));
     const float floorFade = 1.0f - smoothstep(0.62f, 0.98f, input.uv.y);
 
-    const float frame = floor(time * 24.0f);
-    const float grain = Hash(floor(input.pos.xy * 0.45f) + frame * 7.13f);
-    const float driftingDust = smoothstep(0.935f, 1.0f, grain) * 0.42f;
+    // Continuous screen-space flow avoids the television-noise flicker of a
+    // new random pattern every frame. Two differently moving fields suggest
+    // particles at different depths inside the flashlight cone.
+    const float2 dustFlow = float2(time * 0.42f, -time * 0.24f);
+    const float nearDustNoise = ValueNoise(
+        input.pos.xy * 0.070f + dustFlow);
+    const float farDustNoise = ValueNoise(
+        input.pos.xy * 0.031f - dustFlow * 0.57f + 19.7f);
+    const float nearDust =
+        pow(saturate(nearDustNoise), 20.0f) * 0.52f;
+    const float farDust =
+        pow(saturate(farDustNoise), 28.0f) * 0.30f;
+    const float driftingDust = nearDust + farDust;
     const float slowVariation =
         sin(input.uv.y * 38.0f - time * 1.7f) * 0.5f + 0.5f;
 
-    const float density =
+    float density =
         (0.068f + slowVariation * 0.022f + driftingDust) *
         softBeam * visibleLength * floorFade * volumeIntensity;
+    density *= 1.0f + horrorPulseStrength * 0.32f;
     const float3 beamColor = float3(1.0f, 0.78f, 0.50f) *
         saturate(Light.Intensity / 1.6f);
 

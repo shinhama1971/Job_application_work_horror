@@ -15,6 +15,7 @@ private:
     std::vector<std::unique_ptr<Texture>> m_Textures;
 
     bool m_IsCollected = false;
+    bool m_IsActive = true;
 
     // プレイヤーに触れた判定用の距離
 
@@ -24,7 +25,10 @@ public:
     void Draw(Camera* cam) override;
     void Uninit() override;
 
-    bool IsInteractionEnabled() const override { return !m_IsCollected; }
+    bool IsInteractionEnabled() const override
+    {
+        return m_IsActive && !m_IsCollected;
+    }
     DirectX::SimpleMath::Vector3 GetInteractionPosition() const override { return m_Position; }
     const char* GetInteractionPrompt() const override { return "Collect fuse"; }
     void Interact(Player& player) override;
@@ -37,5 +41,15 @@ public:
     bool IsCollected() const
     {
         return m_IsCollected;
+    }
+
+    void SetActive(bool active)
+    {
+        m_IsActive = active;
+    }
+
+    bool IsActive() const
+    {
+        return m_IsActive;
     }
 };

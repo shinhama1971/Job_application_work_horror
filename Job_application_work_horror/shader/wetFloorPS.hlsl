@@ -376,16 +376,16 @@ float4 main(in LIT_PS_IN input) : SV_Target
             * EnvironmentLights[i].ColorIntensity.a
             * pointAttenuation
             * pow(pointLambert, 12.0f)
-            * puddle * 0.48f;
+            * puddle * 0.58f;
 
         // A soft footprint makes ceiling fixtures visibly reflect in water.
         const float horizontalDistance = length(offsetToLight.xz);
         const float reflectedFixture = pow(saturate(
-            1.0f - horizontalDistance / max(lightRange * 0.42f, 0.001f)),
-            5.0f);
+            1.0f - horizontalDistance / max(lightRange * 0.46f, 0.001f)),
+            4.5f);
         specularLighting += EnvironmentLights[i].ColorIntensity.rgb
             * EnvironmentLights[i].ColorIntensity.a
-            * reflectedFixture * puddle * 0.22f;
+            * reflectedFixture * puddle * 0.38f;
     }
 
     if (Light.Enable && Light.FlashlightEnabled && distanceFromCamera > 0.001f)
@@ -438,12 +438,12 @@ float4 main(in LIT_PS_IN input) : SV_Target
     }
 
     color.rgb *= lighting;
-    specularLighting += float3(0.16f, 0.22f, 0.24f)
-        * puddle * (0.10f + fresnel * 0.58f);
+    specularLighting += float3(0.19f, 0.25f, 0.28f)
+        * puddle * (0.15f + fresnel * 0.76f);
     const float rippleHighlight = pow(
         saturate(ripplePattern * 0.5f + 0.5f),
         10.0f) * puddle;
-    specularLighting += float3(0.12f, 0.16f, 0.17f) * rippleHighlight * 0.16f;
+    specularLighting += float3(0.12f, 0.16f, 0.17f) * rippleHighlight * 0.22f;
     specularLighting += float3(0.28f, 0.34f, 0.35f)
         * dripRing * 0.20f * RippleStrength;
     specularLighting += float3(0.10f, 0.13f, 0.125f)
@@ -478,11 +478,16 @@ float4 main(in LIT_PS_IN input) : SV_Target
         g_PlanarReflection.Sample(g_SamplerState, reflectionUV).rgb;
     // Fresnel behavior: looking down mostly shows the floor beneath the
     // water; grazing angles strongly show the mirrored room and fixtures.
-    const float reflectionStrength = puddle * reflectionInside *
-        lerp(0.14f, 0.82f, fresnel) * ReflectionStrength;
+    // The square-root remap makes mid-angle reflections readable while the
+    // low minimum prevents the puddle from returning to a black decal.
+    const float viewAngleReflection = sqrt(saturate(fresnel));
+    const float reflectionStrength = saturate(
+        puddle * reflectionInside *
+        lerp(0.24f, 0.98f, viewAngleReflection) * ReflectionStrength);
+    const float reflectionGain = 1.10f + rippleHighlight * 0.08f;
     color.rgb = lerp(
         color.rgb,
-        reflectedScene * 0.96f + float3(0.018f, 0.026f, 0.030f),
+        reflectedScene * reflectionGain + float3(0.023f, 0.032f, 0.037f),
         reflectionStrength);
 
     // Layered height fog keeps nearby navigation readable while separating

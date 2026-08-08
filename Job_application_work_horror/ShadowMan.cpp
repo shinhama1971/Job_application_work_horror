@@ -1,6 +1,7 @@
 #include "Game.h"
 #include "ShadowMan.h"
 #include "Player.h"
+#include "input.h"
 
 #include <algorithm>
 #include <array>
@@ -10,6 +11,13 @@ using namespace DirectX::SimpleMath;
 
 void ShadowMan::Init()
 {
+	m_Age = 0.0f;
+	m_ObservedAmount = 0.0f;
+	m_ReactedToGaze = false;
+	m_GazeScareEnabled = false;
+	m_OnObserved = nullptr;
+	m_LifeTimer = 120;
+
     m_Vertices.reserve(144);
     m_Indices.reserve(432);
 
@@ -113,18 +121,70 @@ void ShadowMan::Update()
         return;
     }
 
-    const std::vector<Player*> players =
-        Core::Game::GetInstance()->GetObjects<Player>();
-    if (players.empty() || players.front() == nullptr)
+    Core::Game* game = Core::Game::GetInstance();
+    Player* player = game->GetObj<Player>("Player");
+    if (player == nullptr)
     {
         return;
     }
 
-    const Vector3 toPlayer = players.front()->GetPosition() - m_Position;
+    const Vector3 toPlayer = player->GetPosition() - m_Position;
     if (toPlayer.LengthSquared() > 0.0001f)
     {
         m_Rotation.y = std::atan2(toPlayer.x, toPlayer.z);
     }
+
+	const Vector3 shadowCenter = m_Position + Vector3(0.0f, 17.0f, 0.0f);
+	Vector3 cameraToShadow = shadowCenter - game->GetCamera()->GetPosition();
+	const float distanceToShadow = cameraToShadow.Length();
+	if (distanceToShadow > 0.001f)
+	{
+		cameraToShadow /= distanceToShadow;
+	}
+
+	const float gazeAlignment =
+		game->GetCamera()->GetForward().Dot(cameraToShadow);
+	const bool illuminatedByGaze =
+		m_Age > 0.18f &&
+		player->IsFlashlightOn() &&
+		distanceToShadow < 220.0f &&
+		gazeAlignment > 0.955f;
+
+	if (illuminatedByGaze)
+	{
+		m_ObservedAmount += 0.060f;
+		m_LifeTimer -= 2;
+
+		if (!m_ReactedToGaze)
+		{
+			m_ReactedToGaze = true;
+			const float pulseStrength = m_GazeScareEnabled ? 0.62f : 0.20f;
+			const float pulseDuration = m_GazeScareEnabled ? 0.48f : 0.28f;
+			game->GetPostProcess()->TriggerHorrorPulse(
+				pulseStrength,
+				pulseDuration);
+
+			if (m_GazeScareEnabled)
+			{
+				Input::SetVibration(12, 0.32f);
+			}
+
+			if (m_OnObserved)
+			{
+				m_OnObserved();
+			}
+		}
+	}
+	else
+	{
+		m_ObservedAmount -= 0.018f;
+	}
+
+	m_ObservedAmount = (std::clamp)(m_ObservedAmount, 0.0f, 1.0f);
+	if (m_ObservedAmount > 0.82f)
+	{
+		m_LifeTimer = (std::min)(m_LifeTimer, 24);
+	}
 }
 
 void ShadowMan::Draw(Camera* camera)
@@ -157,7 +217,10 @@ void ShadowMan::Draw(Camera* camera)
 
     DissolveBuffer dissolve{};
     dissolve.Time = m_Age;
-    dissolve.Visibility = (std::min)(appear, disappear);
+	const float gazeDissolve = 1.0f - m_ObservedAmount * 0.88f;
+    dissolve.Visibility = (std::min)(
+		(std::min)(appear, disappear),
+		gazeDissolve);
     dissolve.EdgeWidth = 0.085f;
     context->UpdateSubresource(
         m_DissolveBuffer.Get(),
@@ -173,6 +236,7 @@ void ShadowMan::Draw(Camera* camera)
 
 void ShadowMan::Uninit()
 {
+	m_OnObserved = nullptr;
     m_DissolveBuffer.Reset();
     m_Vertices.clear();
     m_Indices.clear();

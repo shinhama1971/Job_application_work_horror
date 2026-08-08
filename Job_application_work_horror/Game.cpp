@@ -8,6 +8,7 @@
 #include "Ground.h"
 #include "Texture2D.h"
 #include "ScreenDustOverlay.h"
+#include "Shader.h"
 
 
 namespace Core
@@ -176,6 +177,8 @@ namespace Core
         m_Instance->m_PostProcess.Uninit();
         m_Instance->m_ShadowMap.Uninit();
         m_Instance->m_PlanarReflection.Uninit();
+
+		Shader::ClearCache();
 
         Input::Release();
 

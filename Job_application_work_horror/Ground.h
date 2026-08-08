@@ -37,6 +37,9 @@ class Ground :public Object
 	int m_SizeZ = 0;//ècÉTÉCÉY
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_WetFloorBuffer;
 	float m_WetTime = 0.0f;
+	float m_PowerReflectionBlend = 0.0f;
+	float m_PowerSurge = 0.0f;
+	bool m_WasPowerRestored = false;
 
 public:
 	

@@ -1,11 +1,35 @@
 #include	"Shader.h"
 #include	"Renderer.h"
 
+#include <unordered_map>
+
+namespace
+{
+	struct ShaderCacheEntry
+	{
+		ComPtr<ID3D11VertexShader> VertexShader;
+		ComPtr<ID3D11PixelShader> PixelShader;
+		ComPtr<ID3D11InputLayout> VertexLayout;
+	};
+
+	std::unordered_map<std::string, ShaderCacheEntry> g_ShaderCache;
+}
+
 //=======================================
 //Shader作成
 //=======================================
 void Shader::Create(std::string vs, std::string ps)
 {
+	const std::string cacheKey = vs + '\n' + ps;
+	const auto cachedShader = g_ShaderCache.find(cacheKey);
+	if (cachedShader != g_ShaderCache.end())
+	{
+		m_pVertexShader = cachedShader->second.VertexShader;
+		m_pPixelShader = cachedShader->second.PixelShader;
+		m_pVertexLayout = cachedShader->second.VertexLayout;
+		return;
+	}
+
 	// 頂点データの定義
 	D3D11_INPUT_ELEMENT_DESC layout[] =
 	{
@@ -41,6 +65,13 @@ void Shader::Create(std::string vs, std::string ps)
 		return;
 	}
 
+	g_ShaderCache.emplace(
+		cacheKey,
+		ShaderCacheEntry{
+			m_pVertexShader,
+			m_pPixelShader,
+			m_pVertexLayout });
+
 	return;
 }
 
@@ -55,5 +86,10 @@ void Shader::SetGPU()
 	devicecontext->PSSetShader(m_pPixelShader.Get(), nullptr, 0);		// ピクセルシェーダーをセット
 	devicecontext->IASetInputLayout(m_pVertexLayout.Get());				// 頂点レイアウトセット
 	
+}
+
+void Shader::ClearCache()
+{
+	g_ShaderCache.clear();
 }
 

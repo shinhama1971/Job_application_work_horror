@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include "RenderTexture.h"
 #include "FullScreenQuad.h"
 #include "ComputeShader.h"
@@ -18,15 +20,17 @@ namespace Effect
         float m_BloomPulseStrength = 0.0f;
         float m_BloomPulseTimer = 0.0f;
         float m_BloomPulseDuration = 0.0f;
-        float m_NoiseAmount = 1.0f;
-        float m_TargetNoiseAmount = 1.0f;
-        float m_VignetteStrength = 1.0f;
-        float m_TargetVignetteStrength = 1.0f;
+        float m_NoiseAmount = 0.18f;
+        float m_TargetNoiseAmount = 0.18f;
+        float m_VignetteStrength = 0.55f;
+        float m_TargetVignetteStrength = 0.55f;
         float m_LensDistortionStrength = 0.32f;
         float m_HorrorPulseStrength = 0.0f;
         float m_HorrorPulsePeak = 0.0f;
         float m_HorrorPulseTimer = 0.0f;
         float m_HorrorPulseDuration = 0.0f;
+        float m_Exposure = 1.0f;
+        float m_TargetExposure = 1.0f;
 
         Graphics::RenderTexture m_RenderTexture;
         Graphics::RenderTexture m_BloomExtractTexture;
@@ -67,6 +71,11 @@ namespace Effect
         void SetNoise(bool enable)
         {
             m_EnableNoise = enable;
+        }
+
+        void SetExposure(float exposure)
+        {
+            m_TargetExposure = (std::clamp)(exposure, 0.85f, 1.20f);
         }
 
         bool IsNoiseEnable() const

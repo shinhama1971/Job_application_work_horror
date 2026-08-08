@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+#include <utility>
 #include <wrl/client.h>
 #include "Object.h"
 #include "VertexBuffer.h"
@@ -26,6 +28,10 @@ private:
 
     Microsoft::WRL::ComPtr<ID3D11Buffer> m_DissolveBuffer;
     float m_Age = 0.0f;
+    float m_ObservedAmount = 0.0f;
+    bool m_ReactedToGaze = false;
+    bool m_GazeScareEnabled = false;
+    std::function<void()> m_OnObserved;
 
     int m_LifeTimer = 120;
 
@@ -38,5 +44,17 @@ public:
     void SetPosition(float x, float y, float z)
     {
         m_Position = DirectX::SimpleMath::Vector3(x, y, z);
+    }
+
+    void EnableGazeScare(float lifetimeSeconds = 6.0f)
+    {
+        m_GazeScareEnabled = true;
+        const int requestedFrames = static_cast<int>(lifetimeSeconds * 60.0f);
+        m_LifeTimer = requestedFrames > 30 ? requestedFrames : 30;
+    }
+
+    void SetOnObserved(std::function<void()> callback)
+    {
+        m_OnObserved = std::move(callback);
     }
 };

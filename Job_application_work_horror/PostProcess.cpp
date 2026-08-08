@@ -10,6 +10,14 @@ namespace Effect
     {
         m_EnableNoise = true;
         m_Time = 0.0f;
+        m_NoiseAmount = 0.18f;
+        m_TargetNoiseAmount = 0.18f;
+        m_VignetteStrength = 0.55f;
+        m_TargetVignetteStrength = 0.55f;
+        m_HorrorPulseStrength = 0.0f;
+        m_HorrorPulseTimer = 0.0f;
+        m_Exposure = 1.0f;
+        m_TargetExposure = 1.0f;
 
         m_RenderTexture.Init(
             Application::GetWidth(),
@@ -52,6 +60,13 @@ namespace Effect
             (m_TargetNoiseAmount - m_NoiseAmount) * 0.075f;
         m_VignetteStrength +=
             (m_TargetVignetteStrength - m_VignetteStrength) * 0.075f;
+
+        // Human vision adjusts slowly after entering darkness, but recovers
+        // quickly when the flashlight or ceiling lights return.
+        const float exposureResponse =
+            m_TargetExposure > m_Exposure ? 0.012f : 0.065f;
+        m_Exposure +=
+            (m_TargetExposure - m_Exposure) * exposureResponse;
 
         if (m_BloomPulseTimer > 0.0f && m_BloomPulseDuration > 0.0f)
         {
@@ -183,6 +198,7 @@ namespace Effect
     {
         RunBloom();
         m_FullScreenQuad.Draw(
+            m_RenderTexture.GetSRV(),
             m_BloomVerticalTexture.GetSRV(),
             m_Time,
             m_BloomIntensity,
@@ -190,6 +206,7 @@ namespace Effect
             m_VignetteStrength,
             m_EnableVolumetricLight ? 1.0f : 0.0f,
             m_LensDistortionStrength,
-            m_HorrorPulseStrength);
+            m_HorrorPulseStrength,
+            m_Exposure);
     }
 }

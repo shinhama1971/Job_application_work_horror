@@ -13,7 +13,7 @@ public:
 
     bool IsInteractionEnabled() const override { return true; }
     DirectX::SimpleMath::Vector3 GetInteractionPosition() const override { return m_Position; }
-    const char* GetInteractionPrompt() const override { return "Leave facility"; }
+    const char* GetInteractionPrompt() const override;
     void Interact(Player& player) override;
 
     void SetPosition(float x, float y, float z)

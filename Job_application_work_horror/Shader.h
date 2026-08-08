@@ -14,6 +14,7 @@ public:
 	~Shader() {}
 	void Create(std::string vs, std::string ps);
 	void SetGPU();
+	static void ClearCache();
 private:
 	ComPtr<ID3D11VertexShader> m_pVertexShader;		// 頂点シェーダー
 	ComPtr<ID3D11PixelShader>  m_pPixelShader;		// ピクセルシェーダー

@@ -1,5 +1,8 @@
 #include "Ground.h"
 #include "stb_image.h"
+#include "Game.h"
+#include <algorithm>
+#include <cmath>
 using namespace DirectX::SimpleMath;
 
 //=======================================
@@ -7,6 +10,11 @@ using namespace DirectX::SimpleMath;
 //=======================================
 void Ground::Init()
 {
+	m_WetTime = 0.0f;
+	m_PowerReflectionBlend = 0.0f;
+	m_PowerSurge = 0.0f;
+	m_WasPowerRestored = false;
+
 	// 頂点データ
 	m_SizeX = 50;
 	m_SizeZ = 50;
@@ -179,11 +187,29 @@ void Ground::Init()
 //=======================================
 void Ground::Update()
 {
-	m_WetTime += 1.0f / 60.0f;
+	constexpr float deltaTime = 1.0f / 60.0f;
+	m_WetTime += deltaTime;
 	if (m_WetTime > 10000.0f)
 	{
 		m_WetTime = 0.0f;
 	}
+
+	const bool powerRestored =
+		Core::Game::GetInstance()->IsPowerRestored();
+	if (powerRestored && !m_WasPowerRestored)
+	{
+		// Briefly disturb the water when the ceiling fixtures surge on.
+		m_PowerSurge = 1.0f;
+	}
+	m_WasPowerRestored = powerRestored;
+
+	const float targetBlend = powerRestored ? 1.0f : 0.0f;
+	const float response = powerRestored ? 2.2f : 4.0f;
+	m_PowerReflectionBlend +=
+		(targetBlend - m_PowerReflectionBlend) * response * deltaTime;
+	m_PowerReflectionBlend = std::clamp(
+		m_PowerReflectionBlend, 0.0f, 1.0f);
+	m_PowerSurge = (std::max)(0.0f, m_PowerSurge - deltaTime * 0.42f);
 }
 
 //=======================================
@@ -219,8 +245,12 @@ void Ground::Draw(Camera* cam)
 
 	WetFloorBuffer wetFloor{};
 	wetFloor.Time = m_WetTime;
-	wetFloor.RippleStrength = 1.0f;
-	wetFloor.ReflectionStrength = 1.0f;
+	const float surgeWave = m_PowerSurge *
+		(0.55f + 0.45f * std::sin(m_WetTime * 17.0f));
+	wetFloor.RippleStrength =
+		0.92f + m_PowerReflectionBlend * 0.10f + surgeWave * 0.18f;
+	wetFloor.ReflectionStrength =
+		0.96f + m_PowerReflectionBlend * 0.22f + surgeWave * 0.12f;
 	devicecontext->UpdateSubresource(
 		m_WetFloorBuffer.Get(), 0, nullptr, &wetFloor, 0, 0);
 	ID3D11Buffer* wetFloorBuffer = m_WetFloorBuffer.Get();

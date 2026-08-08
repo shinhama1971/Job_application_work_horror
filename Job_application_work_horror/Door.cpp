@@ -125,17 +125,16 @@ void Door::Update()
 
 const char* Door::GetInteractionPrompt() const
 {
-    return Core::Game::GetInstance()->IsPowerRestored()
-        ? "Open door"
-        : "Requires power";
+    return "Open corridor door";
 }
 
 void Door::Interact(Player& player)
 {
     (void)player;
 
-    if (!m_IsOpen && !m_IsOpening &&
-        Core::Game::GetInstance()->IsPowerRestored())
+    // This door leads to the repeating corridor and must be usable before
+    // power restoration. The final exit remains separately power-locked.
+    if (!m_IsOpen && !m_IsOpening)
     {
         m_IsOpening = true;
     }

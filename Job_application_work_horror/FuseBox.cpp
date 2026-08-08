@@ -144,6 +144,7 @@ void FuseBox::Interact(Player& player)
     m_IsPowered = true;
     game->SetPowerRestored(true);
     game->GetPostProcess()->TriggerBloomPulse(1.65f, 1.35f);
+    game->GetPostProcess()->TriggerHorrorPulse(0.55f, 0.75f);
     BuildGeometry();
     m_VertexBuffer.Modify(m_Vertices);
     Input::SetVibration(18, 0.28f);

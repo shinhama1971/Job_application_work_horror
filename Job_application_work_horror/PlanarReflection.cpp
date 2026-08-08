@@ -10,9 +10,15 @@ namespace Effect
 {
     void PlanarReflection::Init()
     {
+		// Half-resolution reflections remove most of this extra scene pass's
+		// pixel cost. The slight softness is natural for rippling puddles.
+		const uint32_t reflectionWidth =
+			(Application::GetWidth() + 1u) / 2u;
+		const uint32_t reflectionHeight =
+			(Application::GetHeight() + 1u) / 2u;
         m_Texture.Init(
-            Application::GetWidth(),
-            Application::GetHeight(),
+			reflectionWidth,
+			reflectionHeight,
             DXGI_FORMAT_R8G8B8A8_UNORM);
 
         Renderer::CreateConstantBuffer(

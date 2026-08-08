@@ -146,13 +146,13 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(NuGetPackageRoot)directxtk_desktop_2019\2025.10.28.2\include;C:\directxtk\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\assimp\5.2.5\include;C:\directxtk\include;$(NuGetPackageRoot)directxtk_desktop_2019\2025.10.28.2\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(NuGetPackageRoot)directxtk_desktop_2019\2025.10.28.2\native\lib\x86\Debug;$(NuGetPackageRoot)directxtk_desktop_2019\2025.10.28.2\native\lib\x86\Release;$(NuGetPackageRoot)directxtk_desktop_2019\2025.10.28.2\native\lib\x64\Debug;$(NuGetPackageRoot)directxtk_desktop_2019\2025.10.28.2\native\lib\x64\Release;C:\directxtk\lib\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\assimp\5.2.5\lib;C:\directxtk\lib\x64\Release;$(NuGetPackageRoot)directxtk_desktop_2019\2025.10.28.2\native\lib\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>DirectXTK.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Manifest>

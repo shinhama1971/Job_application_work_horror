@@ -22,6 +22,8 @@ namespace Graphics
             float volumeIntensity;
             float lensDistortionStrength;
             float horrorPulseStrength;
+            float exposure;
+            float exposurePadding[3];
         };
 
         std::vector<VERTEX_3D> m_Vertices;
@@ -33,6 +35,7 @@ namespace Graphics
         Shader m_BloomShader;
         Shader m_VolumeShader;
         Shader m_OverlayShader;
+        Shader m_ExposureShader;
         std::unique_ptr<Material> m_Material;
 
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_TimeBuffer;
@@ -42,6 +45,7 @@ namespace Graphics
         void Uninit();
 
         void Draw(
+            ID3D11ShaderResourceView* sceneSRV,
             ID3D11ShaderResourceView* bloomSRV,
             float time,
             float bloomIntensity,
@@ -49,6 +53,7 @@ namespace Graphics
             float vignetteStrength,
             float volumeIntensity,
             float lensDistortionStrength,
-            float horrorPulseStrength);
+            float horrorPulseStrength,
+            float exposure);
     };
 }

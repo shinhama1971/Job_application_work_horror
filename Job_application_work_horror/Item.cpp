@@ -53,7 +53,7 @@ void Item::Init()
 
 void Item::Update()
 {
-    if (m_IsCollected) return;
+    if (!m_IsActive || m_IsCollected) return;
 
     // 回転
     m_Rotation.y += 0.03f;
@@ -61,7 +61,7 @@ void Item::Update()
 
 void Item::Interact(Player& player)
 {
-    if (m_IsCollected)
+    if (!m_IsActive || m_IsCollected)
     {
         return;
     }
@@ -92,7 +92,7 @@ void Item::Interact(Player& player)
 
 void Item::Draw(Camera* cam)
 {
-    if (m_IsCollected) return;
+    if (!m_IsActive || m_IsCollected) return;
 
     cam->SetCamera();
 

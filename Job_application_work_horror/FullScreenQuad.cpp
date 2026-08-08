@@ -52,6 +52,11 @@ namespace Graphics
             "shader/crtOverlayPS.hlsl"
         );
 
+        m_ExposureShader.Create(
+            "shader/unlitTextureVS.hlsl",
+            "shader/exposurePS.hlsl"
+        );
+
         m_Material = std::make_unique<Material>();
 
         MATERIAL mtrl{};
@@ -72,6 +77,7 @@ namespace Graphics
     }
 
     void FullScreenQuad::Draw(
+        ID3D11ShaderResourceView* sceneSRV,
         ID3D11ShaderResourceView* bloomSRV,
         float time,
         float bloomIntensity,
@@ -79,7 +85,8 @@ namespace Graphics
         float vignetteStrength,
         float volumeIntensity,
         float lensDistortionStrength,
-        float horrorPulseStrength)
+        float horrorPulseStrength,
+        float exposure)
     {
         ID3D11DeviceContext* context =
             Renderer::GetDeviceContext();
@@ -98,6 +105,7 @@ namespace Graphics
         tb.volumeIntensity = volumeIntensity;
         tb.lensDistortionStrength = lensDistortionStrength;
         tb.horrorPulseStrength = horrorPulseStrength;
+        tb.exposure = exposure;
 
         context->UpdateSubresource(
             m_TimeBuffer.Get(),
@@ -121,7 +129,15 @@ namespace Graphics
 
         ID3D11ShaderResourceView* nullResource = nullptr;
 
-        // The original scene stays on the back buffer. Add only bloom.
+        // Add only the eye-adaptation brightness difference. The original
+        // back buffer remains visible even if the captured SRV is unavailable.
+        m_ExposureShader.SetGPU();
+        Renderer::SetBlendState(BS_ADDITIVE);
+        context->PSSetShaderResources(0, 1, &sceneSRV);
+        context->DrawIndexed(4, 0, 0);
+        context->PSSetShaderResources(0, 1, &nullResource);
+
+        // Add bloom after exposure so bright fixtures retain their glow.
         m_BloomShader.SetGPU();
         Renderer::SetBlendState(BS_ADDITIVE);
         context->PSSetShaderResources(0, 1, &bloomSRV);
