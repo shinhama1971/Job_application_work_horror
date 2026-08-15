@@ -71,6 +71,15 @@ static_assert(sizeof(ENVIRONMENT_POINT_LIGHT) == 32,
 static_assert(sizeof(ENVIRONMENT_LIGHTS) == 272,
 	"Environment light buffer must match HLSL layout");
 
+struct DEBUG_VIEW_BUFFER
+{
+    int Mode;
+    float WallDampStrength;
+    float Padding[2];
+};
+
+static_assert(sizeof(DEBUG_VIEW_BUFFER) == 16, "Debug view buffer must be 16 bytes");
+
 //サブセット
 struct SUBSET{
 	std::string MtrlName;
@@ -115,6 +124,7 @@ private:
 
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pLightBuffer;
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pEnvironmentLightBuffer;
+	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pDebugViewBuffer;
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pMaterialBuffer;
 	static LIGHT m_Light;
 	static ENVIRONMENT_LIGHTS m_EnvironmentLights;
@@ -169,6 +179,8 @@ public:
 
 	static void SetLight(LIGHT Light);
 	static void SetEnvironmentLights(const ENVIRONMENT_LIGHTS& lights);
+	static void SetDebugViewMode(
+		int mode, float wallDampStrength = 1.0f);
 	static void SetLightEnable(bool Enable);
 	static bool GetLightEnable();
 	static void SetMaterial(MATERIAL Material);

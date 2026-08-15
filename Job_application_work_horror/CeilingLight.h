@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include "Object.h"
 #include "VertexBuffer.h"
 #include "IndexBuffer.h"
@@ -21,7 +23,11 @@ private:
     float m_FlickerOffset = 0.0f;
     float m_Brightness = 0.0f;
     float m_PowerOnTimer = 0.0f;
+    float m_EventFlickerTimer = 0.0f;
+    float m_EventFlickerDuration = 0.0f;
+    float m_EventFlickerStrength = 0.0f;
     bool m_IsEmergencyLight = false;
+    bool m_IsFaulted = false;
     bool m_WasPowerRestored = false;
 
 public:
@@ -32,6 +38,7 @@ public:
 
     float GetBrightness() const { return m_Brightness; }
     bool IsEmergencyLight() const { return m_IsEmergencyLight; }
+    bool IsFaulted() const { return m_IsFaulted; }
 
     void SetPosition(float x, float y, float z)
     {
@@ -47,5 +54,17 @@ public:
     {
         m_IsEmergencyLight = emergency;
         m_FlickerOffset = flickerOffset;
+    }
+
+    void SetFaulted(bool faulted)
+    {
+        m_IsFaulted = faulted;
+    }
+
+    void TriggerEventFlicker(float duration, float strength)
+    {
+        m_EventFlickerDuration = (std::max)(duration, 0.05f);
+        m_EventFlickerTimer = m_EventFlickerDuration;
+        m_EventFlickerStrength = (std::clamp)(strength, 0.0f, 1.0f);
     }
 };

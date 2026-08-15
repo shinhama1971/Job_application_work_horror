@@ -19,6 +19,7 @@ enum class SceneName
 {
     Title,
     Stage,
+    Stage2,
     Result
 };
 
@@ -46,6 +47,7 @@ namespace Core
         int m_ItemCount = 0;
         bool m_PowerRestored = false;
         SceneName m_CurrentScene = SceneName::Title;
+        unsigned int m_ReflectionFrameIndex = 0;
 
         void ChangeScene(SceneName sName);
 
@@ -59,6 +61,11 @@ namespace Core
         static void Uninit();
 
         static Game* GetInstance();
+
+        Scene* GetScene() const
+        {
+            return m_Scene.get();
+        }
 
         void RequestSceneChange(SceneName sName);
 

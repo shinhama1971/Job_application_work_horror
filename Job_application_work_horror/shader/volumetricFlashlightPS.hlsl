@@ -1,8 +1,8 @@
 struct PS_IN
 {
     float4 pos : SV_POSITION;
-    float2 uv : TEXCOORD0;
     float4 color : COLOR0;
+    float2 uv : TEXCOORD0;
 };
 
 cbuffer PostProcessBuffer : register(b0)
@@ -16,7 +16,9 @@ cbuffer PostProcessBuffer : register(b0)
     float lensDistortionStrength;
     float horrorPulseStrength;
     float exposure;
-    float3 exposurePadding;
+    float lensMoisture;
+    float corridorTension;
+    float exposurePadding;
 };
 
 struct LIGHT
@@ -122,23 +124,27 @@ float4 main(PS_IN input) : SV_Target
     // particles at different depths inside the flashlight cone.
     const float2 dustFlow = float2(time * 0.42f, -time * 0.24f);
     const float nearDustNoise = ValueNoise(
-        input.pos.xy * 0.070f + dustFlow);
+        input.pos.xy * 0.045f + dustFlow);
     const float farDustNoise = ValueNoise(
-        input.pos.xy * 0.031f - dustFlow * 0.57f + 19.7f);
+        input.pos.xy * 0.019f - dustFlow * 0.57f + 19.7f);
     const float nearDust =
-        pow(saturate(nearDustNoise), 20.0f) * 0.52f;
+        smoothstep(0.78f, 0.96f, nearDustNoise) * 0.055f;
     const float farDust =
-        pow(saturate(farDustNoise), 28.0f) * 0.30f;
+        smoothstep(0.84f, 0.98f, farDustNoise) * 0.028f;
     const float driftingDust = nearDust + farDust;
     const float slowVariation =
         sin(input.uv.y * 38.0f - time * 1.7f) * 0.5f + 0.5f;
 
     float density =
-        (0.068f + slowVariation * 0.022f + driftingDust) *
+        (0.032f + slowVariation * 0.012f + driftingDust) *
         softBeam * visibleLength * floorFade * volumeIntensity;
     density *= 1.0f + horrorPulseStrength * 0.32f;
-    const float3 beamColor = float3(1.0f, 0.78f, 0.50f) *
-        saturate(Light.Intensity / 1.6f);
+    density *= 1.0f + corridorTension * 0.48f;
+    const float3 beamColor = lerp(
+        float3(1.0f, 0.78f, 0.50f),
+        float3(0.76f, 0.84f, 0.88f),
+        corridorTension * 0.34f) *
+        saturate(Light.Intensity / 1.35f);
 
     return float4(beamColor, saturate(density));
 }

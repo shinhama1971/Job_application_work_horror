@@ -116,4 +116,15 @@ namespace Effect
             1,
             &reflectionResource);
     }
+
+    void PlanarReflection::Bind()
+    {
+        ID3D11DeviceContext* context = Renderer::GetDeviceContext();
+        ID3D11ShaderResourceView* reflectionResource =
+            m_Texture.GetSRV();
+        context->PSSetShaderResources(
+            6,
+            1,
+            &reflectionResource);
+    }
 }

@@ -31,6 +31,8 @@ namespace Graphics
         }
 
         m_UAV.Reset();
+        m_DepthView.Reset();
+        m_DepthTexture.Reset();
         device->CreateTexture2D(
             &texDesc,
             nullptr,
@@ -56,6 +58,30 @@ namespace Graphics
                 m_UAV.ReleaseAndGetAddressOf()
             );
         }
+
+        // A render target and its depth buffer must have identical dimensions.
+        // Compute-only bloom textures never need a depth buffer.
+        if (!enableUnorderedAccess)
+        {
+            D3D11_TEXTURE2D_DESC depthDesc{};
+            depthDesc.Width = width;
+            depthDesc.Height = height;
+            depthDesc.MipLevels = 1;
+            depthDesc.ArraySize = 1;
+            depthDesc.Format = DXGI_FORMAT_D32_FLOAT;
+            depthDesc.SampleDesc.Count = 1;
+            depthDesc.Usage = D3D11_USAGE_DEFAULT;
+            depthDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+            device->CreateTexture2D(
+                &depthDesc,
+                nullptr,
+                m_DepthTexture.ReleaseAndGetAddressOf());
+            device->CreateDepthStencilView(
+                m_DepthTexture.Get(),
+                nullptr,
+                m_DepthView.ReleaseAndGetAddressOf());
+        }
+
     }
 
     void RenderTexture::Uninit()
@@ -64,6 +90,8 @@ namespace Graphics
         m_SRV.Reset();
         m_RTV.Reset();
         m_Texture.Reset();
+        m_DepthView.Reset();
+        m_DepthTexture.Reset();
         m_Width = 0;
         m_Height = 0;
     }
@@ -82,10 +110,21 @@ namespace Graphics
         context->OMSetRenderTargets(
             1,
             &rtv,
-            Renderer::GetDepthStencilView()
+            m_DepthView.Get()
         );
 
-        Renderer::ClearDepth();
+        D3D11_VIEWPORT viewport{};
+        viewport.Width = static_cast<float>(m_Width);
+        viewport.Height = static_cast<float>(m_Height);
+        viewport.MinDepth = 0.0f;
+        viewport.MaxDepth = 1.0f;
+        context->RSSetViewports(1, &viewport);
+
+        if (m_DepthView)
+        {
+            context->ClearDepthStencilView(
+                m_DepthView.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
+        }
     }
 
     void RenderTexture::Clear(float r, float g, float b, float a)

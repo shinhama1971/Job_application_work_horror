@@ -9,7 +9,7 @@
 class Player : public Object
 {
 private:
-    // ===== 物理演算・移動 =====
+    // ===== Physics and movement =====
     DirectX::SimpleMath::Vector3 m_Velocity =
         DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
     static constexpr float DEFAULT_MOVE_SPEED = 0.5f;
@@ -23,8 +23,10 @@ private:
     static constexpr float SPRINT_SPEED_MULTIPLIER = 1.65f;
     float m_HeadBobTimer = 0.0f;
     float m_HeadBobOffset = 0.0f;
+    float m_HeadBobSideOffset = 0.0f;
+    float m_AmbienceTimer = 0.0f;
 
-    // ===== 懐中電灯システム =====
+    // ===== Flashlight system =====
     bool m_FlashLightOn = true;
     float m_Battery = 100.0f;
     static constexpr float MAX_BATTERY = 100.0f;
@@ -33,8 +35,8 @@ private:
     static constexpr int FLICKER_FRAME_INTERVAL = 10;
     int m_FlickerTimer = 0;
 
-    // ===== ライティング（バイオハザード風） =====
-    // ライトON時の設定
+    // ===== Lighting =====
+    // Flashlight-on color settings.
     float m_LightDiffuseR = 1.72f;
     float m_LightDiffuseG = 1.62f;
     float m_LightDiffuseB = 1.42f;
@@ -42,7 +44,7 @@ private:
     float m_LightAmbientG = 0.1f;
     float m_LightAmbientB = 0.12f;
 
-    // ライトOFF時の設定
+    // Flashlight-off color settings.
     float m_DarkDiffuseR = 0.3f;
     float m_DarkDiffuseG = 0.3f;
     float m_DarkDiffuseB = 0.35f;
@@ -51,15 +53,15 @@ private:
     float m_DarkAmbientB = 0.08f;
     float m_CameraHeightOffset = 30.0f;
 
-    // ===== メッシュ・レンダリング =====
+    // ===== Mesh rendering =====
     MeshRenderer m_MeshRenderer;
     std::vector<std::unique_ptr<Material>> m_Materials;
     std::vector<SUBSET> m_subsets;
     std::vector<std::unique_ptr<Texture>> m_Textures;
 
-    // ===== カメラモード =====
-    bool m_IsFPS = true;                    // true: 一人称, false: 三人称
-    bool m_SpawnAdjusted = false;           // スポーン位置調整フラグ
+    // ===== Camera mode =====
+    bool m_IsFPS = true;                    // true: first person
+    bool m_SpawnAdjusted = false;           // Spawn correction completed.
     bool m_CanControl = true;
     bool m_IsSprinting = false;
 public:
@@ -78,13 +80,13 @@ public:
             m_Battery = 100.0f;
         }
     }
-	// バッテリー残量の取得
+    // Return the current battery percentage.
     float GetBattery() const
     {
         return m_Battery;
     }
  
-	// プレイヤーの位置を設定
+    // Set an explicit world position.
     void SetPosition(DirectX::SimpleMath::Vector3 pos)
     {
         m_Position = pos;

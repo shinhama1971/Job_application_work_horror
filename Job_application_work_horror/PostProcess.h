@@ -12,6 +12,7 @@ namespace Effect
     {
     private:
         bool m_EnableNoise = true;
+        bool m_EnableBloom = true;
         bool m_EnableVolumetricLight = false;
 
         float m_Time = 0.0f;
@@ -31,6 +32,16 @@ namespace Effect
         float m_HorrorPulseDuration = 0.0f;
         float m_Exposure = 1.0f;
         float m_TargetExposure = 1.0f;
+        float m_LensMoisture = 0.0f;
+        float m_LensMoisturePeak = 0.0f;
+        float m_LensMoistureTimer = 0.0f;
+        float m_LensMoistureDuration = 0.0f;
+        float m_CorridorTension = 0.0f;
+        float m_TargetCorridorTension = 0.0f;
+        float m_VolumetricIntensity = 0.58f;
+        float m_TargetVolumetricIntensity = 0.58f;
+        float m_FilmGradeStrength = 0.55f;
+        float m_LensDirtStrength = 0.35f;
 
         Graphics::RenderTexture m_RenderTexture;
         Graphics::RenderTexture m_BloomExtractTexture;
@@ -56,6 +67,12 @@ namespace Effect
 
         void TriggerBloomPulse(float peakIntensity, float duration);
         void TriggerHorrorPulse(float strength, float duration);
+        void TriggerLensMoisture(float strength, float duration);
+
+        void SetCorridorTension(float tension)
+        {
+            m_TargetCorridorTension = (std::clamp)(tension, 0.0f, 1.0f);
+        }
 
         void SetAtmosphere(float noiseAmount, float vignetteStrength)
         {
@@ -68,6 +85,17 @@ namespace Effect
             m_EnableVolumetricLight = enable;
         }
 
+        void SetVolumetricIntensity(float intensity)
+        {
+            m_TargetVolumetricIntensity =
+                (std::clamp)(intensity, 0.0f, 1.0f);
+        }
+
+        void SetBloomEnabled(bool enable)
+        {
+            m_EnableBloom = enable;
+        }
+
         void SetNoise(bool enable)
         {
             m_EnableNoise = enable;
@@ -76,6 +104,21 @@ namespace Effect
         void SetExposure(float exposure)
         {
             m_TargetExposure = (std::clamp)(exposure, 0.85f, 1.20f);
+        }
+
+        void SetLensDistortionStrength(float strength)
+        {
+            m_LensDistortionStrength = (std::clamp)(strength, 0.0f, 0.80f);
+        }
+
+        void SetFilmGradeStrength(float strength)
+        {
+            m_FilmGradeStrength = (std::clamp)(strength, 0.0f, 1.0f);
+        }
+
+        void SetLensDirtStrength(float strength)
+        {
+            m_LensDirtStrength = (std::clamp)(strength, 0.0f, 1.0f);
         }
 
         bool IsNoiseEnable() const

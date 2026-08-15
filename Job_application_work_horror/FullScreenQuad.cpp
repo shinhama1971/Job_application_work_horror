@@ -86,7 +86,11 @@ namespace Graphics
         float volumeIntensity,
         float lensDistortionStrength,
         float horrorPulseStrength,
-        float exposure)
+        float exposure,
+        float lensMoisture,
+        float corridorTension,
+        float filmGradeStrength,
+        float lensDirtStrength)
     {
         ID3D11DeviceContext* context =
             Renderer::GetDeviceContext();
@@ -106,6 +110,10 @@ namespace Graphics
         tb.lensDistortionStrength = lensDistortionStrength;
         tb.horrorPulseStrength = horrorPulseStrength;
         tb.exposure = exposure;
+        tb.lensMoisture = lensMoisture;
+        tb.corridorTension = corridorTension;
+        tb.filmGradeStrength = filmGradeStrength;
+        tb.lensDirtStrength = lensDirtStrength;
 
         context->UpdateSubresource(
             m_TimeBuffer.Get(),
@@ -138,10 +146,13 @@ namespace Graphics
         context->PSSetShaderResources(0, 1, &nullResource);
 
         // Add bloom after exposure so bright fixtures retain their glow.
-        m_BloomShader.SetGPU();
-        Renderer::SetBlendState(BS_ADDITIVE);
-        context->PSSetShaderResources(0, 1, &bloomSRV);
-        context->DrawIndexed(4, 0, 0);
+        if (bloomSRV != nullptr && bloomIntensity > 0.001f)
+        {
+            m_BloomShader.SetGPU();
+            Renderer::SetBlendState(BS_ADDITIVE);
+            context->PSSetShaderResources(0, 1, &bloomSRV);
+            context->DrawIndexed(4, 0, 0);
+        }
 
         context->PSSetShaderResources(0, 1, &nullResource);
 
@@ -155,11 +166,14 @@ namespace Graphics
         }
 
         // CRT is a transparent overlay and can never replace the scene with black.
-        if (noiseAmount > 0.0f || horrorPulseStrength > 0.001f)
+        if (noiseAmount > 0.0f || horrorPulseStrength > 0.001f ||
+            lensMoisture > 0.001f || filmGradeStrength > 0.001f)
         {
             m_OverlayShader.SetGPU();
             Renderer::SetBlendState(BS_ALPHABLEND);
+            context->PSSetShaderResources(0, 1, &sceneSRV);
             context->DrawIndexed(4, 0, 0);
+            context->PSSetShaderResources(0, 1, &nullResource);
         }
 
         Renderer::SetBlendState(BS_NONE);

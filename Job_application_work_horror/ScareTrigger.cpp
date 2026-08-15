@@ -23,13 +23,19 @@ void ScareTrigger::Update()
 
     m_HasTriggered = true;
     const Vector3 shadowPosition = m_ShadowPosition;
+    const bool makePersistentScare = m_RequiresPower;
     game->RequestAddObject<ShadowMan>(
-        [shadowPosition](ShadowMan& shadow)
+        [shadowPosition, makePersistentScare](ShadowMan& shadow)
         {
             shadow.SetPosition(
                 shadowPosition.x,
                 shadowPosition.y,
                 shadowPosition.z);
+
+            if (makePersistentScare)
+            {
+                shadow.EnableGazeScare(5.0f);
+            }
         });
 
     Input::SetVibration(14, 0.34f);

@@ -93,13 +93,13 @@ void Wall::Init()
     m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
     m_Material = std::make_unique<Material>();
-    MATERIAL material{};
-    material.Diffuse = Color(0.34f, 0.36f, 0.33f, 1.0f);
-    material.Ambient = Color(0.03f, 0.035f, 0.03f, 1.0f);
-    material.Specular = Color(0.04f, 0.04f, 0.04f, 1.0f);
-    material.Shininess = 4.0f;
-    material.TextureEnable = FALSE;
-    m_Material->Create(material);
+    m_SurfaceMaterial.Diffuse = Color(0.34f, 0.36f, 0.33f, 1.0f);
+    m_SurfaceMaterial.Ambient = Color(0.03f, 0.035f, 0.03f, 1.0f);
+    m_SurfaceMaterial.Specular = Color(0.04f, 0.04f, 0.04f, 1.0f);
+    m_SurfaceMaterial.Emission = Color(0.0f, 0.0f, 0.0f, 1.0f);
+    m_SurfaceMaterial.Shininess = 4.0f;
+    m_SurfaceMaterial.TextureEnable = FALSE;
+    m_Material->Create(m_SurfaceMaterial);
 }
 
 void Wall::Update()
@@ -108,6 +108,11 @@ void Wall::Update()
 
 void Wall::Draw(Camera* cam)
 {
+    if (!m_Visible)
+    {
+        return;
+    }
+
     cam->SetCamera();
 
     const Matrix rotation = Matrix::CreateFromYawPitchRoll(
@@ -133,6 +138,11 @@ void Wall::Draw(Camera* cam)
 
 void Wall::DrawShadow()
 {
+    if (!m_Visible || !m_CastsShadow)
+    {
+        return;
+    }
+
     const Matrix rotation = Matrix::CreateFromYawPitchRoll(
         m_Rotation.y,
         m_Rotation.x,
@@ -151,6 +161,11 @@ void Wall::DrawShadow()
 
 void Wall::ResolveCollision(Vector3& position, float radius) const
 {
+    if (!m_Visible || !m_CollisionEnabled)
+    {
+        return;
+    }
+
     const float halfX = std::abs(m_Scale.x) * 0.5f;
     const float halfZ = std::abs(m_Scale.z) * 0.5f;
 
@@ -212,8 +227,81 @@ void Wall::ResolveCollision(Vector3& position, float radius) const
     }
 }
 
+bool Wall::IntersectsInteractionSegment(
+    const Vector3& start,
+    const Vector3& end,
+    float& hitDistance) const
+{
+    if (!m_Visible || !m_CollisionEnabled)
+    {
+        return false;
+    }
+
+    const Vector3 halfExtent(
+        std::abs(m_Scale.x) * 0.5f,
+        std::abs(m_Scale.y) * 0.5f,
+        std::abs(m_Scale.z) * 0.5f);
+    const Vector3 boxMin = m_Position - halfExtent;
+    const Vector3 boxMax = m_Position + halfExtent;
+    const Vector3 direction = end - start;
+
+    float minimumTime = 0.0f;
+    float maximumTime = 1.0f;
+    const auto clipAxis = [&minimumTime, &maximumTime](
+        float origin,
+        float delta,
+        float minimum,
+        float maximum)
+    {
+        constexpr float epsilon = 0.000001f;
+        if (std::abs(delta) <= epsilon)
+        {
+            return origin >= minimum && origin <= maximum;
+        }
+
+        float enterTime = (minimum - origin) / delta;
+        float exitTime = (maximum - origin) / delta;
+        if (enterTime > exitTime)
+        {
+            std::swap(enterTime, exitTime);
+        }
+        minimumTime = (std::max)(minimumTime, enterTime);
+        maximumTime = (std::min)(maximumTime, exitTime);
+        return minimumTime <= maximumTime;
+    };
+
+    if (!clipAxis(start.x, direction.x, boxMin.x, boxMax.x) ||
+        !clipAxis(start.y, direction.y, boxMin.y, boxMax.y) ||
+        !clipAxis(start.z, direction.z, boxMin.z, boxMax.z))
+    {
+        return false;
+    }
+
+    const float segmentLength = direction.Length();
+    hitDistance = segmentLength * (std::clamp)(minimumTime, 0.0f, 1.0f);
+    return true;
+}
+
 void Wall::Uninit()
 {
     m_Vertices.clear();
     m_Indices.clear();
+}
+
+void Wall::SetAppearance(
+    const Color& diffuse,
+    const Color& emission,
+    float shininess)
+{
+    m_SurfaceMaterial.Diffuse = diffuse;
+    m_SurfaceMaterial.Ambient = Color(0.025f, 0.025f, 0.025f, 1.0f);
+    m_SurfaceMaterial.Specular = Color(0.10f, 0.11f, 0.10f, 1.0f);
+    m_SurfaceMaterial.Emission = emission;
+    m_SurfaceMaterial.Shininess = (std::max)(shininess, 1.0f);
+    m_SurfaceMaterial.TextureEnable = FALSE;
+
+    if (m_Material != nullptr)
+    {
+        m_Material->SetMaterial(m_SurfaceMaterial);
+    }
 }

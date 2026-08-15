@@ -23,7 +23,13 @@ namespace Graphics
             float lensDistortionStrength;
             float horrorPulseStrength;
             float exposure;
-            float exposurePadding[3];
+            float lensMoisture;
+            float corridorTension;
+            float filmGradeStrength;
+            float lensDirtStrength;
+            float postProcessPadding0;
+            float postProcessPadding1;
+            float postProcessPadding2;
         };
 
         std::vector<VERTEX_3D> m_Vertices;
@@ -54,6 +60,10 @@ namespace Graphics
             float volumeIntensity,
             float lensDistortionStrength,
             float horrorPulseStrength,
-            float exposure);
+            float exposure,
+            float lensMoisture,
+            float corridorTension,
+            float filmGradeStrength,
+            float lensDirtStrength);
     };
 }

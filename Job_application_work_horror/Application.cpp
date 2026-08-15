@@ -2,6 +2,7 @@
 #include <thread>
 #include "Application.h"
 #include "Game.h"
+#include "DebugUI.h"
 
 namespace
 {
@@ -214,6 +215,11 @@ LRESULT CALLBACK Application::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 {
     static bool isFullscreen = true;
     static bool isMessageBoxShowed = false;
+    if (Debug::UI::HandleWindowMessage(hWnd, uMsg, wParam, lParam))
+    {
+        return 1;
+    }
+
     switch (uMsg)
     {
     case WM_DESTROY:// ウィンドウ破棄のメッセージ

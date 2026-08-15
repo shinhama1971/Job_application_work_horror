@@ -20,6 +20,13 @@ ResultScene::~ResultScene()
 // 初期化
 void ResultScene::Init()
 {
+	m_ResultTimer = 0.0f;
+	m_Hud.Init();
+	Core::Game::GetInstance()->GetPostProcess()->SetVolumetricLight(false);
+	Core::Game::GetInstance()->GetPostProcess()->SetExposure(0.92f);
+	Core::Game::GetInstance()->GetPostProcess()->SetAtmosphere(0.08f, 0.62f);
+	Core::Game::GetInstance()->GetPostProcess()->TriggerBloomPulse(0.72f, 0.90f);
+
 	//背景画像オブジェクトを作成
 	Texture2D* pt = Core::Game::GetInstance()->AddObject<Texture2D>();
 	pt->SetTexture("assets/texture/background2.png");//画像を指定
@@ -29,6 +36,7 @@ void ResultScene::Init()
 		0.0f);//大きさを指定
 	m_MySceneObjects.emplace_back(pt);
 	
+	/*
 	//リザルト文字列オブジェクト作成
 	Texture2D* pt2 = Core::Game::GetInstance()->AddObject<Texture2D>();
 	pt2->SetTexture("assets/texture/resultString.png");//画像を指定
@@ -46,26 +54,44 @@ void ResultScene::Init()
 	SetScore(s_Score);
 	m_Sound.Init();
 	m_Sound.Play(SOUND_LABEL_SE001);
+	*/
 }
 
 // 更新
 void ResultScene::Update()
 {
+	constexpr float deltaTime = 1.0f / 60.0f;
+	m_ResultTimer += deltaTime;
+	if (m_ResultTimer < 0.85f)
+	{
+		return;
+	}
+
 	// エンターキーを押してタイトルへ
 	if (Input::GetKeyTrigger(VK_RETURN) ||
 	Input::GetButtonTrigger(XINPUT_A) ||
 	Input::GetButtonTrigger(XINPUT_START))
 	{
-		Core::Game::GetInstance()->RequestSceneChange(
-			static_cast<SceneName>(s_NextScene)
-		);
+		Core::Game::GetInstance()->RequestSceneChange(SceneName::Title);
 	}
 }
 
+
+void ResultScene::Draw(Camera* camera)
+{
+	(void)camera;
+	const float reveal = m_ResultTimer < 1.10f
+		? m_ResultTimer / 1.10f : 1.0f;
+	m_Hud.DrawResult(reveal);
+}
 // 終了処理
 void ResultScene::Uninit()
 {
 	m_Sound.Uninit();
+
+	m_Hud.Uninit();
+	Core::Game::GetInstance()->GetPostProcess()->SetAtmosphere(0.18f, 0.55f);
+	Core::Game::GetInstance()->GetPostProcess()->SetExposure(1.0f);
 
 	// このシーンのオブジェクトを削除する
 	for (auto& o : m_MySceneObjects) {

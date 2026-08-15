@@ -52,14 +52,14 @@ void BatteryItem::Init()
 
 void BatteryItem::Update()
 {
-    if (m_IsCollected) return;
+    if (!m_IsActive || m_IsCollected) return;
 
     m_Rotation.y += 0.03f;
 }
 
 void BatteryItem::Interact(Player& player)
 {
-    if (m_IsCollected || player.GetBattery() >= 100.0f)
+    if (!m_IsActive || m_IsCollected || player.GetBattery() >= 100.0f)
     {
         return;
     }
@@ -70,7 +70,7 @@ void BatteryItem::Interact(Player& player)
 
 void BatteryItem::Draw(Camera* cam)
 {
-    if (m_IsCollected) return;
+    if (!m_IsActive || m_IsCollected) return;
 
     cam->SetCamera();
 

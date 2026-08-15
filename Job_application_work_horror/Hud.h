@@ -17,6 +17,8 @@ public:
         int fuseCount,
         std::string_view interactionPrompt,
         std::string_view objectiveText);
+    void DrawTitle(float time);
+    void DrawResult(float revealAmount);
     void Uninit();
 
 private:
@@ -31,6 +33,7 @@ private:
         std::string_view text,
         float pixelSize,
         const DirectX::SimpleMath::Color& color);
+    void Flush();
 
     Shader m_Shader;
     VertexBuffer<VERTEX_3D> m_VertexBuffer;

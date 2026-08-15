@@ -15,6 +15,8 @@ void ShadowMan::Init()
 	m_ObservedAmount = 0.0f;
 	m_ReactedToGaze = false;
 	m_GazeScareEnabled = false;
+	m_IsActive = true;
+	m_DeactivateOnExpire = false;
 	m_OnObserved = nullptr;
 	m_LifeTimer = 120;
 
@@ -113,11 +115,23 @@ void ShadowMan::Init()
 
 void ShadowMan::Update()
 {
+    if (!m_IsActive)
+    {
+        return;
+    }
+
     m_Age += 1.0f / 60.0f;
     --m_LifeTimer;
     if (m_LifeTimer <= 0)
     {
-        Destroy();
+        if (m_DeactivateOnExpire)
+        {
+            m_IsActive = false;
+        }
+        else
+        {
+            Destroy();
+        }
         return;
     }
 
@@ -189,7 +203,7 @@ void ShadowMan::Update()
 
 void ShadowMan::Draw(Camera* camera)
 {
-    if (m_LifeTimer <= 0)
+    if (!m_IsActive || m_LifeTimer <= 0)
     {
         return;
     }

@@ -136,15 +136,18 @@ float GetFlashlightLensPattern(float3 pixelDirection)
         max(pixelDirection.z * outerTangent, 0.001f);
     const float radius = length(lensUV);
 
-    const float centerHotspot = 1.0f - smoothstep(0.0f, 0.72f, radius);
-    const float softRing = exp(-pow((radius - 0.54f) * 7.0f, 2.0f));
-    const float largeDust = ValueNoise(lensUV * 4.8f + 13.7f);
-    const float fineDust = ValueNoise(lensUV * 13.0f - 5.2f);
-    const float lensDirt = (largeDust - 0.5f) * 0.11f +
-        (fineDust - 0.5f) * 0.035f;
+    const float centerHotspot =
+        1.0f - smoothstep(0.0f, 0.78f, radius);
+    const float patternFade =
+        1.0f - smoothstep(0.38f, 1.02f, radius);
+    const float largeDust = ValueNoise(lensUV * 6.2f + 13.7f);
+    const float fineDust = ValueNoise(lensUV * 17.0f - 5.2f);
+    const float lensDirt =
+        ((largeDust - 0.5f) * 0.030f +
+         (fineDust - 0.5f) * 0.012f) * patternFade;
 
     return saturate(
-        0.91f + centerHotspot * 0.13f + softRing * 0.035f + lensDirt);
+        0.965f + centerHotspot * 0.035f + lensDirt);
 }
 
 float3 ApplyFilmicHorrorGrade(float3 color)
@@ -509,6 +512,33 @@ float4 main(in LIT_PS_IN input) : SV_Target
         float3(0.070f, 0.078f, 0.084f));
     color.rgb = lerp(color.rgb, fogColor, fogFactor);
     color.rgb = ApplyFilmicHorrorGrade(color.rgb);
+
+    if (DebugViewMode == 1)
+    {
+        return float4(detailWorldNormal * 0.5f + 0.5f, 1.0f);
+    }
+    if (DebugViewMode == 2)
+    {
+        const float shadowVisibility =
+            GetFlashlightShadow(input.shadowPos);
+        return float4(shadowVisibility.xxx, 1.0f);
+    }
+    if (DebugViewMode == 3)
+    {
+        return float4(saturate(lighting * 0.5f), 1.0f);
+    }
+    if (DebugViewMode == 4)
+    {
+        return float4(puddle.xxx, 1.0f);
+    }
+    if (DebugViewMode == 5)
+    {
+        return float4(reflectedScene, 1.0f);
+    }
+    if (DebugViewMode >= 6)
+    {
+        return float4(0.0f, 0.0f, 0.0f, 1.0f);
+    }
 
     return color;
 }

@@ -15,14 +15,20 @@ private:
     VertexBuffer<VERTEX_3D> m_VertexBuffer;
     IndexBuffer m_IndexBuffer;
     std::unique_ptr<Material> m_Material;
+    std::unique_ptr<Material> m_LeakMaterial;
+    size_t m_DoorIndexCount = 0;
 
     bool m_IsOpen = false;
     bool m_IsOpening = false;
 
     DirectX::SimpleMath::Vector3 m_StartPosition;
-    DirectX::SimpleMath::Vector3 m_OpenPosition;
+    float m_OpenAngle = 0.0f;
+    float m_OpenSpeed = 0.032f;
+    float m_OpenDelayTimer = 0.0f;
+    float m_OpenDelayDuration = 0.06f;
+    int m_LoopPhase = 0;
 
-    float m_OpenSpeed = 1.0f;
+    DirectX::SimpleMath::Matrix GetDoorWorldMatrix() const;
 
 public:
     void Init() override;
@@ -42,16 +48,12 @@ public:
     void ResolveCollision(
         DirectX::SimpleMath::Vector3& position,
         float radius) const;
+    void ResetClosed(int loopPhase = 0);
 
     void SetPosition(float x, float y, float z)
     {
         m_Position = DirectX::SimpleMath::Vector3(x, y, z);
-
         m_StartPosition = m_Position;
-
-        // 横に80移動して開く
-        m_OpenPosition =
-            m_Position + DirectX::SimpleMath::Vector3(80.0f, 0.0f, 0.0f);
     }
 
     bool IsOpen() const

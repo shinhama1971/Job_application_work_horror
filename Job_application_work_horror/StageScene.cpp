@@ -5,19 +5,19 @@
 #include "Player.h"
 #include "Ground.h"
 #include "Wall.h"
-#include "Texture2D.h"
 #include "Item.h"
 #include "Door.h"
 #include "FuseBox.h"
 #include "CeilingLight.h"
 #include "ExitTrigger.h"
 #include "BatteryItem.h"
-#include "MovieTrigger.h"
 #include "ScreenDustOverlay.h"
 #include "ScareTrigger.h"
 #include "ShadowMan.h"
 #include <SimpleMath.h>
+#include <algorithm>
 #include <cmath>
+#include <string>
 
 using namespace DirectX::SimpleMath;
 
@@ -38,8 +38,16 @@ void StageScene::Init()
     m_CorridorLoopCount = 0;
     m_LoopCooldown = 0.0f;
     m_LoopNoticeTimer = 0.0f;
+    m_EntranceEventTriggered = false;
+    m_EntranceEventTimer = -1.0f;
+    m_EntranceEventPhase = -1;
     m_ScareLightTimer = -1.0f;
     m_ScareLightPhase = -1;
+    m_ScareMessageTimer = 0.0f;
+    m_WasPowerRestored = false;
+    m_PowerRestoreTimer = -1.0f;
+    m_PowerRestorePhase = -1;
+    m_StageVisualTimer = 0.0f;
 
     // プレイヤー
     Player* player = game->CreateObj<Player>("Player");
@@ -135,6 +143,85 @@ void StageScene::Init()
     loopWall4->SetPosition(77.5f, -74.0f, 275.0f);
     loopWall4->SetScale(245.0f, 50.0f, 4.0f);
 
+
+    // Industrial utility details give each area a readable silhouette.
+    // Trims and overhead conduits are visual-only; floor equipment blocks movement.
+    const auto createStageProp = [game](
+        const char* name,
+        const Vector3& position,
+        const Vector3& scale,
+        const Color& diffuse,
+        const Color& emission,
+        float shininess,
+        bool collisionEnabled)
+    {
+        Wall* prop = game->CreateObj<Wall>(name);
+        prop->SetPosition(position.x, position.y, position.z);
+        prop->SetScale(scale.x, scale.y, scale.z);
+        prop->SetAppearance(diffuse, emission, shininess);
+        prop->SetCollisionEnabled(collisionEnabled);
+        return prop;
+    };
+
+    const Color darkMetal(0.10f, 0.115f, 0.11f, 1.0f);
+    const Color cabinetMetal(0.16f, 0.18f, 0.17f, 1.0f);
+    const Color trimColor(0.075f, 0.08f, 0.075f, 1.0f);
+    const Color noEmission(0.0f, 0.0f, 0.0f, 1.0f);
+
+    Wall* ceiling = createStageProp("PropCeilingMain",
+        Vector3(0.0f, -47.0f, 80.0f), Vector3(436.0f, 3.0f, 516.0f),
+        Color(0.055f, 0.06f, 0.058f, 1.0f), noEmission, 4.0f, false);
+    ceiling->SetCastsShadow(false);
+
+    createStageProp("PropPipeLeft", Vector3(-205.0f, -55.0f, 60.0f),
+        Vector3(3.0f, 3.0f, 450.0f), darkMetal, noEmission, 22.0f, false);
+    createStageProp("PropPipeRight", Vector3(205.0f, -55.0f, 60.0f),
+        Vector3(3.0f, 3.0f, 450.0f), darkMetal, noEmission, 22.0f, false);
+    createStageProp("PropPipeCrossDoor", Vector3(-115.0f, -52.5f, 37.0f),
+        Vector3(175.0f, 2.5f, 2.5f), darkMetal, noEmission, 22.0f, false);
+    createStageProp("PropPipeCrossDoorRight", Vector3(115.0f, -52.5f, 37.0f),
+        Vector3(175.0f, 2.5f, 2.5f), darkMetal, noEmission, 22.0f, false);
+    createStageProp("PropPipeCrossHall", Vector3(-132.5f, -52.5f, 177.0f),
+        Vector3(175.0f, 2.5f, 2.5f), darkMetal, noEmission, 22.0f, false);
+    createStageProp("PropPipeCrossHallRight", Vector3(132.5f, -52.5f, 177.0f),
+        Vector3(175.0f, 2.5f, 2.5f), darkMetal, noEmission, 22.0f, false);
+
+    createStageProp("PropBaseboardLeft", Vector3(-217.2f, -96.5f, 80.0f),
+        Vector3(1.5f, 6.0f, 510.0f), trimColor, noEmission, 5.0f, false);
+    createStageProp("PropBaseboardRight", Vector3(217.2f, -96.5f, 80.0f),
+        Vector3(1.5f, 6.0f, 510.0f), trimColor, noEmission, 5.0f, false);
+
+    createStageProp("PropCabinetLeft", Vector3(-190.0f, -87.0f, -132.0f),
+        Vector3(28.0f, 24.0f, 12.0f), cabinetMetal, noEmission, 14.0f, true);
+    createStageProp("PropCabinetRight", Vector3(190.0f, -87.0f, -112.0f),
+        Vector3(28.0f, 24.0f, 12.0f), cabinetMetal, noEmission, 14.0f, true);
+    createStageProp("PropCabinetBack", Vector3(-145.0f, -88.0f, 326.0f),
+        Vector3(36.0f, 22.0f, 14.0f), cabinetMetal, noEmission, 14.0f, true);
+    createStageProp("PropServiceBox", Vector3(205.0f, -82.0f, 118.0f),
+        Vector3(10.0f, 30.0f, 24.0f), cabinetMetal, noEmission, 12.0f, true);
+
+    createStageProp("PropExitColumnLeft", Vector3(-52.0f, -80.0f, 179.0f),
+        Vector3(10.0f, 38.0f, 10.0f), darkMetal, noEmission, 8.0f, true);
+    createStageProp("PropExitColumnRight", Vector3(52.0f, -80.0f, 179.0f),
+        Vector3(10.0f, 38.0f, 10.0f), darkMetal, noEmission, 8.0f, true);
+    createStageProp("PropDoorIndicator", Vector3(58.0f, -68.0f, 177.4f),
+        Vector3(10.0f, 5.0f, 1.0f), Color(0.26f, 0.025f, 0.018f, 1.0f),
+        Color(0.30f, 0.005f, 0.002f, 1.0f), 28.0f, false);
+
+    const auto createLoopMarker = [&createStageProp, &noEmission](
+        const char* name,
+        const Vector3& position)
+    {
+        Wall* marker = createStageProp(name, position,
+            Vector3(30.0f, 7.0f, 1.0f),
+            Color(0.22f, 0.012f, 0.008f, 1.0f), noEmission, 20.0f, false);
+        marker->SetCastsShadow(false);
+        marker->SetVisible(false);
+    };
+
+    createLoopMarker("PropLoopMarker1", Vector3(-82.0f, -67.0f, -177.4f));
+    createLoopMarker("PropLoopMarker2", Vector3(82.0f, -67.0f, -177.4f));
+    createLoopMarker("PropLoopMarker3", Vector3(36.0f, -67.0f, 37.4f));
     // Ceiling fixtures communicate the power state visually.
     CeilingLight* light1 = game->CreateObj<CeilingLight>("CeilingLight1");
     light1->SetPosition(0.0f, -50.5f, -140.0f);
@@ -198,13 +285,12 @@ void StageScene::Init()
     // ゴール
     ExitTrigger* exit = game->CreateObj<ExitTrigger>("ExitTrigger");
     exit->SetPosition(150.0f, -80.0f, 300.0f);
+    exit->SetNextScene(SceneName::Stage2);
 
     // バッテリー
     BatteryItem* battery = game->CreateObj<BatteryItem>("BatteryItem");
     battery->SetPosition(-130.0f, -95.0f, 120.0f);
 
-    MovieTrigger* movie =
-        game->CreateObj<MovieTrigger>("MovieTrigger_01");
     ScreenDustOverlay* crt =
         game->CreateObj<ScreenDustOverlay>("CRTNoise");
 
@@ -218,24 +304,10 @@ void StageScene::Init()
     corridorScare->SetShadowPosition(Vector3(0.0f, -99.0f, 150.0f));
     corridorScare->SetRequiresPower(true);
 
+    // Prime the camera and light before the first draw after scene change.
+    // This also prevents a black stage if gameplay is paused in ImGui.
+    player->Update();
 
-    movie->SetPosition(Vector3(0.0f, -90.0f, 90.0f));
-    movie->SetSize(Vector3(50.0f, 30.0f, 24.0f));
-    movie->SetCameraEnd(
-        Vector3(0.0f, -92.0f, 150.0f),
-        Vector3(0.0f, -92.0f, 185.0f)
-    );
-    movie->SetDuration(1.2f);
-    Texture2D* triggerMark =
-        game->CreateObj<Texture2D>("MovieTriggerMark");
-
-    triggerMark->SetTexture("assets/texture/ui_back.png");
-
-    // センサーと同じ位置
-    triggerMark->SetPosition(0.0f, -90.0f, 90.0f);
-
-    // 大きめに表示
-    triggerMark->SetScale(50.0f, 50.0f, 1.0f);
 
     m_Hud.Init();
 }
@@ -251,32 +323,158 @@ void StageScene::Update()
     }
 
     Core::Game* game = Core::Game::GetInstance();
+    m_StageVisualTimer += 1.0f / 60.0f;
     UpdateCorridorLoop(*player);
+    UpdateEntranceThresholdEvent(*player);
     UpdateScareLightSequence();
+    UpdatePowerRestoreSequence();
+
+    Wall* exitIndicator = game->GetObj<Wall>("PropDoorIndicator");
+    if (exitIndicator != nullptr)
+    {
+        const float indicatorPulse =
+            0.72f + std::sin(m_StageVisualTimer * 3.2f) * 0.10f;
+        if (game->IsPowerRestored())
+        {
+            exitIndicator->SetAppearance(
+                Color(0.025f, 0.20f, 0.055f, 1.0f),
+                Color(0.005f, 0.24f * indicatorPulse, 0.025f, 1.0f),
+                30.0f);
+        }
+        else
+        {
+            exitIndicator->SetAppearance(
+                Color(0.24f, 0.025f, 0.018f, 1.0f),
+                Color(0.28f * indicatorPulse, 0.004f, 0.002f, 1.0f),
+                28.0f);
+        }
+    }
 
     float lowBattery = (25.0f - player->GetBattery()) / 25.0f;
     if (lowBattery < 0.0f) lowBattery = 0.0f;
     if (lowBattery > 1.0f) lowBattery = 1.0f;
 
-    const float powerCalm = game->IsPowerRestored() ? 0.03f : 0.0f;
+    const float powerBlend = game->IsPowerRestored()
+        ? (std::clamp)(m_PowerRestoreTimer / 2.5f, 0.0f, 1.0f)
+        : 0.0f;
+    const float powerCalm = 0.03f * powerBlend;
     const float sprintStress = player->IsSprinting() ? 1.0f : 0.0f;
+    const Vector3 playerPosition = player->GetPosition();
+
+    // The repeating corridor grows subtly oppressive toward its far end.
+    // Loop count raises the baseline, while restored power clears the effect.
+    const float corridorDepth = (std::clamp)(
+        (playerPosition.z - 90.0f) / 190.0f,
+        0.0f,
+        1.0f);
+    const float corridorWidthMask = 1.0f - (std::clamp)(
+        (std::abs(playerPosition.x) - 75.0f) / 105.0f,
+        0.0f,
+        1.0f);
+    const float loopTension = (std::min)(
+        static_cast<float>(m_CorridorLoopCount) * 0.14f,
+        0.42f);
+    const float corridorTension = game->IsPowerRestored()
+        ? 0.0f
+        : (std::clamp)(
+            corridorDepth * corridorWidthMask * 0.72f + loopTension,
+            0.0f,
+            1.0f);
+    game->GetPostProcess()->SetCorridorTension(corridorTension);
 
     // Preserve horror darkness while allowing navigation after the player's
     // eyes have had time to adjust without the flashlight.
     const float targetExposure = game->IsPowerRestored()
-        ? 1.01f
+        ? 1.12f + (1.01f - 1.12f) * powerBlend
         : (player->IsFlashlightOn() ? 1.04f : 1.15f);
     game->GetPostProcess()->SetExposure(targetExposure);
     const float noiseAmount =
-        0.18f - powerCalm + lowBattery * 0.18f + sprintStress * 0.04f;
+        0.18f - powerCalm + lowBattery * 0.18f +
+        sprintStress * 0.04f + corridorTension * 0.055f;
     const float vignetteStrength =
-        0.55f - powerCalm + lowBattery * 0.20f + sprintStress * 0.06f;
+        0.55f - powerCalm + lowBattery * 0.20f +
+        sprintStress * 0.06f + corridorTension * 0.075f;
 
     game->GetPostProcess()->SetAtmosphere(
         noiseAmount,
         vignetteStrength);
 
     m_InteractionSystem.Update(*player);
+}
+
+void StageScene::UpdateEntranceThresholdEvent(Player& player)
+{
+    constexpr float deltaTime = 1.0f / 60.0f;
+    Core::Game* game = Core::Game::GetInstance();
+
+    if (!m_EntranceEventTriggered)
+    {
+        const Vector3 position = player.GetPosition();
+        const bool crossedDoorThreshold =
+            !game->IsPowerRestored() &&
+            position.z > 62.0f &&
+            std::abs(position.x) < 58.0f;
+        if (!crossedDoorThreshold)
+        {
+            return;
+        }
+
+        // A physical light reaction replaces the old forced-camera cutaway.
+        // Control remains with the player, so noticing the event feels earned.
+        m_EntranceEventTriggered = true;
+        m_EntranceEventTimer = 0.0f;
+        m_EntranceEventPhase = 0;
+
+        CeilingLight* lightBehind =
+            game->GetObj<CeilingLight>("CeilingLight4");
+        if (lightBehind != nullptr)
+        {
+            lightBehind->TriggerEventFlicker(0.38f, 0.52f);
+        }
+
+        game->GetPostProcess()->TriggerHorrorPulse(0.075f, 0.14f);
+        Input::SetVibration(3, 0.07f);
+        return;
+    }
+
+    if (m_EntranceEventTimer < 0.0f)
+    {
+        return;
+    }
+    if (game->IsPowerRestored())
+    {
+        m_EntranceEventTimer = -1.0f;
+        m_EntranceEventPhase = -1;
+        return;
+    }
+
+    m_EntranceEventTimer += deltaTime;
+    if (m_EntranceEventPhase == 0 && m_EntranceEventTimer >= 0.38f)
+    {
+        CeilingLight* lightAhead =
+            game->GetObj<CeilingLight>("CeilingLight5");
+        if (lightAhead != nullptr)
+        {
+            lightAhead->TriggerEventFlicker(0.62f, 0.72f);
+        }
+
+        game->GetPostProcess()->TriggerHorrorPulse(0.10f, 0.18f);
+        Input::SetVibration(4, 0.09f);
+        m_EntranceEventPhase = 1;
+    }
+    else if (m_EntranceEventPhase == 1 &&
+        m_EntranceEventTimer >= 1.12f)
+    {
+        CeilingLight* lightBehind =
+            game->GetObj<CeilingLight>("CeilingLight4");
+        if (lightBehind != nullptr)
+        {
+            lightBehind->TriggerEventFlicker(0.20f, 0.28f);
+        }
+
+        m_EntranceEventTimer = -1.0f;
+        m_EntranceEventPhase = 2;
+    }
 }
 
 void StageScene::UpdateCorridorLoop(Player& player)
@@ -321,10 +519,35 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     const int loopPhase = m_CorridorLoopCount < 3
         ? m_CorridorLoopCount
         : 3;
+
+    for (int markerIndex = 1; markerIndex <= 3; ++markerIndex)
+    {
+        const std::string markerName =
+            "PropLoopMarker" + std::to_string(markerIndex);
+        Wall* marker = game->GetObj<Wall>(markerName);
+        if (marker != nullptr)
+        {
+            marker->SetVisible(markerIndex <= loopPhase);
+            const float intensity =
+                0.14f + static_cast<float>(markerIndex) * 0.055f;
+            marker->SetAppearance(
+                Color(0.26f, 0.012f, 0.008f, 1.0f),
+                Color(intensity, 0.002f, 0.001f, 1.0f),
+                24.0f);
+        }
+    }
     game->GetPostProcess()->TriggerHorrorPulse(
         0.24f + static_cast<float>(loopPhase) * 0.13f,
         0.42f + static_cast<float>(loopPhase) * 0.10f);
     Input::SetVibration(7 + loopPhase * 3, 0.18f + loopPhase * 0.04f);
+
+    // Returning to the entrance also restores the corridor door. Reopening
+    // the same physical threshold makes each loop feel deliberate.
+    Door* loopDoor = game->GetObj<Door>("Door");
+    if (loopDoor != nullptr)
+    {
+        loopDoor->ResetClosed(loopPhase);
+    }
 
     CeilingLight* entranceLight =
         game->GetObj<CeilingLight>("CeilingLight1");
@@ -412,13 +635,18 @@ void StageScene::StartScareLightSequence()
 
     m_ScareLightTimer = 0.0f;
     m_ScareLightPhase = 0;
+    m_ScareMessageTimer = 3.8f;
 
     CeilingLight* entrance =
         game->GetObj<CeilingLight>("CeilingLight1");
     CeilingLight* middle =
         game->GetObj<CeilingLight>("CeilingLight4");
+    CeilingLight* hall =
+        game->GetObj<CeilingLight>("CeilingLight5");
     CeilingLight* corner =
         game->GetObj<CeilingLight>("CeilingLight8");
+    CeilingLight* loopExit =
+        game->GetObj<CeilingLight>("CeilingLight7");
 
     if (entrance != nullptr)
     {
@@ -428,14 +656,28 @@ void StageScene::StartScareLightSequence()
     {
         middle->SetEmergencyLight(false, 8.2f);
     }
+    if (hall != nullptr)
+    {
+        hall->SetEmergencyLight(false, 3.1f);
+    }
     if (corner != nullptr)
     {
         corner->SetEmergencyLight(false, 4.3f);
+    }
+    if (loopExit != nullptr)
+    {
+        loopExit->SetEmergencyLight(false, 4.5f);
     }
 }
 
 void StageScene::UpdateScareLightSequence()
 {
+    constexpr float deltaTime = 1.0f / 60.0f;
+    if (m_ScareMessageTimer > 0.0f)
+    {
+        m_ScareMessageTimer -= deltaTime;
+    }
+
     if (m_ScareLightTimer < 0.0f)
     {
         return;
@@ -449,15 +691,18 @@ void StageScene::UpdateScareLightSequence()
         return;
     }
 
-    constexpr float deltaTime = 1.0f / 60.0f;
     m_ScareLightTimer += deltaTime;
 
     CeilingLight* entrance =
         game->GetObj<CeilingLight>("CeilingLight1");
     CeilingLight* middle =
         game->GetObj<CeilingLight>("CeilingLight4");
+    CeilingLight* hall =
+        game->GetObj<CeilingLight>("CeilingLight5");
     CeilingLight* corner =
         game->GetObj<CeilingLight>("CeilingLight8");
+    CeilingLight* loopExit =
+        game->GetObj<CeilingLight>("CeilingLight7");
 
     if (m_ScareLightPhase == 0 && m_ScareLightTimer >= 0.45f)
     {
@@ -471,28 +716,124 @@ void StageScene::UpdateScareLightSequence()
         }
         m_ScareLightPhase = 1;
         game->GetPostProcess()->TriggerHorrorPulse(0.13f, 0.18f);
+        Input::SetVibration(5, 0.10f);
     }
-    else if (m_ScareLightPhase == 1 && m_ScareLightTimer >= 1.05f)
+    else if (m_ScareLightPhase == 1 && m_ScareLightTimer >= 0.90f)
     {
         if (middle != nullptr)
         {
             middle->SetEmergencyLight(false, 0.75f);
         }
-        if (corner != nullptr)
+        if (hall != nullptr)
         {
-            corner->SetEmergencyLight(true, 0.15f);
+            hall->SetEmergencyLight(true, 0.42f);
         }
         m_ScareLightPhase = 2;
-        game->GetPostProcess()->TriggerHorrorPulse(0.16f, 0.20f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.14f, 0.18f);
+        Input::SetVibration(6, 0.13f);
     }
-    else if (m_ScareLightPhase == 2 && m_ScareLightTimer >= 1.85f)
+    else if (m_ScareLightPhase == 2 && m_ScareLightTimer >= 1.38f)
+    {
+        if (hall != nullptr)
+        {
+            hall->SetEmergencyLight(false, 0.42f);
+        }
+        if (corner != nullptr)
+        {
+            corner->SetEmergencyLight(true, 0.18f);
+        }
+        m_ScareLightPhase = 3;
+        game->GetPostProcess()->TriggerHorrorPulse(0.16f, 0.20f);
+        Input::SetVibration(7, 0.16f);
+    }
+    else if (m_ScareLightPhase == 3 && m_ScareLightTimer >= 1.92f)
+    {
+        if (corner != nullptr)
+        {
+            corner->SetEmergencyLight(false, 0.18f);
+        }
+        if (loopExit != nullptr)
+        {
+            loopExit->SetEmergencyLight(true, 0.08f);
+        }
+        m_ScareLightPhase = 4;
+        game->GetPostProcess()->TriggerHorrorPulse(0.19f, 0.22f);
+        Input::SetVibration(8, 0.19f);
+    }
+    else if (m_ScareLightPhase == 4 && m_ScareLightTimer >= 2.65f)
     {
         if (middle != nullptr)
         {
             middle->SetEmergencyLight(true, 2.6f);
         }
+        if (hall != nullptr)
+        {
+            hall->SetEmergencyLight(true, 3.1f);
+        }
+        if (corner != nullptr)
+        {
+            corner->SetEmergencyLight(true, 4.3f);
+        }
+
+        m_ScareLightTimer = -1.0f;
+        m_ScareLightPhase = 5;
+        Input::SetVibration(4, 0.09f);
+    }
+}
+
+void StageScene::UpdatePowerRestoreSequence()
+{
+    constexpr float deltaTime = 1.0f / 60.0f;
+    Core::Game* game = Core::Game::GetInstance();
+    const bool powerRestored = game->IsPowerRestored();
+
+    if (powerRestored && !m_WasPowerRestored)
+    {
+        m_PowerRestoreTimer = 0.0f;
+        m_PowerRestorePhase = 0;
+
+        // Power restoration owns the presentation from this point onward.
         m_ScareLightTimer = -1.0f;
         m_ScareLightPhase = -1;
+        m_ScareMessageTimer = 0.0f;
+
+        for (int markerIndex = 1; markerIndex <= 3; ++markerIndex)
+        {
+            const std::string markerName =
+                "PropLoopMarker" + std::to_string(markerIndex);
+            Wall* marker = game->GetObj<Wall>(markerName);
+            if (marker != nullptr)
+            {
+                marker->SetVisible(false);
+            }
+        }
+    }
+
+    m_WasPowerRestored = powerRestored;
+    if (!powerRestored || m_PowerRestoreTimer < 0.0f)
+    {
+        return;
+    }
+
+    m_PowerRestoreTimer += deltaTime;
+
+    if (m_PowerRestorePhase == 0 && m_PowerRestoreTimer >= 0.38f)
+    {
+        game->GetPostProcess()->TriggerBloomPulse(1.18f, 0.55f);
+        Input::SetVibration(9, 0.16f);
+        m_PowerRestorePhase = 1;
+    }
+    else if (m_PowerRestorePhase == 1 && m_PowerRestoreTimer >= 1.15f)
+    {
+        game->GetPostProcess()->TriggerHorrorPulse(0.12f, 0.22f);
+        Input::SetVibration(6, 0.11f);
+        m_PowerRestorePhase = 2;
+    }
+    else if (m_PowerRestorePhase == 2 && m_PowerRestoreTimer >= 2.25f)
+    {
+        game->GetPostProcess()->TriggerBloomPulse(0.48f, 0.40f);
+        Input::SetVibration(4, 0.07f);
+        m_PowerRestorePhase = 3;
     }
 }
 
@@ -509,7 +850,27 @@ void StageScene::Draw(Camera* camera)
     }
 
     std::string_view objectiveText = "FIND 3 FUSES";
-    if (m_LoopNoticeTimer > 0.0f)
+    ExitTrigger* exitTrigger =
+        game->GetObj<ExitTrigger>("ExitTrigger");
+    if (exitTrigger != nullptr && exitTrigger->IsEscaping())
+    {
+        objectiveText = "ESCAPED";
+    }
+    else if (game->IsPowerRestored() &&
+        m_PowerRestoreTimer >= 0.0f &&
+        m_PowerRestoreTimer < 4.5f)
+    {
+        objectiveText = m_PowerRestoreTimer < 1.55f
+            ? "POWER RESTORED"
+            : "GET OUT";
+    }
+    else if (m_ScareMessageTimer > 0.0f)
+    {
+        objectiveText = m_ScareMessageTimer > 2.65f
+            ? "IT SAW YOU"
+            : "FOLLOW THE LIGHTS";
+    }
+    else if (m_LoopNoticeTimer > 0.0f)
     {
         if (m_CorridorLoopCount == 1)
         {
@@ -544,6 +905,7 @@ void StageScene::Uninit()
 {
     Core::Game::GetInstance()->GetPostProcess()->SetAtmosphere(0.18f, 0.55f);
     Core::Game::GetInstance()->GetPostProcess()->SetExposure(1.0f);
+    Core::Game::GetInstance()->GetPostProcess()->SetCorridorTension(0.0f);
     Core::Game::GetInstance()->GetPostProcess()->SetVolumetricLight(false);
     m_Hud.Uninit();
 
@@ -571,6 +933,26 @@ void StageScene::Uninit()
     game->DestroyObj("LoopWall2");
     game->DestroyObj("LoopWall3");
     game->DestroyObj("LoopWall4");
+    game->DestroyObj("PropCeilingMain");
+
+    game->DestroyObj("PropPipeLeft");
+    game->DestroyObj("PropPipeRight");
+    game->DestroyObj("PropPipeCrossDoor");
+    game->DestroyObj("PropPipeCrossDoorRight");
+    game->DestroyObj("PropPipeCrossHall");
+    game->DestroyObj("PropPipeCrossHallRight");
+    game->DestroyObj("PropBaseboardLeft");
+    game->DestroyObj("PropBaseboardRight");
+    game->DestroyObj("PropCabinetLeft");
+    game->DestroyObj("PropCabinetRight");
+    game->DestroyObj("PropCabinetBack");
+    game->DestroyObj("PropServiceBox");
+    game->DestroyObj("PropExitColumnLeft");
+    game->DestroyObj("PropExitColumnRight");
+    game->DestroyObj("PropDoorIndicator");
+    game->DestroyObj("PropLoopMarker1");
+    game->DestroyObj("PropLoopMarker2");
+    game->DestroyObj("PropLoopMarker3");
 
     game->DestroyObj("CeilingLight1");
     game->DestroyObj("CeilingLight2");
@@ -589,6 +971,5 @@ void StageScene::Uninit()
     game->DestroyObj("FuseBox");
     game->DestroyObj("ExitTrigger");
     game->DestroyObj("BatteryItem");
-    game->DestroyObj("MovieTriggerMark");
     game->DestroyObj("ScareTrigger_Corridor");
 }

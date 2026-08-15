@@ -25,5 +25,6 @@ namespace Effect
         void Uninit();
         void Begin(Camera& camera, float reflectionHeight);
         void End(Camera& camera);
+        void Bind();
     };
 }

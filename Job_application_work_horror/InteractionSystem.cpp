@@ -6,11 +6,13 @@
 #include "Input.h"
 #include "Interactable.h"
 #include "Player.h"
+#include "Wall.h"
 
 using namespace DirectX::SimpleMath;
 
 void InteractionSystem::Update(Player& player)
 {
+    Interactable* previousFocus = m_FocusedInteractable;
     m_FocusedInteractable = nullptr;
 
     Core::Game* game = Core::Game::GetInstance();
@@ -43,8 +45,14 @@ void InteractionSystem::Update(Player& player)
             continue;
         }
 
+        if (!HasClearLineOfSight(origin, candidate->GetInteractionPosition(), distance))
+        {
+            continue;
+        }
+
         const float distanceRate = distance / MaxInteractionDistance;
-        const float score = facingDot * 2.0f - distanceRate;
+        const float focusPersistence = candidate == previousFocus ? 0.08f : 0.0f;
+        const float score = facingDot * 2.0f - distanceRate + focusPersistence;
 
         if (score > bestScore)
         {
@@ -59,6 +67,29 @@ void InteractionSystem::Update(Player& player)
     {
         m_FocusedInteractable->Interact(player);
     }
+}
+
+bool InteractionSystem::HasClearLineOfSight(
+    const Vector3& origin,
+    const Vector3& target,
+    float targetDistance) const
+{
+    Core::Game* game = Core::Game::GetInstance();
+    for (const Wall* wall : game->GetObjects<Wall>())
+    {
+        if (wall == nullptr)
+        {
+            continue;
+        }
+
+        float wallDistance = 0.0f;
+        if (wall->IntersectsInteractionSegment(origin, target, wallDistance) &&
+            wallDistance < targetDistance - SurfaceInteractionTolerance)
+        {
+            return false;
+        }
+    }
+    return true;
 }
 
 std::string_view InteractionSystem::GetPrompt() const

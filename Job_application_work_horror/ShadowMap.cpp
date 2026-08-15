@@ -169,5 +169,9 @@ namespace Effect
     void ShadowMap::SetShader()
     {
         m_DepthShader.SetGPU();
+
+        // The shadow pass writes depth only. Leaving a regular pixel shader
+        // bound causes stage-signature and missing-render-target errors.
+        Renderer::GetDeviceContext()->PSSetShader(nullptr, nullptr, 0);
     }
 }

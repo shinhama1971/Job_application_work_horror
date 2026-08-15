@@ -4,12 +4,15 @@
 #include "Scene.h"
 #include "TitleScene.h"
 #include "StageScene.h"
+#include "Stage2Scene.h"
 #include "ResultScene.h"
 #include "Ground.h"
 #include "Texture2D.h"
 #include "ScreenDustOverlay.h"
 #include "Shader.h"
 
+#include "DebugUI.h"
+#include "Application.h"
 
 namespace Core
 {
@@ -34,6 +37,8 @@ namespace Core
         m_Instance = std::make_unique<Game>();
 
         Renderer::Init();
+        Debug::UI::Init(Application::GetWindow());
+
 
         Input::Create();
 
@@ -48,11 +53,20 @@ namespace Core
     void Game::Update()
     {
         Input::Update();
+        if (Debug::UI::ShouldPauseGameplay())
+        {
+            Debug::UI::ApplyTuning(m_Instance->m_PostProcess);
+            m_Instance->m_PostProcess.Update();
+            return;
+        }
+
 
         if (m_Instance->m_Scene)
         {
             m_Instance->m_Scene->Update();
         }
+
+        Debug::UI::ApplyTuning(m_Instance->m_PostProcess);
 
         m_Instance->m_Camera.Update();
         m_Instance->m_PostProcess.Update();
@@ -105,6 +119,7 @@ namespace Core
 
     void Game::Draw()
     {
+        Debug::UI::BeginFrame();
         m_Instance->m_ShadowMap.Begin(m_Instance->m_Camera);
         for (auto& o : m_Instance->m_Objects)
         {
@@ -117,25 +132,40 @@ namespace Core
 
         if (m_Instance->m_CurrentScene == SceneName::Stage)
         {
-            m_Instance->m_PlanarReflection.Begin(
-                m_Instance->m_Camera,
-                -99.5f);
-
-            for (auto& o : m_Instance->m_Objects)
+            // A puddle reflection is naturally soft, so updating it at 30 Hz
+            // is difficult to notice while removing half of the extra scene
+            // passes. The main view and input still update at 60 Hz.
+            const unsigned int reflectionInterval =
+                Debug::UI::GetReflectionUpdateInterval();
+            const bool updateReflection =
+                (m_Instance->m_ReflectionFrameIndex++ %
+                    reflectionInterval) == 0u;
+            if (updateReflection)
             {
-                if (o->IsDestroy() ||
-                    dynamic_cast<Ground*>(o.get()) != nullptr ||
-                    dynamic_cast<Texture2D*>(o.get()) != nullptr ||
-                    dynamic_cast<ScreenDustOverlay*>(o.get()) != nullptr)
+                m_Instance->m_PlanarReflection.Begin(
+                    m_Instance->m_Camera,
+                    -99.5f);
+
+                for (auto& o : m_Instance->m_Objects)
                 {
-                    continue;
+                    if (o->IsDestroy() ||
+                        dynamic_cast<Ground*>(o.get()) != nullptr ||
+                        dynamic_cast<Texture2D*>(o.get()) != nullptr ||
+                        dynamic_cast<ScreenDustOverlay*>(o.get()) != nullptr)
+                    {
+                        continue;
+                    }
+
+                    o->Draw(&m_Instance->m_Camera);
                 }
 
-                o->Draw(&m_Instance->m_Camera);
+                m_Instance->m_PlanarReflection.End(
+                    m_Instance->m_Camera);
             }
-
-            m_Instance->m_PlanarReflection.End(
-                m_Instance->m_Camera);
+            else
+            {
+                m_Instance->m_PlanarReflection.Bind();
+            }
         }
 
         Renderer::DrawStart();
@@ -156,6 +186,8 @@ namespace Core
         {
             m_Instance->m_Scene->Draw(&m_Instance->m_Camera);
         }
+        Debug::UI::Draw(m_Instance->m_PostProcess);
+
 
         Renderer::DrawEnd();
     }
@@ -178,13 +210,16 @@ namespace Core
         m_Instance->m_ShadowMap.Uninit();
         m_Instance->m_PlanarReflection.Uninit();
 
-		Shader::ClearCache();
-
         Input::Release();
+        Debug::UI::Uninit();
+
+        // Release cached and member-owned GPU objects while the D3D device is
+        // still valid. Renderer::Uninit can then report genuine leaks instead
+        // of resources retained by the still-alive Game singleton.
+        Shader::ClearCache();
+        m_Instance.reset();
 
         Renderer::Uninit();
-
-        m_Instance.reset();
     }
 
     Game* Core::Game::GetInstance()
@@ -215,10 +250,17 @@ namespace Core
             m_Scene = std::make_unique<TitleScene>();
             break;
 
+            m_ReflectionFrameIndex = 0;
         case SceneName::Stage:
             m_ItemCount = 0;
             m_PowerRestored = false;
             m_Scene = std::make_unique<StageScene>();
+            break;
+
+        case SceneName::Stage2:
+            m_ItemCount = 3;
+            m_PowerRestored = true;
+            m_Scene = std::make_unique<Stage2Scene>();
             break;
 
         case SceneName::Result:

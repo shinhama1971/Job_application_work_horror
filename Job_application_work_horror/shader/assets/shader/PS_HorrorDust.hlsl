@@ -1,8 +1,8 @@
 struct PS_IN
 {
     float4 pos : SV_POSITION;
-    float2 uv : TEXCOORD0;
     float4 color : COLOR0;
+    float2 uv : TEXCOORD0;
 };
 
 cbuffer TimeBuffer : register(b0)

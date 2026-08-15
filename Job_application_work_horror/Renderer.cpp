@@ -26,6 +26,7 @@ Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pProjectionBuffer;
 
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pLightBuffer;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pEnvironmentLightBuffer;
+Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pDebugViewBuffer;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pMaterialBuffer;
 LIGHT Renderer::m_Light{};
 ENVIRONMENT_LIGHTS Renderer::m_EnvironmentLights{};
@@ -256,6 +257,14 @@ HRESULT Renderer::Init()
 		6, 1, m_pEnvironmentLightBuffer.GetAddressOf());
 	SetEnvironmentLights(ENVIRONMENT_LIGHTS{});
 
+	bufferDesc.ByteWidth = sizeof(DEBUG_VIEW_BUFFER);
+	hr = m_pDevice->CreateBuffer(
+		&bufferDesc, NULL, m_pDebugViewBuffer.ReleaseAndGetAddressOf());
+	if (FAILED(hr)) return hr;
+	m_pDeviceContext->PSSetConstantBuffers(
+		7, 1, m_pDebugViewBuffer.GetAddressOf());
+	SetDebugViewMode(0);
+
 	bufferDesc.ByteWidth = sizeof(MATERIAL);
 	hr = m_pDevice->CreateBuffer(
 		&bufferDesc, NULL, m_pMaterialBuffer.ReleaseAndGetAddressOf());
@@ -354,6 +363,7 @@ void Renderer::Uninit()
 
 	m_pLightBuffer.Reset();
 	m_pEnvironmentLightBuffer.Reset();
+	m_pDebugViewBuffer.Reset();
 	m_pMaterialBuffer.Reset();
 	m_pTextureBuffer.Reset();
 
@@ -371,6 +381,14 @@ void Renderer::Uninit()
 	m_pDepthStencilView.Reset();
 	m_pRenderTargetView.Reset();
 	m_pSwapChain.Reset();
+
+    // Releasing resources can enqueue deferred driver destruction. Flush once
+    // more before dropping the immediate context so the debug report does not
+    // mistake pending destruction for application-owned live objects.
+    if (m_pDeviceContext != nullptr)
+    {
+        m_pDeviceContext->Flush();
+    }
 	m_pDeviceContext.Reset();
 	m_pDevice.Reset();
 
@@ -429,6 +447,17 @@ void Renderer::SetEnvironmentLights(const ENVIRONMENT_LIGHTS& lights)
 	m_pDeviceContext->UpdateSubresource(
 		m_pEnvironmentLightBuffer.Get(),
 		0, NULL, &m_EnvironmentLights, 0, 0);
+}
+
+void Renderer::SetDebugViewMode(int mode, float wallDampStrength)
+{
+	DEBUG_VIEW_BUFFER buffer{};
+	buffer.Mode = mode;
+	buffer.WallDampStrength = wallDampStrength;
+	m_pDeviceContext->UpdateSubresource(
+		m_pDebugViewBuffer.Get(), 0, NULL, &buffer, 0, 0);
+	m_pDeviceContext->PSSetConstantBuffers(
+		7, 1, m_pDebugViewBuffer.GetAddressOf());
 }
 
 //--------------------------------------------------------------------------------------
@@ -934,6 +963,13 @@ void Renderer::SetBackBufferRenderTarget()
 		m_pRenderTargetView.GetAddressOf(),
 		m_pDepthStencilView.Get()
 	);
+
+    D3D11_VIEWPORT viewport{};
+    viewport.Width = static_cast<float>(Application::GetWidth());
+    viewport.Height = static_cast<float>(Application::GetHeight());
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+    m_pDeviceContext->RSSetViewports(1, &viewport);
 }
 
 void Renderer::ClearBackBuffer(float r, float g, float b, float a)

@@ -44,6 +44,13 @@ struct LIGHT
     float4 SpotParams;
 };
 
+cbuffer DebugViewBuffer : register(b7)
+{
+    int DebugViewMode;
+    float WallDampStrength;
+    float2 DebugViewPadding;
+};
+
 cbuffer LightBuffer : register(b3)
 {
     LIGHT Light;

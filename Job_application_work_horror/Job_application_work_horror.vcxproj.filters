@@ -72,6 +72,9 @@
     <ClCompile Include="StageScene.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Stage2Scene.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="StaticMesh.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -198,6 +201,9 @@
       <Filter>ソース ファイル</Filter>
     </ClInclude>
     <ClInclude Include="StageScene.h">
+      <Filter>ソース ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Stage2Scene.h">
       <Filter>ソース ファイル</Filter>
     </ClInclude>
     <ClInclude Include="StaticMesh.h">

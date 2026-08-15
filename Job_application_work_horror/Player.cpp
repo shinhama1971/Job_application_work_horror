@@ -61,6 +61,8 @@ void Player::Update()
     }
 
     Camera* cam = Core::Game::GetInstance()->GetCamera();
+    constexpr float deltaTime = 1.0f / 60.0f;
+    m_AmbienceTimer += deltaTime;
 
     float yaw = cam->GetCameraDirection();
 
@@ -93,13 +95,21 @@ void Player::Update()
             moveDir.Normalize();
         }
 
-        m_Velocity.x = moveDir.x * currentMoveSpeed;
-        m_Velocity.z = moveDir.z * currentMoveSpeed;
+        const Vector3 desiredVelocity = moveDir * currentMoveSpeed;
+        const float acceleration = m_IsSprinting ? 0.24f : 0.30f;
+        m_Velocity.x +=
+            (desiredVelocity.x - m_Velocity.x) * acceleration;
+        m_Velocity.z +=
+            (desiredVelocity.z - m_Velocity.z) * acceleration;
     }
     else
     {
-        m_Velocity.x = 0.0f;
-        m_Velocity.z = 0.0f;
+        // Ease to a stop instead of changing velocity in one frame. This
+        // removes the small camera snap when a movement key is released.
+        m_Velocity.x *= 0.72f;
+        m_Velocity.z *= 0.72f;
+        if (std::abs(m_Velocity.x) < 0.001f) m_Velocity.x = 0.0f;
+        if (std::abs(m_Velocity.z) < 0.001f) m_Velocity.z = 0.0f;
     }
 
     // �d��
@@ -214,9 +224,23 @@ void Player::Update()
 
     light.Enable = TRUE;
     light.FlashlightEnabled = visibleLight ? TRUE : FALSE;
-    light.Intensity = visibleLight ? 1.6f * lightOutput : 0.0f;
+    light.Intensity = visibleLight ? 1.35f * lightOutput : 0.0f;
     light.Range = 260.0f;
-    light.Direction = Vector4(0.0f, 0.0f, 1.0f, 0.0f);
+    // A hand-held lamp is never perfectly rigid. Low battery adds a little
+    // electrical/mechanical instability without moving the player's aim.
+    const float flashlightSway = visibleLight
+        ? 0.0035f + batteryStress * 0.0065f
+        : 0.0f;
+    Vector3 flashlightDirection(
+        sinf(m_AmbienceTimer * 1.37f) * flashlightSway,
+        sinf(m_AmbienceTimer * 1.91f + 1.2f) * flashlightSway * 0.72f,
+        1.0f);
+    flashlightDirection.Normalize();
+    light.Direction = Vector4(
+        flashlightDirection.x,
+        flashlightDirection.y,
+        flashlightDirection.z,
+        0.0f);
     light.SpotParams = Vector4(
         cosf(DirectX::XMConvertToRadians(16.0f)),
         cosf(DirectX::XMConvertToRadians(32.0f)),
@@ -290,23 +314,42 @@ void Player::Update()
     }
     Renderer::SetEnvironmentLights(environmentLights);
 	// カメラの位置と向きを更新
-    if (isMoving)
+    const float horizontalSpeed = std::sqrt(
+        m_Velocity.x * m_Velocity.x + m_Velocity.z * m_Velocity.z);
+    const bool visiblyMoving = horizontalSpeed > 0.025f;
+    if (visiblyMoving)
     {
-        m_HeadBobTimer += m_IsSprinting ? 0.22f : 0.14f;
-        const float amplitude = m_IsSprinting ? 0.55f : 0.35f;
-        const float targetOffset = sinf(m_HeadBobTimer) * amplitude;
-        m_HeadBobOffset += (targetOffset - m_HeadBobOffset) * 0.35f;
+        const float speedRate = (std::min)(
+            horizontalSpeed / (m_MoveSpeed * SPRINT_SPEED_MULTIPLIER),
+            1.0f);
+        m_HeadBobTimer +=
+            (m_IsSprinting ? 0.22f : 0.14f) * (0.55f + speedRate * 0.45f);
+        const float amplitude =
+            (m_IsSprinting ? 0.48f : 0.30f) * speedRate;
+        const float verticalTarget =
+            std::abs(sinf(m_HeadBobTimer)) * amplitude - amplitude * 0.48f;
+        const float sideTarget =
+            sinf(m_HeadBobTimer * 0.5f) * amplitude * 0.34f;
+        m_HeadBobOffset +=
+            (verticalTarget - m_HeadBobOffset) * 0.30f;
+        m_HeadBobSideOffset +=
+            (sideTarget - m_HeadBobSideOffset) * 0.24f;
     }
     else
     {
-        m_HeadBobOffset *= 0.82f;
+        m_HeadBobOffset *= 0.84f;
+        m_HeadBobSideOffset *= 0.84f;
     }
 
     Vector3 eyePos = m_Position;
     eyePos.y += m_CameraHeightOffset;
     if (m_IsFPS)
     {
-        eyePos.y += m_HeadBobOffset;
+        // The slow component remains while standing still and makes the
+        // viewpoint feel attached to a breathing person rather than a tripod.
+        const float breath = sinf(m_AmbienceTimer * 1.15f) * 0.075f;
+        eyePos.y += m_HeadBobOffset + breath;
+        eyePos += right * m_HeadBobSideOffset;
     }
 
     if (m_IsFPS)

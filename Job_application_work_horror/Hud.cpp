@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 
 #include "Application.h"
@@ -32,6 +33,14 @@ void Hud::Draw(
     const Color dark(0.015f, 0.02f, 0.02f, 0.72f);
     const Color inactive(0.16f, 0.19f, 0.18f, 0.85f);
     const Color active(0.72f, 0.86f, 0.66f, 0.95f);
+    const bool hasInteractionTarget = !interactionPrompt.empty();
+    const bool interactionLocked = hasInteractionTarget &&
+        interactionPrompt.find("Requires") != std::string_view::npos;
+    const Color reticleColor = interactionLocked
+        ? Color(0.92f, 0.28f, 0.20f, 0.96f)
+        : (hasInteractionTarget
+            ? Color(0.62f, 0.92f, 0.70f, 0.98f)
+            : white);
 
     const float screenWidth = static_cast<float>(Application::GetWidth());
     const float screenHeight = static_cast<float>(Application::GetHeight());
@@ -41,7 +50,11 @@ void Hud::Draw(
         const float pixelSize = 3.0f;
         const float objectiveWidth =
             static_cast<float>(objectiveText.size()) * 18.0f + 24.0f;
-        const Color objectiveColor = objectiveText == "ESCAPE"
+        const bool isSafeObjective =
+            objectiveText == "ESCAPE" ||
+            objectiveText == "ESCAPED" ||
+            objectiveText == "POWER RESTORED";
+        const Color objectiveColor = isSafeObjective
             ? Color(0.52f, 0.92f, 0.58f, 0.95f)
             : Color(0.88f, 0.82f, 0.62f, 0.95f);
 
@@ -51,23 +64,27 @@ void Hud::Draw(
     }
 
     // Minimal center reticle.
-    AddRectangle(screenWidth * 0.5f - 9.0f, screenHeight * 0.5f - 1.0f, 7.0f, 2.0f, white);
-    AddRectangle(screenWidth * 0.5f + 2.0f, screenHeight * 0.5f - 1.0f, 7.0f, 2.0f, white);
-    AddRectangle(screenWidth * 0.5f - 1.0f, screenHeight * 0.5f - 9.0f, 2.0f, 7.0f, white);
-    AddRectangle(screenWidth * 0.5f - 1.0f, screenHeight * 0.5f + 2.0f, 2.0f, 7.0f, white);
+    const float reticleExtent = hasInteractionTarget ? 11.0f : 9.0f;
+    AddRectangle(screenWidth * 0.5f - reticleExtent, screenHeight * 0.5f - 1.0f, reticleExtent - 2.0f, 2.0f, reticleColor);
+    AddRectangle(screenWidth * 0.5f + 2.0f, screenHeight * 0.5f - 1.0f, reticleExtent - 2.0f, 2.0f, reticleColor);
+    AddRectangle(screenWidth * 0.5f - 1.0f, screenHeight * 0.5f - reticleExtent, 2.0f, reticleExtent - 2.0f, reticleColor);
+    AddRectangle(screenWidth * 0.5f - 1.0f, screenHeight * 0.5f + 2.0f, 2.0f, reticleExtent - 2.0f, reticleColor);
 
-    // Three fuse indicators.
-    AddRectangle(34.0f, screenHeight - 112.0f, 112.0f, 36.0f, dark);
-    const int clampedFuseCount = std::clamp(fuseCount, 0, 3);
-    for (int i = 0; i < 3; ++i)
+    // A negative count lets non-fuse stages keep the shared battery HUD.
+    if (fuseCount >= 0)
     {
-        AddRectangle(
-            46.0f + static_cast<float>(i) * 32.0f,
-            screenHeight - 101.0f,
-            20.0f,
-            14.0f,
-            i < clampedFuseCount ? active : inactive
-        );
+        AddRectangle(34.0f, screenHeight - 112.0f, 112.0f, 36.0f, dark);
+        const int clampedFuseCount = std::clamp(fuseCount, 0, 3);
+        for (int i = 0; i < 3; ++i)
+        {
+            AddRectangle(
+                46.0f + static_cast<float>(i) * 32.0f,
+                screenHeight - 101.0f,
+                20.0f,
+                14.0f,
+                i < clampedFuseCount ? active : inactive
+            );
+        }
     }
 
     // Flashlight battery frame and fill.
@@ -109,6 +126,145 @@ void Hud::Draw(
         }
     }
 
+    Flush();
+}
+
+void Hud::DrawTitle(float time)
+{
+    m_Vertices.clear();
+
+    const float screenWidth = static_cast<float>(Application::GetWidth());
+    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const Color background(0.002f, 0.004f, 0.004f, 1.0f);
+    const Color dimGreen(0.08f, 0.20f, 0.14f, 0.50f);
+    const Color titleGreen(0.48f, 0.90f, 0.58f, 0.96f);
+    const float pulse = std::sin(time * 2.1f) * 0.5f + 0.5f;
+    const Color promptColor(
+        0.58f + pulse * 0.16f,
+        0.70f + pulse * 0.18f,
+        0.62f + pulse * 0.14f,
+        0.62f + pulse * 0.34f);
+
+    AddRectangle(0.0f, 0.0f, screenWidth, screenHeight, background);
+
+    for (float y = 0.0f; y < screenHeight; y += 7.0f)
+    {
+        AddRectangle(
+            0.0f,
+            y,
+            screenWidth,
+            1.0f,
+            Color(0.08f, 0.16f, 0.11f, 0.075f));
+    }
+
+    const float panelWidth = (std::min)(screenWidth * 0.76f, 980.0f);
+    const float panelHeight = 330.0f;
+    const float panelX = (screenWidth - panelWidth) * 0.5f;
+    const float panelY = (screenHeight - panelHeight) * 0.5f;
+    AddRectangle(panelX, panelY, panelWidth, panelHeight,
+        Color(0.008f, 0.016f, 0.013f, 0.96f));
+    AddRectangle(panelX, panelY, 6.0f, panelHeight, titleGreen);
+    AddRectangle(panelX, panelY, panelWidth, 2.0f, dimGreen);
+    AddRectangle(panelX, panelY + panelHeight - 2.0f,
+        panelWidth, 2.0f, dimGreen);
+
+    constexpr std::string_view title = "SIGNAL LOST";
+    constexpr float titlePixelSize = 9.0f;
+    const float titleWidth =
+        static_cast<float>(title.size()) * titlePixelSize * 6.0f;
+    AddText(
+        (screenWidth - titleWidth) * 0.5f,
+        panelY + 72.0f,
+        title,
+        titlePixelSize,
+        titleGreen);
+
+    constexpr std::string_view subtitle = "ENDLESS HALL";
+    constexpr float subtitlePixelSize = 3.0f;
+    const float subtitleWidth =
+        static_cast<float>(subtitle.size()) * subtitlePixelSize * 6.0f;
+    AddText((screenWidth - subtitleWidth) * 0.5f,
+        panelY + 168.0f, subtitle, subtitlePixelSize,
+        Color(0.42f, 0.58f, 0.48f, 0.74f));
+
+    const std::string_view prompt = Input::IsControllerConnected()
+        ? "PRESS A"
+        : "PRESS ENTER";
+    constexpr float promptPixelSize = 3.0f;
+    const float promptWidth =
+        static_cast<float>(prompt.size()) * promptPixelSize * 6.0f;
+    AddText((screenWidth - promptWidth) * 0.5f,
+        panelY + 246.0f, prompt, promptPixelSize, promptColor);
+
+    Flush();
+}
+
+void Hud::DrawResult(float revealAmount)
+{
+    m_Vertices.clear();
+
+    const float reveal = (std::clamp)(revealAmount, 0.0f, 1.0f);
+    const float screenWidth = static_cast<float>(Application::GetWidth());
+    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const Color background(0.004f, 0.007f, 0.006f, 1.0f);
+    const Color panel(0.018f, 0.028f, 0.025f, 0.94f * reveal);
+    const Color green(0.48f, 0.90f, 0.56f, 0.96f * reveal);
+    const Color pale(0.74f, 0.82f, 0.76f, 0.78f * reveal);
+
+    AddRectangle(0.0f, 0.0f, screenWidth, screenHeight, background);
+
+    for (float y = 0.0f; y < screenHeight; y += 8.0f)
+    {
+        AddRectangle(
+            0.0f,
+            y,
+            screenWidth,
+            1.0f,
+            Color(0.10f, 0.16f, 0.12f, 0.075f * reveal));
+    }
+
+    const float panelWidth = (std::min)(screenWidth * 0.72f, 860.0f);
+    const float panelHeight = 250.0f;
+    const float panelX = (screenWidth - panelWidth) * 0.5f;
+    const float panelY = (screenHeight - panelHeight) * 0.5f;
+    AddRectangle(panelX, panelY, panelWidth, panelHeight, panel);
+    AddRectangle(panelX, panelY, 6.0f, panelHeight, green);
+    AddRectangle(panelX, panelY, panelWidth, 2.0f, green);
+
+    constexpr std::string_view title = "YOU ESCAPED";
+    constexpr float titlePixelSize = 7.0f;
+    const float titleWidth =
+        static_cast<float>(title.size()) * titlePixelSize * 6.0f;
+    AddText(
+        (screenWidth - titleWidth) * 0.5f,
+        panelY + 66.0f,
+        title,
+        titlePixelSize,
+        green);
+
+    const std::string_view prompt = Input::IsControllerConnected()
+        ? "PRESS A"
+        : "PRESS ENTER";
+    constexpr float promptPixelSize = 3.0f;
+    const float promptWidth =
+        static_cast<float>(prompt.size()) * promptPixelSize * 6.0f;
+    AddText(
+        (screenWidth - promptWidth) * 0.5f,
+        panelY + 174.0f,
+        prompt,
+        promptPixelSize,
+        pale);
+
+    Flush();
+}
+
+void Hud::Uninit()
+{
+    m_Vertices.clear();
+}
+
+void Hud::Flush()
+{
     if (m_Vertices.empty())
     {
         return;
@@ -126,11 +282,6 @@ void Hud::Draw(
     context->Draw(static_cast<UINT>(m_Vertices.size()), 0);
 
     Renderer::SetDepthEnable(true);
-}
-
-void Hud::Uninit()
-{
-    m_Vertices.clear();
 }
 
 void Hud::AddRectangle(float x, float y, float width, float height, const Color& color)
@@ -200,7 +351,10 @@ void Hud::AddText(
         case 'D': return Glyph{ 0x1E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1E };
         case 'E': return Glyph{ 0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x1F };
         case 'F': return Glyph{ 0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x10 };
+        case 'G': return Glyph{ 0x0E, 0x11, 0x10, 0x17, 0x11, 0x11, 0x0E };
+        case 'H': return Glyph{ 0x11, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11 };
         case 'I': return Glyph{ 0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x1F };
+        case 'L': return Glyph{ 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1F };
         case 'N': return Glyph{ 0x11, 0x19, 0x19, 0x15, 0x13, 0x13, 0x11 };
         case 'O': return Glyph{ 0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E };
         case 'P': return Glyph{ 0x1E, 0x11, 0x11, 0x1E, 0x10, 0x10, 0x10 };
@@ -208,7 +362,10 @@ void Hud::AddText(
         case 'S': return Glyph{ 0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E };
         case 'T': return Glyph{ 0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04 };
         case 'U': return Glyph{ 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E };
+        case 'V': return Glyph{ 0x11, 0x11, 0x11, 0x11, 0x11, 0x0A, 0x04 };
         case 'W': return Glyph{ 0x11, 0x11, 0x11, 0x15, 0x15, 0x1B, 0x11 };
+        case 'X': return Glyph{ 0x11, 0x11, 0x0A, 0x04, 0x0A, 0x11, 0x11 };
+        case 'Y': return Glyph{ 0x11, 0x11, 0x0A, 0x04, 0x04, 0x04, 0x04 };
         case '3': return Glyph{ 0x1E, 0x01, 0x01, 0x0E, 0x01, 0x01, 0x1E };
         default: return Glyph{};
         }

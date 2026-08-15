@@ -11,6 +11,8 @@ namespace Graphics
         Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_RTV;
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_SRV;
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_UAV;
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_DepthTexture;
+        Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_DepthView;
         int m_Width = 0;
         int m_Height = 0;
 

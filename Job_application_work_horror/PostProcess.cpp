@@ -9,6 +9,7 @@ namespace Effect
     void PostProcess::Init()
     {
         m_EnableNoise = true;
+        m_EnableBloom = true;
         m_Time = 0.0f;
         m_NoiseAmount = 0.18f;
         m_TargetNoiseAmount = 0.18f;
@@ -18,14 +19,27 @@ namespace Effect
         m_HorrorPulseTimer = 0.0f;
         m_Exposure = 1.0f;
         m_TargetExposure = 1.0f;
+        m_LensMoisture = 0.0f;
+        m_LensMoisturePeak = 0.0f;
+        m_LensMoistureTimer = 0.0f;
+        m_LensMoistureDuration = 0.0f;
+        m_CorridorTension = 0.0f;
+        m_TargetCorridorTension = 0.0f;
+        m_VolumetricIntensity = 0.58f;
+        m_TargetVolumetricIntensity = 0.58f;
+        m_FilmGradeStrength = 0.55f;
+        m_LensDirtStrength = 0.16f;
 
         m_RenderTexture.Init(
             Application::GetWidth(),
             Application::GetHeight()
         );
 
-        const int bloomWidth = (Application::GetWidth() + 1) / 2;
-        const int bloomHeight = (Application::GetHeight() + 1) / 2;
+        // Bloom is intentionally soft, so quarter-resolution processing keeps
+        // its appearance while reducing the three compute passes to one
+        // quarter of their previous pixel count.
+        const int bloomWidth = (Application::GetWidth() + 3) / 4;
+        const int bloomHeight = (Application::GetHeight() + 3) / 4;
         constexpr DXGI_FORMAT bloomFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
         m_BloomExtractTexture.Init(bloomWidth, bloomHeight, bloomFormat, true);
@@ -67,6 +81,10 @@ namespace Effect
             m_TargetExposure > m_Exposure ? 0.012f : 0.065f;
         m_Exposure +=
             (m_TargetExposure - m_Exposure) * exposureResponse;
+        m_CorridorTension +=
+            (m_TargetCorridorTension - m_CorridorTension) * 0.035f;
+        m_VolumetricIntensity +=
+            (m_TargetVolumetricIntensity - m_VolumetricIntensity) * 0.055f;
 
         if (m_BloomPulseTimer > 0.0f && m_BloomPulseDuration > 0.0f)
         {
@@ -97,6 +115,21 @@ namespace Effect
             m_HorrorPulseStrength +=
                 (0.0f - m_HorrorPulseStrength) * 0.18f;
         }
+
+        if (m_LensMoistureTimer > 0.0f && m_LensMoistureDuration > 0.0f)
+        {
+            m_LensMoistureTimer = (std::max)(
+                0.0f, m_LensMoistureTimer - 1.0f / 60.0f);
+            const float remaining =
+                m_LensMoistureTimer / m_LensMoistureDuration;
+            const float easedRemaining = remaining * remaining *
+                (3.0f - 2.0f * remaining);
+            m_LensMoisture = m_LensMoisturePeak * easedRemaining;
+        }
+        else
+        {
+            m_LensMoisture += (0.0f - m_LensMoisture) * 0.035f;
+        }
     }
 
     void PostProcess::TriggerBloomPulse(float peakIntensity, float duration)
@@ -114,6 +147,15 @@ namespace Effect
         m_HorrorPulseTimer = m_HorrorPulseDuration;
         m_HorrorPulsePeak = (std::max)(strength, 0.0f);
         m_HorrorPulseStrength = m_HorrorPulsePeak;
+    }
+
+    void PostProcess::TriggerLensMoisture(float strength, float duration)
+    {
+        const float clampedStrength = (std::clamp)(strength, 0.0f, 1.0f);
+        m_LensMoistureDuration = (std::max)(duration, 0.05f);
+        m_LensMoistureTimer = m_LensMoistureDuration;
+        m_LensMoisturePeak = (std::max)(m_LensMoisture, clampedStrength);
+        m_LensMoisture = m_LensMoisturePeak;
     }
 
     void PostProcess::Begin()
@@ -196,17 +238,24 @@ namespace Effect
 
     void PostProcess::Draw()
     {
-        RunBloom();
+        if (m_EnableBloom)
+        {
+            RunBloom();
+        }
         m_FullScreenQuad.Draw(
             m_RenderTexture.GetSRV(),
-            m_BloomVerticalTexture.GetSRV(),
+            m_EnableBloom ? m_BloomVerticalTexture.GetSRV() : nullptr,
             m_Time,
-            m_BloomIntensity,
+            m_EnableBloom ? m_BloomIntensity : 0.0f,
             m_EnableNoise ? m_NoiseAmount : 0.0f,
             m_VignetteStrength,
-            m_EnableVolumetricLight ? 1.0f : 0.0f,
+            m_EnableVolumetricLight ? m_VolumetricIntensity : 0.0f,
             m_LensDistortionStrength,
             m_HorrorPulseStrength,
-            m_Exposure);
+            m_Exposure,
+            m_LensMoisture,
+            m_CorridorTension,
+            m_FilmGradeStrength,
+            m_LensDirtStrength);
     }
 }

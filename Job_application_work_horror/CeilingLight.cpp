@@ -181,6 +181,43 @@ void CeilingLight::Update()
             : 0.22f + (unstable + 1.0f) * 0.08f;
     }
 
+    // A faulted fluorescent tube still provides occasional guidance, but its
+    // ballast drops out for irregular intervals. Explicit event flickers are
+    // applied afterwards so scripted scares remain readable.
+    if (m_IsFaulted && powerRestored)
+    {
+        const float faultTime = m_Time + std::fabs(m_FlickerOffset) * 0.73f;
+        const float faultCycle = 3.1f +
+            std::fmod(std::fabs(m_FlickerOffset) * 0.41f, 1.4f);
+        const float faultPhase = std::fmod(faultTime, faultCycle);
+        const float ballastNoise =
+            std::sin(faultTime * 17.0f) * std::sin(faultTime * 31.0f);
+        const bool longDropout = faultPhase < 0.36f;
+        const bool unstableDropout =
+            faultPhase < 1.15f && ballastNoise < -0.32f;
+        targetBrightness = (longDropout || unstableDropout)
+            ? 0.018f
+            : targetBrightness * 0.58f;
+    }
+
+    if (m_EventFlickerTimer > 0.0f)
+    {
+        m_EventFlickerTimer = (std::max)(
+            0.0f,
+            m_EventFlickerTimer - deltaTime);
+        const float elapsed =
+            m_EventFlickerDuration - m_EventFlickerTimer;
+        const int pulse = static_cast<int>(elapsed * 26.0f);
+        const bool tubeOn =
+            (pulse == 0) || (pulse == 2) ||
+            (pulse >= 4 && (pulse % 3) != 1);
+        const float flareBrightness =
+            0.38f + m_EventFlickerStrength * 0.48f;
+        targetBrightness = tubeOn
+            ? (std::max)(targetBrightness, flareBrightness)
+            : 0.008f;
+    }
+
     const bool startingUp = powerRestored && m_PowerOnTimer < 1.1f;
     const bool voltageDip =
         powerRestored && !startingUp && targetBrightness < 0.75f;

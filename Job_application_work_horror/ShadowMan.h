@@ -31,6 +31,8 @@ private:
     float m_ObservedAmount = 0.0f;
     bool m_ReactedToGaze = false;
     bool m_GazeScareEnabled = false;
+    bool m_IsActive = true;
+    bool m_DeactivateOnExpire = false;
     std::function<void()> m_OnObserved;
 
     int m_LifeTimer = 120;
@@ -56,5 +58,24 @@ public:
     void SetOnObserved(std::function<void()> callback)
     {
         m_OnObserved = std::move(callback);
+    }
+
+    void SetActive(bool active)
+    {
+        if (active && !m_IsActive)
+        {
+            m_Age = 0.0f;
+            m_ObservedAmount = 0.0f;
+            m_ReactedToGaze = false;
+            m_GazeScareEnabled = false;
+            m_LifeTimer = 120;
+            m_OnObserved = nullptr;
+        }
+        m_IsActive = active;
+    }
+
+    void SetDeactivateOnExpire(bool deactivate)
+    {
+        m_DeactivateOnExpire = deactivate;
     }
 };

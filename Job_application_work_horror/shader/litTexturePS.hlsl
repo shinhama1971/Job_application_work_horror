@@ -212,15 +212,18 @@ float GetFlashlightLensPattern(float3 pixelDirection)
         max(pixelDirection.z * outerTangent, 0.001f);
     const float radius = length(lensUV);
 
-    const float centerHotspot = 1.0f - smoothstep(0.0f, 0.72f, radius);
-    const float softRing = exp(-pow((radius - 0.54f) * 7.0f, 2.0f));
-    const float largeDust = FlashlightNoise(lensUV * 4.8f + 13.7f);
-    const float fineDust = FlashlightNoise(lensUV * 13.0f - 5.2f);
-    const float lensDirt = (largeDust - 0.5f) * 0.11f +
-        (fineDust - 0.5f) * 0.035f;
+    const float centerHotspot =
+        1.0f - smoothstep(0.0f, 0.78f, radius);
+    const float patternFade =
+        1.0f - smoothstep(0.38f, 1.02f, radius);
+    const float largeDust = FlashlightNoise(lensUV * 6.2f + 13.7f);
+    const float fineDust = FlashlightNoise(lensUV * 17.0f - 5.2f);
+    const float lensDirt =
+        ((largeDust - 0.5f) * 0.030f +
+         (fineDust - 0.5f) * 0.012f) * patternFade;
 
     return saturate(
-        0.91f + centerHotspot * 0.13f + softRing * 0.035f + lensDirt);
+        0.965f + centerHotspot * 0.035f + lensDirt);
 }
 
 float4 main(in LIT_PS_IN input) : SV_Target
@@ -242,11 +245,12 @@ float4 main(in LIT_PS_IN input) : SV_Target
         abs(Material.Emission.rgb),
         float3(0.3333f, 0.3333f, 0.3333f));
     float3 detailWorldNormal = normalize(input.worldNormal);
+    float grime = 0.0f;
     if (!Material.TextureEnable && emissionEnergy < 0.001f)
     {
-        const float grime = GetProceduralGrime(
+        grime = GetProceduralGrime(
             input.worldPos,
-            input.worldNormal);
+            input.worldNormal) * WallDampStrength;
         color.rgb *= 1.0f - grime * 0.22f;
         color.rgb = lerp(
             color.rgb,
@@ -333,6 +337,17 @@ float4 main(in LIT_PS_IN input) : SV_Target
     }
 
     color.rgb *= lighting;
+
+    // Damp plaster reflects a narrow, cool highlight at grazing angles.
+    // The same grime mask drives both absorption and sheen, keeping the
+    // effect physically coherent without another texture lookup.
+    const float3 viewDirection = normalize(-input.viewPos);
+    const float dampFresnel = pow(
+        1.0f - saturate(dot(detailViewNormal, viewDirection)),
+        4.0f);
+    color.rgb += float3(0.055f, 0.070f, 0.076f) * grime *
+        (0.045f + dampFresnel * 0.42f);
+
     color.rgb += Material.Emission.rgb;
 
     // Layered height fog keeps nearby navigation readable while separating
@@ -354,6 +369,29 @@ float4 main(in LIT_PS_IN input) : SV_Target
         float3(0.070f, 0.078f, 0.084f));
     color.rgb = lerp(color.rgb, fogColor, fogFactor);
     color.rgb = ApplyFilmicHorrorGrade(color.rgb);
+
+    if (DebugViewMode == 1)
+    {
+        return float4(detailWorldNormal * 0.5f + 0.5f, 1.0f);
+    }
+    if (DebugViewMode == 2)
+    {
+        const float shadowVisibility =
+            GetFlashlightShadow(input.shadowPos);
+        return float4(shadowVisibility.xxx, 1.0f);
+    }
+    if (DebugViewMode == 3)
+    {
+        return float4(saturate(lighting * 0.5f), 1.0f);
+    }
+    if (DebugViewMode == 6)
+    {
+        return float4(saturate(grime).xxx, 1.0f);
+    }
+    if (DebugViewMode >= 4)
+    {
+        return float4(0.0f, 0.0f, 0.0f, 1.0f);
+    }
 
     return color;
 }
