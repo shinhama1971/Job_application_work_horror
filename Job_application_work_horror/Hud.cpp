@@ -258,6 +258,24 @@ void Hud::DrawResult(float revealAmount)
     Flush();
 }
 
+void Hud::DrawBlink(float opacity)
+{
+    const float blinkOpacity = (std::clamp)(opacity, 0.0f, 0.90f);
+    if (blinkOpacity <= 0.001f)
+    {
+        return;
+    }
+
+    m_Vertices.clear();
+    AddRectangle(
+        0.0f,
+        0.0f,
+        static_cast<float>(Application::GetWidth()),
+        static_cast<float>(Application::GetHeight()),
+        Color(0.0f, 0.0f, 0.0f, blinkOpacity));
+    Flush();
+}
+
 void Hud::Uninit()
 {
     m_Vertices.clear();

@@ -28,6 +28,13 @@ public:
     const char* GetInteractionPrompt() const override;
     void Interact(Player& player) override;
     bool IsEscaping() const { return m_IsEscaping; }
+    float GetEscapeProgress() const
+    {
+        const float progress = m_EscapeTimer / 2.12f;
+        return progress < 0.0f
+            ? 0.0f
+            : (progress > 1.0f ? 1.0f : progress);
+    }
     void SetNextScene(SceneName nextScene) { m_NextScene = nextScene; }
     void SetInteractionEnabled(bool enabled) { m_InteractionEnabled = enabled; }
 

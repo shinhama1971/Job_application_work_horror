@@ -39,6 +39,17 @@ namespace
         "Stage2FalseDoorFrameTop",
         "Stage2FalseDoorHandle"
     };
+
+    constexpr const char* Stage2ClockNames[] =
+    {
+        "Stage2ClockFace",
+        "Stage2ClockFrameTop",
+        "Stage2ClockFrameBottom",
+        "Stage2ClockFrameNear",
+        "Stage2ClockFrameFar",
+        "Stage2ClockHourHand",
+        "Stage2ClockMinuteHand"
+    };
 }
 
 Stage2Scene::Stage2Scene()
@@ -73,6 +84,13 @@ void Stage2Scene::Init()
     m_ScratchNoticeTimer = 0.0f;
     m_PortraitNoticeTimer = 0.0f;
     m_FalseDoorNoticeTimer = 0.0f;
+    m_ClockHourAngle = 0.42f;
+    m_ClockMinuteAngle = -0.78f;
+    m_ClockNoticeTimer = 0.0f;
+    m_LoopBlinkTimer = 0.0f;
+    m_FinalPursuitTimer = 0.0f;
+    m_PursuitPulseTimer = 0.0f;
+    m_PursuitGazePenaltyTimer = 0.0f;
     m_ScratchUpdateAccumulator = 0.0f;
     m_ObservedScarePhase = 0;
     m_FinalSequencePhase = 0;
@@ -82,6 +100,7 @@ void Stage2Scene::Init()
     m_PortraitChangedThisLoop = false;
     m_FalseDoorObserved = false;
     m_FalseDoorMoved = false;
+    m_ClockObservedThisLoop = false;
     m_FinalSequenceArmed = false;
     m_FinalDoorReady = false;
     m_DebugCommand = 0;
@@ -162,6 +181,43 @@ void Stage2Scene::Init()
         false);
     portraitEyeRight->SetCastsShadow(false);
     portraitEyeRight->SetVisible(false);
+
+    Wall* clockFace = createWall(
+        "Stage2ClockFace", Vector3(-39.3f, -70.0f, -25.0f),
+        Vector3(1.0f, 20.0f, 20.0f),
+        Color(0.095f, 0.086f, 0.070f, 1.0f), false);
+    Wall* clockFrameTop = createWall(
+        "Stage2ClockFrameTop", Vector3(-38.9f, -59.0f, -25.0f),
+        Vector3(1.8f, 2.0f, 24.0f), trimColor, false);
+    Wall* clockFrameBottom = createWall(
+        "Stage2ClockFrameBottom", Vector3(-38.9f, -81.0f, -25.0f),
+        Vector3(1.8f, 2.0f, 24.0f), trimColor, false);
+    Wall* clockFrameNear = createWall(
+        "Stage2ClockFrameNear", Vector3(-38.9f, -70.0f, -36.0f),
+        Vector3(1.8f, 24.0f, 2.0f), trimColor, false);
+    Wall* clockFrameFar = createWall(
+        "Stage2ClockFrameFar", Vector3(-38.9f, -70.0f, -14.0f),
+        Vector3(1.8f, 24.0f, 2.0f), trimColor, false);
+    Wall* clockHourHand = createWall(
+        "Stage2ClockHourHand", Vector3(-38.0f, -70.0f, -25.0f),
+        Vector3(1.6f, 9.0f, 1.4f),
+        Color(0.025f, 0.021f, 0.017f, 1.0f), false);
+    Wall* clockMinuteHand = createWall(
+        "Stage2ClockMinuteHand", Vector3(-37.7f, -70.0f, -25.0f),
+        Vector3(1.4f, 14.0f, 1.0f),
+        Color(0.035f, 0.028f, 0.020f, 1.0f), false);
+    Wall* clockPieces[] =
+    {
+        clockFace, clockFrameTop, clockFrameBottom,
+        clockFrameNear, clockFrameFar, clockHourHand, clockMinuteHand
+    };
+    for (Wall* piece : clockPieces)
+    {
+        piece->SetCastsShadow(false);
+    }
+    clockHourHand->SetRotation(Vector3(m_ClockHourAngle, 0.0f, 0.0f));
+    clockMinuteHand->SetRotation(Vector3(m_ClockMinuteAngle, 0.0f, 0.0f));
+
     Wall* loopMark = createWall("Stage2LoopMark", Vector3(-39.4f, -68.0f, 52.0f),
         Vector3(1.0f, 18.0f, 12.0f), Color(0.22f, 0.01f, 0.006f, 1.0f), false);
     loopMark->SetCastsShadow(false);
@@ -280,7 +336,24 @@ void Stage2Scene::Update()
 {
     Core::Game* game = Core::Game::GetInstance();
     Player* player = game->GetObj<Player>("Player");
-    if (player == nullptr || !player->CanControl())
+    if (player == nullptr)
+    {
+        return;
+    }
+
+    ExitTrigger* exit = game->GetObj<ExitTrigger>("Stage2Exit");
+    if (exit != nullptr && exit->IsEscaping())
+    {
+        m_FinalPursuitTimer = 0.0f;
+        ShadowMan* shadow = game->GetObj<ShadowMan>("Stage2Shadow");
+        if (shadow != nullptr)
+        {
+            shadow->SetActive(false);
+        }
+        return;
+    }
+
+    if (!player->CanControl())
     {
         return;
     }
@@ -319,6 +392,14 @@ void Stage2Scene::Update()
         (std::max)(0.0f, m_PortraitNoticeTimer - deltaTime);
     m_FalseDoorNoticeTimer =
         (std::max)(0.0f, m_FalseDoorNoticeTimer - deltaTime);
+    m_ClockNoticeTimer =
+        (std::max)(0.0f, m_ClockNoticeTimer - deltaTime);
+    m_LoopBlinkTimer =
+        (std::max)(0.0f, m_LoopBlinkTimer - deltaTime);
+    m_FinalPursuitTimer =
+        (std::max)(0.0f, m_FinalPursuitTimer - deltaTime);
+    m_PursuitGazePenaltyTimer = (std::max)(
+        0.0f, m_PursuitGazePenaltyTimer - deltaTime);
 
     if (m_LoopCount < 3 && m_LoopCooldown <= 0.0f &&
         player->GetPosition().z > 116.0f)
@@ -335,6 +416,8 @@ void Stage2Scene::Update()
     UpdateScratchMessage(*player, deltaTime);
     UpdatePortraitAnomaly(*player);
     UpdateFalseDoorAnomaly(*player);
+    UpdateClock(deltaTime);
+    UpdateClockObservation();
 
     const float loopRate = static_cast<float>(m_LoopCount) / 3.0f;
     const char* stageLightNames[] =
@@ -375,10 +458,13 @@ void Stage2Scene::Update()
         0.20f + loopRate * 0.34f);
     game->GetPostProcess()->SetFilmGradeStrength(
         0.58f + loopRate * 0.20f);
+    game->GetPostProcess()->SetLensDirtStrength(
+        0.14f + loopRate * 0.08f);
     game->GetPostProcess()->SetVolumetricLight(player->IsFlashlightOn());
     game->GetPostProcess()->SetVolumetricIntensity(
         0.38f + loopRate * 0.20f + localDarkness * 0.055f);
     UpdateObservedScare(deltaTime);
+    UpdateFinalPursuit(deltaTime);
     UpdateFinalSequence(deltaTime);
 
     Wall* doorIndicator = game->GetObj<Wall>("Stage2DoorIndicator");
@@ -399,6 +485,7 @@ void Stage2Scene::AdvanceLoop(Player& player)
     Core::Game* game = Core::Game::GetInstance();
     ++m_LoopCount;
     m_LoopCooldown = 1.0f;
+    m_LoopBlinkTimer = 0.28f;
     m_NoticeTimer = 3.0f;
     m_LightZoneMask = 0;
     m_ScratchScareTriggered = false;
@@ -406,7 +493,9 @@ void Stage2Scene::AdvanceLoop(Player& player)
     m_PortraitChangedThisLoop = false;
     m_FalseDoorObserved = false;
     m_FalseDoorMoved = false;
+    m_ClockObservedThisLoop = false;
     player.SetPosition(Vector3(0.0f, -99.0f, -125.0f));
+    ConfigureClockForLoop();
 
     game->GetPostProcess()->TriggerHorrorPulse(
         0.26f + static_cast<float>(m_LoopCount) * 0.13f,
@@ -500,6 +589,116 @@ void Stage2Scene::AdvanceLoop(Player& player)
         }
         game->GetPostProcess()->TriggerHorrorPulse(0.64f, 0.58f);
     }
+}
+
+void Stage2Scene::ConfigureClockForLoop()
+{
+    if (m_LoopCount == 1)
+    {
+        m_ClockHourAngle = 1.18f;
+        m_ClockMinuteAngle = -2.34f;
+    }
+    else if (m_LoopCount == 2)
+    {
+        m_ClockHourAngle = -0.62f;
+        m_ClockMinuteAngle = 2.72f;
+    }
+    else if (m_LoopCount >= 3)
+    {
+        m_ClockHourAngle = 3.14159265f;
+        m_ClockMinuteAngle = 3.14159265f;
+
+        Core::Game* game = Core::Game::GetInstance();
+        Wall* face = game->GetObj<Wall>("Stage2ClockFace");
+        if (face != nullptr)
+        {
+            face->SetAppearance(
+                Color(0.075f, 0.018f, 0.012f, 1.0f),
+                Color(0.018f, 0.001f, 0.0f, 1.0f),
+                10.0f);
+        }
+    }
+}
+
+void Stage2Scene::UpdateClock(float deltaTime)
+{
+    if (m_LoopCount == 0)
+    {
+        m_ClockMinuteAngle += deltaTime * 0.035f;
+        m_ClockHourAngle += deltaTime * 0.0029f;
+    }
+    else if (m_LoopCount == 2)
+    {
+        // The reverse motion is deliberately slow enough to be noticed only
+        // when the player compares the hands against the previous loop.
+        m_ClockMinuteAngle -= deltaTime * 0.82f;
+        m_ClockHourAngle -= deltaTime * 0.068f;
+    }
+
+    float displayedHourAngle = m_ClockHourAngle;
+    float displayedMinuteAngle = m_ClockMinuteAngle;
+    if (m_LoopCount == 2)
+    {
+        constexpr float clockStep = 0.105f;
+        displayedHourAngle =
+            std::floor(m_ClockHourAngle / clockStep) * clockStep;
+        displayedMinuteAngle =
+            std::floor(m_ClockMinuteAngle / clockStep) * clockStep;
+    }
+
+    Core::Game* game = Core::Game::GetInstance();
+    Wall* hourHand = game->GetObj<Wall>("Stage2ClockHourHand");
+    Wall* minuteHand = game->GetObj<Wall>("Stage2ClockMinuteHand");
+    if (hourHand != nullptr)
+    {
+        hourHand->SetRotation(Vector3(displayedHourAngle, 0.0f, 0.0f));
+    }
+    if (minuteHand != nullptr)
+    {
+        minuteHand->SetRotation(Vector3(displayedMinuteAngle, 0.0f, 0.0f));
+    }
+}
+
+void Stage2Scene::UpdateClockObservation()
+{
+    if (m_LoopCount <= 0 || m_LoopCount >= 3 ||
+        m_ClockObservedThisLoop)
+    {
+        return;
+    }
+
+    Core::Game* game = Core::Game::GetInstance();
+    const Vector3 clockCenter(-38.0f, -70.0f, -25.0f);
+    Vector3 cameraToClock =
+        clockCenter - game->GetCamera()->GetPosition();
+    const float distance = cameraToClock.Length();
+    if (distance > 0.001f)
+    {
+        cameraToClock /= distance;
+    }
+
+    const float facing =
+        game->GetCamera()->GetForward().Dot(cameraToClock);
+    if (distance > 98.0f || facing < 0.91f)
+    {
+        return;
+    }
+
+    m_ClockObservedThisLoop = true;
+    m_ClockNoticeTimer = 2.6f;
+
+    CeilingLight* clockLight =
+        game->GetObj<CeilingLight>("Stage2Light2");
+    if (clockLight != nullptr)
+    {
+        clockLight->TriggerEventFlicker(
+            m_LoopCount == 1 ? 0.46f : 0.82f,
+            m_LoopCount == 1 ? 0.42f : 0.72f);
+    }
+    game->GetPostProcess()->TriggerHorrorPulse(
+        m_LoopCount == 1 ? 0.14f : 0.28f,
+        0.32f);
+    Input::SetVibration(m_LoopCount == 1 ? 3 : 6, 0.14f);
 }
 
 void Stage2Scene::SetFalseDoorState(bool visible, bool rightSide)
@@ -655,10 +854,57 @@ void Stage2Scene::UpdateObservedScare(float deltaTime)
 void Stage2Scene::StartFinalSequence()
 {
     m_FinalSequenceTimer = 0.0f;
+    m_FinalPursuitTimer = 7.0f;
+    m_PursuitPulseTimer = 0.12f;
+    m_PursuitGazePenaltyTimer = 0.0f;
     m_FinalSequencePhase = 0;
     m_NoticeTimer = 2.8f;
 
     Core::Game* game = Core::Game::GetInstance();
+    Player* player = game->GetObj<Player>("Player");
+    ShadowMan* shadow = game->GetObj<ShadowMan>("Stage2Shadow");
+    if (player != nullptr && shadow != nullptr)
+    {
+        const Vector3 playerPosition = player->GetPosition();
+        shadow->SetPosition(
+            playerPosition.x,
+            -99.0f,
+            playerPosition.z - 72.0f);
+        shadow->SetActive(false);
+        shadow->SetActive(true);
+        shadow->EnableChase(18.0f, 30.0f);
+        shadow->EnableGazeScare(8.0f);
+        shadow->SetOnObserved(
+            [this]()
+            {
+                if (m_FinalPursuitTimer <= 0.0f ||
+                    m_PursuitGazePenaltyTimer > 0.0f)
+                {
+                    return;
+                }
+
+                m_PursuitGazePenaltyTimer = 1.45f;
+                m_NoticeTimer = 1.65f;
+                Core::Game* game = Core::Game::GetInstance();
+                const char* lightNames[] =
+                {
+                    "Stage2Light1", "Stage2Light2",
+                    "Stage2Light3", "CeilingLight4"
+                };
+                for (const char* lightName : lightNames)
+                {
+                    CeilingLight* light =
+                        game->GetObj<CeilingLight>(lightName);
+                    if (light != nullptr)
+                    {
+                        light->TriggerEventFlicker(0.72f, 0.92f);
+                    }
+                }
+                game->GetPostProcess()->TriggerHorrorPulse(0.92f, 0.64f);
+                game->GetPostProcess()->TriggerBloomPulse(0.62f, 0.22f);
+                Input::SetVibration(16, 0.45f);
+            });
+    }
     RevealScratchPieces(0, Stage2ScratchCount, 0.34f);
     game->GetPostProcess()->TriggerHorrorPulse(0.82f, 0.72f);
     Input::SetVibration(18, 0.42f);
@@ -738,6 +984,75 @@ void Stage2Scene::UpdateFinalSequence(float deltaTime)
 
     game->GetPostProcess()->TriggerBloomPulse(0.88f, 0.62f);
     Input::SetVibration(9, 0.24f);
+}
+
+void Stage2Scene::UpdateFinalPursuit(float deltaTime)
+{
+    if (m_FinalPursuitTimer <= 0.0f)
+    {
+        return;
+    }
+
+    Core::Game* game = Core::Game::GetInstance();
+    Player* player = game->GetObj<Player>("Player");
+    ShadowMan* shadow = game->GetObj<ShadowMan>("Stage2Shadow");
+    if (player == nullptr || shadow == nullptr)
+    {
+        return;
+    }
+
+    const Vector3 offset = player->GetPosition() - shadow->GetPosition();
+    const float horizontalDistance =
+        std::sqrt(offset.x * offset.x + offset.z * offset.z);
+    const float proximity = 1.0f - (std::clamp)(
+        (horizontalDistance - 30.0f) / 72.0f,
+        0.0f,
+        1.0f);
+
+    game->GetPostProcess()->SetCorridorTension(
+        0.74f + proximity * 0.16f);
+    if (m_FinalDoorReady)
+    {
+        game->GetPostProcess()->SetAtmosphere(
+            0.30f + proximity * 0.075f,
+            0.76f + proximity * 0.105f);
+        game->GetPostProcess()->SetLensDistortionStrength(
+            0.46f + proximity * 0.16f);
+        game->GetPostProcess()->SetVolumetricIntensity(
+            0.50f + proximity * 0.12f);
+    }
+
+    if (m_PursuitGazePenaltyTimer > 0.0f)
+    {
+        const float penalty = (std::clamp)(
+            m_PursuitGazePenaltyTimer / 1.45f, 0.0f, 1.0f);
+        game->GetPostProcess()->SetAtmosphere(
+            0.43f + penalty * 0.12f,
+            0.88f + penalty * 0.08f);
+        game->GetPostProcess()->SetLensDistortionStrength(
+            0.66f + penalty * 0.14f);
+        game->GetPostProcess()->SetLensDirtStrength(0.32f + penalty * 0.36f);
+        game->GetPostProcess()->SetExposure(0.91f + (1.0f - penalty) * 0.06f);
+    }
+
+    m_PursuitPulseTimer -= deltaTime;
+    if (m_PursuitPulseTimer > 0.0f)
+    {
+        return;
+    }
+
+    const int vibrationFrames =
+        3 + static_cast<int>(proximity * 7.0f);
+    Input::SetVibration(
+        vibrationFrames,
+        0.08f + proximity * 0.17f);
+    if (proximity > 0.34f)
+    {
+        game->GetPostProcess()->TriggerHorrorPulse(
+            0.045f + proximity * 0.075f,
+            0.16f);
+    }
+    m_PursuitPulseTimer = 0.72f - proximity * 0.40f;
 }
 
 void Stage2Scene::RevealScratchPieces(int first, int last, float emission)
@@ -990,9 +1305,17 @@ void Stage2Scene::Draw(Camera* camera)
     {
         objective = "KEEP WALKING";
     }
+    else if (m_PursuitGazePenaltyTimer > 0.0f)
+    {
+        objective = "DON'T LOOK AT IT";
+    }
     else if (m_FinalSequenceTimer >= 0.0f && !m_FinalDoorReady)
     {
         objective = "DO NOT STOP";
+    }
+    else if (m_FinalPursuitTimer > 0.0f)
+    {
+        objective = "DO NOT LOOK BACK";
     }
     else if (m_ScratchNoticeTimer > 0.0f)
     {
@@ -1001,6 +1324,10 @@ void Stage2Scene::Draw(Camera* camera)
     else if (m_FalseDoorNoticeTimer > 0.0f)
     {
         objective = "THAT DOOR MOVED";
+    }
+    else if (m_ClockNoticeTimer > 0.0f)
+    {
+        objective = "TIME IS WRONG";
     }
     else if (m_PortraitNoticeTimer > 0.0f)
     {
@@ -1024,6 +1351,22 @@ void Stage2Scene::Draw(Camera* camera)
     }
 
     m_Hud.Draw(*player, -1, m_InteractionSystem.GetPrompt(), objective);
+    if (m_LoopBlinkTimer > 0.0f)
+    {
+        const float blinkRate =
+            (std::clamp)(m_LoopBlinkTimer / 0.28f, 0.0f, 1.0f);
+        m_Hud.DrawBlink(blinkRate * blinkRate * 0.90f);
+    }
+
+    if (exit != nullptr && exit->IsEscaping())
+    {
+        const float fadeRate = (std::clamp)(
+            (exit->GetEscapeProgress() - 0.36f) / 0.64f,
+            0.0f, 1.0f);
+        const float smoothFade =
+            fadeRate * fadeRate * (3.0f - 2.0f * fadeRate);
+        m_Hud.DrawBlink(smoothFade * 0.90f);
+    }
 }
 
 void Stage2Scene::Uninit()
@@ -1062,6 +1405,10 @@ void Stage2Scene::Uninit()
         game->DestroyObj(name);
     }
     for (const char* name : Stage2FalseDoorNames)
+    {
+        game->DestroyObj(name);
+    }
+    for (const char* name : Stage2ClockNames)
     {
         game->DestroyObj(name);
     }

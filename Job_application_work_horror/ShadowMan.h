@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <functional>
 #include <utility>
 #include <wrl/client.h>
@@ -31,11 +32,14 @@ private:
     float m_ObservedAmount = 0.0f;
     bool m_ReactedToGaze = false;
     bool m_GazeScareEnabled = false;
+    bool m_ChaseEnabled = false;
     bool m_IsActive = true;
     bool m_DeactivateOnExpire = false;
     std::function<void()> m_OnObserved;
 
     int m_LifeTimer = 120;
+    float m_ChaseSpeed = 0.0f;
+    float m_ChaseStopDistance = 28.0f;
 
 public:
     void Init() override;
@@ -68,10 +72,23 @@ public:
             m_ObservedAmount = 0.0f;
             m_ReactedToGaze = false;
             m_GazeScareEnabled = false;
+            m_ChaseEnabled = false;
+            m_ChaseSpeed = 0.0f;
             m_LifeTimer = 120;
             m_OnObserved = nullptr;
         }
+        if (!active)
+        {
+            m_ChaseEnabled = false;
+        }
         m_IsActive = active;
+    }
+
+    void EnableChase(float speed, float stopDistance)
+    {
+        m_ChaseEnabled = true;
+        m_ChaseSpeed = (std::max)(speed, 0.0f);
+        m_ChaseStopDistance = (std::max)(stopDistance, 8.0f);
     }
 
     void SetDeactivateOnExpire(bool deactivate)

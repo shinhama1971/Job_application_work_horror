@@ -19,6 +19,7 @@ public:
         std::string_view objectiveText);
     void DrawTitle(float time);
     void DrawResult(float revealAmount);
+    void DrawBlink(float opacity);
     void Uninit();
 
 private:

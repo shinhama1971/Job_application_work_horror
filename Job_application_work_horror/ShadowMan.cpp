@@ -15,10 +15,13 @@ void ShadowMan::Init()
 	m_ObservedAmount = 0.0f;
 	m_ReactedToGaze = false;
 	m_GazeScareEnabled = false;
+	m_ChaseEnabled = false;
 	m_IsActive = true;
 	m_DeactivateOnExpire = false;
 	m_OnObserved = nullptr;
 	m_LifeTimer = 120;
+	m_ChaseSpeed = 0.0f;
+	m_ChaseStopDistance = 28.0f;
 
     m_Vertices.reserve(144);
     m_Indices.reserve(432);
@@ -142,7 +145,22 @@ void ShadowMan::Update()
         return;
     }
 
-    const Vector3 toPlayer = player->GetPosition() - m_Position;
+    Vector3 toPlayer = player->GetPosition() - m_Position;
+    if (m_ChaseEnabled)
+    {
+        Vector3 horizontalDirection(toPlayer.x, 0.0f, toPlayer.z);
+        const float horizontalDistance = horizontalDirection.Length();
+        if (horizontalDistance > m_ChaseStopDistance &&
+            horizontalDistance > 0.001f)
+        {
+            horizontalDirection /= horizontalDistance;
+            const float travel = (std::min)(
+                m_ChaseSpeed * (1.0f / 60.0f),
+                horizontalDistance - m_ChaseStopDistance);
+            m_Position += horizontalDirection * travel;
+            toPlayer = player->GetPosition() - m_Position;
+        }
+    }
     if (toPlayer.LengthSquared() > 0.0001f)
     {
         m_Rotation.y = std::atan2(toPlayer.x, toPlayer.z);

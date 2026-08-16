@@ -16,12 +16,16 @@ private:
     void UpdateObservedScare(float deltaTime);
     void StartFinalSequence();
     void UpdateFinalSequence(float deltaTime);
+    void UpdateFinalPursuit(float deltaTime);
     void RevealScratchPieces(int first, int last, float emission);
     void UpdateLightZones(const Player& player);
     void UpdateScratchMessage(const Player& player, float deltaTime);
     void UpdatePortraitAnomaly(const Player& player);
     void UpdateFalseDoorAnomaly(const Player& player);
     void SetFalseDoorState(bool visible, bool rightSide);
+    void ConfigureClockForLoop();
+    void UpdateClock(float deltaTime);
+    void UpdateClockObservation();
 
     InteractionSystem m_InteractionSystem;
     Hud m_Hud;
@@ -35,6 +39,13 @@ private:
     float m_ScratchNoticeTimer = 0.0f;
     float m_PortraitNoticeTimer = 0.0f;
     float m_FalseDoorNoticeTimer = 0.0f;
+    float m_ClockHourAngle = 0.0f;
+    float m_ClockMinuteAngle = 0.0f;
+    float m_ClockNoticeTimer = 0.0f;
+    float m_LoopBlinkTimer = 0.0f;
+    float m_FinalPursuitTimer = 0.0f;
+    float m_PursuitPulseTimer = 0.0f;
+    float m_PursuitGazePenaltyTimer = 0.0f;
     float m_ScratchUpdateAccumulator = 0.0f;
     int m_ObservedScarePhase = 0;
     int m_FinalSequencePhase = 0;
@@ -44,6 +55,7 @@ private:
     bool m_PortraitChangedThisLoop = false;
     bool m_FalseDoorObserved = false;
     bool m_FalseDoorMoved = false;
+    bool m_ClockObservedThisLoop = false;
     bool m_FinalSequenceArmed = false;
     bool m_FinalDoorReady = false;
     int m_DebugCommand = 0;
