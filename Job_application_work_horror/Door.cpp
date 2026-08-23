@@ -88,7 +88,9 @@ void Door::Init()
            Color(0.16f, 0.055f, 0.025f, 1.0f));
     addBox(Vector3(0.0f, -0.22f, -0.54f), Vector3(0.35f, 0.17f, 0.035f),
            Color(0.16f, 0.055f, 0.025f, 1.0f));
-    addBox(Vector3(-0.28f, 0.0f, -0.64f), Vector3(0.055f, 0.075f, 0.11f),
+    // The hinge is on the local left edge, so the handle belongs on the
+    // opposite side of the door leaf.
+    addBox(Vector3(0.28f, 0.0f, -0.64f), Vector3(0.055f, 0.075f, 0.11f),
            Color(0.72f, 0.48f, 0.12f, 1.0f));
 
     m_DoorIndexCount = m_Indices.size();
@@ -121,12 +123,28 @@ void Door::Init()
 }
 void Door::Update()
 {
+    constexpr float deltaTime = 1.0f / 60.0f;
+    if (m_LockedRattleTimer > 0.0f)
+    {
+        constexpr float rattleDuration = 0.28f;
+        m_LockedRattleTimer = (std::max)(
+            0.0f,
+            m_LockedRattleTimer - deltaTime);
+        const float remaining = m_LockedRattleTimer / rattleDuration;
+        const float elapsed = rattleDuration - m_LockedRattleTimer;
+        m_OpenAngle = std::sin(elapsed * 62.0f) * 0.018f * remaining;
+        if (m_LockedRattleTimer <= 0.0f)
+        {
+            m_OpenAngle = 0.0f;
+        }
+        return;
+    }
+
     if (!m_IsOpening)
     {
         return;
     }
 
-    constexpr float deltaTime = 1.0f / 60.0f;
     if (m_OpenDelayTimer > 0.0f)
     {
         m_OpenDelayTimer = (std::max)(
@@ -162,12 +180,24 @@ void Door::Update()
 
 const char* Door::GetInteractionPrompt() const
 {
-    return "Open corridor door";
+    return m_IsLocked
+        ? "ドアは開かない"
+        : "ドアを開ける";
 }
 
 void Door::Interact(Player& player)
 {
     (void)player;
+
+    if (m_IsLocked)
+    {
+        m_LockedRattleTimer = 0.28f;
+        Core::Game::GetInstance()->GetPostProcess()->TriggerHorrorPulse(
+            0.10f,
+            0.16f);
+        Input::SetVibration(2, 0.06f);
+        return;
+    }
 
     // This door leads to the repeating corridor and must be usable before
     // power restoration. The final exit remains separately power-locked.
@@ -206,6 +236,8 @@ void Door::ResetClosed(int loopPhase)
     m_OpenAngle = 0.0f;
     m_IsOpen = false;
     m_IsOpening = false;
+    m_IsLocked = false;
+    m_LockedRattleTimer = 0.0f;
     m_OpenDelayTimer = 0.0f;
     m_LoopPhase = (std::clamp)(loopPhase, 0, 3);
 
@@ -244,15 +276,21 @@ void Door::ResolveCollision(Vector3& position, float radius) const
 
     const float halfX = std::abs(m_Scale.x) * 0.5f;
     const float halfZ = std::abs(m_Scale.z) * 0.5f;
-    const float minX = m_Position.x - halfX;
-    const float maxX = m_Position.x + halfX;
-    const float minZ = m_Position.z - halfZ;
-    const float maxZ = m_Position.z + halfZ;
+    const Matrix baseRotation = Matrix::CreateFromYawPitchRoll(
+        m_Rotation.y, m_Rotation.x, m_Rotation.z);
+    const Matrix inverseRotation = baseRotation.Invert();
+    Vector3 localPosition = Vector3::Transform(
+        position - m_Position,
+        inverseRotation);
+    const float minX = -halfX;
+    const float maxX = halfX;
+    const float minZ = -halfZ;
+    const float maxZ = halfZ;
 
-    const float closestX = std::clamp(position.x, minX, maxX);
-    const float closestZ = std::clamp(position.z, minZ, maxZ);
-    const float deltaX = position.x - closestX;
-    const float deltaZ = position.z - closestZ;
+    const float closestX = std::clamp(localPosition.x, minX, maxX);
+    const float closestZ = std::clamp(localPosition.z, minZ, maxZ);
+    const float deltaX = localPosition.x - closestX;
+    const float deltaZ = localPosition.z - closestZ;
     const float distanceSquared = deltaX * deltaX + deltaZ * deltaZ;
 
     if (distanceSquared >= radius * radius)
@@ -265,15 +303,18 @@ void Door::ResolveCollision(Vector3& position, float radius) const
     {
         const float distance = std::sqrt(distanceSquared);
         const float pushDistance = radius - distance;
-        position.x += deltaX / distance * pushDistance;
-        position.z += deltaZ / distance * pushDistance;
+        localPosition.x += deltaX / distance * pushDistance;
+        localPosition.z += deltaZ / distance * pushDistance;
+        position = m_Position + Vector3::Transform(
+            localPosition,
+            baseRotation);
         return;
     }
 
-    const float distanceToLeft = position.x - minX;
-    const float distanceToRight = maxX - position.x;
-    const float distanceToNear = position.z - minZ;
-    const float distanceToFar = maxZ - position.z;
+    const float distanceToLeft = localPosition.x - minX;
+    const float distanceToRight = maxX - localPosition.x;
+    const float distanceToNear = localPosition.z - minZ;
+    const float distanceToFar = maxZ - localPosition.z;
     const float nearestFace = (std::min)(
         (std::min)(distanceToLeft, distanceToRight),
         (std::min)(distanceToNear, distanceToFar)
@@ -281,20 +322,23 @@ void Door::ResolveCollision(Vector3& position, float radius) const
 
     if (nearestFace == distanceToLeft)
     {
-        position.x = minX - radius;
+        localPosition.x = minX - radius;
     }
     else if (nearestFace == distanceToRight)
     {
-        position.x = maxX + radius;
+        localPosition.x = maxX + radius;
     }
     else if (nearestFace == distanceToNear)
     {
-        position.z = minZ - radius;
+        localPosition.z = minZ - radius;
     }
     else
     {
-        position.z = maxZ + radius;
+        localPosition.z = maxZ + radius;
     }
+    position = m_Position + Vector3::Transform(
+        localPosition,
+        baseRotation);
 }
 
 Matrix Door::GetDoorWorldMatrix() const
@@ -302,10 +346,14 @@ Matrix Door::GetDoorWorldMatrix() const
     // The generated mesh is centered. Move its left edge to the origin,
     // rotate around that hinge, then return the hinge to world space.
     const float halfWidth = std::abs(m_Scale.x) * 0.5f;
-    const Vector3 hingePosition(
-        m_StartPosition.x - halfWidth,
-        m_StartPosition.y,
-        m_StartPosition.z);
+    const Matrix baseRotation = Matrix::CreateFromYawPitchRoll(
+        m_Rotation.y,
+        m_Rotation.x,
+        m_Rotation.z);
+    const Vector3 hingeOffset = Vector3::Transform(
+        Vector3(-halfWidth, 0.0f, 0.0f),
+        baseRotation);
+    const Vector3 hingePosition = m_StartPosition + hingeOffset;
     const Matrix scale = Matrix::CreateScale(m_Scale);
     const Matrix centerFromHinge = Matrix::CreateTranslation(
         halfWidth,

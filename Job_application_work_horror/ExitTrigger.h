@@ -27,6 +27,7 @@ public:
     DirectX::SimpleMath::Vector3 GetInteractionPosition() const override { return m_Position; }
     const char* GetInteractionPrompt() const override;
     void Interact(Player& player) override;
+    void BeginEscape(Player& player);
     bool IsEscaping() const { return m_IsEscaping; }
     float GetEscapeProgress() const
     {

@@ -31,7 +31,7 @@ public:
         return m_IsActive && !m_IsCollected;
     }
     DirectX::SimpleMath::Vector3 GetInteractionPosition() const override { return m_Position; }
-    const char* GetInteractionPrompt() const override { return "Take battery"; }
+    const char* GetInteractionPrompt() const override { return "電池を拾う"; }
     void Interact(Player& player) override;
 
     void SetPosition(float x, float y, float z)

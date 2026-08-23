@@ -1,5 +1,6 @@
-#include "BatteryItem.h"
+﻿#include "BatteryItem.h"
 #include "Game.h"
+#include "Input.h"
 #include "Player.h"
 
 using namespace DirectX::SimpleMath;
@@ -66,6 +67,9 @@ void BatteryItem::Interact(Player& player)
 
     player.AddBattery(m_RecoverValue);
     m_IsCollected = true;
+    Core::Game::GetInstance()->GetPostProcess()->TriggerBloomPulse(
+        0.62f, 0.34f);
+    Input::SetVibration(6, 0.13f);
 }
 
 void BatteryItem::Draw(Camera* cam)

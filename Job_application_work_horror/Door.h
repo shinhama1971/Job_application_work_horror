@@ -20,6 +20,8 @@ private:
 
     bool m_IsOpen = false;
     bool m_IsOpening = false;
+    bool m_IsLocked = false;
+    float m_LockedRattleTimer = 0.0f;
 
     DirectX::SimpleMath::Vector3 m_StartPosition;
     float m_OpenAngle = 0.0f;
@@ -49,6 +51,8 @@ public:
         DirectX::SimpleMath::Vector3& position,
         float radius) const;
     void ResetClosed(int loopPhase = 0);
+    void SetLocked(bool locked) { m_IsLocked = locked; }
+    bool IsLocked() const { return m_IsLocked; }
 
     void SetPosition(float x, float y, float z)
     {

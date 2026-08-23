@@ -242,14 +242,6 @@ LRESULT CALLBACK Application::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
     }
     break;
 
-    case WM_KEYDOWN: //キー入力があったメッセージ
-        if (LOWORD(wParam) == VK_ESCAPE)
-        { //入力されたキーがESCAPEなら
-            PostMessage(hWnd, WM_CLOSE, wParam, lParam);//「WM_CLOSE」を送る
-        }
-
-        break;
-
     case WM_ACTIVATE:
         if (wParam == WA_INACTIVE) {
             // フルスクリーン表示かつメッセージボックス非表示なら

@@ -218,6 +218,11 @@ void CeilingLight::Update()
             : 0.008f;
     }
 
+    if (m_IsForcedOff)
+    {
+        targetBrightness = 0.0f;
+    }
+
     const bool startingUp = powerRestored && m_PowerOnTimer < 1.1f;
     const bool voltageDip =
         powerRestored && !startingUp && targetBrightness < 0.75f;
@@ -251,11 +256,22 @@ void CeilingLight::Draw(Camera* camera)
     panel.Diffuse = Color(0.22f, 0.21f, 0.18f, 1.0f);
     if (Core::Game::GetInstance()->IsPowerRestored())
     {
-        panel.Emission = Color(
-            0.68f * m_Brightness,
-            0.76f * m_Brightness,
-            0.88f * m_Brightness,
-            1.0f);
+        if (m_IsFaulted)
+        {
+            panel.Emission = Color(
+                0.52f * m_Brightness,
+                0.62f * m_Brightness,
+                0.45f * m_Brightness,
+                1.0f);
+        }
+        else
+        {
+            panel.Emission = Color(
+                0.68f * m_Brightness,
+                0.76f * m_Brightness,
+                0.88f * m_Brightness,
+                1.0f);
+        }
     }
     else
     {

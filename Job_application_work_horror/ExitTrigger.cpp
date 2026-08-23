@@ -60,16 +60,26 @@ void ExitTrigger::Update()
 
 void ExitTrigger::Interact(Player& player)
 {
-    Core::Game* game = Core::Game::GetInstance();
-    if (m_InteractionEnabled && game->IsPowerRestored() && !m_IsEscaping)
+    if (m_InteractionEnabled)
     {
-        m_IsEscaping = true;
-        m_EscapeTimer = 0.0f;
-        m_EscapePhase = 0;
-        player.SetCanControl(false);
-        game->GetPostProcess()->TriggerHorrorPulse(0.18f, 0.25f);
-        Input::SetVibration(6, 0.12f);
+        BeginEscape(player);
     }
+}
+
+void ExitTrigger::BeginEscape(Player& player)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    if (!game->IsPowerRestored() || m_IsEscaping)
+    {
+        return;
+    }
+
+    m_IsEscaping = true;
+    m_EscapeTimer = 0.0f;
+    m_EscapePhase = 0;
+    player.SetCanControl(false);
+    game->GetPostProcess()->TriggerHorrorPulse(0.18f, 0.25f);
+    Input::SetVibration(6, 0.12f);
 }
 
 const char* ExitTrigger::GetInteractionPrompt() const
@@ -80,8 +90,8 @@ const char* ExitTrigger::GetInteractionPrompt() const
     }
 
     return Core::Game::GetInstance()->IsPowerRestored()
-        ? "Leave facility"
-        : "Exit has no power";
+        ? "出口から移動する"
+        : "電力が必要";
 }
 
 void ExitTrigger::Draw(Camera* cam)

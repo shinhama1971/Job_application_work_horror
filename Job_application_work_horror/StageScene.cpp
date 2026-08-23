@@ -1,4 +1,4 @@
-#include "StageScene.h"
+﻿#include "StageScene.h"
 #include "Game.h"
 #include "Input.h"
 
@@ -35,7 +35,18 @@ void StageScene::Init()
 {
     Core::Game* game = Core::Game::GetInstance();
     game->GetPostProcess()->SetVolumetricLight(true);
+    game->GetPostProcess()->SetLensDistortionStrength(0.20f);
+    game->GetPostProcess()->SetFilmGradeStrength(0.52f);
+    game->GetPostProcess()->SetLensDirtStrength(0.10f);
     m_CorridorLoopCount = 0;
+    m_LastFuseCount = game->GetItemCount();
+    m_FuseNoticeTimer = 0.0f;
+    m_FuseWatcherNoticeTimer = 0.0f;
+    m_FuseWatcherState = 0;
+    m_ChargerNoticeTimer = 0.0f;
+    m_ChargerHandled = false;
+    m_EvidenceNoticeTimer = 0.0f;
+    m_EvidenceHandled = false;
     m_LoopCooldown = 0.0f;
     m_LoopNoticeTimer = 0.0f;
     m_EntranceEventTriggered = false;
@@ -47,7 +58,14 @@ void StageScene::Init()
     m_WasPowerRestored = false;
     m_PowerRestoreTimer = -1.0f;
     m_PowerRestorePhase = -1;
+    m_ExitPowerEventTimer = -1.0f;
+    m_ExitPowerEventPhase = -1;
+    m_ExitPowerSequenceComplete = false;
     m_StageVisualTimer = 0.0f;
+    m_ExitOmenTriggered = false;
+    m_ExitOmenTimer = 0.0f;
+    m_ExitOmenPhase = -1;
+    m_ProgressHintTimer = 0.0f;
 
     // プレイヤー
     Player* player = game->CreateObj<Player>("Player");
@@ -281,11 +299,60 @@ void StageScene::Init()
     FuseBox* fuseBox = game->CreateObj<FuseBox>("FuseBox");
     fuseBox->SetPosition(-180.0f, -90.0f, 35.0f);
 
+    FuseBox* exitPowerPanel =
+        game->CreateObj<FuseBox>("ExitPowerPanel");
+    exitPowerPanel->SetExitControl(true);
+    exitPowerPanel->SetPosition(145.0f, -90.0f, 270.0f);
 
-    // ゴール
+    FuseBox* emergencyCharger =
+        game->CreateObj<FuseBox>("Stage1EmergencyCharger");
+    emergencyCharger->SetManualControl("非常用充電器を使う");
+    emergencyCharger->SetManualInteractionAllowed(true);
+    emergencyCharger->SetPosition(-205.0f, -90.0f, -112.0f);
+    emergencyCharger->SetRotation(Vector3(0.0f, 1.5707963f, 0.0f));
+
+    // Optional exploration reward.  It is deliberately away from the
+    // critical path so players choose between a faster escape and a full run.
+    FuseBox* evidenceTerminal =
+        game->CreateObj<FuseBox>("Stage1EvidenceTerminal");
+    evidenceTerminal->SetManualControl("残された記録を回収する");
+    evidenceTerminal->SetManualInteractionAllowed(true);
+    evidenceTerminal->SetPosition(205.0f, -90.0f, -42.0f);
+    evidenceTerminal->SetRotation(Vector3(0.0f, -1.5707963f, 0.0f));
+    Wall* evidenceMarker = createStageProp(
+        "Stage1EvidenceMarker",
+        Vector3(217.2f, -65.0f, -42.0f),
+        Vector3(1.0f, 5.0f, 18.0f),
+        Color(0.025f, 0.11f, 0.09f, 1.0f),
+        Color(0.02f, 0.24f, 0.16f, 1.0f),
+        36.0f,
+        false);
+    evidenceMarker->SetCastsShadow(false);
+
+
+    // Stage 1 exit: the player must operate a visible door and walk through
+    // it.  The old invisible trigger could be activated by pressing A while
+    // merely walking through the corridor.
+    Door* stageExitDoor = game->CreateObj<Door>("Stage1ExitDoor");
+    stageExitDoor->SetPosition(202.0f, -74.0f, 307.5f);
+    stageExitDoor->SetRotation(Vector3(0.0f, 1.5707963f, 0.0f));
+    stageExitDoor->SetScale(Vector3(60.0f, 50.0f, 4.0f));
+    stageExitDoor->SetLocked(true);
+
+    Wall* stageExitSign = createStageProp(
+        "PropStage1ExitSign",
+        Vector3(198.0f, -51.5f, 307.5f),
+        Vector3(2.0f, 5.0f, 24.0f),
+        Color(0.24f, 0.025f, 0.018f, 1.0f),
+        Color(0.30f, 0.005f, 0.002f, 1.0f),
+        30.0f,
+        false);
+    stageExitSign->SetCastsShadow(false);
+
     ExitTrigger* exit = game->CreateObj<ExitTrigger>("ExitTrigger");
-    exit->SetPosition(150.0f, -80.0f, 300.0f);
+    exit->SetPosition(207.0f, -80.0f, 307.5f);
     exit->SetNextScene(SceneName::Stage2);
+    exit->SetInteractionEnabled(false);
 
     // バッテリー
     BatteryItem* battery = game->CreateObj<BatteryItem>("BatteryItem");
@@ -303,6 +370,17 @@ void StageScene::Init()
     corridorScare->SetSize(Vector3(70.0f, 30.0f, 32.0f));
     corridorScare->SetShadowPosition(Vector3(0.0f, -99.0f, 150.0f));
     corridorScare->SetRequiresPower(true);
+
+    ShadowMan* exitOmen =
+        game->CreateObj<ShadowMan>("Stage1ExitOmen");
+    exitOmen->SetPosition(92.0f, -99.0f, 278.0f);
+    exitOmen->SetDeactivateOnExpire(true);
+    exitOmen->SetActive(false);
+
+    ShadowMan* fuseWatcher =
+        game->CreateObj<ShadowMan>("Stage1FuseWatcher");
+    fuseWatcher->SetDeactivateOnExpire(true);
+    fuseWatcher->SetActive(false);
 
     // Prime the camera and light before the first draw after scene change.
     // This also prevents a black stage if gameplay is paused in ImGui.
@@ -324,17 +402,142 @@ void StageScene::Update()
 
     Core::Game* game = Core::Game::GetInstance();
     m_StageVisualTimer += 1.0f / 60.0f;
+    m_ProgressHintTimer += 1.0f / 60.0f;
+    if (Input::GetKeyTrigger(VK_H) ||
+        Input::GetButtonTrigger(XINPUT_LEFT_SHOULDER))
+    {
+        m_ProgressHintTimer = (std::max)(m_ProgressHintTimer, 35.0f);
+        Input::SetVibration(2, 0.04f);
+    }
+
+    m_FuseNoticeTimer = (std::max)(
+        0.0f, m_FuseNoticeTimer - 1.0f / 60.0f);
+    m_FuseWatcherNoticeTimer = (std::max)(
+        0.0f, m_FuseWatcherNoticeTimer - 1.0f / 60.0f);
+    m_ChargerNoticeTimer = (std::max)(
+        0.0f, m_ChargerNoticeTimer - 1.0f / 60.0f);
+    m_EvidenceNoticeTimer = (std::max)(
+        0.0f, m_EvidenceNoticeTimer - 1.0f / 60.0f);
+    const int currentFuseCount = game->GetItemCount();
+    if (currentFuseCount > m_LastFuseCount)
+    {
+        m_LastFuseCount = currentFuseCount;
+        m_ProgressHintTimer = 0.0f;
+        m_FuseNoticeTimer = 2.35f;
+        game->GetPostProcess()->TriggerBloomPulse(
+            0.48f + static_cast<float>(currentFuseCount) * 0.12f,
+            0.28f);
+        Input::SetVibration(
+            4 + currentFuseCount * 2,
+            0.10f + static_cast<float>(currentFuseCount) * 0.025f);
+        StartFuseWatcher(currentFuseCount);
+    }
+
+    if (game->IsPowerRestored())
+    {
+        ShadowMan* watcher = game->GetObj<ShadowMan>("Stage1FuseWatcher");
+        if (watcher != nullptr) watcher->SetActive(false);
+        m_FuseWatcherState = 0;
+    }
+
+    FuseBox* emergencyCharger =
+        game->GetObj<FuseBox>("Stage1EmergencyCharger");
+    if (!m_ChargerHandled && emergencyCharger != nullptr &&
+        emergencyCharger->IsActivated())
+    {
+        m_ChargerHandled = true;
+        m_ChargerNoticeTimer = 2.8f;
+        player->AddBattery(35.0f);
+        game->RegisterChargerUsed();
+        StartFuseWatcher(2);
+
+        CeilingLight* chargerLight =
+            game->GetObj<CeilingLight>("CeilingLight2");
+        if (chargerLight != nullptr)
+        {
+            chargerLight->TriggerEventFlicker(0.92f, 0.84f);
+        }
+        game->GetPostProcess()->TriggerBloomPulse(0.66f, 0.24f);
+        Input::SetVibration(6, 0.14f);
+    }
+
+    FuseBox* evidenceTerminal =
+        game->GetObj<FuseBox>("Stage1EvidenceTerminal");
+    if (!m_EvidenceHandled && evidenceTerminal != nullptr &&
+        evidenceTerminal->IsActivated())
+    {
+        m_EvidenceHandled = true;
+        m_EvidenceNoticeTimer = 3.2f;
+        game->RegisterEvidenceCollected();
+        player->AddBattery(8.0f);
+        Wall* evidenceMarker = game->GetObj<Wall>("Stage1EvidenceMarker");
+        if (evidenceMarker != nullptr)
+        {
+            evidenceMarker->SetAppearance(
+                Color(0.08f, 0.18f, 0.10f, 1.0f),
+                Color(0.16f, 0.52f, 0.22f, 1.0f),
+                44.0f);
+        }
+        game->GetPostProcess()->TriggerBloomPulse(0.42f, 0.20f);
+        Input::SetVibration(4, 0.09f);
+    }
     UpdateCorridorLoop(*player);
     UpdateEntranceThresholdEvent(*player);
     UpdateScareLightSequence();
     UpdatePowerRestoreSequence();
+    UpdateExitPowerSequence();
+    UpdateExitOmen(*player);
+
+    Door* stageExitDoor = game->GetObj<Door>("Stage1ExitDoor");
+    ExitTrigger* stageExit = game->GetObj<ExitTrigger>("ExitTrigger");
+    const bool exitPowerReady = m_ExitPowerSequenceComplete;
+    if (stageExitDoor != nullptr)
+    {
+        stageExitDoor->SetLocked(!exitPowerReady);
+        const Vector3 exitPosition = player->GetPosition();
+        const bool crossedOpenedDoor =
+            stageExitDoor->IsOpen() &&
+            exitPosition.x >= 199.0f &&
+            std::abs(exitPosition.z - 307.5f) <= 34.0f;
+        if (crossedOpenedDoor && stageExit != nullptr)
+        {
+            stageExit->BeginEscape(*player);
+        }
+    }
+
+    Wall* stageExitSign = game->GetObj<Wall>("PropStage1ExitSign");
+    if (stageExitSign != nullptr)
+    {
+        const float pulse = 0.78f +
+            std::sin(m_StageVisualTimer *
+                (game->IsPowerRestored() ? 3.2f : 7.4f)) * 0.16f;
+        if (exitPowerReady)
+        {
+            stageExitSign->SetAppearance(
+                Color(0.025f, 0.24f, 0.06f, 1.0f),
+                Color(0.006f, 0.36f * pulse, 0.025f, 1.0f),
+                34.0f);
+        }
+        else
+        {
+            stageExitSign->SetAppearance(
+                Color(0.24f, 0.025f, 0.018f, 1.0f),
+                Color(0.32f * pulse, 0.004f, 0.002f, 1.0f),
+                30.0f);
+        }
+    }
 
     Wall* exitIndicator = game->GetObj<Wall>("PropDoorIndicator");
     if (exitIndicator != nullptr)
     {
+        const float omenRate = m_ExitOmenTriggered
+            ? 1.0f - (std::clamp)(m_ExitOmenTimer / 3.2f, 0.0f, 1.0f)
+            : 0.0f;
         const float indicatorPulse =
-            0.72f + std::sin(m_StageVisualTimer * 3.2f) * 0.10f;
-        if (game->IsPowerRestored())
+            0.72f + std::sin(m_StageVisualTimer *
+                (3.2f + omenRate * 8.0f)) *
+                (0.10f + omenRate * 0.14f);
+        if (exitPowerReady)
         {
             exitIndicator->SetAppearance(
                 Color(0.025f, 0.20f, 0.055f, 1.0f),
@@ -374,8 +577,12 @@ void StageScene::Update()
     const float loopTension = (std::min)(
         static_cast<float>(m_CorridorLoopCount) * 0.14f,
         0.42f);
+    const float poweredExitDepth = (std::clamp)(
+        (playerPosition.z - 190.0f) / 105.0f,
+        0.0f,
+        1.0f);
     const float corridorTension = game->IsPowerRestored()
-        ? 0.0f
+        ? poweredExitDepth * 0.38f
         : (std::clamp)(
             corridorDepth * corridorWidthMask * 0.72f + loopTension,
             0.0f,
@@ -398,6 +605,12 @@ void StageScene::Update()
     game->GetPostProcess()->SetAtmosphere(
         noiseAmount,
         vignetteStrength);
+    game->GetPostProcess()->SetLensDistortionStrength(
+        0.20f + corridorTension * 0.22f);
+    game->GetPostProcess()->SetFilmGradeStrength(
+        0.52f + corridorTension * 0.18f);
+    game->GetPostProcess()->SetLensDirtStrength(
+        0.10f + corridorTension * 0.12f);
 
     m_InteractionSystem.Update(*player);
 }
@@ -514,6 +727,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     // reload and preserving the direction in which the player was looking.
     player.SetPosition(Vector3(0.0f, -99.0f, -150.0f));
     m_LoopCooldown = 1.0f;
+    m_ProgressHintTimer = 0.0f;
     m_LoopNoticeTimer = 2.4f;
 
     const int loopPhase = m_CorridorLoopCount < 3
@@ -781,6 +995,59 @@ void StageScene::UpdateScareLightSequence()
     }
 }
 
+void StageScene::StartFuseWatcher(int fuseCount)
+{
+    if (fuseCount < 2 || Core::Game::GetInstance()->IsPowerRestored())
+    {
+        return;
+    }
+
+    Core::Game* game = Core::Game::GetInstance();
+    ShadowMan* watcher = game->GetObj<ShadowMan>("Stage1FuseWatcher");
+    if (watcher == nullptr)
+    {
+        return;
+    }
+
+    watcher->SetActive(false);
+    watcher->SetPosition(
+        0.0f,
+        -99.0f,
+        fuseCount == 2 ? -22.0f : 118.0f);
+    watcher->SetActive(true);
+    watcher->EnableGazeScare(fuseCount == 2 ? 5.8f : 7.2f);
+    watcher->SetOnObserved(
+        [this]()
+        {
+            m_FuseWatcherState = 2;
+            m_FuseWatcherNoticeTimer = 1.8f;
+
+            Core::Game* game = Core::Game::GetInstance();
+            game->RegisterAnomalyHandled();
+            ShadowMan* activeWatcher =
+                game->GetObj<ShadowMan>("Stage1FuseWatcher");
+            if (activeWatcher != nullptr)
+            {
+                activeWatcher->SetActive(false);
+            }
+
+            CeilingLight* reactionLight =
+                game->GetObj<CeilingLight>("CeilingLight4");
+            if (reactionLight != nullptr)
+            {
+                reactionLight->TriggerEventFlicker(0.72f, 0.74f);
+            }
+            game->GetPostProcess()->TriggerBloomPulse(0.42f, 0.18f);
+            Input::SetVibration(7, 0.16f);
+        });
+
+    m_FuseWatcherState = 1;
+    m_FuseWatcherNoticeTimer = fuseCount == 2 ? 5.8f : 7.2f;
+    game->GetPostProcess()->TriggerHorrorPulse(
+        fuseCount == 2 ? 0.20f : 0.32f,
+        0.30f);
+}
+
 void StageScene::UpdatePowerRestoreSequence()
 {
     constexpr float deltaTime = 1.0f / 60.0f;
@@ -790,6 +1057,7 @@ void StageScene::UpdatePowerRestoreSequence()
     if (powerRestored && !m_WasPowerRestored)
     {
         m_PowerRestoreTimer = 0.0f;
+        m_ProgressHintTimer = 0.0f;
         m_PowerRestorePhase = 0;
 
         // Power restoration owns the presentation from this point onward.
@@ -837,6 +1105,146 @@ void StageScene::UpdatePowerRestoreSequence()
     }
 }
 
+void StageScene::UpdateExitPowerSequence()
+{
+    constexpr float deltaTime = 1.0f / 60.0f;
+    Core::Game* game = Core::Game::GetInstance();
+    FuseBox* panel = game->GetObj<FuseBox>("ExitPowerPanel");
+    if (panel == nullptr || !panel->IsActivated())
+    {
+        return;
+    }
+
+    if (m_ExitPowerEventTimer < 0.0f)
+    {
+        m_ExitPowerEventTimer = 0.0f;
+        m_ExitPowerEventPhase = 0;
+        m_ProgressHintTimer = 0.0f;
+
+        CeilingLight* corner = game->GetObj<CeilingLight>("CeilingLight7");
+        CeilingLight* exitLight = game->GetObj<CeilingLight>("CeilingLight8");
+        if (corner != nullptr) corner->SetForcedOff(true);
+        if (exitLight != nullptr) exitLight->SetForcedOff(true);
+        game->GetPostProcess()->TriggerHorrorPulse(0.30f, 0.28f);
+        return;
+    }
+
+    if (m_ExitPowerSequenceComplete)
+    {
+        return;
+    }
+
+    m_ExitPowerEventTimer += deltaTime;
+    if (m_ExitPowerEventPhase == 0 && m_ExitPowerEventTimer >= 0.28f)
+    {
+        CeilingLight* corner = game->GetObj<CeilingLight>("CeilingLight7");
+        if (corner != nullptr)
+        {
+            corner->SetForcedOff(false);
+            corner->SetEmergencyLight(false, 0.0f);
+            corner->TriggerEventFlicker(0.72f, 0.82f);
+        }
+        game->GetPostProcess()->TriggerBloomPulse(0.68f, 0.24f);
+        Input::SetVibration(5, 0.11f);
+        m_ExitPowerEventPhase = 1;
+    }
+    else if (m_ExitPowerEventPhase == 1 && m_ExitPowerEventTimer >= 0.78f)
+    {
+        CeilingLight* exitLight = game->GetObj<CeilingLight>("CeilingLight8");
+        if (exitLight != nullptr)
+        {
+            exitLight->SetForcedOff(false);
+            exitLight->SetEmergencyLight(false, 0.0f);
+            exitLight->TriggerEventFlicker(0.82f, 0.92f);
+        }
+        game->GetPostProcess()->TriggerBloomPulse(0.92f, 0.30f);
+        Input::SetVibration(7, 0.15f);
+        m_ExitPowerEventPhase = 2;
+    }
+    else if (m_ExitPowerEventPhase == 2 && m_ExitPowerEventTimer >= 1.30f)
+    {
+        m_ExitPowerSequenceComplete = true;
+        m_ExitPowerEventPhase = 3;
+        game->GetPostProcess()->TriggerBloomPulse(1.18f, 0.42f);
+        Input::SetVibration(10, 0.20f);
+    }
+}
+
+void StageScene::UpdateExitOmen(Player& player)
+{
+    constexpr float deltaTime = 1.0f / 60.0f;
+    m_ExitOmenTimer =
+        (std::max)(0.0f, m_ExitOmenTimer - deltaTime);
+    if (m_ExitOmenTriggered)
+    {
+        Core::Game* game = Core::Game::GetInstance();
+        if (m_ExitOmenPhase == 0 && m_ExitOmenTimer <= 2.45f)
+        {
+            CeilingLight* lightBehind =
+                game->GetObj<CeilingLight>("CeilingLight8");
+            if (lightBehind != nullptr)
+            {
+                lightBehind->SetForcedOff(true);
+            }
+            game->GetPostProcess()->TriggerHorrorPulse(0.22f, 0.30f);
+            Input::SetVibration(7, 0.16f);
+            m_ExitOmenPhase = 1;
+        }
+        else if (m_ExitOmenPhase == 1 && m_ExitOmenTimer <= 1.35f)
+        {
+            CeilingLight* exitLight =
+                game->GetObj<CeilingLight>("CeilingLight7");
+            if (exitLight != nullptr)
+            {
+                exitLight->SetFaulted(true);
+                exitLight->TriggerEventFlicker(1.10f, 0.88f);
+            }
+            game->GetPostProcess()->TriggerBloomPulse(0.44f, 0.20f);
+            m_ExitOmenPhase = 2;
+        }
+        return;
+    }
+
+    Core::Game* game = Core::Game::GetInstance();
+    const Vector3 playerPosition = player.GetPosition();
+    if (!m_ExitPowerSequenceComplete ||
+        playerPosition.z < 215.0f ||
+        playerPosition.x < 28.0f)
+    {
+        return;
+    }
+
+    m_ExitOmenTriggered = true;
+    m_ExitOmenTimer = 3.2f;
+    m_ExitOmenPhase = 0;
+
+    ShadowMan* shadow =
+        game->GetObj<ShadowMan>("Stage1ExitOmen");
+    if (shadow != nullptr)
+    {
+        shadow->SetActive(true);
+        shadow->EnableGazeScare(4.2f);
+    }
+
+    const char* exitLightNames[] =
+    {
+        "CeilingLight7", "CeilingLight8"
+    };
+    for (const char* lightName : exitLightNames)
+    {
+        CeilingLight* light =
+            game->GetObj<CeilingLight>(lightName);
+        if (light != nullptr)
+        {
+            light->TriggerEventFlicker(0.82f, 0.78f);
+        }
+    }
+
+    game->GetPostProcess()->TriggerHorrorPulse(0.28f, 0.42f);
+    game->GetPostProcess()->TriggerBloomPulse(0.54f, 0.24f);
+    Input::SetVibration(10, 0.22f);
+}
+
 void StageScene::Draw(Camera* camera)
 {
     (void)camera;
@@ -849,56 +1257,246 @@ void StageScene::Draw(Camera* camera)
         return;
     }
 
-    std::string_view objectiveText = "FIND 3 FUSES";
+    FuseBox* exitPowerPanel = game->GetObj<FuseBox>("ExitPowerPanel");
+    const bool exitPowerActivated =
+        exitPowerPanel != nullptr && exitPowerPanel->IsActivated();
+    const bool exitPowerReady = m_ExitPowerSequenceComplete;
+
+    const int fuseCount = game->GetItemCount();
+    std::string_view objectiveText;
+    if (fuseCount <= 0)
+    {
+        objectiveText = "開始地点の近くでヒューズを探す";
+    }
+    else if (fuseCount == 1)
+    {
+        objectiveText = m_CorridorLoopCount < 1
+            ? "中央のドアを開けて廊下の奥へ進む"
+            : "左側の部屋でヒューズを探す";
+    }
+    else if (fuseCount == 2)
+    {
+        objectiveText = m_CorridorLoopCount < 2
+            ? "もう一度廊下の奥まで進む"
+            : "右側の部屋でヒューズを探す";
+    }
+    else
+    {
+        objectiveText = "左の部屋にある配電盤を調べる";
+    }
     ExitTrigger* exitTrigger =
         game->GetObj<ExitTrigger>("ExitTrigger");
     if (exitTrigger != nullptr && exitTrigger->IsEscaping())
     {
-        objectiveText = "ESCAPED";
+        objectiveText = "ドアの先へ移動中";
+    }
+    else if (m_ChargerNoticeTimer > 0.0f)
+    {
+        objectiveText = m_FuseWatcherState == 1
+            ? "充電音で影が現れた ライトを向ける"
+            : "バッテリーを充電した";
+    }
+    else if (m_EvidenceNoticeTimer > 0.0f)
+    {
+        objectiveText = "残された記録を回収した 1 / 3";
+    }
+    else if (m_FuseNoticeTimer > 0.0f)
+    {
+        if (m_FuseWatcherState == 1)
+            objectiveText = "影に懐中電灯を向ける";
+        else if (fuseCount == 1) objectiveText = "ヒューズを1本入手";
+        else if (fuseCount == 2) objectiveText = "ヒューズを2本入手";
+        else objectiveText = "ヒューズを3本入手";
+    }
+    else if (m_FuseWatcherNoticeTimer > 0.0f)
+    {
+        objectiveText = m_FuseWatcherState == 1
+            ? "影を正面から懐中電灯で照らす"
+            : "影が光の中へ消えた";
+    }
+    else if (m_ExitOmenTimer > 0.0f)
+    {
+        objectiveText = m_ExitOmenTimer > 1.75f
+            ? "何かが待っている"
+            : "立ち止まらず進む";
     }
     else if (game->IsPowerRestored() &&
         m_PowerRestoreTimer >= 0.0f &&
         m_PowerRestoreTimer < 4.5f)
     {
         objectiveText = m_PowerRestoreTimer < 1.55f
-            ? "POWER RESTORED"
-            : "GET OUT";
+            ? "電力が復旧した"
+            : "出口側の非常送電盤へ向かう";
+    }
+    else if (exitPowerActivated && !exitPowerReady)
+    {
+        objectiveText = "非常電源を送電中";
     }
     else if (m_ScareMessageTimer > 0.0f)
     {
         objectiveText = m_ScareMessageTimer > 2.65f
-            ? "IT SAW YOU"
-            : "FOLLOW THE LIGHTS";
+            ? "何かに見られている"
+            : "点灯した照明をたどる";
     }
     else if (m_LoopNoticeTimer > 0.0f)
     {
         if (m_CorridorLoopCount == 1)
         {
-            objectiveText = "SOMETHING CHANGED";
+            objectiveText = "廊下の様子が変わった";
         }
         else if (m_CorridorLoopCount == 2)
         {
-            objectiveText = "KEEP WALKING";
+            objectiveText = "そのまま歩き続ける";
         }
         else
         {
-            objectiveText = "DON'T LOOK BACK";
+            objectiveText = "後ろを振り返らない";
         }
+    }
+    else if (m_ProgressHintTimer >= 35.0f)
+    {
+        if (game->IsPowerRestored() && !exitPowerActivated)
+        {
+            objectiveText = "ヒント 右奥の赤い送電盤を調べる";
+        }
+        else if (game->IsPowerRestored())
+        {
+            objectiveText = "ヒント 右奥の緑色の出口へ向かう";
+        }
+        else if (fuseCount <= 0)
+        {
+            objectiveText = "ヒント 最初の壁付近を探す";
+        }
+        else if (fuseCount == 1 && m_CorridorLoopCount < 1)
+        {
+            objectiveText = "ヒント 中央のドアを開け廊下の奥へ進む";
+        }
+        else if (fuseCount == 1)
+        {
+            objectiveText = "ヒント 左奥の部屋を探す";
+        }
+        else if (fuseCount == 2 && m_CorridorLoopCount < 2)
+        {
+            objectiveText = "ヒント もう一度廊下の奥まで進む";
+        }
+        else if (fuseCount == 2)
+        {
+            objectiveText = "ヒント 右奥の部屋を探す";
+        }
+        else
+        {
+            objectiveText = "ヒント 左の部屋の配電盤を調べる";
+        }
+    }
+    else if (m_ProgressHintTimer >= 18.0f)
+    {
+        if (game->IsPowerRestored() && !exitPowerActivated)
+        {
+            objectiveText = "ヒント 出口手前の送電盤へ向かう";
+        }
+        else if (game->IsPowerRestored())
+        {
+            objectiveText = "ヒント 緑色の出口灯をたどる";
+        }
+        else if (fuseCount <= 0)
+        {
+            objectiveText = "ヒント 開始地点の周囲を探す";
+        }
+        else if (fuseCount == 1 && m_CorridorLoopCount < 1)
+        {
+            objectiveText = "ヒント 中央のドアが進行ルート";
+        }
+        else if (fuseCount == 1)
+        {
+            objectiveText = "ヒント 左側の部屋を確認する";
+        }
+        else if (fuseCount == 2 && m_CorridorLoopCount < 2)
+        {
+            objectiveText = "ヒント 長い廊下をもう一度進む";
+        }
+        else if (fuseCount == 2)
+        {
+            objectiveText = "ヒント 右側の部屋を確認する";
+        }
+        else
+        {
+            objectiveText = "ヒント 配電盤へ戻る";
+        }
+    }
+    else if (game->IsPowerRestored() && !exitPowerActivated)
+    {
+        objectiveText = "出口手前の非常送電盤を操作する";
     }
     else if (game->IsPowerRestored())
     {
-        objectiveText = "ESCAPE";
-    }
-    else if (game->GetItemCount() >= 3)
-    {
-        objectiveText = "RESTORE POWER";
+        Door* stageExitDoor = game->GetObj<Door>("Stage1ExitDoor");
+        objectiveText = stageExitDoor != nullptr && stageExitDoor->IsOpen()
+            ? "開いた出口ドアを通り抜ける"
+            : "右奥の出口ドアを開ける";
     }
 
     m_Hud.Draw(
         *player,
-        game->GetItemCount(),
+        fuseCount,
         m_InteractionSystem.GetPrompt(),
         objectiveText);
+
+    if (m_StageVisualTimer >= 4.20f &&
+        (exitTrigger == nullptr || !exitTrigger->IsEscaping()))
+    {
+        Vector3 guideTarget(0.0f, -99.0f, 315.0f);
+        if (game->IsPowerRestored() && !exitPowerActivated)
+        {
+            guideTarget = Vector3(145.0f, -90.0f, 270.0f);
+        }
+        else if (game->IsPowerRestored())
+        {
+            guideTarget = Vector3(202.0f, -74.0f, 307.5f);
+        }
+        else if (fuseCount <= 0)
+        {
+            guideTarget = Vector3(0.0f, -95.0f, -155.0f);
+        }
+        else if (fuseCount == 1 && m_CorridorLoopCount >= 1)
+        {
+            guideTarget = Vector3(-150.0f, -95.0f, -140.0f);
+        }
+        else if (fuseCount == 2 && m_CorridorLoopCount >= 2)
+        {
+            guideTarget = Vector3(150.0f, -95.0f, -140.0f);
+        }
+        else if (fuseCount >= 3)
+        {
+            guideTarget = Vector3(-180.0f, -90.0f, 35.0f);
+        }
+        m_Hud.DrawObjectiveGuide(
+            *camera,
+            player->GetPosition(),
+            guideTarget);
+    }
+
+    if (m_StageVisualTimer < 0.65f)
+    {
+        const float fade = 1.0f - m_StageVisualTimer / 0.65f;
+        m_Hud.DrawBlink(fade * fade);
+    }
+    if (m_StageVisualTimer < 4.20f)
+    {
+        m_Hud.DrawChapterCard(
+            "1階", "ヒューズを集めて電力を復旧する", m_StageVisualTimer);
+    }
+
+    if (game->IsPaused())
+    {
+        m_Hud.DrawPause(
+            game->GetBrightnessLevel(),
+            game->GetEffectLevel(),
+            game->GetLookSensitivityLevel(),
+            game->GetPauseSettingIndex(),
+            1,
+            game->GetRunTimeSeconds(),
+            game->GetCaughtCount());
+    }
 }
 
 void StageScene::Uninit()
@@ -907,6 +1505,9 @@ void StageScene::Uninit()
     Core::Game::GetInstance()->GetPostProcess()->SetExposure(1.0f);
     Core::Game::GetInstance()->GetPostProcess()->SetCorridorTension(0.0f);
     Core::Game::GetInstance()->GetPostProcess()->SetVolumetricLight(false);
+    Core::Game::GetInstance()->GetPostProcess()->SetLensDistortionStrength(0.20f);
+    Core::Game::GetInstance()->GetPostProcess()->SetFilmGradeStrength(0.55f);
+    Core::Game::GetInstance()->GetPostProcess()->SetLensDirtStrength(0.10f);
     m_Hud.Uninit();
 
     Core::Game* game = Core::Game::GetInstance();
@@ -968,8 +1569,16 @@ void StageScene::Uninit()
     game->DestroyObj("Item3");
 
     game->DestroyObj("Door");
+    game->DestroyObj("Stage1ExitDoor");
+    game->DestroyObj("PropStage1ExitSign");
     game->DestroyObj("FuseBox");
+    game->DestroyObj("ExitPowerPanel");
+    game->DestroyObj("Stage1EmergencyCharger");
+    game->DestroyObj("Stage1EvidenceTerminal");
+    game->DestroyObj("Stage1EvidenceMarker");
     game->DestroyObj("ExitTrigger");
     game->DestroyObj("BatteryItem");
     game->DestroyObj("ScareTrigger_Corridor");
+    game->DestroyObj("Stage1ExitOmen");
+    game->DestroyObj("Stage1FuseWatcher");
 }

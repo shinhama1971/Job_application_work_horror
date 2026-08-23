@@ -25,6 +25,12 @@ private:
     float m_HeadBobOffset = 0.0f;
     float m_HeadBobSideOffset = 0.0f;
     float m_AmbienceTimer = 0.0f;
+    float m_Stamina = 100.0f;
+    float m_StaminaRecoveryDelay = 0.0f;
+    bool m_SprintExhausted = false;
+    static constexpr float MAX_STAMINA = 100.0f;
+    static constexpr float STAMINA_DRAIN_PER_FRAME = 0.22f;
+    static constexpr float STAMINA_RECOVERY_PER_FRAME = 0.38f;
 
     // ===== Flashlight system =====
     bool m_FlashLightOn = true;
@@ -34,6 +40,10 @@ private:
     static constexpr float BATTERY_FLICKER_THRESHOLD = 20.0f;
     static constexpr int FLICKER_FRAME_INTERVAL = 10;
     int m_FlickerTimer = 0;
+    float m_BatteryNoticeTimer = 0.0f;
+    int m_LowBatteryWarningLevel = 0;
+    bool m_WasFlashlightVoltageDrop = false;
+    float m_FlashlightNearSurfaceBlend = 0.0f;
 
     // ===== Lighting =====
     // Flashlight-on color settings.
@@ -79,17 +89,25 @@ public:
         {
             m_Battery = 100.0f;
         }
+        m_BatteryNoticeTimer = 2.2f;
+        m_LowBatteryWarningLevel = m_Battery <= 20.0f ? 1 : 0;
     }
     // Return the current battery percentage.
     float GetBattery() const
     {
         return m_Battery;
     }
+
+    float GetBatteryNoticeTimer() const
+    {
+        return m_BatteryNoticeTimer;
+    }
  
     // Set an explicit world position.
     void SetPosition(DirectX::SimpleMath::Vector3 pos)
     {
         m_Position = pos;
+        m_Velocity = DirectX::SimpleMath::Vector3::Zero;
     }
     
     bool IsFPS() const { return m_IsFPS; }
@@ -107,6 +125,18 @@ public:
     bool IsSprinting() const
     {
         return m_IsSprinting;
+    }
+
+    float GetStamina() const
+    {
+        return m_Stamina;
+    }
+
+    void RestoreStamina()
+    {
+        m_Stamina = MAX_STAMINA;
+        m_StaminaRecoveryDelay = 0.0f;
+        m_SprintExhausted = false;
     }
 
     bool IsFlashlightOn() const

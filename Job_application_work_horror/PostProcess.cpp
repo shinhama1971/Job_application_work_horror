@@ -242,20 +242,28 @@ namespace Effect
         {
             RunBloom();
         }
+        const float effectScale = m_UserEffectScale;
+        const float adjustedBloom = (std::clamp)(
+            m_BloomIntensity * (0.65f + effectScale * 0.35f),
+            0.0f, 1.5f);
+        const float adjustedVignette = (std::clamp)(
+            0.45f + (m_VignetteStrength - 0.45f) * effectScale,
+            0.0f, 1.0f);
         m_FullScreenQuad.Draw(
             m_RenderTexture.GetSRV(),
             m_EnableBloom ? m_BloomVerticalTexture.GetSRV() : nullptr,
             m_Time,
-            m_EnableBloom ? m_BloomIntensity : 0.0f,
-            m_EnableNoise ? m_NoiseAmount : 0.0f,
-            m_VignetteStrength,
+            m_EnableBloom ? adjustedBloom : 0.0f,
+            m_EnableNoise ? m_NoiseAmount * effectScale : 0.0f,
+            adjustedVignette,
             m_EnableVolumetricLight ? m_VolumetricIntensity : 0.0f,
-            m_LensDistortionStrength,
-            m_HorrorPulseStrength,
-            m_Exposure,
+            m_LensDistortionStrength * effectScale,
+            m_HorrorPulseStrength * effectScale,
+            (std::clamp)(
+                m_Exposure + m_UserBrightnessOffset, 0.75f, 1.34f),
             m_LensMoisture,
-            m_CorridorTension,
-            m_FilmGradeStrength,
-            m_LensDirtStrength);
+            (std::clamp)(m_CorridorTension * effectScale, 0.0f, 1.0f),
+            (std::clamp)(m_FilmGradeStrength * effectScale, 0.0f, 1.0f),
+            (std::clamp)(m_LensDirtStrength * effectScale, 0.0f, 1.0f));
     }
 }

@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "Camera.h"
 #include "Application.h"
 #include "Input.h"
@@ -74,7 +74,8 @@ void Camera::Update()
             float dx = (float)(mousePos.x - m_LastMousePos.x);
             float dy = (float)(mousePos.y - m_LastMousePos.y);
 
-            float sensitivity = 0.003f;
+            const float sensitivity =
+                0.003f * m_LookSensitivityScale;
 
             m_CameraDirection += dx * sensitivity;
             m_CameraPitch += dy * sensitivity;
@@ -116,22 +117,24 @@ void Camera::Update()
     if (Input::GetButtonPress(XINPUT_UP)) controllerLookY = 1.0f;
     if (Input::GetButtonPress(XINPUT_DOWN)) controllerLookY = -1.0f;
 
-    constexpr float controllerYawSpeed = 0.065f;
-    constexpr float controllerPitchSpeed = 0.050f;
+    const float controllerYawSpeed =
+        0.065f * m_LookSensitivityScale;
+    const float controllerPitchSpeed =
+        0.050f * m_LookSensitivityScale;
     m_CameraDirection += controllerLookX * controllerYawSpeed;
     m_CameraPitch += controllerLookY * controllerPitchSpeed;
 
     if (Input::GetKeyPress(VK_LEFT))
     {
-        m_CameraDirection += 0.05f;
+        m_CameraDirection += 0.05f * m_LookSensitivityScale;
     }
 
     if (Input::GetKeyPress(VK_RIGHT))
     {
-        m_CameraDirection -= 0.05f;
+        m_CameraDirection -= 0.05f * m_LookSensitivityScale;
     }
 
-    const float pitchStep = 0.03f;
+    const float pitchStep = 0.03f * m_LookSensitivityScale;
 
     if (Input::GetKeyPress(VK_UP))
     {

@@ -39,7 +39,7 @@ namespace
     float g_FrameTimes[120]{};
     int g_FrameTimeOffset = 0;
     int g_DebugViewMode = 0;
-    bool g_AdaptiveReflectionQuality = false;
+    bool g_AdaptiveReflectionQuality = true;
     int g_ReflectionPresetIndex = 1;
     int g_ActiveReflectionInterval = 2;
     float g_LowFpsTimer = 0.0f;

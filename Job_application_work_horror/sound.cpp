@@ -78,21 +78,52 @@ HRESULT Sound::Init()
 		}
 
 		//check the file type, should be fourccWAVE or 'XWMA'
-		FindChunk(hFile, fourccRIFF, dwChunkSize, dwChunkPosition);
-		ReadChunkData(hFile, &filetype, sizeof(DWORD), dwChunkPosition);
+		hr = FindChunk(hFile, fourccRIFF, dwChunkSize, dwChunkPosition);
+		if (FAILED(hr) || hr == S_FALSE)
+		{
+			CloseHandle(hFile);
+			Uninit();
+			return FAILED(hr) ? hr : E_FAIL;
+		}
+		hr = ReadChunkData(hFile, &filetype, sizeof(DWORD), dwChunkPosition);
+		if (FAILED(hr))
+		{
+			CloseHandle(hFile);
+			Uninit();
+			return hr;
+		}
 		if (filetype != fourccWAVE) {
 			CloseHandle(hFile);
 			Uninit();
-			return S_FALSE;
+			return E_FAIL;
 		}
 
-		FindChunk(hFile, fourccFMT, dwChunkSize, dwChunkPosition);
-		ReadChunkData(hFile, &m_wfx[i], dwChunkSize, dwChunkPosition);
+		hr = FindChunk(hFile, fourccFMT, dwChunkSize, dwChunkPosition);
+		if (FAILED(hr) || hr == S_FALSE || dwChunkSize > sizeof(m_wfx[i]) ||
+			FAILED(ReadChunkData(hFile, &m_wfx[i], dwChunkSize, dwChunkPosition)))
+		{
+			CloseHandle(hFile);
+			Uninit();
+			return FAILED(hr) ? hr : E_FAIL;
+		}
 
 		//fill out the audio data buffer with the contents of the fourccDATA chunk
-		FindChunk(hFile, fourccDATA, dwChunkSize, dwChunkPosition);
+		hr = FindChunk(hFile, fourccDATA, dwChunkSize, dwChunkPosition);
+		if (FAILED(hr) || hr == S_FALSE || dwChunkSize == 0)
+		{
+			CloseHandle(hFile);
+			Uninit();
+			return FAILED(hr) ? hr : E_FAIL;
+		}
 		m_DataBuffer[i] = std::make_unique<BYTE[]>(dwChunkSize);
-		ReadChunkData(hFile, m_DataBuffer[i].get(), dwChunkSize, dwChunkPosition);
+		hr = ReadChunkData(
+			hFile, m_DataBuffer[i].get(), dwChunkSize, dwChunkPosition);
+		if (FAILED(hr))
+		{
+			CloseHandle(hFile);
+			Uninit();
+			return hr;
+		}
 
 		CloseHandle(hFile);
 
@@ -161,6 +192,11 @@ void Sound::Uninit(void)
 //=============================================================================
 void Sound::Play(SOUND_LABEL label)
 {
+	if (!IsValidLabel(label))
+	{
+		return;
+	}
+
 	if (m_pXAudio2 == nullptr)
 	{
 		return;
@@ -203,6 +239,11 @@ void Sound::Play(SOUND_LABEL label)
 //=============================================================================
 void Sound::Stop(SOUND_LABEL label)
 {
+	if (!IsValidLabel(label))
+	{
+		return;
+	}
+
 	if (m_pSourceVoice[(int)label] == NULL) return;
 
 	XAUDIO2_VOICE_STATE xa2state;
@@ -218,6 +259,11 @@ void Sound::Stop(SOUND_LABEL label)
 //=============================================================================
 void Sound::Resume(SOUND_LABEL label)
 {
+	if (!IsValidLabel(label))
+	{
+		return;
+	}
+
 	IXAudio2SourceVoice*& pSV = m_pSourceVoice[(int)label];
 	if (pSV != nullptr)
 	{

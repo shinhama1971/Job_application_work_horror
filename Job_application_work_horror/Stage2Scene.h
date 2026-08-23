@@ -17,6 +17,8 @@ private:
     void StartFinalSequence();
     void UpdateFinalSequence(float deltaTime);
     void UpdateFinalPursuit(float deltaTime);
+    void StartCaughtSequence(Player& player);
+    void UpdateCaughtSequence(Player& player, float deltaTime);
     void RevealScratchPieces(int first, int last, float emission);
     void UpdateLightZones(const Player& player);
     void UpdateScratchMessage(const Player& player, float deltaTime);
@@ -26,6 +28,8 @@ private:
     void ConfigureClockForLoop();
     void UpdateClock(float deltaTime);
     void UpdateClockObservation();
+    void RegisterPuzzleMistake(int type);
+    void UpdateNoiseThreat(const Player& player, float deltaTime);
 
     InteractionSystem m_InteractionSystem;
     Hud m_Hud;
@@ -42,10 +46,20 @@ private:
     float m_ClockHourAngle = 0.0f;
     float m_ClockMinuteAngle = 0.0f;
     float m_ClockNoticeTimer = 0.0f;
+    float m_PuzzleFeedbackTimer = 0.0f;
+    float m_NoiseThreat = 0.0f;
+    float m_NoiseEventCooldown = 0.0f;
+    float m_NoiseWarningTimer = 0.0f;
+    float m_ChargerNoticeTimer = 0.0f;
+    float m_EvidenceNoticeTimer = 0.0f;
     float m_LoopBlinkTimer = 0.0f;
+    float m_LoopTransitionTimer = -1.0f;
     float m_FinalPursuitTimer = 0.0f;
     float m_PursuitPulseTimer = 0.0f;
     float m_PursuitGazePenaltyTimer = 0.0f;
+    float m_CaughtTimer = -1.0f;
+    float m_ProgressHintTimer = 0.0f;
+    float m_GuidancePulseCooldown = 0.0f;
     float m_ScratchUpdateAccumulator = 0.0f;
     int m_ObservedScarePhase = 0;
     int m_FinalSequencePhase = 0;
@@ -56,6 +70,11 @@ private:
     bool m_FalseDoorObserved = false;
     bool m_FalseDoorMoved = false;
     bool m_ClockObservedThisLoop = false;
+    bool m_ConfirmationHandledThisLoop = false;
+    bool m_ChargerHandled = false;
+    bool m_EvidenceHandled[2] = { false, false };
+    int m_PuzzleFeedbackType = 0;
+    int m_PuzzleMistakeCount = 0;
     bool m_FinalSequenceArmed = false;
     bool m_FinalDoorReady = false;
     int m_DebugCommand = 0;

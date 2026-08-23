@@ -126,9 +126,21 @@ void FuseBox::Update()
 
 const char* FuseBox::GetInteractionPrompt() const
 {
+    if (m_IsManualControl)
+    {
+        return m_ManualPrompt;
+    }
+
+    if (m_IsExitControl)
+    {
+        return Core::Game::GetInstance()->IsPowerRestored()
+            ? "出口へ非常電源を送る"
+            : "先に主電源を復旧する";
+    }
+
     return Core::Game::GetInstance()->GetItemCount() < 3
-        ? "Requires 3 fuses"
-        : "Restore power";
+        ? "ヒューズが3本必要"
+        : "電力を復旧する";
 }
 
 void FuseBox::Interact(Player& player)
@@ -136,6 +148,46 @@ void FuseBox::Interact(Player& player)
     (void)player;
 
     Core::Game* game = Core::Game::GetInstance();
+    if (m_IsManualControl)
+    {
+        if (m_IsPowered || !m_ManualInteractionAllowed)
+        {
+            return;
+        }
+
+        m_IsPowered = true;
+        BuildGeometry();
+        m_VertexBuffer.Modify(m_Vertices);
+        game->GetPostProcess()->TriggerBloomPulse(0.72f, 0.28f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.16f, 0.22f);
+        Input::SetVibration(6, 0.13f);
+        return;
+    }
+
+    if (m_IsExitControl)
+    {
+        if (m_IsPowered || !game->IsPowerRestored())
+        {
+            return;
+        }
+
+        m_IsPowered = true;
+        game->GetPostProcess()->TriggerBloomPulse(1.25f, 0.72f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.32f, 0.36f);
+        BuildGeometry();
+        m_VertexBuffer.Modify(m_Vertices);
+        Input::SetVibration(10, 0.22f);
+
+        ScreenDustOverlay* crt = game->GetObj<ScreenDustOverlay>("CRTNoise");
+        if (crt != nullptr)
+        {
+            crt->SetPower(0.48f);
+            crt->SetActive(true);
+            crt->SetTimer(0.32f);
+        }
+        return;
+    }
+
     if (m_IsPowered || game->GetItemCount() < 3)
     {
         return;
@@ -157,6 +209,13 @@ void FuseBox::Interact(Player& player)
         crt->SetActive(true);
         crt->SetTimer(0.7f);
     }
+}
+
+void FuseBox::ResetActivation()
+{
+    m_IsPowered = false;
+    BuildGeometry();
+    m_VertexBuffer.Modify(m_Vertices);
 }
 
 void FuseBox::Draw(Camera* camera)

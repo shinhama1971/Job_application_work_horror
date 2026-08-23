@@ -47,9 +47,31 @@ namespace Core
         int m_ItemCount = 0;
         bool m_PowerRestored = false;
         SceneName m_CurrentScene = SceneName::Title;
+        bool m_IsPaused = false;
         unsigned int m_ReflectionFrameIndex = 0;
+        unsigned int m_ShadowFrameIndex = 0;
+        float m_RunTimeSeconds = 0.0f;
+        float m_LastClearTimeSeconds = 0.0f;
+        int m_CaughtCount = 0;
+        int m_AnomaliesHandled = 0;
+        int m_PuzzleMistakes = 0;
+        int m_ChargersUsed = 0;
+        int m_EvidenceCollected = 0;
+        int m_BrightnessLevel = 2;
+        int m_EffectLevel = 1;
+        int m_LookSensitivityLevel = 2;
+        int m_PauseSettingIndex = 0;
+        float m_BestClearTimeSeconds = 0.0f;
+        int m_BestCaughtCount = 0;
+        bool m_HasClearRecord = false;
+        bool m_LastRunBestTime = false;
+        bool m_LastRunBestCaught = false;
 
         void ChangeScene(SceneName sName);
+        void LoadBestRecord();
+        void SaveBestRecord() const;
+        void LoadSettings();
+        void SaveSettings() const;
 
     public:
         Game();
@@ -123,6 +145,11 @@ namespace Core
 
             for (auto& o : m_Objects)
             {
+                if (o->IsDestroy())
+                {
+                    continue;
+                }
+
                 if (T* derivedObj = dynamic_cast<T*>(o.get()))
                 {
                     res.emplace_back(derivedObj);
@@ -152,6 +179,85 @@ namespace Core
         {
             return m_PowerRestored;
         }
+
+        bool IsPaused() const
+        {
+            return m_IsPaused;
+        }
+
+        int GetBrightnessLevel() const
+        {
+            return m_BrightnessLevel;
+        }
+
+        int GetEffectLevel() const
+        {
+            return m_EffectLevel;
+        }
+
+        int GetLookSensitivityLevel() const
+        {
+            return m_LookSensitivityLevel;
+        }
+
+        int GetPauseSettingIndex() const
+        {
+            return m_PauseSettingIndex;
+        }
+
+        float GetLastClearTimeSeconds() const
+        {
+            return m_LastClearTimeSeconds;
+        }
+
+        float GetRunTimeSeconds() const
+        {
+            return m_RunTimeSeconds;
+        }
+
+        bool HasClearRecord() const
+        {
+            return m_HasClearRecord;
+        }
+
+        float GetBestClearTimeSeconds() const
+        {
+            return m_BestClearTimeSeconds;
+        }
+
+        int GetBestCaughtCount() const
+        {
+            return m_BestCaughtCount;
+        }
+
+        int GetCaughtCount() const
+        {
+            return m_CaughtCount;
+        }
+
+        bool IsLastRunBestTime() const
+        {
+            return m_LastRunBestTime;
+        }
+
+        bool IsLastRunBestCaught() const
+        {
+            return m_LastRunBestCaught;
+        }
+
+        void RegisterCaught()
+        {
+            ++m_CaughtCount;
+        }
+
+        void RegisterAnomalyHandled() { ++m_AnomaliesHandled; }
+        void RegisterPuzzleMistake() { ++m_PuzzleMistakes; }
+        void RegisterChargerUsed() { ++m_ChargersUsed; }
+        int GetAnomaliesHandled() const { return m_AnomaliesHandled; }
+        int GetPuzzleMistakes() const { return m_PuzzleMistakes; }
+        int GetChargersUsed() const { return m_ChargersUsed; }
+        void RegisterEvidenceCollected() { ++m_EvidenceCollected; }
+        int GetEvidenceCollected() const { return m_EvidenceCollected; }
 
 
 

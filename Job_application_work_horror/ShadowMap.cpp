@@ -166,6 +166,17 @@ namespace Effect
         context->PSSetSamplers(1, 1, &comparisonSampler);
     }
 
+    void ShadowMap::Bind()
+    {
+        ID3D11DeviceContext* context = Renderer::GetDeviceContext();
+        ID3D11ShaderResourceView* shadowResource =
+            m_ShaderResourceView.Get();
+        ID3D11SamplerState* comparisonSampler =
+            m_ComparisonSampler.Get();
+        context->PSSetShaderResources(5, 1, &shadowResource);
+        context->PSSetSamplers(1, 1, &comparisonSampler);
+    }
+
     void ShadowMap::SetShader()
     {
         m_DepthShader.SetGPU();

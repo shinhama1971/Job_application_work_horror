@@ -32,6 +32,8 @@ namespace Effect
         float m_HorrorPulseDuration = 0.0f;
         float m_Exposure = 1.0f;
         float m_TargetExposure = 1.0f;
+        float m_UserBrightnessOffset = 0.0f;
+        float m_UserEffectScale = 1.0f;
         float m_LensMoisture = 0.0f;
         float m_LensMoisturePeak = 0.0f;
         float m_LensMoistureTimer = 0.0f;
@@ -104,6 +106,18 @@ namespace Effect
         void SetExposure(float exposure)
         {
             m_TargetExposure = (std::clamp)(exposure, 0.85f, 1.20f);
+        }
+
+        void SetUserBrightnessOffset(float offset)
+        {
+            m_UserBrightnessOffset =
+                (std::clamp)(offset, -0.12f, 0.14f);
+        }
+
+        void SetUserEffectScale(float scale)
+        {
+            m_UserEffectScale =
+                (std::clamp)(scale, 0.65f, 1.25f);
         }
 
         void SetLensDistortionStrength(float strength)

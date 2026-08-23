@@ -10,6 +10,7 @@ private:
     bool m_FirstMouse = true;
 
     bool m_MouseLookEnable = true;
+    float m_LookSensitivityScale = 1.0f;
 
     DirectX::SimpleMath::Vector3 m_Position =
         DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
@@ -48,6 +49,13 @@ public:
     void Update();
     void SetCamera(int mode = 0);
     void Uninit();
+
+    void SetLookSensitivityScale(float scale)
+    {
+        m_LookSensitivityScale = scale < 0.55f
+            ? 0.55f
+            : (scale > 1.55f ? 1.55f : scale);
+    }
 
     void SetTarget(DirectX::SimpleMath::Vector3 target);
 

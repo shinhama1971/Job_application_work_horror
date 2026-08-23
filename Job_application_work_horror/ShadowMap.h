@@ -36,6 +36,7 @@ namespace Effect
         void Uninit();
         void Begin(const Camera& camera);
         void End();
+        void Bind();
         void SetShader();
     };
 }

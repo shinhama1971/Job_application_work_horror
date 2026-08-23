@@ -32,10 +32,14 @@ private:
 	IXAudio2* m_pXAudio2 = NULL;
 	IXAudio2MasteringVoice* m_pMasteringVoice = NULL;
 	IXAudio2SourceVoice* m_pSourceVoice[SOUND_LABEL_MAX]{};
-	WAVEFORMATEXTENSIBLE m_wfx[SOUND_LABEL_MAX]; // WAVフォーマット
-	XAUDIO2_BUFFER m_buffer[SOUND_LABEL_MAX];
+	WAVEFORMATEXTENSIBLE m_wfx[SOUND_LABEL_MAX]{}; // WAVフォーマット
+	XAUDIO2_BUFFER m_buffer[SOUND_LABEL_MAX]{};
 	std::unique_ptr<BYTE[]> m_DataBuffer[SOUND_LABEL_MAX];
 	bool m_IsComInitialized = false;
+	static bool IsValidLabel(SOUND_LABEL label)
+	{
+		return label >= SOUND_LABEL_BGM000 && label < SOUND_LABEL_MAX;
+	}
 
 	HRESULT FindChunk(HANDLE, DWORD, DWORD&, DWORD&);
 	HRESULT ReadChunkData(HANDLE, void*, DWORD, DWORD);

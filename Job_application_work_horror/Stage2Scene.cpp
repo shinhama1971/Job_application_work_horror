@@ -4,6 +4,7 @@
 #include "CeilingLight.h"
 #include "Door.h"
 #include "ExitTrigger.h"
+#include "FuseBox.h"
 #include "Game.h"
 #include "Input.h"
 #include "Player.h"
@@ -87,10 +88,20 @@ void Stage2Scene::Init()
     m_ClockHourAngle = 0.42f;
     m_ClockMinuteAngle = -0.78f;
     m_ClockNoticeTimer = 0.0f;
+    m_PuzzleFeedbackTimer = 0.0f;
+    m_NoiseThreat = 0.0f;
+    m_NoiseEventCooldown = 0.0f;
+    m_NoiseWarningTimer = 0.0f;
+    m_ChargerNoticeTimer = 0.0f;
+    m_EvidenceNoticeTimer = 0.0f;
     m_LoopBlinkTimer = 0.0f;
+    m_LoopTransitionTimer = -1.0f;
     m_FinalPursuitTimer = 0.0f;
     m_PursuitPulseTimer = 0.0f;
     m_PursuitGazePenaltyTimer = 0.0f;
+    m_CaughtTimer = -1.0f;
+    m_ProgressHintTimer = 0.0f;
+    m_GuidancePulseCooldown = 0.0f;
     m_ScratchUpdateAccumulator = 0.0f;
     m_ObservedScarePhase = 0;
     m_FinalSequencePhase = 0;
@@ -101,6 +112,12 @@ void Stage2Scene::Init()
     m_FalseDoorObserved = false;
     m_FalseDoorMoved = false;
     m_ClockObservedThisLoop = false;
+    m_ConfirmationHandledThisLoop = false;
+    m_ChargerHandled = false;
+    m_EvidenceHandled[0] = false;
+    m_EvidenceHandled[1] = false;
+    m_PuzzleFeedbackType = 0;
+    m_PuzzleMistakeCount = 0;
     m_FinalSequenceArmed = false;
     m_FinalDoorReady = false;
     m_DebugCommand = 0;
@@ -112,6 +129,34 @@ void Stage2Scene::Init()
     stageShadow->SetPosition(0.0f, -99.0f, 62.0f);
     stageShadow->SetDeactivateOnExpire(true);
     stageShadow->SetActive(false);
+
+    FuseBox* confirmationPanel =
+        game->CreateObj<FuseBox>("Stage2ConfirmationPanel");
+    confirmationPanel->SetManualControl("異常確認スイッチを押す");
+    confirmationPanel->SetManualInteractionAllowed(false);
+    confirmationPanel->SetPosition(35.5f, -90.0f, 112.0f);
+    confirmationPanel->SetRotation(Vector3(0.0f, -1.5707963f, 0.0f));
+
+    FuseBox* emergencyCharger =
+        game->CreateObj<FuseBox>("Stage2EmergencyCharger");
+    emergencyCharger->SetManualControl("非常用充電器を使う");
+    emergencyCharger->SetManualInteractionAllowed(true);
+    emergencyCharger->SetPosition(-35.5f, -90.0f, -106.0f);
+    emergencyCharger->SetRotation(Vector3(0.0f, 1.5707963f, 0.0f));
+
+    FuseBox* evidenceTerminal1 =
+        game->CreateObj<FuseBox>("Stage2EvidenceTerminal1");
+    evidenceTerminal1->SetManualControl("残された記録を回収する");
+    evidenceTerminal1->SetManualInteractionAllowed(true);
+    evidenceTerminal1->SetPosition(35.5f, -90.0f, -76.0f);
+    evidenceTerminal1->SetRotation(Vector3(0.0f, -1.5707963f, 0.0f));
+
+    FuseBox* evidenceTerminal2 =
+        game->CreateObj<FuseBox>("Stage2EvidenceTerminal2");
+    evidenceTerminal2->SetManualControl("残された記録を回収する");
+    evidenceTerminal2->SetManualInteractionAllowed(true);
+    evidenceTerminal2->SetPosition(-35.5f, -90.0f, 108.0f);
+    evidenceTerminal2->SetRotation(Vector3(0.0f, 1.5707963f, 0.0f));
 
     const auto createWall = [game](
         const char* name,
@@ -161,6 +206,23 @@ void Stage2Scene::Init()
     Wall* pipeRight = createWall("Stage2PipeRight", Vector3(34.0f, -53.0f, -10.0f),
         Vector3(3.0f, 3.0f, 282.0f), trimColor, false);
     pipeRight->SetCastsShadow(false);
+
+    Wall* evidenceMarker1 = createWall(
+        "Stage2EvidenceMarker1", Vector3(39.4f, -65.0f, -76.0f),
+        Vector3(1.0f, 5.0f, 18.0f),
+        Color(0.025f, 0.11f, 0.09f, 1.0f), false);
+    evidenceMarker1->SetAppearance(
+        Color(0.025f, 0.11f, 0.09f, 1.0f),
+        Color(0.02f, 0.24f, 0.16f, 1.0f), 36.0f);
+    evidenceMarker1->SetCastsShadow(false);
+    Wall* evidenceMarker2 = createWall(
+        "Stage2EvidenceMarker2", Vector3(-39.4f, -65.0f, 108.0f),
+        Vector3(1.0f, 5.0f, 18.0f),
+        Color(0.025f, 0.11f, 0.09f, 1.0f), false);
+    evidenceMarker2->SetAppearance(
+        Color(0.025f, 0.11f, 0.09f, 1.0f),
+        Color(0.02f, 0.24f, 0.16f, 1.0f), 36.0f);
+    evidenceMarker2->SetCastsShadow(false);
 
     Wall* portrait = createWall("Stage2Portrait", Vector3(39.4f, -70.0f, -25.0f),
         Vector3(1.0f, 22.0f, 16.0f), Color(0.055f, 0.042f, 0.034f, 1.0f), false);
@@ -222,6 +284,34 @@ void Stage2Scene::Init()
         Vector3(1.0f, 18.0f, 12.0f), Color(0.22f, 0.01f, 0.006f, 1.0f), false);
     loopMark->SetCastsShadow(false);
     loopMark->SetVisible(false);
+
+    const char* cycleMarkNames[] =
+    {
+        "Stage2CycleMark1",
+        "Stage2CycleMark2",
+        "Stage2CycleMark3"
+    };
+    constexpr float cycleMarkRotations[] =
+    {
+        0.22f, -0.18f, 0.12f
+    };
+    for (int markIndex = 0; markIndex < 3; ++markIndex)
+    {
+        Wall* cycleMark = createWall(
+            cycleMarkNames[markIndex],
+            Vector3(
+                39.45f,
+                -69.0f,
+                -112.0f + static_cast<float>(markIndex) * 8.0f),
+            Vector3(1.0f, 20.0f, 2.0f),
+            Color(0.18f, 0.004f, 0.002f, 1.0f),
+            false);
+        cycleMark->SetRotation(
+            Vector3(cycleMarkRotations[markIndex], 0.0f, 0.0f));
+        cycleMark->SetCastsShadow(false);
+        cycleMark->SetVisible(false);
+    }
+
     Wall* doorIndicator = createWall("Stage2DoorIndicator",
         Vector3(22.0f, -67.0f, 137.4f), Vector3(10.0f, 5.0f, 1.0f),
         Color(0.24f, 0.012f, 0.008f, 1.0f), false);
@@ -321,7 +411,7 @@ void Stage2Scene::Init()
 
     Door* door = game->CreateObj<Door>("Stage2Door");
     door->SetPosition(0.0f, -74.0f, 140.0f);
-    door->ResetClosed(3);
+    door->ResetClosed(0);
 
     ExitTrigger* exit = game->CreateObj<ExitTrigger>("Stage2Exit");
     exit->SetPosition(0.0f, -80.0f, 153.0f);
@@ -353,12 +443,17 @@ void Stage2Scene::Update()
         return;
     }
 
+    constexpr float deltaTime = 1.0f / 60.0f;
+    if (m_CaughtTimer >= 0.0f)
+    {
+        UpdateCaughtSequence(*player, deltaTime);
+        return;
+    }
+
     if (!player->CanControl())
     {
         return;
     }
-
-    constexpr float deltaTime = 1.0f / 60.0f;
 
     const int debugCommand = m_DebugCommand;
     m_DebugCommand = 0;
@@ -383,6 +478,22 @@ void Stage2Scene::Update()
     }
 
     m_VisualTimer += deltaTime;
+    if (m_LoopTransitionTimer >= 0.0f)
+    {
+        m_LoopTransitionTimer += deltaTime;
+        if (m_LoopTransitionTimer >= 4.20f)
+        {
+            m_LoopTransitionTimer = -1.0f;
+        }
+    }
+    m_ProgressHintTimer += deltaTime;
+    if (Input::GetKeyTrigger(VK_H) ||
+        Input::GetButtonTrigger(XINPUT_LEFT_SHOULDER))
+    {
+        m_ProgressHintTimer = (std::max)(m_ProgressHintTimer, 30.0f);
+        Input::SetVibration(2, 0.04f);
+    }
+
     m_LoopCooldown = (std::max)(0.0f, m_LoopCooldown - deltaTime);
     m_NoticeTimer = (std::max)(0.0f, m_NoticeTimer - deltaTime);
     m_GazeNoticeTimer = (std::max)(0.0f, m_GazeNoticeTimer - deltaTime);
@@ -394,15 +505,47 @@ void Stage2Scene::Update()
         (std::max)(0.0f, m_FalseDoorNoticeTimer - deltaTime);
     m_ClockNoticeTimer =
         (std::max)(0.0f, m_ClockNoticeTimer - deltaTime);
+    m_PuzzleFeedbackTimer =
+        (std::max)(0.0f, m_PuzzleFeedbackTimer - deltaTime);
+    m_NoiseEventCooldown =
+        (std::max)(0.0f, m_NoiseEventCooldown - deltaTime);
+    m_NoiseWarningTimer =
+        (std::max)(0.0f, m_NoiseWarningTimer - deltaTime);
+    m_ChargerNoticeTimer =
+        (std::max)(0.0f, m_ChargerNoticeTimer - deltaTime);
+    m_EvidenceNoticeTimer =
+        (std::max)(0.0f, m_EvidenceNoticeTimer - deltaTime);
     m_LoopBlinkTimer =
         (std::max)(0.0f, m_LoopBlinkTimer - deltaTime);
     m_FinalPursuitTimer =
         (std::max)(0.0f, m_FinalPursuitTimer - deltaTime);
     m_PursuitGazePenaltyTimer = (std::max)(
         0.0f, m_PursuitGazePenaltyTimer - deltaTime);
+    m_GuidancePulseCooldown = (std::max)(
+        0.0f, m_GuidancePulseCooldown - deltaTime);
+
+    Door* corridorDoor = game->GetObj<Door>("Stage2Door");
+    if (corridorDoor != nullptr && corridorDoor->IsLocked() &&
+        m_ProgressHintTimer >= 15.0f &&
+        m_GuidancePulseCooldown <= 0.0f)
+    {
+        const char* guideLightName = m_LoopCount == 1
+            ? "Stage2Light3"
+            : "Stage2Light2";
+        CeilingLight* guideLight =
+            game->GetObj<CeilingLight>(guideLightName);
+        if (guideLight != nullptr)
+        {
+            guideLight->TriggerEventFlicker(0.72f, 0.58f);
+        }
+        game->GetPostProcess()->TriggerBloomPulse(0.30f, 0.16f);
+        m_GuidancePulseCooldown = 2.8f;
+    }
 
     if (m_LoopCount < 3 && m_LoopCooldown <= 0.0f &&
-        player->GetPosition().z > 116.0f)
+        // The loop changes only after the player has opened and crossed the
+        // corridor door.  The door itself is centred at z = 140.
+        player->GetPosition().z > 146.0f)
     {
         AdvanceLoop(*player);
     }
@@ -418,6 +561,95 @@ void Stage2Scene::Update()
     UpdateFalseDoorAnomaly(*player);
     UpdateClock(deltaTime);
     UpdateClockObservation();
+    UpdateNoiseThreat(*player, deltaTime);
+
+    FuseBox* emergencyCharger =
+        game->GetObj<FuseBox>("Stage2EmergencyCharger");
+    if (!m_ChargerHandled && emergencyCharger != nullptr &&
+        emergencyCharger->IsActivated())
+    {
+        m_ChargerHandled = true;
+        m_ChargerNoticeTimer = 2.8f;
+        m_NoiseWarningTimer = 3.2f;
+        m_NoiseThreat = (std::max)(m_NoiseThreat, 0.76f);
+        m_NoiseEventCooldown = 0.12f;
+        player->AddBattery(30.0f);
+        game->RegisterChargerUsed();
+
+        CeilingLight* startLight =
+            game->GetObj<CeilingLight>("Stage2Light1");
+        if (startLight != nullptr)
+        {
+            startLight->TriggerEventFlicker(1.10f, 0.88f);
+        }
+        game->GetPostProcess()->TriggerHorrorPulse(0.28f, 0.30f);
+        Input::SetVibration(7, 0.16f);
+    }
+
+    constexpr const char* evidenceNames[] =
+    {
+        "Stage2EvidenceTerminal1",
+        "Stage2EvidenceTerminal2"
+    };
+    for (int evidenceIndex = 0; evidenceIndex < 2; ++evidenceIndex)
+    {
+        FuseBox* evidence = game->GetObj<FuseBox>(evidenceNames[evidenceIndex]);
+        if (!m_EvidenceHandled[evidenceIndex] && evidence != nullptr &&
+            evidence->IsActivated())
+        {
+            m_EvidenceHandled[evidenceIndex] = true;
+            m_EvidenceNoticeTimer = 3.2f;
+            game->RegisterEvidenceCollected();
+            player->AddBattery(6.0f);
+            m_NoiseThreat = (std::max)(0.0f, m_NoiseThreat - 0.18f);
+            const char* markerName = evidenceIndex == 0
+                ? "Stage2EvidenceMarker1"
+                : "Stage2EvidenceMarker2";
+            Wall* marker = game->GetObj<Wall>(markerName);
+            if (marker != nullptr)
+            {
+                marker->SetAppearance(
+                    Color(0.08f, 0.18f, 0.10f, 1.0f),
+                    Color(0.16f, 0.52f, 0.22f, 1.0f),
+                    44.0f);
+            }
+            game->GetPostProcess()->TriggerBloomPulse(0.38f, 0.18f);
+            Input::SetVibration(4, 0.08f);
+        }
+    }
+
+    FuseBox* confirmationPanel =
+        game->GetObj<FuseBox>("Stage2ConfirmationPanel");
+    const bool evidenceConfirmed =
+        (m_LoopCount == 1 && m_FalseDoorMoved) ||
+        (m_LoopCount == 2 && m_ClockObservedThisLoop);
+    if (confirmationPanel != nullptr)
+    {
+        confirmationPanel->SetManualInteractionAllowed(evidenceConfirmed);
+        if (evidenceConfirmed && confirmationPanel->IsActivated() &&
+            !m_ConfirmationHandledThisLoop)
+        {
+            m_ConfirmationHandledThisLoop = true;
+            game->RegisterAnomalyHandled();
+            m_NoticeTimer = 2.8f;
+            m_FalseDoorNoticeTimer = 0.0f;
+            m_ClockNoticeTimer = 0.0f;
+            m_ProgressHintTimer = 0.0f;
+            if (corridorDoor != nullptr)
+            {
+                corridorDoor->SetLocked(false);
+            }
+
+            CeilingLight* doorLight =
+                game->GetObj<CeilingLight>("CeilingLight4");
+            if (doorLight != nullptr)
+            {
+                doorLight->TriggerEventFlicker(0.90f, 0.78f);
+            }
+            game->GetPostProcess()->TriggerBloomPulse(0.76f, 0.28f);
+            Input::SetVibration(7, 0.16f);
+        }
+    }
 
     const float loopRate = static_cast<float>(m_LoopCount) / 3.0f;
     const char* stageLightNames[] =
@@ -446,10 +678,13 @@ void Stage2Scene::Update()
         1.0f - (std::clamp)(localFixtureLight, 0.0f, 1.0f);
     const float pulse = std::sin(m_VisualTimer * 1.7f) * 0.025f;
     game->GetPostProcess()->SetCorridorTension(
-        (std::clamp)(0.38f + loopRate * 0.42f + pulse, 0.0f, 0.86f));
+        (std::clamp)(0.38f + loopRate * 0.42f +
+            m_NoiseThreat * 0.14f + pulse, 0.0f, 0.92f));
     game->GetPostProcess()->SetAtmosphere(
-        0.20f + loopRate * 0.10f + localDarkness * 0.018f,
-        0.62f + loopRate * 0.12f + localDarkness * 0.035f);
+        0.20f + loopRate * 0.10f + localDarkness * 0.018f +
+            m_NoiseThreat * 0.025f,
+        0.62f + loopRate * 0.12f + localDarkness * 0.035f +
+            m_NoiseThreat * 0.045f);
     const float adaptedExposure = player->IsFlashlightOn()
         ? 1.00f + localDarkness * 0.035f
         : 1.055f + localDarkness * 0.090f;
@@ -470,14 +705,70 @@ void Stage2Scene::Update()
     Wall* doorIndicator = game->GetObj<Wall>("Stage2DoorIndicator");
     if (doorIndicator != nullptr && !m_FinalDoorReady)
     {
-        const float indicatorPulse =
-            0.13f + (std::sin(m_VisualTimer * 3.4f) * 0.5f + 0.5f) * 0.08f;
-        doorIndicator->SetAppearance(
-            Color(0.24f, 0.012f, 0.008f, 1.0f),
-            Color(indicatorPulse, 0.001f, 0.0f, 1.0f), 24.0f);
+        const bool locked = corridorDoor != nullptr && corridorDoor->IsLocked();
+        const float indicatorPulse = std::sin(
+            m_VisualTimer * (locked ? 3.4f : 6.2f)) * 0.5f + 0.5f;
+        if (locked)
+        {
+            doorIndicator->SetAppearance(
+                Color(0.24f, 0.012f, 0.008f, 1.0f),
+                Color(0.13f + indicatorPulse * 0.08f,
+                    0.001f, 0.0f, 1.0f), 24.0f);
+        }
+        else
+        {
+            doorIndicator->SetAppearance(
+                Color(0.04f, 0.18f, 0.035f, 1.0f),
+                Color(0.015f, 0.16f + indicatorPulse * 0.10f,
+                    0.008f, 1.0f), 28.0f);
+        }
     }
 
     m_InteractionSystem.Update(*player);
+}
+
+void Stage2Scene::UpdateNoiseThreat(const Player& player, float deltaTime)
+{
+    if (m_LoopCount >= 3 || m_FinalSequenceTimer >= 0.0f)
+    {
+        m_NoiseThreat = (std::max)(0.0f, m_NoiseThreat - deltaTime * 0.8f);
+        return;
+    }
+
+    const float change = player.IsSprinting()
+        ? deltaTime * 0.36f
+        : -deltaTime * 0.22f;
+    m_NoiseThreat = (std::clamp)(m_NoiseThreat + change, 0.0f, 1.0f);
+    if (m_NoiseThreat < 0.70f || m_NoiseEventCooldown > 0.0f)
+    {
+        return;
+    }
+
+    const float playerZ = player.GetPosition().z;
+    const char* reactionLightName = playerZ < -55.0f
+        ? "Stage2Light1"
+        : (playerZ < 18.0f
+            ? "Stage2Light2"
+            : (playerZ < 88.0f ? "Stage2Light3" : "CeilingLight4"));
+
+    Core::Game* game = Core::Game::GetInstance();
+    CeilingLight* reactionLight =
+        game->GetObj<CeilingLight>(reactionLightName);
+    if (reactionLight != nullptr)
+    {
+        reactionLight->TriggerEventFlicker(
+            0.48f + m_NoiseThreat * 0.48f,
+            0.46f + m_NoiseThreat * 0.42f);
+    }
+
+    m_NoiseWarningTimer = 2.1f;
+    m_NoiseEventCooldown = 2.35f;
+    game->GetPostProcess()->TriggerHorrorPulse(
+        0.10f + m_NoiseThreat * 0.16f,
+        0.22f);
+    Input::SetVibration(
+        3 + static_cast<int>(m_NoiseThreat * 4.0f),
+        0.08f + m_NoiseThreat * 0.08f);
 }
 
 void Stage2Scene::AdvanceLoop(Player& player)
@@ -485,7 +776,10 @@ void Stage2Scene::AdvanceLoop(Player& player)
     Core::Game* game = Core::Game::GetInstance();
     ++m_LoopCount;
     m_LoopCooldown = 1.0f;
+    m_ProgressHintTimer = 0.0f;
+    m_GuidancePulseCooldown = 1.2f;
     m_LoopBlinkTimer = 0.28f;
+    m_LoopTransitionTimer = 0.0f;
     m_NoticeTimer = 3.0f;
     m_LightZoneMask = 0;
     m_ScratchScareTriggered = false;
@@ -494,13 +788,82 @@ void Stage2Scene::AdvanceLoop(Player& player)
     m_FalseDoorObserved = false;
     m_FalseDoorMoved = false;
     m_ClockObservedThisLoop = false;
+    m_ConfirmationHandledThisLoop = false;
+    m_PuzzleFeedbackTimer = 0.0f;
+    m_PuzzleFeedbackType = 0;
+    m_PuzzleMistakeCount = 0;
+    m_NoiseThreat = 0.12f;
+    m_NoiseEventCooldown = 1.0f;
+    m_NoiseWarningTimer = 0.0f;
+    FuseBox* confirmationPanel =
+        game->GetObj<FuseBox>("Stage2ConfirmationPanel");
+    if (confirmationPanel != nullptr)
+    {
+        confirmationPanel->ResetActivation();
+        confirmationPanel->SetManualInteractionAllowed(false);
+    }
     player.SetPosition(Vector3(0.0f, -99.0f, -125.0f));
+    Door* loopDoor = game->GetObj<Door>("Stage2Door");
+    if (loopDoor != nullptr)
+    {
+        loopDoor->ResetClosed(m_LoopCount);
+        // Each repeated hallway has one change that must be noticed before
+        // the familiar door will open. This turns the loop into observation
+        // gameplay instead of a straight walk through the same corridor.
+        loopDoor->SetLocked(m_LoopCount > 0);
+    }
+
+    constexpr const char* corridorLightNames[] =
+    {
+        "Stage2Light1", "Stage2Light2",
+        "Stage2Light3", "CeilingLight4"
+    };
+    for (const char* lightName : corridorLightNames)
+    {
+        CeilingLight* light = game->GetObj<CeilingLight>(lightName);
+        if (light != nullptr)
+        {
+            light->SetForcedOff(false);
+        }
+    }
+
     ConfigureClockForLoop();
 
     game->GetPostProcess()->TriggerHorrorPulse(
         0.26f + static_cast<float>(m_LoopCount) * 0.13f,
         0.38f + static_cast<float>(m_LoopCount) * 0.10f);
+    game->GetPostProcess()->TriggerBloomPulse(
+        0.46f + static_cast<float>(m_LoopCount) * 0.08f,
+        0.26f);
     Input::SetVibration(6 + m_LoopCount * 3, 0.18f);
+
+    const char* cycleMarkNames[] =
+    {
+        "Stage2CycleMark1",
+        "Stage2CycleMark2",
+        "Stage2CycleMark3"
+    };
+    for (int markIndex = 0; markIndex < 3; ++markIndex)
+    {
+        Wall* cycleMark =
+            game->GetObj<Wall>(cycleMarkNames[markIndex]);
+        if (cycleMark == nullptr)
+        {
+            continue;
+        }
+
+        const bool revealed = markIndex < m_LoopCount;
+        cycleMark->SetVisible(revealed);
+        if (revealed)
+        {
+            const float emission =
+                0.10f + static_cast<float>(m_LoopCount) * 0.055f;
+            cycleMark->SetAppearance(
+                Color(0.24f, 0.006f, 0.003f, 1.0f),
+                Color(emission, 0.001f, 0.0f, 1.0f),
+                20.0f);
+        }
+    }
 
     Wall* loopMark = game->GetObj<Wall>("Stage2LoopMark");
     Wall* portrait = game->GetObj<Wall>("Stage2Portrait");
@@ -577,11 +940,6 @@ void Stage2Scene::AdvanceLoop(Player& player)
         SetFalseDoorState(false, false);
         RevealScratchPieces(9, Stage2ScratchCount, 0.24f);
         m_FinalSequenceArmed = true;
-        Door* door = game->GetObj<Door>("Stage2Door");
-        if (door != nullptr)
-        {
-            door->ResetClosed(3);
-        }
         CeilingLight* doorLight = game->GetObj<CeilingLight>("CeilingLight4");
         if (doorLight != nullptr)
         {
@@ -684,8 +1042,28 @@ void Stage2Scene::UpdateClockObservation()
         return;
     }
 
+    Player* player = game->GetObj<Player>("Player");
+    if (m_LoopCount == 2 && player != nullptr && player->IsFlashlightOn())
+    {
+        RegisterPuzzleMistake(2);
+        return;
+    }
+
     m_ClockObservedThisLoop = true;
     m_ClockNoticeTimer = 2.6f;
+
+    if (m_LoopCount == 2)
+    {
+        m_NoticeTimer = 2.8f;
+
+        CeilingLight* doorLight =
+            game->GetObj<CeilingLight>("CeilingLight4");
+        if (doorLight != nullptr)
+        {
+            doorLight->TriggerEventFlicker(0.90f, 0.76f);
+        }
+        game->GetPostProcess()->TriggerBloomPulse(0.58f, 0.24f);
+    }
 
     CeilingLight* clockLight =
         game->GetObj<CeilingLight>("Stage2Light2");
@@ -699,6 +1077,45 @@ void Stage2Scene::UpdateClockObservation()
         m_LoopCount == 1 ? 0.14f : 0.28f,
         0.32f);
     Input::SetVibration(m_LoopCount == 1 ? 3 : 6, 0.14f);
+}
+
+void Stage2Scene::RegisterPuzzleMistake(int type)
+{
+    if (m_PuzzleFeedbackTimer > 0.0f)
+    {
+        return;
+    }
+
+    m_PuzzleFeedbackType = type;
+    m_PuzzleFeedbackTimer = 2.2f;
+    m_PuzzleMistakeCount = (std::min)(m_PuzzleMistakeCount + 1, 3);
+
+    Core::Game* game = Core::Game::GetInstance();
+    game->RegisterPuzzleMistake();
+    CeilingLight* warningLight = game->GetObj<CeilingLight>(
+        type == 1 ? "Stage2Light3" : "Stage2Light2");
+    const float mistakeRate =
+        static_cast<float>(m_PuzzleMistakeCount) / 3.0f;
+    if (warningLight != nullptr)
+    {
+        warningLight->TriggerEventFlicker(
+            0.48f + mistakeRate * 0.52f,
+            0.42f + mistakeRate * 0.48f);
+        if (m_PuzzleMistakeCount >= 3)
+        {
+            warningLight->SetForcedOff(true);
+        }
+    }
+
+    game->GetPostProcess()->TriggerHorrorPulse(
+        0.08f + mistakeRate * 0.24f,
+        0.18f + mistakeRate * 0.18f);
+    game->GetPostProcess()->TriggerBloomPulse(
+        0.14f + mistakeRate * 0.28f,
+        0.14f);
+    Input::SetVibration(
+        2 + m_PuzzleMistakeCount * 2,
+        0.06f + mistakeRate * 0.12f);
 }
 
 void Stage2Scene::SetFalseDoorState(bool visible, bool rightSide)
@@ -755,7 +1172,14 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
     const float facing = game->GetCamera()->GetForward().Dot(cameraToDoor);
     if (distance < 105.0f && facing > 0.88f)
     {
+        if (!player.IsFlashlightOn())
+        {
+            RegisterPuzzleMistake(1);
+            return;
+        }
         m_FalseDoorObserved = true;
+        m_PuzzleFeedbackTimer = 0.0f;
+        m_PuzzleFeedbackType = 0;
         return;
     }
 
@@ -767,6 +1191,16 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
     m_FalseDoorMoved = true;
     m_FalseDoorNoticeTimer = 2.8f;
     SetFalseDoorState(true, true);
+
+    m_NoticeTimer = 2.8f;
+
+    CeilingLight* doorLight =
+        game->GetObj<CeilingLight>("CeilingLight4");
+    if (doorLight != nullptr)
+    {
+        doorLight->TriggerEventFlicker(0.90f, 0.76f);
+    }
+    game->GetPostProcess()->TriggerBloomPulse(0.58f, 0.24f);
 
     CeilingLight* oldDoorLight =
         game->GetObj<CeilingLight>("Stage2Light3");
@@ -857,12 +1291,18 @@ void Stage2Scene::StartFinalSequence()
     m_FinalPursuitTimer = 7.0f;
     m_PursuitPulseTimer = 0.12f;
     m_PursuitGazePenaltyTimer = 0.0f;
+    m_NoiseThreat = 0.0f;
+    m_NoiseWarningTimer = 0.0f;
     m_FinalSequencePhase = 0;
     m_NoticeTimer = 2.8f;
 
     Core::Game* game = Core::Game::GetInstance();
     Player* player = game->GetObj<Player>("Player");
     ShadowMan* shadow = game->GetObj<ShadowMan>("Stage2Shadow");
+    if (player != nullptr)
+    {
+        player->RestoreStamina();
+    }
     if (player != nullptr && shadow != nullptr)
     {
         const Vector3 playerPosition = player->GetPosition();
@@ -872,7 +1312,9 @@ void Stage2Scene::StartFinalSequence()
             playerPosition.z - 72.0f);
         shadow->SetActive(false);
         shadow->SetActive(true);
-        shadow->EnableChase(18.0f, 30.0f);
+        const float retryAssist = static_cast<float>((std::min)(
+            game->GetCaughtCount(), 2)) * 1.5f;
+        shadow->EnableChase(18.0f - retryAssist, 30.0f);
         shadow->EnableGazeScare(8.0f);
         shadow->SetOnObserved(
             [this]()
@@ -968,6 +1410,12 @@ void Stage2Scene::UpdateFinalSequence(float deltaTime)
     m_FinalSequenceArmed = false;
     m_NoticeTimer = 3.0f;
 
+    Door* finalDoor = game->GetObj<Door>("Stage2Door");
+    if (finalDoor != nullptr)
+    {
+        finalDoor->SetLocked(false);
+    }
+
     ExitTrigger* exit = game->GetObj<ExitTrigger>("Stage2Exit");
     if (exit != nullptr)
     {
@@ -990,6 +1438,13 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
 {
     if (m_FinalPursuitTimer <= 0.0f)
     {
+        ShadowMan* shadow =
+            Core::Game::GetInstance()->GetObj<ShadowMan>("Stage2Shadow");
+        if (shadow != nullptr)
+        {
+            shadow->SetActive(false);
+        }
+
         return;
     }
 
@@ -1004,22 +1459,39 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
     const Vector3 offset = player->GetPosition() - shadow->GetPosition();
     const float horizontalDistance =
         std::sqrt(offset.x * offset.x + offset.z * offset.z);
+    if (horizontalDistance <= 31.5f)
+    {
+        StartCaughtSequence(*player);
+        return;
+    }
+
     const float proximity = 1.0f - (std::clamp)(
         (horizontalDistance - 30.0f) / 72.0f,
         0.0f,
         1.0f);
+    const float dangerPulse =
+        std::sin(m_VisualTimer * (6.0f + proximity * 5.0f)) *
+        0.5f + 0.5f;
 
     game->GetPostProcess()->SetCorridorTension(
         0.74f + proximity * 0.16f);
     if (m_FinalDoorReady)
     {
         game->GetPostProcess()->SetAtmosphere(
-            0.30f + proximity * 0.075f,
-            0.76f + proximity * 0.105f);
+            0.30f + proximity * 0.085f + dangerPulse * 0.018f,
+            0.76f + proximity * 0.135f);
         game->GetPostProcess()->SetLensDistortionStrength(
-            0.46f + proximity * 0.16f);
+            0.46f + proximity * 0.18f +
+            dangerPulse * proximity * 0.025f);
         game->GetPostProcess()->SetVolumetricIntensity(
             0.50f + proximity * 0.12f);
+        game->GetPostProcess()->SetFilmGradeStrength(
+            0.78f + proximity * 0.18f);
+        game->GetPostProcess()->SetLensDirtStrength(
+            0.20f + proximity * 0.22f);
+        game->GetPostProcess()->SetExposure(
+            1.0f - proximity * 0.055f -
+            dangerPulse * proximity * 0.025f);
     }
 
     if (m_PursuitGazePenaltyTimer > 0.0f)
@@ -1053,6 +1525,89 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
             0.16f);
     }
     m_PursuitPulseTimer = 0.72f - proximity * 0.40f;
+}
+
+void Stage2Scene::StartCaughtSequence(Player& player)
+{
+    if (m_CaughtTimer >= 0.0f)
+    {
+        return;
+    }
+
+    m_CaughtTimer = 0.0f;
+    m_FinalPursuitTimer = 0.0f;
+    m_PursuitPulseTimer = 0.0f;
+    m_PursuitGazePenaltyTimer = 0.0f;
+    player.SetCanControl(false);
+
+    Core::Game* game = Core::Game::GetInstance();
+    game->RegisterCaught();
+    ShadowMan* shadow = game->GetObj<ShadowMan>("Stage2Shadow");
+    if (shadow != nullptr)
+    {
+        shadow->SetActive(false);
+    }
+
+    game->GetPostProcess()->TriggerHorrorPulse(1.0f, 0.72f);
+    game->GetPostProcess()->TriggerBloomPulse(0.18f, 0.16f);
+    Input::SetVibration(24, 0.72f);
+}
+
+void Stage2Scene::UpdateCaughtSequence(Player& player, float deltaTime)
+{
+    m_CaughtTimer += deltaTime;
+    Core::Game* game = Core::Game::GetInstance();
+
+    if (m_CaughtTimer < 1.15f)
+    {
+        const float darkness = (std::clamp)(
+            m_CaughtTimer / 0.34f, 0.0f, 1.0f);
+        game->GetPostProcess()->SetExposure(
+            0.92f - darkness * 0.38f);
+        game->GetPostProcess()->SetAtmosphere(
+            0.46f + darkness * 0.18f,
+            0.90f + darkness * 0.08f);
+        game->GetPostProcess()->SetLensDistortionStrength(
+            0.72f + darkness * 0.18f);
+        return;
+    }
+
+    // Retry from the beginning of the final corridor. The completed loops
+    // remain completed, so failure costs time without deleting progress.
+    player.SetPosition(Vector3(0.0f, -99.0f, -125.0f));
+    player.RestoreStamina();
+    player.SetCanControl(true);
+    m_CaughtTimer = -1.0f;
+    m_FinalSequenceTimer = -1.0f;
+    m_FinalSequencePhase = 0;
+    m_FinalSequenceArmed = true;
+    m_FinalDoorReady = false;
+    m_NoticeTimer = 3.2f;
+
+    Door* door = game->GetObj<Door>("Stage2Door");
+    if (door != nullptr)
+    {
+        door->ResetClosed(3);
+        door->SetLocked(true);
+    }
+
+    ExitTrigger* exit = game->GetObj<ExitTrigger>("Stage2Exit");
+    if (exit != nullptr)
+    {
+        exit->SetInteractionEnabled(false);
+    }
+
+    Wall* indicator = game->GetObj<Wall>("Stage2DoorIndicator");
+    if (indicator != nullptr)
+    {
+        indicator->SetAppearance(
+            Color(0.24f, 0.012f, 0.008f, 1.0f),
+            Color(0.18f, 0.001f, 0.0f, 1.0f),
+            24.0f);
+    }
+
+    game->GetPostProcess()->TriggerHorrorPulse(0.34f, 0.42f);
+    Input::SetVibration(8, 0.18f);
 }
 
 void Stage2Scene::RevealScratchPieces(int first, int last, float emission)
@@ -1120,6 +1675,18 @@ void Stage2Scene::UpdateLightZones(const Player& player)
         if (light != nullptr)
         {
             light->TriggerEventFlicker(0.48f + loopStrength, strength);
+        }
+
+        // From the second pass onward, darkness closes behind the player.
+        // The next loop restores the fixtures so the corridor can repeat.
+        if (m_LoopCount > 0 && index > 0)
+        {
+            CeilingLight* lightBehind = game->GetObj<CeilingLight>(
+                zones[index - 1].LightName);
+            if (lightBehind != nullptr)
+            {
+                lightBehind->SetForcedOff(true);
+            }
         }
 
         game->GetPostProcess()->TriggerBloomPulse(
@@ -1295,67 +1862,309 @@ void Stage2Scene::Draw(Camera* camera)
         return;
     }
 
-    std::string_view objective = "WALK THE HALL";
     ExitTrigger* exit = game->GetObj<ExitTrigger>("Stage2Exit");
+    Door* finalDoor = game->GetObj<Door>("Stage2Door");
+    FuseBox* confirmationPanel =
+        game->GetObj<FuseBox>("Stage2ConfirmationPanel");
+    const bool confirmationPending =
+        (m_LoopCount == 1 || m_LoopCount == 2) &&
+        confirmationPanel != nullptr &&
+        !confirmationPanel->IsActivated() &&
+        ((m_LoopCount == 1 && m_FalseDoorMoved) ||
+         (m_LoopCount == 2 && m_ClockObservedThisLoop));
+    constexpr std::string_view closedLoopObjectives[] =
+    {
+        "奥のドアを開ける 1回目",
+        "奥のドアを開ける 2回目",
+        "奥のドアを開ける 3回目"
+    };
+    constexpr std::string_view openLoopObjectives[] =
+    {
+        "開いたドアを通り抜ける 1回目",
+        "開いたドアを通り抜ける 2回目",
+        "開いたドアを通り抜ける 3回目"
+    };
+
+    std::string_view objective = "廊下の奥にある出口へ向かう";
+    if (m_LoopCount < 3)
+    {
+        const size_t loopIndex = static_cast<size_t>(m_LoopCount);
+        objective = finalDoor != nullptr && finalDoor->IsOpen()
+            ? openLoopObjectives[loopIndex]
+            : closedLoopObjectives[loopIndex];
+    }
+    if (m_LoopCount == 1 && !m_FalseDoorMoved)
+    {
+        objective = m_FalseDoorObserved
+            ? "偽物のドアから視線を外す"
+            : "懐中電灯で左の偽物のドアを照らす";
+    }
+    else if (m_LoopCount == 2 && !m_ClockObservedThisLoop)
+    {
+        objective = "ライトを消して左の時計を見る";
+    }
+    else if (confirmationPending)
+    {
+        objective = "奥の異常確認スイッチを押す";
+    }
     if (exit != nullptr && exit->IsEscaping())
     {
-        objective = "ESCAPED";
+        objective = "脱出中";
     }
     else if (m_GazeNoticeTimer > 0.0f)
     {
-        objective = "KEEP WALKING";
+        objective = "止まらず奥のドアへ進む";
+    }
+    else if (m_CaughtTimer >= 0.0f)
+    {
+        objective = "捕まった チェックポイントへ戻る";
+    }
+    else if (m_ChargerNoticeTimer > 0.0f)
+    {
+        objective = "充電器の音で廊下が反応した";
+    }
+    else if (m_EvidenceNoticeTimer > 0.0f)
+    {
+        objective = "残された記録を回収した";
+    }
+    else if (m_NoiseWarningTimer > 0.0f)
+    {
+        objective = "足音が響いている 歩いて静める";
+    }
+    else if (m_PuzzleFeedbackTimer > 0.0f)
+    {
+        if (m_PuzzleMistakeCount >= 3)
+        {
+            objective = "照明が消えた 正しい方法を試す";
+        }
+        else
+        {
+            objective = m_PuzzleFeedbackType == 1
+                ? "光が必要だ 懐中電灯でドアを照らす"
+                : "光が邪魔だ 懐中電灯を消して時計を見る";
+        }
     }
     else if (m_PursuitGazePenaltyTimer > 0.0f)
     {
-        objective = "DON'T LOOK AT IT";
+        objective = "それを見てはいけない";
     }
     else if (m_FinalSequenceTimer >= 0.0f && !m_FinalDoorReady)
     {
-        objective = "DO NOT STOP";
+        objective = Input::IsControllerConnected()
+            ? "左スティック押し込みで出口まで走る"
+            : "SHIFTを押して出口まで走る";
     }
     else if (m_FinalPursuitTimer > 0.0f)
     {
-        objective = "DO NOT LOOK BACK";
-    }
-    else if (m_ScratchNoticeTimer > 0.0f)
-    {
-        objective = "HELP ME";
-    }
-    else if (m_FalseDoorNoticeTimer > 0.0f)
-    {
-        objective = "THAT DOOR MOVED";
-    }
-    else if (m_ClockNoticeTimer > 0.0f)
-    {
-        objective = "TIME IS WRONG";
-    }
-    else if (m_PortraitNoticeTimer > 0.0f)
-    {
-        objective = "IT MOVED";
-    }
-    else if (m_NoticeTimer > 0.0f)
-    {
-        if (m_LoopCount == 0) objective = "YOU HAVE BEEN HERE";
-        else if (m_LoopCount == 1) objective = "IT CHANGED";
-        else if (m_LoopCount == 2) objective = "DO NOT LOOK";
-        else if (m_FinalDoorReady) objective = "OPEN THE DOOR";
-        else objective = "WALK TO THE LIGHT";
-    }
-    else if (m_FinalSequenceArmed)
-    {
-        objective = "WALK TO THE LIGHT";
+        objective = Input::IsControllerConnected()
+            ? "左スティック押し込みで出口まで走る"
+            : "SHIFTを押して出口まで走る";
     }
     else if (m_FinalDoorReady)
     {
-        objective = "LEAVE";
+        objective = finalDoor != nullptr && !finalDoor->IsOpen()
+            ? "奥のドアを開ける"
+            : "開いた出口を通り抜ける";
+    }
+    else if (m_ScratchNoticeTimer > 0.0f)
+    {
+        objective = "止まらず奥のドアへ進む";
+    }
+    else if (m_FalseDoorNoticeTimer > 0.0f)
+    {
+        objective = "異常を確認した 奥のスイッチへ進む";
+    }
+    else if (m_ClockNoticeTimer > 0.0f)
+    {
+        objective = m_LoopCount == 2
+            ? "逆回転を確認した 奥のスイッチへ進む"
+            : "時計の時刻が変わった";
+    }
+    else if (m_PortraitNoticeTimer > 0.0f)
+    {
+        objective = "止まらず奥のドアへ進む";
+    }
+    else if (m_NoticeTimer > 0.0f)
+    {
+        if (m_LoopCount == 0) objective = "1回目 奥のドアを開ける";
+        else if (m_LoopCount == 1) objective = m_FalseDoorMoved
+            ? (m_ConfirmationHandledThisLoop
+                ? "鍵が開いた 奥のドアへ進む"
+                : "奥の異常確認スイッチを押す")
+            : "2回目 廊下の変化を探す";
+        else if (m_LoopCount == 2) objective = m_ClockObservedThisLoop
+            ? (m_ConfirmationHandledThisLoop
+                ? "鍵が開いた 後ろを見ずに進む"
+                : "奥の異常確認スイッチを押す")
+            : "3回目 左の時計を調べる";
+        else objective = "廊下の奥にある出口へ向かう";
+    }
+    else if (m_ProgressHintTimer >= 30.0f)
+    {
+        if (m_LoopCount == 1 && !m_FalseDoorMoved)
+        {
+            objective = "ヒント ライトで偽物のドアを照らして視線を外す";
+        }
+        else if (m_LoopCount == 2 && !m_ClockObservedThisLoop)
+        {
+            objective = "ヒント ライトを消して左の時計を正面から見る";
+        }
+        else if (confirmationPending)
+        {
+            objective = "ヒント 奥の壁にある赤い確認スイッチを押す";
+        }
+        else if (m_FinalDoorReady)
+        {
+            objective = finalDoor != nullptr && finalDoor->IsOpen()
+                ? "ヒント 開いた出口を通り抜ける"
+                : "ヒント 今すぐ奥のドアを開ける";
+        }
+        else if (m_FinalSequenceArmed)
+        {
+            objective = "ヒント 廊下の中央より先へ進む";
+        }
+        else if (finalDoor != nullptr && finalDoor->IsOpen())
+        {
+            objective = "ヒント 開いた奥のドアを通り抜ける";
+        }
+        else
+        {
+            objective = "ヒント まっすぐ進み奥のドアを開ける";
+        }
+    }
+    else if (m_ProgressHintTimer >= 15.0f)
+    {
+        if (m_LoopCount == 1 && !m_FalseDoorMoved)
+        {
+            objective = m_FalseDoorObserved
+                ? "ヒント 偽物のドアから視線を外す"
+                : "ヒント ライトを点け前方左側の壁を探す";
+        }
+        else if (m_LoopCount == 2 && !m_ClockObservedThisLoop)
+        {
+            objective = "ヒント ライトを消して左の時計を見る";
+        }
+        else if (confirmationPending)
+        {
+            objective = "ヒント ドア手前の確認スイッチへ進む";
+        }
+        else if (m_FinalDoorReady)
+        {
+            objective = "ヒント 廊下の奥にある出口が開いている";
+        }
+        else if (m_FinalSequenceArmed)
+        {
+            objective = "ヒント 廊下をそのまま歩き続ける";
+        }
+        else if (finalDoor != nullptr && finalDoor->IsOpen())
+        {
+            objective = "ヒント 奥のドアを開けると次へ進む";
+        }
+        else
+        {
+            objective = "ヒント 奥のドアを通り抜ける";
+        }
+    }
+    else if (m_FinalSequenceArmed)
+    {
+        objective = "廊下の奥にある出口へ向かう";
     }
 
     m_Hud.Draw(*player, -1, m_InteractionSystem.GetPrompt(), objective);
+    float threatRate = 0.0f;
+    threatRate = (std::max)(threatRate, m_NoiseThreat * 0.78f);
+    if (m_LoopCount == 1 || m_LoopCount == 2)
+    {
+        const float observationDanger =
+            static_cast<float>(m_PuzzleMistakeCount) / 3.0f;
+        threatRate = (std::max)(threatRate, observationDanger * 0.72f);
+    }
+    if (m_FinalPursuitTimer > 0.0f)
+    {
+        ShadowMan* shadow = game->GetObj<ShadowMan>("Stage2Shadow");
+        if (shadow != nullptr)
+        {
+            Vector3 toShadow = shadow->GetPosition() - player->GetPosition();
+            toShadow.y = 0.0f;
+            const float distance = toShadow.Length();
+            threatRate = 1.0f - (std::clamp)(
+                (distance - 18.0f) / 92.0f, 0.0f, 1.0f);
+        }
+    }
+    if (m_VisualTimer >= 4.20f &&
+        m_CaughtTimer < 0.0f &&
+        (exit == nullptr || !exit->IsEscaping()))
+    {
+        m_Hud.DrawStage2Status(
+            m_LoopCount, threatRate, m_FinalDoorReady);
+    }
+    if (m_VisualTimer >= 4.20f &&
+        m_CaughtTimer < 0.0f &&
+        (exit == nullptr || !exit->IsEscaping()))
+    {
+        Vector3 guideTarget = finalDoor != nullptr
+            ? finalDoor->GetPosition()
+            : Vector3(0.0f, -74.0f, 140.0f);
+        if (m_LoopCount == 1 && !m_FalseDoorMoved)
+        {
+            guideTarget = Vector3(-38.3f, -72.0f, 70.0f);
+        }
+        else if (m_LoopCount == 2 && !m_ClockObservedThisLoop)
+        {
+            guideTarget = Vector3(-38.0f, -70.0f, -25.0f);
+        }
+        else if (confirmationPending)
+        {
+            guideTarget = Vector3(35.5f, -90.0f, 112.0f);
+        }
+        m_Hud.DrawObjectiveGuide(
+            *camera, player->GetPosition(), guideTarget);
+    }
+    if (m_VisualTimer < 0.65f)
+    {
+        const float fade = 1.0f - m_VisualTimer / 0.65f;
+        m_Hud.DrawBlink(fade * fade);
+    }
+    if (m_VisualTimer < 4.20f)
+    {
+        m_Hud.DrawChapterCard(
+            "2階",
+            "廊下の変化を見逃さない",
+            m_VisualTimer);
+    }
+    else if (m_LoopTransitionTimer >= 0.0f)
+    {
+        constexpr std::string_view cycleTitles[] =
+        {
+            "1回目を通過",
+            "2回目を通過",
+            "3回目を通過"
+        };
+        constexpr std::string_view cycleSubtitles[] =
+        {
+            "同じ廊下へ戻ってきた",
+            "何かが移動している",
+            "出口の鍵が開いた"
+        };
+        const size_t cycleIndex = static_cast<size_t>((std::clamp)(
+            m_LoopCount - 1, 0, 2));
+        m_Hud.DrawChapterCard(
+            cycleTitles[cycleIndex],
+            cycleSubtitles[cycleIndex],
+            m_LoopTransitionTimer);
+    }
     if (m_LoopBlinkTimer > 0.0f)
     {
         const float blinkRate =
             (std::clamp)(m_LoopBlinkTimer / 0.28f, 0.0f, 1.0f);
         m_Hud.DrawBlink(blinkRate * blinkRate * 0.90f);
+    }
+
+    if (m_CaughtTimer >= 0.0f)
+    {
+        const float caughtFade = (std::clamp)(
+            m_CaughtTimer / 0.34f, 0.0f, 1.0f);
+        m_Hud.DrawBlink(caughtFade * 0.96f);
     }
 
     if (exit != nullptr && exit->IsEscaping())
@@ -1366,6 +2175,18 @@ void Stage2Scene::Draw(Camera* camera)
         const float smoothFade =
             fadeRate * fadeRate * (3.0f - 2.0f * fadeRate);
         m_Hud.DrawBlink(smoothFade * 0.90f);
+    }
+
+    if (game->IsPaused())
+    {
+        m_Hud.DrawPause(
+            game->GetBrightnessLevel(),
+            game->GetEffectLevel(),
+            game->GetLookSensitivityLevel(),
+            game->GetPauseSettingIndex(),
+            2,
+            game->GetRunTimeSeconds(),
+            game->GetCaughtCount());
     }
 }
 
@@ -1387,12 +2208,17 @@ void Stage2Scene::Uninit()
 
     const char* objectNames[] =
     {
-        "Player", "Stage2Shadow", "Stage2WallLeft", "Stage2WallRight", "Stage2WallBack",
+        "Player", "Stage2Shadow", "Stage2ConfirmationPanel",
+        "Stage2EmergencyCharger",
+        "Stage2EvidenceTerminal1", "Stage2EvidenceTerminal2",
+        "Stage2EvidenceMarker1", "Stage2EvidenceMarker2",
+        "Stage2WallLeft", "Stage2WallRight", "Stage2WallBack",
         "Stage2WallFrontLeft", "Stage2WallFrontRight", "Stage2Floor",
         "Stage2Ceiling", "Stage2TrimLeft", "Stage2TrimRight",
         "Stage2PipeLeft", "Stage2PipeRight", "Stage2Portrait",
         "Stage2PortraitEyeLeft", "Stage2PortraitEyeRight",
-        "Stage2LoopMark", "Stage2DoorIndicator", "Stage2BatteryShelf",
+        "Stage2LoopMark", "Stage2CycleMark1", "Stage2CycleMark2",
+        "Stage2CycleMark3", "Stage2DoorIndicator", "Stage2BatteryShelf",
         "Stage2Battery", "Stage2Light1", "Stage2Light2",
         "Stage2Light3", "CeilingLight4", "Stage2Door", "Stage2Exit"
     };

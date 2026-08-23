@@ -17,6 +17,10 @@ private:
     std::unique_ptr<Material> m_Material;
 
     bool m_IsPowered = false;
+    bool m_IsExitControl = false;
+    bool m_IsManualControl = false;
+    bool m_ManualInteractionAllowed = false;
+    const char* m_ManualPrompt = "スイッチを操作する";
 
     void BuildGeometry();
 
@@ -26,13 +30,30 @@ public:
     void Draw(Camera* camera) override;
     void Uninit() override;
 
-    bool IsInteractionEnabled() const override { return !m_IsPowered; }
+    bool IsInteractionEnabled() const override
+    {
+        return !m_IsPowered &&
+            (!m_IsManualControl || m_ManualInteractionAllowed);
+    }
     DirectX::SimpleMath::Vector3 GetInteractionPosition() const override
     {
         return m_Position;
     }
     const char* GetInteractionPrompt() const override;
     void Interact(Player& player) override;
+
+    void SetExitControl(bool enabled) { m_IsExitControl = enabled; }
+    void SetManualControl(const char* prompt)
+    {
+        m_IsManualControl = true;
+        m_ManualPrompt = prompt;
+    }
+    void SetManualInteractionAllowed(bool allowed)
+    {
+        m_ManualInteractionAllowed = allowed;
+    }
+    void ResetActivation();
+    bool IsActivated() const { return m_IsPowered; }
 
     void SetPosition(float x, float y, float z)
     {
