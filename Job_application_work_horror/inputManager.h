@@ -1,9 +1,14 @@
-#pragma once
-#include <d3d11.h>  // DirectX11‚ğg‚¤‚½‚ß‚Ìƒwƒbƒ_[ƒtƒ@ƒCƒ‹
-#include <DirectXMath.h> // DirextX‚Ì”ŠwŠÖ˜A‚Ìƒwƒbƒ_[ƒtƒ@ƒCƒ‹
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: å…¥åŠ›ãƒ‡ãƒã‚¤ã‚¹ã®çŠ¶æ…‹ã‚’ã‚²ãƒ¼ãƒ å‘ã‘ã‚¢ã‚¯ã‚·ãƒ§ãƒ³ã¸ã¾ã¨ã‚ã¾ã™ã€‚
+// ã“ã®ãƒ˜ãƒƒãƒ€ãƒ¼ã§ã¯å¤–éƒ¨ã¸å…¬é–‹ã™ã‚‹å‹ãƒ»çŠ¶æ…‹ãƒ»æ“ä½œã‚’å®£è¨€ã—ã¾ã™ã€‚
+// ============================================================================
 
-#include <Xinput.h> //XInput‚ğg‚¤‚½‚ß‚Ìƒwƒbƒ_[ƒtƒ@ƒCƒ‹
-#pragma comment (lib, "xinput.lib") //XInput‚ğg‚¤‚½‚ß‚É•K—v
+#pragma once
+#include <d3d11.h>  // DirectX11ã‚’ä½¿ã†ãŸã‚ã®ãƒ˜ãƒƒãƒ€ãƒ¼ãƒ•ã‚¡ã‚¤ãƒ«
+#include <DirectXMath.h> // DirextXã®æ•°å­¦é–¢é€£ã®ãƒ˜ãƒƒãƒ€ãƒ¼ãƒ•ã‚¡ã‚¤ãƒ«
+
+#include <Xinput.h> //XInputã‚’ä½¿ã†ãŸã‚ã®ãƒ˜ãƒƒãƒ€ãƒ¼ãƒ•ã‚¡ã‚¤ãƒ«
+#pragma comment (lib, "xinput.lib") //XInputã‚’ä½¿ã†ãŸã‚ã«å¿…è¦
 
 #define XINPUT_A              0x1000
 #define XINPUT_B              0x2000
@@ -15,8 +20,8 @@
 #define XINPUT_RIGHT          0x0008
 #define XINPUT_START          0x0010
 #define XINPUT_BACK           0x0020
-#define XINPUT_LEFT_THUMB     0x0040 //¶ƒXƒeƒBƒbƒN‰Ÿ‚µ‚İ
-#define XINPUT_RIGHT_THUMB    0x0080 //‰EƒXƒeƒBƒbƒN‰Ÿ‚µ‚İ
+#define XINPUT_LEFT_THUMB     0x0040 //å·¦ã‚¹ãƒ†ã‚£ãƒƒã‚¯æŠ¼ã—è¾¼ã¿
+#define XINPUT_RIGHT_THUMB    0x0080 //å³ã‚¹ãƒ†ã‚£ãƒƒã‚¯æŠ¼ã—è¾¼ã¿
 #define XINPUT_LEFT_SHOULDER  0x0100 //L
 #define XINPUT_RIGHT_SHOULDER 0x0200 //R
 
@@ -59,43 +64,43 @@
 
 class Input {
 private:
-	//ƒL[“ü—Íî•ñ‚ğ•Û‘¶‚·‚é•Ï”
+	//ã‚­ãƒ¼å…¥åŠ›æƒ…å ±ã‚’ä¿å­˜ã™ã‚‹å¤‰æ•°
 	BYTE keyState[256] = {};
 	BYTE keyState_old[256] = {};
 
-	//ƒRƒ“ƒgƒ[ƒ‰[“ü—Íî•ñ‚ğ•Û‘¶‚·‚é•Ï”
+	//ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ãƒ¼å…¥åŠ›æƒ…å ±ã‚’ä¿å­˜ã™ã‚‹å¤‰æ•°
 	XINPUT_STATE controllerState = {};
 	XINPUT_STATE controllerState_old = {};
 
-	int VibrationTime; //U“®Œp‘±ŠÔ‚ğƒJƒEƒ“ƒg‚·‚é•Ï”
+	int VibrationTime; //æŒ¯å‹•ç¶™ç¶šæ™‚é–“ã‚’ã‚«ã‚¦ãƒ³ãƒˆã™ã‚‹å¤‰æ•°
 
 public:
 
-	Input(); //ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-	~Input(); //ƒfƒXƒgƒ‰ƒNƒ^
-	void Update(); //XV
+	Input(); //ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+	~Input(); //ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+	void Update(); //æ›´æ–°
 
-	//ƒL[“ü—Í
-	bool GetKeyPress(int key);   //ƒvƒŒƒX(‰Ÿ‚µ‚Ä‚¢‚éŠÔ‚¸‚Á‚Æ)
-	bool GetKeyTrigger(int key); //ƒgƒŠƒK[(‰Ÿ‚µn‚ß‚½)
-	bool GetKeyRelease(int key); //ƒŠƒŠ[ƒX(‰Ÿ‚µI‚í‚Á‚½)
+	//ã‚­ãƒ¼å…¥åŠ›
+	bool GetKeyPress(int key);   //ãƒ—ãƒ¬ã‚¹(æŠ¼ã—ã¦ã„ã‚‹é–“ãšã£ã¨)
+	bool GetKeyTrigger(int key); //ãƒˆãƒªã‚¬ãƒ¼(æŠ¼ã—å§‹ã‚ãŸæ™‚)
+	bool GetKeyRelease(int key); //ãƒªãƒªãƒ¼ã‚¹(æŠ¼ã—çµ‚ã‚ã£ãŸæ™‚)
 
-	//ƒAƒiƒƒOƒXƒeƒBƒbƒN(ƒRƒ“ƒgƒ[ƒ‰[)
+	//ã‚¢ãƒŠãƒ­ã‚°ã‚¹ãƒ†ã‚£ãƒƒã‚¯(ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ãƒ¼)
 	DirectX::XMFLOAT2 GetLeftAnalogStick(void);
 	DirectX::XMFLOAT2 GetRightAnalogStick(void);
 
-	//ƒgƒŠƒK[(ƒRƒ“ƒgƒ[ƒ‰[)
+	//ãƒˆãƒªã‚¬ãƒ¼(ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ãƒ¼)
 	float GetLeftTrigger(void);
 	float GetRightTrigger(void);
 
-	//ƒ{ƒ^ƒ““ü—Í(ƒRƒ“ƒgƒ[ƒ‰[)
-	bool GetButtonPress(WORD btn);   //ƒvƒŒƒX(‰Ÿ‚µ‚Ä‚¢‚éŠÔ‚¸‚Á‚Æ)
-	bool GetButtonTrigger(WORD btn); //ƒgƒŠƒK[(‰Ÿ‚µn‚ß‚½)
-	bool GetButtonRelease(WORD btn); //ƒŠƒŠ[ƒX(‰Ÿ‚µI‚í‚Á‚½)
+	//ãƒœã‚¿ãƒ³å…¥åŠ›(ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ãƒ¼)
+	bool GetButtonPress(WORD btn);   //ãƒ—ãƒ¬ã‚¹(æŠ¼ã—ã¦ã„ã‚‹é–“ãšã£ã¨)
+	bool GetButtonTrigger(WORD btn); //ãƒˆãƒªã‚¬ãƒ¼(æŠ¼ã—å§‹ã‚ãŸæ™‚)
+	bool GetButtonRelease(WORD btn); //ãƒªãƒªãƒ¼ã‚¹(æŠ¼ã—çµ‚ã‚ã£ãŸæ™‚)
 	
-	//U“®(ƒRƒ“ƒgƒ[ƒ‰[)
-	//flameFU“®‚ğŒp‘±‚·‚éŠÔ(’PˆÊFƒtƒŒ[ƒ€)
-	//powoeFU“®‚Ì‹­‚³(0`1)
+	//æŒ¯å‹•(ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ãƒ¼)
+	//flameï¼šæŒ¯å‹•ã‚’ç¶™ç¶šã™ã‚‹æ™‚é–“(å˜ä½ï¼šãƒ•ãƒ¬ãƒ¼ãƒ )
+	//powoeï¼šæŒ¯å‹•ã®å¼·ã•(0ï½1)
 	void SetVibration(int frame = 1, float powor = 1);
 };
 

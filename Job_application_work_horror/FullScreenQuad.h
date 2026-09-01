@@ -1,3 +1,7 @@
+// ============================================================================
+// ファイルの役割: ポストプロセス用の画面全体ポリゴンとレンダーターゲットを管理します。
+// ============================================================================
+
 #pragma once
 
 #include <wrl/client.h>
@@ -27,7 +31,7 @@ namespace Graphics
             float corridorTension;
             float filmGradeStrength;
             float lensDirtStrength;
-            float postProcessPadding0;
+            float signalInterference;
             float postProcessPadding1;
             float postProcessPadding2;
         };
@@ -64,6 +68,7 @@ namespace Graphics
             float lensMoisture,
             float corridorTension,
             float filmGradeStrength,
-            float lensDirtStrength);
+            float lensDirtStrength,
+            float signalInterference);
     };
 }

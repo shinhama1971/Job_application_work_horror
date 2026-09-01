@@ -1,3 +1,7 @@
+// ============================================================================
+// ファイルの役割: 2面のループ廊下、謎解き、段階的な異変とクリア条件を管理します。
+// ============================================================================
+
 #include "Stage2Scene.h"
 
 #include "BatteryItem.h"
@@ -63,6 +67,7 @@ Stage2Scene::~Stage2Scene()
     Uninit();
 }
 
+// ループ廊下の基本形と、周回によって表示を切り替える異変Objectを準備します。
 void Stage2Scene::Init()
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -72,6 +77,7 @@ void Stage2Scene::Init()
     game->GetPostProcess()->SetAtmosphere(0.20f, 0.62f);
     game->GetPostProcess()->SetLensDistortionStrength(0.20f);
     game->GetPostProcess()->SetFilmGradeStrength(0.58f);
+    game->GetPostProcess()->SetSignalInterference(0.0f);
     game->GetPostProcess()->SetVolumetricLight(true);
     game->GetPostProcess()->SetVolumetricIntensity(0.38f);
 
@@ -92,8 +98,12 @@ void Stage2Scene::Init()
     m_NoiseThreat = 0.0f;
     m_NoiseEventCooldown = 0.0f;
     m_NoiseWarningTimer = 0.0f;
+    m_WetStepNoticeTimer = 0.0f;
+    m_NoiseStalkerCooldown = 0.0f;
+    m_NoiseStalkerNoticeTimer = 0.0f;
     m_ChargerNoticeTimer = 0.0f;
     m_EvidenceNoticeTimer = 0.0f;
+    m_SignalNoticeTimer = 0.0f;
     m_LoopBlinkTimer = 0.0f;
     m_LoopTransitionTimer = -1.0f;
     m_FinalPursuitTimer = 0.0f;
@@ -116,10 +126,16 @@ void Stage2Scene::Init()
     m_ChargerHandled = false;
     m_EvidenceHandled[0] = false;
     m_EvidenceHandled[1] = false;
+    m_SignalAccepted[0] = false;
+    m_SignalAccepted[1] = false;
+    m_SignalAccepted[2] = false;
+    m_SignalStep = 0;
+    m_SignalPuzzleComplete = false;
     m_PuzzleFeedbackType = 0;
     m_PuzzleMistakeCount = 0;
     m_FinalSequenceArmed = false;
     m_FinalDoorReady = false;
+    m_NoiseCatch = false;
     m_DebugCommand = 0;
 
     Player* player = game->CreateObj<Player>("Player");
@@ -129,6 +145,12 @@ void Stage2Scene::Init()
     stageShadow->SetPosition(0.0f, -99.0f, 62.0f);
     stageShadow->SetDeactivateOnExpire(true);
     stageShadow->SetActive(false);
+
+    // 謎解き用の影と分け、足音だけに反応する追跡者を独立して管理します。
+    ShadowMan* noiseShadow = game->CreateObj<ShadowMan>("Stage2NoiseShadow");
+    noiseShadow->SetPosition(0.0f, -99.0f, -145.0f);
+    noiseShadow->SetDeactivateOnExpire(true);
+    noiseShadow->SetActive(false);
 
     FuseBox* confirmationPanel =
         game->CreateObj<FuseBox>("Stage2ConfirmationPanel");
@@ -157,6 +179,40 @@ void Stage2Scene::Init()
     evidenceTerminal2->SetManualInteractionAllowed(true);
     evidenceTerminal2->SetPosition(-35.5f, -90.0f, 108.0f);
     evidenceTerminal2->SetRotation(Vector3(0.0f, 1.5707963f, 0.0f));
+
+    constexpr const char* signalTerminalNames[] =
+    {
+        "Stage2SignalTerminalBlue",
+        "Stage2SignalTerminalAmber",
+        "Stage2SignalTerminalRed"
+    };
+    constexpr const char* signalPrompts[] =
+    {
+        "青い信号盤を操作する",
+        "黄色い信号盤を操作する",
+        "赤い信号盤を操作する"
+    };
+    const Vector3 signalPositions[] =
+    {
+        Vector3(35.5f, -90.0f, 82.0f),
+        Vector3(-35.5f, -90.0f, 18.0f),
+        Vector3(35.5f, -90.0f, -108.0f)
+    };
+    for (int signalIndex = 0; signalIndex < 3; ++signalIndex)
+    {
+        FuseBox* signalTerminal =
+            game->CreateObj<FuseBox>(signalTerminalNames[signalIndex]);
+        signalTerminal->SetManualControl(signalPrompts[signalIndex]);
+        signalTerminal->SetManualInteractionAllowed(false);
+        signalTerminal->SetPosition(
+            signalPositions[signalIndex].x,
+            signalPositions[signalIndex].y,
+            signalPositions[signalIndex].z);
+        signalTerminal->SetRotation(Vector3(
+            0.0f,
+            signalIndex == 1 ? 1.5707963f : -1.5707963f,
+            0.0f));
+    }
 
     const auto createWall = [game](
         const char* name,
@@ -191,6 +247,27 @@ void Stage2Scene::Init()
     Wall* floor = createWall("Stage2Floor", Vector3(0.0f, -100.5f, -10.0f),
         Vector3(84.0f, 2.0f, 300.0f), floorColor, false);
     floor->SetCastsShadow(false);
+
+    // 水たまりは安全な近道と静かな迂回路の間に置き、走り抜けるほど敵へ音が伝わります。
+    struct CorridorPuddle { const char* Name; float X; float Z; float Width; float Depth; };
+    const CorridorPuddle corridorPuddles[] =
+    {
+        { "Stage2Puddle1", -9.0f, -82.0f, 40.0f, 22.0f },
+        { "Stage2Puddle2", 10.0f, 12.0f, 38.0f, 25.0f },
+        { "Stage2Puddle3", -7.0f, 92.0f, 44.0f, 20.0f }
+    };
+    for (const CorridorPuddle& puddle : corridorPuddles)
+    {
+        Wall* surface = createWall(
+            puddle.Name,
+            Vector3(puddle.X, -99.32f, puddle.Z),
+            Vector3(puddle.Width, 0.12f, puddle.Depth),
+            Color(0.025f, 0.052f, 0.060f, 0.72f), false);
+        surface->SetAppearance(
+            Color(0.025f, 0.052f, 0.060f, 0.72f),
+            Color(0.045f, 0.095f, 0.11f, 1.0f), 92.0f);
+        surface->SetCastsShadow(false);
+    }
     Wall* ceiling = createWall("Stage2Ceiling", Vector3(0.0f, -47.0f, -10.0f),
         Vector3(84.0f, 3.0f, 300.0f), trimColor, false);
     ceiling->SetCastsShadow(false);
@@ -223,6 +300,39 @@ void Stage2Scene::Init()
         Color(0.025f, 0.11f, 0.09f, 1.0f),
         Color(0.02f, 0.24f, 0.16f, 1.0f), 36.0f);
     evidenceMarker2->SetCastsShadow(false);
+
+    const char* signalMarkerNames[] =
+    {
+        "Stage2SignalMarkerBlue",
+        "Stage2SignalMarkerAmber",
+        "Stage2SignalMarkerRed"
+    };
+    const Color signalDiffuse[] =
+    {
+        Color(0.015f, 0.055f, 0.13f, 1.0f),
+        Color(0.13f, 0.075f, 0.012f, 1.0f),
+        Color(0.13f, 0.018f, 0.012f, 1.0f)
+    };
+    const Color signalEmission[] =
+    {
+        Color(0.015f, 0.18f, 0.48f, 1.0f),
+        Color(0.40f, 0.17f, 0.008f, 1.0f),
+        Color(0.42f, 0.018f, 0.008f, 1.0f)
+    };
+    for (int signalIndex = 0; signalIndex < 3; ++signalIndex)
+    {
+        const bool leftWall = signalIndex == 1;
+        Wall* marker = createWall(
+            signalMarkerNames[signalIndex],
+            Vector3(leftWall ? -39.4f : 39.4f, -72.0f,
+                signalPositions[signalIndex].z),
+            Vector3(1.0f, 17.0f, 18.0f),
+            signalDiffuse[signalIndex], false);
+        marker->SetAppearance(
+            signalDiffuse[signalIndex], signalEmission[signalIndex], 48.0f);
+        marker->SetSignalSurface(true);
+        marker->SetCastsShadow(false);
+    }
 
     Wall* portrait = createWall("Stage2Portrait", Vector3(39.4f, -70.0f, -25.0f),
         Vector3(1.0f, 22.0f, 16.0f), Color(0.055f, 0.042f, 0.034f, 1.0f), false);
@@ -422,6 +532,7 @@ void Stage2Scene::Init()
     m_Hud.Init();
 }
 
+// 周回数、視線、騒音、信号パズル、追跡演出を同時に監視して進行を更新します。
 void Stage2Scene::Update()
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -439,6 +550,11 @@ void Stage2Scene::Update()
         if (shadow != nullptr)
         {
             shadow->SetActive(false);
+        }
+        ShadowMan* noiseShadow = game->GetObj<ShadowMan>("Stage2NoiseShadow");
+        if (noiseShadow != nullptr)
+        {
+            noiseShadow->SetActive(false);
         }
         return;
     }
@@ -467,6 +583,12 @@ void Stage2Scene::Update()
         {
             AdvanceLoop(*player);
         }
+        m_SignalAccepted[0] = true;
+        m_SignalAccepted[1] = true;
+        m_SignalAccepted[2] = true;
+        m_SignalStep = 3;
+        m_SignalPuzzleComplete = true;
+        m_FinalSequenceArmed = true;
         if (m_FinalSequenceArmed && m_FinalSequenceTimer < 0.0f)
         {
             StartFinalSequence();
@@ -511,10 +633,54 @@ void Stage2Scene::Update()
         (std::max)(0.0f, m_NoiseEventCooldown - deltaTime);
     m_NoiseWarningTimer =
         (std::max)(0.0f, m_NoiseWarningTimer - deltaTime);
+    m_WetStepNoticeTimer =
+        (std::max)(0.0f, m_WetStepNoticeTimer - deltaTime);
+    m_NoiseStalkerCooldown =
+        (std::max)(0.0f, m_NoiseStalkerCooldown - deltaTime);
+    m_NoiseStalkerNoticeTimer =
+        (std::max)(0.0f, m_NoiseStalkerNoticeTimer - deltaTime);
+
+    const Vector3 playerPosition = player->GetPosition();
+    const bool onWetSurface =
+        (std::abs(playerPosition.x + 9.0f) <= 20.0f &&
+            std::abs(playerPosition.z + 82.0f) <= 11.0f) ||
+        (std::abs(playerPosition.x - 10.0f) <= 19.0f &&
+            std::abs(playerPosition.z - 12.0f) <= 12.5f) ||
+        (std::abs(playerPosition.x + 7.0f) <= 22.0f &&
+            std::abs(playerPosition.z - 92.0f) <= 10.0f);
+    player->SetWetSurface(onWetSurface);
+
+    // 濡れ面は静止画にせず、微細な反射の揺れと危険時の照明反射を与えます。
+    const char* puddleNames[] =
+    {
+        "Stage2Puddle1", "Stage2Puddle2", "Stage2Puddle3"
+    };
+    for (int puddleIndex = 0; puddleIndex < 3; ++puddleIndex)
+    {
+        Wall* puddle = game->GetObj<Wall>(puddleNames[puddleIndex]);
+        if (puddle == nullptr)
+        {
+            continue;
+        }
+        const float shimmer = std::sin(
+            m_VisualTimer * (1.25f + puddleIndex * 0.17f) + puddleIndex * 2.1f)
+            * 0.5f + 0.5f;
+        const float dangerReflection = m_NoiseThreat * 0.055f;
+        puddle->SetAppearance(
+            Color(0.020f + shimmer * 0.010f,
+                0.045f + shimmer * 0.014f,
+                0.052f + shimmer * 0.018f, 0.76f),
+            Color(0.035f + dangerReflection,
+                0.078f + dangerReflection * 0.55f,
+                0.095f + shimmer * 0.025f, 1.0f),
+            96.0f + shimmer * 28.0f);
+    }
     m_ChargerNoticeTimer =
         (std::max)(0.0f, m_ChargerNoticeTimer - deltaTime);
     m_EvidenceNoticeTimer =
         (std::max)(0.0f, m_EvidenceNoticeTimer - deltaTime);
+    m_SignalNoticeTimer =
+        (std::max)(0.0f, m_SignalNoticeTimer - deltaTime);
     m_LoopBlinkTimer =
         (std::max)(0.0f, m_LoopBlinkTimer - deltaTime);
     m_FinalPursuitTimer =
@@ -550,7 +716,8 @@ void Stage2Scene::Update()
         AdvanceLoop(*player);
     }
 
-    if (m_FinalSequenceArmed && m_FinalSequenceTimer < 0.0f &&
+    if (m_SignalPuzzleComplete && m_FinalSequenceArmed &&
+        m_FinalSequenceTimer < 0.0f &&
         player->GetPosition().z > -8.0f)
     {
         StartFinalSequence();
@@ -617,6 +784,9 @@ void Stage2Scene::Update()
             Input::SetVibration(4, 0.08f);
         }
     }
+
+    UpdateSignalPuzzle();
+    UpdateSignalStalker();
 
     FuseBox* confirmationPanel =
         game->GetObj<FuseBox>("Stage2ConfirmationPanel");
@@ -695,6 +865,21 @@ void Stage2Scene::Update()
         0.58f + loopRate * 0.20f);
     game->GetPostProcess()->SetLensDirtStrength(
         0.14f + loopRate * 0.08f);
+    const bool signalRestorationActive =
+        m_LoopCount >= 3 && !m_SignalPuzzleComplete;
+    const float unresolvedSignalRate =
+        1.0f - static_cast<float>(m_SignalStep) / 3.0f;
+    ShadowMan* activeNoiseShadow =
+        game->GetObj<ShadowMan>("Stage2NoiseShadow");
+    const float stalkerInterference =
+        activeNoiseShadow != nullptr && activeNoiseShadow->IsActive()
+            ? (std::clamp)((m_NoiseThreat - 0.52f) * 0.72f, 0.0f, 0.30f)
+            : 0.0f;
+    game->GetPostProcess()->SetSignalInterference(
+        signalRestorationActive
+            ? (std::clamp)(0.10f + m_NoiseThreat * 0.62f +
+                unresolvedSignalRate * 0.16f, 0.0f, 0.88f)
+            : stalkerInterference);
     game->GetPostProcess()->SetVolumetricLight(player->IsFlashlightOn());
     game->GetPostProcess()->SetVolumetricIntensity(
         0.38f + loopRate * 0.20f + localDarkness * 0.055f);
@@ -727,18 +912,126 @@ void Stage2Scene::Update()
     m_InteractionSystem.Update(*player);
 }
 
-void Stage2Scene::UpdateNoiseThreat(const Player& player, float deltaTime)
+void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
 {
-    if (m_LoopCount >= 3 || m_FinalSequenceTimer >= 0.0f)
+    if (m_FinalSequenceTimer >= 0.0f || m_FinalPursuitTimer > 0.0f)
     {
         m_NoiseThreat = (std::max)(0.0f, m_NoiseThreat - deltaTime * 0.8f);
+        ShadowMan* noiseShadow = Core::Game::GetInstance()->GetObj<ShadowMan>(
+            "Stage2NoiseShadow");
+        if (noiseShadow != nullptr)
+        {
+            noiseShadow->SetActive(false);
+        }
         return;
     }
 
+    const bool signalStealthActive =
+        m_LoopCount >= 3 && !m_SignalPuzzleComplete;
+    if (m_LoopCount >= 3 && !signalStealthActive)
+    {
+        m_NoiseThreat = (std::max)(0.0f, m_NoiseThreat - deltaTime * 0.8f);
+        ShadowMan* noiseShadow = Core::Game::GetInstance()->GetObj<ShadowMan>(
+            "Stage2NoiseShadow");
+        if (noiseShadow != nullptr)
+        {
+            noiseShadow->SetActive(false);
+        }
+        return;
+    }
+
+    const float surfacePulse = player.GetSurfaceNoisePulse();
+    if (surfacePulse > 0.0f)
+    {
+        m_NoiseThreat = (std::min)(1.0f,
+            m_NoiseThreat + surfacePulse * (signalStealthActive ? 0.18f : 0.11f));
+        if (surfacePulse >= 0.60f)
+        {
+            m_WetStepNoticeTimer = 1.8f;
+        }
+    }
+
     const float change = player.IsSprinting()
-        ? deltaTime * 0.36f
-        : -deltaTime * 0.22f;
+        ? deltaTime * (signalStealthActive ? 0.48f : 0.36f)
+        : -deltaTime * (signalStealthActive ? 0.12f : 0.22f);
     m_NoiseThreat = (std::clamp)(m_NoiseThreat + change, 0.0f, 1.0f);
+
+    Core::Game* game = Core::Game::GetInstance();
+    ShadowMan* noiseShadow =
+        game->GetObj<ShadowMan>("Stage2NoiseShadow");
+    if (noiseShadow != nullptr && noiseShadow->IsActive())
+    {
+        Vector3 toShadow = noiseShadow->GetPosition() - player.GetPosition();
+        toShadow.y = 0.0f;
+        const float distance = toShadow.Length();
+        const float proximity = 1.0f - (std::clamp)(
+            (distance - 14.0f) / 72.0f, 0.0f, 1.0f);
+        m_NoiseThreat = (std::max)(m_NoiseThreat, proximity * 0.92f);
+
+        if (distance <= 15.5f)
+        {
+            m_NoiseCatch = true;
+            StartCaughtSequence(player);
+            return;
+        }
+    }
+
+    const bool canSpawnNoiseStalker =
+        m_NoiseThreat >= 0.74f &&
+        m_NoiseStalkerCooldown <= 0.0f &&
+        m_FinalSequenceTimer < 0.0f &&
+        m_FinalPursuitTimer <= 0.0f &&
+        noiseShadow != nullptr && !noiseShadow->IsActive();
+    if (canSpawnNoiseStalker)
+    {
+        const Vector3 forward = player.GetForward();
+        Vector3 spawnPosition = player.GetPosition() - forward * 68.0f;
+        spawnPosition.x = (std::clamp)(spawnPosition.x, -30.0f, 30.0f);
+        spawnPosition.y = -99.0f;
+        spawnPosition.z = (std::clamp)(spawnPosition.z, -145.0f, 128.0f);
+
+        noiseShadow->SetPosition(
+            spawnPosition.x, spawnPosition.y, spawnPosition.z);
+        noiseShadow->SetActive(true);
+        noiseShadow->EnableChase(13.0f + m_NoiseThreat * 6.0f, 12.0f);
+        noiseShadow->EnableGazeScare(7.5f);
+        noiseShadow->SetOnObserved([this]()
+        {
+            Core::Game* currentGame = Core::Game::GetInstance();
+            ShadowMan* currentShadow =
+                currentGame->GetObj<ShadowMan>("Stage2NoiseShadow");
+            if (currentShadow != nullptr)
+            {
+                currentShadow->SetActive(false);
+            }
+            m_NoiseThreat = (std::max)(0.10f, m_NoiseThreat - 0.38f);
+            m_NoiseStalkerCooldown = 6.0f;
+            m_NoiseStalkerNoticeTimer = 2.4f;
+        });
+        m_NoiseStalkerCooldown = 8.5f;
+        m_NoiseStalkerNoticeTimer = 2.8f;
+        m_NoiseWarningTimer = (std::max)(m_NoiseWarningTimer, 2.8f);
+        game->PlayAudioCue(SOUND_CUE_SCARE, 0.78f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.42f, 0.38f);
+        Input::SetVibration(8, 0.22f);
+    }
+
+    if (signalStealthActive && m_NoiseThreat >= 0.98f)
+    {
+        ResetSignalPuzzle();
+        RegisterPuzzleMistake(4);
+        m_PuzzleFeedbackType = 4;
+        m_PuzzleFeedbackTimer = 2.8f;
+        m_SignalNoticeTimer = 3.0f;
+        m_NoiseWarningTimer = 3.0f;
+        m_NoiseThreat = 0.30f;
+        m_NoiseEventCooldown = 2.8f;
+
+        game->GetPostProcess()->TriggerHorrorPulse(0.72f, 0.48f);
+        game->GetPostProcess()->TriggerBloomPulse(0.90f, 0.24f);
+        Input::SetVibration(13, 0.30f);
+        return;
+    }
     if (m_NoiseThreat < 0.70f || m_NoiseEventCooldown > 0.0f)
     {
         return;
@@ -751,7 +1044,6 @@ void Stage2Scene::UpdateNoiseThreat(const Player& player, float deltaTime)
             ? "Stage2Light2"
             : (playerZ < 88.0f ? "Stage2Light3" : "CeilingLight4"));
 
-    Core::Game* game = Core::Game::GetInstance();
     CeilingLight* reactionLight =
         game->GetObj<CeilingLight>(reactionLightName);
     if (reactionLight != nullptr)
@@ -789,12 +1081,21 @@ void Stage2Scene::AdvanceLoop(Player& player)
     m_FalseDoorMoved = false;
     m_ClockObservedThisLoop = false;
     m_ConfirmationHandledThisLoop = false;
+    ResetSignalPuzzle();
     m_PuzzleFeedbackTimer = 0.0f;
     m_PuzzleFeedbackType = 0;
     m_PuzzleMistakeCount = 0;
     m_NoiseThreat = 0.12f;
     m_NoiseEventCooldown = 1.0f;
     m_NoiseWarningTimer = 0.0f;
+    m_NoiseStalkerCooldown = 2.0f;
+    m_NoiseStalkerNoticeTimer = 0.0f;
+    ShadowMan* noiseShadow =
+        game->GetObj<ShadowMan>("Stage2NoiseShadow");
+    if (noiseShadow != nullptr)
+    {
+        noiseShadow->SetActive(false);
+    }
     FuseBox* confirmationPanel =
         game->GetObj<FuseBox>("Stage2ConfirmationPanel");
     if (confirmationPanel != nullptr)
@@ -939,7 +1240,10 @@ void Stage2Scene::AdvanceLoop(Player& player)
     {
         SetFalseDoorState(false, false);
         RevealScratchPieces(9, Stage2ScratchCount, 0.24f);
-        m_FinalSequenceArmed = true;
+        // The last loop now requires restoring the three signal panels.
+        // The chase is armed only after the player has explored the corridor
+        // and entered the visible colour sequence correctly.
+        m_FinalSequenceArmed = false;
         CeilingLight* doorLight = game->GetObj<CeilingLight>("CeilingLight4");
         if (doorLight != nullptr)
         {
@@ -1118,6 +1422,317 @@ void Stage2Scene::RegisterPuzzleMistake(int type)
         0.06f + mistakeRate * 0.12f);
 }
 
+void Stage2Scene::ResetSignalPuzzle()
+{
+    m_SignalStep = 0;
+    m_SignalPuzzleComplete = false;
+    m_SignalAccepted[0] = false;
+    m_SignalAccepted[1] = false;
+    m_SignalAccepted[2] = false;
+    if (m_LoopCount >= 3)
+    {
+        m_FinalSequenceArmed = false;
+    }
+
+    Core::Game* game = Core::Game::GetInstance();
+    ShadowMan* signalShadow = game->GetObj<ShadowMan>("Stage2Shadow");
+    if (signalShadow != nullptr && m_FinalPursuitTimer <= 0.0f)
+    {
+        signalShadow->SetActive(false);
+    }
+    constexpr const char* terminalNames[] =
+    {
+        "Stage2SignalTerminalBlue",
+        "Stage2SignalTerminalAmber",
+        "Stage2SignalTerminalRed"
+    };
+    for (const char* terminalName : terminalNames)
+    {
+        FuseBox* terminal = game->GetObj<FuseBox>(terminalName);
+        if (terminal != nullptr)
+        {
+            terminal->ResetActivation();
+            terminal->SetManualInteractionAllowed(m_LoopCount >= 3);
+        }
+    }
+    ApplySignalLightingState();
+}
+
+void Stage2Scene::UpdateSignalPuzzle()
+{
+    Core::Game* game = Core::Game::GetInstance();
+    constexpr const char* terminalNames[] =
+    {
+        "Stage2SignalTerminalBlue",
+        "Stage2SignalTerminalAmber",
+        "Stage2SignalTerminalRed"
+    };
+    constexpr const char* markerNames[] =
+    {
+        "Stage2SignalMarkerBlue",
+        "Stage2SignalMarkerAmber",
+        "Stage2SignalMarkerRed"
+    };
+    const Color baseDiffuse[] =
+    {
+        Color(0.015f, 0.055f, 0.13f, 1.0f),
+        Color(0.13f, 0.075f, 0.012f, 1.0f),
+        Color(0.13f, 0.018f, 0.012f, 1.0f)
+    };
+    const Color baseEmission[] =
+    {
+        Color(0.015f, 0.18f, 0.48f, 1.0f),
+        Color(0.40f, 0.17f, 0.008f, 1.0f),
+        Color(0.42f, 0.018f, 0.008f, 1.0f)
+    };
+
+    const bool puzzleActive = m_LoopCount >= 3 && !m_SignalPuzzleComplete;
+    for (int signalIndex = 0; signalIndex < 3; ++signalIndex)
+    {
+        FuseBox* terminal = game->GetObj<FuseBox>(terminalNames[signalIndex]);
+        if (terminal != nullptr)
+        {
+            terminal->SetManualInteractionAllowed(puzzleActive);
+        }
+    }
+
+    if (puzzleActive)
+    {
+        for (int signalIndex = 0; signalIndex < 3; ++signalIndex)
+        {
+            FuseBox* terminal = game->GetObj<FuseBox>(terminalNames[signalIndex]);
+            if (terminal == nullptr || !terminal->IsActivated() ||
+                m_SignalAccepted[signalIndex])
+            {
+                continue;
+            }
+
+            if (signalIndex != m_SignalStep)
+            {
+                ResetSignalPuzzle();
+                RegisterPuzzleMistake(3);
+                m_SignalNoticeTimer = 2.8f;
+                m_NoiseThreat = 0.92f;
+                game->GetPostProcess()->TriggerHorrorPulse(0.62f, 0.42f);
+                Input::SetVibration(11, 0.24f);
+                break;
+            }
+
+            m_SignalAccepted[signalIndex] = true;
+            ++m_SignalStep;
+            m_PuzzleFeedbackType = 0;
+            const float retryAssist = static_cast<float>((std::min)(
+                m_PuzzleMistakeCount, 2));
+            m_NoiseThreat = (std::min)(
+                1.0f,
+                m_NoiseThreat + 0.12f - retryAssist * 0.025f);
+            m_SignalNoticeTimer = 2.4f;
+            m_ProgressHintTimer = 0.0f;
+            game->GetPostProcess()->TriggerBloomPulse(0.52f, 0.20f);
+            Input::SetVibration(4 + m_SignalStep * 2, 0.10f);
+
+            CeilingLight* responseLight = game->GetObj<CeilingLight>(
+                signalIndex == 0 ? "Stage2Light3" :
+                signalIndex == 1 ? "Stage2Light2" : "Stage2Light1");
+            if (responseLight != nullptr)
+            {
+                responseLight->TriggerEventFlicker(0.54f, 0.48f);
+            }
+            ApplySignalLightingState();
+
+            if (m_SignalStep >= 3)
+            {
+                m_SignalPuzzleComplete = true;
+                m_FinalSequenceArmed = true;
+                m_NoticeTimer = 3.2f;
+                ApplySignalLightingState();
+                game->RegisterAnomalyHandled();
+                ShadowMan* signalShadow =
+                    game->GetObj<ShadowMan>("Stage2Shadow");
+                if (signalShadow != nullptr)
+                {
+                    signalShadow->SetActive(false);
+                }
+                for (const char* terminalName : terminalNames)
+                {
+                    FuseBox* completedTerminal =
+                        game->GetObj<FuseBox>(terminalName);
+                    if (completedTerminal != nullptr)
+                    {
+                        completedTerminal->SetManualInteractionAllowed(false);
+                    }
+                }
+                game->GetPostProcess()->TriggerBloomPulse(1.05f, 0.44f);
+                game->GetPostProcess()->TriggerHorrorPulse(0.34f, 0.34f);
+            }
+            else
+            {
+                Player* player = game->GetObj<Player>("Player");
+                ShadowMan* signalShadow =
+                    game->GetObj<ShadowMan>("Stage2Shadow");
+                if (player != nullptr && signalShadow != nullptr)
+                {
+                    const Vector3 playerPosition = player->GetPosition();
+                    Vector3 backward = -player->GetForward();
+                    backward.y = 0.0f;
+                    if (backward.LengthSquared() < 0.001f)
+                    {
+                        backward = Vector3(0.0f, 0.0f, -1.0f);
+                    }
+                    backward.Normalize();
+                    const float assistLevel = static_cast<float>((std::min)(
+                        m_PuzzleMistakeCount, 2));
+                    const float spawnDistance =
+                        78.0f - m_SignalStep * 7.0f + assistLevel * 13.0f;
+                    signalShadow->SetPosition(
+                        playerPosition.x + backward.x * spawnDistance,
+                        -99.0f,
+                        playerPosition.z + backward.z * spawnDistance);
+                    signalShadow->SetActive(false);
+                    signalShadow->SetActive(true);
+                    signalShadow->EnableChase(
+                        13.0f + static_cast<float>(m_SignalStep) * 2.0f -
+                            assistLevel * 1.6f,
+                        30.0f);
+                    signalShadow->EnableGazeScare(24.0f);
+                    signalShadow->SetOnObserved(
+                        [this]()
+                        {
+                            Core::Game* currentGame =
+                                Core::Game::GetInstance();
+                            ShadowMan* currentShadow =
+                                currentGame->GetObj<ShadowMan>("Stage2Shadow");
+                            if (currentShadow != nullptr)
+                            {
+                                currentShadow->SetActive(false);
+                            }
+                            m_NoiseThreat = (std::max)(0.12f, m_NoiseThreat - 0.24f);
+                            m_PuzzleFeedbackType = 6;
+                            m_PuzzleFeedbackTimer = 2.0f;
+                            m_SignalNoticeTimer = 2.4f;
+                            currentGame->GetPostProcess()->TriggerBloomPulse(0.72f, 0.22f);
+                            Input::SetVibration(4, 0.10f);
+                        });
+                }
+            }
+            break;
+        }
+    }
+
+    const float pulse = std::sin(m_VisualTimer * 5.4f) * 0.5f + 0.5f;
+    for (int signalIndex = 0; signalIndex < 3; ++signalIndex)
+    {
+        Wall* marker = game->GetObj<Wall>(markerNames[signalIndex]);
+        if (marker == nullptr)
+        {
+            continue;
+        }
+
+        if (m_SignalPuzzleComplete || m_SignalAccepted[signalIndex])
+        {
+            marker->SetAppearance(
+                Color(0.025f, 0.14f, 0.055f, 1.0f),
+                Color(0.02f, 0.42f + pulse * 0.12f, 0.08f, 1.0f),
+                58.0f);
+        }
+        else
+        {
+            const bool isTarget = puzzleActive && signalIndex == m_SignalStep;
+            const float energy = isTarget ? 0.72f + pulse * 0.42f : 0.16f;
+            marker->SetAppearance(
+                baseDiffuse[signalIndex],
+                baseEmission[signalIndex] * energy,
+                isTarget ? 54.0f : 24.0f);
+        }
+    }
+}
+
+void Stage2Scene::ApplySignalLightingState()
+{
+    if (m_LoopCount < 3)
+    {
+        return;
+    }
+
+    Core::Game* game = Core::Game::GetInstance();
+    constexpr const char* restorationLights[] =
+    {
+        "Stage2Light3",
+        "Stage2Light2",
+        "Stage2Light1"
+    };
+    constexpr float flickerOffsets[] = { 2.8f, 1.4f, 0.2f };
+
+    for (int lightIndex = 0; lightIndex < 3; ++lightIndex)
+    {
+        CeilingLight* light =
+            game->GetObj<CeilingLight>(restorationLights[lightIndex]);
+        if (light == nullptr)
+        {
+            continue;
+        }
+
+        const bool restored =
+            m_SignalPuzzleComplete || lightIndex < m_SignalStep;
+        light->SetForcedOff(false);
+        light->SetFaulted(!restored);
+        light->SetEmergencyLight(!restored, flickerOffsets[lightIndex]);
+    }
+
+    CeilingLight* exitLight = game->GetObj<CeilingLight>("CeilingLight4");
+    if (exitLight != nullptr)
+    {
+        exitLight->SetForcedOff(false);
+        exitLight->SetFaulted(!m_SignalPuzzleComplete);
+        exitLight->SetEmergencyLight(
+            !m_SignalPuzzleComplete,
+            4.1f);
+        if (m_SignalPuzzleComplete)
+        {
+            exitLight->TriggerEventFlicker(1.10f, 0.82f);
+        }
+    }
+}
+
+void Stage2Scene::UpdateSignalStalker()
+{
+    if (m_LoopCount < 3 || m_SignalPuzzleComplete || m_SignalStep <= 0)
+    {
+        return;
+    }
+
+    Core::Game* game = Core::Game::GetInstance();
+    Player* player = game->GetObj<Player>("Player");
+    ShadowMan* shadow = game->GetObj<ShadowMan>("Stage2Shadow");
+    if (player == nullptr || shadow == nullptr || !shadow->IsActive())
+    {
+        return;
+    }
+
+    Vector3 toShadow = shadow->GetPosition() - player->GetPosition();
+    toShadow.y = 0.0f;
+    const float distance = toShadow.Length();
+    const float proximity = 1.0f - (std::clamp)((distance - 30.0f) / 90.0f, 0.0f, 1.0f);
+    m_NoiseThreat = (std::max)(m_NoiseThreat, proximity * 0.78f);
+
+    if (distance > 35.0f)
+    {
+        return;
+    }
+
+    shadow->SetActive(false);
+    ResetSignalPuzzle();
+    RegisterPuzzleMistake(5);
+    m_PuzzleFeedbackType = 5;
+    m_PuzzleFeedbackTimer = 2.8f;
+    m_SignalNoticeTimer = 3.0f;
+    m_NoiseThreat = 0.38f;
+    m_NoiseEventCooldown = 2.8f;
+    game->GetPostProcess()->TriggerHorrorPulse(0.88f, 0.48f);
+    game->GetPostProcess()->TriggerBloomPulse(0.16f, 0.16f);
+    Input::SetVibration(15, 0.34f);
+}
+
 void Stage2Scene::SetFalseDoorState(bool visible, bool rightSide)
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -1224,6 +1839,7 @@ void Stage2Scene::StartObservedScare()
     m_ObservedScarePhase = 0;
 
     Core::Game* game = Core::Game::GetInstance();
+    game->PlayAudioCue(SOUND_CUE_SCARE);
     game->GetPostProcess()->TriggerHorrorPulse(0.72f, 0.52f);
     Input::SetVibration(15, 0.34f);
 }
@@ -1299,6 +1915,11 @@ void Stage2Scene::StartFinalSequence()
     Core::Game* game = Core::Game::GetInstance();
     Player* player = game->GetObj<Player>("Player");
     ShadowMan* shadow = game->GetObj<ShadowMan>("Stage2Shadow");
+    ShadowMan* noiseShadow = game->GetObj<ShadowMan>("Stage2NoiseShadow");
+    if (noiseShadow != nullptr)
+    {
+        noiseShadow->SetActive(false);
+    }
     if (player != nullptr)
     {
         player->RestoreStamina();
@@ -1542,10 +2163,16 @@ void Stage2Scene::StartCaughtSequence(Player& player)
 
     Core::Game* game = Core::Game::GetInstance();
     game->RegisterCaught();
+    game->PlayAudioCue(SOUND_CUE_SCARE);
     ShadowMan* shadow = game->GetObj<ShadowMan>("Stage2Shadow");
     if (shadow != nullptr)
     {
         shadow->SetActive(false);
+    }
+    ShadowMan* noiseShadow = game->GetObj<ShadowMan>("Stage2NoiseShadow");
+    if (noiseShadow != nullptr)
+    {
+        noiseShadow->SetActive(false);
     }
 
     game->GetPostProcess()->TriggerHorrorPulse(1.0f, 0.72f);
@@ -1572,33 +2199,43 @@ void Stage2Scene::UpdateCaughtSequence(Player& player, float deltaTime)
         return;
     }
 
-    // Retry from the beginning of the final corridor. The completed loops
-    // remain completed, so failure costs time without deleting progress.
+    // 騒音追跡で捕まった場合は現在の周回を保持し、入口へ戻して再挑戦させます。
     player.SetPosition(Vector3(0.0f, -99.0f, -125.0f));
     player.RestoreStamina();
     player.SetCanControl(true);
     m_CaughtTimer = -1.0f;
-    m_FinalSequenceTimer = -1.0f;
-    m_FinalSequencePhase = 0;
-    m_FinalSequenceArmed = true;
-    m_FinalDoorReady = false;
+    const bool wasNoiseCatch = m_NoiseCatch;
+    if (!wasNoiseCatch)
+    {
+        m_FinalSequenceTimer = -1.0f;
+        m_FinalSequencePhase = 0;
+        m_FinalSequenceArmed = true;
+        m_FinalDoorReady = false;
+    }
+    else
+    {
+        m_NoiseThreat = 0.18f;
+        m_NoiseStalkerCooldown = 7.0f;
+        m_NoiseStalkerNoticeTimer = 3.0f;
+        m_NoiseCatch = false;
+    }
     m_NoticeTimer = 3.2f;
 
     Door* door = game->GetObj<Door>("Stage2Door");
-    if (door != nullptr)
+    if (door != nullptr && !wasNoiseCatch)
     {
         door->ResetClosed(3);
         door->SetLocked(true);
     }
 
     ExitTrigger* exit = game->GetObj<ExitTrigger>("Stage2Exit");
-    if (exit != nullptr)
+    if (exit != nullptr && !wasNoiseCatch)
     {
         exit->SetInteractionEnabled(false);
     }
 
     Wall* indicator = game->GetObj<Wall>("Stage2DoorIndicator");
-    if (indicator != nullptr)
+    if (indicator != nullptr && !wasNoiseCatch)
     {
         indicator->SetAppearance(
             Color(0.24f, 0.012f, 0.008f, 1.0f),
@@ -1907,6 +2544,23 @@ void Stage2Scene::Draw(Camera* camera)
     {
         objective = "奥の異常確認スイッチを押す";
     }
+    else if (m_LoopCount >= 3 && !m_SignalPuzzleComplete)
+    {
+        if (m_SignalStep == 0)
+        {
+            objective = m_PuzzleMistakeCount >= 2
+                ? "再試行補助中 奥の青い信号盤からやり直す"
+                : "信号復旧 まず奥の青い信号盤を操作する";
+        }
+        else if (m_SignalStep == 1)
+        {
+            objective = "信号復旧 黄色へ戻る 背後の影はライトで追い払う";
+        }
+        else
+        {
+            objective = "信号復旧 赤へ戻る 背後の影はライトで追い払う";
+        }
+    }
     if (exit != nullptr && exit->IsEscaping())
     {
         objective = "脱出中";
@@ -1927,21 +2581,85 @@ void Stage2Scene::Draw(Camera* camera)
     {
         objective = "残された記録を回収した";
     }
+    else if (m_SignalNoticeTimer > 0.0f)
+    {
+        if (m_SignalPuzzleComplete)
+        {
+            objective = "信号復旧完了 廊下の中央へ進む";
+        }
+        else if (m_PuzzleFeedbackType == 3)
+        {
+            objective = "順番が違う 青からやり直す";
+        }
+        else if (m_PuzzleFeedbackType == 4)
+        {
+            objective = "走る音で同期が切れた 歩いて青からやり直す";
+        }
+        else if (m_PuzzleFeedbackType == 5)
+        {
+            objective = "影に追いつかれた 青からやり直す";
+        }
+        else if (m_PuzzleFeedbackType == 6)
+        {
+            objective = "影を追い払った 次の信号盤へ進む";
+        }
+        else if (m_SignalStep == 1)
+        {
+            objective = "青を確認 黄色へ戻る 背後に注意";
+        }
+        else
+        {
+            objective = "黄色を確認 赤へ戻る 背後に注意";
+        }
+    }
+    else if (m_NoiseStalkerNoticeTimer > 0.0f)
+    {
+        ShadowMan* noiseShadow =
+            game->GetObj<ShadowMan>("Stage2NoiseShadow");
+        objective = noiseShadow != nullptr && noiseShadow->IsActive()
+            ? "水音を聞いた影が来る 振り返ってライトを当てる"
+            : "影を追い払った 静かに進む";
+    }
+    else if (m_WetStepNoticeTimer > 0.0f)
+    {
+        objective = "水音が廊下に響いた 水たまりは歩いて渡る";
+    }
     else if (m_NoiseWarningTimer > 0.0f)
     {
         objective = "足音が響いている 歩いて静める";
     }
     else if (m_PuzzleFeedbackTimer > 0.0f)
     {
-        if (m_PuzzleMistakeCount >= 3)
+        if (m_PuzzleFeedbackType == 5)
+        {
+            objective = "影に追いつかれた 青からやり直す";
+        }
+        else if (m_PuzzleFeedbackType == 6)
+        {
+            objective = "影を追い払った 次の信号盤へ進む";
+        }
+        else if (m_PuzzleMistakeCount >= 3)
         {
             objective = "照明が消えた 正しい方法を試す";
         }
         else
         {
-            objective = m_PuzzleFeedbackType == 1
-                ? "光が必要だ 懐中電灯でドアを照らす"
-                : "光が邪魔だ 懐中電灯を消して時計を見る";
+            if (m_PuzzleFeedbackType == 1)
+            {
+                objective = "光が必要だ 懐中電灯でドアを照らす";
+            }
+            else if (m_PuzzleFeedbackType == 2)
+            {
+                objective = "光が邪魔だ 懐中電灯を消して時計を見る";
+            }
+            else if (m_PuzzleFeedbackType == 3)
+            {
+                objective = "信号の順番が違う 青からやり直す";
+            }
+            else
+            {
+                objective = "走る音で同期が切れた 歩いて青からやり直す";
+            }
         }
     }
     else if (m_PursuitGazePenaltyTimer > 0.0f)
@@ -1997,7 +2715,9 @@ void Stage2Scene::Draw(Camera* camera)
                 ? "鍵が開いた 後ろを見ずに進む"
                 : "奥の異常確認スイッチを押す")
             : "3回目 左の時計を調べる";
-        else objective = "廊下の奥にある出口へ向かう";
+        else objective = m_SignalPuzzleComplete
+            ? "信号が復旧した 廊下の中央へ進む"
+            : "奥の青い信号盤から復旧する";
     }
     else if (m_ProgressHintTimer >= 30.0f)
     {
@@ -2012,6 +2732,14 @@ void Stage2Scene::Draw(Camera* camera)
         else if (confirmationPending)
         {
             objective = "ヒント 奥の壁にある赤い確認スイッチを押す";
+        }
+        else if (m_LoopCount >= 3 && !m_SignalPuzzleComplete)
+        {
+            objective = m_SignalStep == 0
+                ? "ヒント 青は廊下の奥の右壁"
+                : m_SignalStep == 1
+                    ? "ヒント 黄色は中央左 影は振り返ってライトを当てる"
+                    : "ヒント 赤は入口右 影は振り返ってライトを当てる";
         }
         else if (m_FinalDoorReady)
         {
@@ -2047,6 +2775,10 @@ void Stage2Scene::Draw(Camera* camera)
         else if (confirmationPending)
         {
             objective = "ヒント ドア手前の確認スイッチへ進む";
+        }
+        else if (m_LoopCount >= 3 && !m_SignalPuzzleComplete)
+        {
+            objective = "ヒント 発光している信号盤を 青 黄 赤 の順で操作する";
         }
         else if (m_FinalDoorReady)
         {
@@ -2091,12 +2823,24 @@ void Stage2Scene::Draw(Camera* camera)
                 (distance - 18.0f) / 92.0f, 0.0f, 1.0f);
         }
     }
+    ShadowMan* noiseShadow = game->GetObj<ShadowMan>("Stage2NoiseShadow");
+    if (noiseShadow != nullptr && noiseShadow->IsActive())
+    {
+        Vector3 toShadow = noiseShadow->GetPosition() - player->GetPosition();
+        toShadow.y = 0.0f;
+        const float distance = toShadow.Length();
+        const float noiseShadowDanger = 1.0f - (std::clamp)(
+            (distance - 14.0f) / 72.0f, 0.0f, 1.0f);
+        threatRate = (std::max)(threatRate, noiseShadowDanger);
+    }
     if (m_VisualTimer >= 4.20f &&
         m_CaughtTimer < 0.0f &&
         (exit == nullptr || !exit->IsEscaping()))
     {
         m_Hud.DrawStage2Status(
-            m_LoopCount, threatRate, m_FinalDoorReady);
+            m_LoopCount, threatRate, m_FinalDoorReady,
+            m_SignalStep,
+            m_LoopCount >= 3 && !m_SignalPuzzleComplete);
     }
     if (m_VisualTimer >= 4.20f &&
         m_CaughtTimer < 0.0f &&
@@ -2116,6 +2860,21 @@ void Stage2Scene::Draw(Camera* camera)
         else if (confirmationPending)
         {
             guideTarget = Vector3(35.5f, -90.0f, 112.0f);
+        }
+        else if (m_LoopCount >= 3 && !m_SignalPuzzleComplete)
+        {
+            if (m_SignalStep == 0)
+            {
+                guideTarget = Vector3(35.5f, -90.0f, 82.0f);
+            }
+            else if (m_SignalStep == 1)
+            {
+                guideTarget = Vector3(-35.5f, -90.0f, 18.0f);
+            }
+            else
+            {
+                guideTarget = Vector3(35.5f, -90.0f, -108.0f);
+            }
         }
         m_Hud.DrawObjectiveGuide(
             *camera, player->GetPosition(), guideTarget);
@@ -2144,7 +2903,7 @@ void Stage2Scene::Draw(Camera* camera)
         {
             "同じ廊下へ戻ってきた",
             "何かが移動している",
-            "出口の鍵が開いた"
+            "信号復旧を開始する"
         };
         const size_t cycleIndex = static_cast<size_t>((std::clamp)(
             m_LoopCount - 1, 0, 2));
@@ -2183,6 +2942,7 @@ void Stage2Scene::Draw(Camera* camera)
             game->GetBrightnessLevel(),
             game->GetEffectLevel(),
             game->GetLookSensitivityLevel(),
+            game->GetVolumeLevel(),
             game->GetPauseSettingIndex(),
             2,
             game->GetRunTimeSeconds(),
@@ -2203,17 +2963,22 @@ void Stage2Scene::Uninit()
     game->GetPostProcess()->SetExposure(1.0f);
     game->GetPostProcess()->SetLensDistortionStrength(0.32f);
     game->GetPostProcess()->SetFilmGradeStrength(0.55f);
+    game->GetPostProcess()->SetSignalInterference(0.0f);
     game->GetPostProcess()->SetVolumetricLight(false);
     game->GetPostProcess()->SetVolumetricIntensity(0.58f);
 
     const char* objectNames[] =
     {
-        "Player", "Stage2Shadow", "Stage2ConfirmationPanel",
+        "Player", "Stage2Shadow", "Stage2NoiseShadow", "Stage2ConfirmationPanel",
         "Stage2EmergencyCharger",
         "Stage2EvidenceTerminal1", "Stage2EvidenceTerminal2",
         "Stage2EvidenceMarker1", "Stage2EvidenceMarker2",
+        "Stage2SignalTerminalBlue", "Stage2SignalTerminalAmber",
+        "Stage2SignalTerminalRed", "Stage2SignalMarkerBlue",
+        "Stage2SignalMarkerAmber", "Stage2SignalMarkerRed",
         "Stage2WallLeft", "Stage2WallRight", "Stage2WallBack",
         "Stage2WallFrontLeft", "Stage2WallFrontRight", "Stage2Floor",
+        "Stage2Puddle1", "Stage2Puddle2", "Stage2Puddle3",
         "Stage2Ceiling", "Stage2TrimLeft", "Stage2TrimRight",
         "Stage2PipeLeft", "Stage2PipeRight", "Stage2Portrait",
         "Stage2PortraitEyeLeft", "Stage2PortraitEyeRight",

@@ -1,4 +1,8 @@
-﻿#include "Renderer.h"
+// ============================================================================
+// ファイルの役割: 一人称視点の位置、向き、ビュー行列、射影行列を管理します。
+// ============================================================================
+
+#include "Renderer.h"
 #include "Camera.h"
 #include "Application.h"
 #include "Input.h"
@@ -29,7 +33,7 @@ void Camera::Update()
         float t = m_MovieTimer / m_MovieDuration;
         if (t > 1.0f) t = 1.0f;
 
-        // なめらか補間
+        // なめらかに動くようにする補間
         t = t * t * (3.0f - 2.0f * t);
 
         m_Position = Vector3::Lerp(m_MovieStartPos, m_MovieEndPos, t);

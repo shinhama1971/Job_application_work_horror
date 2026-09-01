@@ -1,3 +1,7 @@
+// ============================================================================
+// ファイルの役割: 目的、操作ヒント、電池残量などのゲーム内UIを描画します。
+// ============================================================================
+
 #pragma once
 
 #include <string_view>
@@ -44,11 +48,14 @@ public:
     void DrawStage2Status(
         int completedLoops,
         float threatRate,
-        bool exitReady);
+        bool exitReady,
+        int signalStep,
+        bool signalActive);
     void DrawPause(
         int brightnessLevel,
         int effectLevel,
         int lookSensitivityLevel,
+        int volumeLevel,
         int selectedSetting,
         int floorNumber,
         float runTimeSeconds,

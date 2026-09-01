@@ -1,14 +1,18 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: 2Dæç”»ç”¨ãƒ†ã‚¯ã‚¹ãƒãƒ£ã¨ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãƒªã‚½ãƒ¼ã‚¹ã‚’ç®¡ç†ã—ã¾ã™ã€‚
+// ============================================================================
+
 #include "Texture2D.h"
 
 using namespace std;
 using namespace DirectX::SimpleMath;
 
 //=======================================
-// ‰Šú‰»ˆ—
+// åˆæœŸåŒ–å‡¦ç†
 //=======================================
 void Texture2D::Init()
 {
-	// ’¸“_ƒf[ƒ^
+	// é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿
 	m_Vertices.resize(4);
 
 	m_Vertices[0].position = Vector3(-0.5f, 0.5f, 0);
@@ -26,10 +30,10 @@ void Texture2D::Init()
 	m_Vertices[2].uv = Vector2(0, 1);
 	m_Vertices[3].uv = Vector2(1, 1);
 
-	// ’¸“_ƒoƒbƒtƒ@¶¬
+	// é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ç”Ÿæˆ
 	m_VertexBuffer.Create(m_Vertices);
 
-	// ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@¶¬
+	// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡ç”Ÿæˆ
 	m_Indices.resize(4);
 
 	m_Indices[0] = 0;
@@ -37,22 +41,22 @@ void Texture2D::Init()
 	m_Indices[2] = 2;
 	m_Indices[3] = 3;
 
-	// ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@¶¬
+	// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡ç”Ÿæˆ
 	m_IndexBuffer.Create(m_Indices);
 
-	// ƒVƒF[ƒ_ƒIƒuƒWƒFƒNƒg¶¬
+	// ã‚·ã‚§ãƒ¼ãƒ€ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆç”Ÿæˆ
 	m_Shader.Create("shader/unlitTextureVS.hlsl", "shader/unlitTexturePS.hlsl");
 
-	// ƒ}ƒeƒŠƒAƒ‹î•ñæ“¾
+	// ãƒãƒ†ãƒªã‚¢ãƒ«æƒ…å ±å–å¾—
 	m_Material = std::make_unique<Material>();
 	MATERIAL mtrl;
 	mtrl.Diffuse = Color(1, 1, 1, 1);
-	mtrl.TextureEnable = true; // ƒeƒNƒXƒ`ƒƒ‚ğg‚¤‚©”Û‚©‚Ìƒtƒ‰ƒO
+	mtrl.TextureEnable = true; // ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’ä½¿ã†ã‹å¦ã‹ã®ãƒ•ãƒ©ã‚°
 	m_Material->Create(mtrl);
 }
 
 //=======================================
-// XVˆ—
+// æ›´æ–°å‡¦ç†
 //=======================================
 void Texture2D::Update()
 {
@@ -60,27 +64,27 @@ void Texture2D::Update()
 }
 
 //=======================================
-// •`‰æˆ—
+// æç”»å‡¦ç†
 //=======================================
 void Texture2D::Draw(Camera* cam)
 {
-	//ƒJƒƒ‰‚ğ‘I‘ğ‚·‚é
+	//ã‚«ãƒ¡ãƒ©ã‚’é¸æŠã™ã‚‹
 	cam->SetCamera(1);
 
-	// SRTî•ñì¬
+	// SRTæƒ…å ±ä½œæˆ
 	Matrix r = Matrix::CreateFromYawPitchRoll(m_Rotation.y, m_Rotation.x, m_Rotation.z);
 	Matrix t = Matrix::CreateTranslation(m_Position.x, m_Position.y, m_Position.z);
 	Matrix s = Matrix::CreateScale(m_Scale.x, m_Scale.y, m_Scale.z);
 
 	Matrix worldmtx;
 	worldmtx = s * r * t;
-	Renderer::SetWorldMatrix(&worldmtx); // GPU‚ÉƒZƒbƒg
+	Renderer::SetWorldMatrix(&worldmtx); // GPUã«ã‚»ãƒƒãƒˆ
 
-	// •`‰æ‚Ìˆ—
+	// æç”»ã®å‡¦ç†
 	ID3D11DeviceContext* devicecontext;
 	devicecontext = Renderer::GetDeviceContext();
 
-	// ƒgƒ|ƒƒW[‚ğƒZƒbƒgiƒvƒŠƒ~ƒeƒBƒuƒ^ƒCƒvj
+	// ãƒˆãƒãƒ­ã‚¸ãƒ¼ã‚’ã‚»ãƒƒãƒˆï¼ˆãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–ã‚¿ã‚¤ãƒ—ï¼‰
 	devicecontext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
 	m_Shader.SetGPU();
@@ -90,7 +94,7 @@ void Texture2D::Draw(Camera* cam)
 	m_Texture.SetGPU();
 	m_Material->SetGPU();
 
-	// UV‚Ìİ’è‚ğw’è
+	// UVã®è¨­å®šã‚’æŒ‡å®š
 	float u = m_NumU - 1;
 	float v = m_NumV - 1;
 	float uw = 1 / m_SplitX;
@@ -99,28 +103,28 @@ void Texture2D::Draw(Camera* cam)
 	Renderer::SetUV(u, v, uw, vh);
 
 	devicecontext->DrawIndexed(
-		(UINT)m_Indices.size(), // •`‰æ‚·‚éƒCƒ“ƒfƒbƒNƒX”
-		0, // Å‰‚ÌƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@‚ÌˆÊ’u
+		(UINT)m_Indices.size(), // æç”»ã™ã‚‹ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°
+		0, // æœ€åˆã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡ã®ä½ç½®
 		0);
 }
 
 //=======================================
-// I—¹ˆ—
+// çµ‚äº†å‡¦ç†
 //=======================================
 void Texture2D::Uninit()
 {
 
 }
 
-// ƒeƒNƒXƒ`ƒƒ‚ğw’è
+// ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’æŒ‡å®š
 void Texture2D::SetTexture(const char* imgname)
 {
-	// ƒeƒNƒXƒ`ƒƒƒ[ƒh
+	// ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ­ãƒ¼ãƒ‰
 	bool sts = m_Texture.Load(imgname);
 	assert(sts == true);
 }
 
-// ˆÊ’u‚ğw’è
+// ä½ç½®ã‚’æŒ‡å®š
 void Texture2D::SetPosition(const float& x, const float& y, const float& z)
 {
 	Vector3 p = { x, y, z };
@@ -131,7 +135,7 @@ void Texture2D::SetPosition(const Vector3& pos)
 	m_Position = pos;
 }
 
-// Šp“x‚ğw’è
+// è§’åº¦ã‚’æŒ‡å®š
 void Texture2D::SetRotation(const float& x, const float& y, const float& z)
 {
 	Vector3 r = { x, y, z };
@@ -139,10 +143,10 @@ void Texture2D::SetRotation(const float& x, const float& y, const float& z)
 }
 void Texture2D::SetRotation(const Vector3& rot)
 {
-	m_Rotation = rot * 3.14f/180; // deg¨rad‚É•ÏŠ·
+	m_Rotation = rot * 3.14f/180; // degâ†’radã«å¤‰æ›
 }
 
-// ‘å‚«‚³‚ğw’è
+// å¤§ãã•ã‚’æŒ‡å®š
 void Texture2D::SetScale(const float& x, const float& y, const float& z)
 {
 	Vector3 s = { x, y, z };
@@ -153,7 +157,7 @@ void Texture2D::SetScale(const Vector3& scl)
 	m_Scale = scl;
 }
 
-// UVÀ•W‚ğw’è
+// UVåº§æ¨™ã‚’æŒ‡å®š
 void Texture2D::SetUV(const float& nu, const float& nv, const float& sx, const float& sy)
 {
 	m_NumU = nu;
@@ -168,15 +172,15 @@ void Texture2D::SetDivide(int divX, int divY)
 	m_DivY = divY;
 }
 
-// w’è‚µ‚½ƒtƒŒ[ƒ€‚ÌUV‚ğŒvZ‚µ‚ÄƒZƒbƒg‚·‚é
+// æŒ‡å®šã—ãŸãƒ•ãƒ¬ãƒ¼ãƒ ã®UVã‚’è¨ˆç®—ã—ã¦ã‚»ãƒƒãƒˆã™ã‚‹
 void Texture2D::SetFrame(int frame)
 {
-	// ƒtƒŒ[ƒ€”Ô†‚©‚çAc‰¡‚ÌƒCƒ“ƒfƒbƒNƒX‚ğŒvZ
-	// —áF‰¡10•ªŠ„‚Å frame‚ª12‚È‚çAx=2, y=1
+	// ãƒ•ãƒ¬ãƒ¼ãƒ ç•ªå·ã‹ã‚‰ã€ç¸¦æ¨ªã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã‚’è¨ˆç®—
+	// ä¾‹ï¼šæ¨ª10åˆ†å‰²ã§ frameãŒ12ãªã‚‰ã€x=2, y=1
 	int xIndex = frame % m_DivX;
 	int yIndex = frame / m_DivX;
 
-	// Šù‘¶‚ÌSetUVŠÖ”‚ğg‚Á‚ÄGPU‚É’Ê’m
-	// (uÀ•W, vÀ•W, ‰¡•, c•)
+	// æ—¢å­˜ã®SetUVé–¢æ•°ã‚’ä½¿ã£ã¦GPUã«é€šçŸ¥
+	// (uåº§æ¨™, våº§æ¨™, æ¨ªå¹…, ç¸¦å¹…)
 	SetUV((float)xIndex, (float)yIndex, (float)m_DivX, (float)m_DivY);
 }

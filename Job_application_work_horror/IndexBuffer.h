@@ -1,3 +1,7 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: Direct3D 11ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡ã‚’RAIIã§ä¿æŒã—ã€æç”»æ™‚ã«è¨­å®šã—ã¾ã™ã€‚
+// ============================================================================
+
 #pragma once
 
 #include	<vector>
@@ -7,7 +11,7 @@
 using Microsoft::WRL::ComPtr;
 
 //-----------------------------------------------------------------------------
-//IndexBufferƒNƒ‰ƒX
+//IndexBufferã‚¯ãƒ©ã‚¹
 //----------------------------------------------------------------------------- 
 class IndexBuffer {
 
@@ -16,27 +20,27 @@ class IndexBuffer {
 public:
 	void Create(const std::vector<unsigned int>& indices)
 	{
-		// ƒfƒoƒCƒXæ“¾
+		// ãƒ‡ãƒã‚¤ã‚¹å–å¾—
 		ID3D11Device* device = nullptr;
 		device = Renderer::GetDevice();
-		assert(device); //device‚ª‘¶İ‚·‚é‚±‚Æ‚ğŠm”F
+		assert(device); //deviceãŒå­˜åœ¨ã™ã‚‹ã“ã¨ã‚’ç¢ºèª
 
-		// ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@ì¬
+		// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡ä½œæˆ
 		bool sts = Renderer::CreateIndexBuffer(
-			(unsigned int)(indices.size()),				// ƒCƒ“ƒfƒbƒNƒX”
-			(void*)indices.data(),						// ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^æ“ªƒAƒhƒŒƒX
-			m_IndexBuffer.ReleaseAndGetAddressOf());							// ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@
+			(unsigned int)(indices.size()),				// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°
+			(void*)indices.data(),						// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿å…ˆé ­ã‚¢ãƒ‰ãƒ¬ã‚¹
+			m_IndexBuffer.ReleaseAndGetAddressOf());							// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡
 
-		assert(sts == true); //Œ‹‰Ê‚ğŠm”F
+		assert(sts == true); //çµæœã‚’ç¢ºèª
 	}
 
 	void SetGPU()
 	{
-		// ƒfƒoƒCƒXƒRƒ“ƒeƒLƒXƒgæ“¾
+		// ãƒ‡ãƒã‚¤ã‚¹ã‚³ãƒ³ãƒ†ã‚­ã‚¹ãƒˆå–å¾—
 		ID3D11DeviceContext* devicecontext = nullptr;
 		devicecontext = Renderer::GetDeviceContext();
 
-		// ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@‚ğƒZƒbƒg
+		// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡ã‚’ã‚»ãƒƒãƒˆ
 		devicecontext->IASetIndexBuffer(m_IndexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
 	}
 };

@@ -1,3 +1,7 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: ä»»æ„é ‚ç‚¹å‹ã®Direct3D 11é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ã‚’RAIIã§ç®¡ç†ã—ã¾ã™ã€‚
+// ============================================================================
+
 #pragma once
 #include	<vector>
 #include	<wrl/client.h>
@@ -6,7 +10,7 @@
 using Microsoft::WRL::ComPtr;
 
 //-----------------------------------------------------------------------------
-//VertexBufferƒNƒ‰ƒX
+//VertexBufferã‚¯ãƒ©ã‚¹
 //-----------------------------------------------------------------------------
 template <typename T> class VertexBuffer{
 
@@ -15,38 +19,38 @@ template <typename T> class VertexBuffer{
 public:
 	void Create(const std::vector<T>& vertices)
 	{
-		// ƒfƒoƒCƒXæ“¾
+		// ãƒ‡ãƒã‚¤ã‚¹å–å¾—
 		ID3D11Device* device = nullptr;
 		device = Renderer::GetDevice();
-		assert(device); //device‚Í‘¶İ‚·‚é‚±‚Æ‚ğŠm”F
+		assert(device); //deviceã¯å­˜åœ¨ã™ã‚‹ã“ã¨ã‚’ç¢ºèª
 
-		// ’¸“_ƒoƒbƒtƒ@ì¬
+		// é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ä½œæˆ
 		bool sts = Renderer::CreateVertexBufferWrite(
-			sizeof(T),						// 1’¸“_“–‚½‚èƒoƒCƒg”
-			(unsigned int)vertices.size(),	// ’¸“_”
-			(void*)vertices.data(),			// ’¸“_ƒf[ƒ^Ši”[ƒƒ‚ƒŠæ“ªƒAƒhƒŒƒX
-			m_VertexBuffer.ReleaseAndGetAddressOf());				// ’¸“_ƒoƒbƒtƒ@
+			sizeof(T),						// 1é ‚ç‚¹å½“ãŸã‚Šãƒã‚¤ãƒˆæ•°
+			(unsigned int)vertices.size(),	// é ‚ç‚¹æ•°
+			(void*)vertices.data(),			// é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿æ ¼ç´ãƒ¡ãƒ¢ãƒªå…ˆé ­ã‚¢ãƒ‰ãƒ¬ã‚¹
+			m_VertexBuffer.ReleaseAndGetAddressOf());				// é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡
 
-		assert(sts == true); //Œ‹‰Ê‚ğŠm”F
+		assert(sts == true); //çµæœã‚’ç¢ºèª
 	}
 
-	// GPU‚ÉƒZƒbƒg
+	// GPUã«ã‚»ãƒƒãƒˆ
 	void SetGPU()
 	{
-		// ƒfƒoƒCƒXƒRƒ“ƒeƒLƒXƒgæ“¾
+		// ãƒ‡ãƒã‚¤ã‚¹ã‚³ãƒ³ãƒ†ã‚­ã‚¹ãƒˆå–å¾—
 		ID3D11DeviceContext* devicecontext = nullptr;
 		devicecontext = Renderer::GetDeviceContext();
 
-		// ’¸“_ƒoƒbƒtƒ@‚ğƒZƒbƒg‚·‚é
+		// é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ã‚’ã‚»ãƒƒãƒˆã™ã‚‹
 		unsigned int stride = sizeof(T);
 		unsigned  offset = 0;
 		devicecontext->IASetVertexBuffers(0, 1, m_VertexBuffer.GetAddressOf(), &stride, &offset);
 	}
 
-	// ’¸“_ƒoƒbƒtƒ@‚ğ‘‚«Š·‚¦‚é
+	// é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ã‚’æ›¸ãæ›ãˆã‚‹
 	void Modify(const std::vector<T>& vertices)
 	{
-		//’¸“_ƒf[ƒ^‘‚«Š·‚¦
+		//é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿æ›¸ãæ›ãˆ
 		D3D11_MAPPED_SUBRESOURCE msr;
 		HRESULT hr = Renderer::GetDeviceContext()->Map(
 			m_VertexBuffer.Get(), 

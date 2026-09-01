@@ -1,3 +1,8 @@
+// ============================================================================
+// シェーダーの役割: 走査線、ノイズ、ビネットを重ねてブラウン管風の画面を作ります。
+// 定数バッファのスロットと入出力構造はCPU側の定義と必ず一致させてください。
+// ============================================================================
+
 struct PS_IN
 {
     float4 pos : SV_POSITION;
@@ -19,6 +24,9 @@ cbuffer TimeBuffer : register(b0)
     float lensMoisture;
     float corridorTension;
     float filmGradeStrength;
+    float lensDirtStrength;
+    float signalInterference;
+    float2 postProcessPadding;
 };
 
 Texture2D SceneTexture : register(t0);
@@ -82,7 +90,7 @@ float4 main(PS_IN input) : SV_TARGET
     float2 centered = input.uv - center;
     const float eventNoise = saturate(
         noiseAmount + horrorPulseStrength * 1.20f +
-        corridorTension * 0.16f);
+        corridorTension * 0.16f + signalInterference * 0.48f);
     const float eventVignette =
         vignetteStrength + horrorPulseStrength * 0.52f +
         corridorTension * 0.18f;
@@ -93,19 +101,30 @@ float4 main(PS_IN input) : SV_TARGET
         max(length(centered), 0.001f);
     const float eventAberration = saturate(
         horrorPulseStrength +
-        corridorTension * (0.16f + lensDistortionStrength * 0.24f));
+        corridorTension * (0.16f + lensDistortionStrength * 0.24f) +
+        signalInterference * 0.72f);
     const float edgeAberration = smoothstep(0.20f, 0.72f, edgeDistance);
     const float2 aspectCentered =
         centered * float2(screenAspect, 1.0f);
     const float radialSquared = dot(aspectCentered, aspectCentered);
     const float radialWarp = lensDistortionStrength *
         (0.0020f + corridorTension * 0.0075f);
+    // Signal restoration errors break the image into independently shifted
+    // horizontal blocks. The displacement is deliberately bounded so the
+    // player never loses navigation information.
+    const float signalBand = floor(input.uv.y * 54.0f);
+    const float signalFrame = floor(time * 18.0f);
+    const float signalSeed = Hash(float2(signalBand, signalFrame));
+    const float signalGate = smoothstep(0.70f, 0.96f, signalSeed);
+    const float signalJitter = (signalSeed - 0.5f) * 0.010f *
+        signalInterference * signalGate;
     const float2 distortedUv = saturate(
-        input.uv + centered * radialSquared * radialWarp);
+        input.uv + centered * radialSquared * radialWarp +
+        float2(signalJitter, 0.0f));
     const float chromaOffset =
         (0.00035f + horrorPulseStrength * 0.0038f +
          corridorTension * lensDistortionStrength * 0.0018f) *
-        edgeAberration;
+        edgeAberration + signalInterference * signalGate * 0.0024f;
     const float3 sceneCenter = SceneTexture.SampleLevel(
         LinearSampler,
         input.uv,
@@ -216,6 +235,7 @@ float4 main(PS_IN input) : SV_TARGET
     float bandId = floor(input.uv.y * 38.0f);
     float bandNoise = Hash(float2(bandId, floor(time * 24.0f)));
     float tear = step(0.86f, bandNoise) * horrorPulseStrength;
+    tear = max(tear, signalGate * signalInterference * 0.58f);
     float thinLine = 1.0f - smoothstep(
         0.02f,
         0.12f,
@@ -227,9 +247,16 @@ float4 main(PS_IN input) : SV_TARGET
         saturate(input.uv + float2(tearOffset, 0.0f)),
         0.0f).rgb;
     float tearAlpha = tear * thinLine * 0.16f;
+    const float signalLine = 1.0f - smoothstep(
+        0.015f, 0.085f,
+        abs(frac(input.uv.y * 54.0f) - 0.5f));
+    const float signalAlpha = signalInterference *
+        (signalGate * signalLine * 0.055f +
+         (1.0f - signalLine) * 0.006f);
     float alpha = saturate(
         darkAlpha + dustAlpha + tearAlpha + dropAlpha +
-        dropRefractionAlpha + chromaAlpha + distortionAlpha);
+        dropRefractionAlpha + chromaAlpha + distortionAlpha +
+        signalAlpha);
 
     float3 overlayColor = lerp(
         float3(0.0f, 0.0f, 0.0f),
@@ -242,6 +269,14 @@ float4 main(PS_IN input) : SV_TARGET
         : float3(0.82f, 0.12f, 0.20f);
     tearColor = lerp(shiftedScene, tearColor, 0.24f);
     overlayColor = lerp(overlayColor, tearColor, saturate(tear));
+    const float3 signalColor = lerp(
+        float3(0.025f, 0.20f, 0.28f),
+        float3(0.38f, 0.055f, 0.035f),
+        signalSeed);
+    overlayColor = lerp(
+        overlayColor,
+        lerp(shiftedScene, signalColor, 0.20f),
+        saturate(signalAlpha * 13.0f));
     overlayColor = lerp(
         overlayColor,
         distortedScene,

@@ -1,3 +1,7 @@
+// ============================================================================
+// ファイルの役割: 露出、ブルーム、CRT、霧など画面全体のシェーダー演出を統括します。
+// ============================================================================
+
 #pragma once
 
 #include <algorithm>
@@ -11,6 +15,7 @@ namespace Effect
     class PostProcess
     {
     private:
+        // enable系は機能そのもののON/OFF、target系は急変を防ぐ補間先です。
         bool m_EnableNoise = true;
         bool m_EnableBloom = true;
         bool m_EnableVolumetricLight = false;
@@ -44,7 +49,10 @@ namespace Effect
         float m_TargetVolumetricIntensity = 0.58f;
         float m_FilmGradeStrength = 0.55f;
         float m_LensDirtStrength = 0.35f;
+        float m_SignalInterference = 0.0f;
+        float m_TargetSignalInterference = 0.0f;
 
+        // シーン描画を一度RenderTextureへ保存し、後段で複数の画面効果を合成します。
         Graphics::RenderTexture m_RenderTexture;
         Graphics::RenderTexture m_BloomExtractTexture;
         Graphics::RenderTexture m_BloomHorizontalTexture;
@@ -55,6 +63,7 @@ namespace Effect
         ComputeShader m_BloomHorizontalShader;
         ComputeShader m_BloomVerticalShader;
 
+        // 高輝度抽出 → 横ぼかし → 縦ぼかしの順でブルーム画像を生成します。
         void RunBloom();
 
     public:
@@ -62,10 +71,10 @@ namespace Effect
         void Uninit();
         void Update();
 
-        void Begin();
-        void End();
+        void Begin(); // 以降の3D描画先をオフスクリーンへ切り替えます。
+        void End();   // 描画先をバックバッファへ戻します。
         void CaptureBackBuffer();
-        void Draw();
+        void Draw();  // 保存したシーンへブルーム、色調、ノイズなどを合成します。
 
         void TriggerBloomPulse(float peakIntensity, float duration);
         void TriggerHorrorPulse(float strength, float duration);
@@ -133,6 +142,12 @@ namespace Effect
         void SetLensDirtStrength(float strength)
         {
             m_LensDirtStrength = (std::clamp)(strength, 0.0f, 1.0f);
+        }
+
+        void SetSignalInterference(float strength)
+        {
+            m_TargetSignalInterference =
+                (std::clamp)(strength, 0.0f, 1.0f);
         }
 
         bool IsNoiseEnable() const

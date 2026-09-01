@@ -1,24 +1,28 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: æ–‡å­—åˆ—å¤‰æ›ãªã©è¤‡æ•°æ©Ÿèƒ½ã‹ã‚‰ä½¿ã†å°ã•ãªè£œåŠ©é–¢æ•°ã‚’æä¾›ã—ã¾ã™ã€‚
+// ============================================================================
+
 #include	<filesystem>
 #include	<string>
 #include	<Windows.h>
 
 namespace utility {
-    // std::string —p‚ÌƒfƒBƒŒƒNƒgƒŠæ“¾ŠÖ”
+    // std::string ç”¨ã®ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªå–å¾—é–¢æ•°
     std::filesystem::path get_directory(const std::string& path) {
         return std::filesystem::path(path).parent_path();
     }
 
-    // std::u8string —p‚ÌƒfƒBƒŒƒNƒgƒŠæ“¾ŠÖ”
+    // std::u8string ç”¨ã®ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªå–å¾—é–¢æ•°
     std::filesystem::path get_directory(const std::u8string& path) {
         return std::filesystem::path(path).parent_path();
     }
 
-    // std::wstring —p‚ÌƒfƒBƒŒƒNƒgƒŠæ“¾ŠÖ”
+    // std::wstring ç”¨ã®ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªå–å¾—é–¢æ•°
     std::filesystem::path get_directory(const std::wstring& path) {
         return std::filesystem::path(path).parent_path();
     }
 
-	// ƒƒCƒh•¶š(utf16)‚ğ‚“|‚Š‚‰‚“‚É
+	// ãƒ¯ã‚¤ãƒ‰æ–‡å­—(utf16)ã‚’ï½“ï¼ï½Šï½‰ï½“ã«
 	std::string wide_to_multi_winapi(std::wstring const& src)
 	{
 		auto const dest_size = ::WideCharToMultiByte(
@@ -47,11 +51,11 @@ namespace utility {
 		return std::string(dest.begin(), dest.end());
 	}
 
-	// utf-8‚ğƒƒCƒh•¶š(utf-16)‚É
+	// utf-8ã‚’ãƒ¯ã‚¤ãƒ‰æ–‡å­—(utf-16)ã«
 	std::wstring utf8_to_wide_winapi(std::string const& src)
 	{
 		auto const dest_size = ::MultiByteToWideChar(
-			CP_UTF8,			 // ƒ\[ƒX‘¤‚ªUTF-8
+			CP_UTF8,			 // ã‚½ãƒ¼ã‚¹å´ãŒUTF-8
 			0U,
 			src.data(),
 			-1,
@@ -66,7 +70,7 @@ namespace utility {
 		return std::wstring(dest.begin(), dest.end());
 	}
 
-	// utf8‚ğS-JIS‚É
+	// utf8ã‚’S-JISã«
 	std::string utf8_to_multi_winapi(std::string const& src)
 	{
 		auto const wide = utf8_to_wide_winapi(src);

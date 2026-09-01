@@ -1,28 +1,32 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: ã‚²ãƒ¼ãƒ çµ‚äº†å¾Œã®è©•ä¾¡ã¨ãƒªã‚¶ãƒ«ãƒˆç”»é¢ã‚’ç®¡ç†ã—ã¾ã™ã€‚
+// ============================================================================
+
 #pragma once
 #include "Scene.h"
 #include "Object.h"
 #include"sound.h"
 #include "Hud.h"
-// ResultSceneƒNƒ‰ƒX
+// ResultSceneã‚¯ãƒ©ã‚¹
 class ResultScene : public Scene
 {
 private:
-	std::vector<Object*> m_MySceneObjects; // ‚±‚ÌƒV[ƒ“‚ÌƒIƒuƒWƒFƒNƒg
+	std::vector<Object*> m_MySceneObjects; // ã“ã®ã‚·ãƒ¼ãƒ³ã®ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆ
 
-	void Init(); // ‰Šú‰»
-	void Uninit(); // I—¹ˆ—
-	Sound m_Sound;//ƒTƒEƒ“ƒh
+	void Init(); // åˆæœŸåŒ–
+	void Uninit(); // çµ‚äº†å‡¦ç†
+	Sound m_Sound;//ã‚µã‚¦ãƒ³ãƒ‰
 	Hud m_Hud;
 	float m_ResultTimer = 0.0f;
 
 public:
-	ResultScene(); // ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-	~ResultScene(); // ƒfƒXƒgƒ‰ƒNƒ^
+	ResultScene(); // ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+	~ResultScene(); // ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
 
-	void Update(); // XV
+	void Update(); // æ›´æ–°
 	void Draw(Camera* camera) override;
-	void SetScore(int c); // ƒXƒRƒAİ’è
-	static int s_Score;      // ƒXƒRƒA•Û‘¶—p
-	static int s_NextScene;  // Ÿ‚ÌƒV[ƒ“ID•Û‘¶—p (SCENE_ID ‚ğ int ‚Åˆµ‚¢‚Ü‚·)
+	void SetScore(int c); // ã‚¹ã‚³ã‚¢è¨­å®š
+	static int s_Score;      // ã‚¹ã‚³ã‚¢ä¿å­˜ç”¨
+	static int s_NextScene;  // æ¬¡ã®ã‚·ãƒ¼ãƒ³IDä¿å­˜ç”¨ (SCENE_ID ã‚’ int ã§æ‰±ã„ã¾ã™)
 };
 

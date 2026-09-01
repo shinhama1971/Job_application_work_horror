@@ -1,3 +1,7 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: OBJãªã©ã®é™çš„ãƒ¢ãƒ‡ãƒ«ã‚’èª­ã¿è¾¼ã¿ã€æç”»ç”¨ãƒ‡ãƒ¼ã‚¿ã¨ã—ã¦ä¿æŒã—ã¾ã™ã€‚
+// ============================================================================
+
 #pragma once
 
 #include	<simplemath.h>
@@ -30,8 +34,8 @@ public:
 
 private:
 
-	std::vector<MATERIAL> m_materials;	    // ƒ}ƒeƒŠƒAƒ‹î•ñ
-	std::vector<std::string> m_texturenames;			// ƒeƒNƒXƒ`ƒƒ–¼
-	std::vector<SUBSET> m_subsets;						// ƒTƒuƒZƒbƒgî•ñ
-	std::vector<std::unique_ptr<Texture>>	m_textures;	// ƒeƒNƒXƒ`ƒƒŒQ
+	std::vector<MATERIAL> m_materials;	    // ãƒãƒ†ãƒªã‚¢ãƒ«æƒ…å ±
+	std::vector<std::string> m_texturenames;			// ãƒ†ã‚¯ã‚¹ãƒãƒ£å
+	std::vector<SUBSET> m_subsets;						// ã‚µãƒ–ã‚»ãƒƒãƒˆæƒ…å ±
+	std::vector<std::unique_ptr<Texture>>	m_textures;	// ãƒ†ã‚¯ã‚¹ãƒãƒ£ç¾¤
 };

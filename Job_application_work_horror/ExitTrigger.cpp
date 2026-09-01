@@ -1,4 +1,8 @@
-﻿#include "ExitTrigger.h"
+// ============================================================================
+// ファイルの役割: 出口での操作判定と、安全なシーン遷移要求を管理します。
+// ============================================================================
+
+#include "ExitTrigger.h"
 #include "Game.h"
 #include "Input.h"
 #include "Player.h"
@@ -96,7 +100,7 @@ const char* ExitTrigger::GetInteractionPrompt() const
 
 void ExitTrigger::Draw(Camera* cam)
 {
-    // 莉翫・菴輔ｂ謠冗判縺励↑縺・
+    //これで終了しますか？
 }
 
 void ExitTrigger::Uninit()

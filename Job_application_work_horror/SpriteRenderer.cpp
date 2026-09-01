@@ -1,14 +1,18 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: HUDã‚„ç”»åƒã‚’æã2Dã‚¹ãƒ—ãƒ©ã‚¤ãƒˆç”¨ãƒãƒƒãƒ•ã‚¡ã¨æç”»å‡¦ç†ã‚’ç®¡ç†ã—ã¾ã™ã€‚
+// ============================================================================
+
 #include "SpriteRenderer.h"
 using namespace std;
 using namespace DirectX::SimpleMath;
 
 
 //=======================================
-// ‰Šú‰»ˆ—
+// åˆæœŸåŒ–å‡¦ç†
 //=======================================
 void SpriteRenderer::Init()
 {
-	// ’¸“_ƒf[ƒ^
+	// é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿
 	m_Vertices.resize(4);
 
 	m_Vertices[0].position = Vector3(-0.5f, 0.5f, 0);
@@ -26,10 +30,10 @@ void SpriteRenderer::Init()
 	m_Vertices[2].uv = Vector2(0, 1);
 	m_Vertices[3].uv = Vector2(1, 1);
 
-	// ’¸“_ƒoƒbƒtƒ@¶¬
+	// é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ç”Ÿæˆ
 	m_VertexBuffer.Create(m_Vertices);
 
-	// ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@¶¬
+	// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡ç”Ÿæˆ
 	m_Indices.resize(4);
 
 	m_Indices[0] = 0;
@@ -37,22 +41,22 @@ void SpriteRenderer::Init()
 	m_Indices[2] = 2;
 	m_Indices[3] = 3;
 
-	// ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@¶¬
+	// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡ç”Ÿæˆ
 	m_IndexBuffer.Create(m_Indices);
 
-	// ƒVƒF[ƒ_ƒIƒuƒWƒFƒNƒg¶¬
+	// ã‚·ã‚§ãƒ¼ãƒ€ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆç”Ÿæˆ
 	m_Shader.Create("shader/unlitTextureVS.hlsl", "shader/unlitTexturePS.hlsl");
 
-	// ƒ}ƒeƒŠƒAƒ‹î•ñæ“¾
+	// ãƒãƒ†ãƒªã‚¢ãƒ«æƒ…å ±å–å¾—
 	m_Material = std::make_unique<Material>();
 	MATERIAL mtrl;
 	mtrl.Diffuse = Color(1, 1, 1, 1);
-	mtrl.TextureEnable = true; // ƒeƒNƒXƒ`ƒƒ‚ğg‚¤‚©”Û‚©‚Ìƒtƒ‰ƒO
+	mtrl.TextureEnable = true; // ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’ä½¿ã†ã‹å¦ã‹ã®ãƒ•ãƒ©ã‚°
 	m_Material->Create(mtrl);
 }
 
 //=======================================
-// XVˆ—
+// æ›´æ–°å‡¦ç†
 //=======================================
 void SpriteRenderer::Update()
 {
@@ -60,27 +64,27 @@ void SpriteRenderer::Update()
 }
 
 //=======================================
-// •`‰æˆ—
+// æç”»å‡¦ç†
 //=======================================
 void SpriteRenderer::Draw(Camera*cam)
 {
-	//ƒJƒƒ‰‚ğ‘I‘ğ‚·‚é
+	//ã‚«ãƒ¡ãƒ©ã‚’é¸æŠã™ã‚‹
 	cam->SetCamera(1);
 
-	// SRTî•ñì¬
+	// SRTæƒ…å ±ä½œæˆ
 	Matrix r = Matrix::CreateFromYawPitchRoll(m_Rotation.y, m_Rotation.x, m_Rotation.z);
 	Matrix t = Matrix::CreateTranslation(m_Position.x, m_Position.y, m_Position.z);
 	Matrix s = Matrix::CreateTranslation(m_Scale.x, m_Scale.y, m_Scale.x);
 
 	Matrix worldmtx;
 	worldmtx = s * r * t;
-	Renderer::SetWorldMatrix(&worldmtx); // GPU‚ÉƒZƒbƒg
+	Renderer::SetWorldMatrix(&worldmtx); // GPUã«ã‚»ãƒƒãƒˆ
 
-	// •`‰æ‚Ìˆ—
+	// æç”»ã®å‡¦ç†
 	ID3D11DeviceContext* devicecontext;
 	devicecontext = Renderer::GetDeviceContext();
 
-	// ƒgƒ|ƒƒW[‚ğƒZƒbƒgiƒvƒŠƒ~ƒeƒBƒuƒ^ƒCƒvj
+	// ãƒˆãƒãƒ­ã‚¸ãƒ¼ã‚’ã‚»ãƒƒãƒˆï¼ˆãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–ã‚¿ã‚¤ãƒ—ï¼‰
 	devicecontext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
 	m_Shader.SetGPU();
@@ -90,10 +94,10 @@ void SpriteRenderer::Draw(Camera*cam)
 	m_Texture.SetGPU();
 	m_Material->SetGPU();
 
-	// UV‚Ìİ’è‚ğw’è
+	// UVã®è¨­å®šã‚’æŒ‡å®š
 	devicecontext->DrawIndexed(
-		(UINT)m_Indices.size(), // •`‰æ‚·‚éƒCƒ“ƒfƒbƒNƒX”
-		0, // Å‰‚ÌƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@‚ÌˆÊ’u
+		(UINT)m_Indices.size(), // æç”»ã™ã‚‹ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°
+		0, // æœ€åˆã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡ã®ä½ç½®
 		0);
 
 	
@@ -101,7 +105,7 @@ void SpriteRenderer::Draw(Camera*cam)
 
 
 //=======================================
-// I—¹ˆ—
+// çµ‚äº†å‡¦ç†
 //=======================================
 void SpriteRenderer::Uninit()
 {
@@ -109,10 +113,10 @@ void SpriteRenderer::Uninit()
 }
 
 
-// ƒeƒNƒXƒ`ƒƒ‚ğw’è
+// ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’æŒ‡å®š
 void SpriteRenderer::SetTexture(const char* imgname)
 {
-	// ƒeƒNƒXƒ`ƒƒƒ[ƒh
+	// ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ­ãƒ¼ãƒ‰
 	bool sts = m_Texture.Load(imgname);
 	assert(sts == true);
 }

@@ -1,4 +1,8 @@
-﻿#include "StageScene.h"
+// ============================================================================
+// ファイルの役割: 1面のステージ配置、ヒューズ探索、電力復旧、出口までの進行を管理します。
+// ============================================================================
+
+#include "StageScene.h"
 #include "Game.h"
 #include "Input.h"
 
@@ -31,6 +35,7 @@ StageScene::~StageScene()
     Uninit();
 }
 
+// 1面で必要な床、壁、照明、アイテム、進行用Triggerをまとめて配置します。
 void StageScene::Init()
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -390,6 +395,7 @@ void StageScene::Init()
     m_Hud.Init();
 }
 
+// ヒューズ数と電力状態を基準に目的表示とイベント段階を更新します。
 void StageScene::Update()
 {
     Player* player =
@@ -1492,6 +1498,7 @@ void StageScene::Draw(Camera* camera)
             game->GetBrightnessLevel(),
             game->GetEffectLevel(),
             game->GetLookSensitivityLevel(),
+            game->GetVolumeLevel(),
             game->GetPauseSettingIndex(),
             1,
             game->GetRunTimeSeconds(),

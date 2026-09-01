@@ -1,3 +1,7 @@
+// ============================================================================
+// ファイルの役割: 遠景の人影、出現時間、消失・ディゾルブ演出を管理します。
+// ============================================================================
+
 #pragma once
 
 #include <algorithm>
@@ -82,6 +86,11 @@ public:
             m_ChaseEnabled = false;
         }
         m_IsActive = active;
+    }
+
+    bool IsActive() const
+    {
+        return m_IsActive;
     }
 
     void EnableChase(float speed, float stopDistance)

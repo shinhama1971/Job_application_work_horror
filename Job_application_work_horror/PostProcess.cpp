@@ -1,3 +1,7 @@
+// ============================================================================
+// ファイルの役割: 露出、ブルーム、CRT、霧など画面全体のシェーダー演出を統括します。
+// ============================================================================
+
 #include "PostProcess.h"
 #include "Renderer.h"
 #include "Application.h"
@@ -6,6 +10,7 @@
 
 namespace Effect
 {
+    // 中間RenderTextureと各シェーダーを一度だけ生成します。
     void PostProcess::Init()
     {
         m_EnableNoise = true;
@@ -29,6 +34,8 @@ namespace Effect
         m_TargetVolumetricIntensity = 0.58f;
         m_FilmGradeStrength = 0.55f;
         m_LensDirtStrength = 0.16f;
+        m_SignalInterference = 0.0f;
+        m_TargetSignalInterference = 0.0f;
 
         m_RenderTexture.Init(
             Application::GetWidth(),
@@ -65,6 +72,7 @@ namespace Effect
         m_RenderTexture.Uninit();
     }
 
+    // target値へ緩やかに補間し、場面転換時の露出やノイズの急変を防ぎます。
     void PostProcess::Update()
     {
         m_Time += 1.0f / 60.0f;
@@ -85,6 +93,8 @@ namespace Effect
             (m_TargetCorridorTension - m_CorridorTension) * 0.035f;
         m_VolumetricIntensity +=
             (m_TargetVolumetricIntensity - m_VolumetricIntensity) * 0.055f;
+        m_SignalInterference +=
+            (m_TargetSignalInterference - m_SignalInterference) * 0.085f;
 
         if (m_BloomPulseTimer > 0.0f && m_BloomPulseDuration > 0.0f)
         {
@@ -158,6 +168,7 @@ namespace Effect
         m_LensMoisture = m_LensMoisturePeak;
     }
 
+    // 3Dシーンの描画先を画面ではなく中間テクスチャへ切り替えます。
     void PostProcess::Begin()
     {
         m_RenderTexture.SetRenderTarget();
@@ -184,6 +195,7 @@ namespace Effect
         Renderer::SetBackBufferRenderTarget();
     }
 
+    // UAV/SRVの同時バインドを避けながら、抽出と2方向ぼかしを順番に実行します。
     void PostProcess::RunBloom()
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
@@ -236,6 +248,7 @@ namespace Effect
         Renderer::SetBackBufferRenderTarget();
     }
 
+    // ブルーム結果と元画像を合成し、最後にCRT・色調・霧・レンズ汚れを適用します。
     void PostProcess::Draw()
     {
         if (m_EnableBloom)
@@ -264,6 +277,7 @@ namespace Effect
             m_LensMoisture,
             (std::clamp)(m_CorridorTension * effectScale, 0.0f, 1.0f),
             (std::clamp)(m_FilmGradeStrength * effectScale, 0.0f, 1.0f),
-            (std::clamp)(m_LensDirtStrength * effectScale, 0.0f, 1.0f));
+            (std::clamp)(m_LensDirtStrength * effectScale, 0.0f, 1.0f),
+            (std::clamp)(m_SignalInterference * effectScale, 0.0f, 1.0f));
     }
 }

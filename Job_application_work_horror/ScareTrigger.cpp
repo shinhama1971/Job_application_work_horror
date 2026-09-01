@@ -1,3 +1,7 @@
+// ============================================================================
+// ファイルの役割: 一度だけ発生する驚かせ演出の条件と進行を管理します。
+// ============================================================================
+
 #include "Game.h"
 #include "ScareTrigger.h"
 #include "Input.h"
@@ -39,6 +43,7 @@ void ScareTrigger::Update()
         });
 
     Input::SetVibration(14, 0.34f);
+    game->PlayAudioCue(SOUND_CUE_SCARE);
     game->GetPostProcess()->TriggerHorrorPulse(1.0f, 0.65f);
 
     ScreenDustOverlay* crt =

@@ -1,3 +1,7 @@
+// ============================================================================
+// ファイルの役割: 一人称移動、視点、懐中電灯、電池、インタラクションを管理します。
+// ============================================================================
+
 #pragma once
 
 #include "Object.h"
@@ -9,7 +13,8 @@
 class Player : public Object
 {
 private:
-    // ===== Physics and movement =====
+    // ===== 移動と当たり判定 =====
+    // 座標の単位はステージ共通。PLAYER_HEIGHTはカメラではなく衝突体の高さです。
     DirectX::SimpleMath::Vector3 m_Velocity =
         DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
     static constexpr float DEFAULT_MOVE_SPEED = 0.5f;
@@ -25,6 +30,10 @@ private:
     float m_HeadBobOffset = 0.0f;
     float m_HeadBobSideOffset = 0.0f;
     float m_AmbienceTimer = 0.0f;
+    float m_FootstepTimer = 0.0f;
+    int m_FootstepIndex = 0;
+    float m_SurfaceNoisePulse = 0.0f;
+    bool m_WetSurfaceOverride = false;
     float m_Stamina = 100.0f;
     float m_StaminaRecoveryDelay = 0.0f;
     bool m_SprintExhausted = false;
@@ -32,7 +41,8 @@ private:
     static constexpr float STAMINA_DRAIN_PER_FRAME = 0.22f;
     static constexpr float STAMINA_RECOVERY_PER_FRAME = 0.38f;
 
-    // ===== Flashlight system =====
+    // ===== 懐中電灯と電池 =====
+    // 電池残量が閾値を下回ると、完全消灯の前に不安定な点滅へ移行します。
     bool m_FlashLightOn = true;
     float m_Battery = 100.0f;
     static constexpr float MAX_BATTERY = 100.0f;
@@ -45,8 +55,8 @@ private:
     bool m_WasFlashlightVoltageDrop = false;
     float m_FlashlightNearSurfaceBlend = 0.0f;
 
-    // ===== Lighting =====
-    // Flashlight-on color settings.
+    // ===== ライティング調整値 =====
+    // 点灯時の色。Diffuseは照射光、Ambientは最低限残す環境光です。
     float m_LightDiffuseR = 1.72f;
     float m_LightDiffuseG = 1.62f;
     float m_LightDiffuseB = 1.42f;
@@ -54,7 +64,7 @@ private:
     float m_LightAmbientG = 0.1f;
     float m_LightAmbientB = 0.12f;
 
-    // Flashlight-off color settings.
+    // 消灯時の色。真っ暗で進行不能にならないための最低照度を保持します。
     float m_DarkDiffuseR = 0.3f;
     float m_DarkDiffuseG = 0.3f;
     float m_DarkDiffuseB = 0.35f;
@@ -63,15 +73,15 @@ private:
     float m_DarkAmbientB = 0.08f;
     float m_CameraHeightOffset = 30.0f;
 
-    // ===== Mesh rendering =====
+    // ===== プレイヤーメッシュの描画資源 =====
     MeshRenderer m_MeshRenderer;
     std::vector<std::unique_ptr<Material>> m_Materials;
     std::vector<SUBSET> m_subsets;
     std::vector<std::unique_ptr<Texture>> m_Textures;
 
-    // ===== Camera mode =====
-    bool m_IsFPS = true;                    // true: first person
-    bool m_SpawnAdjusted = false;           // Spawn correction completed.
+    // ===== カメラと操作状態 =====
+    bool m_IsFPS = true;                    // trueなら一人称視点
+    bool m_SpawnAdjusted = false;           // 初期位置の床補正が完了したか
     bool m_CanControl = true;
     bool m_IsSprinting = false;
 public:
@@ -92,7 +102,7 @@ public:
         m_BatteryNoticeTimer = 2.2f;
         m_LowBatteryWarningLevel = m_Battery <= 20.0f ? 1 : 0;
     }
-    // Return the current battery percentage.
+    // HUDとアイテム判定が参照する現在の電池残量（0～100）。
     float GetBattery() const
     {
         return m_Battery;
@@ -103,7 +113,7 @@ public:
         return m_BatteryNoticeTimer;
     }
  
-    // Set an explicit world position.
+    // ワープ時は慣性が残らないよう、座標と同時に速度もリセットします。
     void SetPosition(DirectX::SimpleMath::Vector3 pos)
     {
         m_Position = pos;
@@ -126,6 +136,10 @@ public:
     {
         return m_IsSprinting;
     }
+
+    // Sceneが持つ特殊な床（水たまり等）を次のUpdateへ通知します。
+    void SetWetSurface(bool wet) { m_WetSurfaceOverride = wet; }
+    float GetSurfaceNoisePulse() const { return m_SurfaceNoisePulse; }
 
     float GetStamina() const
     {

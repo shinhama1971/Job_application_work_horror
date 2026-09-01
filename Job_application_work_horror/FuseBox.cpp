@@ -1,3 +1,7 @@
+// ============================================================================
+// ファイルの役割: ヒューズ挿入、電力復旧、操作フィードバックを管理します。
+// ============================================================================
+
 #include "Game.h"
 #include "FuseBox.h"
 #include "Input.h"
@@ -156,6 +160,7 @@ void FuseBox::Interact(Player& player)
         }
 
         m_IsPowered = true;
+        game->PlayAudioCue(SOUND_CUE_POWER);
         BuildGeometry();
         m_VertexBuffer.Modify(m_Vertices);
         game->GetPostProcess()->TriggerBloomPulse(0.72f, 0.28f);
@@ -172,6 +177,7 @@ void FuseBox::Interact(Player& player)
         }
 
         m_IsPowered = true;
+        game->PlayAudioCue(SOUND_CUE_POWER);
         game->GetPostProcess()->TriggerBloomPulse(1.25f, 0.72f);
         game->GetPostProcess()->TriggerHorrorPulse(0.32f, 0.36f);
         BuildGeometry();
@@ -194,6 +200,7 @@ void FuseBox::Interact(Player& player)
     }
 
     m_IsPowered = true;
+    game->PlayAudioCue(SOUND_CUE_POWER);
     game->SetPowerRestored(true);
     game->GetPostProcess()->TriggerBloomPulse(1.65f, 1.35f);
     game->GetPostProcess()->TriggerHorrorPulse(0.55f, 0.75f);

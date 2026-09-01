@@ -1,5 +1,9 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: AABBãªã©ã®è¡çªåˆ¤å®šã¨ç§»å‹•å¯èƒ½ä½ç½®ã®è¨ˆç®—ã‚’æä¾›ã—ã¾ã™ã€‚
+// ============================================================================
+
 //================================
-// Collision.cpp@v1.0
+// Collision.cppã€€v1.0
 //================================
 #include "Collision.h"
 #include <algorithm>
@@ -9,13 +13,13 @@ using namespace DirectX::SimpleMath;
 namespace Collision
 {
 	//==================================
-	// ¡CheckHitŠÖ”
-	// ü(–³ŒÀ‚Ì’·‚³)‚Æ•½–Ê(–³ŒÀ‚Ì‘å‚«‚³)‚Ì“–‚½‚è”»’è
+	// â– CheckHité–¢æ•°
+	// ç·š(ç„¡é™ã®é•·ã•)ã¨å¹³é¢(ç„¡é™ã®å¤§ãã•)ã®å½“ãŸã‚Šåˆ¤å®š
 	//==================================
 	bool CheckHit(const Line& line, const Plane& plane)
 	{
-		//–³ŒÀ‚Ìü‚ª–³ŒÀ‚Ì•½–Ê‚É‚Ô‚Â‚©‚ç‚È‚¢‚Ì‚Íü‚Æ•½–Ê‚ª•½s‚È‚Ì‚İB
-		//ü‚Ì•ûŒüƒxƒNƒgƒ‹‚Æ•½–Ê‚Ì–@üƒxƒNƒgƒ‹‚ª‚’¼(¨“àÏ‚ª0)‚©‚Ç‚¤‚©‚ğƒ`ƒFƒbƒN‚·‚é
+		//ç„¡é™ã®ç·šãŒç„¡é™ã®å¹³é¢ã«ã¶ã¤ã‹ã‚‰ãªã„ã®ã¯ç·šã¨å¹³é¢ãŒå¹³è¡Œãªæ™‚ã®ã¿ã€‚
+		//ç·šã®æ–¹å‘ãƒ™ã‚¯ãƒˆãƒ«ã¨å¹³é¢ã®æ³•ç·šãƒ™ã‚¯ãƒˆãƒ«ãŒå‚ç›´(â†’å†…ç©ãŒ0)ã‹ã©ã†ã‹ã‚’ãƒã‚§ãƒƒã‚¯ã™ã‚‹
 		if (Dot((plane.point - line.point), plane.normal) == 0 || Dot(line.vec, plane.normal) != 0)
 		{
 			return true;
@@ -24,8 +28,8 @@ namespace Collision
 	}
 
 	//==================================
-	// ¡CheckHitŠÖ”
-	// ü•ª‚Æ•½–Ê(–³ŒÀ‚Ì‘å‚«‚³)‚Ì“–‚½‚è”»’è
+	// â– CheckHité–¢æ•°
+	// ç·šåˆ†ã¨å¹³é¢(ç„¡é™ã®å¤§ãã•)ã®å½“ãŸã‚Šåˆ¤å®š
 	//==================================
 	bool CheckHit(const Segment& segment, const Plane& plane)
 	{
@@ -37,8 +41,8 @@ namespace Collision
 	}
 
 	//==================================
-	// ¡CheckHitŠÖ”
-	// ü(–³ŒÀ‚Ì’·‚³)‚Æƒ|ƒŠƒSƒ“‚Ì“–‚½‚è”»’è
+	// â– CheckHité–¢æ•°
+	// ç·š(ç„¡é™ã®é•·ã•)ã¨ãƒãƒªã‚´ãƒ³ã®å½“ãŸã‚Šåˆ¤å®š
 	//==================================
 	bool CheckHit(const Line& line, const Polygon& polygon)
 	{
@@ -47,27 +51,27 @@ namespace Collision
 	}
 	bool CheckHit(const Line& line, const Polygon& polygon, DirectX::SimpleMath::Vector3& contact)
 	{
-		// OŠpŒ`‚Ì–@ü‚ğŒvZ
+		// ä¸‰è§’å½¢ã®æ³•ç·šã‚’è¨ˆç®—
 		Vector3 normal = GetNormal(polygon);
 
-		// ü‚Æ–@ü‚ª•½s‚Å‚ ‚éê‡
+		// ç·šã¨æ³•ç·šãŒå¹³è¡Œã§ã‚ã‚‹å ´åˆ
 		float denom = Dot(normal, line.vec);
 		if (fabs(denom) < 1e-6f) {
-			return false; // Œğ·‚È‚µ
+			return false; // äº¤å·®ãªã—
 		}
 
-		// üã‚ÌŒğ“_‚ğŒvZ
+		// ç·šä¸Šã®äº¤ç‚¹ã‚’è¨ˆç®—
 		float d = Dot(normal, polygon.p0);
 		float t = (d - Dot(normal, line.point)) / denom;
 		contact = line.point + t * line.vec;
 
-		// OŠpŒ`“à‚ÉŒğ“_‚ª‚ ‚é‚©‚ğ”»’è
+		// ä¸‰è§’å½¢å†…ã«äº¤ç‚¹ãŒã‚ã‚‹ã‹ã‚’åˆ¤å®š
 		return PointInTriangle(contact, polygon);
 	}
 
 	//==================================
-	// ¡CheckHitŠÖ”
-	// ü•ª‚Æƒ|ƒŠƒSƒ“‚Ì“–‚½‚è”»’è
+	// â– CheckHité–¢æ•°
+	// ç·šåˆ†ã¨ãƒãƒªã‚´ãƒ³ã®å½“ãŸã‚Šåˆ¤å®š
 	//==================================
 	bool CheckHit(const Segment& segment, const Polygon& polygon)
 	{
@@ -80,15 +84,15 @@ namespace Collision
 
 		if (CheckHit(segment, plane))
 		{
-			// ü•ª‚Æ•½–Ê‚ÌŒğ“_ˆÊ’u‚ğŒvZ
+			// ç·šåˆ†ã¨å¹³é¢ã®äº¤ç‚¹ä½ç½®ã‚’è¨ˆç®—
 			float denom = plane.normal.Dot(segment.end - segment.start);
 			float t = plane.normal.Dot(plane.point - segment.start) / denom;
 
-			// t‚ª0‚©‚ç1‚Ì”ÍˆÍ“à‚Å‚ ‚ê‚Îü•ª‚Æ•½–Ê‚ªŒğ·‚·‚é
+			// tãŒ0ã‹ã‚‰1ã®ç¯„å›²å†…ã§ã‚ã‚Œã°ç·šåˆ†ã¨å¹³é¢ãŒäº¤å·®ã™ã‚‹
 			if (t >= 0.0f && t <= 1.0f) {
-				contact = segment.start + t * (segment.end - segment.start); // Œğ“_‚ğŒvZ
+				contact = segment.start + t * (segment.end - segment.start); // äº¤ç‚¹ã‚’è¨ˆç®—
 
-				//Œğ“_‚ªOŠpŒ`ƒ|ƒŠƒSƒ“‚Ì“à‘¤‚É‚ ‚é‚©”»’è
+				//äº¤ç‚¹ãŒä¸‰è§’å½¢ãƒãƒªã‚´ãƒ³ã®å†…å´ã«ã‚ã‚‹ã‹åˆ¤å®š
 				return PointInTriangle(contact, polygon);
 			}
 		}
@@ -97,21 +101,21 @@ namespace Collision
 	}
 
 	//==================================
-	// ¡CheckHitŠÖ”
-	// ‹…‘Ì‚Æ•½–Ê‚Ì“–‚½‚è”»’è
+	// â– CheckHité–¢æ•°
+	// çƒä½“ã¨å¹³é¢ã®å½“ãŸã‚Šåˆ¤å®š
 	//==================================
 	bool CheckHit(const Sphere& sphere, const Plane& plane)
 	{
-		// ‹…‘Ì‚Ì’†S‚©‚ç•½–Ê‚Ö‚Ì‹——£‚ğŒvZ
+		// çƒä½“ã®ä¸­å¿ƒã‹ã‚‰å¹³é¢ã¸ã®è·é›¢ã‚’è¨ˆç®—
 		float distance = DistancePointToPlane(sphere.center, plane);
 
-		// ‹…‘Ì‚Ì”¼ŒaˆÈ“à‚È‚çÕ“Ë
+		// çƒä½“ã®åŠå¾„ä»¥å†…ãªã‚‰è¡çª
 		return (distance <= sphere.radius);
 	}
 
 	//==================================
-	// ¡CheckHitŠÖ”
-	// ‹…‘Ì‚Æƒ|ƒŠƒSƒ“‚Ì“–‚½‚è”»’è
+	// â– CheckHité–¢æ•°
+	// çƒä½“ã¨ãƒãƒªã‚´ãƒ³ã®å½“ãŸã‚Šåˆ¤å®š
 	//==================================
 	bool CheckHit(const Sphere& sphere, const Polygon& polygon)
 	{
@@ -122,22 +126,22 @@ namespace Collision
 	{
 		Plane plane(polygon.p0, GetNormal(polygon));
 
-		// ‹…‘Ì‚Ì’†S‚©‚ç•½–Ê‚Ö‚Ì‹——£‚ğŒvZ
+		// çƒä½“ã®ä¸­å¿ƒã‹ã‚‰å¹³é¢ã¸ã®è·é›¢ã‚’è¨ˆç®—
 		float distance = DistancePointToPlane(sphere.center, plane);
 
-		// ‹…‘Ì‚Ì”¼ŒaˆÈ“à‚È‚ç
+		// çƒä½“ã®åŠå¾„ä»¥å†…ãªã‚‰
 		if (distance <= sphere.radius)
 		{
-			//ü•ª‚Æ•½–Ê‚ÌŒğ“_‚ğŒvZ
+			//ç·šåˆ†ã¨å¹³é¢ã®äº¤ç‚¹ã‚’è¨ˆç®—
 			contact = ProjectPointToPlane(sphere.center, plane);
 
-			//Œğ“_‚ªOŠpŒ`ƒ|ƒŠƒSƒ“‚Ì“à‘¤‚É‚ ‚é‚©”»’è
+			//äº¤ç‚¹ãŒä¸‰è§’å½¢ãƒãƒªã‚´ãƒ³ã®å†…å´ã«ã‚ã‚‹ã‹åˆ¤å®š
 			if (PointInTriangle(contact, polygon))
 			{
 				return true;
 			}
 
-			//Œğ“_‚ªOŠpŒ`ƒ|ƒŠƒSƒ“‚ÌŠO‘¤‚È‚çŠe•Ó‚Æ‚Ì‹——£‚ğŒvZ
+			//äº¤ç‚¹ãŒä¸‰è§’å½¢ãƒãƒªã‚´ãƒ³ã®å¤–å´ãªã‚‰å„è¾ºã¨ã®è·é›¢ã‚’è¨ˆç®—
 			if (DistancePointToSegment(sphere.center, { polygon.p0 , polygon.p1 }, contact) <= sphere.radius)
 			{
 				return true;
@@ -158,8 +162,8 @@ namespace Collision
 	}
 
 	//==================================
-	// ¡CheckHitŠÖ”
-	// ‹…‘Ì‚Æ‹…‘Ì‚Ì“–‚½‚è”»’è
+	// â– CheckHité–¢æ•°
+	// çƒä½“ã¨çƒä½“ã®å½“ãŸã‚Šåˆ¤å®š
 	//==================================
 	bool CheckHit(Sphere sphere1, Sphere sphere2)
 	{
@@ -172,7 +176,7 @@ namespace Collision
 		float r2 = (sphere1.radius + sphere2.radius) * (sphere1.radius + sphere2.radius);
 		if (r2 > len2) {
 
-			// ÚG“_‚ğŒvZ ¦sphere1‚ªsphere2‚ÉŒã‚©‚ç‚Ô‚Â‚©‚Á‚Ä—ˆ‚½‚Æ‚µ‚Ä‚¢‚é
+			// æ¥è§¦ç‚¹ã‚’è¨ˆç®— â€»sphere1ãŒsphere2ã«å¾Œã‹ã‚‰ã¶ã¤ã‹ã£ã¦æ¥ãŸã¨ã—ã¦ã„ã‚‹
 			Vector3 v = (sphere1.center - sphere2.center);
 			v.Normalize();
 			contact = sphere2.center + v * sphere2.radius;
@@ -183,12 +187,12 @@ namespace Collision
 	}
 
 	//==================================
-	// ¡CheckHitŠÖ”
-	// AABB‚ÆAABB‚Ì“–‚½‚è”»’è
+	// â– CheckHité–¢æ•°
+	// AABBã¨AABBã®å½“ãŸã‚Šåˆ¤å®š
 	//==================================
 	bool CheckHit(AABB p1, AABB p2) {
 
-		// XÀ•W
+		// Xåº§æ¨™
 		if (p1.max.x < p2.min.x) {
 			return false;
 		}
@@ -197,7 +201,7 @@ namespace Collision
 			return false;
 		}
 
-		// YÀ•W
+		// Yåº§æ¨™
 		if (p1.max.y < p2.min.y) {
 			return false;
 		}
@@ -206,7 +210,7 @@ namespace Collision
 			return false;
 		}
 
-		// ZÀ•W
+		// Zåº§æ¨™
 		if (p1.max.z < p2.min.z) {
 			return false;
 		}
@@ -227,8 +231,8 @@ namespace Collision
 
 
 	//==================================
-	// ¡DotŠÖ”
-	// ƒxƒNƒgƒ‹‚Ì“àÏ‚ğ‹‚ß‚é
+	// â– Doté–¢æ•°
+	// ãƒ™ã‚¯ãƒˆãƒ«ã®å†…ç©ã‚’æ±‚ã‚ã‚‹
 	//==================================
 	float Dot(const Vector3& v1, const Vector3& v2)
 	{
@@ -236,67 +240,67 @@ namespace Collision
 	}
 
 	//==================================
-	// ¡CrossŠÖ”
-	// ƒxƒNƒgƒ‹‚ÌŠOÏ‚ğ‹‚ß‚é
+	// â– Crossé–¢æ•°
+	// ãƒ™ã‚¯ãƒˆãƒ«ã®å¤–ç©ã‚’æ±‚ã‚ã‚‹
 	//==================================
 	Vector3 Cross(const Vector3& v1, const Vector3& v2)
 	{
 		return Vector3(
-			v1.y * v2.z - v1.z * v2.y,	// x¬•ª
-			v1.z * v2.x - v1.x * v2.z,	// y¬•ª
-			v1.x * v2.y - v1.y * v2.x);	// z¬•ª
+			v1.y * v2.z - v1.z * v2.y,	// xæˆåˆ†
+			v1.z * v2.x - v1.x * v2.z,	// yæˆåˆ†
+			v1.x * v2.y - v1.y * v2.x);	// zæˆåˆ†
 	}
 
 	//==================================
-	// ¡ClosestPointOnSegmentŠÖ”
-	// “_‚©‚çü•ª‚Ü‚Å‚ÌÅ‹ß’n“_
+	// â– ClosestPointOnSegmenté–¢æ•°
+	// ç‚¹ã‹ã‚‰ç·šåˆ†ã¾ã§ã®æœ€è¿‘åœ°ç‚¹
 	//==================================
 	Vector3 ClosestPointOnSegment(const Vector3& point, const Segment& segment)
 	{
-		// ü•ª‚ÌƒxƒNƒgƒ‹‚ğŒvZiI“_ - n“_j
+		// ç·šåˆ†ã®ãƒ™ã‚¯ãƒˆãƒ«ã‚’è¨ˆç®—ï¼ˆçµ‚ç‚¹ - å§‹ç‚¹ï¼‰
 		Vector3 vec = segment.end - segment.start;
 
-		// ü•ª‚Ì’·‚³‚Ì•½•û‚ğŒvZiƒxƒNƒgƒ‹‚Ì‘å‚«‚³‚Ì2æj
+		// ç·šåˆ†ã®é•·ã•ã®å¹³æ–¹ã‚’è¨ˆç®—ï¼ˆãƒ™ã‚¯ãƒˆãƒ«ã®å¤§ãã•ã®2ä¹—ï¼‰
 		double r2 = vec.x * vec.x + vec.y * vec.y + vec.z * vec.z;
 
-		// “_‚©‚çü•ª‚Ìn“_‚Ü‚Å‚ÌƒxƒNƒgƒ‹‚Æ‚Ì“àÏ‚ğŒvZ
+		// ç‚¹ã‹ã‚‰ç·šåˆ†ã®å§‹ç‚¹ã¾ã§ã®ãƒ™ã‚¯ãƒˆãƒ«ã¨ã®å†…ç©ã‚’è¨ˆç®—
 		double tt = -Dot(vec, (segment.start - point));
 
-		// “_‚ªn“_‚æ‚è‚àü•ª‚ÌŠO‘¤
+		// ç‚¹ãŒå§‹ç‚¹ã‚ˆã‚Šã‚‚ç·šåˆ†ã®å¤–å´
 		if (tt < 0)
 		{
-			// “_‚Æü•ª‚Ìn“_‚Ì‹——£‚ğ•Ô‚·
+			// ç‚¹ã¨ç·šåˆ†ã®å§‹ç‚¹ã®è·é›¢ã‚’è¿”ã™
 			return segment.start;
 		}
-		// “_‚ªI“_‚æ‚è‚àü•ª‚ÌŠO‘¤‚Ìê‡
+		// ç‚¹ãŒçµ‚ç‚¹ã‚ˆã‚Šã‚‚ç·šåˆ†ã®å¤–å´ã®å ´åˆ
 		else if (tt > r2)
 		{
-			// “_‚Æü•ª‚ÌI“_‚Æ‚Ì‹——£‚ğ•Ô‚·
+			// ç‚¹ã¨ç·šåˆ†ã®çµ‚ç‚¹ã¨ã®è·é›¢ã‚’è¿”ã™
 			return segment.end;
 		}
-		// “_‚ªü•ª‚Ìã‚É“Š‰e‚³‚ê‚éê‡Aü•ªã‚ÌÅ’Z‹——£‚ğŒvZ
+		// ç‚¹ãŒç·šåˆ†ã®ä¸Šã«æŠ•å½±ã•ã‚Œã‚‹å ´åˆã€ç·šåˆ†ä¸Šã®æœ€çŸ­è·é›¢ã‚’è¨ˆç®—
 		else
 		{
-			Vector3 ab = segment.end - segment.start; // ü•ª‚ÌƒxƒNƒgƒ‹
-			float lengthSq = ab.LengthSquared(); // ü•ª‚Ì’·‚³‚Ì“ñæ
+			Vector3 ab = segment.end - segment.start; // ç·šåˆ†ã®ãƒ™ã‚¯ãƒˆãƒ«
+			float lengthSq = ab.LengthSquared(); // ç·šåˆ†ã®é•·ã•ã®äºŒä¹—
 
-			// ü•ª‚ª‘Ş‰»i—¼’[‚ª“¯‚¶“_j‚µ‚Ä‚¢‚éê‡
+			// ç·šåˆ†ãŒé€€åŒ–ï¼ˆä¸¡ç«¯ãŒåŒã˜ç‚¹ï¼‰ã—ã¦ã„ã‚‹å ´åˆ
 			if (lengthSq == 0.0f) {
-				return segment.start; // ü•ª‚Ì’[“_‚ğ•Ô‚·
+				return segment.start; // ç·šåˆ†ã®ç«¯ç‚¹ã‚’è¿”ã™
 			}
 
-			// “_‚ªü•ªã‚É“Š‰e‚³‚ê‚éˆÊ’u‚ğŒvZi0 <= t <= 1 ‚Ì”ÍˆÍj
+			// ç‚¹ãŒç·šåˆ†ä¸Šã«æŠ•å½±ã•ã‚Œã‚‹ä½ç½®ã‚’è¨ˆç®—ï¼ˆ0 <= t <= 1 ã®ç¯„å›²ï¼‰
 			float t = (point - segment.start).Dot(ab) / lengthSq;
 			t = std::clamp(t, 0.0f, 1.0f);
 
-			// ü•ªã‚ÌÅ‹ßÚ“_‚ğ•Ô‚·
+			// ç·šåˆ†ä¸Šã®æœ€è¿‘æ¥ç‚¹ã‚’è¿”ã™
 			return (segment.start + t * ab);
 		}
 	}
 
 	//==================================
-	// ¡DistanceSquaredPointToSegmentŠÖ”
-	// “_‚©‚çü•ª‚Ü‚Å‚Ì‹——£‚Ì2æ
+	// â– DistanceSquaredPointToSegmenté–¢æ•°
+	// ç‚¹ã‹ã‚‰ç·šåˆ†ã¾ã§ã®è·é›¢ã®2ä¹—
 	//==================================
 	float DistanceSquaredPointToSegment(const Vector3& point, const Segment& segment)
 	{
@@ -311,8 +315,8 @@ namespace Collision
 	}
 
 	//==================================
-	// ¡DistancePointToSegmentŠÖ”
-	// “_‚©‚çü•ª‚Ü‚Å‚Ì‹——£
+	// â– DistancePointToSegmenté–¢æ•°
+	// ç‚¹ã‹ã‚‰ç·šåˆ†ã¾ã§ã®è·é›¢
 	//==================================
 	float DistancePointToSegment(const Vector3& point, const Segment& segment)
 	{
@@ -327,8 +331,8 @@ namespace Collision
 	}
 
 	//==================================
-	// ¡DistancePointToPlaneŠÖ”
-	// “_‚©‚ç•½–Ê‚Ü‚Å‚Ì‹——£
+	// â– DistancePointToPlaneé–¢æ•°
+	// ç‚¹ã‹ã‚‰å¹³é¢ã¾ã§ã®è·é›¢
 	//==================================
 	float DistancePointToPlane(const Vector3& point, const Plane& plane)
 	{
@@ -336,71 +340,71 @@ namespace Collision
 	}
 
 	//==================================
-	// ¡ProjectPointToPlaneŠÖ”
-	// “_‚©‚ç•½–Ê‚É‰º‚ë‚µ‚½‚ü‚ÌŒğ“_
+	// â– ProjectPointToPlaneé–¢æ•°
+	// ç‚¹ã‹ã‚‰å¹³é¢ã«ä¸‹ã‚ã—ãŸå‚ç·šã®äº¤ç‚¹
 	//==================================
 	Vector3 ProjectPointToPlane(const Vector3& point, const Plane& plane)
 	{
 		double t = -Dot((point - plane.point), plane.normal) / Dot(plane.normal, plane.normal);
 
-		// Œğ“_‚ÌÀ•W‚ğŒvZ
+		// äº¤ç‚¹ã®åº§æ¨™ã‚’è¨ˆç®—
 		return  point + (plane.normal * (float)t);
 	}
 
 	//==================================
-	// ¡PointInTriangleŠÖ”
-	// OŠpŒ`‚Ì“à•”‚©‚Ç‚¤‚©‚ğ”»’è‚·‚é
+	// â– PointInTriangleé–¢æ•°
+	// ä¸‰è§’å½¢ã®å†…éƒ¨ã‹ã©ã†ã‹ã‚’åˆ¤å®šã™ã‚‹
 	//==================================
 	bool PointInTriangle(const Vector3& point, const Polygon& polygon)
 	{
-		// 3•Ó‚ÌƒxƒNƒgƒ‹
+		// 3è¾ºã®ãƒ™ã‚¯ãƒˆãƒ«
 		Vector3 ab = polygon.p1 - polygon.p0;
 		Vector3 bc = polygon.p2 - polygon.p1;
 		Vector3 ca = polygon.p0 - polygon.p2;
 
-		// “à•”‚Ì“_‚Æ‚ÌƒxƒNƒgƒ‹
+		// å†…éƒ¨ã®ç‚¹ã¨ã®ãƒ™ã‚¯ãƒˆãƒ«
 		Vector3 ap = point - polygon.p0;
 		Vector3 bp = point - polygon.p1;
 		Vector3 cp = point - polygon.p2;
 
-		// 3•Ó‚Æ“à•”‚Ì“_‚Æ‚Ì–@üƒxƒNƒgƒ‹
+		// 3è¾ºã¨å†…éƒ¨ã®ç‚¹ã¨ã®æ³•ç·šãƒ™ã‚¯ãƒˆãƒ«
 		Vector3	n1 = Cross(ab, ap);
 		Vector3	n2 = Cross(bc, bp);
 		Vector3	n3 = Cross(ca, cp);
 
-		// OŠpŒ`‚Ì–@üƒxƒNƒgƒ‹
+		// ä¸‰è§’å½¢ã®æ³•ç·šãƒ™ã‚¯ãƒˆãƒ«
 		Vector3	normal = Cross(ab, bc);
 
 		float dot = n1.Dot(normal);
-		if (dot < 0) return false; // ˆ×‚·Šp“x‚ª“İŠp
+		if (dot < 0) return false; // ç‚ºã™è§’åº¦ãŒéˆè§’
 
 		dot = n2.Dot(normal);
-		if (dot < 0) return false; // ˆ×‚·Šp“x‚ª“İŠp
+		if (dot < 0) return false; // ç‚ºã™è§’åº¦ãŒéˆè§’
 
 		dot = n3.Dot(normal);
-		if (dot < 0) return false; // ˆ×‚·Šp“x‚ª“İŠp
+		if (dot < 0) return false; // ç‚ºã™è§’åº¦ãŒéˆè§’
 
 		return true;
 	}
 
 	//==================================
-	// ¡ClosestPointOnTriangleŠÖ”
-	// “_‚ÆOŠpŒ`ŠÔ‚ÌÅ‹ßÚ“_‚ğ‹‚ß‚é
+	// â– ClosestPointOnTriangleé–¢æ•°
+	// ç‚¹ã¨ä¸‰è§’å½¢é–“ã®æœ€è¿‘æ¥ç‚¹ã‚’æ±‚ã‚ã‚‹
 	//==================================
 	Vector3 ClosestPointOnTriangle(const Vector3& point, const Polygon& polygon)
 	{
 		Plane plane(polygon.p0, GetNormal(polygon));
 
-		//ü•ª‚Æ•½–Ê‚ÌŒğ“_‚ğŒvZ
+		//ç·šåˆ†ã¨å¹³é¢ã®äº¤ç‚¹ã‚’è¨ˆç®—
 		Vector3 p = ProjectPointToPlane(point, plane);
 
-		//Œğ“_‚ªOŠpŒ`ƒ|ƒŠƒSƒ“‚Ì“à‘¤‚É‚ ‚é‚©”»’è
+		//äº¤ç‚¹ãŒä¸‰è§’å½¢ãƒãƒªã‚´ãƒ³ã®å†…å´ã«ã‚ã‚‹ã‹åˆ¤å®š
 		if (PointInTriangle(p, polygon))
 		{
 			return p;
 		}
 
-		//Œğ“_‚ªOŠpŒ`ƒ|ƒŠƒSƒ“‚ÌŠO‘¤‚È‚çŠe•Ó‚Æ‚Ì‹——£‚ğŒvZ
+		//äº¤ç‚¹ãŒä¸‰è§’å½¢ãƒãƒªã‚´ãƒ³ã®å¤–å´ãªã‚‰å„è¾ºã¨ã®è·é›¢ã‚’è¨ˆç®—
 		Vector3 p1, p2, p3;
 		float d1 = DistanceSquaredPointToSegment(point, { polygon.p0 , polygon.p1 }, p1);
 		float d2 = DistanceSquaredPointToSegment(point, { polygon.p1 , polygon.p2 }, p2);
@@ -431,7 +435,7 @@ namespace Collision
 	}
 
 	//==================================
-	// –@ü‚ğŒvZ
+	// æ³•ç·šã‚’è¨ˆç®—
 	//==================================
 	Vector3 GetNormal(const Polygon& polygon)
 	{
@@ -441,33 +445,33 @@ namespace Collision
 	}
 
 	//==================================
-	// ‹…‘Ì‚ğ“–‚½‚Á‚½Œã‚Ì’n“_‚É“®‚©‚·
+	// çƒä½“ã‚’å½“ãŸã£ãŸå¾Œã®åœ°ç‚¹ã«å‹•ã‹ã™
 	//==================================
 	Vector3 moveSphere(const Segment& segment, const float& radius, const Polygon& polygon, const Vector3& contact, float& distance)
 	{
-		// ü•ª‚Ì•ûŒüƒxƒNƒgƒ‹
+		// ç·šåˆ†ã®æ–¹å‘ãƒ™ã‚¯ãƒˆãƒ«
 		Vector3 direction = segment.end - segment.start;
 		float length = direction.Length();
 		direction.Normalize();
 
-		// ü•ª‚Ì’·‚³‚ª0‚Ìê‡‚ÍŒvZ•s”\
+		// ç·šåˆ†ã®é•·ã•ãŒ0ã®å ´åˆã¯è¨ˆç®—ä¸èƒ½
 		if (length == 0.0f) return segment.start;
 
-		// “ñŸ•û’ö®‚ğŒvZ‚·‚é (a*t^2 + b*t + c = 0)
-		float a = 1.0f; // direction‚Í³‹K‰»‚³‚ê‚Ä‚¢‚é‚Ì‚Åa=1
+		// äºŒæ¬¡æ–¹ç¨‹å¼ã‚’è¨ˆç®—ã™ã‚‹ (a*t^2 + b*t + c = 0)
+		float a = 1.0f; // directionã¯æ­£è¦åŒ–ã•ã‚Œã¦ã„ã‚‹ã®ã§a=1
 		float b = 2.0f * Collision::Dot((segment.start - contact), direction);
 		float c = (segment.start - contact).LengthSquared() - radius * radius;
 		float discriminant = b * b - 4.0f * a * c;
 
-		// ‰ğ‚ª‚ ‚ê‚Î
+		// è§£ãŒã‚ã‚Œã°
 		if (discriminant >= 0.0f) {
 
-			// ‰ğ‚ğ‹‚ß‚é
+			// è§£ã‚’æ±‚ã‚ã‚‹
 			float sqrt_discriminant = std::sqrt(discriminant);
 			float t1 = (-b + sqrt_discriminant) / (2.0f * a);
 			float t2 = (-b - sqrt_discriminant) / (2.0f * a);
 
-			// ü•ªã‚Ì‰ğ‚ğ”»’è
+			// ç·šåˆ†ä¸Šã®è§£ã‚’åˆ¤å®š
 			if (t1 < t2)
 			{
 				distance = t1;
@@ -493,7 +497,7 @@ namespace Collision
 	}
 
 	//==================================
-	// AABB‚ğİ’è
+	// AABBã‚’è¨­å®š
 	//==================================
 	AABB SetAABB(Vector3 centerposition, float width, float height, float depth)
 	{

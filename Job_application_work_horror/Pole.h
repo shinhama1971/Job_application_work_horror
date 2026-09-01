@@ -1,3 +1,7 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: ã‚¹ãƒ†ãƒ¼ã‚¸å†…ã®æŸ±çŠ¶ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã‚’ç”Ÿæˆãƒ»æç”»ã—ã¾ã™ã€‚
+// ============================================================================
+
 #pragma once
 #include "Object.h"
 #include "Texture.h"
@@ -7,21 +11,21 @@
 #include "Material.h"
 
 //-----------------------------------------------------------------------------
-// PoleƒNƒ‰ƒX
+// Poleã‚¯ãƒ©ã‚¹
 //-----------------------------------------------------------------------------
 class Pole :public Object
 {
 private:
 
-	// •`‰æ‚Ìˆ×‚Ìî•ñiƒƒbƒVƒ…‚ÉŠÖ‚í‚éî•ñj
-	MeshRenderer m_MeshRenderer; // ’¸“_ƒoƒbƒtƒ@EƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@EƒCƒ“ƒfƒbƒNƒX”
+	// æç”»ã®ç‚ºã®æƒ…å ±ï¼ˆãƒ¡ãƒƒã‚·ãƒ¥ã«é–¢ã‚ã‚‹æƒ…å ±ï¼‰
+	MeshRenderer m_MeshRenderer; // é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ãƒ»ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡ãƒ»ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°
 
-	// •`‰æ‚Ìˆ×‚Ìî•ñiŒ©‚½–Ú‚ÉŠÖ‚í‚é•”•ªj
+	// æç”»ã®ç‚ºã®æƒ…å ±ï¼ˆè¦‹ãŸç›®ã«é–¢ã‚ã‚‹éƒ¨åˆ†ï¼‰
 	std::vector<std::unique_ptr<Material>> m_Materials;
 	std::vector<SUBSET> m_subsets;
-	std::vector<std::unique_ptr<Texture>> m_Textures; // ƒeƒNƒXƒ`ƒƒ
+	std::vector<std::unique_ptr<Texture>> m_Textures; // ãƒ†ã‚¯ã‚¹ãƒãƒ£
 
-	int m_State = 0; // 0:”ñ•\¦E1:•ûŒü‘I‘ğE2:ƒpƒ[‘I‘ğ
+	int m_State = 0; // 0:éè¡¨ç¤ºãƒ»1:æ–¹å‘é¸æŠãƒ»2:ãƒ‘ãƒ¯ãƒ¼é¸æŠ
 
 public:
 
@@ -30,7 +34,7 @@ public:
 	void Draw(Camera* cam);
 	void Uninit();
 
-	// ˆÊ’u‚Ìİ’è
+	// ä½ç½®ã®è¨­å®š
 	void SetPosition(float x, float y, float z);
 	void SetPosition(DirectX::SimpleMath::Vector3 pos);
 };

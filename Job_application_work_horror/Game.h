@@ -1,3 +1,7 @@
+// ============================================================================
+// ファイルの役割: ゲーム全体のオブジェクト所有、更新・描画順、シーン遷移を統括します。
+// ============================================================================
+
 #pragma once
 
 #include <iostream>
@@ -15,6 +19,7 @@
 #include"PostProcess.h"
 #include "ShadowMap.h"
 #include "PlanarReflection.h"
+#include "sound.h"
 enum class SceneName
 {
     Title,
@@ -27,9 +32,14 @@ class Scene;
 
 namespace Core
 {
+    // ゲームループの最上位クラス。
+    // SceneとObjectの所有権はGameがunique_ptrで保持し、外部へ返す生ポインタは
+    // 「参照専用」として扱います。シーン変更と追加・削除は更新ループ後に遅延実行し、
+    // vector走査中に所有コンテナが変化することを防いでいます。
     class Game
     {
     private:
+        // Game自身と現在のSceneは単一所有。明示的なdeleteは行いません。
         static std::unique_ptr<Game> m_Instance;
 
         std::unique_ptr<Scene> m_Scene;
@@ -37,10 +47,14 @@ namespace Core
         Effect::PostProcess m_PostProcess;
         Effect::ShadowMap m_ShadowMap;
         Effect::PlanarReflection m_PlanarReflection;
+        Sound m_Sound;
+        bool m_SoundReady = false;
 
         std::vector<std::unique_ptr<Object>> m_Objects;
+        // 名前検索を高速化する非所有ポインタ。実体は必ずm_Objectsが所有します。
         std::unordered_map<std::string, Object*> m_NamedObjects;
 
+        // Update中のコンテナ変更を避けるための遅延実行キュー。
         std::optional<SceneName> m_PendingScene;
         std::vector<std::function<void()>> m_PendingObjectCommands;
 
@@ -60,6 +74,7 @@ namespace Core
         int m_BrightnessLevel = 2;
         int m_EffectLevel = 1;
         int m_LookSensitivityLevel = 2;
+        int m_VolumeLevel = 3;
         int m_PauseSettingIndex = 0;
         float m_BestClearTimeSeconds = 0.0f;
         int m_BestCaughtCount = 0;
@@ -72,6 +87,7 @@ namespace Core
         void SaveBestRecord() const;
         void LoadSettings();
         void SaveSettings() const;
+        void ApplyAudioVolume(bool paused);
 
     public:
         Game();
@@ -91,6 +107,23 @@ namespace Core
 
         void RequestSceneChange(SceneName sName);
 
+        // 音声初期化に失敗したPCでもゲームを続行できる安全な再生窓口です。
+        void PlayAudioCue(SOUND_LABEL label, float pitch = 1.0f)
+        {
+            if (m_SoundReady)
+            {
+                m_Sound.Play(label, pitch);
+            }
+        }
+
+        void StopAudioCue(SOUND_LABEL label)
+        {
+            if (m_SoundReady)
+            {
+                m_Sound.Stop(label);
+            }
+        }
+
         void DeleteObject(Object* pt);
         void DestroyObj(const std::string& name);
         void DeleteAllObject();
@@ -98,6 +131,7 @@ namespace Core
         template<typename T>
         T* AddObject()
         {
+            // unique_ptrをコンテナへ移してから初期化し、例外時も所有権を失わないようにします。
             auto object = std::make_unique<T>();
             T* pt = object.get();
             m_Objects.emplace_back(std::move(object));
@@ -108,6 +142,7 @@ namespace Core
         template<typename T, typename Setup>
         void RequestAddObject(Setup&& setup)
         {
+            // Object::Update中に呼ばれても、その場ではm_Objectsを書き換えません。
             m_PendingObjectCommands.emplace_back(
                 [this, setup = std::forward<Setup>(setup)]() mutable
                 {
@@ -198,6 +233,11 @@ namespace Core
         int GetLookSensitivityLevel() const
         {
             return m_LookSensitivityLevel;
+        }
+
+        int GetVolumeLevel() const
+        {
+            return m_VolumeLevel;
         }
 
         int GetPauseSettingIndex() const

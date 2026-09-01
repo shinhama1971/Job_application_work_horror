@@ -1,32 +1,36 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: ç”»åƒãƒ•ã‚¡ã‚¤ãƒ«ã‹ã‚‰Direct3D 11ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’ç”Ÿæˆãƒ»ä¿æŒã—ã¾ã™ã€‚
+// ============================================================================
+
 #include	<iostream>
 #include	"Texture.h"
 #include	"stb_image.h"
 #include	"Renderer.h"
 
-// ƒRƒ“ƒXƒgƒ‰ƒNƒ^
+// ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
 Texture::Texture()
 {
 }
 
-// ƒfƒXƒgƒ‰ƒNƒ^
+// ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
 Texture::~Texture()
 {
-	m_srv.Reset();//–¾¦“I‚ÉSRV‚ğ‰ğ•ú
+	m_srv.Reset();//æ˜ç¤ºçš„ã«SRVã‚’è§£æ”¾
 }
-// ƒeƒNƒXƒ`ƒƒ‚ğƒ[ƒh
+// ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’ãƒ­ãƒ¼ãƒ‰
 bool Texture::Load(const std::string& filename)
 {
 	bool sts = true;
 	unsigned char* pixels=nullptr;
 
-	// ‰æ‘œ“Ç‚İ‚İ
+	// ç”»åƒèª­ã¿è¾¼ã¿
 	pixels = stbi_load(filename.c_str(), &m_width, &m_height, &m_bpp, 4);
 	if (pixels == nullptr) {
 		std::cout << filename.c_str() << " Load error " << std::endl;
 		return false;
 	}
 
-	// ƒeƒNƒXƒ`ƒƒ2DƒŠƒ\[ƒX¶¬
+	// ãƒ†ã‚¯ã‚¹ãƒãƒ£2Dãƒªã‚½ãƒ¼ã‚¹ç”Ÿæˆ
 	ComPtr<ID3D11Texture2D> pTexture;
 
 	D3D11_TEXTURE2D_DESC desc{};
@@ -54,26 +58,26 @@ bool Texture::Load(const std::string& filename)
 		return false;
 	}
 
-	// SRV¶¬
+	// SRVç”Ÿæˆ
 	hr = device->CreateShaderResourceView(pTexture.Get(), nullptr, m_srv.ReleaseAndGetAddressOf());
 	if (FAILED(hr)) {
 		stbi_image_free(pixels);
 		return false;
 	}
 
-	// ƒsƒNƒZƒ‹ƒCƒ[ƒW‰ğ•ú
+	// ãƒ”ã‚¯ã‚»ãƒ«ã‚¤ãƒ¡ãƒ¼ã‚¸è§£æ”¾
 	stbi_image_free(pixels);
 
 	return true;
 }
 
-// ƒeƒNƒXƒ`ƒƒ‚ğƒƒ‚ƒŠ‚©‚çƒ[ƒh
+// ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’ãƒ¡ãƒ¢ãƒªã‹ã‚‰ãƒ­ãƒ¼ãƒ‰
 bool Texture::LoadFromMemory(const unsigned char* Data,int len) {
 
 	bool sts = true;
 	unsigned char* pixels=nullptr;
 
-	// ‰æ‘œ“Ç‚İ‚İ
+	// ç”»åƒèª­ã¿è¾¼ã¿
 	pixels = stbi_load_from_memory(Data, 
 		len, 
 		&m_width, 
@@ -81,7 +85,7 @@ bool Texture::LoadFromMemory(const unsigned char* Data,int len) {
 		&m_bpp, 
 		STBI_rgb_alpha);
 
-	// ƒeƒNƒXƒ`ƒƒ2DƒŠƒ\[ƒX¶¬
+	// ãƒ†ã‚¯ã‚¹ãƒãƒ£2Dãƒªã‚½ãƒ¼ã‚¹ç”Ÿæˆ
 	ComPtr<ID3D11Texture2D> pTexture;
 
 	D3D11_TEXTURE2D_DESC desc{};
@@ -109,20 +113,20 @@ bool Texture::LoadFromMemory(const unsigned char* Data,int len) {
 		return false;
 	}
 
-	// SRV¶¬
+	// SRVç”Ÿæˆ
 	hr = device->CreateShaderResourceView(pTexture.Get(), nullptr, m_srv.ReleaseAndGetAddressOf());
 	if (FAILED(hr)) {
 		stbi_image_free(pixels);
 		return false;
 	}
 
-	// ƒsƒNƒZƒ‹ƒCƒ[ƒW‰ğ•ú
+	// ãƒ”ã‚¯ã‚»ãƒ«ã‚¤ãƒ¡ãƒ¼ã‚¸è§£æ”¾
 	stbi_image_free(pixels);
 
 	return true;
 }
 
-// ƒeƒNƒXƒ`ƒƒ‚ğGPU‚ÉƒZƒbƒg
+// ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’GPUã«ã‚»ãƒƒãƒˆ
 void Texture::SetGPU()
 {
 	ID3D11DeviceContext* devicecontext = Renderer::GetDeviceContext();

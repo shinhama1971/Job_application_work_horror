@@ -1,3 +1,7 @@
+// ============================================================================
+// ファイルの役割: ドアの描画、開閉アニメーション、施錠条件、当たり判定を管理します。
+// ============================================================================
+
 #include "Door.h"
 
 #include "CeilingLight.h"
@@ -191,6 +195,7 @@ void Door::Interact(Player& player)
 
     if (m_IsLocked)
     {
+        Core::Game::GetInstance()->PlayAudioCue(SOUND_CUE_DOOR);
         m_LockedRattleTimer = 0.28f;
         Core::Game::GetInstance()->GetPostProcess()->TriggerHorrorPulse(
             0.10f,
@@ -203,6 +208,7 @@ void Door::Interact(Player& player)
     // power restoration. The final exit remains separately power-locked.
     if (!m_IsOpen && !m_IsOpening)
     {
+        Core::Game::GetInstance()->PlayAudioCue(SOUND_CUE_DOOR);
         m_IsOpening = true;
         m_OpenDelayTimer = m_OpenDelayDuration;
 

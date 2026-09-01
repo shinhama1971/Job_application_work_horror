@@ -1,3 +1,7 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: Assimpã§èª­ã¿è¾¼ã‚“ã ãƒ¢ãƒ‡ãƒ«ãƒ‡ãƒ¼ã‚¿ã‚’ã‚²ãƒ¼ãƒ ç”¨ã®é ‚ç‚¹ãƒ»ãƒãƒ†ãƒªã‚¢ãƒ«ã¸å¤‰æ›
+// ============================================================================
+
 #pragma once
 #include	<assimp/Importer.hpp>
 #include	<assimp/scene.h>
@@ -7,33 +11,33 @@
 namespace AssimpPerse
 {
 	struct VERTEX {
-		std::string meshname;		// ƒƒbƒVƒ…–¼
-		aiVector3D	pos;			// ˆÊ’u
-		aiVector3D	normal;			// –@ü
-		aiColor4D	color;			// ’¸“_ƒJƒ‰[	
-		aiVector3D	texcoord;		// ƒeƒNƒXƒ`ƒƒÀ•W	
-		int			materialindex;	// ƒ}ƒeƒŠƒAƒ‹ƒCƒ“ƒfƒbƒNƒX
-		std::string mtrlname;		// ƒ}ƒeƒŠƒAƒ‹–¼
+		std::string meshname;		// ãƒ¡ãƒƒã‚·ãƒ¥å
+		aiVector3D	pos;			// ä½ç½®
+		aiVector3D	normal;			// æ³•ç·š
+		aiColor4D	color;			// é ‚ç‚¹ã‚«ãƒ©ãƒ¼	
+		aiVector3D	texcoord;		// ãƒ†ã‚¯ã‚¹ãƒãƒ£åº§æ¨™	
+		int			materialindex;	// ãƒãƒ†ãƒªã‚¢ãƒ«ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		std::string mtrlname;		// ãƒãƒ†ãƒªã‚¢ãƒ«å
 	};
 
 	struct SUBSET {
-		std::string meshname;		// ƒƒbƒVƒ…–¼
-		int materialindex;			// ƒ}ƒeƒŠƒAƒ‹ƒCƒ“ƒfƒbƒNƒX
-		unsigned int VertexBase;	// ’¸“_ƒoƒbƒtƒ@‚Ìƒx[ƒX
-		unsigned int VertexNum;		// ’¸“_”
-		unsigned int IndexBase;		// ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@‚Ìƒx[ƒX
-		unsigned int IndexNum;		// ƒCƒ“ƒfƒbƒNƒX”
-		std::string	 mtrlname;		// ƒ}ƒeƒŠƒAƒ‹–¼
+		std::string meshname;		// ãƒ¡ãƒƒã‚·ãƒ¥å
+		int materialindex;			// ãƒãƒ†ãƒªã‚¢ãƒ«ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		unsigned int VertexBase;	// é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ã®ãƒ™ãƒ¼ã‚¹
+		unsigned int VertexNum;		// é ‚ç‚¹æ•°
+		unsigned int IndexBase;		// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡ã®ãƒ™ãƒ¼ã‚¹
+		unsigned int IndexNum;		// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°
+		std::string	 mtrlname;		// ãƒãƒ†ãƒªã‚¢ãƒ«å
 	};
 
 	struct MATERIAL {
-		std::string mtrlname;		// ƒ}ƒeƒŠƒAƒ‹–¼
-		aiColor4D	Ambient;		// ƒAƒ“ƒrƒGƒ“ƒg
-		aiColor4D	Diffuse;		// ƒfƒBƒtƒ…[ƒY
-		aiColor4D	Specular;		// ƒXƒyƒLƒ…ƒ‰
-		aiColor4D	Emission;		// ƒGƒ~ƒbƒVƒ‡ƒ“
-		float		Shininess;		// ƒVƒƒƒCƒlƒX
-		std::string texturename;	// ƒeƒNƒXƒ`ƒƒ–¼
+		std::string mtrlname;		// ãƒãƒ†ãƒªã‚¢ãƒ«å
+		aiColor4D	Ambient;		// ã‚¢ãƒ³ãƒ“ã‚¨ãƒ³ãƒˆ
+		aiColor4D	Diffuse;		// ãƒ‡ã‚£ãƒ•ãƒ¥ãƒ¼ã‚º
+		aiColor4D	Specular;		// ã‚¹ãƒšã‚­ãƒ¥ãƒ©
+		aiColor4D	Emission;		// ã‚¨ãƒŸãƒƒã‚·ãƒ§ãƒ³
+		float		Shininess;		// ã‚·ãƒ£ã‚¤ãƒã‚¹
+		std::string texturename;	// ãƒ†ã‚¯ã‚¹ãƒãƒ£å
 	};
 
 	void GetModelData(std::string filename, std::string texturedirectory);

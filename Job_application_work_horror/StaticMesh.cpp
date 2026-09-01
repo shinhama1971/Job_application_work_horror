@@ -1,25 +1,29 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: OBJãªã©ã®é™çš„ãƒ¢ãƒ‡ãƒ«ã‚’èª­ã¿è¾¼ã¿ã€æç”»ç”¨ãƒ‡ãƒ¼ã‚¿ã¨ã—ã¦ä¿æŒã—ã¾ã™ã€‚
+// ============================================================================
+
 #include	"StaticMesh.h"
 #include	"AssimpPerse.h"
 
 void StaticMesh::Load(std::string filename, std::string texturedirectory)
 {
-	std::vector<AssimpPerse::SUBSET> subsets{};					// ƒTƒuƒZƒbƒgî•ñ
-	std::vector<std::vector<AssimpPerse::VERTEX>> vertices{};	// ’¸“_ƒf[ƒ^iƒƒbƒVƒ…’PˆÊj
-	std::vector<std::vector<unsigned int>> indices{};			// ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^iƒƒbƒVƒ…’PˆÊj
-	std::vector<AssimpPerse::MATERIAL> materials{};				// ƒ}ƒeƒŠƒAƒ‹
-	std::vector<std::unique_ptr<Texture>> embededtextures{};	// “à‘ ƒeƒNƒXƒ`ƒƒŒQ
+	std::vector<AssimpPerse::SUBSET> subsets{};					// ã‚µãƒ–ã‚»ãƒƒãƒˆæƒ…å ±
+	std::vector<std::vector<AssimpPerse::VERTEX>> vertices{};	// é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ï¼ˆãƒ¡ãƒƒã‚·ãƒ¥å˜ä½ï¼‰
+	std::vector<std::vector<unsigned int>> indices{};			// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿ï¼ˆãƒ¡ãƒƒã‚·ãƒ¥å˜ä½ï¼‰
+	std::vector<AssimpPerse::MATERIAL> materials{};				// ãƒãƒ†ãƒªã‚¢ãƒ«
+	std::vector<std::unique_ptr<Texture>> embededtextures{};	// å†…è”µãƒ†ã‚¯ã‚¹ãƒãƒ£ç¾¤
 
-	// assimp‚ğg—p‚µ‚Äƒ‚ƒfƒ‹ƒf[ƒ^‚ğæ“¾
+	// assimpã‚’ä½¿ç”¨ã—ã¦ãƒ¢ãƒ‡ãƒ«ãƒ‡ãƒ¼ã‚¿ã‚’å–å¾—
 	AssimpPerse::GetModelData(filename, texturedirectory);
 
-	subsets = AssimpPerse::GetSubsets();		// ƒTƒuƒZƒbƒgî•ñæ“¾
-	vertices = AssimpPerse::GetVertices();		// ’¸“_ƒf[ƒ^iƒƒbƒVƒ…’PˆÊj
-	indices = AssimpPerse::GetIndices();		// ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^iƒƒbƒVƒ…’PˆÊj
-	materials = AssimpPerse::GetMaterials();	// ƒ}ƒeƒŠƒAƒ‹î•ñæ“¾
+	subsets = AssimpPerse::GetSubsets();		// ã‚µãƒ–ã‚»ãƒƒãƒˆæƒ…å ±å–å¾—
+	vertices = AssimpPerse::GetVertices();		// é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ï¼ˆãƒ¡ãƒƒã‚·ãƒ¥å˜ä½ï¼‰
+	indices = AssimpPerse::GetIndices();		// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿ï¼ˆãƒ¡ãƒƒã‚·ãƒ¥å˜ä½ï¼‰
+	materials = AssimpPerse::GetMaterials();	// ãƒãƒ†ãƒªã‚¢ãƒ«æƒ…å ±å–å¾—
 
-	m_textures = AssimpPerse::GetTextures();	// ƒeƒNƒXƒ`ƒƒî•ñæ“¾	
+	m_textures = AssimpPerse::GetTextures();	// ãƒ†ã‚¯ã‚¹ãƒãƒ£æƒ…å ±å–å¾—	
 
-	// ’¸“_ƒf[ƒ^ì¬
+	// é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ä½œæˆ
 	for (const auto& mv : vertices)
 	{
 		for (auto& v : mv)
@@ -34,7 +38,7 @@ void StaticMesh::Load(std::string filename, std::string texturedirectory)
 		}
 	}
 
-	// ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^ì¬
+	// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿ä½œæˆ
 	for (const auto& mi : indices)
 	{
 		for (auto& index : mi)
@@ -43,20 +47,20 @@ void StaticMesh::Load(std::string filename, std::string texturedirectory)
 		}
 	}
 
-	// ƒTƒuƒZƒbƒgƒf[ƒ^ì¬
+	// ã‚µãƒ–ã‚»ãƒƒãƒˆãƒ‡ãƒ¼ã‚¿ä½œæˆ
 	for (const auto& sub : subsets)
 	{
 		SUBSET subset{};
-		subset.VertexBase = sub.VertexBase; // ’¸“_‚ÌŠJnˆÊ’u
-		subset.VertexNum = sub.VertexNum; // ƒTƒuƒZƒbƒg“à‚Ì’¸“_”
-		subset.IndexBase = sub.IndexBase;  // ƒCƒ“ƒfƒbƒNƒX‚ÌŠJnˆÊ’u
-		subset.IndexNum = sub.IndexNum; // ƒTƒuƒZƒbƒg“à‚ÌƒCƒ“ƒfƒbƒNƒX”
-		subset.MtrlName = sub.mtrlname; // ƒ}ƒeƒŠƒAƒ‹–¼
-		subset.MaterialIdx = sub.materialindex; // ƒ}ƒeƒŠƒAƒ‹”z—ñ‚ÌƒCƒ“ƒfƒbƒNƒX
+		subset.VertexBase = sub.VertexBase; // é ‚ç‚¹ã®é–‹å§‹ä½ç½®
+		subset.VertexNum = sub.VertexNum; // ã‚µãƒ–ã‚»ãƒƒãƒˆå†…ã®é ‚ç‚¹æ•°
+		subset.IndexBase = sub.IndexBase;  // ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã®é–‹å§‹ä½ç½®
+		subset.IndexNum = sub.IndexNum; // ã‚µãƒ–ã‚»ãƒƒãƒˆå†…ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°
+		subset.MtrlName = sub.mtrlname; // ãƒãƒ†ãƒªã‚¢ãƒ«å
+		subset.MaterialIdx = sub.materialindex; // ãƒãƒ†ãƒªã‚¢ãƒ«é…åˆ—ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
 		m_subsets.emplace_back(subset);
 	}
 
-	// ƒ}ƒeƒŠƒAƒ‹ƒf[ƒ^ì¬
+	// ãƒãƒ†ãƒªã‚¢ãƒ«ãƒ‡ãƒ¼ã‚¿ä½œæˆ
 	for (const auto& m : materials)
 	{
 		MATERIAL material{};

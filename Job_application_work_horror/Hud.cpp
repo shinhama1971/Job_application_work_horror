@@ -1,3 +1,7 @@
+// ============================================================================
+// ファイルの役割: 目的、操作ヒント、電池残量などのゲーム内UIを描画します。
+// ============================================================================
+
 #include "Hud.h"
 
 #include <algorithm>
@@ -235,7 +239,7 @@ void Hud::Draw(
     {
         constexpr float noticePixelSize = 2.0f;
         const float noticeWidth =
-            static_cast<float>(batteryNotice.size()) *
+            static_cast<float>(CountDisplayedCharacters(batteryNotice)) *
             noticePixelSize * 6.0f;
         const float noticeX = screenWidth - noticeWidth - 52.0f;
         AddRectangle(noticeX - 14.0f, 28.0f,
@@ -290,10 +294,11 @@ void Hud::DrawTitle(
     AddRectangle(panelX, panelY + panelHeight - 2.0f,
         panelWidth, 2.0f, dimGreen);
 
-    constexpr std::string_view title = "SIGNAL LOST";
+    constexpr std::string_view title = "通信途絶";
     constexpr float titlePixelSize = 9.0f;
     const float titleWidth =
-        static_cast<float>(title.size()) * titlePixelSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(title)) *
+        titlePixelSize * 6.0f;
     AddText(
         (screenWidth - titleWidth) * 0.5f,
         panelY + 72.0f,
@@ -301,10 +306,11 @@ void Hud::DrawTitle(
         titlePixelSize,
         titleGreen);
 
-    constexpr std::string_view subtitle = "終わらない廊下";
+    constexpr std::string_view subtitle = "終わらない廊下から脱出する";
     constexpr float subtitlePixelSize = 3.0f;
     const float subtitleWidth =
-        static_cast<float>(subtitle.size()) * subtitlePixelSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(subtitle)) *
+        subtitlePixelSize * 6.0f;
     AddText((screenWidth - subtitleWidth) * 0.5f,
         panelY + 148.0f, subtitle, subtitlePixelSize,
         Color(0.42f, 0.58f, 0.48f, 0.74f));
@@ -322,11 +328,14 @@ void Hud::DrawTitle(
     constexpr float controlsPixelSize = 2.0f;
     const Color controlsColor(0.48f, 0.66f, 0.55f, 0.82f);
     const float controls1Width =
-        static_cast<float>(controls1.size()) * controlsPixelSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(controls1)) *
+        controlsPixelSize * 6.0f;
     const float controls2Width =
-        static_cast<float>(controls2.size()) * controlsPixelSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(controls2)) *
+        controlsPixelSize * 6.0f;
     const float controls3Width =
-        static_cast<float>(controls3.size()) * controlsPixelSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(controls3)) *
+        controlsPixelSize * 6.0f;
     AddText((screenWidth - controls1Width) * 0.5f,
         panelY + 198.0f, controls1, controlsPixelSize, controlsColor);
     AddText((screenWidth - controls2Width) * 0.5f,
@@ -339,10 +348,10 @@ void Hud::DrawTitle(
         const int bestSeconds = (std::max)(
             0, static_cast<int>(bestClearTimeSeconds + 0.5f));
         const std::string recordText =
-            "BEST " + std::to_string(bestSeconds / 60) +
-            " MIN " + std::to_string(bestSeconds % 60) +
-            " SEC   FEWEST CAUGHT " +
-            std::to_string((std::max)(bestCaughtCount, 0));
+            "最短記録 " + std::to_string(bestSeconds / 60) +
+            "分 " + std::to_string(bestSeconds % 60) +
+            "秒   最少捕獲 " +
+            std::to_string((std::max)(bestCaughtCount, 0)) + "回";
         constexpr float recordPixelSize = 2.0f;
         const float recordWidth =
             static_cast<float>(CountDisplayedCharacters(recordText)) *
@@ -355,12 +364,23 @@ void Hud::DrawTitle(
             Color(0.72f, 0.78f, 0.48f, 0.88f));
     }
 
+    const std::string_view guidance = Input::IsControllerConnected()
+        ? "目的表示に従う  迷ったらLBでヒント"
+        : "目的表示に従う  迷ったらHでヒント";
+    constexpr float guidancePixelSize = 1.7f;
+    const float guidanceWidth =
+        static_cast<float>(CountDisplayedCharacters(guidance)) *
+        guidancePixelSize * 6.0f;
+    AddText((screenWidth - guidanceWidth) * 0.5f,
+        panelY + 310.0f, guidance, guidancePixelSize, controlsColor);
+
     const std::string_view prompt = Input::IsControllerConnected()
         ? "Aでゲーム開始"
         : "ENTERでゲーム開始";
     constexpr float promptPixelSize = 3.0f;
     const float promptWidth =
-        static_cast<float>(prompt.size()) * promptPixelSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(prompt)) *
+        promptPixelSize * 6.0f;
     AddText((screenWidth - promptWidth) * 0.5f,
         panelY + 338.0f, prompt, promptPixelSize, promptColor);
 
@@ -369,7 +389,8 @@ void Hud::DrawTitle(
         : "Qでゲーム終了";
     constexpr float quitPixelSize = 2.0f;
     const float quitWidth =
-        static_cast<float>(quitPrompt.size()) * quitPixelSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(quitPrompt)) *
+        quitPixelSize * 6.0f;
     AddText((screenWidth - quitWidth) * 0.5f,
         panelY + 382.0f, quitPrompt, quitPixelSize, controlsColor);
 
@@ -718,7 +739,9 @@ void Hud::DrawObjectiveGuide(
 void Hud::DrawStage2Status(
     int completedLoops,
     float threatRate,
-    bool exitReady)
+    bool exitReady,
+    int signalStep,
+    bool signalActive)
 {
     m_Vertices.clear();
 
@@ -736,7 +759,8 @@ void Hud::DrawStage2Status(
     AddRectangle(panelX, panelY, panelWidth, panelHeight, dark);
     AddRectangle(panelX, panelY, 3.0f, panelHeight, active);
     AddText(panelX + 14.0f, panelY + 8.0f,
-        exitReady ? "出口が開いた" : "廊下の繰り返し",
+        exitReady ? "出口が開いた" :
+            (signalActive ? "信号復旧 青 黄 赤" : "廊下の繰り返し"),
         1.8f, active);
 
     const int safeCompletedLoops = (std::clamp)(completedLoops, 0, 3);
@@ -744,13 +768,33 @@ void Hud::DrawStage2Status(
     constexpr float segmentGap = 7.0f;
     for (int index = 0; index < 3; ++index)
     {
+        const Color signalColors[] =
+        {
+            Color(0.12f, 0.52f, 0.96f, 0.96f),
+            Color(0.96f, 0.68f, 0.14f, 0.96f),
+            Color(0.94f, 0.18f, 0.10f, 0.96f)
+        };
+        const bool segmentComplete = signalActive
+            ? index < (std::clamp)(signalStep, 0, 3)
+            : index < safeCompletedLoops;
+        Color segmentColor = segmentComplete
+            ? (signalActive ? signalColors[index] : active)
+            : inactive;
+        if (signalActive && index == (std::clamp)(signalStep, 0, 2))
+        {
+            segmentColor = Color(
+                signalColors[index].x * 0.58f,
+                signalColors[index].y * 0.58f,
+                signalColors[index].z * 0.58f,
+                0.96f);
+        }
         AddRectangle(
             panelX + 14.0f + static_cast<float>(index) *
                 (segmentWidth + segmentGap),
             panelY + 35.0f,
             segmentWidth,
             10.0f,
-            index < safeCompletedLoops ? active : inactive);
+            segmentColor);
     }
 
     const float safeThreatRate = (std::clamp)(threatRate, 0.0f, 1.0f);
@@ -779,6 +823,7 @@ void Hud::DrawPause(
     int brightnessLevel,
     int effectLevel,
     int lookSensitivityLevel,
+    int volumeLevel,
     int selectedSetting,
     int floorNumber,
     float runTimeSeconds,
@@ -789,7 +834,7 @@ void Hud::DrawPause(
     const float screenWidth = static_cast<float>(Application::GetWidth());
     const float screenHeight = static_cast<float>(Application::GetHeight());
     const float panelWidth = 660.0f;
-    const float panelHeight = 480.0f;
+    const float panelHeight = 520.0f;
     const float panelX = (screenWidth - panelWidth) * 0.5f;
     const float panelY = (screenHeight - panelHeight) * 0.5f;
     const Color shade(0.0f, 0.004f, 0.004f, 0.78f);
@@ -828,8 +873,9 @@ void Hud::DrawPause(
     const int safeEffectLevel = (std::clamp)(effectLevel, 0, 2);
     const int safeSensitivityLevel =
         (std::clamp)(lookSensitivityLevel, 0, 4);
+    const int safeVolumeLevel = (std::clamp)(volumeLevel, 0, 4);
     const int safeSelectedSetting =
-        (std::clamp)(selectedSetting, 0, 2);
+        (std::clamp)(selectedSetting, 0, 3);
     const std::string brightnessText =
         "明るさ " + std::to_string(safeBrightnessLevel + 1) +
         " OF 5";
@@ -848,30 +894,37 @@ void Hud::DrawPause(
     addCenteredText(panelY + 188.0f,
         sensitivityText, 2.5f,
         safeSelectedSetting == 2 ? green : pale);
+    constexpr int volumePercent[] = { 0, 25, 50, 75, 100 };
+    const std::string volumeText = safeVolumeLevel == 0
+        ? "音量 ミュート"
+        : "音量 " + std::to_string(volumePercent[safeVolumeLevel]) + "%";
+    addCenteredText(panelY + 228.0f,
+        volumeText, 2.5f,
+        safeSelectedSetting == 3 ? green : pale);
     if (Input::IsControllerConnected())
     {
-        addCenteredText(panelY + 230.0f,
+        addCenteredText(panelY + 270.0f,
             "十字キーで選択と調整", 2.0f, pale);
-        addCenteredText(panelY + 276.0f,
+        addCenteredText(panelY + 312.0f,
             "START ゲームに戻る", 2.5f, pale);
-        addCenteredText(panelY + 318.0f,
+        addCenteredText(panelY + 354.0f,
             "Y この階をやり直す", 2.5f, pale);
-        addCenteredText(panelY + 360.0f,
+        addCenteredText(panelY + 396.0f,
             "B タイトルへ戻る", 2.5f, pale);
-        addCenteredText(panelY + 402.0f,
+        addCenteredText(panelY + 438.0f,
             "BACK ゲーム終了", 2.5f, pale);
     }
     else
     {
-        addCenteredText(panelY + 230.0f,
+        addCenteredText(panelY + 270.0f,
             "矢印キーで選択と調整", 2.0f, pale);
-        addCenteredText(panelY + 276.0f,
+        addCenteredText(panelY + 312.0f,
             "ESC または P ゲームに戻る", 2.5f, pale);
-        addCenteredText(panelY + 318.0f,
+        addCenteredText(panelY + 354.0f,
             "R この階をやり直す", 2.5f, pale);
-        addCenteredText(panelY + 360.0f,
+        addCenteredText(panelY + 396.0f,
             "T タイトルへ戻る", 2.5f, pale);
-        addCenteredText(panelY + 402.0f,
+        addCenteredText(panelY + 438.0f,
             "Q ゲーム終了", 2.5f, pale);
     }
 

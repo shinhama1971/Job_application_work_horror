@@ -1,3 +1,7 @@
+// ============================================================================
+// ファイルの役割: 壁の形状、材質、衝突範囲、影の有無を管理します。
+// ============================================================================
+
 #pragma once
 
 #include "Object.h"
@@ -44,6 +48,15 @@ public:
         const DirectX::SimpleMath::Color& diffuse,
         const DirectX::SimpleMath::Color& emission,
         float shininess);
+
+    void SetSignalSurface(bool enabled)
+    {
+        m_Shader.Create(
+            "shader/litTextureVS.hlsl",
+            enabled
+                ? "shader/signalPanelPS.hlsl"
+                : "shader/litTexturePS.hlsl");
+    }
 
     void SetCollisionEnabled(bool enabled)
     {

@@ -1,4 +1,10 @@
-﻿#include "sound.h"
+// ============================================================================
+// ファイルの役割: XAudio2による効果音・環境音の読み込み、再生、解放を管理します。
+// ============================================================================
+
+#include "sound.h"
+
+#include <algorithm>
 
 #ifdef _XBOX //Big-Endian
 #define fourccRIFF 'RIFF'
@@ -190,7 +196,7 @@ void Sound::Uninit(void)
 //=============================================================================
 // 再生
 //=============================================================================
-void Sound::Play(SOUND_LABEL label)
+void Sound::Play(SOUND_LABEL label, float pitch)
 {
 	if (!IsValidLabel(label))
 	{
@@ -228,6 +234,10 @@ void Sound::Play(SOUND_LABEL label)
 		pSV = nullptr;
 		return;
 	}
+
+	// WAVごとの音圧差を吸収し、環境音が効果音を覆わないようにします。
+	pSV->SetVolume(m_param[(int)label].volume);
+	pSV->SetFrequencyRatio((std::clamp)(pitch, 0.70f, 1.35f));
 
 	// 再生
 	pSV->Start(0);
@@ -269,6 +279,17 @@ void Sound::Resume(SOUND_LABEL label)
 	{
 		pSV->Start();
 	}
+}
+
+void Sound::SetMasterVolume(float volume)
+{
+	if (m_pMasteringVoice == nullptr)
+	{
+		return;
+	}
+
+	const float safeVolume = (std::clamp)(volume, 0.0f, 1.0f);
+	m_pMasteringVoice->SetVolume(safeVolume);
 }
 
 

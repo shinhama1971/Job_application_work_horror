@@ -1,3 +1,7 @@
+// ============================================================================
+// ファイルの役割: ゲーム全体のオブジェクト所有、更新・描画順、シーン遷移をまとめる
+// ============================================================================
+
 #include "Game.h"
 #include "Renderer.h"
 #include "Input.h"
@@ -32,6 +36,7 @@ namespace Core
         DeleteAllObject();
     }
 
+    // サブシステムを依存順に初期化し、最初のタイトルシーンを生成します。
     void Game::Init()
     {
         if (m_Instance)
@@ -46,6 +51,13 @@ namespace Core
 
 
         Input::Create();
+
+        // 音声が使えない環境ではfalseのまま進み、描画とゲーム進行は継続します。
+        m_Instance->m_SoundReady = SUCCEEDED(m_Instance->m_Sound.Init());
+        if (m_Instance->m_SoundReady)
+        {
+            m_Instance->ApplyAudioVolume(false);
+        }
 
         m_Instance->m_Camera.Init();
         m_Instance->m_Camera.SetLookSensitivityScale(
@@ -65,6 +77,9 @@ namespace Core
         m_Instance->ChangeScene(SceneName::Title);
     }
 
+    // 1フレームの更新順:
+    // 入力 → シーン → カメラ/画面効果 → Object → 破棄 → 遅延追加 → シーン変更。
+    // 遅延処理を最後に置くことで、Object配列の走査中に要素が増減しません。
     void Game::Update()
     {
         Input::Update();
@@ -83,6 +98,7 @@ namespace Core
             {
                 m_Instance->m_PauseSettingIndex = 0;
             }
+            m_Instance->ApplyAudioVolume(m_Instance->m_IsPaused);
             Input::SetVibration(2, 0.06f);
             return;
         }
@@ -103,8 +119,8 @@ namespace Core
             if (selectionDelta != 0)
             {
                 m_Instance->m_PauseSettingIndex = (std::clamp)(
-                    m_Instance->m_PauseSettingIndex + selectionDelta,
-                    0, 2);
+                m_Instance->m_PauseSettingIndex + selectionDelta,
+                    0, 3);
                 Input::SetVibration(1, 0.03f);
             }
 
@@ -157,7 +173,8 @@ namespace Core
                     settingChanged = true;
                 }
             }
-            else if (settingDelta != 0)
+            else if (settingDelta != 0 &&
+                m_Instance->m_PauseSettingIndex == 2)
             {
                 const int newSensitivityLevel = (std::clamp)(
                     m_Instance->m_LookSensitivityLevel +
@@ -175,10 +192,25 @@ namespace Core
                     settingChanged = true;
                 }
             }
+            else if (settingDelta != 0)
+            {
+                const int newVolumeLevel = (std::clamp)(
+                    m_Instance->m_VolumeLevel + settingDelta, 0, 4);
+                if (newVolumeLevel != m_Instance->m_VolumeLevel)
+                {
+                    m_Instance->m_VolumeLevel = newVolumeLevel;
+                    m_Instance->ApplyAudioVolume(true);
+                    settingChanged = true;
+                }
+            }
             if (settingChanged)
             {
                 m_Instance->SaveSettings();
                 Input::SetVibration(2, 0.045f);
+                if (m_Instance->m_PauseSettingIndex == 3)
+                {
+                    m_Instance->PlayAudioCue(SOUND_CUE_PICKUP);
+                }
             }
 
             const bool restartPressed =
@@ -297,6 +329,8 @@ namespace Core
         }
     }
 
+    // 影・反射などの事前パスを必要なフレームだけ更新し、
+    // 本描画をPostProcessへ取り込んでからHUDとデバッグUIを重ねます。
     void Game::Draw()
     {
         Debug::UI::BeginFrame();
@@ -389,6 +423,7 @@ namespace Core
 
         Renderer::DrawEnd();
     }
+    // 生成と逆順に解放します。unique_ptr/ComPtr所有物はresetで確実に破棄されます。
     void Game::Uninit()
     {
         if (m_Instance == nullptr) return;
@@ -408,6 +443,9 @@ namespace Core
         m_Instance->m_ShadowMap.Uninit();
         m_Instance->m_PlanarReflection.Uninit();
 
+        m_Instance->m_Sound.Uninit();
+        m_Instance->m_SoundReady = false;
+
         Input::Release();
         Debug::UI::Uninit();
 
@@ -425,6 +463,7 @@ namespace Core
         return m_Instance.get();
     }
 
+    // シーン遷移は予約のみ。実際の破棄・生成はUpdate末尾の安全な位置で行います。
     void Game::RequestSceneChange(SceneName sName)
     {
         if (m_PendingScene.has_value())
@@ -435,8 +474,10 @@ namespace Core
         m_PendingScene = sName;
     }
 
+    // 現在のSceneとObjectを終了してから、指定された次Sceneを一つだけ生成します。
     void Game::ChangeScene(SceneName sName)
     {
+        const SceneName previousScene = m_CurrentScene;
         if (sName == SceneName::Result)
         {
             m_LastClearTimeSeconds = m_RunTimeSeconds;
@@ -458,6 +499,7 @@ namespace Core
 
         m_CurrentScene = sName;
         m_IsPaused = false;
+        ApplyAudioVolume(false);
         m_Scene.reset();
         m_ReflectionFrameIndex = 0;
         m_ShadowFrameIndex = 0;
@@ -494,6 +536,38 @@ namespace Core
             m_Scene = std::make_unique<ResultScene>();
             break;
         }
+
+        // 階ごとに異なる環境音へ切り替え、タイトルとリザルトでは停止します。
+        if (m_SoundReady)
+        {
+            (void)previousScene;
+            m_Sound.Stop(SOUND_CUE_AMBIENCE_STAGE1);
+            m_Sound.Stop(SOUND_CUE_AMBIENCE_STAGE2);
+            if (sName == SceneName::Stage)
+            {
+                m_Sound.Play(SOUND_CUE_AMBIENCE_STAGE1);
+            }
+            else if (sName == SceneName::Stage2)
+            {
+                m_Sound.Play(SOUND_CUE_AMBIENCE_STAGE2);
+            }
+        }
+    }
+
+    void Game::ApplyAudioVolume(bool paused)
+    {
+        if (!m_SoundReady)
+        {
+            return;
+        }
+
+        constexpr float volumeScales[] =
+        {
+            0.0f, 0.28f, 0.52f, 0.76f, 1.0f
+        };
+        const float pauseScale = paused ? 0.42f : 1.0f;
+        m_Sound.SetMasterVolume(
+            volumeScales[m_VolumeLevel] * pauseScale);
     }
 
     void Game::LoadBestRecord()
@@ -541,6 +615,7 @@ namespace Core
         int brightnessLevel = 2;
         int effectLevel = 1;
         int lookSensitivityLevel = 2;
+        int volumeLevel = 3;
         if (!(settingsFile >> brightnessLevel))
         {
             return;
@@ -559,6 +634,11 @@ namespace Core
             lookSensitivityLevel >= 0 && lookSensitivityLevel <= 4)
         {
             m_LookSensitivityLevel = lookSensitivityLevel;
+        }
+        if (settingsFile >> volumeLevel &&
+            volumeLevel >= 0 && volumeLevel <= 4)
+        {
+            m_VolumeLevel = volumeLevel;
         }
     }
 
@@ -579,7 +659,8 @@ namespace Core
         }
         settingsFile << m_BrightnessLevel << ' '
             << m_EffectLevel << ' '
-            << m_LookSensitivityLevel << '\n';
+            << m_LookSensitivityLevel << ' '
+            << m_VolumeLevel << '\n';
     }
 
     void Game::DeleteObject(Object* pt)

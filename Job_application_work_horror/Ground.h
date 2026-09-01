@@ -1,3 +1,7 @@
+﻿// ============================================================================
+// ファイルの役割: 床面、水たまり、濡れ表現と関連する描画を管理します。
+// ============================================================================
+
 #pragma once
 #include <wrl/client.h>
 
@@ -10,7 +14,7 @@
 class Camera;
 
 //-----------------------------------------------------------------------------
-//TestPlane�N���X
+//TestPlaneクラス
 //-----------------------------------------------------------------------------
 class Ground :public Object 
 {
@@ -40,19 +44,19 @@ class Ground :public Object
 		float Padding;
 	};
 	
-	// ���_�f�[�^
+	// 頂点データ
 	std::vector<VERTEX_3D> m_Vertices;
 
-	//�C���f�b�N�X�f�[�^
+	//インデックスデータ
 	std::vector<unsigned int> m_Indices;
 
-	// �`��ׂ̈̏��i���b�V���Ɋւ����j
-	IndexBuffer	 m_IndexBuffer; // �C���f�b�N�X�o�b�t�@
-	VertexBuffer<VERTEX_3D>	m_VertexBuffer; // ���_�o�b�t�@
+	// 描画の為の情報（メッシュに関わる情報）
+	IndexBuffer	 m_IndexBuffer; // インデックスバッファ
+	VertexBuffer<VERTEX_3D>	m_VertexBuffer; // 頂点バッファ
 	//Texture m_Texture;
 	std::unique_ptr<Material>m_Material;
-	int m_SizeX = 0;//���T�C�Y
-	int m_SizeZ = 0;//�c�T�C�Y
+	int m_SizeX = 0;//横サイズ
+	int m_SizeZ = 0;//縦サイズ
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_WetFloorBuffer;
 	float m_WetTime = 0.0f;
 	float m_PowerReflectionBlend = 0.0f;
@@ -78,9 +82,6 @@ class Ground :public Object
 	void DrawFallingDrops(Camera* camera);
 	void UpdateFootstepRipples(float deltaTime);
 	void DrawWaterRipples(Camera* camera);
-	bool IsInsidePuddle(
-		const DirectX::SimpleMath::Vector3& position) const;
-
 public:
 	
 
@@ -91,6 +92,12 @@ public:
 	void SetScale(float x, float y, float z) { m_Scale = DirectX::SimpleMath::Vector3(x, y, z); }
 	void SetPosition(float x, float y, float z) { m_Position = DirectX::SimpleMath::Vector3(x, y, z); }
 	void SetTexture(const char* filename);
-	//���_�����擾
+	// 足元が水面なら波紋を1回生成します。足音と描画を同じ歩行イベントへ同期します。
+	bool TriggerFootstepRipple(
+		const DirectX::SimpleMath::Vector3& position,
+		bool sprinting);
+	bool IsInsidePuddle(
+		const DirectX::SimpleMath::Vector3& position) const;
+	//頂点情報を取得
 	std::vector<VERTEX_3D>GetVertices();
 };

@@ -1,3 +1,8 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: åºŠé¢ã€æ°´ãŸã¾ã‚Šã€æ¿¡ã‚Œè¡¨ç¾ã¨é–¢é€£ã™ã‚‹æç”»ã‚’ç®¡ç†ã—ã¾ã™ã€‚
+// ã“ã®å®Ÿè£…ãƒ•ã‚¡ã‚¤ãƒ«ã§ã¯å®£è¨€ã•ã‚ŒãŸæ©Ÿèƒ½ã®å…·ä½“çš„ãªå‡¦ç†ã‚’å®šç¾©ã—ã¾ã™ã€‚
+// ============================================================================
+
 #include "Ground.h"
 #include "stb_image.h"
 #include "Game.h"
@@ -7,7 +12,7 @@
 using namespace DirectX::SimpleMath;
 
 //=======================================
-//‰Šú‰»ˆ—
+//åˆæœŸåŒ–å‡¦ç†
 //=======================================
 void Ground::Init()
 {
@@ -17,11 +22,11 @@ void Ground::Init()
 	m_WasPowerRestored = false;
 	BuildFallingDrops();
 
-	// ’¸“_ƒf[ƒ^
+	// é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿
 	m_SizeX = 50;
 	m_SizeZ = 50;
 	/*m_SizeX=10
-	  m_SizeZ=30@@c’·‚Ì’nŒ`‚É‚È‚é*/
+	  m_SizeZ=30ã€€ã€€ç¸¦é•·ã®åœ°å½¢ã«ãªã‚‹*/
 	m_Vertices.resize(6 * m_SizeX * m_SizeZ);
 
 	for (int z = 0; z < m_SizeZ; z++)
@@ -59,14 +64,14 @@ void Ground::Init()
 		}
 	}
 
-	//“Ç‚İ‚Ş‰æ‘œƒtƒ@ƒCƒ‹‚ÌƒpƒX
+	//èª­ã¿è¾¼ã‚€ç”»åƒãƒ•ã‚¡ã‚¤ãƒ«ã®ãƒ‘ã‚¹
 	const char* filename = "assets/texture/teran.png";
 
-	//‰æ‘œƒf[ƒ^‚ğŠi”[‚·‚éƒ|ƒCƒ“ƒ^
+	//ç”»åƒãƒ‡ãƒ¼ã‚¿ã‚’æ ¼ç´ã™ã‚‹ãƒã‚¤ãƒ³ã‚¿
 	unsigned char* imageDate = nullptr;
 	int width, height, channels;
 
-	//ƒOƒŒ[ƒXƒP[ƒ‹(1ƒ`ƒƒƒlƒ‹)‚Å‰æ‘œ‚ğ“Ç‚İ‚Ş
+	//ã‚°ãƒ¬ãƒ¼ã‚¹ã‚±ãƒ¼ãƒ«(1ãƒãƒ£ãƒãƒ«)ã§ç”»åƒã‚’èª­ã¿è¾¼ã‚€
 	imageDate = stbi_load(filename, &width, &height, &channels, 1);
 	if (imageDate)
 	{
@@ -74,63 +79,63 @@ void Ground::Init()
 		{
 			for (int x = 0; x <= m_SizeX; x++)
 			{
-				//‚‚³‚ğŒvZ
-				int picX = (int)(1 + x * (float)(width - 2) / m_SizeX);//¶‰EƒsƒNƒZƒ‹‚ğ–³‹
-				int picY = (int)(1 + z * (float)(height - 2) / m_SizeZ);//ã‰º1ƒsƒNƒZƒ‹‚ğ–³‹
+				//é«˜ã•ã‚’è¨ˆç®—
+				int picX = (int)(1 + x * (float)(width - 2) / m_SizeX);//å·¦å³ãƒ”ã‚¯ã‚»ãƒ«ã‚’ç„¡è¦–
+				int picY = (int)(1 + z * (float)(height - 2) / m_SizeZ);//ä¸Šä¸‹1ãƒ”ã‚¯ã‚»ãƒ«ã‚’ç„¡è¦–
 				unsigned char pixelValue = imageDate[picY * width + picX];
-				float h = (float)pixelValue / 4.0f;//“y’n‚ÌƒfƒRƒ{ƒR‹ï‡‚ğ’²®YÀ•W
+				float h = (float)pixelValue / 4.0f;//åœŸåœ°ã®ãƒ‡ã‚³ãƒœã‚³å…·åˆã‚’èª¿æ•´Yåº§æ¨™
 
-				//’¸“_À•W‚É‚‚³‚ğ‘ã“ü
+				//é ‚ç‚¹åº§æ¨™ã«é«˜ã•ã‚’ä»£å…¥
 				int n = z * m_SizeX * 6 + x * 6;
 				if (x != m_SizeX && z != m_SizeZ)
 				{
 					m_Vertices[n].position.y = h;
 				}
 
-				if (x != 0 && z != m_SizeZ)//¶—×‚Ìƒ|ƒŠƒSƒ“
+				if (x != 0 && z != m_SizeZ)//å·¦éš£ã®ãƒãƒªã‚´ãƒ³
 				{
 					m_Vertices[n - 2].position.y = h;
 					m_Vertices[n - 5].position.y = h;
 				}
 
-				if (x != m_SizeX && z != 0)//ã—×‚Ìƒ|ƒŠƒSƒ“
+				if (x != m_SizeX && z != 0)//ä¸Šéš£ã®ãƒãƒªã‚´ãƒ³
 				{
 					m_Vertices[n - m_SizeX * 6 + 2].position.y = h;
 					m_Vertices[n - m_SizeX * 6 + 3].position.y = h;
 				}
 
-				if (x != 0 && z != 0)//¶ã—×‚Ìƒ|ƒŠƒSƒ“
+				if (x != 0 && z != 0)//å·¦ä¸Šéš£ã®ãƒãƒªã‚´ãƒ³
 				{
 					m_Vertices[n - m_SizeX * 6 - 1].position.y = h;
 				}
 			}
 		}
 
-		//ƒƒ‚ƒŠ‚ğ‰ğ•ú
+		//ãƒ¡ãƒ¢ãƒªã‚’è§£æ”¾
 		stbi_image_free(imageDate);
 	}
 
-	//–@üƒxƒNƒgƒ‹‚ğXV
+	//æ³•ç·šãƒ™ã‚¯ãƒˆãƒ«ã‚’æ›´æ–°
 	for (int z = 0; z < m_SizeZ; z++)
 	{
 		for (int x = 0; x < m_SizeX; x++)
 		{
 			int n = z * m_SizeX * 6 + x * 6;
 
-			//2‚Â‚ÌƒxƒNƒgƒ‹‚ğŒvZ
+			//2ã¤ã®ãƒ™ã‚¯ãƒˆãƒ«ã‚’è¨ˆç®—
 			Vector3 v1 = m_Vertices[n + 1].position - m_Vertices[n + 0].position;
 			Vector3 v2 = m_Vertices[n + 2].position - m_Vertices[n + 0].position;
-			Vector3 normal = v1.Cross(v2);//ŠOÏ‚ğŒvZ
-			normal.Normalize();			  //³‹K‰»
+			Vector3 normal = v1.Cross(v2);//å¤–ç©ã‚’è¨ˆç®—
+			normal.Normalize();			  //æ­£è¦åŒ–
 			m_Vertices[n + 0].normal = normal;
 			m_Vertices[n + 1].normal = normal;
 			m_Vertices[n + 2].normal = normal;
 
-			//2‚Â‚ÌƒxƒNƒgƒ‹‚ğŒvZ
+			//2ã¤ã®ãƒ™ã‚¯ãƒˆãƒ«ã‚’è¨ˆç®—
 			v1 = m_Vertices[n + 4].position - m_Vertices[n + 3].position;
 			v2 = m_Vertices[n + 5].position - m_Vertices[n + 3].position;
-			normal = v1.Cross(v2);//ŠOÏ‚ğŒvZ
-			normal.Normalize();	  //³‹K‰»
+			normal = v1.Cross(v2);//å¤–ç©ã‚’è¨ˆç®—
+			normal.Normalize();	  //æ­£è¦åŒ–
 
 			m_Vertices[n + 3].normal = normal;
 			m_Vertices[n + 4].normal = normal;
@@ -138,10 +143,10 @@ void Ground::Init()
 		}
 	}
 
-	// ’¸“_ƒoƒbƒtƒ@¶¬
+	// é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ç”Ÿæˆ
 	m_VertexBuffer.Create(m_Vertices);
 
-	// ƒCƒ“ƒfƒbƒNƒf[ƒ^
+	// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ãƒ‡ãƒ¼ã‚¿
 	m_Indices.resize(6 * m_SizeX * m_SizeZ);
 
 	for (int z = 0; z < m_SizeZ; z++)
@@ -158,34 +163,34 @@ void Ground::Init()
 		}
 	}
 
-	// ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@¶¬
+	// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡ç”Ÿæˆ
 	m_IndexBuffer.Create(m_Indices);
 
-	// ƒVƒF[ƒ_ƒIƒuƒWƒFƒNƒg¶¬
+	// ã‚·ã‚§ãƒ¼ãƒ€ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆç”Ÿæˆ
 	m_Shader.Create("shader/litTextureVS.hlsl", "shader/wetFloorPS.hlsl");
 
 	Renderer::CreateConstantBuffer(
 		sizeof(WetFloorBuffer),
 		m_WetFloorBuffer.ReleaseAndGetAddressOf());
 
-	//ƒeƒNƒXƒ`ƒƒƒ[ƒh
+	//ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ­ãƒ¼ãƒ‰
 	bool sts = m_Texture.Load("assets/texture/field.jpg");
 	assert(sts == true);
 
-	//ƒ}ƒeƒŠƒAƒ‹î•ñæ“¾
+	//ãƒãƒ†ãƒªã‚¢ãƒ«æƒ…å ±å–å¾—
 	m_Material = std::make_unique<Material>();
 	MATERIAL mtrl;
 	mtrl.Diffuse = Color(1, 1, 1, 1);
-	mtrl.TextureEnable = true;//ƒeƒNƒXƒ`ƒƒ‚ğg‚¤‚©”Û‚©‚Ìƒtƒ‰ƒO
+	mtrl.TextureEnable = true;//ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’ä½¿ã†ã‹å¦ã‹ã®ãƒ•ãƒ©ã‚°
 	m_Material->Create(mtrl);
-	//Ground‚ÌˆÊ’u‚â‘å‚«‚³‚ğ’²®
+	//Groundã®ä½ç½®ã‚„å¤§ãã•ã‚’èª¿æ•´
 	m_Position.y = -100.0f;
 	m_Scale.x = 20.0f;
 	m_Scale.z = 20.0f;
 }
 
 //=======================================
-//XVˆ—
+//æ›´æ–°å‡¦ç†
 //=======================================
 void Ground::Update()
 {
@@ -217,27 +222,27 @@ void Ground::Update()
 }
 
 //=======================================
-//•`‰æˆ—
+//æç”»å‡¦ç†
 //=======================================
 void Ground::Draw(Camera* cam)
 {
-	//ƒJƒƒ‰‚ğ‘I‘ğ‚·‚é
+	//ã‚«ãƒ¡ãƒ©ã‚’é¸æŠã™ã‚‹
 	cam->SetCamera();
 
-	// SRTî•ñì¬
+	// SRTæƒ…å ±ä½œæˆ
 	Matrix r = Matrix::CreateFromYawPitchRoll(m_Rotation.x, m_Rotation.y, m_Rotation.z);
 	Matrix t = Matrix::CreateTranslation(m_Position.x, m_Position.y, m_Position.z);
 	Matrix s = Matrix::CreateScale(m_Scale.x, m_Scale.y, m_Scale.z);
 
 	Matrix worldmtx;
 	worldmtx = s * r * t;
-	Renderer::SetWorldMatrix(&worldmtx); // GPU‚ÉƒZƒbƒg
+	Renderer::SetWorldMatrix(&worldmtx); // GPUã«ã‚»ãƒƒãƒˆ
 
-	// •`‰æ‚Ìˆ—
+	// æç”»ã®å‡¦ç†
 	ID3D11DeviceContext* devicecontext;
 	devicecontext = Renderer::GetDeviceContext();
 
-	// ƒgƒ|ƒƒW[‚ğƒZƒbƒgiƒvƒŠƒ~ƒeƒBƒuƒ^ƒCƒvj
+	// ãƒˆãƒãƒ­ã‚¸ãƒ¼ã‚’ã‚»ãƒƒãƒˆï¼ˆãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–ã‚¿ã‚¤ãƒ—ï¼‰
 	devicecontext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	m_Shader.SetGPU();
@@ -261,8 +266,8 @@ void Ground::Draw(Camera* cam)
 	devicecontext->PSSetConstantBuffers(10, 1, &wetFloorBuffer);
 
 	devicecontext->DrawIndexed(
-		(UINT)m_Indices.size(),	// •`‰æ‚·‚éƒCƒ“ƒfƒbƒNƒX”
-		0,					// Å‰‚ÌƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@‚ÌˆÊ’u
+		(UINT)m_Indices.size(),	// æç”»ã™ã‚‹ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°
+		0,					// æœ€åˆã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡ã®ä½ç½®
 		0);
 
 	DrawFallingDrops(cam);
@@ -270,7 +275,7 @@ void Ground::Draw(Camera* cam)
 }
 
 //=======================================
-//I—¹ˆ—
+//çµ‚äº†å‡¦ç†
 //=======================================
 void Ground::Uninit()
 {
@@ -528,51 +533,40 @@ void Ground::UpdateFootstepRipples(float deltaTime)
 		return ripple.Age >= ripple.Duration;
 	});
 
-	Player* player = Core::Game::GetInstance()->GetObj<Player>("Player");
-	if (player == nullptr)
-	{
-		m_HasLastPlayerPosition = false;
-		return;
-	}
+	// æ³¢ç´‹ã®ç™ºç”Ÿè‡ªä½“ã¯Playerã®è¶³éŸ³ã‚¤ãƒ™ãƒ³ãƒˆã‹ã‚‰å‘¼ã³å‡ºã—ã¾ã™ã€‚
+	// ã“ã‚Œã«ã‚ˆã‚Šã€å£ã¸å‘ã‹ã£ã¦æ­©ã„ãŸå ´åˆã‚„ãƒ•ãƒ¬ãƒ¼ãƒ è½ã¡æ™‚ã«ã‚‚éŸ³ã¨æ³¢ç´‹ãŒãšã‚Œã¾ã›ã‚“ã€‚
+}
 
-	const Vector3 playerPosition = player->GetPosition();
-	if (!m_HasLastPlayerPosition)
+bool Ground::TriggerFootstepRipple(
+	const Vector3& playerPosition,
+	bool sprinting)
+{
+	if (m_FootstepRippleCooldown > 0.0f || !IsInsidePuddle(playerPosition))
 	{
-		m_LastPlayerPosition = playerPosition;
-		m_HasLastPlayerPosition = true;
-		return;
-	}
-
-	const float movementX = playerPosition.x - m_LastPlayerPosition.x;
-	const float movementZ = playerPosition.z - m_LastPlayerPosition.z;
-	const float movementSquared = movementX * movementX + movementZ * movementZ;
-	m_LastPlayerPosition = playerPosition;
-	if (movementSquared < 0.015f || m_FootstepRippleCooldown > 0.0f ||
-		!IsInsidePuddle(playerPosition))
-	{
-		return;
+		return IsInsidePuddle(playerPosition);
 	}
 
 	WaterRipple ripple{};
 	ripple.Position = Vector3(playerPosition.x, -99.96f, playerPosition.z);
-	ripple.Duration = player->IsSprinting() ? 0.82f : 0.68f;
-	ripple.MaxRadius = player->IsSprinting() ? 4.4f : 3.2f;
+	ripple.Duration = sprinting ? 0.82f : 0.68f;
+	ripple.MaxRadius = sprinting ? 4.4f : 3.2f;
 	m_FootstepRipples.push_back(ripple);
 	if (m_FootstepRipples.size() > 8)
 	{
 		m_FootstepRipples.erase(m_FootstepRipples.begin());
 	}
-	m_FootstepRippleCooldown = player->IsSprinting() ? 0.22f : 0.36f;
+	m_FootstepRippleCooldown = sprinting ? 0.22f : 0.36f;
 
 	if (m_LensSplashCooldown <= 0.0f)
 	{
-		const float moistureStrength = player->IsSprinting() ? 0.92f : 0.58f;
-		const float moistureDuration = player->IsSprinting() ? 5.2f : 3.6f;
+		const float moistureStrength = sprinting ? 0.92f : 0.58f;
+		const float moistureDuration = sprinting ? 5.2f : 3.6f;
 		Core::Game::GetInstance()->GetPostProcess()->TriggerLensMoisture(
 			moistureStrength,
 			moistureDuration);
-		m_LensSplashCooldown = player->IsSprinting() ? 1.15f : 1.75f;
+		m_LensSplashCooldown = sprinting ? 1.15f : 1.75f;
 	}
+	return true;
 }
 
 void Ground::DrawFallingDrops(Camera* camera)
@@ -705,19 +699,19 @@ void Ground::DrawWaterRipples(Camera* camera)
 }
 
 //=======================================
-//’¸“_î•ñ‚ğæ“¾
+//é ‚ç‚¹æƒ…å ±ã‚’å–å¾—
 //=======================================
 std::vector<VERTEX_3D>Ground::GetVertices()
 {
 	std::vector<VERTEX_3D>res;
 	res.resize(m_Vertices.size());
-	// SRTî•ñì¬
+	// SRTæƒ…å ±ä½œæˆ
 	Matrix r = Matrix::CreateFromYawPitchRoll(m_Rotation.y, m_Rotation.x, m_Rotation.z);
 	Matrix t = Matrix::CreateTranslation(m_Position.x, m_Position.y, m_Position.z);
 	Matrix s = Matrix::CreateScale(m_Scale.x, m_Scale.y, m_Scale.z);
 	Matrix worldmtx = s * r * t;
 
-	//ƒ[ƒ‹ƒh•ÏŠ·‚µ‚Äƒf[ƒ^‚ğ‘ã“ü
+	//ãƒ¯ãƒ¼ãƒ«ãƒ‰å¤‰æ›ã—ã¦ãƒ‡ãƒ¼ã‚¿ã‚’ä»£å…¥
 	for (int i = 0; i < m_Vertices.size(); i++)
 	{
 		res[i].position = Vector3::Transform(m_Vertices[i].position, worldmtx);

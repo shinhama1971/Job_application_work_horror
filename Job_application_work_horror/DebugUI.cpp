@@ -1,3 +1,7 @@
+// ============================================================================
+// ファイルの役割: ImGuiによるデバッグ表示と、ライティング・演出値の実行時調整を提供します。
+// ============================================================================
+
 #include "DebugUI.h"
 
 #include "Game.h"
@@ -35,6 +39,7 @@ namespace
     float g_CorridorTension = 0.0f;
     float g_FilmGradeStrength = 0.55f;
     float g_LensDirtStrength = 0.16f;
+    float g_SignalInterference = 0.0f;
     float g_WallDampStrength = 1.0f;
     float g_FrameTimes[120]{};
     int g_FrameTimeOffset = 0;
@@ -184,6 +189,7 @@ void Debug::UI::ApplyTuning(Effect::PostProcess& postProcess)
     postProcess.SetCorridorTension(g_CorridorTension);
     postProcess.SetFilmGradeStrength(g_FilmGradeStrength);
     postProcess.SetLensDirtStrength(g_LensDirtStrength);
+    postProcess.SetSignalInterference(g_SignalInterference);
 #else
     (void)postProcess;
 #endif
@@ -229,27 +235,33 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             ? nullptr
             : dynamic_cast<Stage2Scene*>(game->GetScene());
         if (stage2 != nullptr && ImGui::CollapsingHeader(
-            "Stage 2 event testing", ImGuiTreeNodeFlags_DefaultOpen))
+            "2面 イベント確認", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            ImGui::Text("Loop %d / 3", stage2->GetLoopCount());
-            ImGui::Text("Final event: %s  Exit: %s",
-                stage2->IsFinalSequenceArmed() ? "armed" : "idle",
-                stage2->IsFinalDoorReady() ? "ready" : "locked");
-            if (ImGui::Button("Advance one loop"))
+            ImGui::Text("ループ %d / 3", stage2->GetLoopCount());
+            ImGui::Text("信号 %d / 3  足音危険度 %.0f%%",
+                stage2->GetSignalStep(), stage2->GetNoiseThreat() * 100.0f);
+            ImGui::Text("失敗回数 %d  再試行補助 %s",
+                stage2->GetPuzzleMistakeCount(),
+                stage2->GetPuzzleMistakeCount() >= 2 ? "強" :
+                    (stage2->GetPuzzleMistakeCount() == 1 ? "弱" : "なし"));
+            ImGui::Text("最終イベント: %s  出口: %s",
+                stage2->IsFinalSequenceArmed() ? "準備済み" : "待機中",
+                stage2->IsFinalDoorReady() ? "解錠" : "施錠");
+            if (ImGui::Button("ループを1回進める"))
             {
                 stage2->DebugRequestAdvanceLoop();
             }
             ImGui::SameLine();
-            if (ImGui::Button("Run final blackout"))
+            if (ImGui::Button("最終停電を再生"))
             {
                 stage2->DebugRequestFinalSequence();
             }
-            if (ImGui::Button("Run gaze light chase"))
+            if (ImGui::Button("視線ライト演出を再生"))
             {
                 stage2->DebugRequestLightChase();
             }
             ImGui::TextDisabled(
-                "Commands run safely at the start of the next gameplay update.");
+                "操作は次のゲーム更新開始時に安全に実行されます。");
             ImGui::Separator();
         }
 
@@ -288,6 +300,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             g_CorridorTension = 0.15f;
             g_FilmGradeStrength = 0.38f;
             g_LensDirtStrength = 0.12f;
+            g_SignalInterference = 0.0f;
             g_WallDampStrength = 0.65f;
         }
         ImGui::SameLine();
@@ -307,6 +320,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             g_CorridorTension = 0.45f;
             g_FilmGradeStrength = 0.62f;
             g_LensDirtStrength = 0.22f;
+            g_SignalInterference = 0.18f;
             g_WallDampStrength = 1.0f;
         }
         if (ImGui::Button("Scare showcase", ImVec2(196.0f, 0.0f)))
@@ -325,6 +339,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             g_CorridorTension = 0.75f;
             g_FilmGradeStrength = 0.78f;
             g_LensDirtStrength = 0.32f;
+            g_SignalInterference = 0.56f;
             g_WallDampStrength = 1.35f;
         }
         ImGui::SameLine();
@@ -344,6 +359,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             g_CorridorTension = 0.10f;
             g_FilmGradeStrength = 0.30f;
             g_LensDirtStrength = 0.0f;
+            g_SignalInterference = 0.0f;
             g_WallDampStrength = 0.45f;
         }
         ImGui::Separator();
@@ -363,6 +379,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         ImGui::SliderFloat("Corridor tension", &g_CorridorTension, 0.0f, 1.0f, "%.2f");
         ImGui::SliderFloat("Filmic split tone", &g_FilmGradeStrength, 0.0f, 1.0f, "%.2f");
         ImGui::SliderFloat("Lens dirt bloom", &g_LensDirtStrength, 0.0f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Signal interference", &g_SignalInterference, 0.0f, 1.0f, "%.2f");
         ImGui::SliderFloat("Wall dampness", &g_WallDampStrength, 0.0f, 2.0f, "%.2f");
 
         if (ImGui::Button("Bloom pulse"))

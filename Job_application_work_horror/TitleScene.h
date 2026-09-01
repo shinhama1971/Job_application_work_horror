@@ -1,24 +1,28 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: ã‚¿ã‚¤ãƒˆãƒ«ç”»é¢ã®å…¥åŠ›ã€è¡¨ç¤ºã€ã‚²ãƒ¼ãƒ é–‹å§‹ã¸ã®é·ç§»ã‚’ç®¡ç†ã—ã¾ã™ã€‚
+// ============================================================================
+
 #pragma once
 #include "Scene.h"
 #include "Object.h"
 #include "Hud.h"
 
-// TitleSceneƒNƒ‰ƒX
+// TitleSceneã‚¯ãƒ©ã‚¹
 class TitleScene : public Scene
 {
 private:
-	std::vector<Object*> m_MySceneObjects; // ‚±‚ÌƒV[ƒ“‚ÌƒIƒuƒWƒFƒNƒg
+	std::vector<Object*> m_MySceneObjects; // ã“ã®ã‚·ãƒ¼ãƒ³ã®ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆ
     Hud m_Hud;
     float m_TitleTime = 0.0f;
 
-	void Init(); // ‰Šú‰»
-	void Uninit(); // I—¹ˆ—
+	void Init(); // åˆæœŸåŒ–
+	void Uninit(); // çµ‚äº†å‡¦ç†
 
 public:
-	TitleScene(); // ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-	~TitleScene(); // ƒfƒXƒgƒ‰ƒNƒ^
+	TitleScene(); // ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+	~TitleScene(); // ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
 
-	void Update(); // XV
+	void Update(); // æ›´æ–°
     void Draw(Camera* camera) override;
 };
 

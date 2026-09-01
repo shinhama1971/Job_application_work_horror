@@ -1,4 +1,8 @@
-﻿#include "Player.h"
+// ============================================================================
+// ファイルの役割: 一人称移動、視点、懐中電灯、電池、インタラクションを管理します。
+// ============================================================================
+
+#include "Player.h"
 #include "Game.h"
 #include "Input.h"
 #include "Camera.h"
@@ -6,14 +10,16 @@
 #include "Wall.h"
 #include "Door.h"
 #include "CeilingLight.h"
+#include "Ground.h"
 
 using namespace DirectX::SimpleMath;
 
+// 描画資源とプレイヤー状態を初期化します。配置座標はScene側がInit後に設定します。
 void Player::Init()
 {
     StaticMesh staticmesh;
 
-	//今はゴルフボールのモデルを読み込む
+	//今は仮モデルでゴルフボールのモデルを読み込む
     std::u8string modelFile = u8"assets/model/golf_ball/golf_ball.obj";
     std::string texDirectory = "assets/model/golf_ball";
 
@@ -57,10 +63,19 @@ void Player::Init()
     m_LowBatteryWarningLevel = 0;
     m_WasFlashlightVoltageDrop = false;
     m_FlashlightNearSurfaceBlend = 0.0f;
+    m_FootstepTimer = 0.0f;
+    m_FootstepIndex = 0;
+    m_SurfaceNoisePulse = 0.0f;
+    m_WetSurfaceOverride = false;
 }
 
+// 入力、移動、衝突、カメラ、懐中電灯、電池消費を1フレーム分更新します。
+// 操作禁止中もカメラとライトの整合性は維持し、演出から復帰しやすくします。
 void Player::Update()
 {
+    // Scene::UpdateはObject::Updateより先に呼ばれるため、前フレームの値を
+    // Sceneが読んだあとで今回の足音パルスを作り直します。
+    m_SurfaceNoisePulse = 0.0f;
     if (!m_CanControl)
     {
         m_IsSprinting = false;
@@ -157,6 +172,7 @@ void Player::Update()
     // �d��
     m_Velocity.y -= 0.01f;
 
+    const Vector3 positionBeforeMove = m_Position;
     m_Position += m_Velocity;
 
     // ���̗����h�~
@@ -185,14 +201,40 @@ void Player::Update()
         }
     }
 
-    // R�L�[�ň�l��
+    // 衝突補正後に実際に移動できた距離を使うため、壁へ押し続けても足音は鳴りません。
+    m_FootstepTimer = (std::max)(0.0f, m_FootstepTimer - deltaTime);
+    const Vector3 actualMovement(
+        m_Position.x - positionBeforeMove.x,
+        0.0f,
+        m_Position.z - positionBeforeMove.z);
+    if (actualMovement.LengthSquared() > 0.0064f && m_FootstepTimer <= 0.0f)
+    {
+        bool wetStep = m_WetSurfaceOverride;
+        for (Ground* ground : Core::Game::GetInstance()->GetObjects<Ground>())
+        {
+            wetStep = ground->TriggerFootstepRipple(
+                m_Position, m_IsSprinting) || wetStep;
+        }
+        const float alternatingPitch = (m_FootstepIndex % 2 == 0)
+            ? (m_IsSprinting ? 1.08f : 0.97f)
+            : (m_IsSprinting ? 1.14f : 1.03f);
+        Core::Game::GetInstance()->PlayAudioCue(
+            wetStep ? SOUND_CUE_WATER_STEP : SOUND_CUE_FOOTSTEP,
+            wetStep ? alternatingPitch * 0.92f : alternatingPitch);
+        m_SurfaceNoisePulse = wetStep
+            ? (m_IsSprinting ? 1.0f : 0.62f)
+            : (m_IsSprinting ? 0.32f : 0.0f);
+        ++m_FootstepIndex;
+        m_FootstepTimer = m_IsSprinting ? 0.31f : 0.46f;
+    }
+    m_WetSurfaceOverride = false;
+
 #if defined(_DEBUG) && defined(ENABLE_CAMERA_MODE_SHORTCUTS)
     if (Input::GetKeyTrigger(VK_R))
     {
         m_IsFPS = true;
     }
 
-    // J�L�[�ŎO�l��
     if (Input::GetKeyTrigger(VK_T))
     {
         m_IsFPS = false;
@@ -204,14 +246,17 @@ void Player::Update()
     }
 #endif
 
-    // F�L�[�ŉ����d��ON/OFF
+    //ライトのオンオフ
     if (Input::GetKeyTrigger(VK_F) ||
         Input::GetButtonTrigger(XINPUT_Y))
     {
-        // �d�r�����鎞����ON/OFF�ł���
+       
         if (m_Battery > 0.0f)
         {
             m_FlashLightOn = !m_FlashLightOn;
+            Core::Game::GetInstance()->PlayAudioCue(
+                SOUND_CUE_FLASHLIGHT,
+                m_FlashLightOn ? 1.08f : 0.94f);
         }
     }
 
@@ -533,6 +578,7 @@ void Player::Update()
     }*/
 }
 
+// 一人称時は本体を見せず、必要なデバッグ・別視点時だけメッシュを描きます。
 void Player::Draw(Camera* cam)
 {
     cam->SetCamera();
@@ -569,6 +615,7 @@ void Player::Draw(Camera* cam)
 void Player::Uninit()
 {}
 
+// yaw/pitchから正規化済みの視線方向を作り、移動とインタラクションで共有します。
 DirectX::SimpleMath::Vector3 Player::GetForward() const
 {
     Camera* cam = Core::Game::GetInstance()->GetCamera();

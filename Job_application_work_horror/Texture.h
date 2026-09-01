@@ -1,22 +1,26 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: ç”»åƒãƒ•ã‚¡ã‚¤ãƒ«ã‹ã‚‰Direct3D 11ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’ç”Ÿæˆãƒ»ä¿æŒã—ã¾ã™ã€‚
+// ============================================================================
+
 #pragma once
 
 #include	<d3d11.h>
 #include	<string>
-#include	<wrl/client.h> // ComPtr‚Ì’è‹`‚ğŠÜ‚Şƒwƒbƒ_ƒtƒ@ƒCƒ‹
+#include	<wrl/client.h> // ComPtrã®å®šç¾©ã‚’å«ã‚€ãƒ˜ãƒƒãƒ€ãƒ•ã‚¡ã‚¤ãƒ«
 #include	<filesystem>
 
 using Microsoft::WRL::ComPtr;
 
 //-----------------------------------------------------------------------------
-//TextureƒNƒ‰ƒX
+//Textureã‚¯ãƒ©ã‚¹
 //-----------------------------------------------------------------------------
 class Texture
 {
-	std::string m_texname{}; // ƒtƒ@ƒCƒ‹–¼
-	ComPtr<ID3D11ShaderResourceView> m_srv{}; // ƒVƒF[ƒ_[ƒŠƒ\[ƒXƒrƒ…[
+	std::string m_texname{}; // ãƒ•ã‚¡ã‚¤ãƒ«å
+	ComPtr<ID3D11ShaderResourceView> m_srv{}; // ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãƒªã‚½ãƒ¼ã‚¹ãƒ“ãƒ¥ãƒ¼
 
-	int m_width=0; // •
-	int m_height=0; // ‚‚³
+	int m_width=0; // å¹…
+	int m_height=0; // é«˜ã•
 	int m_bpp=0; // BPP
 public:
 	Texture();

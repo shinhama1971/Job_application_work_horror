@@ -1,3 +1,7 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: 2Dæç”»ç”¨ãƒ†ã‚¯ã‚¹ãƒãƒ£ã¨ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãƒªã‚½ãƒ¼ã‚¹ã‚’ç®¡ç†ã—ã¾ã™ã€‚
+// ============================================================================
+
 #pragma once
 #include "Object.h"
 #include "VertexBuffer.h"
@@ -6,33 +10,33 @@
 #include "Material.h"
 
 //-----------------------------------------------------------------------------
-// Texture2DƒNƒ‰ƒX
+// Texture2Dã‚¯ãƒ©ã‚¹
 //-----------------------------------------------------------------------------
 class Texture2D : public Object
 {
 private:
-	// ’¸“_ƒf[ƒ^
+	// é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿
 	std::vector<VERTEX_3D> m_Vertices;
 
-	//ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^
+	//ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿
 	std::vector<unsigned int> m_Indices;
 
 
-	// •`‰æ‚Ìˆ×‚Ìî•ñiƒƒbƒVƒ…‚ÉŠÖ‚í‚éî•ñj
-	IndexBuffer m_IndexBuffer; // ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@
-	VertexBuffer<VERTEX_3D> m_VertexBuffer; // ’¸“_ƒoƒbƒtƒ@
+	// æç”»ã®ç‚ºã®æƒ…å ±ï¼ˆãƒ¡ãƒƒã‚·ãƒ¥ã«é–¢ã‚ã‚‹æƒ…å ±ï¼‰
+	IndexBuffer m_IndexBuffer; // ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡
+	VertexBuffer<VERTEX_3D> m_VertexBuffer; // é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡
 
-	// •`‰æ‚Ìˆ×‚Ìî•ñiŒ©‚½–Ú‚ÉŠÖ‚í‚é•”•ªj
-	Texture m_Texture; // ƒeƒNƒXƒ`ƒƒ
-	std::unique_ptr<Material> m_Material; //ƒ}ƒeƒŠƒAƒ‹
+	// æç”»ã®ç‚ºã®æƒ…å ±ï¼ˆè¦‹ãŸç›®ã«é–¢ã‚ã‚‹éƒ¨åˆ†ï¼‰
+	Texture m_Texture; // ãƒ†ã‚¯ã‚¹ãƒãƒ£
+	std::unique_ptr<Material> m_Material; //ãƒãƒ†ãƒªã‚¢ãƒ«
 
-	// UVÀ•W‚Ìî•ñ
+	// UVåº§æ¨™ã®æƒ…å ±
 	float m_NumU = 1;
 	float m_NumV = 1;
 	float m_SplitX = 1;
 	float m_SplitY = 1;
-	int m_DivX = 1; // ‰¡‚Ì•ªŠ„”
-	int m_DivY = 1; // c‚Ì•ªŠ„”
+	int m_DivX = 1; // æ¨ªã®åˆ†å‰²æ•°
+	int m_DivY = 1; // ç¸¦ã®åˆ†å‰²æ•°
 
 public:
 	void Init();
@@ -40,25 +44,25 @@ public:
 	void Draw(Camera* cam);
 	void Uninit();
 
-	// ƒeƒNƒXƒ`ƒƒ‚ğw’è
+	// ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’æŒ‡å®š
 	void SetTexture(const char* imgname);
 
-	// ˆÊ’u‚ğw’è
+	// ä½ç½®ã‚’æŒ‡å®š
 	void SetPosition(const float& x, const float& y, const float& z);
 	void SetPosition(const DirectX::SimpleMath::Vector3& pos);
 
-	// Šp“x‚ğw’è
+	// è§’åº¦ã‚’æŒ‡å®š
 	void SetRotation(const float& x, const float& y, const float& z);
 	void SetRotation(const DirectX::SimpleMath::Vector3& rot);
 
-	// ‘å‚«‚³‚ğw’è
+	// å¤§ãã•ã‚’æŒ‡å®š
 	void SetScale(const float& x, const float& y, const float& z);
 	void SetScale(const DirectX::SimpleMath::Vector3& scl);
-	// UVÀ•W‚ğw’è
+	// UVåº§æ¨™ã‚’æŒ‡å®š
 	void SetDivide(int divX, int divY);
 
 	void SetFrame(int frame);
-	// UVÀ•W‚ğw’è
+	// UVåº§æ¨™ã‚’æŒ‡å®š
 	void SetUV(const float& nu, const float& nv, const float& sx, const float& sy);
 };
 

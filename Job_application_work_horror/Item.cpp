@@ -1,4 +1,8 @@
-﻿#include "Item.h"
+// ============================================================================
+// ファイルの役割: ヒューズアイテムの形状、浮遊演出、取得処理を管理します。
+// ============================================================================
+
+#include "Item.h"
 #include "Game.h"
 #include "Input.h"
 #include "Player.h"
@@ -133,6 +137,7 @@ void Item::Interact(Player& player)
 
     m_IsCollected = true;
     Core::Game::GetInstance()->AddItemCount();
+    Core::Game::GetInstance()->PlayAudioCue(SOUND_CUE_PICKUP);
     Core::Game::GetInstance()->GetPostProcess()->TriggerBloomPulse(
         0.72f, 0.30f);
     Input::SetVibration(6, 0.14f);

@@ -1,3 +1,7 @@
+// ============================================================================
+// ファイルの役割: ポストプロセス用の画面全体ポリゴンとレンダーターゲットを管理します。
+// ============================================================================
+
 #include "FullScreenQuad.h"
 #include "Application.h"
 
@@ -90,7 +94,8 @@ namespace Graphics
         float lensMoisture,
         float corridorTension,
         float filmGradeStrength,
-        float lensDirtStrength)
+        float lensDirtStrength,
+        float signalInterference)
     {
         ID3D11DeviceContext* context =
             Renderer::GetDeviceContext();
@@ -114,6 +119,7 @@ namespace Graphics
         tb.corridorTension = corridorTension;
         tb.filmGradeStrength = filmGradeStrength;
         tb.lensDirtStrength = lensDirtStrength;
+        tb.signalInterference = signalInterference;
 
         context->UpdateSubresource(
             m_TimeBuffer.Get(),
@@ -167,7 +173,8 @@ namespace Graphics
 
         // CRT is a transparent overlay and can never replace the scene with black.
         if (noiseAmount > 0.0f || horrorPulseStrength > 0.001f ||
-            lensMoisture > 0.001f || filmGradeStrength > 0.001f)
+            lensMoisture > 0.001f || filmGradeStrength > 0.001f ||
+            signalInterference > 0.001f)
         {
             m_OverlayShader.SetGPU();
             Renderer::SetBlendState(BS_ALPHABLEND);

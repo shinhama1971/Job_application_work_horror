@@ -1,10 +1,14 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰ã€ãƒã‚¦ã‚¹ã€XInputã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ãƒ¼ã®å…¥åŠ›çŠ¶æ…‹ã‚’åé›†ã—ã¾ã™ã€‚ã€‚
+// ============================================================================
+
 #pragma once
 #include <memory>
-#include <d3d11.h>  // DirectX11‚ğg‚¤‚½‚ß‚Ìƒwƒbƒ_[ƒtƒ@ƒCƒ‹
-#include <DirectXMath.h> // DirextX‚Ì”ŠwŠÖ˜A‚Ìƒwƒbƒ_[ƒtƒ@ƒCƒ‹
+#include <d3d11.h>  // DirectX11ã‚’ä½¿ã†ãŸã‚ã®ãƒ˜ãƒƒãƒ€ãƒ¼ãƒ•ã‚¡ã‚¤ãƒ«
+#include <DirectXMath.h> // DirextXã®æ•°å­¦é–¢é€£ã®ãƒ˜ãƒƒãƒ€ãƒ¼ãƒ•ã‚¡ã‚¤ãƒ«
 
-#include <Xinput.h> //XInput‚ğg‚¤‚½‚ß‚Ìƒwƒbƒ_[ƒtƒ@ƒCƒ‹
-#pragma comment (lib, "xinput.lib") //XInput‚ğg‚¤‚½‚ß‚É•K—v
+#include <Xinput.h> //XInputã‚’ä½¿ã†ãŸã‚ã®ãƒ˜ãƒƒãƒ€ãƒ¼ãƒ•ã‚¡ã‚¤ãƒ«
+#pragma comment (lib, "xinput.lib") //XInputã‚’ä½¿ã†ãŸã‚ã«å¿…è¦
 
 #define XINPUT_A              0x1000
 #define XINPUT_B              0x2000
@@ -16,8 +20,8 @@
 #define XINPUT_RIGHT          0x0008
 #define XINPUT_START          0x0010
 #define XINPUT_BACK           0x0020
-#define XINPUT_LEFT_THUMB     0x0040 //¶ƒXƒeƒBƒbƒN‰Ÿ‚µ‚İ
-#define XINPUT_RIGHT_THUMB    0x0080 //‰EƒXƒeƒBƒbƒN‰Ÿ‚µ‚İ
+#define XINPUT_LEFT_THUMB     0x0040 //å·¦ã‚¹ãƒ†ã‚£ãƒƒã‚¯æŠ¼ã—è¾¼ã¿
+#define XINPUT_RIGHT_THUMB    0x0080 //å³ã‚¹ãƒ†ã‚£ãƒƒã‚¯æŠ¼ã—è¾¼ã¿
 #define XINPUT_LEFT_SHOULDER  0x0100 //L
 #define XINPUT_RIGHT_SHOULDER 0x0200 //R
 
@@ -60,54 +64,54 @@
 
 class Input {
 private:
-	//©g‚ÌƒCƒ“ƒXƒ^ƒ“ƒX
+	//è‡ªèº«ã®ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹
 	static std::unique_ptr<Input> m_Instance;
 
-	//ƒL[“ü—Íî•ñ‚ğ•Û‘¶‚·‚é•Ï”
+	//ã‚­ãƒ¼å…¥åŠ›æƒ…å ±ã‚’ä¿å­˜ã™ã‚‹å¤‰æ•°
 	BYTE keyState[256];
 	BYTE keyState_old[256];
 
-	//ƒRƒ“ƒgƒ[ƒ‰[“ü—Íî•ñ‚ğ•Û‘¶‚·‚é•Ï”
+	//ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ãƒ¼å…¥åŠ›æƒ…å ±ã‚’ä¿å­˜ã™ã‚‹å¤‰æ•°
 	XINPUT_STATE controllerState;
 	XINPUT_STATE controllerState_old;
 	bool controllerConnected;
 	DWORD controllerIndex;
 
-	int VibrationTime; //U“®Œp‘±ŠÔ‚ğƒJƒEƒ“ƒg‚·‚é•Ï”
+	int VibrationTime; //æŒ¯å‹•ç¶™ç¶šæ™‚é–“ã‚’ã‚«ã‚¦ãƒ³ãƒˆã™ã‚‹å¤‰æ•°
 
 public:
 	Input() = default;
 	Input(const Input&) = delete;
 	Input& operator=(const Input&) = delete;
 
-	//Input(); //ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-	//~Input(); //ƒfƒXƒgƒ‰ƒNƒ^
-	static void Create(); //ì¬
-	static void Update(); //XV
+	//Input(); //ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+	//~Input(); //ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+	static void Create(); //ä½œæˆ
+	static void Update(); //æ›´æ–°
 	static bool IsControllerConnected();
-	static void Release(); //‰ğ•ú
+	static void Release(); //è§£æ”¾
 
-	//ƒL[“ü—Í
-	static bool GetKeyPress(int key);   //ƒvƒŒƒX(‰Ÿ‚µ‚Ä‚¢‚éŠÔ‚¸‚Á‚Æ)
-	static bool GetKeyTrigger(int key); //ƒgƒŠƒK[(‰Ÿ‚µn‚ß‚½)
-	static bool GetKeyRelease(int key); //ƒŠƒŠ[ƒX(‰Ÿ‚µI‚í‚Á‚½)
+	//ã‚­ãƒ¼å…¥åŠ›
+	static bool GetKeyPress(int key);   //ãƒ—ãƒ¬ã‚¹(æŠ¼ã—ã¦ã„ã‚‹é–“ãšã£ã¨)
+	static bool GetKeyTrigger(int key); //ãƒˆãƒªã‚¬ãƒ¼(æŠ¼ã—å§‹ã‚ãŸæ™‚)
+	static bool GetKeyRelease(int key); //ãƒªãƒªãƒ¼ã‚¹(æŠ¼ã—çµ‚ã‚ã£ãŸæ™‚)
 
-	//ƒAƒiƒƒOƒXƒeƒBƒbƒN(ƒRƒ“ƒgƒ[ƒ‰[)
+	//ã‚¢ãƒŠãƒ­ã‚°ã‚¹ãƒ†ã‚£ãƒƒã‚¯(ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ãƒ¼)
 	static DirectX::XMFLOAT2 GetLeftAnalogStick(void);
 	static DirectX::XMFLOAT2 GetRightAnalogStick(void);
 
-	//ƒgƒŠƒK[(ƒRƒ“ƒgƒ[ƒ‰[)
+	//ãƒˆãƒªã‚¬ãƒ¼(ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ãƒ¼)
 	static float GetLeftTrigger(void);
 	static float GetRightTrigger(void);
 
-	//ƒ{ƒ^ƒ““ü—Í(ƒRƒ“ƒgƒ[ƒ‰[)
-	static bool GetButtonPress(WORD btn);   //ƒvƒŒƒX(‰Ÿ‚µ‚Ä‚¢‚éŠÔ‚¸‚Á‚Æ)
-	static bool GetButtonTrigger(WORD btn); //ƒgƒŠƒK[(‰Ÿ‚µn‚ß‚½)
-	static bool GetButtonRelease(WORD btn); //ƒŠƒŠ[ƒX(‰Ÿ‚µI‚í‚Á‚½)
+	//ãƒœã‚¿ãƒ³å…¥åŠ›(ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ãƒ¼)
+	static bool GetButtonPress(WORD btn);   //ãƒ—ãƒ¬ã‚¹(æŠ¼ã—ã¦ã„ã‚‹é–“ãšã£ã¨)
+	static bool GetButtonTrigger(WORD btn); //ãƒˆãƒªã‚¬ãƒ¼(æŠ¼ã—å§‹ã‚ãŸæ™‚)
+	static bool GetButtonRelease(WORD btn); //ãƒªãƒªãƒ¼ã‚¹(æŠ¼ã—çµ‚ã‚ã£ãŸæ™‚)
 
-	//U“®(ƒRƒ“ƒgƒ[ƒ‰[)
-	//flameFU“®‚ğŒp‘±‚·‚éŠÔ(’PˆÊFƒtƒŒ[ƒ€)
-	//powerFU“®‚Ì‹­‚³(0`1)
+	//æŒ¯å‹•(ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ãƒ¼)
+	//flameï¼šæŒ¯å‹•ã‚’ç¶™ç¶šã™ã‚‹æ™‚é–“(å˜ä½ï¼šãƒ•ãƒ¬ãƒ¼ãƒ )
+	//powerï¼šæŒ¯å‹•ã®å¼·ã•(0ï½1)
 	static void SetVibration(int frame = 1, float powor = 1);
 };
 

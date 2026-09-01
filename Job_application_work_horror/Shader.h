@@ -1,3 +1,7 @@
+﻿// ============================================================================
+// ファイルの役割: HLSLのコンパイル、頂点入力レイアウト、GPUへのシェーダー設定を管理します。
+// ============================================================================
+
 #pragma once
 #include	<wrl/client.h>
 #include	<string>
@@ -6,7 +10,7 @@
 using Microsoft::WRL::ComPtr;
 
 //-----------------------------------------------------------------------------
-//Shader�N���X
+//Shaderクラス
 //-----------------------------------------------------------------------------
 class Shader{
 public:
@@ -16,8 +20,8 @@ public:
 	void SetGPU();
 	static void ClearCache();
 private:
-	ComPtr<ID3D11VertexShader> m_pVertexShader;		// ���_�V�F�[�_�[
-	ComPtr<ID3D11PixelShader>  m_pPixelShader;		// �s�N�Z���V�F�[�_�[
-	ComPtr<ID3D11InputLayout>  m_pVertexLayout;		// ���_���C�A�E�g
+	ComPtr<ID3D11VertexShader> m_pVertexShader;		// 頂点シェーダー
+	ComPtr<ID3D11PixelShader>  m_pPixelShader;		// ピクセルシェーダー
+	ComPtr<ID3D11InputLayout>  m_pVertexLayout;		// 頂点レイアウト
 };
 

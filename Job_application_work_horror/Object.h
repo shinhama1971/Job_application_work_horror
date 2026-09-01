@@ -1,3 +1,7 @@
+﻿// ============================================================================
+// ファイルの役割: 全ゲームオブジェクト共通の座標、姿勢、寿命、仮想関数を定義します。
+// ============================================================================
+
 #pragma once
 #include "Camera.h"
 #include "Shader.h"
@@ -5,15 +9,15 @@
 using namespace DirectX::SimpleMath;
 class Object {
 protected:
-	// SRT���i�p�����j
+	// SRT情報（姿勢情報）
 	Vector3 m_Position = DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
 	Vector3 m_Rotation = DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
 	Vector3 m_Scale = DirectX::SimpleMath::Vector3(1.0f, 1.0f, 1.0f);
 	bool m_IsDestroy = false;
 
-	// �`��ׂ̈̏��i�����ڂɊւ�镔���j
-	Shader m_Shader; // �V�F�[�_�[
-	Texture m_Texture;//�e�N�X�`��
+	// 描画の為の情報（見た目に関わる部分）
+	Shader m_Shader; // シェーダー
+	Texture m_Texture;//テクスチャ
 	bool m_IsFPS = true;
 public:
 	Object() {}
@@ -28,7 +32,7 @@ public:
 	void SetPosition(DirectX::SimpleMath::Vector3 pos) { m_Position = pos; }
 	void SetRotation(DirectX::SimpleMath::Vector3 rot) { m_Rotation = rot; }
 	void SetScale(DirectX::SimpleMath::Vector3 scl) { m_Scale = scl; }
-	// �ʒu�̎擾
+	// 位置の取得
 	DirectX::SimpleMath::Vector3 GetPosition() const { return m_Position; }
 	DirectX::SimpleMath::Vector3 GetRotation() { return m_Rotation; }
 	DirectX::SimpleMath::Vector3 GetScale() { return m_Scale; }

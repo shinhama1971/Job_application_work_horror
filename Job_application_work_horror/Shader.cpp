@@ -1,3 +1,7 @@
+ï»¿// ============================================================================
+// ãƒ•ã‚¡ã‚¤ãƒ«ã®å½¹å‰²: HLSLã®ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«ã€é ‚ç‚¹å…¥åŠ›ãƒ¬ã‚¤ã‚¢ã‚¦ãƒˆã€GPUã¸ã®ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼è¨­å®šã‚’ç®¡ç†ã—ã¾ã™ã€‚
+// ============================================================================
+
 #include	"Shader.h"
 #include	"Renderer.h"
 
@@ -16,7 +20,7 @@ namespace
 }
 
 //=======================================
-//Shaderì¬
+//Shaderä½œæˆ
 //=======================================
 void Shader::Create(std::string vs, std::string ps)
 {
@@ -30,7 +34,7 @@ void Shader::Create(std::string vs, std::string ps)
 		return;
 	}
 
-	// ’¸“_ƒf[ƒ^‚Ì’è‹`
+	// é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿ã®å®šç¾©
 	D3D11_INPUT_ELEMENT_DESC layout[] =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,		0,	D3D11_APPEND_ALIGNED_ELEMENT,	D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -41,10 +45,10 @@ void Shader::Create(std::string vs, std::string ps)
 
 	unsigned int numElements = ARRAYSIZE(layout);
 
-	// ’¸“_ƒVƒF[ƒ_[ƒIƒuƒWƒFƒNƒg‚ð¶¬A“¯Žž‚É’¸“_ƒŒƒCƒAƒEƒg‚à¶¬
+	// é ‚ç‚¹ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã‚’ç”Ÿæˆã€åŒæ™‚ã«é ‚ç‚¹ãƒ¬ã‚¤ã‚¢ã‚¦ãƒˆã‚‚ç”Ÿæˆ
 	HRESULT hr = Renderer::CreateVertexShader(
-		m_pVertexShader.ReleaseAndGetAddressOf(),		// ’¸“_ƒVƒF[ƒ_[ƒIƒuƒWƒFƒNƒg
-		m_pVertexLayout.ReleaseAndGetAddressOf(),			// ’¸“_ƒŒƒCƒAƒEƒgƒIƒuƒWƒFƒNƒg
+		m_pVertexShader.ReleaseAndGetAddressOf(),		// é ‚ç‚¹ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆ
+		m_pVertexLayout.ReleaseAndGetAddressOf(),			// é ‚ç‚¹ãƒ¬ã‚¤ã‚¢ã‚¦ãƒˆã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆ
 		layout,
 		numElements,
 		vs.c_str()
@@ -54,9 +58,9 @@ void Shader::Create(std::string vs, std::string ps)
 		return;
 	}
 
-	// ƒsƒNƒZƒ‹ƒVƒF[ƒ_[‚ð¶¬
+	// ãƒ”ã‚¯ã‚»ãƒ«ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚’ç”Ÿæˆ
 
-	hr = Renderer::CreatePixelShader(			// ƒsƒNƒZƒ‹ƒVƒF[ƒ_[ƒIƒuƒWƒFƒNƒg‚ð¶¬
+	hr = Renderer::CreatePixelShader(			// ãƒ”ã‚¯ã‚»ãƒ«ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã‚’ç”Ÿæˆ
 		m_pPixelShader.ReleaseAndGetAddressOf(),
 		ps.c_str()
 		);
@@ -76,15 +80,15 @@ void Shader::Create(std::string vs, std::string ps)
 }
 
 //=======================================
-//GPU‚Éƒf[ƒ^‚ð‘—‚é
+//GPUã«ãƒ‡ãƒ¼ã‚¿ã‚’é€ã‚‹
 //=======================================
 void Shader::SetGPU()
 {
 	ID3D11DeviceContext* devicecontext = Renderer::GetDeviceContext();
 
-	devicecontext->VSSetShader(m_pVertexShader.Get(), nullptr, 0);		// ’¸“_ƒVƒF[ƒ_[‚ðƒZƒbƒg
-	devicecontext->PSSetShader(m_pPixelShader.Get(), nullptr, 0);		// ƒsƒNƒZƒ‹ƒVƒF[ƒ_[‚ðƒZƒbƒg
-	devicecontext->IASetInputLayout(m_pVertexLayout.Get());				// ’¸“_ƒŒƒCƒAƒEƒgƒZƒbƒg
+	devicecontext->VSSetShader(m_pVertexShader.Get(), nullptr, 0);		// é ‚ç‚¹ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚’ã‚»ãƒƒãƒˆ
+	devicecontext->PSSetShader(m_pPixelShader.Get(), nullptr, 0);		// ãƒ”ã‚¯ã‚»ãƒ«ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚’ã‚»ãƒƒãƒˆ
+	devicecontext->IASetInputLayout(m_pVertexLayout.Get());				// é ‚ç‚¹ãƒ¬ã‚¤ã‚¢ã‚¦ãƒˆã‚»ãƒƒãƒˆ
 	
 }
 
