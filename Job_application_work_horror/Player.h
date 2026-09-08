@@ -54,6 +54,7 @@ private:
     int m_LowBatteryWarningLevel = 0;
     bool m_WasFlashlightVoltageDrop = false;
     float m_FlashlightNearSurfaceBlend = 0.0f;
+    float m_FlashlightPowerBlend = 1.0f;
 
     // ===== ライティング調整値 =====
     // 点灯時の色。Diffuseは照射光、Ambientは最低限残す環境光です。
@@ -71,7 +72,7 @@ private:
     float m_DarkAmbientR = 0.06f;
     float m_DarkAmbientG = 0.06f;
     float m_DarkAmbientB = 0.08f;
-    float m_CameraHeightOffset = 30.0f;
+    float m_CameraHeightOffset = 40.0f;
 
     // ===== プレイヤーメッシュの描画資源 =====
     MeshRenderer m_MeshRenderer;

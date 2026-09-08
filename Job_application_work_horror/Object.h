@@ -27,6 +27,7 @@ public:
 	virtual void Update() = 0;
 	virtual void Draw(Camera* cam) = 0;
 	virtual void DrawShadow() {}
+	virtual bool CastsShadow() const { return false; }
 	virtual void Uninit() = 0;
 
 	void SetPosition(DirectX::SimpleMath::Vector3 pos) { m_Position = pos; }
@@ -34,8 +35,8 @@ public:
 	void SetScale(DirectX::SimpleMath::Vector3 scl) { m_Scale = scl; }
 	// 位置の取得
 	DirectX::SimpleMath::Vector3 GetPosition() const { return m_Position; }
-	DirectX::SimpleMath::Vector3 GetRotation() { return m_Rotation; }
-	DirectX::SimpleMath::Vector3 GetScale() { return m_Scale; }
+	DirectX::SimpleMath::Vector3 GetRotation() const { return m_Rotation; }
+	DirectX::SimpleMath::Vector3 GetScale() const { return m_Scale; }
 
 	void Destroy() { m_IsDestroy = true; }
 	bool IsDestroy() const { return m_IsDestroy; }

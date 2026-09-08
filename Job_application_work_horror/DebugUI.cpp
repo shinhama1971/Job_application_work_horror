@@ -22,6 +22,13 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(
 
 namespace
 {
+    unsigned int g_MainDrawn = 0;
+    unsigned int g_MainCulled = 0;
+    unsigned int g_ShadowDrawn = 0;
+    unsigned int g_ShadowCulled = 0;
+    unsigned int g_ReflectionDrawn = 0;
+    unsigned int g_ReflectionCulled = 0;
+    bool g_ReflectionSkipped = false;
 #if defined(ENABLE_IMGUI)
     bool g_Initialized = false;
     bool g_Visible = false;
@@ -31,7 +38,7 @@ namespace
     bool g_EnableNoise = true;
     bool g_EnableVolumetricLight = false;
     float g_VolumetricIntensity = 0.58f;
-    float g_BloomIntensity = 0.72f;
+    float g_BloomIntensity = 0.48f;
     float g_NoiseAmount = 0.18f;
     float g_VignetteStrength = 0.55f;
     float g_Exposure = 1.0f;
@@ -228,6 +235,21 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         ImGui::PlotLines("##FrameTimes", g_FrameTimes, 120,
             g_FrameTimeOffset, "Frame time (16.67 ms = 60 FPS)",
             0.0f, 33.33f, ImVec2(-1.0f, 72.0f));
+        ImGui::Text("Main objects: %u drawn / %u culled",
+            g_MainDrawn, g_MainCulled);
+        ImGui::Text("Shadow casters: %u drawn / %u culled",
+            g_ShadowDrawn, g_ShadowCulled);
+        if (g_ReflectionSkipped)
+        {
+            ImGui::TextColored(
+                ImVec4(0.38f, 0.90f, 0.48f, 1.0f),
+                "Reflection: skipped (no puddle in view)");
+        }
+        else
+        {
+            ImGui::Text("Reflection objects: %u drawn / %u culled",
+                g_ReflectionDrawn, g_ReflectionCulled);
+        }
         ImGui::Separator();
 
         Core::Game* game = Core::Game::GetInstance();
@@ -452,6 +474,25 @@ unsigned int Debug::UI::GetReflectionUpdateInterval()
 #if defined(ENABLE_IMGUI)
     return static_cast<unsigned int>(g_ActiveReflectionInterval);
 #else
+    // 提出版は全体60fpsを優先し、重い平面反射だけ30Hzで更新します。
     return 2u;
 #endif
+}
+
+void Debug::UI::SetCullingStats(
+    unsigned int mainDrawn,
+    unsigned int mainCulled,
+    unsigned int shadowDrawn,
+    unsigned int shadowCulled,
+    unsigned int reflectionDrawn,
+    unsigned int reflectionCulled,
+    bool reflectionSkipped)
+{
+    g_MainDrawn = mainDrawn;
+    g_MainCulled = mainCulled;
+    g_ShadowDrawn = shadowDrawn;
+    g_ShadowCulled = shadowCulled;
+    g_ReflectionDrawn = reflectionDrawn;
+    g_ReflectionCulled = reflectionCulled;
+    g_ReflectionSkipped = reflectionSkipped;
 }

@@ -63,6 +63,7 @@ void Player::Init()
     m_LowBatteryWarningLevel = 0;
     m_WasFlashlightVoltageDrop = false;
     m_FlashlightNearSurfaceBlend = 0.0f;
+    m_FlashlightPowerBlend = m_FlashLightOn ? 1.0f : 0.0f;
     m_FootstepTimer = 0.0f;
     m_FootstepIndex = 0;
     m_SurfaceNoisePulse = 0.0f;
@@ -169,13 +170,11 @@ void Player::Update()
         if (std::abs(m_Velocity.z) < 0.001f) m_Velocity.z = 0.0f;
     }
 
-    // �d��
     m_Velocity.y -= 0.01f;
 
     const Vector3 positionBeforeMove = m_Position;
     m_Position += m_Velocity;
 
-    // ���̗����h�~
     if (m_Position.y < -99.0f)
     {
         m_Position.y = -99.0f;
@@ -292,9 +291,23 @@ void Player::Update()
     }
 
     bool visibleLight = m_FlashLightOn;
-    float lightOutput = visibleLight ? 1.0f : 0.0f;
+    float lightOutput = 1.0f;
     float batteryStress = 0.0f;
     bool voltageDrop = false;
+
+    // 実際の電球は一瞬で最大光量にならないため、点灯と消灯を短く補間します。
+    // 入力判定は従来どおり即時に切り替わるのでゲーム進行には影響しません。
+    const float flashlightBlendTarget = visibleLight ? 1.0f : 0.0f;
+    const float flashlightBlendResponse = visibleLight ? 0.22f : 0.34f;
+    m_FlashlightPowerBlend +=
+        (flashlightBlendTarget - m_FlashlightPowerBlend) *
+        flashlightBlendResponse;
+    if (m_FlashlightPowerBlend < 0.002f)
+    {
+        m_FlashlightPowerBlend = 0.0f;
+    }
+    const bool renderFlashlight =
+        visibleLight || m_FlashlightPowerBlend > 0.002f;
 
     if (m_FlashLightOn && m_Battery <= 20.0f)
     {
@@ -398,16 +411,17 @@ void Player::Update()
     LIGHT light{};
 
     light.Enable = TRUE;
-    light.FlashlightEnabled = visibleLight ? TRUE : FALSE;
+    light.FlashlightEnabled = renderFlashlight ? TRUE : FALSE;
     const float proximityExposure =
         1.0f - m_FlashlightNearSurfaceBlend * 0.42f;
-    light.Intensity = visibleLight
-        ? 1.35f * lightOutput * proximityExposure
+    light.Intensity = renderFlashlight
+        ? 1.50f * lightOutput * proximityExposure *
+            m_FlashlightPowerBlend
         : 0.0f;
-    light.Range = 260.0f - m_FlashlightNearSurfaceBlend * 46.0f;
+    light.Range = 275.0f - m_FlashlightNearSurfaceBlend * 48.0f;
     // A hand-held lamp is never perfectly rigid. Low battery adds a little
     // electrical/mechanical instability without moving the player's aim.
-    const float flashlightSway = visibleLight
+    const float flashlightSway = renderFlashlight
         ? 0.0035f + batteryStress * 0.0065f
         : 0.0f;
     Vector3 flashlightDirection(
@@ -421,13 +435,13 @@ void Player::Update()
         flashlightDirection.z,
         0.0f);
     light.SpotParams = Vector4(
-        cosf(DirectX::XMConvertToRadians(16.0f)),
-        cosf(DirectX::XMConvertToRadians(32.0f)),
-        1.35f,
+        cosf(DirectX::XMConvertToRadians(13.0f)),
+        cosf(DirectX::XMConvertToRadians(29.0f)),
+        1.55f,
         0.0f
     );
 
-    if (visibleLight)
+    if (renderFlashlight)
     {
         // A struggling battery shifts the lamp slightly toward warm yellow.
         light.Diffuse = Color(
@@ -435,22 +449,22 @@ void Player::Update()
             m_LightDiffuseG * (1.0f - batteryStress * 0.06f),
             m_LightDiffuseB * (1.0f - batteryStress * 0.18f),
             1.0f);
-        light.Ambient = Color(0.225f, 0.218f, 0.205f, 1.0f);
+        light.Ambient = Color(0.255f, 0.252f, 0.246f, 1.0f);
     }
     else
     {
         light.Diffuse = Color(0.0f, 0.0f, 0.0f, 1.0f);
         light.Ambient = Color(
-            0.225f, // Readable darkness without flattening the flashlight contrast.
-            0.218f,
-            0.205f,
+            0.245f, // 懐中電灯を消しても壁と進行方向を判別できる最低照度です。
+            0.248f,
+            0.252f,
             1.0f
         );
     }
 
     if (Core::Game::GetInstance()->IsPowerRestored())
     {
-        light.Ambient = Color(0.255f, 0.262f, 0.272f, 1.0f);
+        light.Ambient = Color(0.285f, 0.292f, 0.304f, 1.0f);
     }
 
     Renderer::SetLight(light);
@@ -570,12 +584,12 @@ void Player::Update()
         cam->SetTarget(target);
     }
 
-    /*
+
 	// バッテリーを回復するためのデバッグ用のキー入力
     if (Input::GetKeyTrigger(VK_B))
     {
         AddBattery(50.0f);
-    }*/
+    }
 }
 
 // 一人称時は本体を見せず、必要なデバッグ・別視点時だけメッシュを描きます。

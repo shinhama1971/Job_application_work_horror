@@ -29,5 +29,13 @@ namespace Debug
         static bool IsVisible();
         static bool ShouldPauseGameplay();
         static unsigned int GetReflectionUpdateInterval();
+        static void SetCullingStats(
+            unsigned int mainDrawn,
+            unsigned int mainCulled,
+            unsigned int shadowDrawn,
+            unsigned int shadowCulled,
+            unsigned int reflectionDrawn,
+            unsigned int reflectionCulled,
+            bool reflectionSkipped);
     };
 }

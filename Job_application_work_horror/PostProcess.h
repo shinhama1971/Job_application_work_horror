@@ -21,8 +21,9 @@ namespace Effect
         bool m_EnableVolumetricLight = false;
 
         float m_Time = 0.0f;
-        float m_BloomBaseIntensity = 0.72f;
-        float m_BloomIntensity = 0.72f;
+        // 通常時は控えめにし、停電復旧などのイベント時だけ強く発光させます。
+        float m_BloomBaseIntensity = 0.48f;
+        float m_BloomIntensity = 0.48f;
         float m_BloomPulseStrength = 0.0f;
         float m_BloomPulseTimer = 0.0f;
         float m_BloomPulseDuration = 0.0f;

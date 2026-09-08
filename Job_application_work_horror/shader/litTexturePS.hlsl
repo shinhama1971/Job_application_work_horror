@@ -7,14 +7,10 @@
 
 Texture2D g_Texture : register(t0);
 SamplerState g_SamplerState : register(s0);
-Texture2D<float> g_FlashlightShadowMap : register(t5);
-SamplerComparisonState g_ShadowSampler : register(s1);
+#include "flashlightShadow.hlsli"
 
-cbuffer ShadowBuffer : register(b8)
-{
-    matrix ShadowViewProjection;
-    float4 ShadowParameters;
-}
+
+#include "fastNoise.hlsli"
 
 struct LIT_PS_IN
 {
@@ -29,83 +25,6 @@ struct LIT_PS_IN
     float4 shadowPos : TEXCOORD6;
 };
 
-float GetFlashlightShadow(float4 shadowPosition)
-{
-    if (shadowPosition.w <= 0.0f)
-    {
-        return 1.0f;
-    }
-
-    const float3 projected = shadowPosition.xyz / shadowPosition.w;
-    const float2 shadowUV = float2(
-        projected.x * 0.5f + 0.5f,
-        -projected.y * 0.5f + 0.5f);
-
-    if (shadowUV.x <= 0.0f || shadowUV.x >= 1.0f ||
-        shadowUV.y <= 0.0f || shadowUV.y >= 1.0f ||
-        projected.z <= 0.0f || projected.z >= 1.0f)
-    {
-        return 1.0f;
-    }
-
-    // A rotated Poisson disk avoids the square pattern of a 3x3 kernel.
-    // The radius grows with receiver depth, imitating a small flashlight bulb.
-    static const float2 poissonDisk[12] =
-    {
-        float2(-0.326f, -0.406f), float2(-0.840f, -0.074f),
-        float2(-0.696f,  0.457f), float2(-0.203f,  0.621f),
-        float2( 0.962f, -0.195f), float2( 0.473f, -0.480f),
-        float2( 0.519f,  0.767f), float2( 0.185f, -0.893f),
-        float2( 0.507f,  0.064f), float2( 0.896f,  0.412f),
-        float2(-0.322f, -0.933f), float2(-0.792f, -0.598f)
-    };
-
-    const float rotationNoise = frac(sin(dot(
-        floor(shadowUV * 512.0f),
-        float2(12.9898f, 78.233f))) * 43758.5453f);
-    const float angle = rotationNoise * 6.2831853f;
-    const float cosine = cos(angle);
-    const float sine = sin(angle);
-    const float receiverDepth = saturate(
-        (projected.z - 0.04f) / 0.86f);
-    const float filterRadius = ShadowParameters.x *
-        lerp(1.20f, 3.35f, receiverDepth);
-    const float receiverBias = ShadowParameters.y *
-        lerp(1.10f, 0.82f, receiverDepth);
-
-    float visibility = 0.0f;
-    [unroll]
-    for (int sampleIndex = 0; sampleIndex < 12; ++sampleIndex)
-    {
-        const float2 sampleOffset = poissonDisk[sampleIndex];
-        const float2 rotatedOffset = float2(
-            sampleOffset.x * cosine - sampleOffset.y * sine,
-            sampleOffset.x * sine + sampleOffset.y * cosine);
-        visibility += g_FlashlightShadowMap.SampleCmpLevelZero(
-            g_ShadowSampler,
-            shadowUV + rotatedOffset * filterRadius,
-            projected.z - receiverBias);
-    }
-
-    return visibility / 12.0f;
-}
-
-float FlashlightHash(float2 value)
-{
-    return frac(sin(dot(value, float2(127.1f, 311.7f))) * 43758.5453f);
-}
-
-float FlashlightNoise(float2 value)
-{
-    const float2 cell = floor(value);
-    float2 blend = frac(value);
-    blend = blend * blend * (3.0f - 2.0f * blend);
-    const float a = FlashlightHash(cell);
-    const float b = FlashlightHash(cell + float2(1.0f, 0.0f));
-    const float c = FlashlightHash(cell + float2(0.0f, 1.0f));
-    const float d = FlashlightHash(cell + float2(1.0f, 1.0f));
-    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
-}
 
 float GetProceduralGrime(float3 worldPosition, float3 worldNormal)
 {
@@ -121,15 +40,15 @@ float GetProceduralGrime(float3 worldPosition, float3 worldNormal)
     const float2 wallUV = float2(wallCoordinate, worldPosition.y);
 
     const float broadStain = saturate(
-        (FlashlightNoise(wallUV * float2(0.026f, 0.019f) + 37.2f) - 0.43f)
+        (FastValueNoise(wallUV * float2(0.026f, 0.019f) + 37.2f) - 0.43f)
         * 1.65f);
-    const float fineDust = FlashlightNoise(
+    const float fineDust = FastValueNoise(
         wallUV * float2(0.115f, 0.082f) - 11.8f);
 
     // Long vertical stains are created from a mostly one-dimensional mask.
-    const float dripSeed = FlashlightNoise(
+    const float dripSeed = FastValueNoise(
         float2(wallCoordinate * 0.052f, 8.7f));
-    const float dripBreakup = FlashlightNoise(
+    const float dripBreakup = FastValueNoise(
         wallUV * float2(0.017f, 0.033f) + 4.1f);
     const float drip = smoothstep(0.64f, 0.91f, dripSeed) *
         smoothstep(0.30f, 0.78f, dripBreakup);
@@ -151,9 +70,9 @@ float GetProceduralSurfaceHeight(float3 worldPosition, float3 worldNormal)
         : worldPosition.x;
     const float2 wallUV = float2(wallCoordinate, worldPosition.y);
 
-    const float broad = FlashlightNoise(wallUV * 0.19f + 3.7f);
-    const float plaster = FlashlightNoise(wallUV * 0.63f - 12.4f);
-    const float fine = FlashlightNoise(wallUV * 1.45f + 27.1f);
+    const float broad = FastValueNoise(wallUV * 0.19f + 3.7f);
+    const float plaster = FastValueNoise(wallUV * 0.63f - 12.4f);
+    const float fine = FastValueNoise(wallUV * 1.45f + 27.1f);
     return broad * 0.52f + plaster * 0.33f + fine * 0.15f;
 }
 
@@ -221,14 +140,15 @@ float GetFlashlightLensPattern(float3 pixelDirection)
         1.0f - smoothstep(0.0f, 0.78f, radius);
     const float patternFade =
         1.0f - smoothstep(0.38f, 1.02f, radius);
-    const float largeDust = FlashlightNoise(lensUV * 6.2f + 13.7f);
-    const float fineDust = FlashlightNoise(lensUV * 17.0f - 5.2f);
+    const float largeDust = FastValueNoise(lensUV * 6.2f + 13.7f);
+    const float fineDust = FastValueNoise(lensUV * 17.0f - 5.2f);
     const float lensDirt =
         ((largeDust - 0.5f) * 0.030f +
          (fineDust - 0.5f) * 0.012f) * patternFade;
 
+    // 外周は少し暗く、中心は明るい実物の懐中電灯に近い配光です。
     return saturate(
-        0.965f + centerHotspot * 0.035f + lensDirt);
+        0.90f + centerHotspot * 0.16f + lensDirt);
 }
 
 float4 main(in LIT_PS_IN input) : SV_Target
@@ -269,7 +189,15 @@ float4 main(in LIT_PS_IN input) : SV_Target
         float4(detailWorldNormal, 0.0f),
         View).xyz);
 
-    float3 lighting = Light.Ambient.rgb;
+    // 上向きの面には冷たい天井光、下向き・垂直面には弱い床反射を与えます。
+    // 単色の環境光より立体感を残しながら、暗所でも輪郭を判別できます。
+    const float skyAmount = detailWorldNormal.y * 0.5f + 0.5f;
+    const float3 ambientTint = lerp(
+        float3(0.84f, 0.82f, 0.78f),
+        float3(0.92f, 0.98f, 1.06f),
+        skyAmount);
+    const float ambientStrength = lerp(0.90f, 1.06f, skyAmount);
+    float3 lighting = Light.Ambient.rgb * ambientTint * ambientStrength;
     const float distanceFromCamera = length(input.viewPos);
 
     // Ceiling point lights illuminate nearby floors and walls, not only the panels.
@@ -283,8 +211,14 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
         const float3 offsetToLight =
             EnvironmentLights[i].PositionRange.xyz - input.worldPos;
-        const float distanceToLight = length(offsetToLight);
         const float lightRange = max(EnvironmentLights[i].PositionRange.w, 0.001f);
+        const float distanceSquaredToLight = dot(offsetToLight, offsetToLight);
+        [branch]
+        if (distanceSquaredToLight >= lightRange * lightRange)
+        {
+            continue;
+        }
+        const float distanceToLight = sqrt(distanceSquaredToLight);
         const float3 directionToPointLight =
             offsetToLight / max(distanceToLight, 0.001f);
         float pointAttenuation = saturate(1.0f - distanceToLight / lightRange);
@@ -315,6 +249,9 @@ float4 main(in LIT_PS_IN input) : SV_Target
         const float coneDot = dot(pixelDirection, flashlightDirection);
         const float cone = smoothstep(Light.SpotParams.y, Light.SpotParams.x, coneDot);
         const float shapedCone = pow(saturate(cone), max(Light.SpotParams.z, 0.01f));
+        // 中央のホットスポットを残しつつ、外周は柔らかく落とします。
+        const float hotspot = smoothstep(0.38f, 1.0f, cone);
+        const float beamProfile = shapedCone * lerp(0.82f, 1.08f, hotspot);
 
         const float normalizedDistance = saturate(
             distanceFromCamera / max(Light.Range, 0.001f)
@@ -334,7 +271,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
         lighting += Light.Diffuse.rgb
             * Light.Intensity
-            * shapedCone
+            * beamProfile
             * naturalAttenuation
             * lensPattern
             * softenedLambert
@@ -365,7 +302,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     const float nearSuppression =
         smoothstep(35.0f, 150.0f, distanceFromCamera);
     const float fogVariation = 0.78f +
-        FlashlightNoise(input.worldPos.xz * 0.018f + 21.0f) * 0.22f;
+        FastValueNoise(input.worldPos.xz * 0.018f + 21.0f) * 0.22f;
     const float heightFog =
         heightDensity * nearSuppression * fogVariation * 0.22f;
     const float fogFactor = saturate(distanceFog + heightFog);

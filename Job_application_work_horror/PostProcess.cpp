@@ -33,7 +33,7 @@ namespace Effect
         m_VolumetricIntensity = 0.58f;
         m_TargetVolumetricIntensity = 0.58f;
         m_FilmGradeStrength = 0.55f;
-        m_LensDirtStrength = 0.16f;
+        m_LensDirtStrength = 0.10f;
         m_SignalInterference = 0.0f;
         m_TargetSignalInterference = 0.0f;
 
@@ -42,9 +42,8 @@ namespace Effect
             Application::GetHeight()
         );
 
-        // Bloom is intentionally soft, so quarter-resolution processing keeps
-        // its appearance while reducing the three compute passes to one
-        // quarter of their previous pixel count.
+        // ブルームは4分の1解像度で処理します。元画面は拡大しないため、
+        // 物体の輪郭自体は鮮明なまま発光部分だけが外側へ滲みます。
         const int bloomWidth = (Application::GetWidth() + 3) / 4;
         const int bloomHeight = (Application::GetHeight() + 3) / 4;
         constexpr DXGI_FORMAT bloomFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
@@ -257,8 +256,8 @@ namespace Effect
         }
         const float effectScale = m_UserEffectScale;
         const float adjustedBloom = (std::clamp)(
-            m_BloomIntensity * (0.65f + effectScale * 0.35f),
-            0.0f, 1.5f);
+            m_BloomIntensity * (0.72f + effectScale * 0.28f),
+            0.0f, 1.25f);
         const float adjustedVignette = (std::clamp)(
             0.45f + (m_VignetteStrength - 0.45f) * effectScale,
             0.0f, 1.0f);

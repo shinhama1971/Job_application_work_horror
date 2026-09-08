@@ -100,4 +100,11 @@ public:
     }
 
     DirectX::SimpleMath::Vector3 GetForward() const;
+
+    // 境界球が現在のカメラ視野に入るかを保守的に判定します。
+    // 少し広めの余白を含め、画面端で大型オブジェクトが急に消えるのを防ぎます。
+    bool IsSphereVisible(
+        const DirectX::SimpleMath::Vector3& center,
+        float radius,
+        bool testVertical = true) const;
 };

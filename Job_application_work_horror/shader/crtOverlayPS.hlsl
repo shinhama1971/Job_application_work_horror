@@ -34,7 +34,11 @@ SamplerState LinearSampler : register(s0);
 
 float Hash(float2 value)
 {
-    return frac(sin(dot(value, float2(12.9898f, 78.233f))) * 43758.5453f);
+    // Full-screen grain calls this several times per pixel. An algebraic hash
+    // keeps the unstable analogue pattern without the cost of repeated sin().
+    float3 p3 = frac(float3(value.xyx) * 0.1031f);
+    p3 += dot(p3, p3.yzx + 33.33f);
+    return frac((p3.x + p3.y) * p3.z);
 }
 
 float3 GetLensDrop(
@@ -99,16 +103,23 @@ float4 main(PS_IN input) : SV_TARGET
     float edgeDistance = length(centered * float2(1.15f, 1.0f));
     const float2 radialDirection = centered /
         max(length(centered), 0.001f);
+    // 通常の緊張度だけでは元画像をずらしません。色ずれと歪みは、
+    // 恐怖イベント・信号異常・終盤の高緊張時だけに限定します。
+    const float highTension = smoothstep(0.62f, 0.92f, corridorTension);
+    const float distortionEvent = saturate(
+        horrorPulseStrength * 1.15f +
+        highTension * 0.32f +
+        signalInterference);
     const float eventAberration = saturate(
         horrorPulseStrength +
-        corridorTension * (0.16f + lensDistortionStrength * 0.24f) +
+        highTension * lensDistortionStrength * 0.22f +
         signalInterference * 0.72f);
     const float edgeAberration = smoothstep(0.20f, 0.72f, edgeDistance);
     const float2 aspectCentered =
         centered * float2(screenAspect, 1.0f);
     const float radialSquared = dot(aspectCentered, aspectCentered);
-    const float radialWarp = lensDistortionStrength *
-        (0.0020f + corridorTension * 0.0075f);
+    const float radialWarp = lensDistortionStrength * distortionEvent *
+        (0.0015f + highTension * 0.0040f);
     // Signal restoration errors break the image into independently shifted
     // horizontal blocks. The displacement is deliberately bounded so the
     // player never loses navigation information.
@@ -122,8 +133,8 @@ float4 main(PS_IN input) : SV_TARGET
         input.uv + centered * radialSquared * radialWarp +
         float2(signalJitter, 0.0f));
     const float chromaOffset =
-        (0.00035f + horrorPulseStrength * 0.0038f +
-         corridorTension * lensDistortionStrength * 0.0018f) *
+        (horrorPulseStrength * 0.0038f +
+         highTension * lensDistortionStrength * 0.0012f) *
         edgeAberration + signalInterference * signalGate * 0.0024f;
     const float3 sceneCenter = SceneTexture.SampleLevel(
         LinearSampler,
@@ -133,22 +144,29 @@ float4 main(PS_IN input) : SV_TARGET
         LinearSampler,
         distortedUv,
         0.0f).rgb;
-    const float3 chromaticScene = float3(
-        SceneTexture.SampleLevel(
-            LinearSampler,
-            saturate(distortedUv + radialDirection * chromaOffset),
-            0.0f).r,
-        distortedScene.g,
-        SceneTexture.SampleLevel(
-            LinearSampler,
-            saturate(distortedUv - radialDirection * chromaOffset),
-            0.0f).b);
+    float3 chromaticScene = distortedScene;
+    // Chromatic separation is an event effect. In normal play this uniform
+    // branch saves two full-resolution texture samples per screen pixel.
+    [branch]
+    if (eventAberration > 0.001f)
+    {
+        chromaticScene = float3(
+            SceneTexture.SampleLevel(
+                LinearSampler,
+                saturate(distortedUv + radialDirection * chromaOffset),
+                0.0f).r,
+            distortedScene.g,
+            SceneTexture.SampleLevel(
+                LinearSampler,
+                saturate(distortedUv - radialDirection * chromaOffset),
+                0.0f).b);
+    }
     const float distortionDifference = length(
         abs(distortedScene - sceneCenter));
     const float distortionAlpha = saturate(
-        edgeAberration * lensDistortionStrength *
-        (0.010f + corridorTension * 0.018f) +
-        distortionDifference * corridorTension * 0.10f);
+        edgeAberration * lensDistortionStrength * distortionEvent *
+        (0.008f + highTension * 0.012f) +
+        distortionDifference * distortionEvent * 0.08f);
     const float chromaDifference = length(
         abs(chromaticScene - sceneCenter));
     const float chromaAlpha = saturate(
@@ -183,47 +201,58 @@ float4 main(PS_IN input) : SV_TARGET
     const float slide1 = frac(0.48f + time * 0.006f);
     const float slide2 = frac(0.76f + time * 0.008f);
     float3 lensDrop = 0.0f;
-    lensDrop = max(lensDrop, GetLensDrop(
-        input.uv, float2(0.18f, slide0 * 1.18f - 0.09f),
-        0.025f, screenAspect));
-    lensDrop = max(lensDrop, GetLensDrop(
-        input.uv, float2(0.34f, slide2 * 1.14f - 0.07f),
-        0.014f, screenAspect));
-    lensDrop = max(lensDrop, GetLensDrop(
-        input.uv, float2(0.62f, slide1 * 1.20f - 0.10f),
-        0.031f, screenAspect));
-    lensDrop = max(lensDrop, GetLensDrop(
-        input.uv, float2(0.79f, slide0 * 1.12f - 0.06f),
-        0.018f, screenAspect));
-    lensDrop = max(lensDrop, GetLensDrop(
-        input.uv, float2(0.91f, slide2 * 1.17f - 0.08f),
-        0.011f, screenAspect));
     float2 lensRefraction = 0.0f;
-    lensRefraction += GetLensDropRefraction(
-        input.uv, float2(0.18f, slide0 * 1.18f - 0.09f),
-        0.025f, screenAspect);
-    lensRefraction += GetLensDropRefraction(
-        input.uv, float2(0.34f, slide2 * 1.14f - 0.07f),
-        0.014f, screenAspect);
-    lensRefraction += GetLensDropRefraction(
-        input.uv, float2(0.62f, slide1 * 1.20f - 0.10f),
-        0.031f, screenAspect);
-    lensRefraction += GetLensDropRefraction(
-        input.uv, float2(0.79f, slide0 * 1.12f - 0.06f),
-        0.018f, screenAspect);
-    lensRefraction += GetLensDropRefraction(
-        input.uv, float2(0.91f, slide2 * 1.17f - 0.08f),
-        0.011f, screenAspect);
-    const float refractionMagnitude = length(lensRefraction);
-    if (refractionMagnitude > 0.008f)
-    {
-        lensRefraction *= 0.008f / refractionMagnitude;
-    }
     const float moisture = saturate(lensMoisture);
-    const float3 refractedScene = SceneTexture.SampleLevel(
-        LinearSampler,
-        saturate(input.uv - lensRefraction * moisture),
-        0.0f).rgb;
+    // Lens droplets are absent for most of a run. Keep all ten distance-field
+    // evaluations out of the normal full-screen path until a splash occurs.
+    [branch]
+    if (moisture > 0.001f)
+    {
+        lensDrop = max(lensDrop, GetLensDrop(
+            input.uv, float2(0.18f, slide0 * 1.18f - 0.09f),
+            0.025f, screenAspect));
+        lensDrop = max(lensDrop, GetLensDrop(
+            input.uv, float2(0.34f, slide2 * 1.14f - 0.07f),
+            0.014f, screenAspect));
+        lensDrop = max(lensDrop, GetLensDrop(
+            input.uv, float2(0.62f, slide1 * 1.20f - 0.10f),
+            0.031f, screenAspect));
+        lensDrop = max(lensDrop, GetLensDrop(
+            input.uv, float2(0.79f, slide0 * 1.12f - 0.06f),
+            0.018f, screenAspect));
+        lensDrop = max(lensDrop, GetLensDrop(
+            input.uv, float2(0.91f, slide2 * 1.17f - 0.08f),
+            0.011f, screenAspect));
+        lensRefraction += GetLensDropRefraction(
+            input.uv, float2(0.18f, slide0 * 1.18f - 0.09f),
+            0.025f, screenAspect);
+        lensRefraction += GetLensDropRefraction(
+            input.uv, float2(0.34f, slide2 * 1.14f - 0.07f),
+            0.014f, screenAspect);
+        lensRefraction += GetLensDropRefraction(
+            input.uv, float2(0.62f, slide1 * 1.20f - 0.10f),
+            0.031f, screenAspect);
+        lensRefraction += GetLensDropRefraction(
+            input.uv, float2(0.79f, slide0 * 1.12f - 0.06f),
+            0.018f, screenAspect);
+        lensRefraction += GetLensDropRefraction(
+            input.uv, float2(0.91f, slide2 * 1.17f - 0.08f),
+            0.011f, screenAspect);
+        const float refractionMagnitude = length(lensRefraction);
+        if (refractionMagnitude > 0.008f)
+        {
+            lensRefraction *= 0.008f / refractionMagnitude;
+        }
+    }
+    float3 refractedScene = sceneCenter;
+    [branch]
+    if (moisture > 0.001f)
+    {
+        refractedScene = SceneTexture.SampleLevel(
+            LinearSampler,
+            saturate(input.uv - lensRefraction * moisture),
+            0.0f).rgb;
+    }
     const float dropRefractionAlpha = saturate(
         (lensDrop.y * 0.085f + lensDrop.x * 0.025f) * moisture);
     const float dropAlpha = saturate(
@@ -242,10 +271,15 @@ float4 main(PS_IN input) : SV_TARGET
         abs(frac(input.uv.y * 38.0f) - 0.5f));
     const float tearOffset =
         (bandNoise - 0.5f) * 0.030f * horrorPulseStrength * thinLine;
-    const float3 shiftedScene = SceneTexture.SampleLevel(
-        LinearSampler,
-        saturate(input.uv + float2(tearOffset, 0.0f)),
-        0.0f).rgb;
+    float3 shiftedScene = sceneCenter;
+    [branch]
+    if (horrorPulseStrength > 0.001f || signalInterference > 0.001f)
+    {
+        shiftedScene = SceneTexture.SampleLevel(
+            LinearSampler,
+            saturate(input.uv + float2(tearOffset, 0.0f)),
+            0.0f).rgb;
+    }
     float tearAlpha = tear * thinLine * 0.16f;
     const float signalLine = 1.0f - smoothstep(
         0.015f, 0.085f,

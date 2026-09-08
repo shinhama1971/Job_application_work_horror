@@ -10,16 +10,10 @@
 #include "StageScene.h"
 #include "Stage2Scene.h"
 #include "ResultScene.h"
-#include "Ground.h"
-#include "Texture2D.h"
-#include "ScreenDustOverlay.h"
 #include "Shader.h"
 
 #include "DebugUI.h"
 #include "Application.h"
-
-#include <filesystem>
-#include <fstream>
 
 namespace Core
 {
@@ -329,100 +323,6 @@ namespace Core
         }
     }
 
-    // 影・反射などの事前パスを必要なフレームだけ更新し、
-    // 本描画をPostProcessへ取り込んでからHUDとデバッグUIを重ねます。
-    void Game::Draw()
-    {
-        Debug::UI::BeginFrame();
-        const unsigned int shadowInterval =
-            m_Instance->m_EffectLevel >= 2
-                ? 1u
-                : (m_Instance->m_EffectLevel == 1 ? 2u : 3u);
-        const bool updateShadow =
-            (m_Instance->m_ShadowFrameIndex++ % shadowInterval) == 0u;
-        if (updateShadow)
-        {
-            m_Instance->m_ShadowMap.Begin(m_Instance->m_Camera);
-            for (auto& o : m_Instance->m_Objects)
-            {
-                if (!o->IsDestroy())
-                {
-                    o->DrawShadow();
-                }
-            }
-            m_Instance->m_ShadowMap.End();
-        }
-        else
-        {
-            m_Instance->m_ShadowMap.Bind();
-        }
-
-        if (m_Instance->m_CurrentScene == SceneName::Stage)
-        {
-            // A puddle reflection is naturally soft, so updating it at 30 Hz
-            // is difficult to notice while removing half of the extra scene
-            // passes. The main view and input still update at 60 Hz.
-            const unsigned int minimumReflectionInterval =
-                m_Instance->m_EffectLevel >= 2
-                    ? 2u
-                    : (m_Instance->m_EffectLevel == 1 ? 3u : 4u);
-            const unsigned int reflectionInterval = (std::max)(
-                Debug::UI::GetReflectionUpdateInterval(),
-                minimumReflectionInterval);
-            const bool updateReflection =
-                (m_Instance->m_ReflectionFrameIndex++ %
-                    reflectionInterval) == 0u;
-            if (updateReflection)
-            {
-                m_Instance->m_PlanarReflection.Begin(
-                    m_Instance->m_Camera,
-                    -99.5f);
-
-                for (auto& o : m_Instance->m_Objects)
-                {
-                    if (o->IsDestroy() ||
-                        dynamic_cast<Ground*>(o.get()) != nullptr ||
-                        dynamic_cast<Texture2D*>(o.get()) != nullptr ||
-                        dynamic_cast<ScreenDustOverlay*>(o.get()) != nullptr)
-                    {
-                        continue;
-                    }
-
-                    o->Draw(&m_Instance->m_Camera);
-                }
-
-                m_Instance->m_PlanarReflection.End(
-                    m_Instance->m_Camera);
-            }
-            else
-            {
-                m_Instance->m_PlanarReflection.Bind();
-            }
-        }
-
-        Renderer::DrawStart();
-
-        for (auto& o : m_Instance->m_Objects)
-        {
-            if (!o->IsDestroy())
-            {
-                o->Draw(&m_Instance->m_Camera);
-            }
-        }
-
-        m_Instance->m_PostProcess.CaptureBackBuffer();
-        m_Instance->m_PostProcess.Draw();
-
-        // Draw HUD and scene overlays after bloom so text stays sharp.
-        if (m_Instance->m_Scene)
-        {
-            m_Instance->m_Scene->Draw(&m_Instance->m_Camera);
-        }
-        Debug::UI::Draw(m_Instance->m_PostProcess);
-
-
-        Renderer::DrawEnd();
-    }
     // 生成と逆順に解放します。unique_ptr/ComPtr所有物はresetで確実に破棄されます。
     void Game::Uninit()
     {
@@ -503,6 +403,7 @@ namespace Core
         m_Scene.reset();
         m_ReflectionFrameIndex = 0;
         m_ShadowFrameIndex = 0;
+		m_WasReflectionVisible = false;
 
         DeleteAllObject();
 
@@ -554,114 +455,6 @@ namespace Core
         }
     }
 
-    void Game::ApplyAudioVolume(bool paused)
-    {
-        if (!m_SoundReady)
-        {
-            return;
-        }
-
-        constexpr float volumeScales[] =
-        {
-            0.0f, 0.28f, 0.52f, 0.76f, 1.0f
-        };
-        const float pauseScale = paused ? 0.42f : 1.0f;
-        m_Sound.SetMasterVolume(
-            volumeScales[m_VolumeLevel] * pauseScale);
-    }
-
-    void Game::LoadBestRecord()
-    {
-        std::ifstream recordFile("save/best_record.txt");
-        float clearTime = 0.0f;
-        int caughtCount = 0;
-        if (!(recordFile >> clearTime >> caughtCount))
-        {
-            return;
-        }
-        if (clearTime <= 0.0f || clearTime > 86400.0f ||
-            caughtCount < 0 || caughtCount > 999)
-        {
-            return;
-        }
-
-        m_BestClearTimeSeconds = clearTime;
-        m_BestCaughtCount = caughtCount;
-        m_HasClearRecord = true;
-    }
-
-    void Game::SaveBestRecord() const
-    {
-        std::error_code directoryError;
-        std::filesystem::create_directories("save", directoryError);
-        if (directoryError)
-        {
-            return;
-        }
-
-        std::ofstream recordFile(
-            "save/best_record.txt", std::ios::trunc);
-        if (!recordFile)
-        {
-            return;
-        }
-        recordFile << m_BestClearTimeSeconds << ' '
-            << m_BestCaughtCount << '\n';
-    }
-
-    void Game::LoadSettings()
-    {
-        std::ifstream settingsFile("save/settings.txt");
-        int brightnessLevel = 2;
-        int effectLevel = 1;
-        int lookSensitivityLevel = 2;
-        int volumeLevel = 3;
-        if (!(settingsFile >> brightnessLevel))
-        {
-            return;
-        }
-        if (brightnessLevel < 0 || brightnessLevel > 4)
-        {
-            return;
-        }
-        m_BrightnessLevel = brightnessLevel;
-        if (settingsFile >> effectLevel &&
-            effectLevel >= 0 && effectLevel <= 2)
-        {
-            m_EffectLevel = effectLevel;
-        }
-        if (settingsFile >> lookSensitivityLevel &&
-            lookSensitivityLevel >= 0 && lookSensitivityLevel <= 4)
-        {
-            m_LookSensitivityLevel = lookSensitivityLevel;
-        }
-        if (settingsFile >> volumeLevel &&
-            volumeLevel >= 0 && volumeLevel <= 4)
-        {
-            m_VolumeLevel = volumeLevel;
-        }
-    }
-
-    void Game::SaveSettings() const
-    {
-        std::error_code directoryError;
-        std::filesystem::create_directories("save", directoryError);
-        if (directoryError)
-        {
-            return;
-        }
-
-        std::ofstream settingsFile(
-            "save/settings.txt", std::ios::trunc);
-        if (!settingsFile)
-        {
-            return;
-        }
-        settingsFile << m_BrightnessLevel << ' '
-            << m_EffectLevel << ' '
-            << m_LookSensitivityLevel << ' '
-            << m_VolumeLevel << '\n';
-    }
 
     void Game::DeleteObject(Object* pt)
     {

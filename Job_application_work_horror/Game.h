@@ -64,6 +64,7 @@ namespace Core
         bool m_IsPaused = false;
         unsigned int m_ReflectionFrameIndex = 0;
         unsigned int m_ShadowFrameIndex = 0;
+		bool m_WasReflectionVisible = false;
         float m_RunTimeSeconds = 0.0f;
         float m_LastClearTimeSeconds = 0.0f;
         int m_CaughtCount = 0;

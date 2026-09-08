@@ -41,11 +41,13 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     const float3 color4 = InputTexture.Load(
         int3(sourceCenter, 0)).rgb;
 
-    // Preserve small hot highlights while downsampling the scene to half resolution.
-    const float3 brightColor = max(
-        max(max(color0, color1), max(color2, color3)),
-        color4);
+    // 最大値だけを使うと、1個の明るい画素が4分の1解像度の領域全体へ
+    // 広がって輪郭をぼかします。中心を重視した平均で発光体だけを残します。
+    const float3 brightColor =
+        color4 * 0.40f +
+        (color0 + color1 + color2 + color3) * 0.15f;
     const float luminance = dot(brightColor, float3(0.2126f, 0.7152f, 0.0722f));
-    const float contribution = smoothstep(0.52f, 0.88f, luminance);
+    // 壁や床の中間輝度は除外し、照明・非常灯などの高輝度部分だけを抽出します。
+    const float contribution = smoothstep(0.72f, 0.98f, luminance);
     OutputTexture[dispatchThreadId.xy] = float4(brightColor * contribution, 1.0f);
 }

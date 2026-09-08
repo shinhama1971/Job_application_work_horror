@@ -6,15 +6,9 @@
 
 Texture2D g_Texture : register(t0);
 SamplerState g_SamplerState : register(s0);
-Texture2D<float> g_FlashlightShadowMap : register(t5);
-Texture2D g_PlanarReflection : register(t6);
-SamplerComparisonState g_ShadowSampler : register(s1);
+#include "flashlightShadow.hlsli"
 
-cbuffer ShadowBuffer : register(b8)
-{
-    matrix ShadowViewProjection;
-    float4 ShadowParameters;
-}
+Texture2D g_PlanarReflection : register(t6);
 
 cbuffer WetFloorBuffer : register(b10)
 {
@@ -38,66 +32,6 @@ struct LIT_PS_IN
     float4 reflectionPos : TEXCOORD7;
 };
 
-float GetFlashlightShadow(float4 shadowPosition)
-{
-    if (shadowPosition.w <= 0.0f)
-    {
-        return 1.0f;
-    }
-
-    const float3 projected = shadowPosition.xyz / shadowPosition.w;
-    const float2 shadowUV = float2(
-        projected.x * 0.5f + 0.5f,
-        -projected.y * 0.5f + 0.5f);
-
-    if (shadowUV.x <= 0.0f || shadowUV.x >= 1.0f ||
-        shadowUV.y <= 0.0f || shadowUV.y >= 1.0f ||
-        projected.z <= 0.0f || projected.z >= 1.0f)
-    {
-        return 1.0f;
-    }
-
-    // A rotated Poisson disk avoids the square pattern of a 3x3 kernel.
-    // The radius grows with receiver depth, imitating a small flashlight bulb.
-    static const float2 poissonDisk[12] =
-    {
-        float2(-0.326f, -0.406f), float2(-0.840f, -0.074f),
-        float2(-0.696f,  0.457f), float2(-0.203f,  0.621f),
-        float2( 0.962f, -0.195f), float2( 0.473f, -0.480f),
-        float2( 0.519f,  0.767f), float2( 0.185f, -0.893f),
-        float2( 0.507f,  0.064f), float2( 0.896f,  0.412f),
-        float2(-0.322f, -0.933f), float2(-0.792f, -0.598f)
-    };
-
-    const float rotationNoise = frac(sin(dot(
-        floor(shadowUV * 512.0f),
-        float2(12.9898f, 78.233f))) * 43758.5453f);
-    const float angle = rotationNoise * 6.2831853f;
-    const float cosine = cos(angle);
-    const float sine = sin(angle);
-    const float receiverDepth = saturate(
-        (projected.z - 0.04f) / 0.86f);
-    const float filterRadius = ShadowParameters.x *
-        lerp(1.20f, 3.35f, receiverDepth);
-    const float receiverBias = ShadowParameters.y *
-        lerp(1.10f, 0.82f, receiverDepth);
-
-    float visibility = 0.0f;
-    [unroll]
-    for (int sampleIndex = 0; sampleIndex < 12; ++sampleIndex)
-    {
-        const float2 sampleOffset = poissonDisk[sampleIndex];
-        const float2 rotatedOffset = float2(
-            sampleOffset.x * cosine - sampleOffset.y * sine,
-            sampleOffset.x * sine + sampleOffset.y * cosine);
-        visibility += g_FlashlightShadowMap.SampleCmpLevelZero(
-            g_ShadowSampler,
-            shadowUV + rotatedOffset * filterRadius,
-            projected.z - receiverBias);
-    }
-
-    return visibility / 12.0f;
-}
 
 float Hash21(float2 value)
 {
@@ -117,19 +51,8 @@ float ValueNoise(float2 value)
     return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
 }
 
-float FractalNoise(float2 value)
-{
-    float result = 0.0f;
-    float amplitude = 0.55f;
-    [unroll]
-    for (int octave = 0; octave < 4; ++octave)
-    {
-        result += ValueNoise(value) * amplitude;
-        value = value * 2.03f + 7.17f;
-        amplitude *= 0.48f;
-    }
-    return result;
-}
+#include "fastNoise.hlsli"
+
 
 float GetFlashlightLensPattern(float3 pixelDirection)
 {
@@ -212,6 +135,8 @@ float GetPuddleMask(
     out float shore,
     out float ripplePattern)
 {
+    shore = 0.0f;
+    ripplePattern = 0.0f;
     // Each large world-space cell may contain one irregular, rotated pool.
     // Keeping the radius below the cell boundary makes separate puddles
     // instead of turning the entire floor into one uniformly wet surface.
@@ -220,10 +145,19 @@ float GetPuddleMask(
     const float2 cell = floor(gridPosition);
     float2 localPosition = frac(gridPosition) - 0.5f;
 
-    const float2 randomValue = Hash22(cell);
     const float hasPuddle = step(
         0.62f,
         Hash21(cell + float2(53.4f, 27.9f)));
+    // Most floor cells are dry. Avoid all rotation, edge-noise and wave work
+    // in those cells; the branch is coherent over a large world-space tile.
+    if (hasPuddle < 0.5f)
+    {
+        shore = 0.0f;
+        ripplePattern = 0.0f;
+        return 0.0f;
+    }
+
+    const float2 randomValue = Hash22(cell);
     localPosition -= (randomValue - 0.5f) * 0.22f;
 
     const float angle = randomValue.x * 6.2831853f;
@@ -242,7 +176,7 @@ float GetPuddleMask(
         sin(polarAngle * 5.0f + randomValue.x * 9.0f) * 0.045f +
         sin(polarAngle * 9.0f + randomValue.y * 13.0f) * 0.022f;
     const float edgeWarp =
-        (FractalNoise(worldPosition * 0.052f + cell * 1.73f) - 0.5f) * 0.22f +
+        (FastFractalNoise3(worldPosition * 0.052f + cell * 1.73f) - 0.5f) * 0.22f +
         organicLobes;
     const float irregularDistance = radialDistance + edgeWarp;
 
@@ -281,7 +215,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
             floorLuminance.xxx,
             sampledFloor,
             0.10f);
-        const float broadVariation = saturate(FractalNoise(
+        const float broadVariation = saturate(FastFractalNoise3(
             input.worldPos.xz * 0.020f + 6.4f));
         concreteFloor *= float3(0.72f, 0.75f, 0.73f) *
             lerp(0.88f, 1.04f, broadVariation);
@@ -301,25 +235,31 @@ float4 main(in LIT_PS_IN input) : SV_Target
     puddle *= smoothstep(0.55f, 0.92f, saturate(input.worldNormal.y));
     shore *= smoothstep(0.55f, 0.92f, saturate(input.worldNormal.y));
 
-    const float dripRing = GetDripRing(input.worldPos.xz) * puddle;
-    ripplePattern += dripRing * 1.35f;
-
-    // Slowly scrolling derivatives distort the real planar reflection.
-    const float2 animatedNoiseOffset = float2(
-        WetTime * 0.018f,
-        -WetTime * 0.013f);
-    const float ripple = FractalNoise(
-        input.worldPos.xz * 0.095f + animatedNoiseOffset);
-    const float rippleX = FractalNoise(
-        input.worldPos.xz * 0.095f + animatedNoiseOffset +
-        float2(0.035f, 0.0f));
-    const float rippleZ = FractalNoise(
-        input.worldPos.xz * 0.095f + animatedNoiseOffset +
-        float2(0.0f, 0.035f));
-    const float3 detailWorldNormal = normalize(
-        input.worldNormal +
-        float3(ripple - rippleX, 0.0f, ripple - rippleZ) *
-        (0.72f + abs(ripplePattern) * 0.55f) * puddle * RippleStrength);
+    float dripRing = 0.0f;
+    float3 detailWorldNormal = normalize(input.worldNormal);
+    // Animated normal reconstruction is useful only on the puddle and its
+    // narrow shoreline. Dry concrete now avoids three fractal-noise calls.
+    [branch]
+    if (puddle > 0.001f || shore > 0.001f)
+    {
+        dripRing = GetDripRing(input.worldPos.xz) * puddle;
+        ripplePattern += dripRing * 1.35f;
+        const float2 animatedNoiseOffset = float2(
+            WetTime * 0.018f,
+            -WetTime * 0.013f);
+        const float ripple = FastFractalNoise3(
+            input.worldPos.xz * 0.095f + animatedNoiseOffset);
+        const float rippleX = FastFractalNoise3(
+            input.worldPos.xz * 0.095f + animatedNoiseOffset +
+            float2(0.035f, 0.0f));
+        const float rippleZ = FastFractalNoise3(
+            input.worldPos.xz * 0.095f + animatedNoiseOffset +
+            float2(0.0f, 0.035f));
+        detailWorldNormal = normalize(
+            input.worldNormal +
+            float3(ripple - rippleX, 0.0f, ripple - rippleZ) *
+            (0.72f + abs(ripplePattern) * 0.55f) * puddle * RippleStrength);
+    }
 
     const float baseLuminance = dot(
         color.rgb,
@@ -355,8 +295,14 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
         const float3 offsetToLight =
             EnvironmentLights[i].PositionRange.xyz - input.worldPos;
-        const float distanceToLight = length(offsetToLight);
         const float lightRange = max(EnvironmentLights[i].PositionRange.w, 0.001f);
+        const float distanceSquaredToLight = dot(offsetToLight, offsetToLight);
+        [branch]
+        if (distanceSquaredToLight >= lightRange * lightRange)
+        {
+            continue;
+        }
+        const float distanceToLight = sqrt(distanceSquaredToLight);
         const float3 directionToPointLight =
             offsetToLight / max(distanceToLight, 0.001f);
         float pointAttenuation = saturate(1.0f - distanceToLight / lightRange);
@@ -481,8 +427,6 @@ float4 main(in LIT_PS_IN input) : SV_Target
         puddle * RippleStrength;
     reflectionUV = saturate(reflectionUV + waterDistortion);
 
-    const float3 reflectedScene =
-        g_PlanarReflection.Sample(g_SamplerState, reflectionUV).rgb;
     // Fresnel behavior: looking down mostly shows the floor beneath the
     // water; grazing angles strongly show the mirrored room and fixtures.
     // The square-root remap makes mid-angle reflections readable while the
@@ -491,6 +435,13 @@ float4 main(in LIT_PS_IN input) : SV_Target
     const float reflectionStrength = saturate(
         puddle * reflectionInside *
         lerp(0.24f, 0.98f, viewAngleReflection) * ReflectionStrength);
+    float3 reflectedScene = 0.0f;
+    [branch]
+    if (reflectionStrength > 0.001f)
+    {
+        reflectedScene =
+            g_PlanarReflection.Sample(g_SamplerState, reflectionUV).rgb;
+    }
     const float reflectionGain = 1.10f + rippleHighlight * 0.08f;
     color.rgb = lerp(
         color.rgb,
@@ -507,7 +458,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     const float nearSuppression =
         smoothstep(35.0f, 150.0f, distanceFromCamera);
     const float fogVariation = 0.78f +
-        saturate(FractalNoise(input.worldPos.xz * 0.018f + 21.0f)) * 0.22f;
+        saturate(FastFractalNoise3(input.worldPos.xz * 0.018f + 21.0f)) * 0.22f;
     const float heightFog =
         heightDensity * nearSuppression * fogVariation * 0.22f;
     const float fogFactor = saturate(distanceFog + heightFog);

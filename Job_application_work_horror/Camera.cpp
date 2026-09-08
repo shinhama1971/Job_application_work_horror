@@ -7,6 +7,9 @@
 #include "Application.h"
 #include "Input.h"
 
+#include <algorithm>
+#include <cmath>
+
 using namespace DirectX::SimpleMath;
 
 void Camera::Init()
@@ -130,12 +133,12 @@ void Camera::Update()
 
     if (Input::GetKeyPress(VK_LEFT))
     {
-        m_CameraDirection += 0.05f * m_LookSensitivityScale;
+        m_CameraDirection += 0.1f * m_LookSensitivityScale;
     }
 
     if (Input::GetKeyPress(VK_RIGHT))
     {
-        m_CameraDirection -= 0.05f * m_LookSensitivityScale;
+        m_CameraDirection -= 0.1f * m_LookSensitivityScale;
     }
 
     const float pitchStep = 0.03f * m_LookSensitivityScale;
@@ -260,6 +263,70 @@ Vector3 Camera::GetForward() const
     forward.Normalize();
 
     return forward;
+}
+
+bool Camera::IsSphereVisible(
+    const Vector3& center,
+    float radius,
+    bool testVertical) const
+{
+    // 描画側の射影行列（縦60度、far 1000）に合わせた軽量な視錐台判定です。
+    // 完全な6平面テストより余白を広く取り、細長い壁も安全側に残します。
+    radius = (std::max)(radius, 1.0f);
+    const Vector3 offset = center - m_Position;
+    const float distanceSquared =
+        offset.x * offset.x + offset.y * offset.y + offset.z * offset.z;
+    const float farDistance = 1000.0f + radius;
+    if (distanceSquared > farDistance * farDistance)
+    {
+        return false;
+    }
+
+    const Vector3 forward = GetForward();
+    const float depth =
+        offset.x * forward.x + offset.y * forward.y + offset.z * forward.z;
+    if (depth + radius < 0.5f)
+    {
+        return false;
+    }
+
+    Vector3 right(forward.z, 0.0f, -forward.x);
+    const float rightLengthSquared =
+        right.x * right.x + right.z * right.z;
+    if (rightLengthSquared <= 0.0001f)
+    {
+        right = Vector3(1.0f, 0.0f, 0.0f);
+    }
+    else
+    {
+        right /= std::sqrt(rightLengthSquared);
+    }
+    Vector3 up = forward.Cross(right);
+    up.Normalize();
+
+    constexpr float tanHalfVerticalFov = 0.57735026919f;
+    const float height = static_cast<float>((std::max)(Application::GetHeight(), 1u));
+    const float aspect = static_cast<float>(Application::GetWidth()) / height;
+    const float positiveDepth = (std::max)(depth, 0.0f);
+    const float safetyRadius = radius * 1.35f + 2.0f;
+    const float horizontal = std::abs(
+        offset.x * right.x + offset.y * right.y + offset.z * right.z);
+    if (horizontal > positiveDepth * tanHalfVerticalFov * aspect + safetyRadius)
+    {
+        return false;
+    }
+
+    if (testVertical)
+    {
+        const float vertical = std::abs(
+            offset.x * up.x + offset.y * up.y + offset.z * up.z);
+        if (vertical > positiveDepth * tanHalfVerticalFov + safetyRadius)
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 void Camera::StartMovieLook(

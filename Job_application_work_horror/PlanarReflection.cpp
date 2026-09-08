@@ -14,12 +14,11 @@ namespace Effect
 {
     void PlanarReflection::Init()
     {
-		// Half-resolution reflections remove most of this extra scene pass's
-		// pixel cost. The slight softness is natural for rippling puddles.
+		// 水面には波の歪みとフレネル反射が掛かる。
 		const uint32_t reflectionWidth =
-			(Application::GetWidth() + 1u) / 2u;
+			(Application::GetWidth() + 5u) / 6u;
 		const uint32_t reflectionHeight =
-			(Application::GetHeight() + 1u) / 2u;
+			(Application::GetHeight() + 5u) / 6u;
         m_Texture.Init(
 			reflectionWidth,
 			reflectionHeight,
@@ -31,7 +30,9 @@ namespace Effect
 
         D3D11_RASTERIZER_DESC rasterizerDesc{};
         rasterizerDesc.FillMode = D3D11_FILL_SOLID;
-        rasterizerDesc.CullMode = D3D11_CULL_NONE;
+        // 各立体は表裏の面を持つ
+        // 以前のCULL_NONEは同じ面の逆巻き三角形まで処理。
+        rasterizerDesc.CullMode = D3D11_CULL_BACK;
         rasterizerDesc.DepthClipEnable = TRUE;
         Renderer::GetDevice()->CreateRasterizerState(
             &rasterizerDesc,
@@ -57,7 +58,7 @@ namespace Effect
         context->PSSetShaderResources(6, 1, &nullResource);
 
         m_Texture.SetRenderTarget();
-        m_Texture.Clear(0.008f, 0.010f, 0.013f, 1.0f);
+        m_Texture.Clear(0.1f, 0.1f, 0.13f, 1.0f);
 
         context->RSGetState(m_PreviousRasterizer.ReleaseAndGetAddressOf());
         context->RSSetState(m_TwoSidedRasterizer.Get());

@@ -92,9 +92,9 @@ float4 main(PS_IN input) : SV_TARGET
         0.32f,
         streakLuminance);
     const float eventBoost = saturate(
-        (bloomIntensity - 0.72f) * 0.85f);
+        (bloomIntensity - 0.48f) * 0.85f);
     const float streakStrength =
-        (0.11f + eventBoost * 0.10f) * brightStreak * compactHighlight;
+        (0.055f + eventBoost * 0.075f) * brightStreak * compactHighlight;
     const float3 streakColor =
         streak * float3(0.84f, 0.91f, 1.0f) * streakStrength;
 
@@ -113,7 +113,7 @@ float4 main(PS_IN input) : SV_TARGET
     const float visibleDirt = dirtMask * smoothstep(0.025f, 0.30f, bloomLuminance)
         * saturate(lensDirtStrength);
     const float3 dirtGlow = bloom * float3(1.00f, 0.88f, 0.70f)
-        * visibleDirt * 0.22f;
+        * visibleDirt * 0.12f;
 
     return float4(
         bloom * bloomIntensity + streakColor + dirtGlow,

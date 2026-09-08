@@ -98,6 +98,8 @@ public:
 		bool sprinting);
 	bool IsInsidePuddle(
 		const DirectX::SimpleMath::Vector3& position) const;
+	// 反射面が画面外なら高コストな平面反射パスを丸ごと省略できます。
+	bool IsAnyPuddleVisible(const Camera& camera) const;
 	//頂点情報を取得
 	std::vector<VERTEX_3D>GetVertices();
 };

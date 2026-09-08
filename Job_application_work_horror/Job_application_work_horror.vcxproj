@@ -201,8 +201,12 @@
     <ClCompile Include="FullScreenQuad.cpp" />
     <ClCompile Include="FuseBox.cpp" />
     <ClCompile Include="Game.cpp" />
+    <ClCompile Include="GameRendering.cpp" />
+    <ClCompile Include="GamePersistence.cpp" />
     <ClCompile Include="Ground.cpp" />
+    <ClCompile Include="GroundWaterEffects.cpp" />
     <ClCompile Include="Hud.cpp" />
+    <ClCompile Include="HudScreens.cpp" />
     <ClCompile Include="input.cpp" />
     <ClCompile Include="InteractionSystem.cpp" />
     <ClCompile Include="Item.cpp" />
@@ -214,6 +218,8 @@
     <ClCompile Include="PlanarReflection.cpp" />
     <ClCompile Include="PostProcess.cpp" />
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="RendererResources.cpp" />
+    <ClCompile Include="RendererState.cpp" />
     <ClCompile Include="RenderTexture.cpp" />
     <ClCompile Include="ResultScene.cpp" />
     <ClCompile Include="ScareTrigger.cpp" />
@@ -225,7 +231,12 @@
     <ClCompile Include="sound.cpp" />
     <ClCompile Include="SpriteRenderer.cpp" />
     <ClCompile Include="StageScene.cpp" />
+    <ClCompile Include="StageSceneEvents.cpp" />
+    <ClCompile Include="StageSceneDraw.cpp" />
     <ClCompile Include="Stage2Scene.cpp" />
+    <ClCompile Include="Stage2ScenePuzzles.cpp" />
+    <ClCompile Include="Stage2SceneHorror.cpp" />
+    <ClCompile Include="Stage2SceneDraw.cpp" />
     <ClCompile Include="StaticMesh.cpp" />
     <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="Texture.cpp" />
@@ -287,6 +298,7 @@
     <ClInclude Include="SpriteRenderer.h" />
     <ClInclude Include="StageScene.h" />
     <ClInclude Include="Stage2Scene.h" />
+    <ClInclude Include="Stage2SceneConstants.h" />
     <ClInclude Include="StaticMesh.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Texture.h" />
@@ -295,6 +307,8 @@
     <ClInclude Include="utility.h" />
     <ClInclude Include="VertexBuffer.h" />
     <ClInclude Include="Wall.h" />
+    <ClInclude Include="shader\fastNoise.hlsli" />
+    <ClInclude Include="shader\flashlightShadow.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="shader\wetFloorPS.hlsl">
