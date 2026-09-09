@@ -605,6 +605,27 @@ void Hud::DrawStage2Status(
     Flush();
 }
 
+void Hud::DrawQuietRecovery(float progressRate, float cooldown, bool success, bool tooClose)
+{
+    m_Vertices.clear();
+    const float x = (std::max)(12.0f, static_cast<float>(Application::GetWidth()) - 330.0f);
+    constexpr float y = 150.0f;
+    const Color color = tooClose ? Color(0.96f, 0.38f, 0.25f, 1.0f)
+        : Color(0.64f, 0.84f, 0.78f, 1.0f);
+    AddRectangle(x, y, 296.0f, 76.0f, Color(0.005f, 0.012f, 0.015f, 0.85f));
+    const std::string_view message = success ? "気配が遠のいた" :
+        (tooClose ? "影が近い 距離を取るか光で対処" :
+        (cooldown > 0.0f ? "呼吸を整えている" : "消灯して2秒止まると気配を抑える"));
+    AddText(x + 10.0f, y + 10.0f, message, 1.6f, color);
+    AddText(x + 10.0f, y + 31.0f,
+        success ? "静かに歩いて探索を続ける" : "移動や点灯で静止の計測はやり直し", 1.4f, color);
+    AddRectangle(x + 10.0f, y + 58.0f, 276.0f, 6.0f, Color(0.09f, 0.14f, 0.14f, 1.0f));
+    const float fill = success ? 1.0f : (cooldown > 0.0f ?
+        1.0f - cooldown / 10.0f : progressRate);
+    AddRectangle(x + 10.0f, y + 58.0f, 276.0f * (std::clamp)(fill, 0.0f, 1.0f), 6.0f, color);
+    Flush();
+}
+
 void Hud::DrawPause(
     int brightnessLevel,
     int effectLevel,
@@ -649,9 +670,9 @@ void Hud::DrawPause(
     const int runSeconds = (std::max)(
         0, static_cast<int>(runTimeSeconds));
     const std::string runStatus =
-        "FLOOR " + std::to_string((std::clamp)(floorNumber, 1, 2)) +
-        "   TIME " + std::to_string(runSeconds / 60) + " MIN " +
-        std::to_string(runSeconds % 60) + " SEC   CAUGHT " +
+        "現在 " + std::to_string((std::clamp)(floorNumber, 1, 2)) +
+        "階   経過 " + std::to_string(runSeconds / 60) + "分 " +
+        std::to_string(runSeconds % 60) + "秒   捕まった回数 " +
         std::to_string((std::max)(caughtCount, 0));
     addCenteredText(panelY + 78.0f, runStatus, 2.0f, pale);
     const int safeBrightnessLevel =
@@ -668,9 +689,12 @@ void Hud::DrawPause(
     addCenteredText(panelY + 108.0f,
         brightnessText, 2.5f,
         safeSelectedSetting == 0 ? green : pale);
+    constexpr std::string_view effectNames[] =
+    {
+        "軽量 FPS優先", "標準", "高品質"
+    };
     const std::string effectText =
-        "画面効果 " + std::to_string(safeEffectLevel + 1) +
-        " OF 3";
+        "画面効果 " + std::string(effectNames[safeEffectLevel]);
     addCenteredText(panelY + 148.0f,
         effectText, 2.5f,
         safeSelectedSetting == 1 ? green : pale);
@@ -716,4 +740,3 @@ void Hud::DrawPause(
 
     Flush();
 }
-

@@ -11,7 +11,6 @@
 #include "Stage2Scene.h"
 #include "ResultScene.h"
 #include "Shader.h"
-
 #include "DebugUI.h"
 #include "Application.h"
 
@@ -404,6 +403,7 @@ namespace Core
         m_ReflectionFrameIndex = 0;
         m_ShadowFrameIndex = 0;
 		m_WasReflectionVisible = false;
+        m_HasReflectionCameraPose = false;
 
         DeleteAllObject();
 

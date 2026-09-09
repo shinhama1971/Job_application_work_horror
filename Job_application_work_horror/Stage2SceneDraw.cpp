@@ -109,6 +109,18 @@ void Stage2Scene::Draw(Camera* camera)
     {
         objective = "捕まった チェックポイントへ戻る";
     }
+    else if (m_QuietRecovery.tooClose)
+    {
+        objective = "影が近すぎる 距離を取りライトを消して止まる";
+    }
+    else if (m_QuietRecovery.successNotice > 0.0f)
+    {
+        objective = "気配が遠のいた 静かに探索を続ける";
+    }
+    else if (m_QuietRecovery.progress > 0.0f)
+    {
+        objective = "息を潜めている 消灯したまま動かない";
+    }
     else if (m_ChargerNoticeTimer > 0.0f)
     {
         objective = "充電器の音で廊下が反応した";
@@ -377,6 +389,17 @@ void Stage2Scene::Draw(Camera* camera)
             m_LoopCount, threatRate, m_FinalDoorReady,
             m_SignalStep,
             m_LoopCount >= 3 && !m_SignalPuzzleComplete);
+        if (m_LoopCount < 3 && m_ObservedScareTimer < 0.0f &&
+            m_FinalPursuitTimer <= 0.0f && m_FinalSequenceTimer < 0.0f &&
+            m_LoopTransitionTimer < 0.0f &&
+            (m_NoiseThreat > 0.25f || m_QuietRecovery.progress > 0.0f ||
+                m_QuietRecovery.successNotice > 0.0f || m_QuietRecovery.cooldown > 0.0f))
+        {
+            m_Hud.DrawQuietRecovery(
+                m_QuietRecovery.progress / QuietRecovery::RequiredSeconds,
+                m_QuietRecovery.cooldown, m_QuietRecovery.successNotice > 0.0f,
+                m_QuietRecovery.tooClose);
+        }
     }
     if (m_VisualTimer >= 4.20f &&
         m_CaughtTimer < 0.0f &&

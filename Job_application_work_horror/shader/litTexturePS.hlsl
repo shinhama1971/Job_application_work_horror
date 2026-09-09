@@ -11,6 +11,7 @@ SamplerState g_SamplerState : register(s0);
 
 
 #include "fastNoise.hlsli"
+#include "flashlightLighting.hlsli"
 
 struct LIT_PS_IN
 {
@@ -42,8 +43,10 @@ float GetProceduralGrime(float3 worldPosition, float3 worldNormal)
     const float broadStain = saturate(
         (FastValueNoise(wallUV * float2(0.026f, 0.019f) + 37.2f) - 0.43f)
         * 1.65f);
-    const float fineDust = FastValueNoise(
-        wallUV * float2(0.115f, 0.082f) - 11.8f);
+    // 細かな粒は補間ノイズではなくセル単位のハッシュで十分です。
+    // 壁が画面の大半を占める場面のピクセル負荷を抑えます。
+    const float fineDust = FastHash21(floor(
+        wallUV * float2(0.115f, 0.082f) - 11.8f));
 
     // Long vertical stains are created from a mostly one-dimensional mask.
     const float dripSeed = FastValueNoise(
@@ -72,7 +75,7 @@ float GetProceduralSurfaceHeight(float3 worldPosition, float3 worldNormal)
 
     const float broad = FastValueNoise(wallUV * 0.19f + 3.7f);
     const float plaster = FastValueNoise(wallUV * 0.63f - 12.4f);
-    const float fine = FastValueNoise(wallUV * 1.45f + 27.1f);
+    const float fine = FastHash21(floor(wallUV * 1.45f + 27.1f));
     return broad * 0.52f + plaster * 0.33f + fine * 0.15f;
 }
 
@@ -127,29 +130,6 @@ float3 ApplyFilmicHorrorGrade(float3 color)
     return saturate(color);
 }
 
-float GetFlashlightLensPattern(float3 pixelDirection)
-{
-    const float outerCosine = max(Light.SpotParams.y, 0.05f);
-    const float outerTangent =
-        sqrt(saturate(1.0f - outerCosine * outerCosine)) / outerCosine;
-    const float2 lensUV = pixelDirection.xy /
-        max(pixelDirection.z * outerTangent, 0.001f);
-    const float radius = length(lensUV);
-
-    const float centerHotspot =
-        1.0f - smoothstep(0.0f, 0.78f, radius);
-    const float patternFade =
-        1.0f - smoothstep(0.38f, 1.02f, radius);
-    const float largeDust = FastValueNoise(lensUV * 6.2f + 13.7f);
-    const float fineDust = FastValueNoise(lensUV * 17.0f - 5.2f);
-    const float lensDirt =
-        ((largeDust - 0.5f) * 0.030f +
-         (fineDust - 0.5f) * 0.012f) * patternFade;
-
-    // 外周は少し暗く、中心は明るい実物の懐中電灯に近い配光です。
-    return saturate(
-        0.90f + centerHotspot * 0.16f + lensDirt);
-}
 
 float4 main(in LIT_PS_IN input) : SV_Target
 {
@@ -189,15 +169,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         float4(detailWorldNormal, 0.0f),
         View).xyz);
 
-    // 上向きの面には冷たい天井光、下向き・垂直面には弱い床反射を与えます。
-    // 単色の環境光より立体感を残しながら、暗所でも輪郭を判別できます。
-    const float skyAmount = detailWorldNormal.y * 0.5f + 0.5f;
-    const float3 ambientTint = lerp(
-        float3(0.84f, 0.82f, 0.78f),
-        float3(0.92f, 0.98f, 1.06f),
-        skyAmount);
-    const float ambientStrength = lerp(0.90f, 1.06f, skyAmount);
-    float3 lighting = Light.Ambient.rgb * ambientTint * ambientStrength;
+    float3 lighting = GetHemisphereAmbient(detailWorldNormal);
     const float distanceFromCamera = length(input.viewPos);
 
     // Ceiling point lights illuminate nearby floors and walls, not only the panels.
@@ -245,37 +217,35 @@ float4 main(in LIT_PS_IN input) : SV_Target
     if (Light.Enable && Light.FlashlightEnabled && distanceFromCamera > 0.001f)
     {
         const float3 pixelDirection = input.viewPos / distanceFromCamera;
-        const float3 flashlightDirection = normalize(Light.Direction.xyz);
-        const float coneDot = dot(pixelDirection, flashlightDirection);
-        const float cone = smoothstep(Light.SpotParams.y, Light.SpotParams.x, coneDot);
-        const float shapedCone = pow(saturate(cone), max(Light.SpotParams.z, 0.01f));
-        // 中央のホットスポットを残しつつ、外周は柔らかく落とします。
-        const float hotspot = smoothstep(0.38f, 1.0f, cone);
-        const float beamProfile = shapedCone * lerp(0.82f, 1.08f, hotspot);
+        const float beamProfile = GetFlashlightBeamProfile(pixelDirection);
+        // 円錐外ではレンズ汚れノイズとシャドウマップ参照を丸ごと省略します。
+        [branch]
+        if (beamProfile > 0.001f)
+        {
+            const float normalizedDistance = saturate(
+                distanceFromCamera / max(Light.Range, 0.001f));
+            const float rangeFade = saturate(
+                1.0f - normalizedDistance * normalizedDistance);
+            const float attenuation = rangeFade * rangeFade;
+            const float lensPattern = GetFlashlightLensPattern(pixelDirection);
+            const float physicalFalloff = rcp(
+                1.0f + distanceFromCamera * distanceFromCamera * 0.000018f);
+            const float naturalAttenuation = attenuation *
+                lerp(1.0f, physicalFalloff, 0.32f);
 
-        const float normalizedDistance = saturate(
-            distanceFromCamera / max(Light.Range, 0.001f)
-        );
-        const float rangeFade = saturate(1.0f - normalizedDistance * normalizedDistance);
-        const float attenuation = rangeFade * rangeFade;
-        const float lensPattern = GetFlashlightLensPattern(pixelDirection);
-        const float physicalFalloff = rcp(
-            1.0f + distanceFromCamera * distanceFromCamera * 0.000018f);
-        const float naturalAttenuation = attenuation *
-            lerp(1.0f, physicalFalloff, 0.32f);
+            const float3 normal = detailViewNormal;
+            const float3 directionToLight = -pixelDirection;
+            const float lambert = saturate(dot(normal, directionToLight));
+            const float softenedLambert = 0.25f + lambert * 0.75f;
 
-        const float3 normal = detailViewNormal;
-        const float3 directionToLight = -pixelDirection;
-        const float lambert = saturate(dot(normal, directionToLight));
-        const float softenedLambert = 0.25f + lambert * 0.75f;
-
-        lighting += Light.Diffuse.rgb
-            * Light.Intensity
-            * beamProfile
-            * naturalAttenuation
-            * lensPattern
-            * softenedLambert
-            * GetFlashlightShadow(input.shadowPos);
+            lighting += Light.Diffuse.rgb
+                * Light.Intensity
+                * beamProfile
+                * naturalAttenuation
+                * lensPattern
+                * softenedLambert
+                * GetFlashlightShadow(input.shadowPos);
+        }
     }
 
     color.rgb *= lighting;

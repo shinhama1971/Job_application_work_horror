@@ -65,6 +65,9 @@ namespace Core
         unsigned int m_ReflectionFrameIndex = 0;
         unsigned int m_ShadowFrameIndex = 0;
 		bool m_WasReflectionVisible = false;
+        DirectX::SimpleMath::Vector3 m_LastReflectionCameraPosition{};
+        DirectX::SimpleMath::Vector3 m_LastReflectionCameraForward{ 0.0f, 0.0f, 1.0f };
+        bool m_HasReflectionCameraPose = false;
         float m_RunTimeSeconds = 0.0f;
         float m_LastClearTimeSeconds = 0.0f;
         int m_CaughtCount = 0;

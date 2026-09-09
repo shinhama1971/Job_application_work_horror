@@ -261,6 +261,10 @@ namespace Effect
         const float adjustedVignette = (std::clamp)(
             0.45f + (m_VignetteStrength - 0.45f) * effectScale,
             0.0f, 1.0f);
+        // 軽量設定では全画面の光芒パスを止めます。ブルームと懐中電灯本体は
+        // 残るため視認性は変えず、古いGPUで最も重い追加パスだけを省けます。
+        const float volumeQuality = (std::clamp)(
+            (effectScale - 0.75f) / 0.25f, 0.0f, 1.0f);
         m_FullScreenQuad.Draw(
             m_RenderTexture.GetSRV(),
             m_EnableBloom ? m_BloomVerticalTexture.GetSRV() : nullptr,
@@ -268,7 +272,9 @@ namespace Effect
             m_EnableBloom ? adjustedBloom : 0.0f,
             m_EnableNoise ? m_NoiseAmount * effectScale : 0.0f,
             adjustedVignette,
-            m_EnableVolumetricLight ? m_VolumetricIntensity : 0.0f,
+            m_EnableVolumetricLight
+                ? m_VolumetricIntensity * volumeQuality
+                : 0.0f,
             m_LensDistortionStrength * effectScale,
             m_HorrorPulseStrength * effectScale,
             (std::clamp)(

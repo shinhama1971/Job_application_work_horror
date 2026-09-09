@@ -58,35 +58,22 @@ float4 main(PS_IN input) : SV_TARGET
     // Wide taps favor fluorescent fixtures without requiring another texture.
     float3 streak = 0.0f;
     streak += bloomTexture.SampleLevel(
-        bloomSampler, saturate(uv + float2(texelSize.x * 5.0f, 0.0f)), 0.0f).rgb * 0.26f;
+        bloomSampler, saturate(uv + float2(texelSize.x * 7.0f, 0.0f)), 0.0f).rgb * 0.34f;
     streak += bloomTexture.SampleLevel(
-        bloomSampler, saturate(uv - float2(texelSize.x * 5.0f, 0.0f)), 0.0f).rgb * 0.26f;
+        bloomSampler, saturate(uv - float2(texelSize.x * 7.0f, 0.0f)), 0.0f).rgb * 0.34f;
     streak += bloomTexture.SampleLevel(
-        bloomSampler, saturate(uv + float2(texelSize.x * 12.0f, 0.0f)), 0.0f).rgb * 0.15f;
+        bloomSampler, saturate(uv + float2(texelSize.x * 20.0f, 0.0f)), 0.0f).rgb * 0.16f;
     streak += bloomTexture.SampleLevel(
-        bloomSampler, saturate(uv - float2(texelSize.x * 12.0f, 0.0f)), 0.0f).rgb * 0.15f;
-    streak += bloomTexture.SampleLevel(
-        bloomSampler, saturate(uv + float2(texelSize.x * 22.0f, 0.0f)), 0.0f).rgb * 0.09f;
-    streak += bloomTexture.SampleLevel(
-        bloomSampler, saturate(uv - float2(texelSize.x * 22.0f, 0.0f)), 0.0f).rgb * 0.09f;
+        bloomSampler, saturate(uv - float2(texelSize.x * 20.0f, 0.0f)), 0.0f).rgb * 0.16f;
 
     const float streakLuminance = dot(
         streak,
         float3(0.2126f, 0.7152f, 0.0722f));
-    const float3 verticalNeighbors =
-        (bloomTexture.SampleLevel(
-            bloomSampler,
-            saturate(uv + float2(0.0f, texelSize.y * 4.0f)),
-            0.0f).rgb +
-         bloomTexture.SampleLevel(
-            bloomSampler,
-            saturate(uv - float2(0.0f, texelSize.y * 4.0f)),
-            0.0f).rgb) * 0.5f;
-    const float verticalLuminance = dot(
-        verticalNeighbors,
+    const float bloomLuminanceForShape = dot(
+        bloom,
         float3(0.2126f, 0.7152f, 0.0722f));
     const float compactHighlight = saturate(
-        (streakLuminance - verticalLuminance) * 4.5f + 0.20f);
+        (streakLuminance - bloomLuminanceForShape * 0.72f) * 4.2f + 0.20f);
     const float brightStreak = smoothstep(
         0.045f,
         0.32f,

@@ -30,6 +30,7 @@ namespace Effect
         Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_ShadowRasterizer;
         Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_PreviousRasterizer;
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_ShadowBuffer;
+		Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_TwoSidedRasterizer;//
 
         D3D11_VIEWPORT m_PreviousViewport{};
         UINT m_PreviousViewportCount = 1;

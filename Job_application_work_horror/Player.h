@@ -138,6 +138,11 @@ public:
         return m_IsSprinting;
     }
 
+    bool IsMovingHorizontally() const
+    {
+        return m_Velocity.x * m_Velocity.x + m_Velocity.z * m_Velocity.z > 0.0025f;
+    }
+
     // Sceneが持つ特殊な床（水たまり等）を次のUpdateへ通知します。
     void SetWetSurface(bool wet) { m_WetSurfaceOverride = wet; }
     float GetSurfaceNoisePulse() const { return m_SurfaceNoisePulse; }

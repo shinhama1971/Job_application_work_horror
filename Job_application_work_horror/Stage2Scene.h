@@ -7,6 +7,7 @@
 #include "Scene.h"
 #include "InteractionSystem.h"
 #include "Hud.h"
+#include "QuietRecovery.h"
 
 class Player;
 
@@ -44,6 +45,7 @@ private:
     // プレイヤーが見ている操作対象と、画面へ出す案内を分離して管理します。
     InteractionSystem m_InteractionSystem;
     Hud m_Hud;
+    QuietRecovery m_QuietRecovery;
 
     // timerが負数なら未実行、0以上なら対応する演出シーケンスが進行中です。
     int m_LoopCount = 0;

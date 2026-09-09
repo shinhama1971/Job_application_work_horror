@@ -84,7 +84,7 @@ void Player::Update()
     }
 
     Camera* cam = Core::Game::GetInstance()->GetCamera();
-    constexpr float deltaTime = 1.0f / 60.0f;
+    constexpr float deltaTime = 1.0f / 60.0f;//今60湖底
     m_AmbienceTimer += deltaTime;
     m_BatteryNoticeTimer = (std::max)(
         0.0f, m_BatteryNoticeTimer - deltaTime);
@@ -322,8 +322,7 @@ void Player::Update()
             flickerTime * 7.1f + sinf(flickerTime * 1.7f) * 1.8f);
         const float ballastNoise =
             sinf(flickerTime * 13.7f) * sinf(flickerTime * 4.3f);
-        const float unstableOutput =
-            0.84f + slowVoltage * 0.075f + ballastNoise * 0.055f;
+        const float unstableOutput =0.93f+ slowVoltage * 0.025f+ ballastNoise * 0.015f;
         lightOutput =
             1.0f + (unstableOutput - 1.0f) * batteryStress;
 
@@ -335,7 +334,7 @@ void Player::Update()
         if (dropPhase < dropDuration)
         {
             voltageDrop = true;
-            lightOutput *= 0.46f - batteryStress * 0.23f;
+            lightOutput *= 0.80f - batteryStress * 0.10f;
         }
     }
     else

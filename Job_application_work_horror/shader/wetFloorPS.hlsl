@@ -52,30 +52,9 @@ float ValueNoise(float2 value)
 }
 
 #include "fastNoise.hlsli"
+#include "flashlightLighting.hlsli"
 
 
-float GetFlashlightLensPattern(float3 pixelDirection)
-{
-    const float outerCosine = max(Light.SpotParams.y, 0.05f);
-    const float outerTangent =
-        sqrt(saturate(1.0f - outerCosine * outerCosine)) / outerCosine;
-    const float2 lensUV = pixelDirection.xy /
-        max(pixelDirection.z * outerTangent, 0.001f);
-    const float radius = length(lensUV);
-
-    const float centerHotspot =
-        1.0f - smoothstep(0.0f, 0.78f, radius);
-    const float patternFade =
-        1.0f - smoothstep(0.38f, 1.02f, radius);
-    const float largeDust = ValueNoise(lensUV * 6.2f + 13.7f);
-    const float fineDust = ValueNoise(lensUV * 17.0f - 5.2f);
-    const float lensDirt =
-        ((largeDust - 0.5f) * 0.030f +
-         (fineDust - 0.5f) * 0.012f) * patternFade;
-
-    return saturate(
-        0.965f + centerHotspot * 0.035f + lensDirt);
-}
 
 float3 ApplyFilmicHorrorGrade(float3 color)
 {
@@ -176,7 +155,7 @@ float GetPuddleMask(
         sin(polarAngle * 5.0f + randomValue.x * 9.0f) * 0.045f +
         sin(polarAngle * 9.0f + randomValue.y * 13.0f) * 0.022f;
     const float edgeWarp =
-        (FastFractalNoise3(worldPosition * 0.052f + cell * 1.73f) - 0.5f) * 0.22f +
+        (FastValueNoise(worldPosition * 0.052f + cell * 1.73f) - 0.5f) * 0.22f +
         organicLobes;
     const float irregularDistance = radialDistance + edgeWarp;
 
@@ -215,7 +194,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
             floorLuminance.xxx,
             sampledFloor,
             0.10f);
-        const float broadVariation = saturate(FastFractalNoise3(
+        const float broadVariation = saturate(FastValueNoise(
             input.worldPos.xz * 0.020f + 6.4f));
         concreteFloor *= float3(0.72f, 0.75f, 0.73f) *
             lerp(0.88f, 1.04f, broadVariation);
@@ -247,12 +226,12 @@ float4 main(in LIT_PS_IN input) : SV_Target
         const float2 animatedNoiseOffset = float2(
             WetTime * 0.018f,
             -WetTime * 0.013f);
-        const float ripple = FastFractalNoise3(
+        const float ripple = FastValueNoise(
             input.worldPos.xz * 0.095f + animatedNoiseOffset);
-        const float rippleX = FastFractalNoise3(
+        const float rippleX = FastValueNoise(
             input.worldPos.xz * 0.095f + animatedNoiseOffset +
             float2(0.035f, 0.0f));
-        const float rippleZ = FastFractalNoise3(
+        const float rippleZ = FastValueNoise(
             input.worldPos.xz * 0.095f + animatedNoiseOffset +
             float2(0.0f, 0.035f));
         detailWorldNormal = normalize(
@@ -274,7 +253,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     color.rgb = lerp(color.rgb, wetColor, puddle * 0.84f);
     color.rgb *= 1.0f - shore * 0.035f;
 
-    float3 lighting = Light.Ambient.rgb;
+    float3 lighting = GetHemisphereAmbient(detailWorldNormal);
     float3 specularLighting = 0.0f;
     const float distanceFromCamera = length(input.viewPos);
     const float3 viewDirection = distanceFromCamera > 0.001f
@@ -344,50 +323,51 @@ float4 main(in LIT_PS_IN input) : SV_Target
     if (Light.Enable && Light.FlashlightEnabled && distanceFromCamera > 0.001f)
     {
         const float3 pixelDirection = input.viewPos / distanceFromCamera;
-        const float3 flashlightDirection = normalize(Light.Direction.xyz);
-        const float coneDot = dot(pixelDirection, flashlightDirection);
-        const float cone = smoothstep(Light.SpotParams.y, Light.SpotParams.x, coneDot);
-        const float shapedCone = pow(saturate(cone), max(Light.SpotParams.z, 0.01f));
+        const float beamProfile = GetFlashlightBeamProfile(pixelDirection);
+        // 円錐外の床はレンズ汚れ、影、鏡面反射の計算を行いません。
+        [branch]
+        if (beamProfile > 0.001f)
+        {
+            const float normalizedDistance = saturate(
+                distanceFromCamera / max(Light.Range, 0.001f));
+            const float rangeFade = saturate(
+                1.0f - normalizedDistance * normalizedDistance);
+            const float attenuation = rangeFade * rangeFade;
+            const float lensPattern = GetFlashlightLensPattern(pixelDirection);
+            const float physicalFalloff = rcp(
+                1.0f + distanceFromCamera * distanceFromCamera * 0.000018f);
+            const float naturalAttenuation = attenuation *
+                lerp(1.0f, physicalFalloff, 0.32f);
 
-        const float normalizedDistance = saturate(
-            distanceFromCamera / max(Light.Range, 0.001f)
-        );
-        const float rangeFade = saturate(1.0f - normalizedDistance * normalizedDistance);
-        const float attenuation = rangeFade * rangeFade;
-        const float lensPattern = GetFlashlightLensPattern(pixelDirection);
-        const float physicalFalloff = rcp(
-            1.0f + distanceFromCamera * distanceFromCamera * 0.000018f);
-        const float naturalAttenuation = attenuation *
-            lerp(1.0f, physicalFalloff, 0.32f);
+            const float3 normal = normalize(input.viewNormal);
+            const float3 directionToLight = -pixelDirection;
+            const float lambert = saturate(dot(normal, directionToLight));
+            const float softenedLambert = 0.25f + lambert * 0.75f;
 
-        const float3 normal = normalize(input.viewNormal);
-        const float3 directionToLight = -pixelDirection;
-        const float lambert = saturate(dot(normal, directionToLight));
-        const float softenedLambert = 0.25f + lambert * 0.75f;
+            const float shadow = GetFlashlightShadow(input.shadowPos);
+            const float flashlightAmount = Light.Intensity
+                * beamProfile * naturalAttenuation * lensPattern * shadow;
 
-        const float shadow = GetFlashlightShadow(input.shadowPos);
-        const float flashlightAmount = Light.Intensity
-            * shapedCone * naturalAttenuation * lensPattern * shadow;
+            lighting += Light.Diffuse.rgb
+                * flashlightAmount
+                * softenedLambert;
 
-        lighting += Light.Diffuse.rgb
-            * flashlightAmount
-            * softenedLambert;
+            const float3 halfVector = normalize(directionToLight + viewDirection);
+            const float wetSpecular = pow(
+                saturate(dot(normal, halfVector)),
+                lerp(18.0f, 92.0f, puddle));
+            specularLighting += Light.Diffuse.rgb
+                * flashlightAmount
+                * wetSpecular
+                * lerp(0.025f, 1.15f, puddle);
 
-        const float3 halfVector = normalize(directionToLight + viewDirection);
-        const float wetSpecular = pow(
-            saturate(dot(normal, halfVector)),
-            lerp(18.0f, 92.0f, puddle));
-        specularLighting += Light.Diffuse.rgb
-            * flashlightAmount
-            * wetSpecular
-            * lerp(0.025f, 1.15f, puddle);
-
-        // Even when the exact mirror angle misses the camera, shallow water
-        // returns a broad, weak flashlight reflection instead of becoming black.
-        specularLighting += Light.Diffuse.rgb
-            * flashlightAmount
-            * puddle
-            * (0.045f + fresnel * 0.12f);
+            // Even when the exact mirror angle misses the camera, shallow water
+            // returns a broad, weak flashlight reflection instead of becoming black.
+            specularLighting += Light.Diffuse.rgb
+                * flashlightAmount
+                * puddle
+                * (0.045f + fresnel * 0.12f);
+        }
     }
 
     color.rgb *= lighting;
@@ -458,7 +438,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     const float nearSuppression =
         smoothstep(35.0f, 150.0f, distanceFromCamera);
     const float fogVariation = 0.78f +
-        saturate(FastFractalNoise3(input.worldPos.xz * 0.018f + 21.0f)) * 0.22f;
+        saturate(FastValueNoise(input.worldPos.xz * 0.018f + 21.0f)) * 0.22f;
     const float heightFog =
         heightDensity * nearSuppression * fogVariation * 0.22f;
     const float fogFactor = saturate(distanceFog + heightFog);

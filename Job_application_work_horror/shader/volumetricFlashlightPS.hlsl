@@ -129,8 +129,9 @@ float4 main(PS_IN input) : SV_Target
     const float2 dustFlow = float2(time * 0.42f, -time * 0.24f);
     const float nearDustNoise = ValueNoise(
         input.pos.xy * 0.045f + dustFlow);
-    const float farDustNoise = ValueNoise(
-        input.pos.xy * 0.019f - dustFlow * 0.57f + 19.7f);
+    // 遠い粒は補間不要のセルノイズで十分なため、4回のハッシュを1回にします。
+    const float farDustNoise = Hash(floor(
+        input.pos.xy * 0.019f - dustFlow * 0.57f + 19.7f));
     const float nearDust =
         smoothstep(0.78f, 0.96f, nearDustNoise) * 0.055f;
     const float farDust =

@@ -51,6 +51,7 @@ public:
         bool exitReady,
         int signalStep,
         bool signalActive);
+    void DrawQuietRecovery(float progressRate, float cooldown, bool success, bool tooClose);
     void DrawPause(
         int brightnessLevel,
         int effectLevel,

@@ -140,10 +140,17 @@ float4 main(PS_IN input) : SV_TARGET
         LinearSampler,
         input.uv,
         0.0f).rgb;
-    const float3 distortedScene = SceneTexture.SampleLevel(
-        LinearSampler,
-        distortedUv,
-        0.0f).rgb;
+    float3 distortedScene = sceneCenter;
+    // 通常時はdistortedUvとinput.uvが同一です。恐怖演出時だけ2回目を読み、
+    // 平常時の全画面テクスチャ参照を1回分減らします。
+    [branch]
+    if (distortionEvent > 0.001f)
+    {
+        distortedScene = SceneTexture.SampleLevel(
+            LinearSampler,
+            distortedUv,
+            0.0f).rgb;
+    }
     float3 chromaticScene = distortedScene;
     // Chromatic separation is an event effect. In normal play this uniform
     // branch saves two full-resolution texture samples per screen pixel.

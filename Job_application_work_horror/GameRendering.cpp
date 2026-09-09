@@ -76,9 +76,24 @@ namespace
             object.GetPosition() - camera.GetPosition();
         // 1/6解像度の反射では遠景の細部は判別できないため、遠方を省略します。
         // 大型の壁はradius分だけ範囲を広げ、背景が欠けないようにします。
-        const float reflectionRange = 340.0f + radius;
+        // 反射テクスチャは1/6解像度なので、遠方の小物を描いても画面上では
+        // ほぼ1画素以下です。大型の壁はradius分だけ自動的に残ります。
+        const float reflectionRange = 230.0f + radius;
         return offset.x * offset.x + offset.y * offset.y + offset.z * offset.z <=
             reflectionRange * reflectionRange;
+    }
+
+    bool ContributesToPlanarReflection(const Object& object)
+    {
+        // 当たり判定やシーン遷移トリガーはDrawが空でも仮想関数呼び出しが発生します。
+        // 水面へ実際に姿が映るオブジェクトだけを反射パスへ送ります。
+        return dynamic_cast<const Wall*>(&object) != nullptr ||
+            dynamic_cast<const Door*>(&object) != nullptr ||
+            dynamic_cast<const CeilingLight*>(&object) != nullptr ||
+            dynamic_cast<const FuseBox*>(&object) != nullptr ||
+            dynamic_cast<const Item*>(&object) != nullptr ||
+            dynamic_cast<const BatteryItem*>(&object) != nullptr ||
+            dynamic_cast<const ShadowMan*>(&object) != nullptr;
     }
 }
 
@@ -142,16 +157,32 @@ namespace Core
                 }
             }
 
-            // 平面反射はステージをもう一度描くため、通常品質では30Hzに抑えます。
-            // 水面の波・歪み・波紋は本描画側で60Hz更新されるので動きは維持されます。
-            // 60Hz反射は高品質設定だけに限定し、ゲーム全体の60fpsを優先します。
+            // 移動中は反射カメラも動くため毎フレーム更新します。静止中は反射像を
+            // 再利用し、ドアや照明の変化を拾うためだけに低頻度で更新します。
+            const DirectX::SimpleMath::Vector3 reflectionCameraPosition =
+                m_Instance->m_Camera.GetPosition();
+            const DirectX::SimpleMath::Vector3 reflectionCameraForward =
+                m_Instance->m_Camera.GetForward();
+            const DirectX::SimpleMath::Vector3 reflectionPositionDelta =
+                reflectionCameraPosition -
+                m_Instance->m_LastReflectionCameraPosition;
+            const bool reflectionCameraMoved =
+                !m_Instance->m_HasReflectionCameraPose ||
+                reflectionPositionDelta.LengthSquared() > 0.03f * 0.03f ||
+                reflectionCameraForward.Dot(
+                    m_Instance->m_LastReflectionCameraForward) < 0.99998f;
             const unsigned int minimumReflectionInterval =
-                m_Instance->m_EffectLevel >= 2
-                    ? 1u
-                    : (m_Instance->m_EffectLevel == 1 ? 2u : 4u);
-            const unsigned int reflectionInterval = (std::max)(
+                m_Instance->m_EffectLevel == 0 ? 2u : 1u;
+            const unsigned int movingReflectionInterval = (std::max)(
                 Debug::UI::GetReflectionUpdateInterval(),
                 minimumReflectionInterval);
+            const unsigned int idleReflectionInterval =
+                m_Instance->m_EffectLevel >= 2
+                    ? 3u
+                    : (m_Instance->m_EffectLevel == 1 ? 6u : 8u);
+            const unsigned int reflectionInterval = reflectionCameraMoved
+                ? movingReflectionInterval
+                : (std::max)(movingReflectionInterval, idleReflectionInterval);
             // 水面が画面へ入った最初のフレームは直ちに更新し、古い反射を見せません。
             const bool updateReflection = reflectionVisible &&
                 (!m_Instance->m_WasReflectionVisible ||
@@ -165,11 +196,7 @@ namespace Core
 
                 for (auto& o : m_Instance->m_Objects)
                 {
-                    if (o->IsDestroy() ||
-                        dynamic_cast<Ground*>(o.get()) != nullptr ||
-                        dynamic_cast<Player*>(o.get()) != nullptr ||
-                        dynamic_cast<Texture2D*>(o.get()) != nullptr ||
-                        dynamic_cast<ScreenDustOverlay*>(o.get()) != nullptr)
+                    if (o->IsDestroy() || !ContributesToPlanarReflection(*o))
                     {
                         continue;
                     }
@@ -189,6 +216,11 @@ namespace Core
 
                 m_Instance->m_PlanarReflection.End(
                     m_Instance->m_Camera);
+                m_Instance->m_LastReflectionCameraPosition =
+                    reflectionCameraPosition;
+                m_Instance->m_LastReflectionCameraForward =
+                    reflectionCameraForward;
+                m_Instance->m_HasReflectionCameraPose = true;
             }
             else
             {
@@ -200,6 +232,7 @@ namespace Core
         else
         {
             m_Instance->m_WasReflectionVisible = false;
+            m_Instance->m_HasReflectionCameraPose = false;
         }
 
         Renderer::DrawStart();

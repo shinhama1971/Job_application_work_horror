@@ -413,6 +413,7 @@ void Stage2Scene::StartCaughtSequence(Player& player)
     }
 
     m_CaughtTimer = 0.0f;
+    m_QuietRecovery.Reset();
     m_FinalPursuitTimer = 0.0f;
     m_PursuitPulseTimer = 0.0f;
     m_PursuitGazePenaltyTimer = 0.0f;

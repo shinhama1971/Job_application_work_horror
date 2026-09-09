@@ -27,6 +27,7 @@ namespace AssimpPerse
 		unsigned int VertexNum;		// 頂点数
 		unsigned int IndexBase;		// インデックスバッファのベース
 		unsigned int IndexNum;		// インデックス数
+		unsigned int IndexNum2;
 		std::string	 mtrlname;		// マテリアル名
 	};
 
@@ -37,6 +38,7 @@ namespace AssimpPerse
 		aiColor4D	Specular;		// スペキュラ
 		aiColor4D	Emission;		// エミッション
 		float		Shininess;		// シャイネス
+		float       Padding[3];		// パディング
 		std::string texturename;	// テクスチャ名
 	};
 

@@ -254,6 +254,9 @@
     <ClInclude Include="shader\flashlightShadow.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="shader\flashlightLighting.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="ScareTrigger.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -402,6 +405,9 @@
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
     <ClInclude Include="Stage2SceneConstants.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="QuietRecovery.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
     <ClInclude Include="ShadowMan.h">

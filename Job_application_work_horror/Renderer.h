@@ -183,6 +183,7 @@ public:
 	static bool CreateConstantBufferWrite(unsigned int bytesize, ID3D11Buffer** pConstantBuffer);
 
 	static void SetLight(LIGHT Light);
+	static void SetPointLight(LIGHT Light);
 	static void SetEnvironmentLights(const ENVIRONMENT_LIGHTS& lights);
 	static void SetDebugViewMode(
 		int mode, float wallDampStrength = 1.0f);

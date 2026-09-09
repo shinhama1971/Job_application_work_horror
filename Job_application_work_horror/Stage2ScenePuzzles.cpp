@@ -29,6 +29,7 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
 {
     if (m_FinalSequenceTimer >= 0.0f || m_FinalPursuitTimer > 0.0f)
     {
+        m_QuietRecovery.Reset();
         m_NoiseThreat = (std::max)(0.0f, m_NoiseThreat - deltaTime * 0.8f);
         ShadowMan* noiseShadow = Core::Game::GetInstance()->GetObj<ShadowMan>(
             "Stage2NoiseShadow");
@@ -87,6 +88,32 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
             StartCaughtSequence(player);
             return;
         }
+    }
+
+    // 初めの3周では、距離を取って消灯・静止すると足音の影を振り切れます。
+    // 信号パズルと最終追跡はそれぞれの対処法を維持します。
+    bool nearbyThreat = false;
+    if (noiseShadow != nullptr && noiseShadow->IsActive())
+    {
+        Vector3 offset = noiseShadow->GetPosition() - player.GetPosition();
+        offset.y = 0.0f;
+        nearbyThreat = offset.LengthSquared() <= 25.0f * 25.0f;
+    }
+    const bool quietEligible = m_LoopCount < 3 &&
+        m_ObservedScareTimer < 0.0f && m_LoopTransitionTimer < 0.0f &&
+        (m_NoiseThreat > 0.05f || m_QuietRecovery.progress > 0.0f ||
+            (noiseShadow != nullptr && noiseShadow->IsActive()));
+    if (m_QuietRecovery.Update(deltaTime, quietEligible,
+        !player.IsMovingHorizontally(), !player.IsFlashlightOn(), nearbyThreat))
+    {
+        m_NoiseThreat = (std::max)(0.0f, m_NoiseThreat - 0.45f);
+        if (noiseShadow != nullptr) noiseShadow->SetActive(false);
+        m_NoiseStalkerCooldown = (std::max)(m_NoiseStalkerCooldown, 8.0f);
+        m_NoiseWarningTimer = 0.0f;
+        // 成功時は強いフラッシュを避け、視界の落ち着きで成功を伝えます。
+        game->GetPostProcess()->TriggerHorrorPulse(0.08f, 0.16f);
+        game->GetPostProcess()->TriggerBloomPulse(0.18f, 0.16f);
+        Input::SetVibration(2, 0.06f);
     }
 
     const bool canSpawnNoiseStalker =
@@ -178,6 +205,7 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
 
 void Stage2Scene::AdvanceLoop(Player& player)
 {
+    m_QuietRecovery.Reset();
     Core::Game* game = Core::Game::GetInstance();
     ++m_LoopCount;
     m_LoopCooldown = 1.0f;

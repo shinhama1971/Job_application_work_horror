@@ -52,8 +52,8 @@ namespace
     int g_FrameTimeOffset = 0;
     int g_DebugViewMode = 0;
     bool g_AdaptiveReflectionQuality = true;
-    int g_ReflectionPresetIndex = 1;
-    int g_ActiveReflectionInterval = 2;
+    int g_ReflectionPresetIndex = 0;
+    int g_ActiveReflectionInterval = 1;
     float g_LowFpsTimer = 0.0f;
     float g_RecoveryFpsTimer = 0.0f;
 
@@ -474,8 +474,9 @@ unsigned int Debug::UI::GetReflectionUpdateInterval()
 #if defined(ENABLE_IMGUI)
     return static_cast<unsigned int>(g_ActiveReflectionInterval);
 #else
-    // 提出版は全体60fpsを優先し、重い平面反射だけ30Hzで更新します。
-    return 2u;
+    // 1/6解像度と反射専用カリングにより、移動中は滑らかな60Hzを優先します。
+    // 静止中の間引きはGameRendering側で行います。
+    return 1u;
 #endif
 }
 

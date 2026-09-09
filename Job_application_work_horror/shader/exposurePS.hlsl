@@ -38,25 +38,19 @@ float4 main(PS_IN input) : SV_TARGET
     uint sceneHeight;
     sceneTexture.GetDimensions(sceneWidth, sceneHeight);
     const float2 texelSize = rcp(float2(sceneWidth, sceneHeight));
-    const float2 localOffset = texelSize * 6.0f;
+    const float2 localOffset = texelSize * 5.0f;
+    // 中心と対角2点で局所輝度を取ります。十字5点との差は暗部判定では
+    // 小さく、全画面パスのテクスチャ読取りを40%削減できます。
     const float3 localAverage =
         (scene +
          sceneTexture.SampleLevel(
             sceneSampler,
-            saturate(input.uv + float2(localOffset.x, 0.0f)),
+            saturate(input.uv + localOffset),
             0.0f).rgb +
          sceneTexture.SampleLevel(
             sceneSampler,
-            saturate(input.uv - float2(localOffset.x, 0.0f)),
-            0.0f).rgb +
-         sceneTexture.SampleLevel(
-            sceneSampler,
-            saturate(input.uv + float2(0.0f, localOffset.y)),
-            0.0f).rgb +
-         sceneTexture.SampleLevel(
-            sceneSampler,
-            saturate(input.uv - float2(0.0f, localOffset.y)),
-            0.0f).rgb) * 0.20f;
+            saturate(input.uv - localOffset),
+            0.0f).rgb) * (1.0f / 3.0f);
 
     // A power surge briefly blooms the image during event pulses. The clamp
     // prevents eye adaptation from washing out UI drawn after this pass.

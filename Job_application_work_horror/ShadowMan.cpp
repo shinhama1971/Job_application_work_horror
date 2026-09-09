@@ -23,7 +23,7 @@ void ShadowMan::Init()
 	m_IsActive = true;
 	m_DeactivateOnExpire = false;
 	m_OnObserved = nullptr;
-	m_LifeTimer = 120;
+	m_LifeTimer = 240;
 	m_ChaseSpeed = 0.0f;
 	m_ChaseStopDistance = 28.0f;
 

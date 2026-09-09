@@ -299,6 +299,7 @@
     <ClInclude Include="StageScene.h" />
     <ClInclude Include="Stage2Scene.h" />
     <ClInclude Include="Stage2SceneConstants.h" />
+    <ClInclude Include="QuietRecovery.h" />
     <ClInclude Include="StaticMesh.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Texture.h" />
@@ -309,6 +310,7 @@
     <ClInclude Include="Wall.h" />
     <ClInclude Include="shader\fastNoise.hlsli" />
     <ClInclude Include="shader\flashlightShadow.hlsli" />
+    <ClInclude Include="shader\flashlightLighting.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="shader\wetFloorPS.hlsl">
