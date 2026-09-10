@@ -43,8 +43,8 @@ void Stage2Scene::Draw(Camera* camera)
         (m_LoopCount == 1 || m_LoopCount == 2) &&
         confirmationPanel != nullptr &&
         !confirmationPanel->IsActivated() &&
-        ((m_LoopCount == 1 && m_FalseDoorMoved) ||
-         (m_LoopCount == 2 && m_ClockObservedThisLoop));
+        ((m_LoopCount == 1 && m_FalseDoorAnomaly.HasMoved()) ||
+         (m_LoopCount == 2 && m_ClockAnomaly.WasObservedThisLoop()));
     constexpr std::string_view closedLoopObjectives[] =
     {
         "奥のドアを開ける 1回目",
@@ -66,13 +66,13 @@ void Stage2Scene::Draw(Camera* camera)
             ? openLoopObjectives[loopIndex]
             : closedLoopObjectives[loopIndex];
     }
-    if (m_LoopCount == 1 && !m_FalseDoorMoved)
+    if (m_LoopCount == 1 && !m_FalseDoorAnomaly.HasMoved())
     {
-        objective = m_FalseDoorObserved
+        objective = m_FalseDoorAnomaly.WasObserved()
             ? "偽物のドアから視線を外す"
             : "懐中電灯で左の偽物のドアを照らす";
     }
-    else if (m_LoopCount == 2 && !m_ClockObservedThisLoop)
+    else if (m_LoopCount == 2 && !m_ClockAnomaly.WasObservedThisLoop())
     {
         objective = "ライトを消して左の時計を見る";
     }
@@ -80,15 +80,15 @@ void Stage2Scene::Draw(Camera* camera)
     {
         objective = "奥の異常確認スイッチを押す";
     }
-    else if (m_LoopCount >= 3 && !m_SignalPuzzleComplete)
+    else if (m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete())
     {
-        if (m_SignalStep == 0)
+        if (m_SignalPuzzle.GetStep() == 0)
         {
-            objective = m_PuzzleMistakeCount >= 2
+            objective = m_PuzzleFeedback.GetMistakeCount() >= 2
                 ? "再試行補助中 奥の青い信号盤からやり直す"
                 : "信号復旧 まず奥の青い信号盤を操作する";
         }
-        else if (m_SignalStep == 1)
+        else if (m_SignalPuzzle.GetStep() == 1)
         {
             objective = "信号復旧 黄色へ戻る 背後の影はライトで追い払う";
         }
@@ -101,11 +101,11 @@ void Stage2Scene::Draw(Camera* camera)
     {
         objective = "脱出中";
     }
-    else if (m_GazeNoticeTimer > 0.0f)
+    else if (m_ObservedScareSequence.GetNoticeTimer() > 0.0f)
     {
         objective = "止まらず奥のドアへ進む";
     }
-    else if (m_CaughtTimer >= 0.0f)
+    else if (m_CaughtSequence.IsActive())
     {
         objective = "捕まった チェックポイントへ戻る";
     }
@@ -131,27 +131,27 @@ void Stage2Scene::Draw(Camera* camera)
     }
     else if (m_SignalNoticeTimer > 0.0f)
     {
-        if (m_SignalPuzzleComplete)
+        if (m_SignalPuzzle.IsComplete())
         {
             objective = "信号復旧完了 廊下の中央へ進む";
         }
-        else if (m_PuzzleFeedbackType == 3)
+        else if (m_PuzzleFeedback.GetType() == 3)
         {
             objective = "順番が違う 青からやり直す";
         }
-        else if (m_PuzzleFeedbackType == 4)
+        else if (m_PuzzleFeedback.GetType() == 4)
         {
             objective = "走る音で同期が切れた 歩いて青からやり直す";
         }
-        else if (m_PuzzleFeedbackType == 5)
+        else if (m_PuzzleFeedback.GetType() == 5)
         {
             objective = "影に追いつかれた 青からやり直す";
         }
-        else if (m_PuzzleFeedbackType == 6)
+        else if (m_PuzzleFeedback.GetType() == 6)
         {
             objective = "影を追い払った 次の信号盤へ進む";
         }
-        else if (m_SignalStep == 1)
+        else if (m_SignalPuzzle.GetStep() == 1)
         {
             objective = "青を確認 黄色へ戻る 背後に注意";
         }
@@ -160,7 +160,7 @@ void Stage2Scene::Draw(Camera* camera)
             objective = "黄色を確認 赤へ戻る 背後に注意";
         }
     }
-    else if (m_NoiseStalkerNoticeTimer > 0.0f)
+    else if (m_NoiseThreatSystem.GetStalkerNoticeTimer() > 0.0f)
     {
         ShadowMan* noiseShadow =
             game->GetObj<ShadowMan>("Stage2NoiseShadow");
@@ -168,39 +168,39 @@ void Stage2Scene::Draw(Camera* camera)
             ? "水音を聞いた影が来る 振り返ってライトを当てる"
             : "影を追い払った 静かに進む";
     }
-    else if (m_WetStepNoticeTimer > 0.0f)
+    else if (m_NoiseThreatSystem.GetWetStepNoticeTimer() > 0.0f)
     {
         objective = "水音が廊下に響いた 水たまりは歩いて渡る";
     }
-    else if (m_NoiseWarningTimer > 0.0f)
+    else if (m_NoiseThreatSystem.GetWarningTimer() > 0.0f)
     {
         objective = "足音が響いている 歩いて静める";
     }
-    else if (m_PuzzleFeedbackTimer > 0.0f)
+    else if (m_PuzzleFeedback.IsVisible())
     {
-        if (m_PuzzleFeedbackType == 5)
+        if (m_PuzzleFeedback.GetType() == 5)
         {
             objective = "影に追いつかれた 青からやり直す";
         }
-        else if (m_PuzzleFeedbackType == 6)
+        else if (m_PuzzleFeedback.GetType() == 6)
         {
             objective = "影を追い払った 次の信号盤へ進む";
         }
-        else if (m_PuzzleMistakeCount >= 3)
+        else if (m_PuzzleFeedback.GetMistakeCount() >= 3)
         {
             objective = "照明が消えた 正しい方法を試す";
         }
         else
         {
-            if (m_PuzzleFeedbackType == 1)
+            if (m_PuzzleFeedback.GetType() == 1)
             {
                 objective = "光が必要だ 懐中電灯でドアを照らす";
             }
-            else if (m_PuzzleFeedbackType == 2)
+            else if (m_PuzzleFeedback.GetType() == 2)
             {
                 objective = "光が邪魔だ 懐中電灯を消して時計を見る";
             }
-            else if (m_PuzzleFeedbackType == 3)
+            else if (m_PuzzleFeedback.GetType() == 3)
             {
                 objective = "信号の順番が違う 青からやり直す";
             }
@@ -210,17 +210,17 @@ void Stage2Scene::Draw(Camera* camera)
             }
         }
     }
-    else if (m_PursuitGazePenaltyTimer > 0.0f)
+    else if (m_FinalSequence.HasGazePenalty())
     {
         objective = "それを見てはいけない";
     }
-    else if (m_FinalSequenceTimer >= 0.0f && !m_FinalDoorReady)
+    else if (m_FinalSequence.IsSequenceActive() && !m_FinalDoorReady)
     {
         objective = Input::IsControllerConnected()
             ? "左スティック押し込みで出口まで走る"
             : "SHIFTを押して出口まで走る";
     }
-    else if (m_FinalPursuitTimer > 0.0f)
+    else if (m_FinalSequence.IsPursuitActive())
     {
         objective = Input::IsControllerConnected()
             ? "左スティック押し込みで出口まで走る"
@@ -232,48 +232,48 @@ void Stage2Scene::Draw(Camera* camera)
             ? "奥のドアを開ける"
             : "開いた出口を通り抜ける";
     }
-    else if (m_ScratchNoticeTimer > 0.0f)
+    else if (m_ScratchAnomaly.GetNoticeTimer() > 0.0f)
     {
         objective = "止まらず奥のドアへ進む";
     }
-    else if (m_FalseDoorNoticeTimer > 0.0f)
+    else if (m_FalseDoorAnomaly.GetNoticeTimer() > 0.0f)
     {
         objective = "異常を確認した 奥のスイッチへ進む";
     }
-    else if (m_ClockNoticeTimer > 0.0f)
+    else if (m_ClockAnomaly.GetNoticeTimer() > 0.0f)
     {
         objective = m_LoopCount == 2
             ? "逆回転を確認した 奥のスイッチへ進む"
             : "時計の時刻が変わった";
     }
-    else if (m_PortraitNoticeTimer > 0.0f)
+    else if (m_PortraitAnomaly.GetNoticeTimer() > 0.0f)
     {
         objective = "止まらず奥のドアへ進む";
     }
     else if (m_NoticeTimer > 0.0f)
     {
         if (m_LoopCount == 0) objective = "1回目 奥のドアを開ける";
-        else if (m_LoopCount == 1) objective = m_FalseDoorMoved
+        else if (m_LoopCount == 1) objective = m_FalseDoorAnomaly.HasMoved()
             ? (m_ConfirmationHandledThisLoop
                 ? "鍵が開いた 奥のドアへ進む"
                 : "奥の異常確認スイッチを押す")
             : "2回目 廊下の変化を探す";
-        else if (m_LoopCount == 2) objective = m_ClockObservedThisLoop
+        else if (m_LoopCount == 2) objective = m_ClockAnomaly.WasObservedThisLoop()
             ? (m_ConfirmationHandledThisLoop
                 ? "鍵が開いた 後ろを見ずに進む"
                 : "奥の異常確認スイッチを押す")
             : "3回目 左の時計を調べる";
-        else objective = m_SignalPuzzleComplete
+        else objective = m_SignalPuzzle.IsComplete()
             ? "信号が復旧した 廊下の中央へ進む"
             : "奥の青い信号盤から復旧する";
     }
     else if (m_ProgressHintTimer >= 30.0f)
     {
-        if (m_LoopCount == 1 && !m_FalseDoorMoved)
+        if (m_LoopCount == 1 && !m_FalseDoorAnomaly.HasMoved())
         {
             objective = "ヒント ライトで偽物のドアを照らして視線を外す";
         }
-        else if (m_LoopCount == 2 && !m_ClockObservedThisLoop)
+        else if (m_LoopCount == 2 && !m_ClockAnomaly.WasObservedThisLoop())
         {
             objective = "ヒント ライトを消して左の時計を正面から見る";
         }
@@ -281,11 +281,11 @@ void Stage2Scene::Draw(Camera* camera)
         {
             objective = "ヒント 奥の壁にある赤い確認スイッチを押す";
         }
-        else if (m_LoopCount >= 3 && !m_SignalPuzzleComplete)
+        else if (m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete())
         {
-            objective = m_SignalStep == 0
+            objective = m_SignalPuzzle.GetStep() == 0
                 ? "ヒント 青は廊下の奥の右壁"
-                : m_SignalStep == 1
+                : m_SignalPuzzle.GetStep() == 1
                     ? "ヒント 黄色は中央左 影は振り返ってライトを当てる"
                     : "ヒント 赤は入口右 影は振り返ってライトを当てる";
         }
@@ -310,13 +310,13 @@ void Stage2Scene::Draw(Camera* camera)
     }
     else if (m_ProgressHintTimer >= 15.0f)
     {
-        if (m_LoopCount == 1 && !m_FalseDoorMoved)
+        if (m_LoopCount == 1 && !m_FalseDoorAnomaly.HasMoved())
         {
-            objective = m_FalseDoorObserved
+            objective = m_FalseDoorAnomaly.WasObserved()
                 ? "ヒント 偽物のドアから視線を外す"
                 : "ヒント ライトを点け前方左側の壁を探す";
         }
-        else if (m_LoopCount == 2 && !m_ClockObservedThisLoop)
+        else if (m_LoopCount == 2 && !m_ClockAnomaly.WasObservedThisLoop())
         {
             objective = "ヒント ライトを消して左の時計を見る";
         }
@@ -324,7 +324,7 @@ void Stage2Scene::Draw(Camera* camera)
         {
             objective = "ヒント ドア手前の確認スイッチへ進む";
         }
-        else if (m_LoopCount >= 3 && !m_SignalPuzzleComplete)
+        else if (m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete())
         {
             objective = "ヒント 発光している信号盤を 青 黄 赤 の順で操作する";
         }
@@ -352,14 +352,15 @@ void Stage2Scene::Draw(Camera* camera)
 
     m_Hud.Draw(*player, -1, m_InteractionSystem.GetPrompt(), objective);
     float threatRate = 0.0f;
-    threatRate = (std::max)(threatRate, m_NoiseThreat * 0.78f);
+    threatRate = (std::max)(
+        threatRate, m_NoiseThreatSystem.GetThreat() * 0.78f);
     if (m_LoopCount == 1 || m_LoopCount == 2)
     {
         const float observationDanger =
-            static_cast<float>(m_PuzzleMistakeCount) / 3.0f;
+            static_cast<float>(m_PuzzleFeedback.GetMistakeCount()) / 3.0f;
         threatRate = (std::max)(threatRate, observationDanger * 0.72f);
     }
-    if (m_FinalPursuitTimer > 0.0f)
+    if (m_FinalSequence.IsPursuitActive())
     {
         ShadowMan* shadow = game->GetObj<ShadowMan>("Stage2Shadow");
         if (shadow != nullptr)
@@ -382,17 +383,19 @@ void Stage2Scene::Draw(Camera* camera)
         threatRate = (std::max)(threatRate, noiseShadowDanger);
     }
     if (m_VisualTimer >= 4.20f &&
-        m_CaughtTimer < 0.0f &&
+        !m_CaughtSequence.IsActive() &&
         (exit == nullptr || !exit->IsEscaping()))
     {
         m_Hud.DrawStage2Status(
             m_LoopCount, threatRate, m_FinalDoorReady,
-            m_SignalStep,
-            m_LoopCount >= 3 && !m_SignalPuzzleComplete);
-        if (m_LoopCount < 3 && m_ObservedScareTimer < 0.0f &&
-            m_FinalPursuitTimer <= 0.0f && m_FinalSequenceTimer < 0.0f &&
+            m_SignalPuzzle.GetStep(),
+            m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete());
+        if (m_LoopCount < 3 && !m_ObservedScareSequence.IsActive() &&
+            !m_FinalSequence.IsPursuitActive() &&
+            !m_FinalSequence.IsSequenceActive() &&
             m_LoopTransitionTimer < 0.0f &&
-            (m_NoiseThreat > 0.25f || m_QuietRecovery.progress > 0.0f ||
+            (m_NoiseThreatSystem.GetThreat() > 0.25f ||
+                m_QuietRecovery.progress > 0.0f ||
                 m_QuietRecovery.successNotice > 0.0f || m_QuietRecovery.cooldown > 0.0f))
         {
             m_Hud.DrawQuietRecovery(
@@ -402,17 +405,17 @@ void Stage2Scene::Draw(Camera* camera)
         }
     }
     if (m_VisualTimer >= 4.20f &&
-        m_CaughtTimer < 0.0f &&
+        !m_CaughtSequence.IsActive() &&
         (exit == nullptr || !exit->IsEscaping()))
     {
         Vector3 guideTarget = finalDoor != nullptr
             ? finalDoor->GetPosition()
             : Vector3(0.0f, -74.0f, 140.0f);
-        if (m_LoopCount == 1 && !m_FalseDoorMoved)
+        if (m_LoopCount == 1 && !m_FalseDoorAnomaly.HasMoved())
         {
             guideTarget = Vector3(-38.3f, -72.0f, 70.0f);
         }
-        else if (m_LoopCount == 2 && !m_ClockObservedThisLoop)
+        else if (m_LoopCount == 2 && !m_ClockAnomaly.WasObservedThisLoop())
         {
             guideTarget = Vector3(-38.0f, -70.0f, -25.0f);
         }
@@ -420,13 +423,13 @@ void Stage2Scene::Draw(Camera* camera)
         {
             guideTarget = Vector3(35.5f, -90.0f, 112.0f);
         }
-        else if (m_LoopCount >= 3 && !m_SignalPuzzleComplete)
+        else if (m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete())
         {
-            if (m_SignalStep == 0)
+            if (m_SignalPuzzle.GetStep() == 0)
             {
                 guideTarget = Vector3(35.5f, -90.0f, 82.0f);
             }
-            else if (m_SignalStep == 1)
+            else if (m_SignalPuzzle.GetStep() == 1)
             {
                 guideTarget = Vector3(-35.5f, -90.0f, 18.0f);
             }
@@ -478,10 +481,9 @@ void Stage2Scene::Draw(Camera* camera)
         m_Hud.DrawBlink(blinkRate * blinkRate * 0.90f);
     }
 
-    if (m_CaughtTimer >= 0.0f)
+    if (m_CaughtSequence.IsActive())
     {
-        const float caughtFade = (std::clamp)(
-            m_CaughtTimer / 0.34f, 0.0f, 1.0f);
+        const float caughtFade = m_CaughtSequence.GetFadeRate();
         m_Hud.DrawBlink(caughtFade * 0.96f);
     }
 

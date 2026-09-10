@@ -28,6 +28,13 @@ public:
 	virtual void Draw(Camera* cam) = 0;
 	virtual void DrawShadow() {}
 	virtual bool CastsShadow() const { return false; }
+	// 描画パスへの参加可否は型判定ではなく各Object自身が宣言します。
+	virtual bool UsesCameraCulling() const { return false; }
+	virtual bool ContributesToPlanarReflection() const { return false; }
+	virtual bool IsPlanarReflectionSurfaceVisible(const Camera&) const
+	{
+		return false;
+	}
 	virtual void Uninit() = 0;
 
 	void SetPosition(DirectX::SimpleMath::Vector3 pos) { m_Position = pos; }

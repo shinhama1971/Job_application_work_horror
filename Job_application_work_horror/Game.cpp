@@ -21,7 +21,7 @@ namespace Core
     Game::Game()
     {
         LoadBestRecord();
-        LoadSettings();
+        m_Settings.Load();
     }
 
     Game::~Game()
@@ -56,17 +56,17 @@ namespace Core
         m_Instance->m_Camera.SetLookSensitivityScale(
             0.60f +
             static_cast<float>(
-                m_Instance->m_LookSensitivityLevel) * 0.20f);
+                m_Instance->m_Settings.GetLookSensitivityLevel()) * 0.20f);
 
         m_Instance->m_PlanarReflection.Init();
         m_Instance->m_ShadowMap.Init();
         m_Instance->m_PostProcess.Init();
         m_Instance->m_PostProcess.SetUserBrightnessOffset(
             static_cast<float>(
-                m_Instance->m_BrightnessLevel - 2) * 0.055f);
+                m_Instance->m_Settings.GetBrightnessLevel() - 2) * 0.055f);
         constexpr float effectScales[] = { 0.70f, 1.0f, 1.25f };
         m_Instance->m_PostProcess.SetUserEffectScale(
-            effectScales[m_Instance->m_EffectLevel]);
+            effectScales[m_Instance->m_Settings.GetEffectLevel()]);
         m_Instance->ChangeScene(SceneName::Title);
     }
 
@@ -133,16 +133,14 @@ namespace Core
                 m_Instance->m_PauseSettingIndex == 0)
             {
                 const int newBrightnessLevel = (std::clamp)(
-                    m_Instance->m_BrightnessLevel + settingDelta,
+                    m_Instance->m_Settings.GetBrightnessLevel() + settingDelta,
                     0, 4);
-                if (newBrightnessLevel !=
-                    m_Instance->m_BrightnessLevel)
+                if (m_Instance->m_Settings.SetBrightnessLevel(
+                    newBrightnessLevel))
                 {
-                    m_Instance->m_BrightnessLevel =
-                        newBrightnessLevel;
                     const float brightnessOffset =
                         static_cast<float>(
-                            m_Instance->m_BrightnessLevel - 2) *
+                            m_Instance->m_Settings.GetBrightnessLevel() - 2) *
                         0.055f;
                     m_Instance->m_PostProcess.SetUserBrightnessOffset(
                         brightnessOffset);
@@ -153,16 +151,16 @@ namespace Core
                 m_Instance->m_PauseSettingIndex == 1)
             {
                 const int newEffectLevel = (std::clamp)(
-                    m_Instance->m_EffectLevel + settingDelta, 0, 2);
-                if (newEffectLevel != m_Instance->m_EffectLevel)
+                    m_Instance->m_Settings.GetEffectLevel() + settingDelta,
+                    0, 2);
+                if (m_Instance->m_Settings.SetEffectLevel(newEffectLevel))
                 {
-                    m_Instance->m_EffectLevel = newEffectLevel;
                     constexpr float effectScales[] =
                     {
                         0.70f, 1.0f, 1.25f
                     };
                     m_Instance->m_PostProcess.SetUserEffectScale(
-                        effectScales[m_Instance->m_EffectLevel]);
+                        effectScales[m_Instance->m_Settings.GetEffectLevel()]);
                     settingChanged = true;
                 }
             }
@@ -170,17 +168,15 @@ namespace Core
                 m_Instance->m_PauseSettingIndex == 2)
             {
                 const int newSensitivityLevel = (std::clamp)(
-                    m_Instance->m_LookSensitivityLevel +
+                    m_Instance->m_Settings.GetLookSensitivityLevel() +
                     settingDelta, 0, 4);
-                if (newSensitivityLevel !=
-                    m_Instance->m_LookSensitivityLevel)
+                if (m_Instance->m_Settings.SetLookSensitivityLevel(
+                    newSensitivityLevel))
                 {
-                    m_Instance->m_LookSensitivityLevel =
-                        newSensitivityLevel;
                     m_Instance->m_Camera.SetLookSensitivityScale(
                         0.60f +
                         static_cast<float>(
-                            m_Instance->m_LookSensitivityLevel) *
+                            m_Instance->m_Settings.GetLookSensitivityLevel()) *
                         0.20f);
                     settingChanged = true;
                 }
@@ -188,17 +184,17 @@ namespace Core
             else if (settingDelta != 0)
             {
                 const int newVolumeLevel = (std::clamp)(
-                    m_Instance->m_VolumeLevel + settingDelta, 0, 4);
-                if (newVolumeLevel != m_Instance->m_VolumeLevel)
+                    m_Instance->m_Settings.GetVolumeLevel() + settingDelta,
+                    0, 4);
+                if (m_Instance->m_Settings.SetVolumeLevel(newVolumeLevel))
                 {
-                    m_Instance->m_VolumeLevel = newVolumeLevel;
                     m_Instance->ApplyAudioVolume(true);
                     settingChanged = true;
                 }
             }
             if (settingChanged)
             {
-                m_Instance->SaveSettings();
+                m_Instance->m_Settings.Save();
                 Input::SetVibration(2, 0.045f);
                 if (m_Instance->m_PauseSettingIndex == 3)
                 {
@@ -246,7 +242,7 @@ namespace Core
 
         if (gameplayScene)
         {
-            m_Instance->m_RunTimeSeconds += 1.0f / 60.0f;
+            m_Instance->m_State.AddRunTime(1.0f / 60.0f);
         }
 
 
@@ -261,47 +257,12 @@ namespace Core
         m_Instance->m_PostProcess.Update();
 
 
-        for (auto& o : m_Instance->m_Objects)
-        {
-            if (!o->IsDestroy())
-            {
-                o->Update();
-            }
-        }
-
-        // Remove lookup entries before their owning unique_ptr objects are
-        // erased. This also keeps GetObj safe when an object destroys itself.
-        for (auto it = m_Instance->m_NamedObjects.begin();
-            it != m_Instance->m_NamedObjects.end();)
-        {
-            Object* object = it->second;
-            if (object == nullptr || object->IsDestroy())
-            {
-                it = m_Instance->m_NamedObjects.erase(it);
-            }
-            else
-            {
-                ++it;
-            }
-        }
-
-        std::erase_if(
-            m_Instance->m_Objects,
-            [](const std::unique_ptr<Object>& o)
-            {
-                if (o->IsDestroy())
-                {
-                    o->Uninit();
-                    return true;
-                }
-
-                return false;
-            }
-        );
+        m_Instance->m_ObjectManager.UpdateAll();
+        m_Instance->m_ObjectManager.RemoveDestroyed();
 
         if (m_Instance->m_PendingScene.has_value())
         {
-            m_Instance->m_PendingObjectCommands.clear();
+            m_Instance->m_ObjectManager.ClearPendingCommands();
 
             const SceneName nextScene =
                 m_Instance->m_PendingScene.value();
@@ -311,15 +272,7 @@ namespace Core
             return;
         }
 
-        auto pendingCommands =
-            std::move(m_Instance->m_PendingObjectCommands);
-
-        m_Instance->m_PendingObjectCommands.clear();
-
-        for (auto& command : pendingCommands)
-        {
-            command();
-        }
+        m_Instance->m_ObjectManager.FlushPendingCommands();
     }
 
     // 生成と逆順に解放します。unique_ptr/ComPtr所有物はresetで確実に破棄されます。
@@ -331,13 +284,7 @@ namespace Core
 
         m_Instance->m_Scene.reset();
 
-        for (auto& o : m_Instance->m_Objects)
-        {
-            o->Uninit();
-        }
-
-        m_Instance->m_Objects.clear();
-        m_Instance->m_NamedObjects.clear();
+        m_Instance->m_ObjectManager.DeleteAll();
         m_Instance->m_PostProcess.Uninit();
         m_Instance->m_ShadowMap.Uninit();
         m_Instance->m_PlanarReflection.Uninit();
@@ -379,20 +326,7 @@ namespace Core
         const SceneName previousScene = m_CurrentScene;
         if (sName == SceneName::Result)
         {
-            m_LastClearTimeSeconds = m_RunTimeSeconds;
-            m_LastRunBestTime = !m_HasClearRecord ||
-                m_LastClearTimeSeconds < m_BestClearTimeSeconds;
-            m_LastRunBestCaught = !m_HasClearRecord ||
-                m_CaughtCount < m_BestCaughtCount;
-            if (m_LastRunBestTime)
-            {
-                m_BestClearTimeSeconds = m_LastClearTimeSeconds;
-            }
-            if (m_LastRunBestCaught)
-            {
-                m_BestCaughtCount = m_CaughtCount;
-            }
-            m_HasClearRecord = true;
+            m_State.CompleteRun();
             SaveBestRecord();
         }
 
@@ -414,22 +348,12 @@ namespace Core
             break;
 
         case SceneName::Stage:
-            m_ItemCount = 0;
-            m_PowerRestored = false;
-            m_RunTimeSeconds = 0.0f;
-            m_CaughtCount = 0;
-            m_AnomaliesHandled = 0;
-            m_PuzzleMistakes = 0;
-            m_ChargersUsed = 0;
-            m_EvidenceCollected = 0;
-            m_LastRunBestTime = false;
-            m_LastRunBestCaught = false;
+            m_State.BeginRun();
             m_Scene = std::make_unique<StageScene>();
             break;
 
         case SceneName::Stage2:
-            m_ItemCount = 3;
-            m_PowerRestored = true;
+            m_State.EnterStage2();
             m_Scene = std::make_unique<Stage2Scene>();
             break;
 
@@ -458,49 +382,16 @@ namespace Core
 
     void Game::DeleteObject(Object* pt)
     {
-        if (pt == nullptr) return;
-
-        pt->Destroy();
-
-        for (auto it = m_NamedObjects.begin(); it != m_NamedObjects.end();)
-        {
-            if (it->second == pt)
-            {
-                it = m_NamedObjects.erase(it);
-            }
-            else
-            {
-                ++it;
-            }
-        }
+        m_ObjectManager.DeleteObject(pt);
     }
 
     void Game::DestroyObj(const std::string& name)
     {
-        auto it = m_NamedObjects.find(name);
-
-        if (it == m_NamedObjects.end())
-        {
-            return;
-        }
-
-        if (it->second != nullptr)
-        {
-            it->second->Destroy();
-        }
-
-        m_NamedObjects.erase(it);
+        m_ObjectManager.DestroyNamedObject(name);
     }
 
     void Game::DeleteAllObject()
     {
-        for (auto& o : m_Objects)
-        {
-            o->Uninit();
-        }
-
-        m_Objects.clear();
-
-        m_NamedObjects.clear();
+        m_ObjectManager.DeleteAll();
     }
 }

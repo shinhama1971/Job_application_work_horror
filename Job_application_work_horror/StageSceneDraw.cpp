@@ -40,7 +40,7 @@ void StageScene::Draw(Camera* camera)
     FuseBox* exitPowerPanel = game->GetObj<FuseBox>("ExitPowerPanel");
     const bool exitPowerActivated =
         exitPowerPanel != nullptr && exitPowerPanel->IsActivated();
-    const bool exitPowerReady = m_ExitPowerSequenceComplete;
+    const bool exitPowerReady = m_PowerSequence.IsExitComplete();
 
     const int fuseCount = game->GetItemCount();
     std::string_view objectiveText;
@@ -94,17 +94,17 @@ void StageScene::Draw(Camera* camera)
             ? "影を正面から懐中電灯で照らす"
             : "影が光の中へ消えた";
     }
-    else if (m_ExitOmenTimer > 0.0f)
+    else if (m_ExitOmenSequence.GetTimer() > 0.0f)
     {
-        objectiveText = m_ExitOmenTimer > 1.75f
+        objectiveText = m_ExitOmenSequence.GetTimer() > 1.75f
             ? "何かが待っている"
             : "立ち止まらず進む";
     }
     else if (game->IsPowerRestored() &&
-        m_PowerRestoreTimer >= 0.0f &&
-        m_PowerRestoreTimer < 4.5f)
+        m_PowerSequence.IsRestoreActive() &&
+        m_PowerSequence.GetRestoreTimer() < 4.5f)
     {
-        objectiveText = m_PowerRestoreTimer < 1.55f
+        objectiveText = m_PowerSequence.GetRestoreTimer() < 1.55f
             ? "電力が復旧した"
             : "出口側の非常送電盤へ向かう";
     }
@@ -112,9 +112,9 @@ void StageScene::Draw(Camera* camera)
     {
         objectiveText = "非常電源を送電中";
     }
-    else if (m_ScareMessageTimer > 0.0f)
+    else if (m_ScareLightSequence.GetNoticeTimer() > 0.0f)
     {
-        objectiveText = m_ScareMessageTimer > 2.65f
+        objectiveText = m_ScareLightSequence.GetNoticeTimer() > 2.65f
             ? "何かに見られている"
             : "点灯した照明をたどる";
     }
@@ -279,4 +279,3 @@ void StageScene::Draw(Camera* camera)
             game->GetCaughtCount());
     }
 }
-

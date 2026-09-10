@@ -55,15 +55,9 @@ void Player::Init()
 
     m_Position = Vector3(0.0f, -80.0f, 0.0f);
     m_Scale = Vector3(1.0f, 1.0f, 1.0f);
-    m_Velocity = Vector3::Zero;
-    m_Stamina = MAX_STAMINA;
-    m_StaminaRecoveryDelay = 0.0f;
-    m_SprintExhausted = false;
-    m_BatteryNoticeTimer = 0.0f;
-    m_LowBatteryWarningLevel = 0;
-    m_WasFlashlightVoltageDrop = false;
+    m_Movement.Initialize();
+    m_Flashlight.InitializeRuntimeNotifications();
     m_FlashlightNearSurfaceBlend = 0.0f;
-    m_FlashlightPowerBlend = m_FlashLightOn ? 1.0f : 0.0f;
     m_FootstepTimer = 0.0f;
     m_FootstepIndex = 0;
     m_SurfaceNoisePulse = 0.0f;
@@ -79,15 +73,14 @@ void Player::Update()
     m_SurfaceNoisePulse = 0.0f;
     if (!m_CanControl)
     {
-        m_IsSprinting = false;
+        m_Movement.StopControl();
         return;
     }
 
     Camera* cam = Core::Game::GetInstance()->GetCamera();
     constexpr float deltaTime = 1.0f / 60.0f;//今60湖底
     m_AmbienceTimer += deltaTime;
-    m_BatteryNoticeTimer = (std::max)(
-        0.0f, m_BatteryNoticeTimer - deltaTime);
+    m_Flashlight.TickNotice(deltaTime);
 
     float yaw = cam->GetCameraDirection();
 
@@ -105,80 +98,21 @@ void Player::Update()
     moveDir += right * leftStick.x;
     moveDir += forward * leftStick.y;
 
-    const float moveLengthSquared = moveDir.LengthSquared();
-    const bool isMoving = moveLengthSquared > 0.0001f;
     const bool wantsToSprint =
         Input::GetKeyPress(VK_SHIFT) ||
         Input::GetButtonPress(XINPUT_LEFT_THUMB);
-
-    if (m_SprintExhausted && m_Stamina >= MAX_STAMINA * 0.30f)
+    if (m_Movement.Update(moveDir, wantsToSprint, deltaTime))
     {
-        m_SprintExhausted = false;
+        Input::SetVibration(5, 0.10f);
     }
-
-    m_IsSprinting = isMoving && wantsToSprint &&
-        !m_SprintExhausted && m_Stamina > 0.0f;
-    if (m_IsSprinting)
-    {
-        m_Stamina = (std::max)(
-            0.0f, m_Stamina - STAMINA_DRAIN_PER_FRAME);
-        m_StaminaRecoveryDelay = 0.45f;
-        if (m_Stamina <= 0.0f)
-        {
-            m_IsSprinting = false;
-            m_SprintExhausted = true;
-            m_StaminaRecoveryDelay = 1.0f;
-            Input::SetVibration(5, 0.10f);
-        }
-    }
-    else if (m_StaminaRecoveryDelay > 0.0f)
-    {
-        m_StaminaRecoveryDelay = (std::max)(
-            0.0f, m_StaminaRecoveryDelay - deltaTime);
-    }
-    else
-    {
-        m_Stamina = (std::min)(
-            MAX_STAMINA,
-            m_Stamina + STAMINA_RECOVERY_PER_FRAME);
-    }
-
-    const float currentMoveSpeed = m_MoveSpeed *
-        (m_IsSprinting ? SPRINT_SPEED_MULTIPLIER : 1.0f);
-
-    if (isMoving)
-    {
-        if (moveLengthSquared > 1.0f)
-        {
-            moveDir.Normalize();
-        }
-
-        const Vector3 desiredVelocity = moveDir * currentMoveSpeed;
-        const float acceleration = m_IsSprinting ? 0.24f : 0.30f;
-        m_Velocity.x +=
-            (desiredVelocity.x - m_Velocity.x) * acceleration;
-        m_Velocity.z +=
-            (desiredVelocity.z - m_Velocity.z) * acceleration;
-    }
-    else
-    {
-        // Ease to a stop instead of changing velocity in one frame. This
-        // removes the small camera snap when a movement key is released.
-        m_Velocity.x *= 0.72f;
-        m_Velocity.z *= 0.72f;
-        if (std::abs(m_Velocity.x) < 0.001f) m_Velocity.x = 0.0f;
-        if (std::abs(m_Velocity.z) < 0.001f) m_Velocity.z = 0.0f;
-    }
-
-    m_Velocity.y -= 0.01f;
 
     const Vector3 positionBeforeMove = m_Position;
-    m_Position += m_Velocity;
+    m_Position += m_Movement.GetVelocity();
 
     if (m_Position.y < -99.0f)
     {
         m_Position.y = -99.0f;
-        m_Velocity.y = 0.0f;
+        m_Movement.StopVerticalVelocity();
     }
 
     const std::vector<Wall*> walls =
@@ -212,19 +146,19 @@ void Player::Update()
         for (Ground* ground : Core::Game::GetInstance()->GetObjects<Ground>())
         {
             wetStep = ground->TriggerFootstepRipple(
-                m_Position, m_IsSprinting) || wetStep;
+                m_Position, m_Movement.IsSprinting()) || wetStep;
         }
         const float alternatingPitch = (m_FootstepIndex % 2 == 0)
-            ? (m_IsSprinting ? 1.08f : 0.97f)
-            : (m_IsSprinting ? 1.14f : 1.03f);
+            ? (m_Movement.IsSprinting() ? 1.08f : 0.97f)
+            : (m_Movement.IsSprinting() ? 1.14f : 1.03f);
         Core::Game::GetInstance()->PlayAudioCue(
             wetStep ? SOUND_CUE_WATER_STEP : SOUND_CUE_FOOTSTEP,
             wetStep ? alternatingPitch * 0.92f : alternatingPitch);
         m_SurfaceNoisePulse = wetStep
-            ? (m_IsSprinting ? 1.0f : 0.62f)
-            : (m_IsSprinting ? 0.32f : 0.0f);
+            ? (m_Movement.IsSprinting() ? 1.0f : 0.62f)
+            : (m_Movement.IsSprinting() ? 0.32f : 0.0f);
         ++m_FootstepIndex;
-        m_FootstepTimer = m_IsSprinting ? 0.31f : 0.46f;
+        m_FootstepTimer = m_Movement.IsSprinting() ? 0.31f : 0.46f;
     }
     m_WetSurfaceOverride = false;
 
@@ -250,33 +184,17 @@ void Player::Update()
         Input::GetButtonTrigger(XINPUT_Y))
     {
        
-        if (m_Battery > 0.0f)
+        if (m_Flashlight.Toggle())
         {
-            m_FlashLightOn = !m_FlashLightOn;
             Core::Game::GetInstance()->PlayAudioCue(
                 SOUND_CUE_FLASHLIGHT,
-                m_FlashLightOn ? 1.08f : 0.94f);
+                m_Flashlight.IsOn() ? 1.08f : 0.94f);
         }
     }
 
-   
-    if (m_FlashLightOn)
+    const int warningLevel = m_Flashlight.UpdateBattery();
+    if (warningLevel > 0)
     {
-        m_Battery -= 0.02f;
-
-        if (m_Battery <= 0.0f)
-        {
-            m_Battery = 0.0f;
-            m_FlashLightOn = false;
-        }
-    }
-
-    const int warningLevel = m_Battery <= 10.0f
-        ? 2
-        : (m_Battery <= 20.0f ? 1 : 0);
-    if (warningLevel > m_LowBatteryWarningLevel)
-    {
-        m_LowBatteryWarningLevel = warningLevel;
         Core::Game* game = Core::Game::GetInstance();
         game->GetPostProcess()->TriggerHorrorPulse(
             warningLevel == 2 ? 0.26f : 0.12f,
@@ -285,64 +203,14 @@ void Player::Update()
             warningLevel == 2 ? 8 : 4,
             warningLevel == 2 ? 0.18f : 0.09f);
     }
-    else if (m_Battery > 25.0f)
-    {
-        m_LowBatteryWarningLevel = 0;
-    }
+    const FlashlightSystem::FrameState flashlightState =
+        m_Flashlight.UpdateFrameState();
+    const bool visibleLight = flashlightState.visible;
+    const bool renderFlashlight = flashlightState.render;
+    const float lightOutput = flashlightState.output;
+    const float batteryStress = flashlightState.batteryStress;
 
-    bool visibleLight = m_FlashLightOn;
-    float lightOutput = 1.0f;
-    float batteryStress = 0.0f;
-    bool voltageDrop = false;
-
-    // 実際の電球は一瞬で最大光量にならないため、点灯と消灯を短く補間します。
-    // 入力判定は従来どおり即時に切り替わるのでゲーム進行には影響しません。
-    const float flashlightBlendTarget = visibleLight ? 1.0f : 0.0f;
-    const float flashlightBlendResponse = visibleLight ? 0.22f : 0.34f;
-    m_FlashlightPowerBlend +=
-        (flashlightBlendTarget - m_FlashlightPowerBlend) *
-        flashlightBlendResponse;
-    if (m_FlashlightPowerBlend < 0.002f)
-    {
-        m_FlashlightPowerBlend = 0.0f;
-    }
-    const bool renderFlashlight =
-        visibleLight || m_FlashlightPowerBlend > 0.002f;
-
-    if (m_FlashLightOn && m_Battery <= 20.0f)
-    {
-        m_FlickerTimer++;
-        batteryStress = (20.0f - m_Battery) / 20.0f;
-
-        // Combine unrelated frequencies so low-battery flicker never becomes
-        // a predictable square wave. The beam normally stays usable.
-        const float flickerTime =
-            static_cast<float>(m_FlickerTimer) / 60.0f;
-        const float slowVoltage = sinf(
-            flickerTime * 7.1f + sinf(flickerTime * 1.7f) * 1.8f);
-        const float ballastNoise =
-            sinf(flickerTime * 13.7f) * sinf(flickerTime * 4.3f);
-        const float unstableOutput =0.93f+ slowVoltage * 0.025f+ ballastNoise * 0.015f;
-        lightOutput =
-            1.0f + (unstableOutput - 1.0f) * batteryStress;
-
-        // Very short voltage drops become more frequent near empty, but do
-        // not hold the player in complete darkness for regular intervals.
-        const float dropCycle = 3.7f - batteryStress * 1.45f;
-        const float dropPhase = fmodf(flickerTime, dropCycle);
-        const float dropDuration = 0.025f + batteryStress * 0.060f;
-        if (dropPhase < dropDuration)
-        {
-            voltageDrop = true;
-            lightOutput *= 0.80f - batteryStress * 0.10f;
-        }
-    }
-    else
-    {
-        m_FlickerTimer = 0;
-    }
-
-    if (voltageDrop && !m_WasFlashlightVoltageDrop)
+    if (flashlightState.voltageDropStarted)
     {
         Core::Game::GetInstance()->GetPostProcess()->TriggerHorrorPulse(
             0.055f + batteryStress * 0.095f,
@@ -351,8 +219,6 @@ void Player::Update()
             2 + static_cast<int>(batteryStress * 4.0f),
             0.035f + batteryStress * 0.065f);
     }
-    m_WasFlashlightVoltageDrop = voltageDrop;
-
     // Reduce flashlight exposure near walls and the floor. A constant beam
     // made nearby surfaces clip to white and hid the material detail.
     float closestSurfaceDistance = 70.0f;
@@ -415,7 +281,7 @@ void Player::Update()
         1.0f - m_FlashlightNearSurfaceBlend * 0.42f;
     light.Intensity = renderFlashlight
         ? 1.50f * lightOutput * proximityExposure *
-            m_FlashlightPowerBlend
+            flashlightState.powerBlend
         : 0.0f;
     light.Range = 275.0f - m_FlashlightNearSurfaceBlend * 48.0f;
     // A hand-held lamp is never perfectly rigid. Low battery adds a little
@@ -514,32 +380,7 @@ void Player::Update()
     }
     Renderer::SetEnvironmentLights(environmentLights);
 	// カメラの位置と向きを更新
-    const float horizontalSpeed = std::sqrt(
-        m_Velocity.x * m_Velocity.x + m_Velocity.z * m_Velocity.z);
-    const bool visiblyMoving = horizontalSpeed > 0.025f;
-    if (visiblyMoving)
-    {
-        const float speedRate = (std::min)(
-            horizontalSpeed / (m_MoveSpeed * SPRINT_SPEED_MULTIPLIER),
-            1.0f);
-        m_HeadBobTimer +=
-            (m_IsSprinting ? 0.22f : 0.14f) * (0.55f + speedRate * 0.45f);
-        const float amplitude =
-            (m_IsSprinting ? 0.48f : 0.30f) * speedRate;
-        const float verticalTarget =
-            std::abs(sinf(m_HeadBobTimer)) * amplitude - amplitude * 0.48f;
-        const float sideTarget =
-            sinf(m_HeadBobTimer * 0.5f) * amplitude * 0.34f;
-        m_HeadBobOffset +=
-            (verticalTarget - m_HeadBobOffset) * 0.30f;
-        m_HeadBobSideOffset +=
-            (sideTarget - m_HeadBobSideOffset) * 0.24f;
-    }
-    else
-    {
-        m_HeadBobOffset *= 0.84f;
-        m_HeadBobSideOffset *= 0.84f;
-    }
+    m_Movement.UpdateHeadBob();
 
     Vector3 eyePos = m_Position;
     eyePos.y += m_CameraHeightOffset;
@@ -548,8 +389,8 @@ void Player::Update()
         // The slow component remains while standing still and makes the
         // viewpoint feel attached to a breathing person rather than a tripod.
         const float breath = sinf(m_AmbienceTimer * 1.15f) * 0.075f;
-        eyePos.y += m_HeadBobOffset + breath;
-        eyePos += right * m_HeadBobSideOffset;
+        eyePos.y += m_Movement.GetHeadBobOffset() + breath;
+        eyePos += right * m_Movement.GetHeadBobSideOffset();
     }
 
     if (m_IsFPS)

@@ -5,17 +5,9 @@
 #include "Game.h"
 #include "Scene.h"
 #include "Renderer.h"
-#include "Ground.h"
 #include "Texture2D.h"
 #include "ScreenDustOverlay.h"
 #include "Player.h"
-#include "Wall.h"
-#include "Door.h"
-#include "CeilingLight.h"
-#include "FuseBox.h"
-#include "Item.h"
-#include "BatteryItem.h"
-#include "ShadowMan.h"
 #include "DebugUI.h"
 
 #include <algorithm>
@@ -23,19 +15,6 @@
 
 namespace
 {
-    // 描画内容を持つワールドオブジェクトだけを対象にします。
-    // HUD、プレイヤー、各種トリガーは従来どおり描画経路を通すため挙動を変えません。
-    bool UsesCameraCulling(const Object* object)
-    {
-        return dynamic_cast<const Wall*>(object) != nullptr ||
-            dynamic_cast<const Door*>(object) != nullptr ||
-            dynamic_cast<const CeilingLight*>(object) != nullptr ||
-            dynamic_cast<const FuseBox*>(object) != nullptr ||
-            dynamic_cast<const Item*>(object) != nullptr ||
-            dynamic_cast<const BatteryItem*>(object) != nullptr ||
-            dynamic_cast<const ShadowMan*>(object) != nullptr;
-    }
-
     float GetConservativeCullingRadius(const Object& object)
     {
         const DirectX::SimpleMath::Vector3 scale = object.GetScale();
@@ -50,7 +29,7 @@ namespace
         const Camera& camera,
         bool testVertical)
     {
-        return !UsesCameraCulling(&object) || camera.IsSphereVisible(
+        return !object.UsesCameraCulling() || camera.IsSphereVisible(
             object.GetPosition(),
             GetConservativeCullingRadius(object),
             testVertical);
@@ -83,18 +62,6 @@ namespace
             reflectionRange * reflectionRange;
     }
 
-    bool ContributesToPlanarReflection(const Object& object)
-    {
-        // 当たり判定やシーン遷移トリガーはDrawが空でも仮想関数呼び出しが発生します。
-        // 水面へ実際に姿が映るオブジェクトだけを反射パスへ送ります。
-        return dynamic_cast<const Wall*>(&object) != nullptr ||
-            dynamic_cast<const Door*>(&object) != nullptr ||
-            dynamic_cast<const CeilingLight*>(&object) != nullptr ||
-            dynamic_cast<const FuseBox*>(&object) != nullptr ||
-            dynamic_cast<const Item*>(&object) != nullptr ||
-            dynamic_cast<const BatteryItem*>(&object) != nullptr ||
-            dynamic_cast<const ShadowMan*>(&object) != nullptr;
-    }
 }
 
 namespace Core
@@ -112,15 +79,15 @@ namespace Core
         unsigned int reflectionCulled = 0;
         bool reflectionSkipped = false;
         const unsigned int shadowInterval =
-            m_Instance->m_EffectLevel >= 2
+            m_Instance->m_Settings.GetEffectLevel() >= 2
                 ? 1u
-                : (m_Instance->m_EffectLevel == 1 ? 2u : 3u);
+                : (m_Instance->m_Settings.GetEffectLevel() == 1 ? 2u : 3u);
         const bool updateShadow =
             (m_Instance->m_ShadowFrameIndex++ % shadowInterval) == 0u;
         if (updateShadow)
         {
             m_Instance->m_ShadowMap.Begin(m_Instance->m_Camera);
-            for (auto& o : m_Instance->m_Objects)
+            for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
             {
                 if (o->IsDestroy() || !o->CastsShadow())
                 {
@@ -146,11 +113,12 @@ namespace Core
         if (m_Instance->m_CurrentScene == SceneName::Stage)
         {
             bool reflectionVisible = false;
-            for (const auto& object : m_Instance->m_Objects)
+            for (const auto& object :
+                m_Instance->m_ObjectManager.GetAllObjects())
             {
-                const Ground* ground = dynamic_cast<const Ground*>(object.get());
-                if (!object->IsDestroy() && ground != nullptr &&
-                    ground->IsAnyPuddleVisible(m_Instance->m_Camera))
+                if (!object->IsDestroy() &&
+                    object->IsPlanarReflectionSurfaceVisible(
+                        m_Instance->m_Camera))
                 {
                     reflectionVisible = true;
                     break;
@@ -172,14 +140,14 @@ namespace Core
                 reflectionCameraForward.Dot(
                     m_Instance->m_LastReflectionCameraForward) < 0.99998f;
             const unsigned int minimumReflectionInterval =
-                m_Instance->m_EffectLevel == 0 ? 2u : 1u;
+                m_Instance->m_Settings.GetEffectLevel() == 0 ? 2u : 1u;
             const unsigned int movingReflectionInterval = (std::max)(
                 Debug::UI::GetReflectionUpdateInterval(),
                 minimumReflectionInterval);
             const unsigned int idleReflectionInterval =
-                m_Instance->m_EffectLevel >= 2
+                m_Instance->m_Settings.GetEffectLevel() >= 2
                     ? 3u
-                    : (m_Instance->m_EffectLevel == 1 ? 6u : 8u);
+                    : (m_Instance->m_Settings.GetEffectLevel() == 1 ? 6u : 8u);
             const unsigned int reflectionInterval = reflectionCameraMoved
                 ? movingReflectionInterval
                 : (std::max)(movingReflectionInterval, idleReflectionInterval);
@@ -194,9 +162,10 @@ namespace Core
                     m_Instance->m_Camera,
                     -99.5f);
 
-                for (auto& o : m_Instance->m_Objects)
+                for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
                 {
-                    if (o->IsDestroy() || !ContributesToPlanarReflection(*o))
+                    if (o->IsDestroy() ||
+                        !o->ContributesToPlanarReflection())
                     {
                         continue;
                     }
@@ -237,7 +206,7 @@ namespace Core
 
         Renderer::DrawStart();
 
-        for (auto& o : m_Instance->m_Objects)
+        for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
         {
             if (!o->IsDestroy())
             {

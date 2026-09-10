@@ -7,7 +7,7 @@
 #include "Game.h"
 #include "PostProcess.h"
 #include "Renderer.h"
-#include "Stage2Scene.h"
+#include "Scene.h"
 
 #if defined(ENABLE_IMGUI)
 #include "imgui.h"
@@ -253,34 +253,37 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         ImGui::Separator();
 
         Core::Game* game = Core::Game::GetInstance();
-        Stage2Scene* stage2 = game == nullptr
-            ? nullptr
-            : dynamic_cast<Stage2Scene*>(game->GetScene());
-        if (stage2 != nullptr && ImGui::CollapsingHeader(
+        Scene* scene = game == nullptr ? nullptr : game->GetScene();
+        SceneDebugInfo sceneDebugInfo{};
+        if (scene != nullptr && scene->TryGetDebugInfo(sceneDebugInfo) &&
+            ImGui::CollapsingHeader(
             "2面 イベント確認", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            ImGui::Text("ループ %d / 3", stage2->GetLoopCount());
+            ImGui::Text("ループ %d / 3", sceneDebugInfo.progressionStep);
             ImGui::Text("信号 %d / 3  足音危険度 %.0f%%",
-                stage2->GetSignalStep(), stage2->GetNoiseThreat() * 100.0f);
+                sceneDebugInfo.puzzleStep, sceneDebugInfo.threatLevel * 100.0f);
             ImGui::Text("失敗回数 %d  再試行補助 %s",
-                stage2->GetPuzzleMistakeCount(),
-                stage2->GetPuzzleMistakeCount() >= 2 ? "強" :
-                    (stage2->GetPuzzleMistakeCount() == 1 ? "弱" : "なし"));
+                sceneDebugInfo.puzzleMistakeCount,
+                sceneDebugInfo.puzzleMistakeCount >= 2 ? "強" :
+                    (sceneDebugInfo.puzzleMistakeCount == 1 ? "弱" : "なし"));
             ImGui::Text("最終イベント: %s  出口: %s",
-                stage2->IsFinalSequenceArmed() ? "準備済み" : "待機中",
-                stage2->IsFinalDoorReady() ? "解錠" : "施錠");
+                sceneDebugInfo.finalSequenceArmed ? "準備済み" : "待機中",
+                sceneDebugInfo.exitReady ? "解錠" : "施錠");
             if (ImGui::Button("ループを1回進める"))
             {
-                stage2->DebugRequestAdvanceLoop();
+                scene->RequestDebugAction(
+                    SceneDebugAction::AdvanceProgression);
             }
             ImGui::SameLine();
             if (ImGui::Button("最終停電を再生"))
             {
-                stage2->DebugRequestFinalSequence();
+                scene->RequestDebugAction(
+                    SceneDebugAction::PlayFinalSequence);
             }
             if (ImGui::Button("視線ライト演出を再生"))
             {
-                stage2->DebugRequestLightChase();
+                scene->RequestDebugAction(
+                    SceneDebugAction::PlayLightingEvent);
             }
             ImGui::TextDisabled(
                 "操作は次のゲーム更新開始時に安全に実行されます。");

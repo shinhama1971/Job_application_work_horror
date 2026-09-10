@@ -257,9 +257,7 @@ void StageScene::StartScareLightSequence()
         return;
     }
 
-    m_ScareLightTimer = 0.0f;
-    m_ScareLightPhase = 0;
-    m_ScareMessageTimer = 3.8f;
+    m_ScareLightSequence.Start();
 
     CeilingLight* entrance =
         game->GetObj<CeilingLight>("CeilingLight1");
@@ -297,12 +295,9 @@ void StageScene::StartScareLightSequence()
 void StageScene::UpdateScareLightSequence()
 {
     constexpr float deltaTime = 1.0f / 60.0f;
-    if (m_ScareMessageTimer > 0.0f)
-    {
-        m_ScareMessageTimer -= deltaTime;
-    }
+    m_ScareLightSequence.UpdateNotice(deltaTime);
 
-    if (m_ScareLightTimer < 0.0f)
+    if (!m_ScareLightSequence.IsActive())
     {
         return;
     }
@@ -310,12 +305,11 @@ void StageScene::UpdateScareLightSequence()
     Core::Game* game = Core::Game::GetInstance();
     if (game->IsPowerRestored())
     {
-        m_ScareLightTimer = -1.0f;
-        m_ScareLightPhase = -1;
+        m_ScareLightSequence.Cancel();
         return;
     }
 
-    m_ScareLightTimer += deltaTime;
+    m_ScareLightSequence.Advance(deltaTime);
 
     CeilingLight* entrance =
         game->GetObj<CeilingLight>("CeilingLight1");
@@ -328,8 +322,9 @@ void StageScene::UpdateScareLightSequence()
     CeilingLight* loopExit =
         game->GetObj<CeilingLight>("CeilingLight7");
 
-    if (m_ScareLightPhase == 0 && m_ScareLightTimer >= 0.45f)
+    switch (m_ScareLightSequence.ConsumePendingBeat())
     {
+    case 0:
         if (entrance != nullptr)
         {
             entrance->SetEmergencyLight(false, 0.35f);
@@ -338,12 +333,10 @@ void StageScene::UpdateScareLightSequence()
         {
             middle->SetEmergencyLight(true, 0.75f);
         }
-        m_ScareLightPhase = 1;
         game->GetPostProcess()->TriggerHorrorPulse(0.13f, 0.18f);
         Input::SetVibration(5, 0.10f);
-    }
-    else if (m_ScareLightPhase == 1 && m_ScareLightTimer >= 0.90f)
-    {
+        break;
+    case 1:
         if (middle != nullptr)
         {
             middle->SetEmergencyLight(false, 0.75f);
@@ -352,12 +345,10 @@ void StageScene::UpdateScareLightSequence()
         {
             hall->SetEmergencyLight(true, 0.42f);
         }
-        m_ScareLightPhase = 2;
         game->GetPostProcess()->TriggerHorrorPulse(0.14f, 0.18f);
         Input::SetVibration(6, 0.13f);
-    }
-    else if (m_ScareLightPhase == 2 && m_ScareLightTimer >= 1.38f)
-    {
+        break;
+    case 2:
         if (hall != nullptr)
         {
             hall->SetEmergencyLight(false, 0.42f);
@@ -366,12 +357,10 @@ void StageScene::UpdateScareLightSequence()
         {
             corner->SetEmergencyLight(true, 0.18f);
         }
-        m_ScareLightPhase = 3;
         game->GetPostProcess()->TriggerHorrorPulse(0.16f, 0.20f);
         Input::SetVibration(7, 0.16f);
-    }
-    else if (m_ScareLightPhase == 3 && m_ScareLightTimer >= 1.92f)
-    {
+        break;
+    case 3:
         if (corner != nullptr)
         {
             corner->SetEmergencyLight(false, 0.18f);
@@ -380,12 +369,10 @@ void StageScene::UpdateScareLightSequence()
         {
             loopExit->SetEmergencyLight(true, 0.08f);
         }
-        m_ScareLightPhase = 4;
         game->GetPostProcess()->TriggerHorrorPulse(0.19f, 0.22f);
         Input::SetVibration(8, 0.19f);
-    }
-    else if (m_ScareLightPhase == 4 && m_ScareLightTimer >= 2.65f)
-    {
+        break;
+    case 4:
         if (middle != nullptr)
         {
             middle->SetEmergencyLight(true, 2.6f);
@@ -398,10 +385,10 @@ void StageScene::UpdateScareLightSequence()
         {
             corner->SetEmergencyLight(true, 4.3f);
         }
-
-        m_ScareLightTimer = -1.0f;
-        m_ScareLightPhase = 5;
         Input::SetVibration(4, 0.09f);
+        break;
+    default:
+        break;
     }
 }
 
@@ -464,16 +451,13 @@ void StageScene::UpdatePowerRestoreSequence()
     Core::Game* game = Core::Game::GetInstance();
     const bool powerRestored = game->IsPowerRestored();
 
-    if (powerRestored && !m_WasPowerRestored)
+    if (m_PowerSequence.ObservePowerState(powerRestored))
     {
-        m_PowerRestoreTimer = 0.0f;
         m_ProgressHintTimer = 0.0f;
-        m_PowerRestorePhase = 0;
 
         // Power restoration owns the presentation from this point onward.
-        m_ScareLightTimer = -1.0f;
-        m_ScareLightPhase = -1;
-        m_ScareMessageTimer = 0.0f;
+        m_ScareLightSequence.Cancel();
+        m_ScareLightSequence.ClearNotice();
 
         for (int markerIndex = 1; markerIndex <= 3; ++markerIndex)
         {
@@ -487,31 +471,29 @@ void StageScene::UpdatePowerRestoreSequence()
         }
     }
 
-    m_WasPowerRestored = powerRestored;
-    if (!powerRestored || m_PowerRestoreTimer < 0.0f)
+    if (!powerRestored || !m_PowerSequence.IsRestoreActive())
     {
         return;
     }
 
-    m_PowerRestoreTimer += deltaTime;
+    m_PowerSequence.AdvanceRestore(deltaTime);
 
-    if (m_PowerRestorePhase == 0 && m_PowerRestoreTimer >= 0.38f)
+    switch (m_PowerSequence.ConsumeRestoreBeat())
     {
+    case 0:
         game->GetPostProcess()->TriggerBloomPulse(1.18f, 0.55f);
         Input::SetVibration(9, 0.16f);
-        m_PowerRestorePhase = 1;
-    }
-    else if (m_PowerRestorePhase == 1 && m_PowerRestoreTimer >= 1.15f)
-    {
+        break;
+    case 1:
         game->GetPostProcess()->TriggerHorrorPulse(0.12f, 0.22f);
         Input::SetVibration(6, 0.11f);
-        m_PowerRestorePhase = 2;
-    }
-    else if (m_PowerRestorePhase == 2 && m_PowerRestoreTimer >= 2.25f)
-    {
+        break;
+    case 2:
         game->GetPostProcess()->TriggerBloomPulse(0.48f, 0.40f);
         Input::SetVibration(4, 0.07f);
-        m_PowerRestorePhase = 3;
+        break;
+    default:
+        break;
     }
 }
 
@@ -525,10 +507,8 @@ void StageScene::UpdateExitPowerSequence()
         return;
     }
 
-    if (m_ExitPowerEventTimer < 0.0f)
+    if (m_PowerSequence.BeginExitIfNeeded())
     {
-        m_ExitPowerEventTimer = 0.0f;
-        m_ExitPowerEventPhase = 0;
         m_ProgressHintTimer = 0.0f;
 
         CeilingLight* corner = game->GetObj<CeilingLight>("CeilingLight7");
@@ -539,13 +519,15 @@ void StageScene::UpdateExitPowerSequence()
         return;
     }
 
-    if (m_ExitPowerSequenceComplete)
+    if (m_PowerSequence.IsExitComplete())
     {
         return;
     }
 
-    m_ExitPowerEventTimer += deltaTime;
-    if (m_ExitPowerEventPhase == 0 && m_ExitPowerEventTimer >= 0.28f)
+    m_PowerSequence.AdvanceExit(deltaTime);
+    switch (m_PowerSequence.ConsumeExitBeat())
+    {
+    case 0:
     {
         CeilingLight* corner = game->GetObj<CeilingLight>("CeilingLight7");
         if (corner != nullptr)
@@ -556,9 +538,9 @@ void StageScene::UpdateExitPowerSequence()
         }
         game->GetPostProcess()->TriggerBloomPulse(0.68f, 0.24f);
         Input::SetVibration(5, 0.11f);
-        m_ExitPowerEventPhase = 1;
+        break;
     }
-    else if (m_ExitPowerEventPhase == 1 && m_ExitPowerEventTimer >= 0.78f)
+    case 1:
     {
         CeilingLight* exitLight = game->GetObj<CeilingLight>("CeilingLight8");
         if (exitLight != nullptr)
@@ -569,26 +551,27 @@ void StageScene::UpdateExitPowerSequence()
         }
         game->GetPostProcess()->TriggerBloomPulse(0.92f, 0.30f);
         Input::SetVibration(7, 0.15f);
-        m_ExitPowerEventPhase = 2;
+        break;
     }
-    else if (m_ExitPowerEventPhase == 2 && m_ExitPowerEventTimer >= 1.30f)
-    {
-        m_ExitPowerSequenceComplete = true;
-        m_ExitPowerEventPhase = 3;
+    case 2:
         game->GetPostProcess()->TriggerBloomPulse(1.18f, 0.42f);
         Input::SetVibration(10, 0.20f);
+        break;
+    default:
+        break;
     }
 }
 
 void StageScene::UpdateExitOmen(Player& player)
 {
     constexpr float deltaTime = 1.0f / 60.0f;
-    m_ExitOmenTimer =
-        (std::max)(0.0f, m_ExitOmenTimer - deltaTime);
-    if (m_ExitOmenTriggered)
+    m_ExitOmenSequence.Update(deltaTime);
+    if (m_ExitOmenSequence.IsTriggered())
     {
         Core::Game* game = Core::Game::GetInstance();
-        if (m_ExitOmenPhase == 0 && m_ExitOmenTimer <= 2.45f)
+        switch (m_ExitOmenSequence.ConsumePendingBeat())
+        {
+        case 0:
         {
             CeilingLight* lightBehind =
                 game->GetObj<CeilingLight>("CeilingLight8");
@@ -598,9 +581,9 @@ void StageScene::UpdateExitOmen(Player& player)
             }
             game->GetPostProcess()->TriggerHorrorPulse(0.22f, 0.30f);
             Input::SetVibration(7, 0.16f);
-            m_ExitOmenPhase = 1;
+            break;
         }
-        else if (m_ExitOmenPhase == 1 && m_ExitOmenTimer <= 1.35f)
+        case 1:
         {
             CeilingLight* exitLight =
                 game->GetObj<CeilingLight>("CeilingLight7");
@@ -610,23 +593,24 @@ void StageScene::UpdateExitOmen(Player& player)
                 exitLight->TriggerEventFlicker(1.10f, 0.88f);
             }
             game->GetPostProcess()->TriggerBloomPulse(0.44f, 0.20f);
-            m_ExitOmenPhase = 2;
+            break;
+        }
+        default:
+            break;
         }
         return;
     }
 
     Core::Game* game = Core::Game::GetInstance();
     const Vector3 playerPosition = player.GetPosition();
-    if (!m_ExitPowerSequenceComplete ||
+    if (!m_PowerSequence.IsExitComplete() ||
         playerPosition.z < 215.0f ||
         playerPosition.x < 28.0f)
     {
         return;
     }
 
-    m_ExitOmenTriggered = true;
-    m_ExitOmenTimer = 3.2f;
-    m_ExitOmenPhase = 0;
+    m_ExitOmenSequence.Start();
 
     ShadowMan* shadow =
         game->GetObj<ShadowMan>("Stage1ExitOmen");
@@ -654,4 +638,3 @@ void StageScene::UpdateExitOmen(Player& player)
     game->GetPostProcess()->TriggerBloomPulse(0.54f, 0.24f);
     Input::SetVibration(10, 0.22f);
 }
-

@@ -27,7 +27,7 @@ using namespace DirectX::SimpleMath;
 
 void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
 {
-    if (m_LoopCount != 1 || m_FalseDoorMoved)
+    if (m_LoopCount != 1 || m_FalseDoorAnomaly.HasMoved())
     {
         return;
     }
@@ -49,19 +49,18 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
             RegisterPuzzleMistake(1);
             return;
         }
-        m_FalseDoorObserved = true;
-        m_PuzzleFeedbackTimer = 0.0f;
-        m_PuzzleFeedbackType = 0;
+        m_FalseDoorAnomaly.MarkObserved();
+        m_PuzzleFeedback.Clear();
         return;
     }
 
-    if (!m_FalseDoorObserved || (facing > 0.30f && distance < 118.0f))
+    if (!m_FalseDoorAnomaly.WasObserved() ||
+        (facing > 0.30f && distance < 118.0f))
     {
         return;
     }
 
-    m_FalseDoorMoved = true;
-    m_FalseDoorNoticeTimer = 2.8f;
+    m_FalseDoorAnomaly.MarkMoved();
     SetFalseDoorState(true, true);
 
     m_NoticeTimer = 2.8f;
@@ -86,14 +85,10 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
 
 void Stage2Scene::StartObservedScare()
 {
-    if (m_ObservedScareTimer >= 0.0f)
+    if (!m_ObservedScareSequence.Start())
     {
         return;
     }
-
-    m_ObservedScareTimer = 0.0f;
-    m_GazeNoticeTimer = 2.8f;
-    m_ObservedScarePhase = 0;
 
     Core::Game* game = Core::Game::GetInstance();
     game->PlayAudioCue(SOUND_CUE_SCARE);
@@ -103,35 +98,32 @@ void Stage2Scene::StartObservedScare()
 
 void Stage2Scene::UpdateObservedScare(float deltaTime)
 {
-    if (m_ObservedScareTimer < 0.0f)
+    if (!m_ObservedScareSequence.IsActive())
     {
         return;
     }
 
-    m_ObservedScareTimer += deltaTime;
+    m_ObservedScareSequence.Advance(deltaTime);
     Core::Game* game = Core::Game::GetInstance();
 
     struct LightBeat
     {
-        float Time;
         const char* Name;
         float Strength;
     };
 
     constexpr LightBeat beats[] =
     {
-        { 0.05f, "CeilingLight4", 0.94f },
-        { 0.30f, "Stage2Light3", 0.90f },
-        { 0.58f, "Stage2Light2", 0.86f },
-        { 0.90f, "Stage2Light1", 0.80f }
+        { "CeilingLight4", 0.94f },
+        { "Stage2Light3", 0.90f },
+        { "Stage2Light2", 0.86f },
+        { "Stage2Light1", 0.80f }
     };
 
-    constexpr int beatCount =
-        static_cast<int>(sizeof(beats) / sizeof(beats[0]));
-    while (m_ObservedScarePhase < beatCount &&
-        m_ObservedScareTimer >= beats[m_ObservedScarePhase].Time)
+    int pendingBeat = m_ObservedScareSequence.ConsumePendingBeat();
+    while (pendingBeat >= 0)
     {
-        const LightBeat& beat = beats[m_ObservedScarePhase];
+        const LightBeat& beat = beats[pendingBeat];
         CeilingLight* light = game->GetObj<CeilingLight>(beat.Name);
         if (light != nullptr)
         {
@@ -141,32 +133,28 @@ void Stage2Scene::UpdateObservedScare(float deltaTime)
         game->GetPostProcess()->TriggerBloomPulse(
             0.26f + beat.Strength * 0.25f,
             0.16f);
-        ++m_ObservedScarePhase;
+        pendingBeat = m_ObservedScareSequence.ConsumePendingBeat();
     }
 
-    if (m_ObservedScareTimer < 1.35f)
+    if (m_ObservedScareSequence.GetTimer() < 1.35f)
     {
         const float intensity =
-            1.0f - (std::min)(m_ObservedScareTimer / 1.35f, 1.0f);
+            m_ObservedScareSequence.GetAtmosphereIntensity();
         game->GetPostProcess()->SetAtmosphere(
             0.30f + intensity * 0.16f,
             0.76f + intensity * 0.12f);
     }
     else
     {
-        m_ObservedScareTimer = -1.0f;
+        m_ObservedScareSequence.CompleteIfElapsed();
     }
 }
 
 void Stage2Scene::StartFinalSequence()
 {
-    m_FinalSequenceTimer = 0.0f;
-    m_FinalPursuitTimer = 7.0f;
-    m_PursuitPulseTimer = 0.12f;
-    m_PursuitGazePenaltyTimer = 0.0f;
-    m_NoiseThreat = 0.0f;
-    m_NoiseWarningTimer = 0.0f;
-    m_FinalSequencePhase = 0;
+    m_FinalSequence.Start();
+    m_NoiseThreatSystem.SetThreat(0.0f);
+    m_NoiseThreatSystem.SetWarningTimer(0.0f);
     m_NoticeTimer = 2.8f;
 
     Core::Game* game = Core::Game::GetInstance();
@@ -197,13 +185,11 @@ void Stage2Scene::StartFinalSequence()
         shadow->SetOnObserved(
             [this]()
             {
-                if (m_FinalPursuitTimer <= 0.0f ||
-                    m_PursuitGazePenaltyTimer > 0.0f)
+                if (!m_FinalSequence.TryTriggerGazePenalty())
                 {
                     return;
                 }
 
-                m_PursuitGazePenaltyTimer = 1.45f;
                 m_NoticeTimer = 1.65f;
                 Core::Game* game = Core::Game::GetInstance();
                 const char* lightNames[] =
@@ -232,49 +218,43 @@ void Stage2Scene::StartFinalSequence()
 
 void Stage2Scene::UpdateFinalSequence(float deltaTime)
 {
-    if (m_FinalSequenceTimer < 0.0f || m_FinalDoorReady)
+    if (!m_FinalSequence.IsSequenceActive() || m_FinalDoorReady)
     {
         return;
     }
 
-    m_FinalSequenceTimer += deltaTime;
+    m_FinalSequence.AdvanceSequence(deltaTime);
     Core::Game* game = Core::Game::GetInstance();
 
-    struct FinalBeat
+    constexpr const char* lightNames[] =
     {
-        float Time;
-        const char* LightName;
+        "Stage2Light1",
+        "Stage2Light2",
+        "Stage2Light3",
+        "CeilingLight4"
     };
-    constexpr FinalBeat beats[] =
-    {
-        { 0.05f, "Stage2Light1" },
-        { 0.30f, "Stage2Light2" },
-        { 0.58f, "Stage2Light3" },
-        { 0.90f, "CeilingLight4" }
-    };
-    constexpr int beatCount =
-        static_cast<int>(sizeof(beats) / sizeof(beats[0]));
 
-    while (m_FinalSequencePhase < beatCount &&
-        m_FinalSequenceTimer >= beats[m_FinalSequencePhase].Time)
+    int pendingBeat = m_FinalSequence.ConsumePendingBeat();
+    while (pendingBeat >= 0)
     {
         CeilingLight* light = game->GetObj<CeilingLight>(
-            beats[m_FinalSequencePhase].LightName);
+            lightNames[pendingBeat]);
         if (light != nullptr)
         {
             light->SetEmergencyLight(
                 true,
-                9.0f + static_cast<float>(m_FinalSequencePhase) * 0.7f);
+                9.0f + static_cast<float>(pendingBeat) * 0.7f);
             light->TriggerEventFlicker(1.0f, 0.96f);
         }
         game->GetPostProcess()->TriggerBloomPulse(0.48f, 0.18f);
-        ++m_FinalSequencePhase;
+        pendingBeat = m_FinalSequence.ConsumePendingBeat();
     }
 
-    if (m_FinalSequenceTimer < 1.65f)
+    if (m_FinalSequence.GetSequenceTimer() < 1.65f)
     {
         const float pulse =
-            std::sin(m_FinalSequenceTimer * 22.0f) * 0.5f + 0.5f;
+            std::sin(m_FinalSequence.GetSequenceTimer() * 22.0f) *
+                0.5f + 0.5f;
         game->GetPostProcess()->SetExposure(0.76f + pulse * 0.17f);
         game->GetPostProcess()->SetAtmosphere(0.43f, 0.88f);
         game->GetPostProcess()->SetLensDistortionStrength(
@@ -314,7 +294,7 @@ void Stage2Scene::UpdateFinalSequence(float deltaTime)
 
 void Stage2Scene::UpdateFinalPursuit(float deltaTime)
 {
-    if (m_FinalPursuitTimer <= 0.0f)
+    if (!m_FinalSequence.IsPursuitActive())
     {
         ShadowMan* shadow =
             Core::Game::GetInstance()->GetObj<ShadowMan>("Stage2Shadow");
@@ -339,7 +319,7 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
         std::sqrt(offset.x * offset.x + offset.z * offset.z);
     if (horizontalDistance <= 31.5f)
     {
-        StartCaughtSequence(*player);
+        StartCaughtSequence(*player, CaughtSequence::Reason::FinalPursuit);
         return;
     }
 
@@ -372,10 +352,9 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
             dangerPulse * proximity * 0.025f);
     }
 
-    if (m_PursuitGazePenaltyTimer > 0.0f)
+    if (m_FinalSequence.HasGazePenalty())
     {
-        const float penalty = (std::clamp)(
-            m_PursuitGazePenaltyTimer / 1.45f, 0.0f, 1.0f);
+        const float penalty = m_FinalSequence.GetGazePenaltyRate();
         game->GetPostProcess()->SetAtmosphere(
             0.43f + penalty * 0.12f,
             0.88f + penalty * 0.08f);
@@ -385,8 +364,7 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
         game->GetPostProcess()->SetExposure(0.91f + (1.0f - penalty) * 0.06f);
     }
 
-    m_PursuitPulseTimer -= deltaTime;
-    if (m_PursuitPulseTimer > 0.0f)
+    if (!m_FinalSequence.AdvancePursuitPulse(deltaTime))
     {
         return;
     }
@@ -402,21 +380,20 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
             0.045f + proximity * 0.075f,
             0.16f);
     }
-    m_PursuitPulseTimer = 0.72f - proximity * 0.40f;
+    m_FinalSequence.SchedulePursuitPulse(proximity);
 }
 
-void Stage2Scene::StartCaughtSequence(Player& player)
+void Stage2Scene::StartCaughtSequence(
+    Player& player,
+    CaughtSequence::Reason reason)
 {
-    if (m_CaughtTimer >= 0.0f)
+    if (!m_CaughtSequence.Start(reason))
     {
         return;
     }
 
-    m_CaughtTimer = 0.0f;
     m_QuietRecovery.Reset();
-    m_FinalPursuitTimer = 0.0f;
-    m_PursuitPulseTimer = 0.0f;
-    m_PursuitGazePenaltyTimer = 0.0f;
+    m_FinalSequence.StopForCaught();
     player.SetCanControl(false);
 
     Core::Game* game = Core::Game::GetInstance();
@@ -440,13 +417,12 @@ void Stage2Scene::StartCaughtSequence(Player& player)
 
 void Stage2Scene::UpdateCaughtSequence(Player& player, float deltaTime)
 {
-    m_CaughtTimer += deltaTime;
+    m_CaughtSequence.Advance(deltaTime);
     Core::Game* game = Core::Game::GetInstance();
 
-    if (m_CaughtTimer < 1.15f)
+    if (!m_CaughtSequence.IsReadyToRecover())
     {
-        const float darkness = (std::clamp)(
-            m_CaughtTimer / 0.34f, 0.0f, 1.0f);
+        const float darkness = m_CaughtSequence.GetFadeRate();
         game->GetPostProcess()->SetExposure(
             0.92f - darkness * 0.38f);
         game->GetPostProcess()->SetAtmosphere(
@@ -461,21 +437,19 @@ void Stage2Scene::UpdateCaughtSequence(Player& player, float deltaTime)
     player.SetPosition(Vector3(0.0f, -99.0f, -125.0f));
     player.RestoreStamina();
     player.SetCanControl(true);
-    m_CaughtTimer = -1.0f;
-    const bool wasNoiseCatch = m_NoiseCatch;
+    const bool wasNoiseCatch = m_CaughtSequence.WasNoiseStalker();
+    m_CaughtSequence.Complete();
     if (!wasNoiseCatch)
     {
-        m_FinalSequenceTimer = -1.0f;
-        m_FinalSequencePhase = 0;
+        m_FinalSequence.ResetSequenceForRetry();
         m_FinalSequenceArmed = true;
         m_FinalDoorReady = false;
     }
     else
     {
-        m_NoiseThreat = 0.18f;
-        m_NoiseStalkerCooldown = 7.0f;
-        m_NoiseStalkerNoticeTimer = 3.0f;
-        m_NoiseCatch = false;
+        m_NoiseThreatSystem.SetThreat(0.18f);
+        m_NoiseThreatSystem.SetStalkerCooldown(7.0f);
+        m_NoiseThreatSystem.SetStalkerNoticeTimer(3.0f);
     }
     m_NoticeTimer = 3.2f;
 
@@ -530,7 +504,7 @@ void Stage2Scene::RevealScratchPieces(int first, int last, float emission)
 
 void Stage2Scene::UpdateLightZones(const Player& player)
 {
-    if (m_LoopCount >= 3 || m_FinalSequenceTimer >= 0.0f)
+    if (m_LoopCount >= 3 || m_FinalSequence.IsSequenceActive())
     {
         return;
     }
@@ -553,14 +527,11 @@ void Stage2Scene::UpdateLightZones(const Player& player)
     Core::Game* game = Core::Game::GetInstance();
     for (int index = 0; index < zoneCount; ++index)
     {
-        const unsigned int zoneBit = 1u << index;
-        if ((m_LightZoneMask & zoneBit) != 0u ||
-            player.GetPosition().z <= zones[index].TriggerZ)
+        if (!m_LightZoneProgress.TryEnter(
+            index, player.GetPosition().z, zones[index].TriggerZ))
         {
             continue;
         }
-
-        m_LightZoneMask |= zoneBit;
         CeilingLight* light = game->GetObj<CeilingLight>(zones[index].LightName);
         const float loopStrength = static_cast<float>(m_LoopCount) * 0.17f;
         const float strength = (std::clamp)(
@@ -606,12 +577,10 @@ void Stage2Scene::UpdateScratchMessage(
         return;
     }
 
-    m_ScratchUpdateAccumulator += deltaTime;
-    if (m_ScratchUpdateAccumulator < 0.05f)
+    if (!m_ScratchAnomaly.ConsumeUpdateInterval(deltaTime))
     {
         return;
     }
-    m_ScratchUpdateAccumulator = 0.0f;
 
     Core::Game* game = Core::Game::GetInstance();
     const Vector3 messageCenter(39.45f, -71.0f, 31.0f);
@@ -640,27 +609,19 @@ void Stage2Scene::UpdateScratchMessage(
         std::sin(m_VisualTimer * (2.4f + m_LoopCount * 0.45f)) *
         0.5f + 0.5f;
     const float finalBoost =
-        (m_FinalSequenceTimer >= 0.0f && !m_FinalDoorReady) ? 0.16f : 0.0f;
+        (m_FinalSequence.IsSequenceActive() && !m_FinalDoorReady)
+            ? 0.16f : 0.0f;
     const float emission =
         0.07f + static_cast<float>(m_LoopCount) * 0.035f +
         flashlightResponse * (0.10f + heartbeat * 0.16f) + finalBoost;
 
-    int visibleCount = Stage2ScratchCount;
-    if (m_LoopCount == 1)
-    {
-        visibleCount = 3;
-    }
-    else if (m_LoopCount == 2)
-    {
-        visibleCount = 9;
-    }
+    const int visibleCount = m_ScratchAnomaly.GetVisiblePieceCount(
+        m_LoopCount, Stage2ScratchCount);
     RevealScratchPieces(0, visibleCount, emission);
 
-    if (!m_ScratchScareTriggered && m_LoopCount >= 2 &&
-        player.IsFlashlightOn() && distance < 92.0f && facing > 0.90f)
+    if (m_ScratchAnomaly.TryTriggerScare(
+        m_LoopCount, player.IsFlashlightOn(), distance, facing))
     {
-        m_ScratchScareTriggered = true;
-        m_ScratchNoticeTimer = 2.2f;
         game->GetPostProcess()->TriggerHorrorPulse(
             0.24f + static_cast<float>(m_LoopCount) * 0.08f,
             0.32f);
@@ -672,7 +633,7 @@ void Stage2Scene::UpdateScratchMessage(
 void Stage2Scene::UpdatePortraitAnomaly(const Player& player)
 {
     if (m_LoopCount <= 0 || m_LoopCount >= 3 ||
-        m_PortraitChangedThisLoop)
+        m_PortraitAnomaly.HasChangedThisLoop())
     {
         return;
     }
@@ -693,17 +654,17 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player)
         player.IsFlashlightOn() && distance < 105.0f && facing > 0.91f;
     if (lookingAtPortrait)
     {
-        m_PortraitObserved = true;
+        m_PortraitAnomaly.MarkObserved();
         return;
     }
 
-    if (!m_PortraitObserved || (facing > 0.55f && distance < 112.0f))
+    if (!m_PortraitAnomaly.WasObserved() ||
+        (facing > 0.55f && distance < 112.0f))
     {
         return;
     }
 
-    m_PortraitChangedThisLoop = true;
-    m_PortraitNoticeTimer = 2.4f;
+    m_PortraitAnomaly.MarkChanged();
 
     const float emission = m_LoopCount == 1 ? 0.10f : 0.28f;
     const char* eyeNames[] =

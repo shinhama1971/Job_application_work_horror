@@ -20,7 +20,7 @@ void Ground::Init()
 	m_PowerReflectionBlend = 0.0f;
 	m_PowerSurge = 0.0f;
 	m_WasPowerRestored = false;
-	BuildFallingDrops();
+	m_WaterEffects.Init();
 
 	// 頂点データ
 	m_SizeX = 50;
@@ -217,8 +217,7 @@ void Ground::Update()
 	m_PowerReflectionBlend = std::clamp(
 		m_PowerReflectionBlend, 0.0f, 1.0f);
 	m_PowerSurge = (std::max)(0.0f, m_PowerSurge - deltaTime * 0.42f);
-	UpdateFallingDrops(deltaTime);
-	UpdateFootstepRipples(deltaTime);
+	m_WaterEffects.Update(deltaTime);
 }
 
 //=======================================
@@ -270,8 +269,7 @@ void Ground::Draw(Camera* cam)
 		0,					// 最初のインデックスバッファの位置
 		0);
 
-	DrawFallingDrops(cam);
-	DrawWaterRipples(cam);
+	m_WaterEffects.Draw(cam);
 }
 
 //=======================================
@@ -279,13 +277,7 @@ void Ground::Draw(Camera* cam)
 //=======================================
 void Ground::Uninit()
 {
-	m_FallingDrops.clear();
-	m_PuddleCenters.clear();
-	m_DropVertices.clear();
-	m_DropMaterial.reset();
-	m_RippleVertices.clear();
-	m_FootstepRipples.clear();
-	m_RippleMaterial.reset();
+	m_WaterEffects.Uninit();
 	m_WetFloorBuffer.Reset();
 }
 

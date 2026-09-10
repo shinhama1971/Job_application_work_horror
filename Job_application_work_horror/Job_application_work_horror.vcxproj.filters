@@ -144,6 +144,9 @@
     <ClCompile Include="GamePersistence.cpp">
       <Filter>ソース ファイル\Core</Filter>
     </ClCompile>
+    <ClCompile Include="GameSettings.cpp">
+      <Filter>ソース ファイル\Core</Filter>
+    </ClCompile>
     <ClCompile Include="GameRendering.cpp">
       <Filter>ソース ファイル\Core</Filter>
     </ClCompile>
@@ -184,6 +187,9 @@
       <Filter>ソース ファイル\Core</Filter>
     </ClCompile>
     <ClCompile Include="Object.cpp">
+      <Filter>ソース ファイル\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="ObjectManager.cpp">
       <Filter>ソース ファイル\Core</Filter>
     </ClCompile>
     <ClCompile Include="Pole.cpp">
@@ -260,10 +266,25 @@
     <ClInclude Include="ScareTrigger.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="ScareLightSequence.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="StagePowerSequence.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="ExitOmenSequence.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
     <ClInclude Include="Application.h">
       <Filter>ソース ファイル\Core</Filter>
     </ClInclude>
     <ClInclude Include="Game.h">
+      <Filter>ソース ファイル\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="GameSettings.h">
+      <Filter>ソース ファイル\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="GameState.h">
       <Filter>ソース ファイル\Core</Filter>
     </ClInclude>
     <ClInclude Include="input.h">
@@ -277,6 +298,39 @@
     </ClInclude>
     <ClInclude Include="Shader.h">
       <Filter>ソース ファイル\Rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="SignalPuzzle.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="NoiseThreatSystem.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="ClockAnomaly.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="FalseDoorAnomaly.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="PortraitAnomaly.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="ScratchAnomaly.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="ObservedScareSequence.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="CaughtSequence.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="FinalSequence.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="LightZoneProgress.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="PuzzleFeedback.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
     <ClInclude Include="ComputeShader.h">
       <Filter>ソース ファイル\Rendering</Filter>
@@ -302,6 +356,9 @@
     <ClInclude Include="Ground.h">
       <Filter>ソース ファイル\Warld</Filter>
     </ClInclude>
+    <ClInclude Include="WaterEffectSystem.h">
+      <Filter>ソース ファイル\Warld</Filter>
+    </ClInclude>
     <ClInclude Include="Wall.h">
       <Filter>ソース ファイル\Warld</Filter>
     </ClInclude>
@@ -314,7 +371,13 @@
     <ClInclude Include="ExitTrigger.h">
       <Filter>ソース ファイル\Warld</Filter>
     </ClInclude>
+    <ClInclude Include="FlashlightSystem.h">
+      <Filter>ソース ファイル\Gameplay</Filter>
+    </ClInclude>
     <ClInclude Include="Player.h">
+      <Filter>ソース ファイル\Gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="PlayerMovement.h">
       <Filter>ソース ファイル\Gameplay</Filter>
     </ClInclude>
     <ClInclude Include="InteractionSystem.h">
@@ -370,6 +433,9 @@
     </ClInclude>
     <ClInclude Include="Object.h">
       <Filter>ソース ファイル\Warld</Filter>
+    </ClInclude>
+    <ClInclude Include="ObjectManager.h">
+      <Filter>ソース ファイル\Core</Filter>
     </ClInclude>
     <ClInclude Include="Pole.h">
       <Filter>ソース ファイル\ImGui</Filter>

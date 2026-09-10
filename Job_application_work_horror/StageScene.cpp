@@ -57,19 +57,10 @@ void StageScene::Init()
     m_EntranceEventTriggered = false;
     m_EntranceEventTimer = -1.0f;
     m_EntranceEventPhase = -1;
-    m_ScareLightTimer = -1.0f;
-    m_ScareLightPhase = -1;
-    m_ScareMessageTimer = 0.0f;
-    m_WasPowerRestored = false;
-    m_PowerRestoreTimer = -1.0f;
-    m_PowerRestorePhase = -1;
-    m_ExitPowerEventTimer = -1.0f;
-    m_ExitPowerEventPhase = -1;
-    m_ExitPowerSequenceComplete = false;
+    m_ScareLightSequence.Reset();
+    m_PowerSequence.Reset();
     m_StageVisualTimer = 0.0f;
-    m_ExitOmenTriggered = false;
-    m_ExitOmenTimer = 0.0f;
-    m_ExitOmenPhase = -1;
+    m_ExitOmenSequence.Reset();
     m_ProgressHintTimer = 0.0f;
 
     // プレイヤー
@@ -496,7 +487,7 @@ void StageScene::Update()
 
     Door* stageExitDoor = game->GetObj<Door>("Stage1ExitDoor");
     ExitTrigger* stageExit = game->GetObj<ExitTrigger>("ExitTrigger");
-    const bool exitPowerReady = m_ExitPowerSequenceComplete;
+    const bool exitPowerReady = m_PowerSequence.IsExitComplete();
     if (stageExitDoor != nullptr)
     {
         stageExitDoor->SetLocked(!exitPowerReady);
@@ -536,8 +527,9 @@ void StageScene::Update()
     Wall* exitIndicator = game->GetObj<Wall>("PropDoorIndicator");
     if (exitIndicator != nullptr)
     {
-        const float omenRate = m_ExitOmenTriggered
-            ? 1.0f - (std::clamp)(m_ExitOmenTimer / 3.2f, 0.0f, 1.0f)
+        const float omenRate = m_ExitOmenSequence.IsTriggered()
+            ? 1.0f - (std::clamp)(
+                m_ExitOmenSequence.GetTimer() / 3.2f, 0.0f, 1.0f)
             : 0.0f;
         const float indicatorPulse =
             0.72f + std::sin(m_StageVisualTimer *
@@ -564,7 +556,8 @@ void StageScene::Update()
     if (lowBattery > 1.0f) lowBattery = 1.0f;
 
     const float powerBlend = game->IsPowerRestored()
-        ? (std::clamp)(m_PowerRestoreTimer / 2.5f, 0.0f, 1.0f)
+        ? (std::clamp)(
+            m_PowerSequence.GetRestoreTimer() / 2.5f, 0.0f, 1.0f)
         : 0.0f;
     const float powerCalm = 0.03f * powerBlend;
     const float sprintStress = player->IsSprinting() ? 1.0f : 0.0f;

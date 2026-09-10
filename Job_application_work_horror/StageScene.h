@@ -7,6 +7,9 @@
 #include "Scene.h"
 #include "InteractionSystem.h"
 #include "Hud.h"
+#include "ScareLightSequence.h"
+#include "StagePowerSequence.h"
+#include "ExitOmenSequence.h"
 
 class StageScene : public Scene
 {
@@ -30,6 +33,9 @@ private:
     // InteractionSystemは視線先、Hudは現在目的と操作ヒントを担当します。
     InteractionSystem m_InteractionSystem;
     Hud m_Hud;
+    ScareLightSequence m_ScareLightSequence;
+    StagePowerSequence m_PowerSequence;
+    ExitOmenSequence m_ExitOmenSequence;
 
     // 0以上のtimerは演出実行中、-1は未実行または終了を表します。
     int m_CorridorLoopCount = 0;
@@ -46,19 +52,7 @@ private:
     bool m_EntranceEventTriggered = false;
     float m_EntranceEventTimer = -1.0f;
     int m_EntranceEventPhase = -1;
-    float m_ScareLightTimer = -1.0f;
-    int m_ScareLightPhase = -1;
-    float m_ScareMessageTimer = 0.0f;
-    bool m_WasPowerRestored = false;
-    float m_PowerRestoreTimer = -1.0f;
-    int m_PowerRestorePhase = -1;
-    float m_ExitPowerEventTimer = -1.0f;
-    int m_ExitPowerEventPhase = -1;
-    bool m_ExitPowerSequenceComplete = false;
     float m_StageVisualTimer = 0.0f;
-    bool m_ExitOmenTriggered = false;
-    float m_ExitOmenTimer = 0.0f;
-    int m_ExitOmenPhase = -1;
     float m_ProgressHintTimer = 0.0f;
 public:
     StageScene();

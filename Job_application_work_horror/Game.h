@@ -7,10 +7,8 @@
 #include <iostream>
 #include <vector>
 #include <memory>
-#include <unordered_map>
 #include <string>
 #include <optional>
-#include <functional>
 #include <utility>
 
 #include "Camera.h"
@@ -19,6 +17,9 @@
 #include"PostProcess.h"
 #include "ShadowMap.h"
 #include "PlanarReflection.h"
+#include "GameState.h"
+#include "GameSettings.h"
+#include "ObjectManager.h"
 #include "sound.h"
 enum class SceneName
 {
@@ -50,16 +51,11 @@ namespace Core
         Sound m_Sound;
         bool m_SoundReady = false;
 
-        std::vector<std::unique_ptr<Object>> m_Objects;
-        // 名前検索を高速化する非所有ポインタ。実体は必ずm_Objectsが所有します。
-        std::unordered_map<std::string, Object*> m_NamedObjects;
-
-        // Update中のコンテナ変更を避けるための遅延実行キュー。
+        ObjectManager m_ObjectManager;
         std::optional<SceneName> m_PendingScene;
-        std::vector<std::function<void()>> m_PendingObjectCommands;
 
-        int m_ItemCount = 0;
-        bool m_PowerRestored = false;
+        GameState m_State;
+        GameSettings m_Settings;
         SceneName m_CurrentScene = SceneName::Title;
         bool m_IsPaused = false;
         unsigned int m_ReflectionFrameIndex = 0;
@@ -68,29 +64,11 @@ namespace Core
         DirectX::SimpleMath::Vector3 m_LastReflectionCameraPosition{};
         DirectX::SimpleMath::Vector3 m_LastReflectionCameraForward{ 0.0f, 0.0f, 1.0f };
         bool m_HasReflectionCameraPose = false;
-        float m_RunTimeSeconds = 0.0f;
-        float m_LastClearTimeSeconds = 0.0f;
-        int m_CaughtCount = 0;
-        int m_AnomaliesHandled = 0;
-        int m_PuzzleMistakes = 0;
-        int m_ChargersUsed = 0;
-        int m_EvidenceCollected = 0;
-        int m_BrightnessLevel = 2;
-        int m_EffectLevel = 1;
-        int m_LookSensitivityLevel = 2;
-        int m_VolumeLevel = 3;
         int m_PauseSettingIndex = 0;
-        float m_BestClearTimeSeconds = 0.0f;
-        int m_BestCaughtCount = 0;
-        bool m_HasClearRecord = false;
-        bool m_LastRunBestTime = false;
-        bool m_LastRunBestCaught = false;
 
         void ChangeScene(SceneName sName);
         void LoadBestRecord();
         void SaveBestRecord() const;
-        void LoadSettings();
-        void SaveSettings() const;
         void ApplyAudioVolume(bool paused);
 
     public:
@@ -135,88 +113,53 @@ namespace Core
         template<typename T>
         T* AddObject()
         {
-            // unique_ptrをコンテナへ移してから初期化し、例外時も所有権を失わないようにします。
-            auto object = std::make_unique<T>();
-            T* pt = object.get();
-            m_Objects.emplace_back(std::move(object));
-            pt->Init();
-            return pt;
+            return m_ObjectManager.AddObject<T>();
         }
 
         template<typename T, typename Setup>
         void RequestAddObject(Setup&& setup)
         {
-            // Object::Update中に呼ばれても、その場ではm_Objectsを書き換えません。
-            m_PendingObjectCommands.emplace_back(
-                [this, setup = std::forward<Setup>(setup)]() mutable
-                {
-                    T* object = AddObject<T>();
-                    setup(*object);
-                }
-            );
+            m_ObjectManager.RequestAddObject<T>(
+                std::forward<Setup>(setup));
         }
 
         template<typename T>
         T* CreateObj(const std::string& name)
         {
-            T* pt = AddObject<T>();
-            m_NamedObjects[name] = pt;
-            return pt;
+            return m_ObjectManager.CreateNamedObject<T>(name);
         }
 
         template<typename T>
         T* GetObj(const std::string& name)
         {
-            auto it = m_NamedObjects.find(name);
-
-            if (it == m_NamedObjects.end())
-            {
-                return nullptr;
-            }
-
-            return dynamic_cast<T*>(it->second);
+            return m_ObjectManager.FindNamedObject<T>(name);
         }
 
         template<typename T>
         std::vector<T*> GetObjects()
         {
-            std::vector<T*> res;
-
-            for (auto& o : m_Objects)
-            {
-                if (o->IsDestroy())
-                {
-                    continue;
-                }
-
-                if (T* derivedObj = dynamic_cast<T*>(o.get()))
-                {
-                    res.emplace_back(derivedObj);
-                }
-            }
-
-            return res;
+            return m_ObjectManager.FindObjects<T>();
         }
 
 
         void AddItemCount()
         {
-            m_ItemCount++;
+            m_State.AddItem();
         }
 
         int GetItemCount() const
         {
-            return m_ItemCount;
+            return m_State.GetItemCount();
         }
 
         void SetPowerRestored(bool restored)
         {
-            m_PowerRestored = restored;
+            m_State.SetPowerRestored(restored);
         }
 
         bool IsPowerRestored() const
         {
-            return m_PowerRestored;
+            return m_State.IsPowerRestored();
         }
 
         bool IsPaused() const
@@ -226,22 +169,22 @@ namespace Core
 
         int GetBrightnessLevel() const
         {
-            return m_BrightnessLevel;
+            return m_Settings.GetBrightnessLevel();
         }
 
         int GetEffectLevel() const
         {
-            return m_EffectLevel;
+            return m_Settings.GetEffectLevel();
         }
 
         int GetLookSensitivityLevel() const
         {
-            return m_LookSensitivityLevel;
+            return m_Settings.GetLookSensitivityLevel();
         }
 
         int GetVolumeLevel() const
         {
-            return m_VolumeLevel;
+            return m_Settings.GetVolumeLevel();
         }
 
         int GetPauseSettingIndex() const
@@ -251,57 +194,57 @@ namespace Core
 
         float GetLastClearTimeSeconds() const
         {
-            return m_LastClearTimeSeconds;
+            return m_State.GetLastClearTimeSeconds();
         }
 
         float GetRunTimeSeconds() const
         {
-            return m_RunTimeSeconds;
+            return m_State.GetRunTimeSeconds();
         }
 
         bool HasClearRecord() const
         {
-            return m_HasClearRecord;
+            return m_State.HasClearRecord();
         }
 
         float GetBestClearTimeSeconds() const
         {
-            return m_BestClearTimeSeconds;
+            return m_State.GetBestClearTimeSeconds();
         }
 
         int GetBestCaughtCount() const
         {
-            return m_BestCaughtCount;
+            return m_State.GetBestCaughtCount();
         }
 
         int GetCaughtCount() const
         {
-            return m_CaughtCount;
+            return m_State.GetCaughtCount();
         }
 
         bool IsLastRunBestTime() const
         {
-            return m_LastRunBestTime;
+            return m_State.IsLastRunBestTime();
         }
 
         bool IsLastRunBestCaught() const
         {
-            return m_LastRunBestCaught;
+            return m_State.IsLastRunBestCaught();
         }
 
         void RegisterCaught()
         {
-            ++m_CaughtCount;
+            m_State.RegisterCaught();
         }
 
-        void RegisterAnomalyHandled() { ++m_AnomaliesHandled; }
-        void RegisterPuzzleMistake() { ++m_PuzzleMistakes; }
-        void RegisterChargerUsed() { ++m_ChargersUsed; }
-        int GetAnomaliesHandled() const { return m_AnomaliesHandled; }
-        int GetPuzzleMistakes() const { return m_PuzzleMistakes; }
-        int GetChargersUsed() const { return m_ChargersUsed; }
-        void RegisterEvidenceCollected() { ++m_EvidenceCollected; }
-        int GetEvidenceCollected() const { return m_EvidenceCollected; }
+        void RegisterAnomalyHandled() { m_State.RegisterAnomalyHandled(); }
+        void RegisterPuzzleMistake() { m_State.RegisterPuzzleMistake(); }
+        void RegisterChargerUsed() { m_State.RegisterChargerUsed(); }
+        int GetAnomaliesHandled() const { return m_State.GetAnomaliesHandled(); }
+        int GetPuzzleMistakes() const { return m_State.GetPuzzleMistakes(); }
+        int GetChargersUsed() const { return m_State.GetChargersUsed(); }
+        void RegisterEvidenceCollected() { m_State.RegisterEvidenceCollected(); }
+        int GetEvidenceCollected() const { return m_State.GetEvidenceCollected(); }
 
 
 

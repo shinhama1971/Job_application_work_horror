@@ -12,7 +12,7 @@
 
 using namespace DirectX::SimpleMath;
 
-void Ground::BuildFallingDrops()
+void WaterEffectSystem::Init()
 {
 	m_FallingDrops.clear();
 	m_PuddleCenters.clear();
@@ -198,7 +198,7 @@ void Ground::BuildFallingDrops()
 	}
 }
 
-void Ground::UpdateFallingDrops(float deltaTime)
+void WaterEffectSystem::UpdateFallingDrops(float deltaTime)
 {
 	for (FallingDrop& drop : m_FallingDrops)
 	{
@@ -226,7 +226,7 @@ void Ground::UpdateFallingDrops(float deltaTime)
 	}
 }
 
-bool Ground::IsInsidePuddle(const Vector3& position) const
+bool WaterEffectSystem::IsInsidePuddle(const Vector3& position) const
 {
 	for (const Vector2& center : m_PuddleCenters)
 	{
@@ -241,7 +241,7 @@ bool Ground::IsInsidePuddle(const Vector3& position) const
 	return false;
 }
 
-bool Ground::IsAnyPuddleVisible(const Camera& camera) const
+bool WaterEffectSystem::IsAnyPuddleVisible(const Camera& camera) const
 {
 	for (const Vector2& center : m_PuddleCenters)
 	{
@@ -256,7 +256,7 @@ bool Ground::IsAnyPuddleVisible(const Camera& camera) const
 	return false;
 }
 
-void Ground::UpdateFootstepRipples(float deltaTime)
+void WaterEffectSystem::UpdateFootstepRipples(float deltaTime)
 {
 	m_FootstepRippleCooldown = (std::max)(
 		0.0f, m_FootstepRippleCooldown - deltaTime);
@@ -275,7 +275,7 @@ void Ground::UpdateFootstepRipples(float deltaTime)
 	// これにより、壁へ向かって歩いた場合やフレーム落ち時にも音と波紋がずれません。
 }
 
-bool Ground::TriggerFootstepRipple(
+bool WaterEffectSystem::TriggerFootstepRipple(
 	const Vector3& playerPosition,
 	bool sprinting)
 {
@@ -307,7 +307,7 @@ bool Ground::TriggerFootstepRipple(
 	return true;
 }
 
-void Ground::DrawFallingDrops(Camera* camera)
+void WaterEffectSystem::DrawFallingDrops(Camera* camera)
 {
 	if (m_DropVertices.empty() || m_DropMaterial == nullptr)
 	{
@@ -338,7 +338,7 @@ void Ground::DrawFallingDrops(Camera* camera)
 	Renderer::SetBlendState(BS_NONE);
 }
 
-void Ground::DrawWaterRipples(Camera* camera)
+void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 {
 	if (m_RippleVertices.empty() || m_RippleMaterial == nullptr ||
 		m_DropMaterial == nullptr)
@@ -443,3 +443,42 @@ void Ground::DrawWaterRipples(Camera* camera)
 	Renderer::SetBlendState(BS_NONE);
 }
 
+void WaterEffectSystem::Update(float deltaTime)
+{
+	UpdateFallingDrops(deltaTime);
+	UpdateFootstepRipples(deltaTime);
+}
+
+void WaterEffectSystem::Draw(Camera* camera)
+{
+	DrawFallingDrops(camera);
+	DrawWaterRipples(camera);
+}
+
+void WaterEffectSystem::Uninit()
+{
+	m_FallingDrops.clear();
+	m_PuddleCenters.clear();
+	m_DropVertices.clear();
+	m_DropMaterial.reset();
+	m_RippleVertices.clear();
+	m_FootstepRipples.clear();
+	m_RippleMaterial.reset();
+}
+
+bool Ground::TriggerFootstepRipple(
+	const Vector3& position,
+	bool sprinting)
+{
+	return m_WaterEffects.TriggerFootstepRipple(position, sprinting);
+}
+
+bool Ground::IsInsidePuddle(const Vector3& position) const
+{
+	return m_WaterEffects.IsInsidePuddle(position);
+}
+
+bool Ground::IsAnyPuddleVisible(const Camera& camera) const
+{
+	return m_WaterEffects.IsAnyPuddleVisible(camera);
+}

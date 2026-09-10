@@ -49,6 +49,8 @@ public:
     void Init() override;
     void Update() override;
     void Draw(Camera* camera) override;
+    bool UsesCameraCulling() const override { return true; }
+    bool ContributesToPlanarReflection() const override { return true; }
     void Uninit() override;
 
     void SetPosition(float x, float y, float z)

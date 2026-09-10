@@ -40,6 +40,8 @@ public:
     void Init() override;
     void Update() override;
     void Draw(Camera* cam) override;
+    bool UsesCameraCulling() const override { return true; }
+    bool ContributesToPlanarReflection() const override { return true; }
     void Uninit() override;
 
     bool IsInteractionEnabled() const override

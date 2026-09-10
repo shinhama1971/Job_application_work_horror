@@ -34,6 +34,8 @@ public:
     void Draw(Camera* cam) override;
     void DrawShadow() override;
     bool CastsShadow() const override { return m_Visible && m_CastsShadow; }
+    bool UsesCameraCulling() const override { return true; }
+    bool ContributesToPlanarReflection() const override { return true; }
     void Uninit() override;
 
     void ResolveCollision(
