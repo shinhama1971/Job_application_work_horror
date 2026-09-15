@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: ライト視点の深度描画と、影テクスチャの生成を管理します。
+// 主な技術: Depth Texture、比較サンプラー、ライト行列、深度専用パス
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "ShadowMap.h"
@@ -10,6 +12,7 @@ using namespace DirectX::SimpleMath;
 
 namespace Effect
 {
+    // 処理内容: 必要な状態とGPU・音声リソースを初期化します。
     void ShadowMap::Init()
     {
         ID3D11Device* device = Renderer::GetDevice();
@@ -82,6 +85,7 @@ namespace Effect
             "shader/shadowDepthPS.hlsl");
     }
 
+    // 処理内容: 所有するリソースを依存関係の逆順で解放します。
     void ShadowMap::Uninit()
     {
         m_PreviousRasterizer.Reset();
@@ -93,6 +97,7 @@ namespace Effect
         m_Texture.Reset();
     }
 
+    // 処理内容: 処理区間を開始し、必要な状態を設定します。
     void ShadowMap::Begin(const Camera& camera)
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
@@ -151,6 +156,7 @@ namespace Effect
         context->PSSetConstantBuffers(8, 1, &shadowBuffer);
     }
 
+    // 処理内容: 処理区間を終了し、変更した状態を戻します。
     void ShadowMap::End()
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
@@ -170,6 +176,7 @@ namespace Effect
         context->PSSetSamplers(1, 1, &comparisonSampler);
     }
 
+    // 処理内容: ShadowMapの「Bind」処理を担当します。
     void ShadowMap::Bind()
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
@@ -181,12 +188,13 @@ namespace Effect
         context->PSSetSamplers(1, 1, &comparisonSampler);
     }
 
+    // 処理内容: 外部から受け取った値を検証して状態へ反映します。
     void ShadowMap::SetShader()
     {
         m_DepthShader.SetGPU();
 
-        // The shadow pass writes depth only. Leaving a regular pixel shader
-        // bound causes stage-signature and missing-render-target errors.
+        // 影生成パスは深度だけを書き込みます。通常のピクセルシェーダーが残ると、
+        // 入出力シグネチャやレンダーターゲット不足のエラーになるため解除します。
         Renderer::GetDeviceContext()->PSSetShader(nullptr, nullptr, 0);
     }
 }

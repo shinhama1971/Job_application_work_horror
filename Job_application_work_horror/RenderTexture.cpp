@@ -1,11 +1,14 @@
 // ============================================================================
 // ファイルの役割: オフスクリーン描画用テクスチャ、RTV、SRV、深度を管理します。
+// 主な技術: Render Target View、Shader Resource View、Depth Stencil、解像度同期
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "RenderTexture.h"
 
 namespace Graphics
 {
+    // 処理内容: 必要な状態とGPU・音声リソースを初期化します。
     void RenderTexture::Init(
         int width,
         int height,
@@ -63,8 +66,8 @@ namespace Graphics
             );
         }
 
-        // A render target and its depth buffer must have identical dimensions.
-        // Compute-only bloom textures never need a depth buffer.
+        // レンダーターゲットと深度バッファは同じ寸法で作成します。
+        // コンピュート処理専用のブルーム画像には深度バッファを作りません。
         if (!enableUnorderedAccess)
         {
             D3D11_TEXTURE2D_DESC depthDesc{};
@@ -88,6 +91,7 @@ namespace Graphics
 
     }
 
+    // 処理内容: 所有するリソースを依存関係の逆順で解放します。
     void RenderTexture::Uninit()
     {
         m_UAV.Reset();
@@ -100,6 +104,7 @@ namespace Graphics
         m_Height = 0;
     }
 
+    // 処理内容: 外部から受け取った値を検証して状態へ反映します。
     void RenderTexture::SetRenderTarget()
     {
         ID3D11DeviceContext* context =
@@ -131,6 +136,7 @@ namespace Graphics
         }
     }
 
+    // 処理内容: RenderTextureの「Clear」処理を担当します。
     void RenderTexture::Clear(float r, float g, float b, float a)
     {
         float clearColor[4] = { r, g, b, a };

@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 壁の形状、材質、衝突範囲、影の有無を管理します。
+// 主な技術: プロシージャルメッシュ、AABB、最近傍面への押し戻し、SRT行列
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Wall.h"
@@ -13,6 +15,7 @@
 
 using namespace DirectX::SimpleMath;
 
+// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void Wall::Init()
 {
     m_Vertices.clear();
@@ -45,8 +48,8 @@ void Wall::Init()
             m_Vertices.push_back(vertex);
         }
 
-        // Both windings keep the wall visible from either side. This is
-        // useful while the room layout is still being iterated.
+        // 表裏両方の頂点順を持たせ、どちら側からでも壁を表示します。
+        // 部屋配置を調整中でも裏面欠けを起こさないためです。
         const unsigned int faceIndices[] =
         {
             base + 0, base + 1, base + 2,
@@ -106,10 +109,12 @@ void Wall::Init()
     m_Material->Create(m_SurfaceMaterial);
 }
 
+// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void Wall::Update()
 {
 }
 
+// 処理内容: 現在の状態に対応する描画命令を発行します。
 void Wall::Draw(Camera* cam)
 {
     if (!m_Visible)
@@ -140,6 +145,7 @@ void Wall::Draw(Camera* cam)
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
 }
 
+// 処理内容: ライト視点の深度をシャドウマップへ描画します。
 void Wall::DrawShadow()
 {
     if (!m_Visible || !m_CastsShadow)
@@ -163,6 +169,7 @@ void Wall::DrawShadow()
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
 }
 
+// 処理内容: 競合やめり込みを解消した結果を返します。
 void Wall::ResolveCollision(Vector3& position, float radius) const
 {
     if (!m_Visible || !m_CollisionEnabled)
@@ -201,8 +208,8 @@ void Wall::ResolveCollision(Vector3& position, float radius) const
         return;
     }
 
-    // The player's center is inside the wall rectangle. Push it through the
-    // nearest face so even a spawn or a large frame step can recover safely.
+    // プレイヤー中心が壁内部にある場合は、最も近い面の外へ押し出します。
+    // 壁内スポーンや大きなフレーム移動が起きても安全に復帰できます。
     const float distanceToLeft = position.x - minX;
     const float distanceToRight = maxX - position.x;
     const float distanceToNear = position.z - minZ;
@@ -231,6 +238,7 @@ void Wall::ResolveCollision(Vector3& position, float radius) const
     }
 }
 
+// 処理内容: Wallの「IntersectsInteractionSegment」処理を担当します。
 bool Wall::IntersectsInteractionSegment(
     const Vector3& start,
     const Vector3& end,
@@ -286,12 +294,14 @@ bool Wall::IntersectsInteractionSegment(
     return true;
 }
 
+// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void Wall::Uninit()
 {
     m_Vertices.clear();
     m_Indices.clear();
 }
 
+// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Wall::SetAppearance(
     const Color& diffuse,
     const Color& emission,

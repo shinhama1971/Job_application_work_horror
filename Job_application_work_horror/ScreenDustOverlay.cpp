@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 画面の埃、レンズ汚れ、湿り表現のオーバーレイを管理します。
+// 主な技術: スクリーンスペース表現、粒子、アルファブレンド、時間アニメーション
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "ScreenDustOverlay.h"
@@ -8,6 +10,7 @@
 
 using namespace DirectX::SimpleMath;
 
+// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void ScreenDustOverlay::Init()
 {
     float w = (float)Application::GetWidth();
@@ -54,6 +57,7 @@ void ScreenDustOverlay::Init()
     );
 }
 
+// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void ScreenDustOverlay::Update()
 {
     if (!m_IsActive) return;
@@ -71,6 +75,7 @@ void ScreenDustOverlay::Update()
     }
 }
 
+// 処理内容: 現在の状態に対応する描画命令を発行します。
 void ScreenDustOverlay::Draw(Camera* cam)
 {
     if (!m_IsActive) return;
@@ -113,6 +118,7 @@ void ScreenDustOverlay::Draw(Camera* cam)
     Renderer::SetDepthEnable(true);
 }
 
+// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void ScreenDustOverlay::Uninit()
 {
     m_TimeBuffer.Reset();

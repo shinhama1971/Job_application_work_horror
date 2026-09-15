@@ -1,5 +1,7 @@
-// ============================================================================
+﻿// ============================================================================
 // ファイルの役割: 音量設定とクリア記録の保存・読み込みを管理します。
+// 主な技術: ファイルI/O、値の検証、失敗時の既定値復旧
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Game.h"
@@ -9,6 +11,7 @@
 
 namespace Core
 {
+    // 処理内容: 計算済みの設定や効果を対象へ反映します。
     void Game::ApplyAudioVolume(bool paused)
     {
         if (!m_SoundReady)
@@ -25,6 +28,7 @@ namespace Core
             volumeScales[m_Settings.GetVolumeLevel()] * pauseScale);
     }
 
+    // 処理内容: ファイルからデータを読み込み、利用可能な形へ変換します。
     void Game::LoadBestRecord()
     {
         std::ifstream recordFile("save/best_record.txt");
@@ -43,6 +47,7 @@ namespace Core
         m_State.LoadBestRecord(clearTime, caughtCount);
     }
 
+    // 処理内容: 現在の状態を次回復元できる形式で保存します。
     void Game::SaveBestRecord() const
     {
         std::error_code directoryError;

@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: Windowsアプリケーションの生成、メインループ、終了処理を管理します。
+// 主な技術: Win32 API、固定タイムステップ、メッセージループ、フレーム時間の上限処理
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // この実装ファイルでは宣言された機能の具体的な処理を定義します。
 // ============================================================================
 
@@ -86,8 +88,8 @@ bool Application::InitApp()
     // インスタンスハンドル設定
     m_hInst = hInst;
 
-    // Use the desktop resolution before Direct3D and post-process textures are
-    // created. This keeps every render target the same size in fullscreen.
+    // Direct3Dと画面効果用テクスチャを作る前にデスクトップ解像度を取得します。
+    // 全画面時も全レンダーターゲットを同じ大きさに保つためです。
     m_Width = static_cast<uint32_t>(GetSystemMetrics(SM_CXSCREEN));
     m_Height = static_cast<uint32_t>(GetSystemMetrics(SM_CYSCREEN));
 

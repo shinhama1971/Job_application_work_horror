@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 1面の入口演出、廊下ループ、電力復旧、出口イベントを管理します。
+// 主な技術: イベント駆動、有限状態機械、カメラ・照明・音の同期
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "StageScene.h"
@@ -25,6 +27,7 @@
 
 using namespace DirectX::SimpleMath;
 
+// 処理内容: StageSceneの「UpdateEntranceThresholdEvent」処理を担当します。
 void StageScene::UpdateEntranceThresholdEvent(Player& player)
 {
     constexpr float deltaTime = 1.0f / 60.0f;
@@ -42,8 +45,8 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
             return;
         }
 
-        // A physical light reaction replaces the old forced-camera cutaway.
-        // Control remains with the player, so noticing the event feels earned.
+        // 強制カメラ演出の代わりに、空間内の照明変化で出来事を見せます。
+        // 操作を奪わず、プレイヤー自身が異変へ気付ける演出にします。
         m_EntranceEventTriggered = true;
         m_EntranceEventTimer = 0.0f;
         m_EntranceEventPhase = 0;
@@ -100,6 +103,7 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
     }
 }
 
+// 処理内容: StageSceneの「UpdateCorridorLoop」処理を担当します。
 void StageScene::UpdateCorridorLoop(Player& player)
 {
     constexpr float deltaTime = 1.0f / 60.0f;
@@ -128,13 +132,14 @@ void StageScene::UpdateCorridorLoop(Player& player)
     }
 }
 
+// 処理内容: StageSceneの「AdvanceCorridorLoop」処理を担当します。
 void StageScene::AdvanceCorridorLoop(Player& player)
 {
     Core::Game* game = Core::Game::GetInstance();
     ++m_CorridorLoopCount;
 
-    // The camera is updated by Player later in the same frame, hiding a scene
-    // reload and preserving the direction in which the player was looking.
+    // 同じフレーム後半でPlayerがカメラを更新するため、再配置の瞬間を隠しつつ
+    // プレイヤーが見ていた方向を維持できます。
     player.SetPosition(Vector3(0.0f, -99.0f, -150.0f));
     m_LoopCooldown = 1.0f;
     m_ProgressHintTimer = 0.0f;
@@ -165,8 +170,8 @@ void StageScene::AdvanceCorridorLoop(Player& player)
         0.42f + static_cast<float>(loopPhase) * 0.10f);
     Input::SetVibration(7 + loopPhase * 3, 0.18f + loopPhase * 0.04f);
 
-    // Returning to the entrance also restores the corridor door. Reopening
-    // the same physical threshold makes each loop feel deliberate.
+    // 入口へ戻すときに廊下の扉も復元します。同じ境界を再び開けさせることで、
+    // 各周回が意図的な反復として感じられるようにします。
     Door* loopDoor = game->GetObj<Door>("Door");
     if (loopDoor != nullptr)
     {
@@ -231,7 +236,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
             cornerLight->SetEmergencyLight(false, 4.3f);
         }
 
-        // The warning is literal: a single apparition waits behind the player.
+        // 警告文どおり、プレイヤーの背後に一度だけ人影を出現させます。
         if (m_CorridorLoopCount == 3)
         {
             game->RequestAddObject<ShadowMan>(
@@ -249,6 +254,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     }
 }
 
+// 処理内容: StageSceneの「StartScareLightSequence」処理を担当します。
 void StageScene::StartScareLightSequence()
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -292,6 +298,7 @@ void StageScene::StartScareLightSequence()
     }
 }
 
+// 処理内容: StageSceneの「UpdateScareLightSequence」処理を担当します。
 void StageScene::UpdateScareLightSequence()
 {
     constexpr float deltaTime = 1.0f / 60.0f;
@@ -392,6 +399,7 @@ void StageScene::UpdateScareLightSequence()
     }
 }
 
+// 処理内容: StageSceneの「StartFuseWatcher」処理を担当します。
 void StageScene::StartFuseWatcher(int fuseCount)
 {
     if (fuseCount < 2 || Core::Game::GetInstance()->IsPowerRestored())
@@ -445,6 +453,7 @@ void StageScene::StartFuseWatcher(int fuseCount)
         0.30f);
 }
 
+// 処理内容: StageSceneの「UpdatePowerRestoreSequence」処理を担当します。
 void StageScene::UpdatePowerRestoreSequence()
 {
     constexpr float deltaTime = 1.0f / 60.0f;
@@ -455,7 +464,7 @@ void StageScene::UpdatePowerRestoreSequence()
     {
         m_ProgressHintTimer = 0.0f;
 
-        // Power restoration owns the presentation from this point onward.
+        // ここから先の画面・照明・音の演出は通電シーケンス側で一括管理します。
         m_ScareLightSequence.Cancel();
         m_ScareLightSequence.ClearNotice();
 
@@ -497,6 +506,7 @@ void StageScene::UpdatePowerRestoreSequence()
     }
 }
 
+// 処理内容: StageSceneの「UpdateExitPowerSequence」処理を担当します。
 void StageScene::UpdateExitPowerSequence()
 {
     constexpr float deltaTime = 1.0f / 60.0f;
@@ -562,6 +572,7 @@ void StageScene::UpdateExitPowerSequence()
     }
 }
 
+// 処理内容: StageSceneの「UpdateExitOmen」処理を担当します。
 void StageScene::UpdateExitOmen(Player& player)
 {
     constexpr float deltaTime = 1.0f / 60.0f;

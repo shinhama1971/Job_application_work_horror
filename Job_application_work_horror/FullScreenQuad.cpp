@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: ポストプロセス用の画面全体ポリゴンとレンダーターゲットを管理します。
+// 主な技術: フルスクリーンクアッド、加算合成、ブルーム、露出補正、CRT、ボリュームライト
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "FullScreenQuad.h"
@@ -9,6 +11,7 @@ using namespace DirectX::SimpleMath;
 
 namespace Graphics
 {
+    // 処理内容: 必要な状態とGPU・音声リソースを初期化します。
     void FullScreenQuad::Init()
     {
         m_Vertices.resize(4);
@@ -75,6 +78,7 @@ namespace Graphics
         );
     }
 
+    // 処理内容: 所有するリソースを依存関係の逆順で解放します。
     void FullScreenQuad::Uninit()
     {
         m_TimeBuffer.Reset();
@@ -143,15 +147,15 @@ namespace Graphics
 
         ID3D11ShaderResourceView* nullResource = nullptr;
 
-        // Add only the eye-adaptation brightness difference. The original
-        // back buffer remains visible even if the captured SRV is unavailable.
+        // 目の順応による明るさの差分だけを加算します。
+        // 取得用SRVが使えない場合も元のバックバッファを見える状態に保ちます。
         m_ExposureShader.SetGPU();
         Renderer::SetBlendState(BS_ADDITIVE);
         context->PSSetShaderResources(0, 1, &sceneSRV);
         context->DrawIndexed(4, 0, 0);
         context->PSSetShaderResources(0, 1, &nullResource);
 
-        // Add bloom after exposure so bright fixtures retain their glow.
+        // 露出補正の後にブルームを加算し、明るい照明のにじみを残します。
         if (bloomSRV != nullptr && bloomIntensity > 0.001f)
         {
             m_BloomShader.SetGPU();
@@ -162,8 +166,8 @@ namespace Graphics
 
         context->PSSetShaderResources(0, 1, &nullResource);
 
-        // Integrate a short section of atmospheric scattering along the
-        // flashlight ray. The shadow depth map stops the beam at walls.
+        // 懐中電灯の光線上で短い区間の大気散乱を積算します。
+        // シャドウ深度を参照し、壁の位置で光の筋を止めます。
         if (volumeIntensity > 0.0f)
         {
             m_VolumeShader.SetGPU();
@@ -171,7 +175,7 @@ namespace Graphics
             context->DrawIndexed(4, 0, 0);
         }
 
-        // CRT is a transparent overlay and can never replace the scene with black.
+        // CRT効果は透過オーバーレイとして合成し、シーン全体を黒で上書きしないようにします。
         if (noiseAmount > 0.0f || horrorPulseStrength > 0.001f ||
             lensMoisture > 0.001f || filmGradeStrength > 0.001f ||
             signalInterference > 0.001f)

@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 遠景の人影、出現時間、消失・ディゾルブ演出を管理します。
+// 主な技術: ゲームAI状態機械、追跡補間、シャドウ表現、ディゾルブ
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Game.h"
@@ -13,6 +15,7 @@
 
 using namespace DirectX::SimpleMath;
 
+// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void ShadowMan::Init()
 {
 	m_Age = 0.0f;
@@ -120,6 +123,7 @@ void ShadowMan::Init()
     m_Scale = Vector3(8.0f, 16.0f, 8.0f);
 }
 
+// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void ShadowMan::Update()
 {
     if (!m_IsActive)
@@ -223,6 +227,7 @@ void ShadowMan::Update()
 	}
 }
 
+// 処理内容: 現在の状態に対応する描画命令を発行します。
 void ShadowMan::Draw(Camera* camera)
 {
     if (!m_IsActive || m_LifeTimer <= 0)
@@ -270,6 +275,7 @@ void ShadowMan::Draw(Camera* camera)
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
 }
 
+// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void ShadowMan::Uninit()
 {
 	m_OnObserved = nullptr;

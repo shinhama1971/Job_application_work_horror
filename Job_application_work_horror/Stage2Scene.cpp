@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 2面のループ廊下、謎解き、段階的な異変とクリア条件を管理します。
+// 主な技術: シーン分割、有限状態機械、観察型パズル、追跡演出
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Stage2Scene.h"
@@ -25,16 +27,19 @@ using namespace DirectX::SimpleMath;
 #include "Stage2SceneConstants.h"
 
 
+// 処理内容: Stage2Sceneを生成し、初期状態を準備します。
 Stage2Scene::Stage2Scene()
 {
     Init();
 }
 
+// 処理内容: Stage2Sceneが所有する処理とリソースを終了します。
 Stage2Scene::~Stage2Scene()
 {
     Uninit();
 }
 
+// 処理内容: Stage2Sceneの「TryGetDebugInfo」処理を担当します。
 bool Stage2Scene::TryGetDebugInfo(SceneDebugInfo& info) const
 {
     info.progressionStep = m_LoopCount;
@@ -46,6 +51,7 @@ bool Stage2Scene::TryGetDebugInfo(SceneDebugInfo& info) const
     return true;
 }
 
+// 処理内容: Stage2Sceneの「RequestDebugAction」処理を担当します。
 void Stage2Scene::RequestDebugAction(SceneDebugAction action)
 {
     switch (action)
@@ -576,6 +582,7 @@ void Stage2Scene::Update()
     }
     m_ProgressHintTimer += deltaTime;
     if (Input::GetKeyTrigger(VK_H) ||
+        // 処理内容: 保持している値または参照を取得します。
         Input::GetButtonTrigger(XINPUT_LEFT_SHOULDER))
     {
         m_ProgressHintTimer = (std::max)(m_ProgressHintTimer, 30.0f);
@@ -659,8 +666,8 @@ void Stage2Scene::Update()
     }
 
     if (m_LoopCount < 3 && m_LoopCooldown <= 0.0f &&
-        // The loop changes only after the player has opened and crossed the
-        // corridor door.  The door itself is centred at z = 140.
+        // プレイヤーが廊下の扉を開けて通過した後だけ周回状態を変更します。
+        // 扉の中心座標はz=140です。
         player->GetPosition().z > 146.0f)
     {
         AdvanceLoop(*player);
@@ -868,6 +875,7 @@ void Stage2Scene::Update()
 
 
 
+// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void Stage2Scene::Uninit()
 {
     Core::Game* game = Core::Game::GetInstance();

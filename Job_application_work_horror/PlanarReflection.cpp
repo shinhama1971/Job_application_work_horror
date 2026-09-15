@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 水面用の平面反射レンダーターゲットと反射カメラを管理します。
+// 主な技術: Render To Texture、反射行列、クリップ平面、SRV/RTV競合回避
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "PlanarReflection.h"
@@ -12,6 +14,7 @@ using namespace DirectX::SimpleMath;
 
 namespace Effect
 {
+    // 処理内容: 必要な状態とGPU・音声リソースを初期化します。
     void PlanarReflection::Init()
     {
 		// 水面には波の歪みとフレネル反射が掛かる。
@@ -42,6 +45,7 @@ namespace Effect
             m_TwoSidedRasterizer.ReleaseAndGetAddressOf());
     }
 
+    // 処理内容: 所有するリソースを依存関係の逆順で解放します。
     void PlanarReflection::Uninit()
     {
         m_PreviousRasterizer.Reset();
@@ -50,13 +54,14 @@ namespace Effect
         m_Texture.Uninit();
     }
 
+    // 処理内容: 処理区間を開始し、必要な状態を設定します。
     void PlanarReflection::Begin(
         Camera& camera,
         float reflectionHeight)
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
 
-        // The texture cannot be sampled while it is used as a render target.
+        // 同じテクスチャを描画先として使用中にサンプリングできないため、事前にSRVを解除します。
         ID3D11ShaderResourceView* nullResource = nullptr;
         context->PSSetShaderResources(6, 1, &nullResource);
 
@@ -107,6 +112,7 @@ namespace Effect
             reflectionProjection);
     }
 
+    // 処理内容: 処理区間を終了し、変更した状態を戻します。
     void PlanarReflection::End(Camera& camera)
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
@@ -125,6 +131,7 @@ namespace Effect
             &reflectionResource);
     }
 
+    // 処理内容: PlanarReflectionの「Bind」処理を担当します。
     void PlanarReflection::Bind()
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();

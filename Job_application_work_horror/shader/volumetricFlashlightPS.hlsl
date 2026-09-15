@@ -1,4 +1,10 @@
 // ============================================================================
+// ファイルの役割: 懐中電灯の光路に沿って散乱光を積算します。
+// 主な技術: HLSL Pixel Shader、レイマーチ、シャドウマップ、距離減衰
+// 読み方: この実装ファイルでは宣言された機能の具体的な処理を定義します。
+// ============================================================================
+
+// ============================================================================
 // シェーダーの役割: 懐中電灯の光芒と霧による散乱を画面上へ合成します。
 // ============================================================================
 
@@ -88,7 +94,7 @@ float4 main(PS_IN input) : SV_Target
         return 0.0f;
     }
 
-    // Reconstruct the camera ray and project it into the square spotlight map.
+    // カメラレイを復元し、正方形のスポットライト深度マップへ投影します。
     const float2 screenNdc = float2(
         input.uv.x * 2.0f - 1.0f,
         1.0f - input.uv.y * 2.0f);
@@ -117,15 +123,13 @@ float4 main(PS_IN input) : SV_Target
 
     const float radial = saturate(1.0f - length(shadowNdc));
     const float softBeam = radial * radial * (3.0f - 2.0f * radial);
-    // Square-root response keeps short beams visible near walls while long
-    // corridors still collect more atmospheric light.
+    // 平方根応答で壁近くの短い光線も見せつつ、長い廊下では散乱光を多く蓄積します。
     const float visibleLength = sqrt(saturate(
         (occluderDistance - 2.0f) / 120.0f));
     const float floorFade = 1.0f - smoothstep(0.62f, 0.98f, input.uv.y);
 
-    // Continuous screen-space flow avoids the television-noise flicker of a
-    // new random pattern every frame. Two differently moving fields suggest
-    // particles at different depths inside the flashlight cone.
+    // 連続したスクリーン空間の流れを使い、毎フレーム乱数を変えるテレビノイズ状のちらつきを避けます。
+    // 速度の異なる二層で、光円錐内の異なる奥行きに漂う粒子を表現します。
     const float2 dustFlow = float2(time * 0.42f, -time * 0.24f);
     const float nearDustNoise = ValueNoise(
         input.pos.xy * 0.045f + dustFlow);

@@ -1,4 +1,10 @@
 // ============================================================================
+// ファイルの役割: 影の人物をノイズで段階的に消去します。
+// 主な技術: HLSL Pixel Shader、ディゾルブ、疑似乱数、エッジ発光
+// 読み方: この実装ファイルでは宣言された機能の具体的な処理を定義します。
+// ============================================================================
+
+// ============================================================================
 // シェーダーの役割: 人影(シャドウマン)の輪郭をノイズで崩しながら消失させます。
 // ============================================================================
 
@@ -21,8 +27,8 @@ float Hash31(float3 value)
 
 float4 main(in PS_IN input) : SV_Target
 {
-    // World-space cells keep the pattern attached to the apparition while it
-    // turns toward the player. A second moving sample prevents static noise.
+    // ワールド空間セルで模様を人影へ固定し、プレイヤー方向へ回転してもずれないようにします。
+    // 動く二つ目のサンプルを重ね、静止ノイズに見えることを防ぎます。
     const float3 cell = floor(input.worldPos * 0.42f);
     const float coarseNoise = Hash31(cell);
     const float movingNoise = Hash31(

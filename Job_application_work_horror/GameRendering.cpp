@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: カリング、影、水面反射、本描画の順序を管理します。
+// 主な技術: マルチパス描画、シャドウマップ、視錐台カリング、ポストプロセス
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Game.h"
@@ -233,7 +235,7 @@ namespace Core
         m_Instance->m_PostProcess.CaptureBackBuffer();
         m_Instance->m_PostProcess.Draw();
 
-        // Draw HUD and scene overlays after bloom so text stays sharp.
+        // ブルーム後にHUDと画面表示を描き、文字の輪郭がぼけないようにします。
         if (m_Instance->m_Scene)
         {
             m_Instance->m_Scene->Draw(&m_Instance->m_Camera);

@@ -1,4 +1,10 @@
 // ============================================================================
+// ファイルの役割: 信号パネルの発光色と点滅を描画します。
+// 主な技術: HLSL Pixel Shader、エミッシブ、時間アニメーション
+// 読み方: この実装ファイルでは宣言された機能の具体的な処理を定義します。
+// ============================================================================
+
+// ============================================================================
 // シェーダーの役割: 2面の信号パネルを状態に応じた発光色で描きます。
 // 定数バッファのスロットと入出力構造はCPU側の定義と必ず一致させてください。
 // ============================================================================
@@ -30,8 +36,7 @@ float4 main(SIGNAL_PS_IN input) : SV_Target
     const float border = 1.0f - smoothstep(
         0.025f, 0.085f, min(edgeDistance.x, edgeDistance.y));
 
-    // A procedural diagnostic grid gives each marker a readable electronic
-    // surface without adding texture memory or another asset dependency.
+    // プロシージャルな診断グリッドで、追加テクスチャなしに電子パネルらしい表面を作ります。
     const float2 gridCoordinate = abs(frac(uv * float2(12.0f, 7.0f)) - 0.5f);
     const float grid = 1.0f - smoothstep(
         0.455f, 0.495f, max(gridCoordinate.x, gridCoordinate.y));
@@ -74,7 +79,7 @@ float4 main(SIGNAL_PS_IN input) : SV_Target
     color += Material.Emission.rgb *
         (0.42f + centerGlow * 0.38f + pattern * 0.62f);
 
-    // Fine horizontal phosphor bands remain subtle at normal viewing distance.
+    // 細い水平蛍光体ラインは、通常の視距離で目立ちすぎない強度にします。
     const float phosphor = 0.965f +
         sin(input.pos.y * 3.1415926f) * 0.035f;
     color *= phosphor;
@@ -83,7 +88,6 @@ float4 main(SIGNAL_PS_IN input) : SV_Target
     {
         return float4(normal * 0.5f + 0.5f, 1.0f);
     }
-    // Keep HDR values above 1.0 so the existing bloom extraction pass can
-    // turn a restored panel into a soft light source in the corridor.
+    // HDR値を1.0より高く保ち、既存のブルーム抽出で復旧パネルを柔らかな光源として見せます。
     return float4(max(color, 0.0f), 1.0f);
 }

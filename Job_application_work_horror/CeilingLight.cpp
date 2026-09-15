@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 天井照明の形状、点灯状態、故障時のちらつきを管理します。
+// 主な技術: 動的ライティング、エミッシブ表現、疑似乱数、時間ベースの蛍光灯演出
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Game.h"
@@ -10,6 +12,7 @@
 
 using namespace DirectX::SimpleMath;
 
+// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void CeilingLight::Init()
 {
     m_Vertices.reserve(48);
@@ -105,6 +108,7 @@ void CeilingLight::Init()
     m_LightMaterial->Create(panel);
 }
 
+// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void CeilingLight::Update()
 {
     constexpr float deltaTime = 1.0f / 60.0f;
@@ -131,8 +135,8 @@ void CeilingLight::Update()
     float targetBrightness = 0.0f;
     if (powerRestored)
     {
-        // Start fixtures one after another, then make each fluorescent tube
-        // stutter briefly before it reaches full output.
+        // 照明を順番に起動し、各蛍光灯が全点灯する直前に短く明滅させます。
+        // 一斉点灯を避け、古い設備が復旧する不安定さを表現します。
         const float startupDelay =
             std::fmod(std::fabs(m_FlickerOffset), 5.0f) * 0.10f;
         const float startupTime = m_PowerOnTimer - startupDelay;
@@ -149,8 +153,8 @@ void CeilingLight::Update()
         }
         else if (startupTime >= 0.58f)
         {
-            // Each old fluorescent fixture has a slightly different ballast.
-            // A rare voltage dip breaks the perfectly constant game-light look.
+            // 器具ごとに安定器の個体差を持たせ、まれな電圧低下を再現します。
+            // ゲーム的に一定すぎる光を避け、古い施設らしさを出します。
             const float fixtureWear = std::fmod(
                 std::fabs(m_FlickerOffset) * 0.371f + 0.17f,
                 1.0f);
@@ -185,9 +189,8 @@ void CeilingLight::Update()
             : 0.22f + (unstable + 1.0f) * 0.08f;
     }
 
-    // A faulted fluorescent tube still provides occasional guidance, but its
-    // ballast drops out for irregular intervals. Explicit event flickers are
-    // applied afterwards so scripted scares remain readable.
+    // 故障した蛍光灯も時々点灯して進路を示しますが、不規則に消灯します。
+    // この自然な揺らぎの後からイベント用点滅を適用し、恐怖演出を確実に見せます。
     if (m_IsFaulted && powerRestored)
     {
         const float faultTime = m_Time + std::fabs(m_FlickerOffset) * 0.73f;
@@ -236,6 +239,7 @@ void CeilingLight::Update()
     m_Brightness += (targetBrightness - m_Brightness) * response;
 }
 
+// 処理内容: 現在の状態に対応する描画命令を発行します。
 void CeilingLight::Draw(Camera* camera)
 {
     camera->SetCamera();
@@ -297,6 +301,7 @@ void CeilingLight::Draw(Camera* camera)
         0);
 }
 
+// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void CeilingLight::Uninit()
 {
     m_Vertices.clear();

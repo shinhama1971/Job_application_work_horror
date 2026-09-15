@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: ゲーム全体のオブジェクト所有、更新・描画順、シーン遷移をまとめる
+// 主な技術: RAII、unique_ptr、遅延追加・削除、シングルトン、固定更新順
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Game.h"
@@ -18,12 +20,14 @@ namespace Core
 {
     std::unique_ptr<Game> Game::m_Instance;
 
+    // 処理内容: Gameを生成し、初期状態を準備します。
     Game::Game()
     {
         LoadBestRecord();
         m_Settings.Load();
     }
 
+    // 処理内容: Gameが所有する処理とリソースを終了します。
     Game::~Game()
     {
         DeleteAllObject();
@@ -100,11 +104,13 @@ namespace Core
         {
             int selectionDelta = 0;
             if (Input::GetKeyTrigger(VK_UP) ||
+                // 処理内容: 保持している値または参照を取得します。
                 Input::GetButtonTrigger(XINPUT_UP))
             {
                 selectionDelta = -1;
             }
             else if (Input::GetKeyTrigger(VK_DOWN) ||
+                // 処理内容: 保持している値または参照を取得します。
                 Input::GetButtonTrigger(XINPUT_DOWN))
             {
                 selectionDelta = 1;
@@ -119,11 +125,13 @@ namespace Core
 
             int settingDelta = 0;
             if (Input::GetKeyTrigger(VK_LEFT) ||
+                // 処理内容: 保持している値または参照を取得します。
                 Input::GetButtonTrigger(XINPUT_LEFT))
             {
                 settingDelta = -1;
             }
             else if (Input::GetKeyTrigger(VK_RIGHT) ||
+                // 処理内容: 保持している値または参照を取得します。
                 Input::GetButtonTrigger(XINPUT_RIGHT))
             {
                 settingDelta = 1;
@@ -295,15 +303,16 @@ namespace Core
         Input::Release();
         Debug::UI::Uninit();
 
-        // Release cached and member-owned GPU objects while the D3D device is
-        // still valid. Renderer::Uninit can then report genuine leaks instead
-        // of resources retained by the still-alive Game singleton.
+        // D3Dデバイスが有効な間に、キャッシュとGame所有のGPUリソースを解放します。
+        // これによりRenderer::Uninitのデバッグ出力が、Gameに残った参照ではなく
+        // 本当のリークだけを報告できます。
         Shader::ClearCache();
         m_Instance.reset();
 
         Renderer::Uninit();
     }
 
+    // 処理内容: 保持している値または参照を取得します。
     Game* Core::Game::GetInstance()
     {
         return m_Instance.get();
@@ -380,16 +389,19 @@ namespace Core
     }
 
 
+    // 処理内容: Gameの「DeleteObject」処理を担当します。
     void Game::DeleteObject(Object* pt)
     {
         m_ObjectManager.DeleteObject(pt);
     }
 
+    // 処理内容: Gameの「DestroyObj」処理を担当します。
     void Game::DestroyObj(const std::string& name)
     {
         m_ObjectManager.DestroyNamedObject(name);
     }
 
+    // 処理内容: Gameの「DeleteAllObject」処理を担当します。
     void Game::DeleteAllObject()
     {
         m_ObjectManager.DeleteAll();

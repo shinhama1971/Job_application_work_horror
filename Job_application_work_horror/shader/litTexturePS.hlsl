@@ -1,4 +1,10 @@
 // ============================================================================
+// ファイルの役割: 材質と複数ライトから最終色を計算します。
+// 主な技術: HLSL Pixel Shader、Phong/PBR要素、シャドウ、霧、懐中電灯
+// 読み方: この実装ファイルでは宣言された機能の具体的な処理を定義します。
+// ============================================================================
+
+// ============================================================================
 // シェーダーの役割: 材質、環境光、懐中電灯、天井灯、影を合成して3D表面を照明します。
 // 定数バッファのスロットと入出力構造はCPU側の定義と必ず一致させてください。
 // ============================================================================
@@ -33,8 +39,7 @@ float GetProceduralGrime(float3 worldPosition, float3 worldNormal)
     const float verticalSurface =
         saturate(1.0f - normal.y * normal.y);
 
-    // Select the dominant wall axis so the pattern stays in world scale even
-    // when an object has strongly stretched UV coordinates.
+    // 壁の主要軸を選んでワールドスケールの模様を作り、UVが大きく引き伸ばされた物体でも密度を保ちます。
     const float wallCoordinate = normal.x > normal.z
         ? worldPosition.z
         : worldPosition.x;
@@ -48,7 +53,7 @@ float GetProceduralGrime(float3 worldPosition, float3 worldNormal)
     const float fineDust = FastHash21(floor(
         wallUV * float2(0.115f, 0.082f) - 11.8f));
 
-    // Long vertical stains are created from a mostly one-dimensional mask.
+    // 主に一次元のマスクから、重力方向へ伸びる縦長の汚れを作ります。
     const float dripSeed = FastValueNoise(
         float2(wallCoordinate * 0.052f, 8.7f));
     const float dripBreakup = FastValueNoise(
@@ -105,7 +110,7 @@ float3 ApplyFilmicHorrorGrade(float3 color)
 {
     color = max(color, 0.0f);
 
-    // Blend a restrained filmic shoulder instead of crushing the shadows.
+    // 影を潰す強いクリップを避け、控えめなフィルム調ハイライト圧縮を合成します。
     const float3 acesColor = saturate(
         (color * (2.51f * color + 0.03f)) /
         (color * (2.43f * color + 0.59f) + 0.14f));
@@ -144,8 +149,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
         color *= Material.Diffuse;
     }
 
-    // Procedural dirt is reserved for opaque, untextured construction pieces.
-    // Emissive panels stay clean so bloom and ceiling lights are not dulled.
+    // プロシージャル汚れは、不透明でテクスチャのない建材だけへ適用します。
+    // 発光パネルは汚さず、ブルームと天井光の明るさを保ちます。
     const float emissionEnergy = dot(
         abs(Material.Emission.rgb),
         float3(0.3333f, 0.3333f, 0.3333f));
@@ -172,7 +177,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     float3 lighting = GetHemisphereAmbient(detailWorldNormal);
     const float distanceFromCamera = length(input.viewPos);
 
-    // Ceiling point lights illuminate nearby floors and walls, not only the panels.
+    // 天井の点光源はパネルだけでなく、近くの床と壁も照らします。
     [unroll]
     for (int i = 0; i < 8; ++i)
     {
@@ -199,8 +204,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
         const float pointLambert = saturate(dot(
             detailWorldNormal, directionToPointLight));
         const float softPointLambert = 0.20f + pointLambert * 0.80f;
-        // Ceiling panels are broad downward emitters, not bare point bulbs.
-        // Keep a little sideways spill while concentrating energy on the floor.
+        // 天井パネルを裸の点電球ではなく、下向きに広がる面光源として近似します。
+        // 床へ光を集中させつつ、横方向にも少量の光を残します。
         const float downwardAmount = saturate(directionToPointLight.y);
         const float fixtureDistribution = lerp(
             0.22f,
@@ -250,9 +255,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
     color.rgb *= lighting;
 
-    // Damp plaster reflects a narrow, cool highlight at grazing angles.
-    // The same grime mask drives both absorption and sheen, keeping the
-    // effect physically coherent without another texture lookup.
+    // 湿った漆喰は浅い入射角で細く冷たいハイライトを返します。
+    // 同じ汚れマスクを吸収と光沢へ使い、追加参照なしで見た目の整合性を保ちます。
     const float3 viewDirection = normalize(-input.viewPos);
     const float dampFresnel = pow(
         1.0f - saturate(dot(detailViewNormal, viewDirection)),
@@ -262,9 +266,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
     color.rgb += Material.Emission.rgb;
 
-    // Layered height fog keeps nearby navigation readable while separating
-    // distant silhouettes. It gathers near the floor instead of uniformly
-    // washing out the entire room.
+    // 高さの異なる霧を重ね、近距離の移動視認性を保ちながら遠景の輪郭を分離します。
+    // 部屋全体を一様に白くせず、床付近へ霧を集めます。
     const float distanceFog =
         smoothstep(110.0f, 390.0f, distanceFromCamera) * 0.72f;
     const float heightFromFloor = max(input.worldPos.y + 100.0f, 0.0f);

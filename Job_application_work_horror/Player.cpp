@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 一人称移動、視点、懐中電灯、電池、インタラクションを管理します。
+// 主な技術: FPS制御、衝突応答、ヘッドボブ、スポットライト、入力統合
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Player.h"
@@ -120,8 +122,7 @@ void Player::Update()
     const std::vector<Door*> doors =
         Core::Game::GetInstance()->GetObjects<Door>();
 
-    // Resolve twice so a push from one wall is also checked against the
-    // neighbouring wall at room corners.
+    // 壁による押し戻しを2回解決し、部屋の角で隣の壁へ入った場合も再判定します。
     for (int pass = 0; pass < 2; ++pass)
     {
         for (const Wall* wall : walls)
@@ -219,8 +220,8 @@ void Player::Update()
             2 + static_cast<int>(batteryStress * 4.0f),
             0.035f + batteryStress * 0.065f);
     }
-    // Reduce flashlight exposure near walls and the floor. A constant beam
-    // made nearby surfaces clip to white and hid the material detail.
+    // 壁や床が近いときは懐中電灯の露出を下げます。
+    // 一定光量では近距離面が白飛びし、材質の細部が消えるためです。
     float closestSurfaceDistance = 70.0f;
     if (visibleLight)
     {
@@ -252,8 +253,7 @@ void Player::Update()
             }
         }
 
-        // Ground is rendered separately from Wall, so include its horizontal
-        // plane when the player aims down.
+        // 床はWallとは別に描画されるため、下を向いたときは水平面との距離も計算します。
         if (beamDirection.y < -0.001f)
         {
             const float floorDistance =
@@ -284,8 +284,8 @@ void Player::Update()
             flashlightState.powerBlend
         : 0.0f;
     light.Range = 275.0f - m_FlashlightNearSurfaceBlend * 48.0f;
-    // A hand-held lamp is never perfectly rigid. Low battery adds a little
-    // electrical/mechanical instability without moving the player's aim.
+    // 手持ちライトの微細な揺れを加えます。電池低下時は視点を動かさず、
+    // 光だけへ電気的・機械的な不安定さを足します。
     const float flashlightSway = renderFlashlight
         ? 0.0035f + batteryStress * 0.0065f
         : 0.0f;
@@ -308,7 +308,7 @@ void Player::Update()
 
     if (renderFlashlight)
     {
-        // A struggling battery shifts the lamp slightly toward warm yellow.
+        // 電池が弱るほど光を少し暖色へ寄せ、残量低下を色でも伝えます。
         light.Diffuse = Color(
             m_LightDiffuseR * (1.0f + batteryStress * 0.04f),
             m_LightDiffuseG * (1.0f - batteryStress * 0.06f),
@@ -334,7 +334,7 @@ void Player::Update()
 
     Renderer::SetLight(light);
 
-    // Turn the visible ceiling fixtures into real lights for the room geometry.
+    // 見えている天井照明を実ライトとして登録し、部屋の形状へ光を当てます。
     ENVIRONMENT_LIGHTS environmentLights{};
     const bool powerRestored = Core::Game::GetInstance()->IsPowerRestored();
     for (CeilingLight* fixture : Core::Game::GetInstance()->GetObjects<CeilingLight>())
@@ -354,7 +354,7 @@ void Player::Update()
         ENVIRONMENT_POINT_LIGHT& pointLight =
             environmentLights.Lights[environmentLights.Count++];
 
-        // Move the light slightly below the glowing panel to illuminate the room.
+        // 発光パネルより少し下へライトを置き、天井に埋もれず室内を照らすようにします。
         pointLight.PositionRange = Vector4(
             fixturePosition.x, fixturePosition.y - 3.0f, fixturePosition.z,
             powerRestored ? 165.0f : 115.0f);
@@ -386,8 +386,7 @@ void Player::Update()
     eyePos.y += m_CameraHeightOffset;
     if (m_IsFPS)
     {
-        // The slow component remains while standing still and makes the
-        // viewpoint feel attached to a breathing person rather than a tripod.
+        // 停止中も遅い揺れを残し、三脚ではなく呼吸する人物の視点として感じられるようにします。
         const float breath = sinf(m_AmbienceTimer * 1.15f) * 0.075f;
         eyePos.y += m_Movement.GetHeadBobOffset() + breath;
         eyePos += right * m_Movement.GetHeadBobSideOffset();
@@ -466,6 +465,7 @@ void Player::Draw(Camera* cam)
     }
 }
 
+// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void Player::Uninit()
 {}
 

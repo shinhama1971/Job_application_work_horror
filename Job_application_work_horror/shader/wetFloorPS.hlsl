@@ -1,4 +1,10 @@
 // ============================================================================
+// ファイルの役割: 濡れた床の反射、粗さ、波紋を画素単位で表現します。
+// 主な技術: HLSL Pixel Shader、平面反射、法線摂動、Fresnel、時間アニメーション
+// 読み方: この実装ファイルでは宣言された機能の具体的な処理を定義します。
+// ============================================================================
+
+// ============================================================================
 // シェーダーの役割: 濡れた床の反射、フレネル、波紋、粗さを計算します。
 // ============================================================================
 
@@ -92,7 +98,7 @@ float2 Hash22(float2 value)
 
 float GetDripRing(float2 worldPosition)
 {
-    // Sparse drops make the puddles feel alive without looking like rain.
+    // 水滴を疎に発生させ、雨に見せず水たまりへ小さな動きを加えます。
     const float cellSize = 15.0f;
     const float2 cell = floor(worldPosition / cellSize);
     const float2 localPosition = frac(worldPosition / cellSize);
@@ -116,9 +122,8 @@ float GetPuddleMask(
 {
     shore = 0.0f;
     ripplePattern = 0.0f;
-    // Each large world-space cell may contain one irregular, rotated pool.
-    // Keeping the radius below the cell boundary makes separate puddles
-    // instead of turning the entire floor into one uniformly wet surface.
+    // 大きなワールド空間セルごとに、不規則に回転した水たまりを一つ配置します。
+    // 半径をセル境界より小さくし、床全体を均一に濡らさず独立した水たまりにします。
     const float cellSize = 82.0f;
     const float2 gridPosition = worldPosition / cellSize;
     const float2 cell = floor(gridPosition);
@@ -127,7 +132,7 @@ float GetPuddleMask(
     const float hasPuddle = step(
         0.62f,
         Hash21(cell + float2(53.4f, 27.9f)));
-    // Most floor cells are dry. Avoid all rotation, edge-noise and wave work
+    // 大半の床セルは乾いているため、対象外では回転・輪郭ノイズ・波計算を省略します。
     // in those cells; the branch is coherent over a large world-space tile.
     if (hasPuddle < 0.5f)
     {
@@ -180,9 +185,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
     if (Material.TextureEnable)
     {
-        // The source image is visually close to grass. A positive mip bias
-        // removes its harsh high-frequency grain, then a restrained palette
-        // turns it into damp, dirty concrete without requiring a new asset.
+        // 元画像の草らしい高周波模様を正のMipバイアスで弱めます。
+        // 色域を抑えて湿った汚いコンクリートへ見せ、追加素材を不要にします。
         const float3 sampledFloor = g_Texture.SampleBias(
             g_SamplerState,
             input.tex,
@@ -216,8 +220,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
     float dripRing = 0.0f;
     float3 detailWorldNormal = normalize(input.worldNormal);
-    // Animated normal reconstruction is useful only on the puddle and its
-    // narrow shoreline. Dry concrete now avoids three fractal-noise calls.
+    // 動的な法線再構築は水たまりと狭い水際だけに適用します。
+    // 乾いた床では三回のフラクタルノイズ計算を省きます。
     [branch]
     if (puddle > 0.001f || shore > 0.001f)
     {
@@ -243,8 +247,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     const float baseLuminance = dot(
         color.rgb,
         float3(0.2126f, 0.7152f, 0.0722f));
-    // Shallow indoor water should reveal the floor when viewed from above.
-    // Darkening it too much makes the puddle read as a painted black decal.
+    // 浅い室内水は上から見たときに床面を透かします。
+    // 暗くしすぎて黒いデカールに見えることを防ぎます。
     const float3 wetColor = lerp(
         color.rgb * 0.76f,
         color.rgb * 0.58f +
@@ -263,7 +267,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         1.0f - saturate(dot(normalize(input.viewNormal), viewDirection)),
         4.0f);
 
-    // Ceiling point lights illuminate nearby floors and walls, not only the panels.
+    // 天井の点光源はパネルだけでなく、近くの床と壁も照らします。
     [unroll]
     for (int i = 0; i < 8; ++i)
     {
@@ -290,8 +294,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
         const float pointLambert = saturate(dot(
             detailWorldNormal, directionToPointLight));
         const float softPointLambert = 0.20f + pointLambert * 0.80f;
-        // Ceiling panels are broad downward emitters, not bare point bulbs.
-        // Keep a little sideways spill while concentrating energy on the floor.
+        // 天井パネルを裸の点電球ではなく、下向きに広がる面光源として近似します。
+        // 床へ光を集中させつつ、横方向にも少量の光を残します。
         const float downwardAmount = saturate(directionToPointLight.y);
         const float fixtureDistribution = lerp(
             0.22f,
@@ -310,7 +314,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
             * pow(pointLambert, 12.0f)
             * puddle * 0.58f;
 
-        // A soft footprint makes ceiling fixtures visibly reflect in water.
+        // 柔らかい光の範囲を作り、天井照明が水面へ映ることを分かりやすくします。
         const float horizontalDistance = length(offsetToLight.xz);
         const float reflectedFixture = pow(saturate(
             1.0f - horizontalDistance / max(lightRange * 0.46f, 0.001f)),
@@ -361,8 +365,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
                 * wetSpecular
                 * lerp(0.025f, 1.15f, puddle);
 
-            // Even when the exact mirror angle misses the camera, shallow water
-            // returns a broad, weak flashlight reflection instead of becoming black.
+            // 完全な鏡面反射方向がカメラを外れても、浅い水は懐中電灯を弱く広く反射します。
+            // 水面が黒く落ちることを防ぎます。
             specularLighting += Light.Diffuse.rgb
                 * flashlightAmount
                 * puddle
@@ -384,7 +388,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     color.rgb += specularLighting;
     color.rgb += Material.Emission.rgb;
 
-    // Project the world position into the mirrored camera image. This is a
+    // ワールド座標を反転カメラ画像へ投影し、平面反射の参照位置を求めます。
     // real scene reflection; the normal only adds a small water distortion.
     const float reflectionW = max(input.reflectionPos.w, 0.0001f);
     const float3 reflectionNdc =
@@ -407,10 +411,10 @@ float4 main(in LIT_PS_IN input) : SV_Target
         puddle * RippleStrength;
     reflectionUV = saturate(reflectionUV + waterDistortion);
 
-    // Fresnel behavior: looking down mostly shows the floor beneath the
+    // フレネル効果により、真上からは主に水面下の床を見せます。
     // water; grazing angles strongly show the mirrored room and fixtures.
-    // The square-root remap makes mid-angle reflections readable while the
-    // low minimum prevents the puddle from returning to a black decal.
+    // 平方根で再マッピングして中間角度の反射を見やすくします。
+    // 最小値を低く保ち、水たまりが黒い板に戻ることを防ぎます。
     const float viewAngleReflection = sqrt(saturate(fresnel));
     const float reflectionStrength = saturate(
         puddle * reflectionInside *
@@ -428,9 +432,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
         reflectedScene * reflectionGain + float3(0.023f, 0.032f, 0.037f),
         reflectionStrength);
 
-    // Layered height fog keeps nearby navigation readable while separating
-    // distant silhouettes. It gathers near the floor instead of uniformly
-    // washing out the entire room.
+    // 高さの異なる霧を重ね、近距離の移動視認性を保ちながら遠景の輪郭を分離します。
+    // 部屋全体を一様に白くせず、床付近へ霧を集めます。
     const float distanceFog =
         smoothstep(110.0f, 390.0f, distanceFromCamera) * 0.72f;
     const float heightFromFloor = max(input.worldPos.y + 100.0f, 0.0f);
