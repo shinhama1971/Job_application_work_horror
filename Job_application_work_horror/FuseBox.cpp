@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: ヒューズ挿入、電力復旧、操作フィードバックを管理します。
+// 主な技術: Interactable、有限状態機械、進行条件、照明・効果音連携
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Game.h"
@@ -12,6 +14,7 @@
 
 using namespace DirectX::SimpleMath;
 
+// 処理内容: 後続処理で使うデータ構造または描画情報を組み立てます。
 void FuseBox::BuildGeometry()
 {
     m_Vertices.clear();
@@ -103,6 +106,7 @@ void FuseBox::BuildGeometry()
            Color(0.52f, 0.39f, 0.12f, 1.0f));
 }
 
+// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void FuseBox::Init()
 {
     m_Vertices.reserve(168);
@@ -124,10 +128,12 @@ void FuseBox::Init()
     m_Scale = Vector3(12.0f, 18.0f, 4.0f);
 }
 
+// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void FuseBox::Update()
 {
 }
 
+// 処理内容: 保持している値または参照を取得します。
 const char* FuseBox::GetInteractionPrompt() const
 {
     if (m_IsManualControl)
@@ -147,6 +153,7 @@ const char* FuseBox::GetInteractionPrompt() const
         : "電力を復旧する";
 }
 
+// 処理内容: FuseBoxの「Interact」処理を担当します。
 void FuseBox::Interact(Player& player)
 {
     (void)player;
@@ -218,6 +225,7 @@ void FuseBox::Interact(Player& player)
     }
 }
 
+// 処理内容: FuseBoxの「ResetActivation」処理を担当します。
 void FuseBox::ResetActivation()
 {
     m_IsPowered = false;
@@ -225,6 +233,7 @@ void FuseBox::ResetActivation()
     m_VertexBuffer.Modify(m_Vertices);
 }
 
+// 処理内容: 現在の状態に対応する描画命令を発行します。
 void FuseBox::Draw(Camera* camera)
 {
     camera->SetCamera();
@@ -246,6 +255,7 @@ void FuseBox::Draw(Camera* camera)
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
 }
 
+// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void FuseBox::Uninit()
 {
     m_Vertices.clear();

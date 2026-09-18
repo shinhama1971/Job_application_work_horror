@@ -1,5 +1,7 @@
 ﻿// ============================================================================
 // ファイルの役割: 全ゲームオブジェクト共通の座標、姿勢、寿命、仮想関数を定義します。
+// 主な技術: 基底クラス、仮想関数、ライフサイクル管理
+// 読み方: 公開関数は外部から使う操作、メンバー変数は保持する状態を表します。
 // ============================================================================
 
 #pragma once
@@ -28,6 +30,13 @@ public:
 	virtual void Draw(Camera* cam) = 0;
 	virtual void DrawShadow() {}
 	virtual bool CastsShadow() const { return false; }
+	// 描画パスへの参加可否は型判定ではなく各Object自身が宣言します。
+	virtual bool UsesCameraCulling() const { return false; }
+	virtual bool ContributesToPlanarReflection() const { return false; }
+	virtual bool IsPlanarReflectionSurfaceVisible(const Camera&) const
+	{
+		return false;
+	}
 	virtual void Uninit() = 0;
 
 	void SetPosition(DirectX::SimpleMath::Vector3 pos) { m_Position = pos; }

@@ -1,5 +1,7 @@
 ﻿// ============================================================================
 // ファイルの役割: 床面、水たまり、濡れ表現と関連する描画を管理します。
+// 主な技術: プロシージャルメッシュ、SRT行列、法線・UV、ウェットフロアシェーダー
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // この実装ファイルでは宣言された機能の具体的な処理を定義します。
 // ============================================================================
 
@@ -20,7 +22,7 @@ void Ground::Init()
 	m_PowerReflectionBlend = 0.0f;
 	m_PowerSurge = 0.0f;
 	m_WasPowerRestored = false;
-	BuildFallingDrops();
+	m_WaterEffects.Init();
 
 	// 頂点データ
 	m_SizeX = 50;
@@ -205,7 +207,7 @@ void Ground::Update()
 		Core::Game::GetInstance()->IsPowerRestored();
 	if (powerRestored && !m_WasPowerRestored)
 	{
-		// Briefly disturb the water when the ceiling fixtures surge on.
+		// 天井照明へ電気が流れた瞬間に水面を短く乱し、通電の衝撃を視覚でも伝えます。
 		m_PowerSurge = 1.0f;
 	}
 	m_WasPowerRestored = powerRestored;
@@ -217,8 +219,7 @@ void Ground::Update()
 	m_PowerReflectionBlend = std::clamp(
 		m_PowerReflectionBlend, 0.0f, 1.0f);
 	m_PowerSurge = (std::max)(0.0f, m_PowerSurge - deltaTime * 0.42f);
-	UpdateFallingDrops(deltaTime);
-	UpdateFootstepRipples(deltaTime);
+	m_WaterEffects.Update(deltaTime);
 }
 
 //=======================================
@@ -270,8 +271,7 @@ void Ground::Draw(Camera* cam)
 		0,					// 最初のインデックスバッファの位置
 		0);
 
-	DrawFallingDrops(cam);
-	DrawWaterRipples(cam);
+	m_WaterEffects.Draw(cam);
 }
 
 //=======================================
@@ -279,13 +279,7 @@ void Ground::Draw(Camera* cam)
 //=======================================
 void Ground::Uninit()
 {
-	m_FallingDrops.clear();
-	m_PuddleCenters.clear();
-	m_DropVertices.clear();
-	m_DropMaterial.reset();
-	m_RippleVertices.clear();
-	m_FootstepRipples.clear();
-	m_RippleMaterial.reset();
+	m_WaterEffects.Uninit();
 	m_WetFloorBuffer.Reset();
 }
 
@@ -313,6 +307,7 @@ std::vector<VERTEX_3D>Ground::GetVertices()
 	return res;
 }
 
+// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Ground::SetTexture(const char* filename)
 {
 	m_Texture.Load(filename);

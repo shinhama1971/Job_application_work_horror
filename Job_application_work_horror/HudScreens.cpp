@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: タイトル、結果、目的ガイド、ポーズなどの画面別UIを描画します。
+// 主な技術: 画面状態機械、レスポンシブ配置、入力フォーカス
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Hud.h"
@@ -37,6 +39,7 @@ namespace
     }
 }
 
+// 処理内容: Hudの「DrawTitle」処理を担当します。
 void Hud::DrawTitle(
     float time,
     bool hasClearRecord,
@@ -183,6 +186,7 @@ void Hud::DrawTitle(
     Flush();
 }
 
+// 処理内容: Hudの「DrawResult」処理を担当します。
 void Hud::DrawResult(
     float revealAmount,
     float clearTimeSeconds,
@@ -408,6 +412,7 @@ void Hud::DrawResult(
     Flush();
 }
 
+// 処理内容: Hudの「DrawChapterCard」処理を担当します。
 void Hud::DrawChapterCard(
     std::string_view chapter,
     std::string_view subtitle,
@@ -463,6 +468,7 @@ void Hud::DrawChapterCard(
     Flush();
 }
 
+// 処理内容: Hudの「DrawObjectiveGuide」処理を担当します。
 void Hud::DrawObjectiveGuide(
     const Camera& camera,
     const Vector3& origin,
@@ -522,6 +528,7 @@ void Hud::DrawObjectiveGuide(
     Flush();
 }
 
+// 処理内容: Hudの「DrawStage2Status」処理を担当します。
 void Hud::DrawStage2Status(
     int completedLoops,
     float threatRate,
@@ -605,6 +612,7 @@ void Hud::DrawStage2Status(
     Flush();
 }
 
+// 処理内容: Hudの「DrawQuietRecovery」処理を担当します。
 void Hud::DrawQuietRecovery(float progressRate, float cooldown, bool success, bool tooClose)
 {
     m_Vertices.clear();
@@ -626,6 +634,7 @@ void Hud::DrawQuietRecovery(float progressRate, float cooldown, bool success, bo
     Flush();
 }
 
+// 処理内容: Hudの「DrawPause」処理を担当します。
 void Hud::DrawPause(
     int brightnessLevel,
     int effectLevel,

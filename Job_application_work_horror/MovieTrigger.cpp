@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 指定範囲への侵入を検知し、ホラー演出イベントを開始します。
+// 主な技術: トリガー領域、ワンショットイベント、状態フラグ
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "MovieTrigger.h"
@@ -10,6 +12,7 @@
 
 using namespace DirectX::SimpleMath;
 
+// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void MovieTrigger::Init()
 {
     m_Position = Vector3(0.0f, 0.0f, 0.0f);
@@ -21,6 +24,7 @@ void MovieTrigger::Init()
     m_IsPlayed = false;
 }
 
+// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void MovieTrigger::Update()
 {
     Player* player =
@@ -74,6 +78,7 @@ void MovieTrigger::Update()
     }
 }
 
+// 処理内容: 現在の状態に対応する描画命令を発行します。
 void MovieTrigger::Draw(Camera* cam)
 {
     // センサーなので描画しない
@@ -82,6 +87,7 @@ void MovieTrigger::Draw(Camera* cam)
 void MovieTrigger::Uninit()
 {}
 
+// 処理内容: 幾何条件または進行条件を判定します。
 bool MovieTrigger::CheckPlayerInside()
 {
     Player* player =

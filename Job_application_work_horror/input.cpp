@@ -1,5 +1,7 @@
 ﻿// ============================================================================
 // ファイルの役割: キーボード、マウス、XInputコントローラーの入力状態を収集します。
+// 主な技術: Win32入力、XInput、エッジ検出、ゲームパッド振動
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // マウス振動もこのプログラムの中に入っている
 // ============================================================================
 
@@ -30,6 +32,7 @@ namespace
 
 std::unique_ptr<Input> Input::m_Instance;
 
+// 処理内容: 必要なCPU/GPUリソースを生成します。
 void Input::Create()
 {
 	if (m_Instance)return;
@@ -44,6 +47,7 @@ void Input::Create()
 	m_Instance->VibrationTime = 0;
 }
 
+// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void Input::Update()
 {
 	//1フレーム前の入力を記録しておく
@@ -104,11 +108,13 @@ void Input::Update()
 	}
 }
 
+// 処理内容: 現在の状態が条件を満たすか返します。
 bool Input::IsControllerConnected()
 {
 	return m_Instance != nullptr && m_Instance->controllerConnected;
 }
 
+// 処理内容: 保持している参照とリソースを安全に解放します。
 void Input::Release()
 {
 	//振動を終了させる
@@ -129,10 +135,12 @@ bool Input::GetKeyPress(int key) //プレス
 {
 	return m_Instance->keyState[key] & 0x80;
 }
+// 処理内容: 保持している値または参照を取得します。
 bool Input::GetKeyTrigger(int key) //トリガー
 {
 	return (m_Instance->keyState[key] & 0x80) && !(m_Instance->keyState_old[key] & 0x80);
 }
+// 処理内容: 保持している値または参照を取得します。
 bool Input::GetKeyRelease(int key) //リリース
 {
 	return !(m_Instance->keyState[key] & 0x80) && (m_Instance->keyState_old[key] & 0x80);
@@ -181,10 +189,12 @@ bool Input::GetButtonPress(WORD btn) //プレス
 {
 	return (m_Instance->controllerState.Gamepad.wButtons & btn) != 0;
 }
+// 処理内容: 保持している値または参照を取得します。
 bool Input::GetButtonTrigger(WORD btn) //トリガー
 {
 	return (m_Instance->controllerState.Gamepad.wButtons & btn) != 0 && (m_Instance->controllerState_old.Gamepad.wButtons & btn) == 0;
 }
+// 処理内容: 保持している値または参照を取得します。
 bool Input::GetButtonRelease(WORD btn) //リリース
 {
 	return (m_Instance->controllerState.Gamepad.wButtons & btn) == 0 && (m_Instance->controllerState_old.Gamepad.wButtons & btn) != 0;

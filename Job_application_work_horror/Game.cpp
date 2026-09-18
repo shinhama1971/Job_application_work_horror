@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: ゲーム全体のオブジェクト所有、更新・描画順、シーン遷移をまとめる
+// 主な技術: RAII、unique_ptr、遅延追加・削除、シングルトン、固定更新順
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Game.h"
@@ -18,12 +20,14 @@ namespace Core
 {
     std::unique_ptr<Game> Game::m_Instance;
 
+    // 処理内容: Gameを生成し、初期状態を準備します。
     Game::Game()
     {
         LoadBestRecord();
-        LoadSettings();
+        m_Settings.Load();
     }
 
+    // 処理内容: Gameが所有する処理とリソースを終了します。
     Game::~Game()
     {
         DeleteAllObject();
@@ -56,17 +60,17 @@ namespace Core
         m_Instance->m_Camera.SetLookSensitivityScale(
             0.60f +
             static_cast<float>(
-                m_Instance->m_LookSensitivityLevel) * 0.20f);
+                m_Instance->m_Settings.GetLookSensitivityLevel()) * 0.20f);
 
         m_Instance->m_PlanarReflection.Init();
         m_Instance->m_ShadowMap.Init();
         m_Instance->m_PostProcess.Init();
         m_Instance->m_PostProcess.SetUserBrightnessOffset(
             static_cast<float>(
-                m_Instance->m_BrightnessLevel - 2) * 0.055f);
+                m_Instance->m_Settings.GetBrightnessLevel() - 2) * 0.055f);
         constexpr float effectScales[] = { 0.70f, 1.0f, 1.25f };
         m_Instance->m_PostProcess.SetUserEffectScale(
-            effectScales[m_Instance->m_EffectLevel]);
+            effectScales[m_Instance->m_Settings.GetEffectLevel()]);
         m_Instance->ChangeScene(SceneName::Title);
     }
 
@@ -100,11 +104,13 @@ namespace Core
         {
             int selectionDelta = 0;
             if (Input::GetKeyTrigger(VK_UP) ||
+                // 処理内容: 保持している値または参照を取得します。
                 Input::GetButtonTrigger(XINPUT_UP))
             {
                 selectionDelta = -1;
             }
             else if (Input::GetKeyTrigger(VK_DOWN) ||
+                // 処理内容: 保持している値または参照を取得します。
                 Input::GetButtonTrigger(XINPUT_DOWN))
             {
                 selectionDelta = 1;
@@ -119,11 +125,13 @@ namespace Core
 
             int settingDelta = 0;
             if (Input::GetKeyTrigger(VK_LEFT) ||
+                // 処理内容: 保持している値または参照を取得します。
                 Input::GetButtonTrigger(XINPUT_LEFT))
             {
                 settingDelta = -1;
             }
             else if (Input::GetKeyTrigger(VK_RIGHT) ||
+                // 処理内容: 保持している値または参照を取得します。
                 Input::GetButtonTrigger(XINPUT_RIGHT))
             {
                 settingDelta = 1;
@@ -133,16 +141,14 @@ namespace Core
                 m_Instance->m_PauseSettingIndex == 0)
             {
                 const int newBrightnessLevel = (std::clamp)(
-                    m_Instance->m_BrightnessLevel + settingDelta,
+                    m_Instance->m_Settings.GetBrightnessLevel() + settingDelta,
                     0, 4);
-                if (newBrightnessLevel !=
-                    m_Instance->m_BrightnessLevel)
+                if (m_Instance->m_Settings.SetBrightnessLevel(
+                    newBrightnessLevel))
                 {
-                    m_Instance->m_BrightnessLevel =
-                        newBrightnessLevel;
                     const float brightnessOffset =
                         static_cast<float>(
-                            m_Instance->m_BrightnessLevel - 2) *
+                            m_Instance->m_Settings.GetBrightnessLevel() - 2) *
                         0.055f;
                     m_Instance->m_PostProcess.SetUserBrightnessOffset(
                         brightnessOffset);
@@ -153,16 +159,16 @@ namespace Core
                 m_Instance->m_PauseSettingIndex == 1)
             {
                 const int newEffectLevel = (std::clamp)(
-                    m_Instance->m_EffectLevel + settingDelta, 0, 2);
-                if (newEffectLevel != m_Instance->m_EffectLevel)
+                    m_Instance->m_Settings.GetEffectLevel() + settingDelta,
+                    0, 2);
+                if (m_Instance->m_Settings.SetEffectLevel(newEffectLevel))
                 {
-                    m_Instance->m_EffectLevel = newEffectLevel;
                     constexpr float effectScales[] =
                     {
                         0.70f, 1.0f, 1.25f
                     };
                     m_Instance->m_PostProcess.SetUserEffectScale(
-                        effectScales[m_Instance->m_EffectLevel]);
+                        effectScales[m_Instance->m_Settings.GetEffectLevel()]);
                     settingChanged = true;
                 }
             }
@@ -170,17 +176,15 @@ namespace Core
                 m_Instance->m_PauseSettingIndex == 2)
             {
                 const int newSensitivityLevel = (std::clamp)(
-                    m_Instance->m_LookSensitivityLevel +
+                    m_Instance->m_Settings.GetLookSensitivityLevel() +
                     settingDelta, 0, 4);
-                if (newSensitivityLevel !=
-                    m_Instance->m_LookSensitivityLevel)
+                if (m_Instance->m_Settings.SetLookSensitivityLevel(
+                    newSensitivityLevel))
                 {
-                    m_Instance->m_LookSensitivityLevel =
-                        newSensitivityLevel;
                     m_Instance->m_Camera.SetLookSensitivityScale(
                         0.60f +
                         static_cast<float>(
-                            m_Instance->m_LookSensitivityLevel) *
+                            m_Instance->m_Settings.GetLookSensitivityLevel()) *
                         0.20f);
                     settingChanged = true;
                 }
@@ -188,17 +192,17 @@ namespace Core
             else if (settingDelta != 0)
             {
                 const int newVolumeLevel = (std::clamp)(
-                    m_Instance->m_VolumeLevel + settingDelta, 0, 4);
-                if (newVolumeLevel != m_Instance->m_VolumeLevel)
+                    m_Instance->m_Settings.GetVolumeLevel() + settingDelta,
+                    0, 4);
+                if (m_Instance->m_Settings.SetVolumeLevel(newVolumeLevel))
                 {
-                    m_Instance->m_VolumeLevel = newVolumeLevel;
                     m_Instance->ApplyAudioVolume(true);
                     settingChanged = true;
                 }
             }
             if (settingChanged)
             {
-                m_Instance->SaveSettings();
+                m_Instance->m_Settings.Save();
                 Input::SetVibration(2, 0.045f);
                 if (m_Instance->m_PauseSettingIndex == 3)
                 {
@@ -246,7 +250,7 @@ namespace Core
 
         if (gameplayScene)
         {
-            m_Instance->m_RunTimeSeconds += 1.0f / 60.0f;
+            m_Instance->m_State.AddRunTime(1.0f / 60.0f);
         }
 
 
@@ -261,47 +265,12 @@ namespace Core
         m_Instance->m_PostProcess.Update();
 
 
-        for (auto& o : m_Instance->m_Objects)
-        {
-            if (!o->IsDestroy())
-            {
-                o->Update();
-            }
-        }
-
-        // Remove lookup entries before their owning unique_ptr objects are
-        // erased. This also keeps GetObj safe when an object destroys itself.
-        for (auto it = m_Instance->m_NamedObjects.begin();
-            it != m_Instance->m_NamedObjects.end();)
-        {
-            Object* object = it->second;
-            if (object == nullptr || object->IsDestroy())
-            {
-                it = m_Instance->m_NamedObjects.erase(it);
-            }
-            else
-            {
-                ++it;
-            }
-        }
-
-        std::erase_if(
-            m_Instance->m_Objects,
-            [](const std::unique_ptr<Object>& o)
-            {
-                if (o->IsDestroy())
-                {
-                    o->Uninit();
-                    return true;
-                }
-
-                return false;
-            }
-        );
+        m_Instance->m_ObjectManager.UpdateAll();
+        m_Instance->m_ObjectManager.RemoveDestroyed();
 
         if (m_Instance->m_PendingScene.has_value())
         {
-            m_Instance->m_PendingObjectCommands.clear();
+            m_Instance->m_ObjectManager.ClearPendingCommands();
 
             const SceneName nextScene =
                 m_Instance->m_PendingScene.value();
@@ -311,15 +280,7 @@ namespace Core
             return;
         }
 
-        auto pendingCommands =
-            std::move(m_Instance->m_PendingObjectCommands);
-
-        m_Instance->m_PendingObjectCommands.clear();
-
-        for (auto& command : pendingCommands)
-        {
-            command();
-        }
+        m_Instance->m_ObjectManager.FlushPendingCommands();
     }
 
     // 生成と逆順に解放します。unique_ptr/ComPtr所有物はresetで確実に破棄されます。
@@ -331,13 +292,7 @@ namespace Core
 
         m_Instance->m_Scene.reset();
 
-        for (auto& o : m_Instance->m_Objects)
-        {
-            o->Uninit();
-        }
-
-        m_Instance->m_Objects.clear();
-        m_Instance->m_NamedObjects.clear();
+        m_Instance->m_ObjectManager.DeleteAll();
         m_Instance->m_PostProcess.Uninit();
         m_Instance->m_ShadowMap.Uninit();
         m_Instance->m_PlanarReflection.Uninit();
@@ -348,15 +303,16 @@ namespace Core
         Input::Release();
         Debug::UI::Uninit();
 
-        // Release cached and member-owned GPU objects while the D3D device is
-        // still valid. Renderer::Uninit can then report genuine leaks instead
-        // of resources retained by the still-alive Game singleton.
+        // D3Dデバイスが有効な間に、キャッシュとGame所有のGPUリソースを解放します。
+        // これによりRenderer::Uninitのデバッグ出力が、Gameに残った参照ではなく
+        // 本当のリークだけを報告できます。
         Shader::ClearCache();
         m_Instance.reset();
 
         Renderer::Uninit();
     }
 
+    // 処理内容: 保持している値または参照を取得します。
     Game* Core::Game::GetInstance()
     {
         return m_Instance.get();
@@ -379,20 +335,7 @@ namespace Core
         const SceneName previousScene = m_CurrentScene;
         if (sName == SceneName::Result)
         {
-            m_LastClearTimeSeconds = m_RunTimeSeconds;
-            m_LastRunBestTime = !m_HasClearRecord ||
-                m_LastClearTimeSeconds < m_BestClearTimeSeconds;
-            m_LastRunBestCaught = !m_HasClearRecord ||
-                m_CaughtCount < m_BestCaughtCount;
-            if (m_LastRunBestTime)
-            {
-                m_BestClearTimeSeconds = m_LastClearTimeSeconds;
-            }
-            if (m_LastRunBestCaught)
-            {
-                m_BestCaughtCount = m_CaughtCount;
-            }
-            m_HasClearRecord = true;
+            m_State.CompleteRun();
             SaveBestRecord();
         }
 
@@ -414,22 +357,12 @@ namespace Core
             break;
 
         case SceneName::Stage:
-            m_ItemCount = 0;
-            m_PowerRestored = false;
-            m_RunTimeSeconds = 0.0f;
-            m_CaughtCount = 0;
-            m_AnomaliesHandled = 0;
-            m_PuzzleMistakes = 0;
-            m_ChargersUsed = 0;
-            m_EvidenceCollected = 0;
-            m_LastRunBestTime = false;
-            m_LastRunBestCaught = false;
+            m_State.BeginRun();
             m_Scene = std::make_unique<StageScene>();
             break;
 
         case SceneName::Stage2:
-            m_ItemCount = 3;
-            m_PowerRestored = true;
+            m_State.EnterStage2();
             m_Scene = std::make_unique<Stage2Scene>();
             break;
 
@@ -456,51 +389,21 @@ namespace Core
     }
 
 
+    // 処理内容: Gameの「DeleteObject」処理を担当します。
     void Game::DeleteObject(Object* pt)
     {
-        if (pt == nullptr) return;
-
-        pt->Destroy();
-
-        for (auto it = m_NamedObjects.begin(); it != m_NamedObjects.end();)
-        {
-            if (it->second == pt)
-            {
-                it = m_NamedObjects.erase(it);
-            }
-            else
-            {
-                ++it;
-            }
-        }
+        m_ObjectManager.DeleteObject(pt);
     }
 
+    // 処理内容: Gameの「DestroyObj」処理を担当します。
     void Game::DestroyObj(const std::string& name)
     {
-        auto it = m_NamedObjects.find(name);
-
-        if (it == m_NamedObjects.end())
-        {
-            return;
-        }
-
-        if (it->second != nullptr)
-        {
-            it->second->Destroy();
-        }
-
-        m_NamedObjects.erase(it);
+        m_ObjectManager.DestroyNamedObject(name);
     }
 
+    // 処理内容: Gameの「DeleteAllObject」処理を担当します。
     void Game::DeleteAllObject()
     {
-        for (auto& o : m_Objects)
-        {
-            o->Uninit();
-        }
-
-        m_Objects.clear();
-
-        m_NamedObjects.clear();
+        m_ObjectManager.DeleteAll();
     }
 }

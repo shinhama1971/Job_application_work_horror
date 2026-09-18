@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 視線レイと距離を使って、現在操作できる対象を選択します。
+// 主な技術: レイ判定、最近傍選択、遮蔽判定、インターフェース分離
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "InteractionSystem.h"
@@ -14,6 +16,7 @@
 
 using namespace DirectX::SimpleMath;
 
+// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void InteractionSystem::Update(Player& player)
 {
     Interactable* previousFocus = m_FocusedInteractable;
@@ -67,12 +70,14 @@ void InteractionSystem::Update(Player& player)
 
     if (m_FocusedInteractable != nullptr &&
         (Input::GetKeyTrigger(VK_E) ||
+         // 処理内容: 保持している値または参照を取得します。
          Input::GetButtonTrigger(XINPUT_A)))
     {
         m_FocusedInteractable->Interact(player);
     }
 }
 
+// 処理内容: 対象を保持しているか返します。
 bool InteractionSystem::HasClearLineOfSight(
     const Vector3& origin,
     const Vector3& target,
@@ -96,6 +101,7 @@ bool InteractionSystem::HasClearLineOfSight(
     return true;
 }
 
+// 処理内容: 保持している値または参照を取得します。
 std::string_view InteractionSystem::GetPrompt() const
 {
     return m_FocusedInteractable == nullptr

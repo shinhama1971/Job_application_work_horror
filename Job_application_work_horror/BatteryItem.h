@@ -1,5 +1,7 @@
-// ============================================================================
+﻿// ============================================================================
 // ファイルの役割: 懐中電灯の電池回復アイテムと、その表示・取得演出を管理します。
+// 主な技術: Interactableインターフェース、AABB判定、発光表現、時間ベースアニメーション
+// 読み方: 公開関数は外部から使う操作、メンバー変数は保持する状態を表します。
 // ============================================================================
 
 #pragma once
@@ -40,6 +42,8 @@ public:
     void Init() override;
     void Update() override;
     void Draw(Camera* cam) override;
+    bool UsesCameraCulling() const override { return true; }
+    bool ContributesToPlanarReflection() const override { return true; }
     void Uninit() override;
 
     bool IsInteractionEnabled() const override

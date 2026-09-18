@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: ドアの描画、開閉アニメーション、施錠条件、当たり判定を管理します。
+// 主な技術: 有限状態機械、SRT行列、蝶番回転、AABB、インタラクション
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Door.h"
@@ -15,6 +17,7 @@
 
 using namespace DirectX::SimpleMath;
 
+// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void Door::Init()
 {
     m_Vertices.clear();
@@ -92,14 +95,12 @@ void Door::Init()
            Color(0.16f, 0.055f, 0.025f, 1.0f));
     addBox(Vector3(0.0f, -0.22f, -0.54f), Vector3(0.35f, 0.17f, 0.035f),
            Color(0.16f, 0.055f, 0.025f, 1.0f));
-    // The hinge is on the local left edge, so the handle belongs on the
-    // opposite side of the door leaf.
+    // 蝶番をローカル左端に置くため、取っ手は扉板の反対側へ配置します。
     addBox(Vector3(0.28f, 0.0f, -0.64f), Vector3(0.055f, 0.075f, 0.11f),
            Color(0.72f, 0.48f, 0.12f, 1.0f));
 
     m_DoorIndexCount = m_Indices.size();
-    // A separate, non-shadow-casting strip represents light escaping from
-    // the room beyond the threshold.
+    // 影を落とさない別メッシュで、扉の隙間から漏れる奥の部屋の光を表現します。
     addBox(Vector3(0.0f, -0.505f, -0.61f),
            Vector3(0.48f, 0.018f, 0.045f),
            Color(1.0f, 0.72f, 0.42f, 1.0f));
@@ -125,6 +126,7 @@ void Door::Init()
 
     m_Scale = Vector3(30.0f, 50.0f, 4.0f);
 }
+// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void Door::Update()
 {
     constexpr float deltaTime = 1.0f / 60.0f;
@@ -182,6 +184,7 @@ void Door::Update()
     }
 }
 
+// 処理内容: 保持している値または参照を取得します。
 const char* Door::GetInteractionPrompt() const
 {
     return m_IsLocked
@@ -189,6 +192,7 @@ const char* Door::GetInteractionPrompt() const
         : "ドアを開ける";
 }
 
+// 処理内容: Doorの「Interact」処理を担当します。
 void Door::Interact(Player& player)
 {
     (void)player;
@@ -204,8 +208,8 @@ void Door::Interact(Player& player)
         return;
     }
 
-    // This door leads to the repeating corridor and must be usable before
-    // power restoration. The final exit remains separately power-locked.
+    // この扉はループ廊下へ続くため、通電前でも操作可能にします。
+    // 最終出口だけは別の条件で通電ロックを維持します。
     if (!m_IsOpen && !m_IsOpening)
     {
         Core::Game::GetInstance()->PlayAudioCue(SOUND_CUE_DOOR);
@@ -236,6 +240,7 @@ void Door::Interact(Player& player)
     }
 }
 
+// 処理内容: Doorの「ResetClosed」処理を担当します。
 void Door::ResetClosed(int loopPhase)
 {
     m_Position = m_StartPosition;
@@ -247,8 +252,8 @@ void Door::ResetClosed(int loopPhase)
     m_OpenDelayTimer = 0.0f;
     m_LoopPhase = (std::clamp)(loopPhase, 0, 3);
 
-    // Each return changes the familiar door slightly: the second loop drags,
-    // while the final loop hesitates and then opens with unnatural speed.
+    // 同じ扉でも周回ごとに開き方を変えます。2周目は重く、最終周は一度ためてから
+    // 不自然な速さで開き、見慣れた空間の違和感を強めます。
     if (m_LoopPhase == 0)
     {
         m_OpenSpeed = 0.032f;
@@ -271,10 +276,11 @@ void Door::ResetClosed(int loopPhase)
     }
 }
 
+// 処理内容: 競合やめり込みを解消した結果を返します。
 void Door::ResolveCollision(Vector3& position, float radius) const
 {
-    // Once the handle is used, let the player pass while the leaf swings.
-    // This avoids the rotating mesh pushing the player into the wall.
+    // 取っ手を操作した後は、扉板の回転中でも通行を許可します。
+    // 回転するメッシュがプレイヤーを壁へ押し込むことを防ぎます。
     if (m_IsOpen || m_IsOpening)
     {
         return;
@@ -347,10 +353,11 @@ void Door::ResolveCollision(Vector3& position, float radius) const
         baseRotation);
 }
 
+// 処理内容: 保持している値または参照を取得します。
 Matrix Door::GetDoorWorldMatrix() const
 {
-    // The generated mesh is centered. Move its left edge to the origin,
-    // rotate around that hinge, then return the hinge to world space.
+    // 中心原点で生成したメッシュを左端が原点になるよう移動し、蝶番を中心に回転してから
+    // ワールド座標へ戻すことで、自然な扉の開閉行列を作ります。
     const float halfWidth = std::abs(m_Scale.x) * 0.5f;
     const Matrix baseRotation = Matrix::CreateFromYawPitchRoll(
         m_Rotation.y,
@@ -373,6 +380,7 @@ Matrix Door::GetDoorWorldMatrix() const
         Matrix::CreateTranslation(hingePosition);
 }
 
+// 処理内容: 現在の状態に対応する描画命令を発行します。
 void Door::Draw(Camera* camera)
 {
     camera->SetCamera();
@@ -426,8 +434,7 @@ void Door::Draw(Camera* camera)
     m_LeakMaterial->SetMaterial(leakMaterial);
     m_LeakMaterial->SetGPU();
 
-    // The leak belongs to the doorway, so it remains fixed while the door
-    // leaf rotates around its hinge.
+    // 漏れ光は開口部側の表現なので、扉板が蝶番で回転しても固定位置に残します。
     const Matrix baseRotation = Matrix::CreateFromYawPitchRoll(
         m_Rotation.y, m_Rotation.x, m_Rotation.z);
     Matrix leakWorld = Matrix::CreateScale(m_Scale) * baseRotation *
@@ -439,6 +446,7 @@ void Door::Draw(Camera* camera)
         0);
 }
 
+// 処理内容: ライト視点の深度をシャドウマップへ描画します。
 void Door::DrawShadow()
 {
     Matrix world = GetDoorWorldMatrix();
@@ -452,6 +460,7 @@ void Door::DrawShadow()
     context->DrawIndexed(static_cast<UINT>(m_DoorIndexCount), 0, 0);
 }
 
+// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void Door::Uninit()
 {
     m_Vertices.clear();

@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 遠景の人影、出現時間、消失・ディゾルブ演出を管理します。
+// 主な技術: ゲームAI状態機械、追跡補間、シャドウ表現、ディゾルブ
+// 読み方: 公開関数は外部から使う操作、メンバー変数は保持する状態を表します。
 // ============================================================================
 
 #pragma once
@@ -49,6 +51,8 @@ public:
     void Init() override;
     void Update() override;
     void Draw(Camera* camera) override;
+    bool UsesCameraCulling() const override { return true; }
+    bool ContributesToPlanarReflection() const override { return true; }
     void Uninit() override;
 
     void SetPosition(float x, float y, float z)

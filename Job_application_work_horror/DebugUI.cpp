@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: ImGuiによるデバッグ表示と、ライティング・演出値の実行時調整を提供します。
+// 主な技術: Dear ImGui、リアルタイムパラメータ編集、デバッグ可視化
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "DebugUI.h"
@@ -7,7 +9,7 @@
 #include "Game.h"
 #include "PostProcess.h"
 #include "Renderer.h"
-#include "Stage2Scene.h"
+#include "Scene.h"
 
 #if defined(ENABLE_IMGUI)
 #include "imgui.h"
@@ -96,6 +98,7 @@ namespace
 #endif
 }
 
+// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 bool Debug::UI::Init(HWND window)
 {
 #if defined(ENABLE_IMGUI)
@@ -122,6 +125,7 @@ bool Debug::UI::Init(HWND window)
     }
 
     if (!ImGui_ImplDX11_Init(
+        // 処理内容: 保持している値または参照を取得します。
         Renderer::GetDevice(),
         Renderer::GetDeviceContext()))
     {
@@ -137,6 +141,7 @@ bool Debug::UI::Init(HWND window)
     return true;
 }
 
+// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void Debug::UI::Uninit()
 {
 #if defined(ENABLE_IMGUI)
@@ -153,6 +158,7 @@ void Debug::UI::Uninit()
 #endif
 }
 
+// 処理内容: 処理区間を開始し、必要な状態を設定します。
 void Debug::UI::BeginFrame()
 {
 #if defined(ENABLE_IMGUI)
@@ -173,6 +179,7 @@ void Debug::UI::BeginFrame()
 #endif
 }
 
+// 処理内容: 計算済みの設定や効果を対象へ反映します。
 void Debug::UI::ApplyTuning(Effect::PostProcess& postProcess)
 {
 #if defined(ENABLE_IMGUI)
@@ -202,6 +209,7 @@ void Debug::UI::ApplyTuning(Effect::PostProcess& postProcess)
 #endif
 }
 
+// 処理内容: 現在の状態に対応する描画命令を発行します。
 void Debug::UI::Draw(Effect::PostProcess& postProcess)
 {
 #if defined(ENABLE_IMGUI)
@@ -253,34 +261,38 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         ImGui::Separator();
 
         Core::Game* game = Core::Game::GetInstance();
-        Stage2Scene* stage2 = game == nullptr
-            ? nullptr
-            : dynamic_cast<Stage2Scene*>(game->GetScene());
-        if (stage2 != nullptr && ImGui::CollapsingHeader(
+        Scene* scene = game == nullptr ? nullptr : game->GetScene();
+        SceneDebugInfo sceneDebugInfo{};
+        if (scene != nullptr && scene->TryGetDebugInfo(sceneDebugInfo) &&
+            // 処理内容: ImGuiの「CollapsingHeader」処理を担当します。
+            ImGui::CollapsingHeader(
             "2面 イベント確認", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            ImGui::Text("ループ %d / 3", stage2->GetLoopCount());
+            ImGui::Text("ループ %d / 3", sceneDebugInfo.progressionStep);
             ImGui::Text("信号 %d / 3  足音危険度 %.0f%%",
-                stage2->GetSignalStep(), stage2->GetNoiseThreat() * 100.0f);
+                sceneDebugInfo.puzzleStep, sceneDebugInfo.threatLevel * 100.0f);
             ImGui::Text("失敗回数 %d  再試行補助 %s",
-                stage2->GetPuzzleMistakeCount(),
-                stage2->GetPuzzleMistakeCount() >= 2 ? "強" :
-                    (stage2->GetPuzzleMistakeCount() == 1 ? "弱" : "なし"));
+                sceneDebugInfo.puzzleMistakeCount,
+                sceneDebugInfo.puzzleMistakeCount >= 2 ? "強" :
+                    (sceneDebugInfo.puzzleMistakeCount == 1 ? "弱" : "なし"));
             ImGui::Text("最終イベント: %s  出口: %s",
-                stage2->IsFinalSequenceArmed() ? "準備済み" : "待機中",
-                stage2->IsFinalDoorReady() ? "解錠" : "施錠");
+                sceneDebugInfo.finalSequenceArmed ? "準備済み" : "待機中",
+                sceneDebugInfo.exitReady ? "解錠" : "施錠");
             if (ImGui::Button("ループを1回進める"))
             {
-                stage2->DebugRequestAdvanceLoop();
+                scene->RequestDebugAction(
+                    SceneDebugAction::AdvanceProgression);
             }
             ImGui::SameLine();
             if (ImGui::Button("最終停電を再生"))
             {
-                stage2->DebugRequestFinalSequence();
+                scene->RequestDebugAction(
+                    SceneDebugAction::PlayFinalSequence);
             }
             if (ImGui::Button("視線ライト演出を再生"))
             {
-                stage2->DebugRequestLightChase();
+                scene->RequestDebugAction(
+                    SceneDebugAction::PlayLightingEvent);
             }
             ImGui::TextDisabled(
                 "操作は次のゲーム更新開始時に安全に実行されます。");
@@ -430,6 +442,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
 #endif
 }
 
+// 処理内容: UIの「HandleWindowMessage」処理を担当します。
 bool Debug::UI::HandleWindowMessage(
     HWND window,
     UINT message,
@@ -451,6 +464,7 @@ bool Debug::UI::HandleWindowMessage(
     return false;
 }
 
+// 処理内容: 現在の状態が条件を満たすか返します。
 bool Debug::UI::IsVisible()
 {
 #if defined(ENABLE_IMGUI)
@@ -460,6 +474,7 @@ bool Debug::UI::IsVisible()
 #endif
 }
 
+// 処理内容: UIの「ShouldPauseGameplay」処理を担当します。
 bool Debug::UI::ShouldPauseGameplay()
 {
 #if defined(ENABLE_IMGUI)
@@ -469,6 +484,7 @@ bool Debug::UI::ShouldPauseGameplay()
 #endif
 }
 
+// 処理内容: 保持している値または参照を取得します。
 unsigned int Debug::UI::GetReflectionUpdateInterval()
 {
 #if defined(ENABLE_IMGUI)
@@ -480,6 +496,7 @@ unsigned int Debug::UI::GetReflectionUpdateInterval()
 #endif
 }
 
+// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Debug::UI::SetCullingStats(
     unsigned int mainDrawn,
     unsigned int mainCulled,

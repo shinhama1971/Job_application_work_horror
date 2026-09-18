@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 壁の形状、材質、衝突範囲、影の有無を管理します。
+// 主な技術: プロシージャルメッシュ、AABB、最近傍面への押し戻し、SRT行列
+// 読み方: 公開関数は外部から使う操作、メンバー変数は保持する状態を表します。
 // ============================================================================
 
 #pragma once
@@ -34,6 +36,8 @@ public:
     void Draw(Camera* cam) override;
     void DrawShadow() override;
     bool CastsShadow() const override { return m_Visible && m_CastsShadow; }
+    bool UsesCameraCulling() const override { return true; }
+    bool ContributesToPlanarReflection() const override { return true; }
     void Uninit() override;
 
     void ResolveCollision(

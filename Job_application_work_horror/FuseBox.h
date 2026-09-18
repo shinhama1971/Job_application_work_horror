@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: ヒューズ挿入、電力復旧、操作フィードバックを管理します。
+// 主な技術: Interactable、有限状態機械、進行条件、照明・効果音連携
+// 読み方: 公開関数は外部から使う操作、メンバー変数は保持する状態を表します。
 // ============================================================================
 
 #pragma once
@@ -32,6 +34,8 @@ public:
     void Init() override;
     void Update() override;
     void Draw(Camera* camera) override;
+    bool UsesCameraCulling() const override { return true; }
+    bool ContributesToPlanarReflection() const override { return true; }
     void Uninit() override;
 
     bool IsInteractionEnabled() const override

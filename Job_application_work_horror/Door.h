@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: ドアの描画、開閉アニメーション、施錠条件、当たり判定を管理します。
+// 主な技術: 有限状態機械、SRT行列、蝶番回転、AABB、インタラクション
+// 読み方: 公開関数は外部から使う操作、メンバー変数は保持する状態を表します。
 // ============================================================================
 
 #pragma once
@@ -42,6 +44,8 @@ public:
     void Draw(Camera* cam) override;
     void DrawShadow() override;
     bool CastsShadow() const override { return true; }
+    bool UsesCameraCulling() const override { return true; }
+    bool ContributesToPlanarReflection() const override { return true; }
     void Uninit() override;
 
     bool IsInteractionEnabled() const override { return !m_IsOpen && !m_IsOpening; }

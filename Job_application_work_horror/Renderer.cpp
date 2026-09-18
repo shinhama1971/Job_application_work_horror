@@ -1,5 +1,7 @@
 ﻿// ============================================================================
 // ファイルの役割: Direct3D 11デバイス、描画状態、ライト、各種定数バッファを管理します。
+// 主な技術: Direct3D 11、Swap Chain、深度・ブレンド・ラスタライザ状態、Debug Layer
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 
@@ -87,7 +89,7 @@ HRESULT Renderer::Init()
 		m_pDeviceContext.ReleaseAndGetAddressOf());
 
 #if defined(DEBUG) || defined(_DEBUG)
-    // The game must still start on PCs without the optional graphics tools.
+    // 任意のグラフィックスデバッグ機能が使えないPCでもゲームを起動できるようにします。
     if (hr == DXGI_ERROR_SDK_COMPONENT_MISSING)
     {
         hr = D3D11CreateDeviceAndSwapChain(
@@ -386,9 +388,8 @@ void Renderer::Uninit()
 	m_pRenderTargetView.Reset();
 	m_pSwapChain.Reset();
 
-    // Releasing resources can enqueue deferred driver destruction. Flush once
-    // more before dropping the immediate context so the debug report does not
-    // mistake pending destruction for application-owned live objects.
+    // リソース解放はドライバー側で遅延処理される場合があるため、コンテキスト破棄前にFlushします。
+    // デバッグレポートが解放待ちをアプリ所有の生存オブジェクトと誤認しないためです。
     if (m_pDeviceContext != nullptr)
     {
         m_pDeviceContext->Flush();
@@ -440,8 +441,8 @@ HRESULT Renderer::ResizeWindow(int width, int height)
 	// スワップチェインが存在しない場合は処理しない
 	if (!m_pSwapChain)return S_FALSE;
 
-	// The device context also owns a reference to the current back buffer.
-	// Unbind it before ResizeBuffers so every reference is released.
+	// デバイスコンテキストも現在のバックバッファを参照するため、
+	// ResizeBuffers前にバインドを解除して全参照を解放します。
 	m_pDeviceContext->OMSetRenderTargets(0, nullptr, nullptr);
 	m_pDeviceContext->Flush();
 

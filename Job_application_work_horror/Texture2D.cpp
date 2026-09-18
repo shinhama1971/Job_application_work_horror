@@ -1,5 +1,7 @@
 ﻿// ============================================================================
 // ファイルの役割: 2D描画用テクスチャとシェーダーリソースを管理します。
+// 主な技術: Direct3D 11 Texture2D、SRV、Sampler State、RAII
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Texture2D.h"
@@ -130,6 +132,7 @@ void Texture2D::SetPosition(const float& x, const float& y, const float& z)
 	Vector3 p = { x, y, z };
 	SetPosition(p);
 }
+// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Texture2D::SetPosition(const Vector3& pos)
 {
 	m_Position = pos;
@@ -141,6 +144,7 @@ void Texture2D::SetRotation(const float& x, const float& y, const float& z)
 	Vector3 r = { x, y, z };
 	SetRotation(r);
 }
+// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Texture2D::SetRotation(const Vector3& rot)
 {
 	m_Rotation = rot * 3.14f/180; // deg→radに変換
@@ -152,6 +156,7 @@ void Texture2D::SetScale(const float& x, const float& y, const float& z)
 	Vector3 s = { x, y, z };
 	SetScale(s);
 }
+// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Texture2D::SetScale(const Vector3& scl)
 {
 	m_Scale = scl;
@@ -166,6 +171,7 @@ void Texture2D::SetUV(const float& nu, const float& nv, const float& sx, const f
 	m_SplitY = sy;
 }
 
+// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Texture2D::SetDivide(int divX, int divY)
 {
 	m_DivX = divX;

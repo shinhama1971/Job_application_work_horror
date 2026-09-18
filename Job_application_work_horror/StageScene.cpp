@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 1面のステージ配置、ヒューズ探索、電力復旧、出口までの進行を管理します。
+// 主な技術: シーン構成、オブジェクト配置、進行状態、環境ストーリーテリング
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "StageScene.h"
@@ -25,11 +27,13 @@
 
 using namespace DirectX::SimpleMath;
 
+// 処理内容: StageSceneを生成し、初期状態を準備します。
 StageScene::StageScene()
 {
     Init();
 }
 
+// 処理内容: StageSceneが所有する処理とリソースを終了します。
 StageScene::~StageScene()
 {
     Uninit();
@@ -57,19 +61,10 @@ void StageScene::Init()
     m_EntranceEventTriggered = false;
     m_EntranceEventTimer = -1.0f;
     m_EntranceEventPhase = -1;
-    m_ScareLightTimer = -1.0f;
-    m_ScareLightPhase = -1;
-    m_ScareMessageTimer = 0.0f;
-    m_WasPowerRestored = false;
-    m_PowerRestoreTimer = -1.0f;
-    m_PowerRestorePhase = -1;
-    m_ExitPowerEventTimer = -1.0f;
-    m_ExitPowerEventPhase = -1;
-    m_ExitPowerSequenceComplete = false;
+    m_ScareLightSequence.Reset();
+    m_PowerSequence.Reset();
     m_StageVisualTimer = 0.0f;
-    m_ExitOmenTriggered = false;
-    m_ExitOmenTimer = 0.0f;
-    m_ExitOmenPhase = -1;
+    m_ExitOmenSequence.Reset();
     m_ProgressHintTimer = 0.0f;
 
     // プレイヤー
@@ -106,7 +101,7 @@ void StageScene::Init()
     wall6->SetPosition(117.5f, -74.0f, 40.0f);
     wall6->SetScale(205.0f, 50.0f, 4.0f);
 
-    // Storage-room divider with a wide central passage.
+    // 倉庫区画を分けつつ、中央に広い通路を確保します。
     Wall* wall7 = game->CreateObj<Wall>("Wall7");
     wall7->SetPosition(-135.0f, -74.0f, -70.0f);
     wall7->SetScale(170.0f, 50.0f, 4.0f);
@@ -115,7 +110,7 @@ void StageScene::Init()
     wall8->SetPosition(135.0f, -74.0f, -70.0f);
     wall8->SetScale(170.0f, 50.0f, 4.0f);
 
-    // Short walls divide the rear storage area into three searchable rooms.
+    // 短い壁で奥の倉庫を三つの探索可能な部屋へ分割します。
     Wall* wall9 = game->CreateObj<Wall>("Wall9");
     wall9->SetPosition(-90.0f, -74.0f, -140.0f);
     wall9->SetScale(4.0f, 50.0f, 80.0f);
@@ -124,7 +119,7 @@ void StageScene::Init()
     wall10->SetPosition(90.0f, -74.0f, -140.0f);
     wall10->SetScale(4.0f, 50.0f, 80.0f);
 
-    // The powered-door side becomes a narrow corridor with a side office.
+    // 通電扉側は脇部屋を持つ細い廊下として構成します。
     Wall* wall11 = game->CreateObj<Wall>("Wall11");
     wall11->SetPosition(-45.0f, -74.0f, 75.0f);
     wall11->SetScale(4.0f, 50.0f, 70.0f);
@@ -137,7 +132,7 @@ void StageScene::Init()
     wall13->SetPosition(45.0f, -74.0f, 110.0f);
     wall13->SetScale(4.0f, 50.0f, 140.0f);
 
-    // Exit-hall divider. The center opening connects to the corridor.
+    // 脱出ホールを区切り、中央の開口部を廊下へ接続します。
     Wall* wall14 = game->CreateObj<Wall>("Wall14");
     wall14->SetPosition(-132.5f, -74.0f, 180.0f);
     wall14->SetScale(175.0f, 50.0f, 4.0f);
@@ -146,8 +141,8 @@ void StageScene::Init()
     wall15->SetPosition(132.5f, -74.0f, 180.0f);
     wall15->SetScale(175.0f, 50.0f, 4.0f);
 
-    // A narrow L-shaped repeating corridor begins at the center opening.
-    // The first section runs north, then turns right behind a blind corner.
+    // 中央開口部から細いL字型のループ廊下を始めます。
+    // 最初は北へ進ませ、死角の先で右へ曲がる構成です。
     Wall* loopWall1 = game->CreateObj<Wall>("LoopWall1");
     loopWall1->SetPosition(-45.0f, -74.0f, 227.5f);
     loopWall1->SetScale(4.0f, 50.0f, 95.0f);
@@ -156,19 +151,19 @@ void StageScene::Init()
     loopWall2->SetPosition(45.0f, -74.0f, 207.5f);
     loopWall2->SetScale(4.0f, 50.0f, 55.0f);
 
-    // The south wall starts at the corner, leaving the straight section open.
+    // 南側の壁は角から始め、直線区間の入口を開けておきます。
     Wall* loopWall3 = game->CreateObj<Wall>("LoopWall3");
     loopWall3->SetPosition(122.5f, -74.0f, 235.0f);
     loopWall3->SetScale(155.0f, 50.0f, 4.0f);
 
-    // This long wall closes the forward view and forces the right turn.
+    // 長い壁で前方視界を塞ぎ、右折を自然に誘導します。
     Wall* loopWall4 = game->CreateObj<Wall>("LoopWall4");
     loopWall4->SetPosition(77.5f, -74.0f, 275.0f);
     loopWall4->SetScale(245.0f, 50.0f, 4.0f);
 
 
-    // Industrial utility details give each area a readable silhouette.
-    // Trims and overhead conduits are visual-only; floor equipment blocks movement.
+    // 配管や設備で区画ごとのシルエットを区別し、現在地を把握しやすくします。
+    // 縁と天井配管は装飾のみ、床設備には当たり判定を持たせます。
     const auto createStageProp = [game](
         const char* name,
         const Vector3& position,
@@ -245,7 +240,7 @@ void StageScene::Init()
     createLoopMarker("PropLoopMarker1", Vector3(-82.0f, -67.0f, -177.4f));
     createLoopMarker("PropLoopMarker2", Vector3(82.0f, -67.0f, -177.4f));
     createLoopMarker("PropLoopMarker3", Vector3(36.0f, -67.0f, 37.4f));
-    // Ceiling fixtures communicate the power state visually.
+    // 天井照明の見た目で、施設の通電状態を直接伝えます。
     CeilingLight* light1 = game->CreateObj<CeilingLight>("CeilingLight1");
     light1->SetPosition(0.0f, -50.5f, -140.0f);
     light1->SetScale(24.0f, 2.0f, 11.0f);
@@ -316,8 +311,8 @@ void StageScene::Init()
     emergencyCharger->SetPosition(-205.0f, -90.0f, -112.0f);
     emergencyCharger->SetRotation(Vector3(0.0f, 1.5707963f, 0.0f));
 
-    // Optional exploration reward.  It is deliberately away from the
-    // critical path so players choose between a faster escape and a full run.
+    // 任意探索の報酬は最短経路から外して配置します。
+    // 素早い脱出と完全探索のどちらを選ぶか判断させるためです。
     FuseBox* evidenceTerminal =
         game->CreateObj<FuseBox>("Stage1EvidenceTerminal");
     evidenceTerminal->SetManualControl("残された記録を回収する");
@@ -335,9 +330,8 @@ void StageScene::Init()
     evidenceMarker->SetCastsShadow(false);
 
 
-    // Stage 1 exit: the player must operate a visible door and walk through
-    // it.  The old invisible trigger could be activated by pressing A while
-    // merely walking through the corridor.
+    // 1面の出口は、見える扉を操作して通過したときだけ成立させます。
+    // 廊下を歩きながら操作キーを押すだけで透明トリガーが反応する問題を防ぎます。
     Door* stageExitDoor = game->CreateObj<Door>("Stage1ExitDoor");
     stageExitDoor->SetPosition(202.0f, -74.0f, 307.5f);
     stageExitDoor->SetRotation(Vector3(0.0f, 1.5707963f, 0.0f));
@@ -387,8 +381,8 @@ void StageScene::Init()
     fuseWatcher->SetDeactivateOnExpire(true);
     fuseWatcher->SetActive(false);
 
-    // Prime the camera and light before the first draw after scene change.
-    // This also prevents a black stage if gameplay is paused in ImGui.
+    // シーン変更後の初回描画前にカメラとライトを更新します。
+    // ImGuiでゲームを停止した場合も、面全体が黒くなることを防ぎます。
     player->Update();
 
 
@@ -410,6 +404,7 @@ void StageScene::Update()
     m_StageVisualTimer += 1.0f / 60.0f;
     m_ProgressHintTimer += 1.0f / 60.0f;
     if (Input::GetKeyTrigger(VK_H) ||
+        // 処理内容: 保持している値または参照を取得します。
         Input::GetButtonTrigger(XINPUT_LEFT_SHOULDER))
     {
         m_ProgressHintTimer = (std::max)(m_ProgressHintTimer, 35.0f);
@@ -496,7 +491,7 @@ void StageScene::Update()
 
     Door* stageExitDoor = game->GetObj<Door>("Stage1ExitDoor");
     ExitTrigger* stageExit = game->GetObj<ExitTrigger>("ExitTrigger");
-    const bool exitPowerReady = m_ExitPowerSequenceComplete;
+    const bool exitPowerReady = m_PowerSequence.IsExitComplete();
     if (stageExitDoor != nullptr)
     {
         stageExitDoor->SetLocked(!exitPowerReady);
@@ -536,8 +531,9 @@ void StageScene::Update()
     Wall* exitIndicator = game->GetObj<Wall>("PropDoorIndicator");
     if (exitIndicator != nullptr)
     {
-        const float omenRate = m_ExitOmenTriggered
-            ? 1.0f - (std::clamp)(m_ExitOmenTimer / 3.2f, 0.0f, 1.0f)
+        const float omenRate = m_ExitOmenSequence.IsTriggered()
+            ? 1.0f - (std::clamp)(
+                m_ExitOmenSequence.GetTimer() / 3.2f, 0.0f, 1.0f)
             : 0.0f;
         const float indicatorPulse =
             0.72f + std::sin(m_StageVisualTimer *
@@ -564,14 +560,15 @@ void StageScene::Update()
     if (lowBattery > 1.0f) lowBattery = 1.0f;
 
     const float powerBlend = game->IsPowerRestored()
-        ? (std::clamp)(m_PowerRestoreTimer / 2.5f, 0.0f, 1.0f)
+        ? (std::clamp)(
+            m_PowerSequence.GetRestoreTimer() / 2.5f, 0.0f, 1.0f)
         : 0.0f;
     const float powerCalm = 0.03f * powerBlend;
     const float sprintStress = player->IsSprinting() ? 1.0f : 0.0f;
     const Vector3 playerPosition = player->GetPosition();
 
-    // The repeating corridor grows subtly oppressive toward its far end.
-    // Loop count raises the baseline, while restored power clears the effect.
+    // ループ廊下の奥ほど圧迫感を強め、周回数に応じて基準値も上げます。
+    // 通電後は効果を解除し、状況が変わったことを伝えます。
     const float corridorDepth = (std::clamp)(
         (playerPosition.z - 90.0f) / 190.0f,
         0.0f,
@@ -595,8 +592,8 @@ void StageScene::Update()
             1.0f);
     game->GetPostProcess()->SetCorridorTension(corridorTension);
 
-    // Preserve horror darkness while allowing navigation after the player's
-    // eyes have had time to adjust without the flashlight.
+    // ホラーらしい暗さを保ちつつ、懐中電灯なしでも時間経過で目が慣れ、
+    // 最低限移動できる明るさへ調整します。
     const float targetExposure = game->IsPowerRestored()
         ? 1.12f + (1.01f - 1.12f) * powerBlend
         : (player->IsFlashlightOn() ? 1.04f : 1.15f);
@@ -623,6 +620,7 @@ void StageScene::Update()
 
 
 
+// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void StageScene::Uninit()
 {
     Core::Game::GetInstance()->GetPostProcess()->SetAtmosphere(0.18f, 0.55f);

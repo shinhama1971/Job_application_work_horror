@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 露出、ブルーム、CRT、霧など画面全体のシェーダー演出を統括します。
+// 主な技術: Render To Texture、Compute Shader、Ping-Pong Blur、トーン調整
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "PostProcess.h"
@@ -59,6 +61,7 @@ namespace Effect
         m_FullScreenQuad.Init();
     }
 
+    // 処理内容: 所有するリソースを依存関係の逆順で解放します。
     void PostProcess::Uninit()
     {
         m_BloomVerticalShader.Uninit();
@@ -76,14 +79,14 @@ namespace Effect
     {
         m_Time += 1.0f / 60.0f;
 
-        // Smooth changes so sprinting and battery warnings never pop on screen.
+        // 走行や電池警告の強度を平滑化し、画面効果が瞬間的に切り替わらないようにします。
         m_NoiseAmount +=
             (m_TargetNoiseAmount - m_NoiseAmount) * 0.075f;
         m_VignetteStrength +=
             (m_TargetVignetteStrength - m_VignetteStrength) * 0.075f;
 
-        // Human vision adjusts slowly after entering darkness, but recovers
-        // quickly when the flashlight or ceiling lights return.
+        // 暗所へ入った後はゆっくり目を順応させ、懐中電灯や照明が戻ったときは
+        // 素早く通常露出へ戻すことで、人の視覚変化に近づけます。
         const float exposureResponse =
             m_TargetExposure > m_Exposure ? 0.012f : 0.065f;
         m_Exposure +=
@@ -141,6 +144,7 @@ namespace Effect
         }
     }
 
+    // 処理内容: PostProcessの「TriggerBloomPulse」処理を担当します。
     void PostProcess::TriggerBloomPulse(float peakIntensity, float duration)
     {
         m_BloomPulseDuration = (std::max)(duration, 0.01f);
@@ -150,6 +154,7 @@ namespace Effect
         m_BloomIntensity = m_BloomBaseIntensity + m_BloomPulseStrength;
     }
 
+    // 処理内容: PostProcessの「TriggerHorrorPulse」処理を担当します。
     void PostProcess::TriggerHorrorPulse(float strength, float duration)
     {
         m_HorrorPulseDuration = (std::max)(duration, 0.01f);
@@ -158,6 +163,7 @@ namespace Effect
         m_HorrorPulseStrength = m_HorrorPulsePeak;
     }
 
+    // 処理内容: PostProcessの「TriggerLensMoisture」処理を担当します。
     void PostProcess::TriggerLensMoisture(float strength, float duration)
     {
         const float clampedStrength = (std::clamp)(strength, 0.0f, 1.0f);
@@ -174,16 +180,18 @@ namespace Effect
         m_RenderTexture.Clear(0.0f, 0.0f, 0.0f, 1.0f);
     }
 
+    // 処理内容: 処理区間を終了し、変更した状態を戻します。
     void PostProcess::End()
     {
         Renderer::SetBackBufferRenderTarget();
     }
 
+    // 処理内容: PostProcessの「CaptureBackBuffer」処理を担当します。
     void PostProcess::CaptureBackBuffer()
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
 
-        // A resource cannot be copied safely while it is still an output target.
+        // 出力先に設定中のリソースは安全にコピーできないため、描画先から解除します。
         context->OMSetRenderTargets(0, nullptr, nullptr);
 
         ID3D11Resource* backBufferResource = nullptr;

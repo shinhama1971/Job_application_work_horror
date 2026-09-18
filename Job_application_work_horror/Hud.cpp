@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 目的、操作ヒント、電池残量などのゲーム内UIを描画します。
+// 主な技術: 2Dスプライト、ベクターフォント、アンカー配置、状態に応じたUI
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Hud.h"
@@ -37,6 +39,7 @@ namespace
     }
 }
 
+// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void Hud::Init()
 {
     m_Shader.Create("shader/hudVS.hlsl", "shader/hudPS.hlsl");
@@ -46,6 +49,7 @@ void Hud::Init()
     m_Vertices.reserve(MaxVertices);
 }
 
+// 処理内容: 現在の状態に対応する描画命令を発行します。
 void Hud::Draw(
     const Player& player,
     int fuseCount,
@@ -96,9 +100,8 @@ void Hud::Draw(
         AddText(48.0f, 37.0f, objectiveText, pixelSize, objectiveColor);
     }
 
-    // Keep optional exploration visible without competing with the current
-    // mandatory objective.  This also makes the result-screen bonus legible
-    // before the player reaches the end of the game.
+    // 任意探索の情報を必須目標より控えめに表示し、両方を同時に把握できるようにします。
+    // リザルトで加点される探索要素も、クリア前から理解できる表示にします。
     Core::Game* game = Core::Game::GetInstance();
     const int evidenceCount = game != nullptr
         ? (std::clamp)(game->GetEvidenceCollected(), 0, 3)
@@ -118,14 +121,14 @@ void Hud::Draw(
     AddText(evidenceX, 82.0f,
         evidenceText, evidencePixelSize, evidenceColor);
 
-    // Minimal center reticle.
+    // 視線位置だけを伝える小さな中央レティクルを描画します。
     const float reticleExtent = hasInteractionTarget ? 11.0f : 9.0f;
     AddRectangle(screenWidth * 0.5f - reticleExtent, screenHeight * 0.5f - 1.0f, reticleExtent - 2.0f, 2.0f, reticleColor);
     AddRectangle(screenWidth * 0.5f + 2.0f, screenHeight * 0.5f - 1.0f, reticleExtent - 2.0f, 2.0f, reticleColor);
     AddRectangle(screenWidth * 0.5f - 1.0f, screenHeight * 0.5f - reticleExtent, 2.0f, reticleExtent - 2.0f, reticleColor);
     AddRectangle(screenWidth * 0.5f - 1.0f, screenHeight * 0.5f + 2.0f, 2.0f, reticleExtent - 2.0f, reticleColor);
 
-    // A negative count lets non-fuse stages keep the shared battery HUD.
+    // 負の個数を「ヒューズ表示なし」として扱い、ヒューズのない面でも電池HUDを共用します。
     if (fuseCount >= 0)
     {
         AddRectangle(34.0f, screenHeight - 112.0f, 112.0f, 36.0f, dark);
@@ -142,7 +145,7 @@ void Hud::Draw(
         }
     }
 
-    // Flashlight battery frame and fill.
+    // 懐中電灯の電池枠と残量ゲージを描画します。
     const float batteryRate = std::clamp(
         player.GetBattery() / 100.0f, 0.0f, 1.0f);
     Color batteryColor(0.42f, 0.82f, 0.48f, 0.95f);
@@ -191,8 +194,8 @@ void Hud::Draw(
             barFillWidth * staminaRate, 10.0f, staminaColor);
     }
 
-    // Show both the input and the selected action.  The old button-only
-    // prompt did not tell the player whether E/A would collect, open or leave.
+    // 入力キーと実行される操作名を同時に表示します。
+    // ボタン名だけでは、取得・開閉・脱出のどれが起きるか分からなかったためです。
     if (!interactionPrompt.empty())
     {
         const Color promptColor = interactionLocked
@@ -252,6 +255,7 @@ void Hud::Draw(
 }
 
 
+// 処理内容: Hudの「DrawBlink」処理を担当します。
 void Hud::DrawBlink(float opacity)
 {
     const float blinkOpacity = (std::clamp)(opacity, 0.0f, 0.90f);
@@ -270,11 +274,13 @@ void Hud::DrawBlink(float opacity)
     Flush();
 }
 
+// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void Hud::Uninit()
 {
     m_Vertices.clear();
 }
 
+// 処理内容: Hudの「Flush」処理を担当します。
 void Hud::Flush()
 {
     if (m_Vertices.empty())
@@ -296,6 +302,7 @@ void Hud::Flush()
     Renderer::SetDepthEnable(true);
 }
 
+// 処理内容: Hudの「AddRectangle」処理を担当します。
 void Hud::AddRectangle(float x, float y, float width, float height, const Color& color)
 {
     if (m_Vertices.size() + 6 > MaxVertices)
@@ -327,6 +334,7 @@ void Hud::AddRectangle(float x, float y, float width, float height, const Color&
     m_Vertices.push_back(makeVertex(right, bottom));
 }
 
+// 処理内容: Hudの「AddLetterE」処理を担当します。
 void Hud::AddLetterE(float x, float y, float size, const Color& color)
 {
     const float stroke = (std::max)(2.0f, size * 0.18f);
@@ -336,6 +344,7 @@ void Hud::AddLetterE(float x, float y, float size, const Color& color)
     AddRectangle(x, y + size - stroke, size, stroke, color);
 }
 
+// 処理内容: Hudの「AddLetterA」処理を担当します。
 void Hud::AddLetterA(float x, float y, float size, const Color& color)
 {
     const float stroke = (std::max)(2.0f, size * 0.18f);
@@ -345,6 +354,7 @@ void Hud::AddLetterA(float x, float y, float size, const Color& color)
     AddRectangle(x, y + size * 0.5f - stroke * 0.5f, size, stroke, color);
 }
 
+// 処理内容: Hudの「AddText」処理を担当します。
 void Hud::AddText(
     float x,
     float y,
@@ -527,8 +537,8 @@ void Hud::AddText(
 
             const RasterGlyph& glyph = japaneseGlyphs.Get(
                 static_cast<wchar_t>(codePoint));
-            // Match the 5x7 Latin font's visual height and advance so mixed
-            // Japanese/ASCII text stays inside the existing HUD panels.
+            // 5x7英字フォントの見た目の高さと送り幅に合わせます。
+            // 日本語とASCIIが混在しても既存HUDパネル内へ収めるためです。
             const float glyphPixelSize = pixelSize * 0.34f;
             for (unsigned int row = 0; row < glyph.height; ++row)
             {

@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 水たまり位置、落下水滴、着水・足音波紋の生成と描画を管理します。
+// 主な技術: オブジェクトプール、距離ソート、アルファ合成、時間減衰
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Ground.h"
@@ -12,7 +14,8 @@
 
 using namespace DirectX::SimpleMath;
 
-void Ground::BuildFallingDrops()
+// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
+void WaterEffectSystem::Init()
 {
 	m_FallingDrops.clear();
 	m_PuddleCenters.clear();
@@ -22,7 +25,7 @@ void Ground::BuildFallingDrops()
 	m_PuddleCenters.reserve(40);
 	m_FootstepRipples.reserve(8);
 
-	// A tapered crossed streak reads as a small water drop from every angle.
+	// 先細りの線を十字に組み、どの角度から見ても小さな水滴に見える形状にします。
 	const Color dropColor(0.62f, 0.76f, 0.80f, 0.80f);
 	const float tailWidth = 0.025f;
 	const float headWidth = 0.14f;
@@ -154,8 +157,8 @@ void Ground::BuildFallingDrops()
 				 Vector2(0.5f, 0.5f) +
 				 (randomValue - Vector2(0.5f, 0.5f)) * 0.22f) * cellSize;
 			m_PuddleCenters.push_back(puddleCenter);
-			// The playable area is centred slightly toward positive Z. Sorting
-			// prevents the limited pool from being consumed by map-edge cells.
+			// プレイ領域はZ正方向へ少し寄っているため、候補を距離順に並べます。
+			// 限られたプールがマップ端のセルだけで埋まることを防ぎます。
 			const Vector2 fromGameplayCenter =
 				puddleCenter - Vector2(0.0f, 70.0f);
 			candidates.push_back({
@@ -168,6 +171,7 @@ void Ground::BuildFallingDrops()
 		}
 	}
 
+	// 処理内容: stdの「sort」処理を担当します。
 	std::sort(
 		candidates.begin(),
 		candidates.end(),
@@ -198,7 +202,8 @@ void Ground::BuildFallingDrops()
 	}
 }
 
-void Ground::UpdateFallingDrops(float deltaTime)
+// 処理内容: WaterEffectSystemの「UpdateFallingDrops」処理を担当します。
+void WaterEffectSystem::UpdateFallingDrops(float deltaTime)
 {
 	for (FallingDrop& drop : m_FallingDrops)
 	{
@@ -226,7 +231,8 @@ void Ground::UpdateFallingDrops(float deltaTime)
 	}
 }
 
-bool Ground::IsInsidePuddle(const Vector3& position) const
+// 処理内容: 現在の状態が条件を満たすか返します。
+bool WaterEffectSystem::IsInsidePuddle(const Vector3& position) const
 {
 	for (const Vector2& center : m_PuddleCenters)
 	{
@@ -241,7 +247,8 @@ bool Ground::IsInsidePuddle(const Vector3& position) const
 	return false;
 }
 
-bool Ground::IsAnyPuddleVisible(const Camera& camera) const
+// 処理内容: 現在の状態が条件を満たすか返します。
+bool WaterEffectSystem::IsAnyPuddleVisible(const Camera& camera) const
 {
 	for (const Vector2& center : m_PuddleCenters)
 	{
@@ -256,7 +263,8 @@ bool Ground::IsAnyPuddleVisible(const Camera& camera) const
 	return false;
 }
 
-void Ground::UpdateFootstepRipples(float deltaTime)
+// 処理内容: WaterEffectSystemの「UpdateFootstepRipples」処理を担当します。
+void WaterEffectSystem::UpdateFootstepRipples(float deltaTime)
 {
 	m_FootstepRippleCooldown = (std::max)(
 		0.0f, m_FootstepRippleCooldown - deltaTime);
@@ -266,6 +274,7 @@ void Ground::UpdateFootstepRipples(float deltaTime)
 	{
 		ripple.Age += deltaTime;
 	}
+	// 処理内容: stdの「erase_if」処理を担当します。
 	std::erase_if(m_FootstepRipples, [](const WaterRipple& ripple)
 	{
 		return ripple.Age >= ripple.Duration;
@@ -275,7 +284,7 @@ void Ground::UpdateFootstepRipples(float deltaTime)
 	// これにより、壁へ向かって歩いた場合やフレーム落ち時にも音と波紋がずれません。
 }
 
-bool Ground::TriggerFootstepRipple(
+bool WaterEffectSystem::TriggerFootstepRipple(
 	const Vector3& playerPosition,
 	bool sprinting)
 {
@@ -307,7 +316,8 @@ bool Ground::TriggerFootstepRipple(
 	return true;
 }
 
-void Ground::DrawFallingDrops(Camera* camera)
+// 処理内容: WaterEffectSystemの「DrawFallingDrops」処理を担当します。
+void WaterEffectSystem::DrawFallingDrops(Camera* camera)
 {
 	if (m_DropVertices.empty() || m_DropMaterial == nullptr)
 	{
@@ -338,7 +348,8 @@ void Ground::DrawFallingDrops(Camera* camera)
 	Renderer::SetBlendState(BS_NONE);
 }
 
-void Ground::DrawWaterRipples(Camera* camera)
+// 処理内容: WaterEffectSystemの「DrawWaterRipples」処理を担当します。
+void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 {
 	if (m_RippleVertices.empty() || m_RippleMaterial == nullptr ||
 		m_DropMaterial == nullptr)
@@ -443,3 +454,48 @@ void Ground::DrawWaterRipples(Camera* camera)
 	Renderer::SetBlendState(BS_NONE);
 }
 
+// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
+void WaterEffectSystem::Update(float deltaTime)
+{
+	UpdateFallingDrops(deltaTime);
+	UpdateFootstepRipples(deltaTime);
+}
+
+// 処理内容: 現在の状態に対応する描画命令を発行します。
+void WaterEffectSystem::Draw(Camera* camera)
+{
+	DrawFallingDrops(camera);
+	DrawWaterRipples(camera);
+}
+
+// 処理内容: 所有するリソースを依存関係の逆順で解放します。
+void WaterEffectSystem::Uninit()
+{
+	m_FallingDrops.clear();
+	m_PuddleCenters.clear();
+	m_DropVertices.clear();
+	m_DropMaterial.reset();
+	m_RippleVertices.clear();
+	m_FootstepRipples.clear();
+	m_RippleMaterial.reset();
+}
+
+// 処理内容: Groundの「TriggerFootstepRipple」処理を担当します。
+bool Ground::TriggerFootstepRipple(
+	const Vector3& position,
+	bool sprinting)
+{
+	return m_WaterEffects.TriggerFootstepRipple(position, sprinting);
+}
+
+// 処理内容: 現在の状態が条件を満たすか返します。
+bool Ground::IsInsidePuddle(const Vector3& position) const
+{
+	return m_WaterEffects.IsInsidePuddle(position);
+}
+
+// 処理内容: 現在の状態が条件を満たすか返します。
+bool Ground::IsAnyPuddleVisible(const Camera& camera) const
+{
+	return m_WaterEffects.IsAnyPuddleVisible(camera);
+}

@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 天井照明の形状、点灯状態、故障時のちらつきを管理します。
+// 主な技術: 動的ライティング、エミッシブ表現、疑似乱数、時間ベースの蛍光灯演出
+// 読み方: 公開関数は外部から使う操作、メンバー変数は保持する状態を表します。
 // ============================================================================
 
 #pragma once
@@ -39,6 +41,8 @@ public:
     void Init() override;
     void Update() override;
     void Draw(Camera* camera) override;
+    bool UsesCameraCulling() const override { return true; }
+    bool ContributesToPlanarReflection() const override { return true; }
     void Uninit() override;
 
     float GetBrightness() const { return m_Brightness; }

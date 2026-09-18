@@ -1,4 +1,10 @@
 // ============================================================================
+// ファイルの役割: ぼかした高輝度成分を元の画面へ加算合成します。
+// 主な技術: HLSL Pixel Shader、加算合成、露出を考慮したブルーム
+// 読み方: この実装ファイルでは宣言された機能の具体的な処理を定義します。
+// ============================================================================
+
+// ============================================================================
 // シェーダーの役割: 元のシーン色へブルーム画像を加算合成します。
 // ============================================================================
 
@@ -54,8 +60,8 @@ float4 main(PS_IN input) : SV_TARGET
         uv,
         0.0f).rgb;
 
-    // Reuse the blurred bloom buffer for a restrained horizontal streak.
-    // Wide taps favor fluorescent fixtures without requiring another texture.
+    // ぼかし済みブルームを再利用して、控えめな横方向の光条を作ります。
+    // 広い間隔でサンプリングし、追加テクスチャなしで蛍光灯の横長形状を強調します。
     float3 streak = 0.0f;
     streak += bloomTexture.SampleLevel(
         bloomSampler, saturate(uv + float2(texelSize.x * 7.0f, 0.0f)), 0.0f).rgb * 0.34f;
@@ -85,8 +91,8 @@ float4 main(PS_IN input) : SV_TARGET
     const float3 streakColor =
         streak * float3(0.84f, 0.91f, 1.0f) * streakStrength;
 
-    // Dirt is visible only where bloom already exists. This avoids a static
-    // dirty-screen overlay while giving bright fixtures an optical response.
+    // レンズ汚れはブルームが存在する場所だけへ表示します。
+    // 常時貼り付く汚れを避けながら、明るい照明へ光学的な反応を加えます。
     const float2 centered = (uv - 0.5f) * float2(screenAspect, 1.0f);
     const float edgeWeight = smoothstep(0.08f, 0.72f, length(centered));
     const float dirtWave = LensDirtWave(uv);

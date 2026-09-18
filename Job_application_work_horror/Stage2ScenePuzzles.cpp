@@ -1,5 +1,7 @@
 // ============================================================================
 // ファイルの役割: 2面の足音危険度、時計、信号パズル、偽ドア状態を管理します。
+// 主な技術: 入力列照合、状態機械、環境パズル、進行ゲート
+// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Stage2Scene.h"
@@ -25,12 +27,15 @@ using namespace DirectX::SimpleMath;
 #include "Stage2SceneConstants.h"
 
 
+// 処理内容: Stage2Sceneの「UpdateNoiseThreat」処理を担当します。
 void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
 {
-    if (m_FinalSequenceTimer >= 0.0f || m_FinalPursuitTimer > 0.0f)
+    if (m_FinalSequence.IsSequenceActive() ||
+        m_FinalSequence.IsPursuitActive())
     {
         m_QuietRecovery.Reset();
-        m_NoiseThreat = (std::max)(0.0f, m_NoiseThreat - deltaTime * 0.8f);
+        m_NoiseThreatSystem.SetThreat((std::max)(0.0f,
+            m_NoiseThreatSystem.GetThreat() - deltaTime * 0.8f));
         ShadowMan* noiseShadow = Core::Game::GetInstance()->GetObj<ShadowMan>(
             "Stage2NoiseShadow");
         if (noiseShadow != nullptr)
@@ -41,10 +46,11 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
     }
 
     const bool signalStealthActive =
-        m_LoopCount >= 3 && !m_SignalPuzzleComplete;
+        m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete();
     if (m_LoopCount >= 3 && !signalStealthActive)
     {
-        m_NoiseThreat = (std::max)(0.0f, m_NoiseThreat - deltaTime * 0.8f);
+        m_NoiseThreatSystem.SetThreat((std::max)(0.0f,
+            m_NoiseThreatSystem.GetThreat() - deltaTime * 0.8f));
         ShadowMan* noiseShadow = Core::Game::GetInstance()->GetObj<ShadowMan>(
             "Stage2NoiseShadow");
         if (noiseShadow != nullptr)
@@ -57,18 +63,20 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
     const float surfacePulse = player.GetSurfaceNoisePulse();
     if (surfacePulse > 0.0f)
     {
-        m_NoiseThreat = (std::min)(1.0f,
-            m_NoiseThreat + surfacePulse * (signalStealthActive ? 0.18f : 0.11f));
+        m_NoiseThreatSystem.SetThreat((std::min)(1.0f,
+            m_NoiseThreatSystem.GetThreat() +
+                surfacePulse * (signalStealthActive ? 0.18f : 0.11f)));
         if (surfacePulse >= 0.60f)
         {
-            m_WetStepNoticeTimer = 1.8f;
+            m_NoiseThreatSystem.SetWetStepNoticeTimer(1.8f);
         }
     }
 
     const float change = player.IsSprinting()
         ? deltaTime * (signalStealthActive ? 0.48f : 0.36f)
         : -deltaTime * (signalStealthActive ? 0.12f : 0.22f);
-    m_NoiseThreat = (std::clamp)(m_NoiseThreat + change, 0.0f, 1.0f);
+    m_NoiseThreatSystem.SetThreat((std::clamp)(
+        m_NoiseThreatSystem.GetThreat() + change, 0.0f, 1.0f));
 
     Core::Game* game = Core::Game::GetInstance();
     ShadowMan* noiseShadow =
@@ -80,12 +88,13 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         const float distance = toShadow.Length();
         const float proximity = 1.0f - (std::clamp)(
             (distance - 14.0f) / 72.0f, 0.0f, 1.0f);
-        m_NoiseThreat = (std::max)(m_NoiseThreat, proximity * 0.92f);
+        m_NoiseThreatSystem.SetThreat((std::max)(
+            m_NoiseThreatSystem.GetThreat(), proximity * 0.92f));
 
         if (distance <= 15.5f)
         {
-            m_NoiseCatch = true;
-            StartCaughtSequence(player);
+            StartCaughtSequence(
+                player, CaughtSequence::Reason::NoiseStalker);
             return;
         }
     }
@@ -100,16 +109,20 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         nearbyThreat = offset.LengthSquared() <= 25.0f * 25.0f;
     }
     const bool quietEligible = m_LoopCount < 3 &&
-        m_ObservedScareTimer < 0.0f && m_LoopTransitionTimer < 0.0f &&
-        (m_NoiseThreat > 0.05f || m_QuietRecovery.progress > 0.0f ||
+        !m_ObservedScareSequence.IsActive() &&
+        m_LoopTransitionTimer < 0.0f &&
+        (m_NoiseThreatSystem.GetThreat() > 0.05f ||
+            m_QuietRecovery.progress > 0.0f ||
             (noiseShadow != nullptr && noiseShadow->IsActive()));
     if (m_QuietRecovery.Update(deltaTime, quietEligible,
         !player.IsMovingHorizontally(), !player.IsFlashlightOn(), nearbyThreat))
     {
-        m_NoiseThreat = (std::max)(0.0f, m_NoiseThreat - 0.45f);
+        m_NoiseThreatSystem.SetThreat((std::max)(
+            0.0f, m_NoiseThreatSystem.GetThreat() - 0.45f));
         if (noiseShadow != nullptr) noiseShadow->SetActive(false);
-        m_NoiseStalkerCooldown = (std::max)(m_NoiseStalkerCooldown, 8.0f);
-        m_NoiseWarningTimer = 0.0f;
+        m_NoiseThreatSystem.SetStalkerCooldown((std::max)(
+            m_NoiseThreatSystem.GetStalkerCooldown(), 8.0f));
+        m_NoiseThreatSystem.SetWarningTimer(0.0f);
         // 成功時は強いフラッシュを避け、視界の落ち着きで成功を伝えます。
         game->GetPostProcess()->TriggerHorrorPulse(0.08f, 0.16f);
         game->GetPostProcess()->TriggerBloomPulse(0.18f, 0.16f);
@@ -117,10 +130,10 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
     }
 
     const bool canSpawnNoiseStalker =
-        m_NoiseThreat >= 0.74f &&
-        m_NoiseStalkerCooldown <= 0.0f &&
-        m_FinalSequenceTimer < 0.0f &&
-        m_FinalPursuitTimer <= 0.0f &&
+        m_NoiseThreatSystem.GetThreat() >= 0.74f &&
+        m_NoiseThreatSystem.GetStalkerCooldown() <= 0.0f &&
+        !m_FinalSequence.IsSequenceActive() &&
+        !m_FinalSequence.IsPursuitActive() &&
         noiseShadow != nullptr && !noiseShadow->IsActive();
     if (canSpawnNoiseStalker)
     {
@@ -133,7 +146,8 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         noiseShadow->SetPosition(
             spawnPosition.x, spawnPosition.y, spawnPosition.z);
         noiseShadow->SetActive(true);
-        noiseShadow->EnableChase(13.0f + m_NoiseThreat * 6.0f, 12.0f);
+        noiseShadow->EnableChase(
+            13.0f + m_NoiseThreatSystem.GetThreat() * 6.0f, 12.0f);
         noiseShadow->EnableGazeScare(7.5f);
         noiseShadow->SetOnObserved([this]()
         {
@@ -144,35 +158,37 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
             {
                 currentShadow->SetActive(false);
             }
-            m_NoiseThreat = (std::max)(0.10f, m_NoiseThreat - 0.38f);
-            m_NoiseStalkerCooldown = 6.0f;
-            m_NoiseStalkerNoticeTimer = 2.4f;
+            m_NoiseThreatSystem.SetThreat((std::max)(
+                0.10f, m_NoiseThreatSystem.GetThreat() - 0.38f));
+            m_NoiseThreatSystem.SetStalkerCooldown(6.0f);
+            m_NoiseThreatSystem.SetStalkerNoticeTimer(2.4f);
         });
-        m_NoiseStalkerCooldown = 8.5f;
-        m_NoiseStalkerNoticeTimer = 2.8f;
-        m_NoiseWarningTimer = (std::max)(m_NoiseWarningTimer, 2.8f);
+        m_NoiseThreatSystem.SetStalkerCooldown(8.5f);
+        m_NoiseThreatSystem.SetStalkerNoticeTimer(2.8f);
+        m_NoiseThreatSystem.SetWarningTimer((std::max)(
+            m_NoiseThreatSystem.GetWarningTimer(), 2.8f));
         game->PlayAudioCue(SOUND_CUE_SCARE, 0.78f);
         game->GetPostProcess()->TriggerHorrorPulse(0.42f, 0.38f);
         Input::SetVibration(8, 0.22f);
     }
 
-    if (signalStealthActive && m_NoiseThreat >= 0.98f)
+    if (signalStealthActive && m_NoiseThreatSystem.GetThreat() >= 0.98f)
     {
         ResetSignalPuzzle();
         RegisterPuzzleMistake(4);
-        m_PuzzleFeedbackType = 4;
-        m_PuzzleFeedbackTimer = 2.8f;
+        m_PuzzleFeedback.Set(4, 2.8f);
         m_SignalNoticeTimer = 3.0f;
-        m_NoiseWarningTimer = 3.0f;
-        m_NoiseThreat = 0.30f;
-        m_NoiseEventCooldown = 2.8f;
+        m_NoiseThreatSystem.SetWarningTimer(3.0f);
+        m_NoiseThreatSystem.SetThreat(0.30f);
+        m_NoiseThreatSystem.SetEventCooldown(2.8f);
 
         game->GetPostProcess()->TriggerHorrorPulse(0.72f, 0.48f);
         game->GetPostProcess()->TriggerBloomPulse(0.90f, 0.24f);
         Input::SetVibration(13, 0.30f);
         return;
     }
-    if (m_NoiseThreat < 0.70f || m_NoiseEventCooldown > 0.0f)
+    if (m_NoiseThreatSystem.GetThreat() < 0.70f ||
+        m_NoiseThreatSystem.GetEventCooldown() > 0.0f)
     {
         return;
     }
@@ -189,20 +205,21 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
     if (reactionLight != nullptr)
     {
         reactionLight->TriggerEventFlicker(
-            0.48f + m_NoiseThreat * 0.48f,
-            0.46f + m_NoiseThreat * 0.42f);
+            0.48f + m_NoiseThreatSystem.GetThreat() * 0.48f,
+            0.46f + m_NoiseThreatSystem.GetThreat() * 0.42f);
     }
 
-    m_NoiseWarningTimer = 2.1f;
-    m_NoiseEventCooldown = 2.35f;
+    m_NoiseThreatSystem.SetWarningTimer(2.1f);
+    m_NoiseThreatSystem.SetEventCooldown(2.35f);
     game->GetPostProcess()->TriggerHorrorPulse(
-        0.10f + m_NoiseThreat * 0.16f,
+        0.10f + m_NoiseThreatSystem.GetThreat() * 0.16f,
         0.22f);
     Input::SetVibration(
-        3 + static_cast<int>(m_NoiseThreat * 4.0f),
-        0.08f + m_NoiseThreat * 0.08f);
+        3 + static_cast<int>(m_NoiseThreatSystem.GetThreat() * 4.0f),
+        0.08f + m_NoiseThreatSystem.GetThreat() * 0.08f);
 }
 
+// 処理内容: Stage2Sceneの「AdvanceLoop」処理を担当します。
 void Stage2Scene::AdvanceLoop(Player& player)
 {
     m_QuietRecovery.Reset();
@@ -214,23 +231,18 @@ void Stage2Scene::AdvanceLoop(Player& player)
     m_LoopBlinkTimer = 0.28f;
     m_LoopTransitionTimer = 0.0f;
     m_NoticeTimer = 3.0f;
-    m_LightZoneMask = 0;
-    m_ScratchScareTriggered = false;
-    m_PortraitObserved = false;
-    m_PortraitChangedThisLoop = false;
-    m_FalseDoorObserved = false;
-    m_FalseDoorMoved = false;
-    m_ClockObservedThisLoop = false;
+    m_LightZoneProgress.Reset();
+    m_ScratchAnomaly.ResetProgressForLoop();
+    m_PortraitAnomaly.ResetProgressForLoop();
+    m_FalseDoorAnomaly.ResetProgressForLoop();
     m_ConfirmationHandledThisLoop = false;
     ResetSignalPuzzle();
-    m_PuzzleFeedbackTimer = 0.0f;
-    m_PuzzleFeedbackType = 0;
-    m_PuzzleMistakeCount = 0;
-    m_NoiseThreat = 0.12f;
-    m_NoiseEventCooldown = 1.0f;
-    m_NoiseWarningTimer = 0.0f;
-    m_NoiseStalkerCooldown = 2.0f;
-    m_NoiseStalkerNoticeTimer = 0.0f;
+    m_PuzzleFeedback.Reset();
+    m_NoiseThreatSystem.SetThreat(0.12f);
+    m_NoiseThreatSystem.SetEventCooldown(1.0f);
+    m_NoiseThreatSystem.SetWarningTimer(0.0f);
+    m_NoiseThreatSystem.SetStalkerCooldown(2.0f);
+    m_NoiseThreatSystem.SetStalkerNoticeTimer(0.0f);
     ShadowMan* noiseShadow =
         game->GetObj<ShadowMan>("Stage2NoiseShadow");
     if (noiseShadow != nullptr)
@@ -249,9 +261,8 @@ void Stage2Scene::AdvanceLoop(Player& player)
     if (loopDoor != nullptr)
     {
         loopDoor->ResetClosed(m_LoopCount);
-        // Each repeated hallway has one change that must be noticed before
-        // the familiar door will open. This turns the loop into observation
-        // gameplay instead of a straight walk through the same corridor.
+        // 各周回には発見必須の変化を一つ設け、気付くまで同じ扉を開けません。
+        // 同じ廊下を直進するだけでなく、周囲を観察するゲームプレイにします。
         loopDoor->SetLocked(m_LoopCount > 0);
     }
 
@@ -381,9 +392,8 @@ void Stage2Scene::AdvanceLoop(Player& player)
     {
         SetFalseDoorState(false, false);
         RevealScratchPieces(9, Stage2ScratchCount, 0.24f);
-        // The last loop now requires restoring the three signal panels.
-        // The chase is armed only after the player has explored the corridor
-        // and entered the visible colour sequence correctly.
+        // 最終周では三つの信号パネルを復旧する必要があります。
+        // 廊下を探索して表示された色順を正しく入力した後だけ追跡を開始します。
         m_FinalSequenceArmed = false;
         CeilingLight* doorLight = game->GetObj<CeilingLight>("CeilingLight4");
         if (doorLight != nullptr)
@@ -394,23 +404,12 @@ void Stage2Scene::AdvanceLoop(Player& player)
     }
 }
 
+// 処理内容: Stage2Sceneの「ConfigureClockForLoop」処理を担当します。
 void Stage2Scene::ConfigureClockForLoop()
 {
-    if (m_LoopCount == 1)
+    m_ClockAnomaly.ConfigureForLoop(m_LoopCount);
+    if (m_LoopCount >= 3)
     {
-        m_ClockHourAngle = 1.18f;
-        m_ClockMinuteAngle = -2.34f;
-    }
-    else if (m_LoopCount == 2)
-    {
-        m_ClockHourAngle = -0.62f;
-        m_ClockMinuteAngle = 2.72f;
-    }
-    else if (m_LoopCount >= 3)
-    {
-        m_ClockHourAngle = 3.14159265f;
-        m_ClockMinuteAngle = 3.14159265f;
-
         Core::Game* game = Core::Game::GetInstance();
         Wall* face = game->GetObj<Wall>("Stage2ClockFace");
         if (face != nullptr)
@@ -423,31 +422,15 @@ void Stage2Scene::ConfigureClockForLoop()
     }
 }
 
+// 処理内容: Stage2Sceneの「UpdateClock」処理を担当します。
 void Stage2Scene::UpdateClock(float deltaTime)
 {
-    if (m_LoopCount == 0)
-    {
-        m_ClockMinuteAngle += deltaTime * 0.035f;
-        m_ClockHourAngle += deltaTime * 0.0029f;
-    }
-    else if (m_LoopCount == 2)
-    {
-        // The reverse motion is deliberately slow enough to be noticed only
-        // when the player compares the hands against the previous loop.
-        m_ClockMinuteAngle -= deltaTime * 0.82f;
-        m_ClockHourAngle -= deltaTime * 0.068f;
-    }
-
-    float displayedHourAngle = m_ClockHourAngle;
-    float displayedMinuteAngle = m_ClockMinuteAngle;
-    if (m_LoopCount == 2)
-    {
-        constexpr float clockStep = 0.105f;
-        displayedHourAngle =
-            std::floor(m_ClockHourAngle / clockStep) * clockStep;
-        displayedMinuteAngle =
-            std::floor(m_ClockMinuteAngle / clockStep) * clockStep;
-    }
+    // 針の進み方と逆回転時の刻み表示は時計異変自身が管理します。
+    m_ClockAnomaly.Update(m_LoopCount, deltaTime);
+    const float displayedHourAngle =
+        m_ClockAnomaly.GetDisplayedHourAngle(m_LoopCount);
+    const float displayedMinuteAngle =
+        m_ClockAnomaly.GetDisplayedMinuteAngle(m_LoopCount);
 
     Core::Game* game = Core::Game::GetInstance();
     Wall* hourHand = game->GetObj<Wall>("Stage2ClockHourHand");
@@ -462,10 +445,11 @@ void Stage2Scene::UpdateClock(float deltaTime)
     }
 }
 
+// 処理内容: Stage2Sceneの「UpdateClockObservation」処理を担当します。
 void Stage2Scene::UpdateClockObservation()
 {
     if (m_LoopCount <= 0 || m_LoopCount >= 3 ||
-        m_ClockObservedThisLoop)
+        m_ClockAnomaly.WasObservedThisLoop())
     {
         return;
     }
@@ -494,8 +478,7 @@ void Stage2Scene::UpdateClockObservation()
         return;
     }
 
-    m_ClockObservedThisLoop = true;
-    m_ClockNoticeTimer = 2.6f;
+    m_ClockAnomaly.MarkObserved();
 
     if (m_LoopCount == 2)
     {
@@ -524,29 +507,26 @@ void Stage2Scene::UpdateClockObservation()
     Input::SetVibration(m_LoopCount == 1 ? 3 : 6, 0.14f);
 }
 
+// 処理内容: Stage2Sceneの「RegisterPuzzleMistake」処理を担当します。
 void Stage2Scene::RegisterPuzzleMistake(int type)
 {
-    if (m_PuzzleFeedbackTimer > 0.0f)
+    if (!m_PuzzleFeedback.TryRegisterMistake(type))
     {
         return;
     }
-
-    m_PuzzleFeedbackType = type;
-    m_PuzzleFeedbackTimer = 2.2f;
-    m_PuzzleMistakeCount = (std::min)(m_PuzzleMistakeCount + 1, 3);
 
     Core::Game* game = Core::Game::GetInstance();
     game->RegisterPuzzleMistake();
     CeilingLight* warningLight = game->GetObj<CeilingLight>(
         type == 1 ? "Stage2Light3" : "Stage2Light2");
-    const float mistakeRate =
-        static_cast<float>(m_PuzzleMistakeCount) / 3.0f;
+    const int mistakeCount = m_PuzzleFeedback.GetMistakeCount();
+    const float mistakeRate = static_cast<float>(mistakeCount) / 3.0f;
     if (warningLight != nullptr)
     {
         warningLight->TriggerEventFlicker(
             0.48f + mistakeRate * 0.52f,
             0.42f + mistakeRate * 0.48f);
-        if (m_PuzzleMistakeCount >= 3)
+        if (mistakeCount >= 3)
         {
             warningLight->SetForcedOff(true);
         }
@@ -559,17 +539,14 @@ void Stage2Scene::RegisterPuzzleMistake(int type)
         0.14f + mistakeRate * 0.28f,
         0.14f);
     Input::SetVibration(
-        2 + m_PuzzleMistakeCount * 2,
+        2 + mistakeCount * 2,
         0.06f + mistakeRate * 0.12f);
 }
 
+// 処理内容: Stage2Sceneの「ResetSignalPuzzle」処理を担当します。
 void Stage2Scene::ResetSignalPuzzle()
 {
-    m_SignalStep = 0;
-    m_SignalPuzzleComplete = false;
-    m_SignalAccepted[0] = false;
-    m_SignalAccepted[1] = false;
-    m_SignalAccepted[2] = false;
+    m_SignalPuzzle.Reset();
     if (m_LoopCount >= 3)
     {
         m_FinalSequenceArmed = false;
@@ -577,7 +554,7 @@ void Stage2Scene::ResetSignalPuzzle()
 
     Core::Game* game = Core::Game::GetInstance();
     ShadowMan* signalShadow = game->GetObj<ShadowMan>("Stage2Shadow");
-    if (signalShadow != nullptr && m_FinalPursuitTimer <= 0.0f)
+    if (signalShadow != nullptr && !m_FinalSequence.IsPursuitActive())
     {
         signalShadow->SetActive(false);
     }
@@ -599,6 +576,7 @@ void Stage2Scene::ResetSignalPuzzle()
     ApplySignalLightingState();
 }
 
+// 処理内容: Stage2Sceneの「UpdateSignalPuzzle」処理を担当します。
 void Stage2Scene::UpdateSignalPuzzle()
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -627,7 +605,8 @@ void Stage2Scene::UpdateSignalPuzzle()
         Color(0.42f, 0.018f, 0.008f, 1.0f)
     };
 
-    const bool puzzleActive = m_LoopCount >= 3 && !m_SignalPuzzleComplete;
+    const bool puzzleActive =
+        m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete();
     for (int signalIndex = 0; signalIndex < 3; ++signalIndex)
     {
         FuseBox* terminal = game->GetObj<FuseBox>(terminalNames[signalIndex]);
@@ -643,34 +622,39 @@ void Stage2Scene::UpdateSignalPuzzle()
         {
             FuseBox* terminal = game->GetObj<FuseBox>(terminalNames[signalIndex]);
             if (terminal == nullptr || !terminal->IsActivated() ||
-                m_SignalAccepted[signalIndex])
+                m_SignalPuzzle.IsAccepted(signalIndex))
             {
                 continue;
             }
 
-            if (signalIndex != m_SignalStep)
+            const SignalPuzzle::AcceptResult acceptResult =
+                m_SignalPuzzle.Accept(signalIndex);
+            if (acceptResult == SignalPuzzle::AcceptResult::WrongOrder)
             {
-                ResetSignalPuzzle();
+                if (m_LoopCount >= 3)
+                {
+                    m_FinalSequenceArmed = false;
+                }
                 RegisterPuzzleMistake(3);
                 m_SignalNoticeTimer = 2.8f;
-                m_NoiseThreat = 0.92f;
+                m_NoiseThreatSystem.SetThreat(0.92f);
                 game->GetPostProcess()->TriggerHorrorPulse(0.62f, 0.42f);
                 Input::SetVibration(11, 0.24f);
                 break;
             }
 
-            m_SignalAccepted[signalIndex] = true;
-            ++m_SignalStep;
-            m_PuzzleFeedbackType = 0;
+            m_PuzzleFeedback.SetType(0);
             const float retryAssist = static_cast<float>((std::min)(
-                m_PuzzleMistakeCount, 2));
-            m_NoiseThreat = (std::min)(
+                m_PuzzleFeedback.GetMistakeCount(), 2));
+            m_NoiseThreatSystem.SetThreat((std::min)(
                 1.0f,
-                m_NoiseThreat + 0.12f - retryAssist * 0.025f);
+                m_NoiseThreatSystem.GetThreat() + 0.12f -
+                    retryAssist * 0.025f));
             m_SignalNoticeTimer = 2.4f;
             m_ProgressHintTimer = 0.0f;
             game->GetPostProcess()->TriggerBloomPulse(0.52f, 0.20f);
-            Input::SetVibration(4 + m_SignalStep * 2, 0.10f);
+            Input::SetVibration(
+                4 + m_SignalPuzzle.GetStep() * 2, 0.10f);
 
             CeilingLight* responseLight = game->GetObj<CeilingLight>(
                 signalIndex == 0 ? "Stage2Light3" :
@@ -681,9 +665,8 @@ void Stage2Scene::UpdateSignalPuzzle()
             }
             ApplySignalLightingState();
 
-            if (m_SignalStep >= 3)
+            if (acceptResult == SignalPuzzle::AcceptResult::Completed)
             {
-                m_SignalPuzzleComplete = true;
                 m_FinalSequenceArmed = true;
                 m_NoticeTimer = 3.2f;
                 ApplySignalLightingState();
@@ -722,9 +705,10 @@ void Stage2Scene::UpdateSignalPuzzle()
                     }
                     backward.Normalize();
                     const float assistLevel = static_cast<float>((std::min)(
-                        m_PuzzleMistakeCount, 2));
+                        m_PuzzleFeedback.GetMistakeCount(), 2));
                     const float spawnDistance =
-                        78.0f - m_SignalStep * 7.0f + assistLevel * 13.0f;
+                        78.0f - m_SignalPuzzle.GetStep() * 7.0f +
+                            assistLevel * 13.0f;
                     signalShadow->SetPosition(
                         playerPosition.x + backward.x * spawnDistance,
                         -99.0f,
@@ -732,7 +716,8 @@ void Stage2Scene::UpdateSignalPuzzle()
                     signalShadow->SetActive(false);
                     signalShadow->SetActive(true);
                     signalShadow->EnableChase(
-                        13.0f + static_cast<float>(m_SignalStep) * 2.0f -
+                        13.0f + static_cast<float>(
+                            m_SignalPuzzle.GetStep()) * 2.0f -
                             assistLevel * 1.6f,
                         30.0f);
                     signalShadow->EnableGazeScare(24.0f);
@@ -747,9 +732,9 @@ void Stage2Scene::UpdateSignalPuzzle()
                             {
                                 currentShadow->SetActive(false);
                             }
-                            m_NoiseThreat = (std::max)(0.12f, m_NoiseThreat - 0.24f);
-                            m_PuzzleFeedbackType = 6;
-                            m_PuzzleFeedbackTimer = 2.0f;
+                            m_NoiseThreatSystem.SetThreat((std::max)(0.12f,
+                                m_NoiseThreatSystem.GetThreat() - 0.24f));
+                            m_PuzzleFeedback.Set(6, 2.0f);
                             m_SignalNoticeTimer = 2.4f;
                             currentGame->GetPostProcess()->TriggerBloomPulse(0.72f, 0.22f);
                             Input::SetVibration(4, 0.10f);
@@ -769,7 +754,8 @@ void Stage2Scene::UpdateSignalPuzzle()
             continue;
         }
 
-        if (m_SignalPuzzleComplete || m_SignalAccepted[signalIndex])
+        if (m_SignalPuzzle.IsComplete() ||
+            m_SignalPuzzle.IsAccepted(signalIndex))
         {
             marker->SetAppearance(
                 Color(0.025f, 0.14f, 0.055f, 1.0f),
@@ -778,7 +764,8 @@ void Stage2Scene::UpdateSignalPuzzle()
         }
         else
         {
-            const bool isTarget = puzzleActive && signalIndex == m_SignalStep;
+            const bool isTarget = puzzleActive &&
+                signalIndex == m_SignalPuzzle.GetStep();
             const float energy = isTarget ? 0.72f + pulse * 0.42f : 0.16f;
             marker->SetAppearance(
                 baseDiffuse[signalIndex],
@@ -788,6 +775,7 @@ void Stage2Scene::UpdateSignalPuzzle()
     }
 }
 
+// 処理内容: 計算済みの設定や効果を対象へ反映します。
 void Stage2Scene::ApplySignalLightingState()
 {
     if (m_LoopCount < 3)
@@ -814,7 +802,8 @@ void Stage2Scene::ApplySignalLightingState()
         }
 
         const bool restored =
-            m_SignalPuzzleComplete || lightIndex < m_SignalStep;
+            m_SignalPuzzle.IsComplete() ||
+            lightIndex < m_SignalPuzzle.GetStep();
         light->SetForcedOff(false);
         light->SetFaulted(!restored);
         light->SetEmergencyLight(!restored, flickerOffsets[lightIndex]);
@@ -824,20 +813,22 @@ void Stage2Scene::ApplySignalLightingState()
     if (exitLight != nullptr)
     {
         exitLight->SetForcedOff(false);
-        exitLight->SetFaulted(!m_SignalPuzzleComplete);
+        exitLight->SetFaulted(!m_SignalPuzzle.IsComplete());
         exitLight->SetEmergencyLight(
-            !m_SignalPuzzleComplete,
+            !m_SignalPuzzle.IsComplete(),
             4.1f);
-        if (m_SignalPuzzleComplete)
+        if (m_SignalPuzzle.IsComplete())
         {
             exitLight->TriggerEventFlicker(1.10f, 0.82f);
         }
     }
 }
 
+// 処理内容: Stage2Sceneの「UpdateSignalStalker」処理を担当します。
 void Stage2Scene::UpdateSignalStalker()
 {
-    if (m_LoopCount < 3 || m_SignalPuzzleComplete || m_SignalStep <= 0)
+    if (m_LoopCount < 3 || m_SignalPuzzle.IsComplete() ||
+        m_SignalPuzzle.GetStep() <= 0)
     {
         return;
     }
@@ -854,7 +845,8 @@ void Stage2Scene::UpdateSignalStalker()
     toShadow.y = 0.0f;
     const float distance = toShadow.Length();
     const float proximity = 1.0f - (std::clamp)((distance - 30.0f) / 90.0f, 0.0f, 1.0f);
-    m_NoiseThreat = (std::max)(m_NoiseThreat, proximity * 0.78f);
+    m_NoiseThreatSystem.SetThreat((std::max)(
+        m_NoiseThreatSystem.GetThreat(), proximity * 0.78f));
 
     if (distance > 35.0f)
     {
@@ -864,18 +856,19 @@ void Stage2Scene::UpdateSignalStalker()
     shadow->SetActive(false);
     ResetSignalPuzzle();
     RegisterPuzzleMistake(5);
-    m_PuzzleFeedbackType = 5;
-    m_PuzzleFeedbackTimer = 2.8f;
+    m_PuzzleFeedback.Set(5, 2.8f);
     m_SignalNoticeTimer = 3.0f;
-    m_NoiseThreat = 0.38f;
-    m_NoiseEventCooldown = 2.8f;
+    m_NoiseThreatSystem.SetThreat(0.38f);
+    m_NoiseThreatSystem.SetEventCooldown(2.8f);
     game->GetPostProcess()->TriggerHorrorPulse(0.88f, 0.48f);
     game->GetPostProcess()->TriggerBloomPulse(0.16f, 0.16f);
     Input::SetVibration(15, 0.34f);
 }
 
+// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Stage2Scene::SetFalseDoorState(bool visible, bool rightSide)
 {
+    m_FalseDoorAnomaly.SetVisualState(visible, rightSide);
     Core::Game* game = Core::Game::GetInstance();
     const float surfaceX = rightSide ? 39.3f : -39.3f;
     const float frameX = rightSide ? 39.0f : -39.0f;

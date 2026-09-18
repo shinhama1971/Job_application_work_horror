@@ -1,4 +1,10 @@
 // ============================================================================
+// ファイルの役割: ブルーム画像を水平方向へぼかします。
+// 主な技術: HLSL Compute Shader、共有メモリ、ガウシアンブラー、境界クランプ
+// 読み方: この実装ファイルでは宣言された機能の具体的な処理を定義します。
+// ============================================================================
+
+// ============================================================================
 // シェーダーの役割: ブルーム画像を水平方向へガウシアンぼかしをす
 // ============================================================================
 
@@ -9,7 +15,7 @@ static const int GroupSize = 128;
 static const int Radius = 4;
 static const int SharedSize = GroupSize + Radius * 2 + 1;
 
-// Separate scalar arrays keep neighboring threads on neighboring memory banks.
+// スカラー配列を分け、隣接スレッドのアクセスを異なる共有メモリバンクへ分散します。
 groupshared float SharedRed[SharedSize];
 groupshared float SharedGreen[SharedSize];
 groupshared float SharedBlue[SharedSize];
