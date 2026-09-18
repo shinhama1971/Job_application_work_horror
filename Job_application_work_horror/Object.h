@@ -1,13 +1,14 @@
 ﻿// ============================================================================
 // ファイルの役割: 全ゲームオブジェクト共通の座標、姿勢、寿命、仮想関数を定義します。
 // 主な技術: 基底クラス、仮想関数、ライフサイクル管理
-// 読み方: 公開関数は外部から使う操作、メンバー変数は保持する状態を表します。
 // ============================================================================
 
 #pragma once
 #include "Camera.h"
 #include "Shader.h"
 #include"Texture.h"
+#include "ModelBounds.h"
+#include <memory>
 using namespace DirectX::SimpleMath;
 class Object {
 protected:
@@ -16,6 +17,7 @@ protected:
 	Vector3 m_Rotation = DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
 	Vector3 m_Scale = DirectX::SimpleMath::Vector3(1.0f, 1.0f, 1.0f);
 	bool m_IsDestroy = false;
+	std::shared_ptr<const ModelBounds> m_ModelBounds;
 
 	// 描画の為の情報（見た目に関わる部分）
 	Shader m_Shader; // シェーダー
@@ -46,6 +48,20 @@ public:
 	DirectX::SimpleMath::Vector3 GetPosition() const { return m_Position; }
 	DirectX::SimpleMath::Vector3 GetRotation() const { return m_Rotation; }
 	DirectX::SimpleMath::Vector3 GetScale() const { return m_Scale; }
+	void SetModelBounds(const ModelBounds& bounds)
+	{
+		m_ModelBounds = std::make_shared<ModelBounds>(bounds);
+	}
+	void SetModelBounds(std::shared_ptr<const ModelBounds> bounds)
+	{
+		m_ModelBounds = std::move(bounds);
+	}
+	bool HasModelBounds() const
+	{
+		return m_ModelBounds != nullptr && m_ModelBounds->IsValid;
+	}
+	const ModelBounds& GetModelBounds() const { return *m_ModelBounds; }
+	WorldBoundingSphere GetWorldBoundingSphere() const;
 
 	void Destroy() { m_IsDestroy = true; }
 	bool IsDestroy() const { return m_IsDestroy; }

@@ -1,14 +1,15 @@
 // ============================================================================
 // ファイルの役割: 露出、ブルーム、CRT、霧など画面全体のシェーダー演出を統括します。
 // 主な技術: Render To Texture、Compute Shader、Ping-Pong Blur、トーン調整
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "PostProcess.h"
+#include "GpuTimer.h"
 #include "Renderer.h"
 #include "Application.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace Effect
 {
@@ -61,7 +62,6 @@ namespace Effect
         m_FullScreenQuad.Init();
     }
 
-    // 処理内容: 所有するリソースを依存関係の逆順で解放します。
     void PostProcess::Uninit()
     {
         m_BloomVerticalShader.Uninit();
@@ -77,31 +77,37 @@ namespace Effect
     // target値へ緩やかに補間し、場面転換時の露出やノイズの急変を防ぎます。
     void PostProcess::Update()
     {
-        m_Time += 1.0f / 60.0f;
+        const float deltaTime = Application::GetDeltaTime();
+        const auto response = [deltaTime](float responseAt60Fps)
+        {
+            return 1.0f - std::pow(
+                1.0f - responseAt60Fps, deltaTime * 60.0f);
+        };
+        m_Time += deltaTime;
 
         // 走行や電池警告の強度を平滑化し、画面効果が瞬間的に切り替わらないようにします。
         m_NoiseAmount +=
-            (m_TargetNoiseAmount - m_NoiseAmount) * 0.075f;
+            (m_TargetNoiseAmount - m_NoiseAmount) * response(0.075f);
         m_VignetteStrength +=
-            (m_TargetVignetteStrength - m_VignetteStrength) * 0.075f;
+            (m_TargetVignetteStrength - m_VignetteStrength) * response(0.075f);
 
         // 暗所へ入った後はゆっくり目を順応させ、懐中電灯や照明が戻ったときは
         // 素早く通常露出へ戻すことで、人の視覚変化に近づけます。
-        const float exposureResponse =
-            m_TargetExposure > m_Exposure ? 0.012f : 0.065f;
+        const float exposureResponse = response(
+            m_TargetExposure > m_Exposure ? 0.012f : 0.065f);
         m_Exposure +=
             (m_TargetExposure - m_Exposure) * exposureResponse;
         m_CorridorTension +=
-            (m_TargetCorridorTension - m_CorridorTension) * 0.035f;
+            (m_TargetCorridorTension - m_CorridorTension) * response(0.035f);
         m_VolumetricIntensity +=
-            (m_TargetVolumetricIntensity - m_VolumetricIntensity) * 0.055f;
+            (m_TargetVolumetricIntensity - m_VolumetricIntensity) * response(0.055f);
         m_SignalInterference +=
-            (m_TargetSignalInterference - m_SignalInterference) * 0.085f;
+            (m_TargetSignalInterference - m_SignalInterference) * response(0.085f);
 
         if (m_BloomPulseTimer > 0.0f && m_BloomPulseDuration > 0.0f)
         {
             m_BloomPulseTimer =
-                (std::max)(0.0f, m_BloomPulseTimer - 1.0f / 60.0f);
+                (std::max)(0.0f, m_BloomPulseTimer - deltaTime);
             const float remaining =
                 m_BloomPulseTimer / m_BloomPulseDuration;
             m_BloomIntensity = m_BloomBaseIntensity +
@@ -110,13 +116,13 @@ namespace Effect
         else
         {
             m_BloomIntensity +=
-                (m_BloomBaseIntensity - m_BloomIntensity) * 0.12f;
+                (m_BloomBaseIntensity - m_BloomIntensity) * response(0.12f);
         }
 
         if (m_HorrorPulseTimer > 0.0f && m_HorrorPulseDuration > 0.0f)
         {
             m_HorrorPulseTimer =
-                (std::max)(0.0f, m_HorrorPulseTimer - 1.0f / 60.0f);
+                (std::max)(0.0f, m_HorrorPulseTimer - deltaTime);
             const float remaining =
                 m_HorrorPulseTimer / m_HorrorPulseDuration;
             m_HorrorPulseStrength =
@@ -125,13 +131,13 @@ namespace Effect
         else
         {
             m_HorrorPulseStrength +=
-                (0.0f - m_HorrorPulseStrength) * 0.18f;
+                (0.0f - m_HorrorPulseStrength) * response(0.18f);
         }
 
         if (m_LensMoistureTimer > 0.0f && m_LensMoistureDuration > 0.0f)
         {
             m_LensMoistureTimer = (std::max)(
-                0.0f, m_LensMoistureTimer - 1.0f / 60.0f);
+                0.0f, m_LensMoistureTimer - deltaTime);
             const float remaining =
                 m_LensMoistureTimer / m_LensMoistureDuration;
             const float easedRemaining = remaining * remaining *
@@ -140,11 +146,10 @@ namespace Effect
         }
         else
         {
-            m_LensMoisture += (0.0f - m_LensMoisture) * 0.035f;
+            m_LensMoisture += (0.0f - m_LensMoisture) * response(0.035f);
         }
     }
 
-    // 処理内容: PostProcessの「TriggerBloomPulse」処理を担当します。
     void PostProcess::TriggerBloomPulse(float peakIntensity, float duration)
     {
         m_BloomPulseDuration = (std::max)(duration, 0.01f);
@@ -154,7 +159,6 @@ namespace Effect
         m_BloomIntensity = m_BloomBaseIntensity + m_BloomPulseStrength;
     }
 
-    // 処理内容: PostProcessの「TriggerHorrorPulse」処理を担当します。
     void PostProcess::TriggerHorrorPulse(float strength, float duration)
     {
         m_HorrorPulseDuration = (std::max)(duration, 0.01f);
@@ -163,7 +167,6 @@ namespace Effect
         m_HorrorPulseStrength = m_HorrorPulsePeak;
     }
 
-    // 処理内容: PostProcessの「TriggerLensMoisture」処理を担当します。
     void PostProcess::TriggerLensMoisture(float strength, float duration)
     {
         const float clampedStrength = (std::clamp)(strength, 0.0f, 1.0f);
@@ -173,20 +176,21 @@ namespace Effect
         m_LensMoisture = m_LensMoisturePeak;
     }
 
-    // 3Dシーンの描画先を画面ではなく中間テクスチャへ切り替えます。
+    // 3Dシーンを直接中間テクスチャへ描くための入口です。
+    // 現在のGame::DrawはBackBufferを複製するため、この経路を使用していません。
     void PostProcess::Begin()
     {
         m_RenderTexture.SetRenderTarget();
         m_RenderTexture.Clear(0.0f, 0.0f, 0.0f, 1.0f);
     }
 
-    // 処理内容: 処理区間を終了し、変更した状態を戻します。
     void PostProcess::End()
     {
         Renderer::SetBackBufferRenderTarget();
     }
 
-    // 処理内容: PostProcessの「CaptureBackBuffer」処理を担当します。
+    // 現行構成では3DシーンをBackBufferへ描くため、画面効果の入力として
+    // 同じ寸法・形式の中間テクスチャへ複製します。
     void PostProcess::CaptureBackBuffer()
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
@@ -256,11 +260,25 @@ namespace Effect
     }
 
     // ブルーム結果と元画像を合成し、最後にCRT・色調・霧・レンズ汚れを適用します。
-    void PostProcess::Draw()
+    void PostProcess::Draw(GpuTimer* gpuTimer)
     {
         if (m_EnableBloom)
         {
+            if (gpuTimer != nullptr)
+            {
+                gpuTimer->BeginPass(
+                    GpuPass::Bloom, Renderer::GetDeviceContext());
+            }
             RunBloom();
+            if (gpuTimer != nullptr)
+            {
+                gpuTimer->EndPass(
+                    GpuPass::Bloom, Renderer::GetDeviceContext());
+            }
+        }
+        else if (gpuTimer != nullptr)
+        {
+            gpuTimer->SkipPass(GpuPass::Bloom);
         }
         const float effectScale = m_UserEffectScale;
         const float adjustedBloom = (std::clamp)(

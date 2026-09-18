@@ -1,13 +1,14 @@
 ﻿// ============================================================================
 // ファイルの役割: OBJなどの静的モデルを読み込み、描画用データとして保持します。
 // 主な技術: Assimp、GPUバッファ、マテリアル、インデックス描画
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include	"StaticMesh.h"
 #include	"AssimpPerse.h"
 
-// 処理内容: ファイルからデータを読み込み、利用可能な形へ変換します。
+#include <algorithm>
+#include <cfloat>
+
 void StaticMesh::Load(std::string filename, std::string texturedirectory)
 {
 	std::vector<AssimpPerse::SUBSET> subsets{};					// サブセット情報
@@ -25,6 +26,9 @@ void StaticMesh::Load(std::string filename, std::string texturedirectory)
 	materials = AssimpPerse::GetMaterials();	// マテリアル情報取得
 
 	m_textures = AssimpPerse::GetTextures();	// テクスチャ情報取得	
+	m_modelBounds = {};
+	DirectX::SimpleMath::Vector3 boundsMin(FLT_MAX, FLT_MAX, FLT_MAX);
+	DirectX::SimpleMath::Vector3 boundsMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
 	// 頂点データ作成
 	for (const auto& mv : vertices)
@@ -37,8 +41,23 @@ void StaticMesh::Load(std::string filename, std::string texturedirectory)
 			vertex.uv = DirectX::SimpleMath::Vector2(v.texcoord.x, v.texcoord.y);
 			vertex.color = DirectX::SimpleMath::Color(v.color.r, v.color.g, v.color.b, v.color.a);
 
+			boundsMin.x = (std::min)(boundsMin.x, vertex.position.x);
+			boundsMin.y = (std::min)(boundsMin.y, vertex.position.y);
+			boundsMin.z = (std::min)(boundsMin.z, vertex.position.z);
+			boundsMax.x = (std::max)(boundsMax.x, vertex.position.x);
+			boundsMax.y = (std::max)(boundsMax.y, vertex.position.y);
+			boundsMax.z = (std::max)(boundsMax.z, vertex.position.z);
+
 			m_vertices.emplace_back(vertex);
 		}
+	}
+
+	if (!m_vertices.empty())
+	{
+		m_modelBounds.Center = (boundsMin + boundsMax) * 0.5f;
+		m_modelBounds.Extents = (boundsMax - boundsMin) * 0.5f;
+		m_modelBounds.SphereRadius = m_modelBounds.Extents.Length();
+		m_modelBounds.IsValid = true;
 	}
 
 	// インデックスデータ作成

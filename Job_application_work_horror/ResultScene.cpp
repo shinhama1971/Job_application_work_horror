@@ -1,27 +1,24 @@
 // ============================================================================
 // ファイルの役割: ゲーム終了後の評価とリザルト画面を管理します。
 // 主な技術: Scene継承、記録集計、2D UI、入力遷移
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "ResultScene.h"
+#include "Application.h"
 
 #include "Game.h"
 #include "Input.h"
 
-// 処理内容: ResultSceneを生成し、初期状態を準備します。
 ResultScene::ResultScene()
 {
     Init();
 }
 
-// 処理内容: ResultSceneが所有する処理とリソースを終了します。
 ResultScene::~ResultScene()
 {
     Uninit();
 }
 
-// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void ResultScene::Init()
 {
     m_ResultTimer = 0.0f;
@@ -40,10 +37,9 @@ void ResultScene::Init()
     postProcess->TriggerBloomPulse(0.72f, 0.90f);
 }
 
-// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void ResultScene::Update()
 {
-    constexpr float deltaTime = 1.0f / 60.0f;
+    const float deltaTime = Application::GetDeltaTime();
     m_ResultTimer += deltaTime;
     if (m_ResultTimer < 0.85f)
     {
@@ -51,13 +47,11 @@ void ResultScene::Update()
     }
 
     if (Input::GetKeyTrigger('R') ||
-        // 処理内容: 保持している値または参照を取得します。
         Input::GetButtonTrigger(XINPUT_X))
     {
         Core::Game::GetInstance()->RequestSceneChange(SceneName::Stage);
     }
     else if (Input::GetKeyTrigger(VK_RETURN) ||
-        // 処理内容: 保持している値または参照を取得します。
         Input::GetButtonTrigger(XINPUT_A) ||
         Input::GetButtonTrigger(XINPUT_START))
     {
@@ -65,7 +59,6 @@ void ResultScene::Update()
     }
 }
 
-// 処理内容: 現在の状態に対応する描画命令を発行します。
 void ResultScene::Draw(Camera* camera)
 {
     (void)camera;
@@ -85,7 +78,6 @@ void ResultScene::Draw(Camera* camera)
         game->IsLastRunBestCaught());
 }
 
-// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void ResultScene::Uninit()
 {
     m_Hud.Uninit();

@@ -1,7 +1,6 @@
 ﻿// ============================================================================
-// ファイルの役割: Assimpで読み込んだモデルデータをゲーム用の頂点・マテリアルへ変換します。
-// 主な技術: Assimp、インデックス付きメッシュ、DirectXMath、マテリアル・テクスチャ変換
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
+// ファイルの役割: aiSceneから頂点・Index・Material・Textureを一時キャッシュへ展開します。
+// 主な技術: Assimp、左手座標変換、三角形化、Texture所有権移譲
 // ============================================================================
 
 #include	<vector>
@@ -11,29 +10,36 @@
 #include	"Texture.h"
 #include	"AssimpPerse.h"
 
+// Assimp側のCRT構成と一致させ、Release版がデバッグランタイムへ依存するのを防ぎます。
+#if defined(_DEBUG)
 #pragma comment(lib, "assimp-vc143-mtd.lib")
+#else
+#pragma comment(lib, "assimp-vc143-mt.lib")
+#endif
 
 namespace AssimpPerse
 {
+	// g_*は1回のLoadだけに使う作業領域で、GetModelDataの先頭で初期化します。
+	// Textureだけはunique_ptrなのでGetTexturesで呼び出し元へ所有権を移します。
 	std::vector<std::vector<VERTEX>> g_vertices{};		// 頂点データ
 	std::vector<std::vector<unsigned int>> g_indices{};	// インデックスデータ
 	std::vector<SUBSET> g_subsets{};					// サブセット情報
 	std::vector<MATERIAL> g_materials{};				// マテリアル
 	std::vector<std::unique_ptr<Texture>> g_textures;	// ディフューズテクスチャ群
 
-	// ディフューズTxtureコンテナを返す
+	// unique_ptrをコピーできないため、Texture群はまとめて呼び出し元へ移します。
 	std::vector<std::unique_ptr<Texture>> GetTextures()
 	{
 		return std::move(g_textures);
 	}
 
-	// マテリアル情報をassimpを使用して取得する
+	// MaterialIndexと同じ添字で参照できるよう、Texture領域をMaterial数に合わせます。
 	void GetMaterialData(const aiScene* pScene, std::string texturedirectory)
 	{
-		// マテリアル数分テクスチャ格納エリアを用意する
+		// TextureがないMaterialも添字を維持するため、先に全要素を確保します。
 		g_textures.resize(pScene->mNumMaterials);
 
-		// マテリアル数文ループ
+		// Materialごとに色とDiffuse Textureを同じ添字へ収集します。
 		for (unsigned int m = 0; m < pScene->mNumMaterials; m++)
 		{
 			aiMaterial* material = pScene->mMaterials[m];
@@ -192,12 +198,13 @@ namespace AssimpPerse
 		{
 			std::cout << "load error" << filename.c_str() << importer.GetErrorString() << std::endl;
 		}
+		// Debugでは読み込み失敗を即座に止めます。Releaseは有効なパスが渡る前提です。
 		assert(pScene != nullptr);
 
 		// マテリアル情報取得
 		GetMaterialData(pScene, texturedirectory);
 
-		// メッシュ数文ループ（マテリアル毎にメッシュを分割するように指定している）
+		// aiMeshは一つのMaterialIndexを持つため、メッシュ単位で頂点配列を作ります。
 		g_vertices.resize(pScene->mNumMeshes);
 
 		for (unsigned int m = 0; m < pScene->mNumMeshes; m++)
@@ -255,8 +262,7 @@ namespace AssimpPerse
 			}
 		}
 
-		// メッシュ数文ループ
-		// インデックスデータ作成
+		// Triangulate済みのFaceをメッシュ単位のIndex配列へ連結します。
 		g_indices.resize(pScene->mNumMeshes);
 		for (unsigned int m = 0; m < pScene->mNumMeshes; m++)
 		{

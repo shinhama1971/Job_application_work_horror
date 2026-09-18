@@ -1,12 +1,12 @@
 // ============================================================================
 // ファイルの役割: ImGuiによるデバッグ表示と、ライティング・演出値の実行時調整を提供します。
 // 主な技術: Dear ImGui、リアルタイムパラメータ編集、デバッグ可視化
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "DebugUI.h"
 
 #include "Game.h"
+#include "ModelCache.h"
 #include "PostProcess.h"
 #include "Renderer.h"
 #include "Scene.h"
@@ -98,7 +98,6 @@ namespace
 #endif
 }
 
-// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 bool Debug::UI::Init(HWND window)
 {
 #if defined(ENABLE_IMGUI)
@@ -125,7 +124,6 @@ bool Debug::UI::Init(HWND window)
     }
 
     if (!ImGui_ImplDX11_Init(
-        // 処理内容: 保持している値または参照を取得します。
         Renderer::GetDevice(),
         Renderer::GetDeviceContext()))
     {
@@ -141,7 +139,6 @@ bool Debug::UI::Init(HWND window)
     return true;
 }
 
-// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void Debug::UI::Uninit()
 {
 #if defined(ENABLE_IMGUI)
@@ -158,7 +155,6 @@ void Debug::UI::Uninit()
 #endif
 }
 
-// 処理内容: 処理区間を開始し、必要な状態を設定します。
 void Debug::UI::BeginFrame()
 {
 #if defined(ENABLE_IMGUI)
@@ -179,7 +175,6 @@ void Debug::UI::BeginFrame()
 #endif
 }
 
-// 処理内容: 計算済みの設定や効果を対象へ反映します。
 void Debug::UI::ApplyTuning(Effect::PostProcess& postProcess)
 {
 #if defined(ENABLE_IMGUI)
@@ -209,7 +204,6 @@ void Debug::UI::ApplyTuning(Effect::PostProcess& postProcess)
 #endif
 }
 
-// 処理内容: 現在の状態に対応する描画命令を発行します。
 void Debug::UI::Draw(Effect::PostProcess& postProcess)
 {
 #if defined(ENABLE_IMGUI)
@@ -243,10 +237,56 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         ImGui::PlotLines("##FrameTimes", g_FrameTimes, 120,
             g_FrameTimeOffset, "Frame time (16.67 ms = 60 FPS)",
             0.0f, 33.33f, ImVec2(-1.0f, 72.0f));
+        Core::Game* game = Core::Game::GetInstance();
+        if (ImGui::CollapsingHeader(
+            "GPU Performance", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::Text("CPU frame       %.2f ms", currentFrameMs);
+            const auto drawGpuTiming = [](const char* label, GpuTiming timing)
+            {
+                switch (timing.Status)
+                {
+                case GpuTimingStatus::Available:
+                    ImGui::Text("%-15s %.3f ms", label, timing.Milliseconds);
+                    break;
+                case GpuTimingStatus::Skipped:
+                    ImGui::Text("%-15s Skipped", label);
+                    break;
+                case GpuTimingStatus::Invalid:
+                    ImGui::Text("%-15s N/A", label);
+                    break;
+                default:
+                    ImGui::Text("%-15s Waiting", label);
+                    break;
+                }
+            };
+
+            GpuTimer* gpuTimer = game == nullptr ? nullptr : game->GetGpuTimer();
+            if (gpuTimer != nullptr)
+            {
+                drawGpuTiming("GPU total", gpuTimer->GetTiming(GpuPass::Total));
+                drawGpuTiming("Shadow", gpuTimer->GetTiming(GpuPass::Shadow));
+                drawGpuTiming(
+                    "Reflection", gpuTimer->GetTiming(GpuPass::Reflection));
+                drawGpuTiming(
+                    "Main scene", gpuTimer->GetTiming(GpuPass::MainScene));
+                drawGpuTiming("Bloom", gpuTimer->GetTiming(GpuPass::Bloom));
+                drawGpuTiming(
+                    "PostProcess", gpuTimer->GetTiming(GpuPass::PostProcess));
+                ImGui::TextDisabled("4-frame query ring / no GPU wait");
+            }
+        }
         ImGui::Text("Main objects: %u drawn / %u culled",
             g_MainDrawn, g_MainCulled);
         ImGui::Text("Shadow casters: %u drawn / %u culled",
             g_ShadowDrawn, g_ShadowCulled);
+        const ModelCacheStats modelCacheStats = ModelCache::GetStats();
+        ImGui::Text("Model cache: %zu loaded / %llu hit / %llu miss",
+            modelCacheStats.LoadedModels,
+            static_cast<unsigned long long>(modelCacheStats.CacheHits),
+            static_cast<unsigned long long>(modelCacheStats.CacheMisses));
+        ImGui::Text("Assimp loads through cache: %llu",
+            static_cast<unsigned long long>(modelCacheStats.AssimpLoads));
         if (g_ReflectionSkipped)
         {
             ImGui::TextColored(
@@ -260,11 +300,9 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         }
         ImGui::Separator();
 
-        Core::Game* game = Core::Game::GetInstance();
         Scene* scene = game == nullptr ? nullptr : game->GetScene();
         SceneDebugInfo sceneDebugInfo{};
         if (scene != nullptr && scene->TryGetDebugInfo(sceneDebugInfo) &&
-            // 処理内容: ImGuiの「CollapsingHeader」処理を担当します。
             ImGui::CollapsingHeader(
             "2面 イベント確認", ImGuiTreeNodeFlags_DefaultOpen))
         {
@@ -442,7 +480,6 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
 #endif
 }
 
-// 処理内容: UIの「HandleWindowMessage」処理を担当します。
 bool Debug::UI::HandleWindowMessage(
     HWND window,
     UINT message,
@@ -464,7 +501,6 @@ bool Debug::UI::HandleWindowMessage(
     return false;
 }
 
-// 処理内容: 現在の状態が条件を満たすか返します。
 bool Debug::UI::IsVisible()
 {
 #if defined(ENABLE_IMGUI)
@@ -474,7 +510,6 @@ bool Debug::UI::IsVisible()
 #endif
 }
 
-// 処理内容: UIの「ShouldPauseGameplay」処理を担当します。
 bool Debug::UI::ShouldPauseGameplay()
 {
 #if defined(ENABLE_IMGUI)
@@ -484,7 +519,6 @@ bool Debug::UI::ShouldPauseGameplay()
 #endif
 }
 
-// 処理内容: 保持している値または参照を取得します。
 unsigned int Debug::UI::GetReflectionUpdateInterval()
 {
 #if defined(ENABLE_IMGUI)
@@ -496,7 +530,6 @@ unsigned int Debug::UI::GetReflectionUpdateInterval()
 #endif
 }
 
-// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Debug::UI::SetCullingStats(
     unsigned int mainDrawn,
     unsigned int mainCulled,

@@ -1,7 +1,6 @@
 ﻿// ============================================================================
 // ファイルの役割: 懐中電灯のON/OFF、電池消費、低残量通知を管理します。
-// 主な技術: 状態管理、指数平滑化、低電力演出、スポットライト制御
-// 読み方: 公開関数は外部から使う操作、メンバー変数は保持する状態を表します。
+// 主な技術: DeltaTime、電池状態、低電圧フリッカー、光量補間
 // 光の色・範囲・描画はPlayer側に残し、見た目への依存を持ちません。
 // ============================================================================
 
@@ -25,14 +24,14 @@ public:
 
 private:
     static constexpr float MaxBattery = 100.0f;
-    static constexpr float ConsumptionPerFrame = 0.02f;
+    static constexpr float ConsumptionPerSecond = 1.2f;
 
     bool m_IsOn = true;
     float m_Battery = MaxBattery;
     float m_BatteryNoticeTimer = 0.0f;
     float m_PowerBlend = 1.0f;
     int m_LowBatteryWarningLevel = 0;
-    int m_FlickerTimer = 0;
+    float m_FlickerTime = 0.0f;
     bool m_WasVoltageDrop = false;
 
 public:
@@ -41,7 +40,7 @@ public:
         m_BatteryNoticeTimer = 0.0f;
         m_LowBatteryWarningLevel = 0;
         m_PowerBlend = m_IsOn ? 1.0f : 0.0f;
-        m_FlickerTimer = 0;
+        m_FlickerTime = 0.0f;
         m_WasVoltageDrop = false;
     }
 
@@ -62,11 +61,11 @@ public:
     }
 
     // 戻り値は、このフレームで新しく到達した警告段階です。0は通知なしです。
-    int UpdateBattery()
+    int UpdateBattery(float deltaTime)
     {
         if (m_IsOn)
         {
-            m_Battery -= ConsumptionPerFrame;
+            m_Battery -= ConsumptionPerSecond * deltaTime;
             if (m_Battery <= 0.0f)
             {
                 m_Battery = 0.0f;
@@ -90,13 +89,15 @@ public:
     }
 
     // 電池状態から、このフレームの光量と低電圧フリッカーを算出します。
-    FrameState UpdateFrameState()
+    FrameState UpdateFrameState(float deltaTime)
     {
         FrameState state{};
         state.visible = m_IsOn;
 
         const float blendTarget = state.visible ? 1.0f : 0.0f;
-        const float blendResponse = state.visible ? 0.22f : 0.34f;
+        const float responseAt60Fps = state.visible ? 0.22f : 0.34f;
+        const float blendResponse = 1.0f - std::pow(
+            1.0f - responseAt60Fps, deltaTime * 60.0f);
         m_PowerBlend += (blendTarget - m_PowerBlend) * blendResponse;
         if (m_PowerBlend < 0.002f)
         {
@@ -108,11 +109,11 @@ public:
         bool voltageDrop = false;
         if (m_IsOn && m_Battery <= 20.0f)
         {
-            ++m_FlickerTimer;
+            m_FlickerTime += deltaTime;
             state.batteryStress = (20.0f - m_Battery) / 20.0f;
 
-            const float flickerTime =
-                static_cast<float>(m_FlickerTimer) / 60.0f;
+            // 異なる周期を重ね、規則的すぎない電圧揺らぎにします。
+            const float flickerTime = m_FlickerTime;
             const float slowVoltage = std::sin(
                 flickerTime * 7.1f + std::sin(flickerTime * 1.7f) * 1.8f);
             const float ballastNoise =
@@ -135,7 +136,7 @@ public:
         }
         else
         {
-            m_FlickerTimer = 0;
+            m_FlickerTime = 0.0f;
         }
 
         state.voltageDropStarted = voltageDrop && !m_WasVoltageDrop;

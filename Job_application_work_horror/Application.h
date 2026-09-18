@@ -1,7 +1,6 @@
 // ============================================================================
 // ファイルの役割: Windowsアプリケーションの生成、メインループ、終了処理を管理します。
-// 主な技術: Win32 API、固定タイムステップ、メッセージループ、フレーム時間の上限処理
-// 読み方: 公開関数は外部から使う操作、メンバー変数は保持する状態を表します。
+// 主な技術: Win32 API、DeltaTime、メッセージループ、フレーム時間の上限処理
 // このヘッダーでは外部へ公開する型・状態・操作を宣言します。
 // ============================================================================
 
@@ -35,11 +34,17 @@ public:
         return m_hWnd;
     }
 
+    // MainLoopで計測し、停止復帰時の急変を抑えるため上限を設定した経過秒です。
+    static float GetDeltaTime() {
+        return m_DeltaTime;
+    }
+
 private:
     static HINSTANCE   m_hInst;        // インスタンスハンドル
     static HWND        m_hWnd;         // ウィンドウハンドル
     static uint32_t    m_Width;        // ウィンドウの横幅
     static uint32_t    m_Height;       // ウィンドウの縦幅
+    static float       m_DeltaTime;    // 前回更新からの経過秒
 
     static bool InitApp(); //初期化
     static void UninitApp(); //終了処理

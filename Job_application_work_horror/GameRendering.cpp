@@ -1,7 +1,6 @@
 // ============================================================================
 // ファイルの役割: カリング、影、水面反射、本描画の順序を管理します。
 // 主な技術: マルチパス描画、シャドウマップ、視錐台カリング、ポストプロセス
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Game.h"
@@ -17,13 +16,23 @@
 
 namespace
 {
-    float GetConservativeCullingRadius(const Object& object)
+    WorldBoundingSphere GetConservativeCullingBounds(const Object& object)
     {
+        if (object.HasModelBounds())
+        {
+            WorldBoundingSphere bounds = object.GetWorldBoundingSphere();
+            // 既存の画面端余白を維持し、実モデルBoundsでも急な消失を防ぎます。
+            bounds.Radius += 3.0f;
+            return bounds;
+        }
+
         const DirectX::SimpleMath::Vector3 scale = object.GetScale();
-        // 各メッシュはローカル[-0.5, 0.5]を基準に作られているため、
-        // scaleの半対角を境界球にし、複合形状用の余白も加えます。
-        return 0.5f * std::sqrt(
+        WorldBoundingSphere bounds;
+        bounds.Center = object.GetPosition();
+        // コード生成メッシュは従来どおりScaleの半対角と余白を使います。
+        bounds.Radius = 0.5f * std::sqrt(
             scale.x * scale.x + scale.y * scale.y + scale.z * scale.z) + 3.0f;
+        return bounds;
     }
 
     bool IsVisibleToCamera(
@@ -31,34 +40,42 @@ namespace
         const Camera& camera,
         bool testVertical)
     {
-        return !object.UsesCameraCulling() || camera.IsSphereVisible(
-            object.GetPosition(),
-            GetConservativeCullingRadius(object),
-            testVertical);
+        if (!object.UsesCameraCulling())
+        {
+            return true;
+        }
+
+        const WorldBoundingSphere bounds =
+            GetConservativeCullingBounds(object);
+        return camera.IsSphereVisible(
+            bounds.Center, bounds.Radius, testVertical);
     }
 
     bool IsRelevantToShadowMap(const Object& object, const Camera& camera)
     {
-        const float radius = GetConservativeCullingRadius(object);
+        const WorldBoundingSphere bounds =
+            GetConservativeCullingBounds(object);
+        const float radius = bounds.Radius;
         const DirectX::SimpleMath::Vector3 offset =
-            object.GetPosition() - camera.GetPosition();
-        // ShadowMapのfarは280。少し外側まで残し、画面端へ落ちる影を保護します。
+            bounds.Center - camera.GetPosition();
+        // 投影far=280の境界に大きな物体の一部が掛かる場合を残すため、
+        // 中心距離の判定には半径と固定余白を加えます。
         const float shadowRange = 292.0f + radius;
         const float distanceSquared =
             offset.x * offset.x + offset.y * offset.y + offset.z * offset.z;
         return distanceSquared <= shadowRange * shadowRange &&
-            camera.IsSphereVisible(object.GetPosition(), radius + 18.0f, false);
+            camera.IsSphereVisible(bounds.Center, radius + 18.0f, false);
     }
 
     bool IsNearEnoughForReflection(const Object& object, const Camera& camera)
     {
-        const float radius = GetConservativeCullingRadius(object);
+        const WorldBoundingSphere bounds =
+            GetConservativeCullingBounds(object);
+        const float radius = bounds.Radius;
         const DirectX::SimpleMath::Vector3 offset =
-            object.GetPosition() - camera.GetPosition();
-        // 1/6解像度の反射では遠景の細部は判別できないため、遠方を省略します。
-        // 大型の壁はradius分だけ範囲を広げ、背景が欠けないようにします。
-        // 反射テクスチャは1/6解像度なので、遠方の小物を描いても画面上では
-        // ほぼ1画素以下です。大型の壁はradius分だけ自動的に残ります。
+            bounds.Center - camera.GetPosition();
+        // 1/6解像度では判別できない遠景を省きます。大型物だけはradius分を
+        // 判定距離へ加え、背景になる壁が欠けないようにします。
         const float reflectionRange = 230.0f + radius;
         return offset.x * offset.x + offset.y * offset.y + offset.z * offset.z <=
             reflectionRange * reflectionRange;
@@ -73,6 +90,8 @@ namespace Core
     void Game::Draw()
     {
         Debug::UI::BeginFrame();
+        ID3D11DeviceContext* context = Renderer::GetDeviceContext();
+        m_Instance->m_GpuTimer.BeginFrame(context);
         unsigned int mainDrawn = 0;
         unsigned int mainCulled = 0;
         unsigned int shadowDrawn = 0;
@@ -88,6 +107,7 @@ namespace Core
             (m_Instance->m_ShadowFrameIndex++ % shadowInterval) == 0u;
         if (updateShadow)
         {
+            m_Instance->m_GpuTimer.BeginPass(GpuPass::Shadow, context);
             m_Instance->m_ShadowMap.Begin(m_Instance->m_Camera);
             for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
             {
@@ -106,9 +126,11 @@ namespace Core
                 o->DrawShadow();
             }
             m_Instance->m_ShadowMap.End();
+            m_Instance->m_GpuTimer.EndPass(GpuPass::Shadow, context);
         }
         else
         {
+            m_Instance->m_GpuTimer.SkipPass(GpuPass::Shadow);
             m_Instance->m_ShadowMap.Bind();
         }
 
@@ -160,6 +182,8 @@ namespace Core
                         reflectionInterval) == 0u);
             if (updateReflection)
             {
+                m_Instance->m_GpuTimer.BeginPass(
+                    GpuPass::Reflection, context);
                 m_Instance->m_PlanarReflection.Begin(
                     m_Instance->m_Camera,
                     -99.5f);
@@ -187,6 +211,8 @@ namespace Core
 
                 m_Instance->m_PlanarReflection.End(
                     m_Instance->m_Camera);
+                m_Instance->m_GpuTimer.EndPass(
+                    GpuPass::Reflection, context);
                 m_Instance->m_LastReflectionCameraPosition =
                     reflectionCameraPosition;
                 m_Instance->m_LastReflectionCameraForward =
@@ -195,6 +221,7 @@ namespace Core
             }
             else
             {
+                m_Instance->m_GpuTimer.SkipPass(GpuPass::Reflection);
                 m_Instance->m_PlanarReflection.Bind();
                 reflectionSkipped = !reflectionVisible;
             }
@@ -202,10 +229,12 @@ namespace Core
         }
         else
         {
+            m_Instance->m_GpuTimer.SkipPass(GpuPass::Reflection);
             m_Instance->m_WasReflectionVisible = false;
             m_Instance->m_HasReflectionCameraPose = false;
         }
 
+        m_Instance->m_GpuTimer.BeginPass(GpuPass::MainScene, context);
         Renderer::DrawStart();
 
         for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
@@ -222,6 +251,7 @@ namespace Core
                 o->Draw(&m_Instance->m_Camera);
             }
         }
+        m_Instance->m_GpuTimer.EndPass(GpuPass::MainScene, context);
 
         Debug::UI::SetCullingStats(
             mainDrawn,
@@ -232,8 +262,10 @@ namespace Core
             reflectionCulled,
             reflectionSkipped);
 
+        m_Instance->m_GpuTimer.BeginPass(GpuPass::PostProcess, context);
         m_Instance->m_PostProcess.CaptureBackBuffer();
-        m_Instance->m_PostProcess.Draw();
+        m_Instance->m_PostProcess.Draw(&m_Instance->m_GpuTimer);
+        m_Instance->m_GpuTimer.EndPass(GpuPass::PostProcess, context);
 
         // ブルーム後にHUDと画面表示を描き、文字の輪郭がぼけないようにします。
         if (m_Instance->m_Scene)
@@ -242,7 +274,7 @@ namespace Core
         }
         Debug::UI::Draw(m_Instance->m_PostProcess);
 
-
+        m_Instance->m_GpuTimer.EndFrame(context);
         Renderer::DrawEnd();
     }
 }

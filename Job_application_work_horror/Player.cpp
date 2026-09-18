@@ -1,10 +1,10 @@
 // ============================================================================
 // ファイルの役割: 一人称移動、視点、懐中電灯、電池、インタラクションを管理します。
 // 主な技術: FPS制御、衝突応答、ヘッドボブ、スポットライト、入力統合
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Player.h"
+#include "Application.h"
 #include "Game.h"
 #include "Input.h"
 #include "Camera.h"
@@ -32,6 +32,7 @@ void Player::Init()
 
     staticmesh.Load(tmpStr, texDirectory);
 
+    SetModelBounds(staticmesh.GetModelBounds());
     m_MeshRenderer.Init(staticmesh);
     m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
@@ -80,7 +81,7 @@ void Player::Update()
     }
 
     Camera* cam = Core::Game::GetInstance()->GetCamera();
-    constexpr float deltaTime = 1.0f / 60.0f;//今60湖底
+    const float deltaTime = Application::GetDeltaTime();
     m_AmbienceTimer += deltaTime;
     m_Flashlight.TickNotice(deltaTime);
 
@@ -109,7 +110,7 @@ void Player::Update()
     }
 
     const Vector3 positionBeforeMove = m_Position;
-    m_Position += m_Movement.GetVelocity();
+    m_Position += m_Movement.GetVelocity() * deltaTime;
 
     if (m_Position.y < -99.0f)
     {
@@ -141,7 +142,10 @@ void Player::Update()
         m_Position.x - positionBeforeMove.x,
         0.0f,
         m_Position.z - positionBeforeMove.z);
-    if (actualMovement.LengthSquared() > 0.0064f && m_FootstepTimer <= 0.0f)
+    const float footstepMovementThreshold = 4.8f * deltaTime;
+    if (actualMovement.LengthSquared() >
+        footstepMovementThreshold * footstepMovementThreshold &&
+        m_FootstepTimer <= 0.0f)
     {
         bool wetStep = m_WetSurfaceOverride;
         for (Ground* ground : Core::Game::GetInstance()->GetObjects<Ground>())
@@ -193,7 +197,7 @@ void Player::Update()
         }
     }
 
-    const int warningLevel = m_Flashlight.UpdateBattery();
+    const int warningLevel = m_Flashlight.UpdateBattery(deltaTime);
     if (warningLevel > 0)
     {
         Core::Game* game = Core::Game::GetInstance();
@@ -205,7 +209,7 @@ void Player::Update()
             warningLevel == 2 ? 0.18f : 0.09f);
     }
     const FlashlightSystem::FrameState flashlightState =
-        m_Flashlight.UpdateFrameState();
+        m_Flashlight.UpdateFrameState(deltaTime);
     const bool visibleLight = flashlightState.visible;
     const bool renderFlashlight = flashlightState.render;
     const float lightOutput = flashlightState.output;
@@ -270,8 +274,11 @@ void Player::Update()
         ? 1.0f - (std::clamp)(
             (closestSurfaceDistance - 12.0f) / 42.0f, 0.0f, 1.0f)
         : 0.0f;
+    const float nearSurfaceResponse = 1.0f - std::pow(
+        1.0f - 0.18f, deltaTime * 60.0f);
     m_FlashlightNearSurfaceBlend +=
-        (nearSurfaceTarget - m_FlashlightNearSurfaceBlend) * 0.18f;
+        (nearSurfaceTarget - m_FlashlightNearSurfaceBlend) *
+        nearSurfaceResponse;
 
     LIGHT light{};
 
@@ -380,7 +387,7 @@ void Player::Update()
     }
     Renderer::SetEnvironmentLights(environmentLights);
 	// カメラの位置と向きを更新
-    m_Movement.UpdateHeadBob();
+    m_Movement.UpdateHeadBob(deltaTime);
 
     Vector3 eyePos = m_Position;
     eyePos.y += m_CameraHeightOffset;
@@ -465,7 +472,6 @@ void Player::Draw(Camera* cam)
     }
 }
 
-// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void Player::Uninit()
 {}
 

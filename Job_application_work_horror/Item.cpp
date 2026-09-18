@@ -1,10 +1,10 @@
 // ============================================================================
 // ファイルの役割: ヒューズアイテムの形状、浮遊演出、取得処理を管理します。
 // 主な技術: オブジェクト指向、発光パルス、AABB、時間ベースアニメーション
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Item.h"
+#include "Application.h"
 #include "Game.h"
 #include "Input.h"
 #include "Player.h"
@@ -15,7 +15,6 @@
 
 using namespace DirectX::SimpleMath;
 
-// 処理内容: 後続処理で使うデータ構造または描画情報を組み立てます。
 void Item::BuildGeometry()
 {
     m_Vertices.clear();
@@ -96,7 +95,6 @@ void Item::BuildGeometry()
         Vector3(0.045f, 0.34f, 0.035f), filament);
 }
 
-// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void Item::Init()
 {
     m_Vertices.reserve(96);
@@ -121,19 +119,17 @@ void Item::Init()
     m_AnimationTime = 0.0f;
 }
 
-// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void Item::Update()
 {
     if (!m_IsActive || m_IsCollected) return;
 
     // ゆっくりした浮遊と明滅で、暗い部屋でも小さなヒューズを発見しやすくします。
-    constexpr float deltaTime = 1.0f / 60.0f;
+    const float deltaTime = Application::GetDeltaTime();
     m_AnimationTime += deltaTime;
-    m_Rotation.y += 0.025f;
+    m_Rotation.y += 1.5f * deltaTime;
     m_Position.y = m_BaseY + std::sin(m_AnimationTime * 2.6f) * 0.75f;
 }
 
-// 処理内容: Itemの「Interact」処理を担当します。
 void Item::Interact(Player& player)
 {
     if (!m_IsActive || m_IsCollected)
@@ -156,7 +152,6 @@ void Item::Interact(Player& player)
             player.GetPosition().z - 80.0f
         );
 
-        // 処理内容: 保持している値または参照を取得します。
         Core::Game::GetInstance()->RequestAddObject<ShadowMan>(
             [shadowPosition](ShadowMan& shadow)
             {
@@ -170,7 +165,6 @@ void Item::Interact(Player& player)
     }
 }
 
-// 処理内容: 現在の状態に対応する描画命令を発行します。
 void Item::Draw(Camera* cam)
 {
     if (!m_IsActive || m_IsCollected) return;
@@ -206,7 +200,6 @@ void Item::Draw(Camera* cam)
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
 }
 
-// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void Item::Uninit()
 {
     m_Vertices.clear();

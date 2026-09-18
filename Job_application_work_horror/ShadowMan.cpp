@@ -1,10 +1,10 @@
 // ============================================================================
 // ファイルの役割: 遠景の人影、出現時間、消失・ディゾルブ演出を管理します。
 // 主な技術: ゲームAI状態機械、追跡補間、シャドウ表現、ディゾルブ
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Game.h"
+#include "Application.h"
 #include "ShadowMan.h"
 #include "Player.h"
 #include "input.h"
@@ -15,7 +15,6 @@
 
 using namespace DirectX::SimpleMath;
 
-// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void ShadowMan::Init()
 {
 	m_Age = 0.0f;
@@ -26,7 +25,7 @@ void ShadowMan::Init()
 	m_IsActive = true;
 	m_DeactivateOnExpire = false;
 	m_OnObserved = nullptr;
-	m_LifeTimer = 240;
+	m_LifeTime = 4.0f;
 	m_ChaseSpeed = 0.0f;
 	m_ChaseStopDistance = 28.0f;
 
@@ -123,7 +122,6 @@ void ShadowMan::Init()
     m_Scale = Vector3(8.0f, 16.0f, 8.0f);
 }
 
-// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void ShadowMan::Update()
 {
     if (!m_IsActive)
@@ -131,9 +129,10 @@ void ShadowMan::Update()
         return;
     }
 
-    m_Age += 1.0f / 60.0f;
-    --m_LifeTimer;
-    if (m_LifeTimer <= 0)
+    const float deltaTime = Application::GetDeltaTime();
+    m_Age += deltaTime;
+    m_LifeTime -= deltaTime;
+    if (m_LifeTime <= 0.0f)
     {
         if (m_DeactivateOnExpire)
         {
@@ -163,7 +162,7 @@ void ShadowMan::Update()
         {
             horizontalDirection /= horizontalDistance;
             const float travel = (std::min)(
-                m_ChaseSpeed * (1.0f / 60.0f),
+                m_ChaseSpeed * deltaTime,
                 horizontalDistance - m_ChaseStopDistance);
             m_Position += horizontalDirection * travel;
             toPlayer = player->GetPosition() - m_Position;
@@ -192,8 +191,8 @@ void ShadowMan::Update()
 
 	if (illuminatedByGaze)
 	{
-		m_ObservedAmount += 0.060f;
-		m_LifeTimer -= 2;
+		m_ObservedAmount += 3.6f * deltaTime;
+		m_LifeTime -= 2.0f * deltaTime;
 
 		if (!m_ReactedToGaze)
 		{
@@ -217,20 +216,19 @@ void ShadowMan::Update()
 	}
 	else
 	{
-		m_ObservedAmount -= 0.018f;
+		m_ObservedAmount -= 1.08f * deltaTime;
 	}
 
 	m_ObservedAmount = (std::clamp)(m_ObservedAmount, 0.0f, 1.0f);
 	if (m_ObservedAmount > 0.82f)
 	{
-		m_LifeTimer = (std::min)(m_LifeTimer, 24);
+		m_LifeTime = (std::min)(m_LifeTime, 0.4f);
 	}
 }
 
-// 処理内容: 現在の状態に対応する描画命令を発行します。
 void ShadowMan::Draw(Camera* camera)
 {
-    if (!m_IsActive || m_LifeTimer <= 0)
+    if (!m_IsActive || m_LifeTime <= 0.0f)
     {
         return;
     }
@@ -253,7 +251,7 @@ void ShadowMan::Draw(Camera* camera)
 
     const float appear = (std::min)(m_Age / 0.35f, 1.0f);
     const float disappear = (std::min)(
-        static_cast<float>(m_LifeTimer) / 30.0f,
+        m_LifeTime / 0.5f,
         1.0f);
 
     DissolveBuffer dissolve{};
@@ -275,7 +273,6 @@ void ShadowMan::Draw(Camera* camera)
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
 }
 
-// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void ShadowMan::Uninit()
 {
 	m_OnObserved = nullptr;

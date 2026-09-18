@@ -1,7 +1,6 @@
 // ============================================================================
 // ファイルの役割: 一度だけ発生する驚かせ演出の条件と進行を管理します。
 // 主な技術: AABBトリガー、イベント発火、再実行防止
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Game.h"
@@ -13,12 +12,10 @@
 
 using namespace DirectX::SimpleMath;
 
-// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void ScareTrigger::Init()
 {
 }
 
-// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void ScareTrigger::Update()
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -60,18 +57,15 @@ void ScareTrigger::Update()
     }
 }
 
-// 処理内容: 現在の状態に対応する描画命令を発行します。
 void ScareTrigger::Draw(Camera* camera)
 {
     (void)camera;
 }
 
-// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void ScareTrigger::Uninit()
 {
 }
 
-// 処理内容: 現在の状態が条件を満たすか返します。
 bool ScareTrigger::IsPlayerInside() const
 {
     const std::vector<Player*> players =

@@ -1,7 +1,6 @@
 // ============================================================================
 // ファイルの役割: XAudio2による効果音・環境音の読み込み、再生、解放を管理します。
 // 主な技術: XAudio2、RIFF/WAVE解析、Source Voice、RAII
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "sound.h"
@@ -17,7 +16,6 @@
 #define fourccDPDS 'dpds'
 #endif
 
-// 処理内容: Soundが所有する処理とリソースを終了します。
 Sound::~Sound()
 {
 	Uninit();
@@ -284,7 +282,6 @@ void Sound::Resume(SOUND_LABEL label)
 	}
 }
 
-// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Sound::SetMasterVolume(float volume)
 {
 	if (m_pMasteringVoice == nullptr)
@@ -344,7 +341,6 @@ HRESULT Sound::FindChunk(HANDLE hFile, DWORD fourcc, DWORD& dwChunkSize, DWORD& 
 	return S_OK;
 }
 
-// 処理内容: Soundの「ReadChunkData」処理を担当します。
 HRESULT Sound::ReadChunkData(HANDLE hFile, void* buffer, DWORD buffersize, DWORD bufferoffset)
 {
 	HRESULT hr = S_OK;

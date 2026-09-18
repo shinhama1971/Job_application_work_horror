@@ -1,7 +1,6 @@
 // ============================================================================
 // ファイルの役割: 露出、ブルーム、CRT、霧など画面全体のシェーダー演出を統括します。
 // 主な技術: Render To Texture、Compute Shader、Ping-Pong Blur、トーン調整
-// 読み方: 公開関数は外部から使う操作、メンバー変数は保持する状態を表します。
 // ============================================================================
 
 #pragma once
@@ -11,6 +10,8 @@
 #include "RenderTexture.h"
 #include "FullScreenQuad.h"
 #include "ComputeShader.h"
+
+class GpuTimer;
 
 namespace Effect
 {
@@ -77,7 +78,7 @@ namespace Effect
         void Begin(); // 以降の3D描画先をオフスクリーンへ切り替えます。
         void End();   // 描画先をバックバッファへ戻します。
         void CaptureBackBuffer();
-        void Draw();  // 保存したシーンへブルーム、色調、ノイズなどを合成します。
+        void Draw(GpuTimer* gpuTimer); // 保存したシーンへ画面効果を合成します。
 
         void TriggerBloomPulse(float peakIntensity, float duration);
         void TriggerHorrorPulse(float strength, float duration);

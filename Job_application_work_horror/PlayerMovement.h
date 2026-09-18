@@ -1,7 +1,6 @@
 ﻿// ============================================================================
 // ファイルの役割: プレイヤーの速度、重力、Sprint、Staminaを更新します。
-// 主な技術: 加速度、減速、デルタタイム、状態遷移、足音イベント
-// 読み方: 公開関数は外部から使う操作、メンバー変数は保持する状態を表します。
+// 主な技術: DeltaTime、速度補間、Sprint/Stamina状態、Head Bob
 // Collisionと座標補正はPlayer側に残し、ステージ形状には依存しません。
 // ============================================================================
 
@@ -15,12 +14,18 @@
 class PlayerMovement final
 {
 private:
-    static constexpr float DefaultMoveSpeed = 0.5f;
+    static constexpr float DefaultMoveSpeedPerSecond = 30.0f;
     static constexpr float SprintSpeedMultiplier = 1.65f;
-    static constexpr float Gravity = 0.01f;
+    static constexpr float GravityAcceleration = 36.0f;
     static constexpr float MaxStamina = 100.0f;
-    static constexpr float StaminaDrainPerFrame = 0.22f;
-    static constexpr float StaminaRecoveryPerFrame = 0.38f;
+    static constexpr float StaminaDrainPerSecond = 13.2f;
+    static constexpr float StaminaRecoveryPerSecond = 22.8f;
+
+    static float GetResponse(float responseAt60Fps, float deltaTime)
+    {
+        return 1.0f - std::pow(
+            1.0f - responseAt60Fps, deltaTime * 60.0f);
+    }
 
     DirectX::SimpleMath::Vector3 m_Velocity =
         DirectX::SimpleMath::Vector3::Zero;
@@ -65,7 +70,7 @@ public:
         if (m_IsSprinting)
         {
             m_Stamina = (std::max)(
-                0.0f, m_Stamina - StaminaDrainPerFrame);
+                0.0f, m_Stamina - StaminaDrainPerSecond * deltaTime);
             m_StaminaRecoveryDelay = 0.45f;
             if (m_Stamina <= 0.0f)
             {
@@ -83,10 +88,11 @@ public:
         else
         {
             m_Stamina = (std::min)(
-                MaxStamina, m_Stamina + StaminaRecoveryPerFrame);
+                MaxStamina, m_Stamina + StaminaRecoveryPerSecond * deltaTime);
         }
 
-        const float currentMoveSpeed = DefaultMoveSpeed *
+        // 急な入力変化をそのまま座標へ反映せず、速度補間で視点の揺れを抑えます。
+        const float currentMoveSpeed = DefaultMoveSpeedPerSecond *
             (m_IsSprinting ? SprintSpeedMultiplier : 1.0f);
         if (isMoving)
         {
@@ -96,7 +102,8 @@ public:
             }
             const DirectX::SimpleMath::Vector3 desiredVelocity =
                 moveDirection * currentMoveSpeed;
-            const float acceleration = m_IsSprinting ? 0.24f : 0.30f;
+            const float acceleration = GetResponse(
+                m_IsSprinting ? 0.24f : 0.30f, deltaTime);
             m_Velocity.x +=
                 (desiredVelocity.x - m_Velocity.x) * acceleration;
             m_Velocity.z +=
@@ -104,18 +111,20 @@ public:
         }
         else
         {
-            m_Velocity.x *= 0.72f;
-            m_Velocity.z *= 0.72f;
+            const float deceleration = std::pow(0.72f, deltaTime * 60.0f);
+            m_Velocity.x *= deceleration;
+            m_Velocity.z *= deceleration;
             if (std::abs(m_Velocity.x) < 0.001f) m_Velocity.x = 0.0f;
             if (std::abs(m_Velocity.z) < 0.001f) m_Velocity.z = 0.0f;
         }
 
-        m_Velocity.y -= Gravity;
+        m_Velocity.y -= GravityAcceleration * deltaTime;
         return exhaustedThisFrame;
     }
 
     // 移動速度に対応する一人称カメラの上下・左右揺れを更新します。
-    void UpdateHeadBob()
+    // 位相と減衰を経過時間で進め、停止時だけ自然に中央へ戻します。
+    void UpdateHeadBob(float deltaTime)
     {
         const float horizontalSpeed = std::sqrt(
             m_Velocity.x * m_Velocity.x + m_Velocity.z * m_Velocity.z);
@@ -124,8 +133,8 @@ public:
             const float speedRate = (std::min)(
                 horizontalSpeed / GetMaximumHorizontalSpeed(), 1.0f);
             m_HeadBobTimer +=
-                (m_IsSprinting ? 0.22f : 0.14f) *
-                (0.55f + speedRate * 0.45f);
+                (m_IsSprinting ? 13.2f : 8.4f) *
+                (0.55f + speedRate * 0.45f) * deltaTime;
             const float amplitude =
                 (m_IsSprinting ? 0.48f : 0.30f) * speedRate;
             const float verticalTarget =
@@ -134,14 +143,17 @@ public:
             const float sideTarget =
                 std::sin(m_HeadBobTimer * 0.5f) * amplitude * 0.34f;
             m_HeadBobOffset +=
-                (verticalTarget - m_HeadBobOffset) * 0.30f;
+                (verticalTarget - m_HeadBobOffset) *
+                GetResponse(0.30f, deltaTime);
             m_HeadBobSideOffset +=
-                (sideTarget - m_HeadBobSideOffset) * 0.24f;
+                (sideTarget - m_HeadBobSideOffset) *
+                GetResponse(0.24f, deltaTime);
         }
         else
         {
-            m_HeadBobOffset *= 0.84f;
-            m_HeadBobSideOffset *= 0.84f;
+            const float returnDecay = std::pow(0.84f, deltaTime * 60.0f);
+            m_HeadBobOffset *= returnDecay;
+            m_HeadBobSideOffset *= returnDecay;
         }
     }
 
@@ -167,7 +179,7 @@ public:
     float GetHeadBobSideOffset() const { return m_HeadBobSideOffset; }
     float GetMaximumHorizontalSpeed() const
     {
-        return DefaultMoveSpeed * SprintSpeedMultiplier;
+        return DefaultMoveSpeedPerSecond * SprintSpeedMultiplier;
     }
 
     bool IsMovingHorizontally() const

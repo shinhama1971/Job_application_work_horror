@@ -1,7 +1,6 @@
 ﻿// ============================================================================
 // ファイルの役割: シェーダー、GPUバッファ、バックバッファ操作を管理します。
 // 主な技術: COM、Constant Buffer、Shader Resource View、RAII
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Renderer.h"
@@ -296,7 +295,6 @@ bool Renderer::CreateConstantBuffer(
 	return true;
 }
 
-// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Renderer::SetBackBufferRenderTarget()
 {
 	m_pDeviceContext->OMSetRenderTargets(
@@ -313,7 +311,6 @@ void Renderer::SetBackBufferRenderTarget()
     m_pDeviceContext->RSSetViewports(1, &viewport);
 }
 
-// 処理内容: Rendererの「ClearBackBuffer」処理を担当します。
 void Renderer::ClearBackBuffer(float r, float g, float b, float a)
 {
 	float clearColor[4] = { r, g, b, a };
@@ -324,7 +321,6 @@ void Renderer::ClearBackBuffer(float r, float g, float b, float a)
 	);
 }
 
-// 処理内容: Rendererの「ClearDepth」処理を担当します。
 void Renderer::ClearDepth()
 {
 	m_pDeviceContext->ClearDepthStencilView(

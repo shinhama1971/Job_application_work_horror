@@ -1,7 +1,6 @@
 // ============================================================================
 // ファイルの役割: 遠景の人影、出現時間、消失・ディゾルブ演出を管理します。
 // 主な技術: ゲームAI状態機械、追跡補間、シャドウ表現、ディゾルブ
-// 読み方: 公開関数は外部から使う操作、メンバー変数は保持する状態を表します。
 // ============================================================================
 
 #pragma once
@@ -43,7 +42,7 @@ private:
     bool m_DeactivateOnExpire = false;
     std::function<void()> m_OnObserved;
 
-    int m_LifeTimer = 120;
+    float m_LifeTime = 2.0f;
     float m_ChaseSpeed = 0.0f;
     float m_ChaseStopDistance = 28.0f;
 
@@ -63,8 +62,7 @@ public:
     void EnableGazeScare(float lifetimeSeconds = 6.0f)
     {
         m_GazeScareEnabled = true;
-        const int requestedFrames = static_cast<int>(lifetimeSeconds * 60.0f);
-        m_LifeTimer = requestedFrames > 30 ? requestedFrames : 30;
+        m_LifeTime = (std::max)(lifetimeSeconds, 0.5f);
     }
 
     void SetOnObserved(std::function<void()> callback)
@@ -82,7 +80,7 @@ public:
             m_GazeScareEnabled = false;
             m_ChaseEnabled = false;
             m_ChaseSpeed = 0.0f;
-            m_LifeTimer = 120;
+            m_LifeTime = 2.0f;
             m_OnObserved = nullptr;
         }
         if (!active)

@@ -1,7 +1,6 @@
 // ============================================================================
 // ファイルの役割: ドアの描画、開閉アニメーション、施錠条件、当たり判定を管理します。
 // 主な技術: 有限状態機械、SRT行列、蝶番回転、AABB、インタラクション
-// 読み方: 公開関数は外部から使う操作、メンバー変数は保持する状態を表します。
 // ============================================================================
 
 #pragma once
@@ -31,7 +30,7 @@ private:
 
     DirectX::SimpleMath::Vector3 m_StartPosition;
     float m_OpenAngle = 0.0f;
-    float m_OpenSpeed = 0.032f;
+    float m_OpenSpeedPerSecond = 1.92f;
     float m_OpenDelayTimer = 0.0f;
     float m_OpenDelayDuration = 0.06f;
     int m_LoopPhase = 0;

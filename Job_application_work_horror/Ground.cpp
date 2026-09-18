@@ -1,11 +1,11 @@
 ﻿// ============================================================================
 // ファイルの役割: 床面、水たまり、濡れ表現と関連する描画を管理します。
 // 主な技術: プロシージャルメッシュ、SRT行列、法線・UV、ウェットフロアシェーダー
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // この実装ファイルでは宣言された機能の具体的な処理を定義します。
 // ============================================================================
 
 #include "Ground.h"
+#include "Application.h"
 #include "stb_image.h"
 #include "Game.h"
 #include "Player.h"
@@ -196,7 +196,7 @@ void Ground::Init()
 //=======================================
 void Ground::Update()
 {
-	constexpr float deltaTime = 1.0f / 60.0f;
+	const float deltaTime = Application::GetDeltaTime();
 	m_WetTime += deltaTime;
 	if (m_WetTime > 10000.0f)
 	{
@@ -307,7 +307,6 @@ std::vector<VERTEX_3D>Ground::GetVertices()
 	return res;
 }
 
-// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Ground::SetTexture(const char* filename)
 {
 	m_Texture.Load(filename);

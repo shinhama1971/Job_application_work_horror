@@ -1,7 +1,6 @@
 // ============================================================================
 // ファイルの役割: 2面の偽ドア異変、視線演出、停電、追跡、捕獲イベントを管理します。
 // 主な技術: 有限状態機械、動的照明、距離判定、時間演出
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Stage2Scene.h"
@@ -27,7 +26,6 @@ using namespace DirectX::SimpleMath;
 #include "Stage2SceneConstants.h"
 
 
-// 処理内容: Stage2Sceneの「UpdateFalseDoorAnomaly」処理を担当します。
 void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
 {
     if (m_LoopCount != 1 || m_FalseDoorAnomaly.HasMoved())
@@ -86,7 +84,6 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
     Input::SetVibration(8, 0.20f);
 }
 
-// 処理内容: Stage2Sceneの「StartObservedScare」処理を担当します。
 void Stage2Scene::StartObservedScare()
 {
     if (!m_ObservedScareSequence.Start())
@@ -100,7 +97,6 @@ void Stage2Scene::StartObservedScare()
     Input::SetVibration(15, 0.34f);
 }
 
-// 処理内容: Stage2Sceneの「UpdateObservedScare」処理を担当します。
 void Stage2Scene::UpdateObservedScare(float deltaTime)
 {
     if (!m_ObservedScareSequence.IsActive())
@@ -155,7 +151,6 @@ void Stage2Scene::UpdateObservedScare(float deltaTime)
     }
 }
 
-// 処理内容: Stage2Sceneの「StartFinalSequence」処理を担当します。
 void Stage2Scene::StartFinalSequence()
 {
     m_FinalSequence.Start();
@@ -222,7 +217,6 @@ void Stage2Scene::StartFinalSequence()
     Input::SetVibration(18, 0.42f);
 }
 
-// 処理内容: Stage2Sceneの「UpdateFinalSequence」処理を担当します。
 void Stage2Scene::UpdateFinalSequence(float deltaTime)
 {
     if (!m_FinalSequence.IsSequenceActive() || m_FinalDoorReady)
@@ -299,7 +293,6 @@ void Stage2Scene::UpdateFinalSequence(float deltaTime)
     Input::SetVibration(9, 0.24f);
 }
 
-// 処理内容: Stage2Sceneの「UpdateFinalPursuit」処理を担当します。
 void Stage2Scene::UpdateFinalPursuit(float deltaTime)
 {
     if (!m_FinalSequence.IsPursuitActive())
@@ -391,7 +384,6 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
     m_FinalSequence.SchedulePursuitPulse(proximity);
 }
 
-// 処理内容: Stage2Sceneの「StartCaughtSequence」処理を担当します。
 void Stage2Scene::StartCaughtSequence(
     Player& player,
     CaughtSequence::Reason reason)
@@ -424,7 +416,6 @@ void Stage2Scene::StartCaughtSequence(
     Input::SetVibration(24, 0.72f);
 }
 
-// 処理内容: Stage2Sceneの「UpdateCaughtSequence」処理を担当します。
 void Stage2Scene::UpdateCaughtSequence(Player& player, float deltaTime)
 {
     m_CaughtSequence.Advance(deltaTime);
@@ -489,7 +480,6 @@ void Stage2Scene::UpdateCaughtSequence(Player& player, float deltaTime)
     Input::SetVibration(8, 0.18f);
 }
 
-// 処理内容: Stage2Sceneの「RevealScratchPieces」処理を担当します。
 void Stage2Scene::RevealScratchPieces(int first, int last, float emission)
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -513,7 +503,6 @@ void Stage2Scene::RevealScratchPieces(int first, int last, float emission)
     }
 }
 
-// 処理内容: Stage2Sceneの「UpdateLightZones」処理を担当します。
 void Stage2Scene::UpdateLightZones(const Player& player)
 {
     if (m_LoopCount >= 3 || m_FinalSequence.IsSequenceActive())
@@ -580,7 +569,6 @@ void Stage2Scene::UpdateLightZones(const Player& player)
     }
 }
 
-// 処理内容: Stage2Sceneの「UpdateScratchMessage」処理を担当します。
 void Stage2Scene::UpdateScratchMessage(
     const Player& player,
     float deltaTime)
@@ -643,7 +631,6 @@ void Stage2Scene::UpdateScratchMessage(
     }
 }
 
-// 処理内容: Stage2Sceneの「UpdatePortraitAnomaly」処理を担当します。
 void Stage2Scene::UpdatePortraitAnomaly(const Player& player)
 {
     if (m_LoopCount <= 0 || m_LoopCount >= 3 ||

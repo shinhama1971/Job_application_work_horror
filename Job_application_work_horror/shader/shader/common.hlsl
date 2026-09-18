@@ -26,7 +26,7 @@ struct PS_IN
 	float4 col : COLOR0;
 	float2 tex : TEXCOORD0;
     float depth : TEXCOORD1;
-    float3 viewPos : TEXCOORD2; //ƒJƒƒ‰‚©‚çŒ©‚½x,y,zÀ•W ‰ù’†“`“
+    float3 viewPos : TEXCOORD2; //ï¿½Jï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½çŒ©ï¿½ï¿½x,y,zï¿½ï¿½ï¿½W ï¿½ï¿½ï¿½ï¿½ï¿½`ï¿½ï¿½
 };
 
 struct LIGHT
@@ -62,7 +62,7 @@ cbuffer MaterialBuffer : register(b4)
   MATERIAL Material;
 }
 
-//UVÀ•WˆÚ“®s—ñ
+//UVï¿½ï¿½ï¿½Wï¿½Ú“ï¿½ï¿½sï¿½ï¿½
 cbuffer TextureBuffer : register(b5)
 {
     matrix matrixTex;

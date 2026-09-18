@@ -1,10 +1,10 @@
 // ============================================================================
 // ファイルの役割: 1面の入口演出、廊下ループ、電力復旧、出口イベントを管理します。
 // 主な技術: イベント駆動、有限状態機械、カメラ・照明・音の同期
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "StageScene.h"
+#include "Application.h"
 #include "Game.h"
 #include "Input.h"
 
@@ -27,10 +27,9 @@
 
 using namespace DirectX::SimpleMath;
 
-// 処理内容: StageSceneの「UpdateEntranceThresholdEvent」処理を担当します。
 void StageScene::UpdateEntranceThresholdEvent(Player& player)
 {
-    constexpr float deltaTime = 1.0f / 60.0f;
+    const float deltaTime = Application::GetDeltaTime();
     Core::Game* game = Core::Game::GetInstance();
 
     if (!m_EntranceEventTriggered)
@@ -103,10 +102,9 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
     }
 }
 
-// 処理内容: StageSceneの「UpdateCorridorLoop」処理を担当します。
 void StageScene::UpdateCorridorLoop(Player& player)
 {
-    constexpr float deltaTime = 1.0f / 60.0f;
+    const float deltaTime = Application::GetDeltaTime();
     if (m_LoopCooldown > 0.0f)
     {
         m_LoopCooldown -= deltaTime;
@@ -132,7 +130,6 @@ void StageScene::UpdateCorridorLoop(Player& player)
     }
 }
 
-// 処理内容: StageSceneの「AdvanceCorridorLoop」処理を担当します。
 void StageScene::AdvanceCorridorLoop(Player& player)
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -254,7 +251,6 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     }
 }
 
-// 処理内容: StageSceneの「StartScareLightSequence」処理を担当します。
 void StageScene::StartScareLightSequence()
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -298,10 +294,9 @@ void StageScene::StartScareLightSequence()
     }
 }
 
-// 処理内容: StageSceneの「UpdateScareLightSequence」処理を担当します。
 void StageScene::UpdateScareLightSequence()
 {
-    constexpr float deltaTime = 1.0f / 60.0f;
+    const float deltaTime = Application::GetDeltaTime();
     m_ScareLightSequence.UpdateNotice(deltaTime);
 
     if (!m_ScareLightSequence.IsActive())
@@ -399,7 +394,6 @@ void StageScene::UpdateScareLightSequence()
     }
 }
 
-// 処理内容: StageSceneの「StartFuseWatcher」処理を担当します。
 void StageScene::StartFuseWatcher(int fuseCount)
 {
     if (fuseCount < 2 || Core::Game::GetInstance()->IsPowerRestored())
@@ -453,10 +447,9 @@ void StageScene::StartFuseWatcher(int fuseCount)
         0.30f);
 }
 
-// 処理内容: StageSceneの「UpdatePowerRestoreSequence」処理を担当します。
 void StageScene::UpdatePowerRestoreSequence()
 {
-    constexpr float deltaTime = 1.0f / 60.0f;
+    const float deltaTime = Application::GetDeltaTime();
     Core::Game* game = Core::Game::GetInstance();
     const bool powerRestored = game->IsPowerRestored();
 
@@ -506,10 +499,9 @@ void StageScene::UpdatePowerRestoreSequence()
     }
 }
 
-// 処理内容: StageSceneの「UpdateExitPowerSequence」処理を担当します。
 void StageScene::UpdateExitPowerSequence()
 {
-    constexpr float deltaTime = 1.0f / 60.0f;
+    const float deltaTime = Application::GetDeltaTime();
     Core::Game* game = Core::Game::GetInstance();
     FuseBox* panel = game->GetObj<FuseBox>("ExitPowerPanel");
     if (panel == nullptr || !panel->IsActivated())
@@ -572,10 +564,9 @@ void StageScene::UpdateExitPowerSequence()
     }
 }
 
-// 処理内容: StageSceneの「UpdateExitOmen」処理を担当します。
 void StageScene::UpdateExitOmen(Player& player)
 {
-    constexpr float deltaTime = 1.0f / 60.0f;
+    const float deltaTime = Application::GetDeltaTime();
     m_ExitOmenSequence.Update(deltaTime);
     if (m_ExitOmenSequence.IsTriggered())
     {

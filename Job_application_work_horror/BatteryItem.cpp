@@ -1,10 +1,10 @@
 // ============================================================================
 // ファイルの役割: 懐中電灯の電池回復アイテムと、その表示・取得演出を管理
 // 主な技術: Interactableインターフェース、AABB判定、発光表現、時間ベースアニメーション
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "BatteryItem.h"
+#include "Application.h"
 #include "Game.h"
 #include "Input.h"
 #include "Player.h"
@@ -13,7 +13,6 @@
 
 using namespace DirectX::SimpleMath;
 
-// 処理内容: 後続処理で使うデータ構造または描画情報を組み立てます。
 void BatteryItem::BuildGeometry()
 {
     m_Vertices.clear();
@@ -107,7 +106,6 @@ void BatteryItem::BuildGeometry()
         m_ChargeIndexStart;
 }
 
-// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void BatteryItem::Init()
 {
     BuildGeometry();
@@ -155,18 +153,16 @@ void BatteryItem::Init()
     m_AnimationTime = 0.0f;
 }
 
-// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void BatteryItem::Update()
 {
     if (!m_IsActive || m_IsCollected) return;
 
-    constexpr float deltaTime = 1.0f / 60.0f;
+    const float deltaTime = Application::GetDeltaTime();
     m_AnimationTime += deltaTime;
-    m_Rotation.y += 0.022f;
+    m_Rotation.y += 1.32f * deltaTime;
     m_Position.y = m_BaseY + std::sin(m_AnimationTime * 2.4f) * 0.38f;
 }
 
-// 処理内容: BatteryItemの「Interact」処理を担当します。
 void BatteryItem::Interact(Player& player)
 {
     if (!m_IsActive || m_IsCollected || player.GetBattery() >= 100.0f)
@@ -182,7 +178,6 @@ void BatteryItem::Interact(Player& player)
     Input::SetVibration(6, 0.13f);
 }
 
-// 処理内容: 現在の状態に対応する描画命令を発行します。
 void BatteryItem::Draw(Camera* cam)
 {
     if (!m_IsActive || m_IsCollected) return;
@@ -213,7 +208,6 @@ void BatteryItem::Draw(Camera* cam)
     context->DrawIndexed(m_ChargeIndexCount, m_ChargeIndexStart, 0);
 }
 
-// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void BatteryItem::Uninit()
 {
     m_Vertices.clear();

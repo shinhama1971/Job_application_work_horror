@@ -1,7 +1,6 @@
 // ============================================================================
 // ファイルの役割: ゲーム全体のオブジェクト所有、更新・描画順、シーン遷移を統括します。
 // 主な技術: RAII、unique_ptr、遅延追加・削除、シングルトン、固定更新順
-// 読み方: 公開関数は外部から使う操作、メンバー変数は保持する状態を表します。
 // ============================================================================
 
 #pragma once
@@ -22,6 +21,7 @@
 #include "GameState.h"
 #include "GameSettings.h"
 #include "ObjectManager.h"
+#include "GpuTimer.h"
 #include "sound.h"
 enum class SceneName
 {
@@ -50,6 +50,7 @@ namespace Core
         Effect::PostProcess m_PostProcess;
         Effect::ShadowMap m_ShadowMap;
         Effect::PlanarReflection m_PlanarReflection;
+        GpuTimer m_GpuTimer;
         Sound m_Sound;
         bool m_SoundReady = false;
 
@@ -263,6 +264,11 @@ namespace Core
         Effect::ShadowMap* GetShadowMap()
         {
             return &m_ShadowMap;
+        }
+
+        GpuTimer* GetGpuTimer()
+        {
+            return &m_GpuTimer;
         }
     };
 }

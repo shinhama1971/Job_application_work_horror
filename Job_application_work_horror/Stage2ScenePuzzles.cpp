@@ -1,7 +1,6 @@
 // ============================================================================
 // ファイルの役割: 2面の足音危険度、時計、信号パズル、偽ドア状態を管理します。
 // 主な技術: 入力列照合、状態機械、環境パズル、進行ゲート
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Stage2Scene.h"
@@ -27,7 +26,6 @@ using namespace DirectX::SimpleMath;
 #include "Stage2SceneConstants.h"
 
 
-// 処理内容: Stage2Sceneの「UpdateNoiseThreat」処理を担当します。
 void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
 {
     if (m_FinalSequence.IsSequenceActive() ||
@@ -219,7 +217,6 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         0.08f + m_NoiseThreatSystem.GetThreat() * 0.08f);
 }
 
-// 処理内容: Stage2Sceneの「AdvanceLoop」処理を担当します。
 void Stage2Scene::AdvanceLoop(Player& player)
 {
     m_QuietRecovery.Reset();
@@ -404,7 +401,6 @@ void Stage2Scene::AdvanceLoop(Player& player)
     }
 }
 
-// 処理内容: Stage2Sceneの「ConfigureClockForLoop」処理を担当します。
 void Stage2Scene::ConfigureClockForLoop()
 {
     m_ClockAnomaly.ConfigureForLoop(m_LoopCount);
@@ -422,7 +418,6 @@ void Stage2Scene::ConfigureClockForLoop()
     }
 }
 
-// 処理内容: Stage2Sceneの「UpdateClock」処理を担当します。
 void Stage2Scene::UpdateClock(float deltaTime)
 {
     // 針の進み方と逆回転時の刻み表示は時計異変自身が管理します。
@@ -445,7 +440,6 @@ void Stage2Scene::UpdateClock(float deltaTime)
     }
 }
 
-// 処理内容: Stage2Sceneの「UpdateClockObservation」処理を担当します。
 void Stage2Scene::UpdateClockObservation()
 {
     if (m_LoopCount <= 0 || m_LoopCount >= 3 ||
@@ -507,7 +501,6 @@ void Stage2Scene::UpdateClockObservation()
     Input::SetVibration(m_LoopCount == 1 ? 3 : 6, 0.14f);
 }
 
-// 処理内容: Stage2Sceneの「RegisterPuzzleMistake」処理を担当します。
 void Stage2Scene::RegisterPuzzleMistake(int type)
 {
     if (!m_PuzzleFeedback.TryRegisterMistake(type))
@@ -543,7 +536,6 @@ void Stage2Scene::RegisterPuzzleMistake(int type)
         0.06f + mistakeRate * 0.12f);
 }
 
-// 処理内容: Stage2Sceneの「ResetSignalPuzzle」処理を担当します。
 void Stage2Scene::ResetSignalPuzzle()
 {
     m_SignalPuzzle.Reset();
@@ -576,7 +568,6 @@ void Stage2Scene::ResetSignalPuzzle()
     ApplySignalLightingState();
 }
 
-// 処理内容: Stage2Sceneの「UpdateSignalPuzzle」処理を担当します。
 void Stage2Scene::UpdateSignalPuzzle()
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -775,7 +766,6 @@ void Stage2Scene::UpdateSignalPuzzle()
     }
 }
 
-// 処理内容: 計算済みの設定や効果を対象へ反映します。
 void Stage2Scene::ApplySignalLightingState()
 {
     if (m_LoopCount < 3)
@@ -824,7 +814,6 @@ void Stage2Scene::ApplySignalLightingState()
     }
 }
 
-// 処理内容: Stage2Sceneの「UpdateSignalStalker」処理を担当します。
 void Stage2Scene::UpdateSignalStalker()
 {
     if (m_LoopCount < 3 || m_SignalPuzzle.IsComplete() ||
@@ -865,7 +854,6 @@ void Stage2Scene::UpdateSignalStalker()
     Input::SetVibration(15, 0.34f);
 }
 
-// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Stage2Scene::SetFalseDoorState(bool visible, bool rightSide)
 {
     m_FalseDoorAnomaly.SetVisualState(visible, rightSide);

@@ -4,7 +4,7 @@ PS_IN main(in VS_IN input)
 {
     PS_IN output;
 	//positoin=============================
-	// ƒ[ƒ‹ƒhAƒrƒ…[AƒvƒƒWƒFƒNƒVƒ‡ƒ“s—ñ‚ğŠ|‚¯‡‚í‚¹‚ÄÀ•W•ÏŠ·‚ğs‚¤
+	// ï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½hï¿½Aï¿½rï¿½ï¿½ï¿½[ï¿½Aï¿½vï¿½ï¿½ï¿½Wï¿½Fï¿½Nï¿½Vï¿½ï¿½ï¿½ï¿½ï¿½sï¿½ï¿½ï¿½|ï¿½ï¿½ï¿½ï¿½ï¿½í‚¹ï¿½Äï¿½ï¿½Wï¿½ÏŠï¿½ï¿½ï¿½sï¿½ï¿½
 	matrix wvp;
 	wvp = mul(World, View);
 	wvp = mul(wvp, Projection);
@@ -17,13 +17,13 @@ PS_IN main(in VS_IN input)
 	
     float d = -dot(Light.Direction.xyz, worldNormal.xyz);
     d = saturate(d);
-    output.col.xyz = input.col.xyz * d*Light.Diffuse.xyz; // ŠgUŒõ‚Ì‰e‹¿‚ğæZ
-    output.col.xyz += input.col.xyz * Light.Ambient.xyz; // ƒAƒ“ƒrƒGƒ“ƒgŒõ‚ğ‰ÁZ
+    output.col.xyz = input.col.xyz * d*Light.Diffuse.xyz; // ï¿½gï¿½Uï¿½ï¿½ï¿½Ì‰eï¿½ï¿½ï¿½ï¿½ï¿½Z
+    output.col.xyz += input.col.xyz * Light.Ambient.xyz; // ï¿½Aï¿½ï¿½ï¿½rï¿½Gï¿½ï¿½ï¿½gï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Z
     output.col.xyz += Material.Emission.xyz;
-    output.col.a = input.col.a * Material.Diffuse.a; // ƒAƒ‹ƒtƒ@’l‚Í‚»‚Ì‚Ü‚Üg—p
+    output.col.a = input.col.a * Material.Diffuse.a; // ï¿½Aï¿½ï¿½ï¿½tï¿½@ï¿½lï¿½Í‚ï¿½ï¿½Ì‚Ü‚Ügï¿½p
 	
 	//texture=============================
-	// ƒeƒNƒXƒ`ƒƒÀ•W‚Í‚»‚Ì‚Ü‚Üg—p
+	// ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½ï¿½ï¿½Wï¿½Í‚ï¿½ï¿½Ì‚Ü‚Ügï¿½p
     output.tex = input.tex;
 	
     return output;

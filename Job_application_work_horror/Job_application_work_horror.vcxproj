@@ -202,6 +202,7 @@
     <ClCompile Include="FuseBox.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="GameRendering.cpp" />
+    <ClCompile Include="GpuTimer.cpp" />
     <ClCompile Include="GamePersistence.cpp" />
     <ClCompile Include="GameSettings.cpp" />
     <ClCompile Include="Ground.cpp" />
@@ -240,9 +241,11 @@
     <ClCompile Include="Stage2SceneHorror.cpp" />
     <ClCompile Include="Stage2SceneDraw.cpp" />
     <ClCompile Include="StaticMesh.cpp" />
+    <ClCompile Include="ModelCache.cpp" />
     <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Texture2D.cpp" />
+    <ClCompile Include="TestPipe.cpp" />
     <ClCompile Include="TitleScene.cpp" />
     <ClCompile Include="utility.cpp" />
     <ClCompile Include="Wall.cpp" />
@@ -271,6 +274,7 @@
     <ClInclude Include="FullScreenQuad.h" />
     <ClInclude Include="FuseBox.h" />
     <ClInclude Include="Game.h" />
+    <ClInclude Include="GpuTimer.h" />
     <ClInclude Include="GameSettings.h" />
     <ClInclude Include="GameState.h" />
     <ClInclude Include="Ground.h" />
@@ -285,6 +289,8 @@
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="MeshRenderer.h" />
+    <ClInclude Include="ModelBounds.h" />
+    <ClInclude Include="ModelCache.h" />
     <ClInclude Include="MovieTrigger.h" />
     <ClInclude Include="ObjectManager.h" />
     <ClInclude Include="Object.h" />
@@ -326,6 +332,7 @@
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="Texture2D.h" />
+    <ClInclude Include="TestPipe.h" />
     <ClInclude Include="TitleScene.h" />
     <ClInclude Include="utility.h" />
     <ClInclude Include="VertexBuffer.h" />

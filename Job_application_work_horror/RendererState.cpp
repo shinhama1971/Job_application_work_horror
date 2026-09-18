@@ -1,7 +1,6 @@
 ﻿// ============================================================================
 // ファイルの役割: ライト、マテリアル、深度、行列など描画状態を管理します。
 // 主な技術: OM/RS/IAステート管理、状態キャッシュ、パイプライン復元
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Renderer.h"
@@ -10,7 +9,6 @@
 using namespace DirectX::SimpleMath;
 
 //--------------------------------------------------------------------------------------
-// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Renderer::SetLight(LIGHT Light)
 {
 	m_Light = Light;
@@ -20,7 +18,6 @@ void Renderer::SetLight(LIGHT Light)
 
 }
 
-// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Renderer::SetEnvironmentLights(const ENVIRONMENT_LIGHTS& lights)
 {
 	m_EnvironmentLights = lights;
@@ -29,7 +26,6 @@ void Renderer::SetEnvironmentLights(const ENVIRONMENT_LIGHTS& lights)
 		0, NULL, &m_EnvironmentLights, 0, 0);
 }
 
-// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Renderer::SetDebugViewMode(int mode, float wallDampStrength)
 {
 	DEBUG_VIEW_BUFFER buffer{};
@@ -44,7 +40,6 @@ void Renderer::SetDebugViewMode(int mode, float wallDampStrength)
 //--------------------------------------------------------------------------------------
 // 
 //--------------------------------------------------------------------------------------
-// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Renderer::SetLightEnable(bool Enable)
 {
 	m_LightEnable = Enable;
@@ -126,7 +121,6 @@ void Renderer::SetATCEnable(bool Enable)
 //--------------------------------------------------------------------------------------
 //
 //--------------------------------------------------------------------------------------
-// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Renderer::SetWorldViewProjection2D()
 {
 	Matrix world = Matrix::Identity;			// 単位行列にする

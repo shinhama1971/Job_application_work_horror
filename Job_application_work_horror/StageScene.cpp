@@ -1,10 +1,10 @@
 // ============================================================================
 // ファイルの役割: 1面のステージ配置、ヒューズ探索、電力復旧、出口までの進行を管理します。
 // 主な技術: シーン構成、オブジェクト配置、進行状態、環境ストーリーテリング
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "StageScene.h"
+#include "Application.h"
 #include "Game.h"
 #include "Input.h"
 
@@ -20,6 +20,7 @@
 #include "ScreenDustOverlay.h"
 #include "ScareTrigger.h"
 #include "ShadowMan.h"
+#include "TestPipe.h"
 #include <SimpleMath.h>
 #include <algorithm>
 #include <cmath>
@@ -27,13 +28,11 @@
 
 using namespace DirectX::SimpleMath;
 
-// 処理内容: StageSceneを生成し、初期状態を準備します。
 StageScene::StageScene()
 {
     Init();
 }
 
-// 処理内容: StageSceneが所有する処理とリソースを終了します。
 StageScene::~StageScene()
 {
     Uninit();
@@ -70,6 +69,22 @@ void StageScene::Init()
     // プレイヤー
     Player* player = game->CreateObj<Player>("Player");
     player->SetPosition(Vector3(0.0f, -99.0f, -120.0f));
+
+    // 外部FBXの表示確認用。進行や当たり判定には参加させません。
+    TestPipe* testPipe = game->CreateObj<TestPipe>("TestPipe");
+    testPipe->SetPosition(Vector3(22.0f, -87.54f, -105.0f));
+    testPipe->SetRotation(Vector3(0.0f, 0.45f, 0.0f));
+    testPipe->SetScale(Vector3(8.0f, 8.0f, 8.0f));
+
+    TestPipe* testPipe2 = game->CreateObj<TestPipe>("TestPipe2");
+    testPipe2->SetPosition(Vector3(-22.0f, -87.54f, -105.0f));
+    testPipe2->SetRotation(Vector3(0.0f, -0.45f, 0.0f));
+    testPipe2->SetScale(Vector3(8.0f, 8.0f, 8.0f));
+
+    TestPipe* testPipe3 = game->CreateObj<TestPipe>("TestPipe3");
+    testPipe3->SetPosition(Vector3(0.0f, -87.54f, -155.0f));
+    testPipe3->SetRotation(Vector3(0.0f, 1.57f, 0.0f));
+    testPipe3->SetScale(Vector3(8.0f, 8.0f, 8.0f));
 
     // 地面
     Ground* ground = game->CreateObj<Ground>("Ground");
@@ -401,10 +416,10 @@ void StageScene::Update()
     }
 
     Core::Game* game = Core::Game::GetInstance();
-    m_StageVisualTimer += 1.0f / 60.0f;
-    m_ProgressHintTimer += 1.0f / 60.0f;
+    const float deltaTime = Application::GetDeltaTime();
+    m_StageVisualTimer += deltaTime;
+    m_ProgressHintTimer += deltaTime;
     if (Input::GetKeyTrigger(VK_H) ||
-        // 処理内容: 保持している値または参照を取得します。
         Input::GetButtonTrigger(XINPUT_LEFT_SHOULDER))
     {
         m_ProgressHintTimer = (std::max)(m_ProgressHintTimer, 35.0f);
@@ -412,13 +427,13 @@ void StageScene::Update()
     }
 
     m_FuseNoticeTimer = (std::max)(
-        0.0f, m_FuseNoticeTimer - 1.0f / 60.0f);
+        0.0f, m_FuseNoticeTimer - deltaTime);
     m_FuseWatcherNoticeTimer = (std::max)(
-        0.0f, m_FuseWatcherNoticeTimer - 1.0f / 60.0f);
+        0.0f, m_FuseWatcherNoticeTimer - deltaTime);
     m_ChargerNoticeTimer = (std::max)(
-        0.0f, m_ChargerNoticeTimer - 1.0f / 60.0f);
+        0.0f, m_ChargerNoticeTimer - deltaTime);
     m_EvidenceNoticeTimer = (std::max)(
-        0.0f, m_EvidenceNoticeTimer - 1.0f / 60.0f);
+        0.0f, m_EvidenceNoticeTimer - deltaTime);
     const int currentFuseCount = game->GetItemCount();
     if (currentFuseCount > m_LastFuseCount)
     {
@@ -620,7 +635,6 @@ void StageScene::Update()
 
 
 
-// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void StageScene::Uninit()
 {
     Core::Game::GetInstance()->GetPostProcess()->SetAtmosphere(0.18f, 0.55f);
@@ -635,6 +649,9 @@ void StageScene::Uninit()
     Core::Game* game = Core::Game::GetInstance();
 
     game->DestroyObj("Player");
+    game->DestroyObj("TestPipe");
+    game->DestroyObj("TestPipe2");
+    game->DestroyObj("TestPipe3");
     game->DestroyObj("Ground");
 
     game->DestroyObj("Wall1");

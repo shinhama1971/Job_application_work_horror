@@ -150,6 +150,9 @@
     <ClCompile Include="GameRendering.cpp">
       <Filter>ソース ファイル\Core</Filter>
     </ClCompile>
+    <ClCompile Include="GpuTimer.cpp">
+      <Filter>ソース ファイル\Rendering</Filter>
+    </ClCompile>
     <ClCompile Include="GroundWaterEffects.cpp">
       <Filter>ソース ファイル\Warld</Filter>
     </ClCompile>
@@ -249,6 +252,12 @@
     <ClCompile Include="StaticMesh.cpp">
       <Filter>ソース ファイル\Rendering</Filter>
     </ClCompile>
+    <ClCompile Include="ModelCache.cpp">
+      <Filter>ソース ファイル\Rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="TestPipe.cpp">
+      <Filter>ソース ファイル\Warld</Filter>
+    </ClCompile>
     <ClCompile Include="utility.cpp">
       <Filter>ソース ファイル\Core</Filter>
     </ClCompile>
@@ -280,6 +289,9 @@
     </ClInclude>
     <ClInclude Include="Game.h">
       <Filter>ソース ファイル\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="GpuTimer.h">
+      <Filter>ソース ファイル\Rendering</Filter>
     </ClInclude>
     <ClInclude Include="GameSettings.h">
       <Filter>ソース ファイル\Core</Filter>
@@ -428,6 +440,12 @@
     <ClInclude Include="MeshRenderer.h">
       <Filter>ソース ファイル\Rendering</Filter>
     </ClInclude>
+    <ClInclude Include="ModelBounds.h">
+      <Filter>ソース ファイル\Rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="ModelCache.h">
+      <Filter>ソース ファイル\Rendering</Filter>
+    </ClInclude>
     <ClInclude Include="MovieTrigger.h">
       <Filter>ソース ファイル\Rendering</Filter>
     </ClInclude>
@@ -504,6 +522,9 @@
       <Filter>ソース ファイル\Rendering</Filter>
     </ClInclude>
     <ClInclude Include="StaticMesh.h">
+      <Filter>ソース ファイル\Warld</Filter>
+    </ClInclude>
+    <ClInclude Include="TestPipe.h">
       <Filter>ソース ファイル\Warld</Filter>
     </ClInclude>
     <ClInclude Include="utility.h">

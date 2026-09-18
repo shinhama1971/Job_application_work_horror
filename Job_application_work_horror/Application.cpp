@@ -1,7 +1,6 @@
 // ============================================================================
 // ファイルの役割: Windowsアプリケーションの生成、メインループ、終了処理を管理します。
-// 主な技術: Win32 API、固定タイムステップ、メッセージループ、フレーム時間の上限処理
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
+// 主な技術: Win32 API、DeltaTime、メッセージループ、フレーム時間の上限処理
 // この実装ファイルでは宣言された機能の具体的な処理を定義します。
 // ============================================================================
 
@@ -15,7 +14,6 @@ namespace
 {
     constexpr auto ClassName = TEXT("SignalLostWindowClass");
     constexpr auto WindowName = TEXT("SIGNAL LOST");
-    constexpr auto FixedTimeStep = std::chrono::duration<double>(1.0 / 60.0);
     constexpr auto MaximumFrameTime = std::chrono::duration<double>(0.25);
 }
 
@@ -23,6 +21,7 @@ HINSTANCE  Application::m_hInst;   // インスタンスハンドル
 HWND       Application::m_hWnd;    // ウィンドウハンドル
 uint32_t   Application::m_Width;   // ウィンドウの横幅
 uint32_t   Application::m_Height;  // ウィンドウの縦幅
+float      Application::m_DeltaTime = 1.0f / 60.0f;
 
 //-----------------------------------------------------------------------------
 // コンストラクタ
@@ -161,7 +160,6 @@ void Application::MainLoop()
 
     using Clock = std::chrono::steady_clock;
     auto previousTime = Clock::now();
-    std::chrono::duration<double> accumulator = std::chrono::duration<double>::zero();
     bool running = true;
 
     while (running)
@@ -192,24 +190,9 @@ void Application::MainLoop()
             frameTime = MaximumFrameTime;
         }
 
-        accumulator += frameTime;
-
-        bool updated = false;
-        while (accumulator >= FixedTimeStep)
-        {
-            Core::Game::Update();
-            accumulator -= FixedTimeStep;
-            updated = true;
-        }
-
-        if (updated)
-        {
-            Core::Game::Draw();
-        }
-        else
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
+        m_DeltaTime = static_cast<float>(frameTime.count());
+        Core::Game::Update();
+        Core::Game::Draw();
     }
 
     Core::Game::Uninit();

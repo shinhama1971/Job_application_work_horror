@@ -1,7 +1,6 @@
 // ============================================================================
 // ファイルの役割: 目的、操作ヒント、電池残量などのゲーム内UIを描画します。
 // 主な技術: 2Dスプライト、ベクターフォント、アンカー配置、状態に応じたUI
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Hud.h"
@@ -39,7 +38,6 @@ namespace
     }
 }
 
-// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void Hud::Init()
 {
     m_Shader.Create("shader/hudVS.hlsl", "shader/hudPS.hlsl");
@@ -49,7 +47,6 @@ void Hud::Init()
     m_Vertices.reserve(MaxVertices);
 }
 
-// 処理内容: 現在の状態に対応する描画命令を発行します。
 void Hud::Draw(
     const Player& player,
     int fuseCount,
@@ -255,7 +252,6 @@ void Hud::Draw(
 }
 
 
-// 処理内容: Hudの「DrawBlink」処理を担当します。
 void Hud::DrawBlink(float opacity)
 {
     const float blinkOpacity = (std::clamp)(opacity, 0.0f, 0.90f);
@@ -274,13 +270,11 @@ void Hud::DrawBlink(float opacity)
     Flush();
 }
 
-// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void Hud::Uninit()
 {
     m_Vertices.clear();
 }
 
-// 処理内容: Hudの「Flush」処理を担当します。
 void Hud::Flush()
 {
     if (m_Vertices.empty())
@@ -302,7 +296,6 @@ void Hud::Flush()
     Renderer::SetDepthEnable(true);
 }
 
-// 処理内容: Hudの「AddRectangle」処理を担当します。
 void Hud::AddRectangle(float x, float y, float width, float height, const Color& color)
 {
     if (m_Vertices.size() + 6 > MaxVertices)
@@ -334,7 +327,6 @@ void Hud::AddRectangle(float x, float y, float width, float height, const Color&
     m_Vertices.push_back(makeVertex(right, bottom));
 }
 
-// 処理内容: Hudの「AddLetterE」処理を担当します。
 void Hud::AddLetterE(float x, float y, float size, const Color& color)
 {
     const float stroke = (std::max)(2.0f, size * 0.18f);
@@ -344,7 +336,6 @@ void Hud::AddLetterE(float x, float y, float size, const Color& color)
     AddRectangle(x, y + size - stroke, size, stroke, color);
 }
 
-// 処理内容: Hudの「AddLetterA」処理を担当します。
 void Hud::AddLetterA(float x, float y, float size, const Color& color)
 {
     const float stroke = (std::max)(2.0f, size * 0.18f);
@@ -354,7 +345,6 @@ void Hud::AddLetterA(float x, float y, float size, const Color& color)
     AddRectangle(x, y + size * 0.5f - stroke * 0.5f, size, stroke, color);
 }
 
-// 処理内容: Hudの「AddText」処理を担当します。
 void Hud::AddText(
     float x,
     float y,

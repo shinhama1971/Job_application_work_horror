@@ -1,7 +1,6 @@
 // ============================================================================
 // ファイルの役割: 水面用の平面反射レンダーターゲットと反射カメラを管理します。
-// 主な技術: Render To Texture、反射行列、クリップ平面、SRV/RTV競合回避
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
+// 主な技術: 低解像度Render To Texture、反転カメラ、SRV/RTV競合回避、描画状態の復元
 // ============================================================================
 
 #include "PlanarReflection.h"
@@ -14,7 +13,6 @@ using namespace DirectX::SimpleMath;
 
 namespace Effect
 {
-    // 処理内容: 必要な状態とGPU・音声リソースを初期化します。
     void PlanarReflection::Init()
     {
 		// 水面には波の歪みとフレネル反射が掛かる。
@@ -36,8 +34,8 @@ namespace Effect
 
         D3D11_RASTERIZER_DESC rasterizerDesc{};
         rasterizerDesc.FillMode = D3D11_FILL_SOLID;
-        // 各立体は表裏の面を持つ
-        // 以前のCULL_NONEは同じ面の逆巻き三角形まで処理。
+        // 生成する立体は表裏両面を持つため背面カリングを使用できます。
+        // 旧CULL_NONEで逆巻き面まで描くコストを避けます。
         rasterizerDesc.CullMode = D3D11_CULL_BACK;
         rasterizerDesc.DepthClipEnable = TRUE;
         Renderer::GetDevice()->CreateRasterizerState(
@@ -45,7 +43,6 @@ namespace Effect
             m_TwoSidedRasterizer.ReleaseAndGetAddressOf());
     }
 
-    // 処理内容: 所有するリソースを依存関係の逆順で解放します。
     void PlanarReflection::Uninit()
     {
         m_PreviousRasterizer.Reset();
@@ -54,7 +51,6 @@ namespace Effect
         m_Texture.Uninit();
     }
 
-    // 処理内容: 処理区間を開始し、必要な状態を設定します。
     void PlanarReflection::Begin(
         Camera& camera,
         float reflectionHeight)
@@ -112,7 +108,6 @@ namespace Effect
             reflectionProjection);
     }
 
-    // 処理内容: 処理区間を終了し、変更した状態を戻します。
     void PlanarReflection::End(Camera& camera)
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
@@ -131,7 +126,6 @@ namespace Effect
             &reflectionResource);
     }
 
-    // 処理内容: PlanarReflectionの「Bind」処理を担当します。
     void PlanarReflection::Bind()
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();

@@ -1,16 +1,15 @@
 // ============================================================================
 // ファイルの役割: 出口での操作判定と、安全なシーン遷移要求を管理します。
 // 主な技術: トリガー領域、状態条件、遅延シーン遷移
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "ExitTrigger.h"
+#include "Application.h"
 #include "Game.h"
 #include "Input.h"
 #include "Player.h"
 #include "ScreenDustOverlay.h"
 
-// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void ExitTrigger::Init()
 {
     m_IsEscaping = false;
@@ -20,7 +19,6 @@ void ExitTrigger::Init()
     m_InteractionEnabled = true;
 }
 
-// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void ExitTrigger::Update()
 {
     if (!m_IsEscaping)
@@ -28,7 +26,7 @@ void ExitTrigger::Update()
         return;
     }
 
-    constexpr float deltaTime = 1.0f / 60.0f;
+    const float deltaTime = Application::GetDeltaTime();
     m_EscapeTimer += deltaTime;
 
     Core::Game* game = Core::Game::GetInstance();
@@ -66,7 +64,6 @@ void ExitTrigger::Update()
     }
 }
 
-// 処理内容: ExitTriggerの「Interact」処理を担当します。
 void ExitTrigger::Interact(Player& player)
 {
     if (m_InteractionEnabled)
@@ -75,7 +72,6 @@ void ExitTrigger::Interact(Player& player)
     }
 }
 
-// 処理内容: 処理区間を開始し、必要な状態を設定します。
 void ExitTrigger::BeginEscape(Player& player)
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -92,7 +88,6 @@ void ExitTrigger::BeginEscape(Player& player)
     Input::SetVibration(6, 0.12f);
 }
 
-// 処理内容: 保持している値または参照を取得します。
 const char* ExitTrigger::GetInteractionPrompt() const
 {
     if (!m_InteractionEnabled || m_IsEscaping)
@@ -105,7 +100,6 @@ const char* ExitTrigger::GetInteractionPrompt() const
         : "電力が必要";
 }
 
-// 処理内容: 現在の状態に対応する描画命令を発行します。
 void ExitTrigger::Draw(Camera* cam)
 {
     //これで終了しますか？

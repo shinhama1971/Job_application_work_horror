@@ -1,7 +1,6 @@
 ﻿// ============================================================================
 // ファイルの役割: HUDや画像を描く2Dスプライト用バッファと描画処理を管理します。
 // 主な技術: 動的頂点バッファ、アルファ合成、正規化画面座標
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "SpriteRenderer.h"
@@ -123,7 +122,6 @@ void SpriteRenderer::SetTexture(const char* imgname)
 	assert(sts == true);
 }
 
-// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void SpriteRenderer::SetUV(const float& nu, const float& nv, const float& sx, const float& sy)
 {
 	m_NumU = nu;

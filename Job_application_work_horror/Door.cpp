@@ -1,10 +1,10 @@
 // ============================================================================
 // ファイルの役割: ドアの描画、開閉アニメーション、施錠条件、当たり判定を管理します。
 // 主な技術: 有限状態機械、SRT行列、蝶番回転、AABB、インタラクション
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Door.h"
+#include "Application.h"
 
 #include "CeilingLight.h"
 #include "Game.h"
@@ -17,7 +17,6 @@
 
 using namespace DirectX::SimpleMath;
 
-// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void Door::Init()
 {
     m_Vertices.clear();
@@ -126,10 +125,9 @@ void Door::Init()
 
     m_Scale = Vector3(30.0f, 50.0f, 4.0f);
 }
-// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void Door::Update()
 {
-    constexpr float deltaTime = 1.0f / 60.0f;
+    const float deltaTime = Application::GetDeltaTime();
     if (m_LockedRattleTimer > 0.0f)
     {
         constexpr float rattleDuration = 0.28f;
@@ -174,7 +172,7 @@ void Door::Update()
 
     constexpr float targetAngle = 1.50f;
     m_OpenAngle = (std::min)(
-        m_OpenAngle + m_OpenSpeed,
+        m_OpenAngle + m_OpenSpeedPerSecond * deltaTime,
         targetAngle);
 
     if (m_OpenAngle >= targetAngle)
@@ -184,7 +182,6 @@ void Door::Update()
     }
 }
 
-// 処理内容: 保持している値または参照を取得します。
 const char* Door::GetInteractionPrompt() const
 {
     return m_IsLocked
@@ -192,7 +189,6 @@ const char* Door::GetInteractionPrompt() const
         : "ドアを開ける";
 }
 
-// 処理内容: Doorの「Interact」処理を担当します。
 void Door::Interact(Player& player)
 {
     (void)player;
@@ -240,7 +236,6 @@ void Door::Interact(Player& player)
     }
 }
 
-// 処理内容: Doorの「ResetClosed」処理を担当します。
 void Door::ResetClosed(int loopPhase)
 {
     m_Position = m_StartPosition;
@@ -256,27 +251,26 @@ void Door::ResetClosed(int loopPhase)
     // 不自然な速さで開き、見慣れた空間の違和感を強めます。
     if (m_LoopPhase == 0)
     {
-        m_OpenSpeed = 0.032f;
+        m_OpenSpeedPerSecond = 1.92f;
         m_OpenDelayDuration = 0.06f;
     }
     else if (m_LoopPhase == 1)
     {
-        m_OpenSpeed = 0.029f;
+        m_OpenSpeedPerSecond = 1.74f;
         m_OpenDelayDuration = 0.20f;
     }
     else if (m_LoopPhase == 2)
     {
-        m_OpenSpeed = 0.023f;
+        m_OpenSpeedPerSecond = 1.38f;
         m_OpenDelayDuration = 0.38f;
     }
     else
     {
-        m_OpenSpeed = 0.046f;
+        m_OpenSpeedPerSecond = 2.76f;
         m_OpenDelayDuration = 0.58f;
     }
 }
 
-// 処理内容: 競合やめり込みを解消した結果を返します。
 void Door::ResolveCollision(Vector3& position, float radius) const
 {
     // 取っ手を操作した後は、扉板の回転中でも通行を許可します。
@@ -353,7 +347,6 @@ void Door::ResolveCollision(Vector3& position, float radius) const
         baseRotation);
 }
 
-// 処理内容: 保持している値または参照を取得します。
 Matrix Door::GetDoorWorldMatrix() const
 {
     // 中心原点で生成したメッシュを左端が原点になるよう移動し、蝶番を中心に回転してから
@@ -380,7 +373,6 @@ Matrix Door::GetDoorWorldMatrix() const
         Matrix::CreateTranslation(hingePosition);
 }
 
-// 処理内容: 現在の状態に対応する描画命令を発行します。
 void Door::Draw(Camera* camera)
 {
     camera->SetCamera();
@@ -446,7 +438,6 @@ void Door::Draw(Camera* camera)
         0);
 }
 
-// 処理内容: ライト視点の深度をシャドウマップへ描画します。
 void Door::DrawShadow()
 {
     Matrix world = GetDoorWorldMatrix();
@@ -460,7 +451,6 @@ void Door::DrawShadow()
     context->DrawIndexed(static_cast<UINT>(m_DoorIndexCount), 0, 0);
 }
 
-// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void Door::Uninit()
 {
     m_Vertices.clear();

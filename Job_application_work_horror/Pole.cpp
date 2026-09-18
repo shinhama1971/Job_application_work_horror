@@ -1,7 +1,6 @@
 ﻿// ============================================================================
 // ファイルの役割: ステージ内の柱状オブジェクトを生成・描画します。
 // 主な技術: プロシージャル形状、SRT行列、インデックス描画
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Pole.h"
@@ -30,6 +29,7 @@ void Pole::Init()
 	std::string tmpStr1(reinterpret_cast<const char*>(modelFile.c_str()), modelFile.size());
 	staticmesh.Load(tmpStr1, texDirectory);
 
+	SetModelBounds(staticmesh.GetModelBounds());
 	m_MeshRenderer.Init(staticmesh);
 
 	// シェーダオブジェクト生成
@@ -125,7 +125,6 @@ void Pole::SetPosition(float x, float y, float z)
 	Vector3 p = { x, y, z };
 	SetPosition(p);
 }
-// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Pole::SetPosition(Vector3 pos)
 {
 	m_Position = pos;

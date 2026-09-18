@@ -1,7 +1,6 @@
 // ============================================================================
 // ファイルの役割: 一人称視点の位置、向き、ビュー行列、射影行列を管理します。
 // 主な技術: DirectXMath、ビュー行列、透視投影、マウスルック、オイラー角制御
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Renderer.h"
@@ -14,7 +13,6 @@
 
 using namespace DirectX::SimpleMath;
 
-// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void Camera::Init()
 {
     m_Position = Vector3(0.0f, 20.0f, -50.0f);
@@ -29,13 +27,13 @@ void Camera::Init()
     ShowCursor(FALSE);
 }
 
-// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void Camera::Update()
 {
+    const float deltaTime = Application::GetDeltaTime();
 
     if (m_IsMovie)
     {
-        m_MovieTimer += 1.0f / 60.0f;
+        m_MovieTimer += deltaTime;
 
         float t = m_MovieTimer / m_MovieDuration;
         if (t > 1.0f) t = 1.0f;
@@ -129,23 +127,23 @@ void Camera::Update()
     if (Input::GetButtonPress(XINPUT_DOWN)) controllerLookY = -1.0f;
 
     const float controllerYawSpeed =
-        0.065f * m_LookSensitivityScale;
+        3.9f * m_LookSensitivityScale * deltaTime;
     const float controllerPitchSpeed =
-        0.050f * m_LookSensitivityScale;
+        3.0f * m_LookSensitivityScale * deltaTime;
     m_CameraDirection += controllerLookX * controllerYawSpeed;
     m_CameraPitch += controllerLookY * controllerPitchSpeed;
 
     if (Input::GetKeyPress(VK_LEFT))
     {
-        m_CameraDirection += 0.1f * m_LookSensitivityScale;
+        m_CameraDirection += 6.0f * m_LookSensitivityScale * deltaTime;
     }
 
     if (Input::GetKeyPress(VK_RIGHT))
     {
-        m_CameraDirection -= 0.1f * m_LookSensitivityScale;
+        m_CameraDirection -= 6.0f * m_LookSensitivityScale * deltaTime;
     }
 
-    const float pitchStep = 0.03f * m_LookSensitivityScale;
+    const float pitchStep = 1.8f * m_LookSensitivityScale * deltaTime;
 
     if (Input::GetKeyPress(VK_UP))
     {
@@ -164,7 +162,6 @@ void Camera::Update()
     if (m_CameraPitch < minPitch) m_CameraPitch = minPitch;
 }
 
-// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Camera::SetCamera(int mode)
 {
     if (mode == 0)
@@ -231,19 +228,16 @@ void Camera::SetCamera(int mode)
     }
 }
 
-// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void Camera::Uninit()
 {
     ShowCursor(TRUE);
 }
 
-// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Camera::SetTarget(Vector3 target)
 {
     m_Target = target;
 }
 
-// 処理内容: 外部から受け取った値を検証して状態へ反映します。
 void Camera::SetOverrideMatrices(
     const Matrix& view,
     const Matrix& projection)
@@ -253,13 +247,11 @@ void Camera::SetOverrideMatrices(
     m_UseOverrideMatrices = true;
 }
 
-// 処理内容: Cameraの「ClearOverrideMatrices」処理を担当します。
 void Camera::ClearOverrideMatrices()
 {
     m_UseOverrideMatrices = false;
 }
 
-// 処理内容: 保持している値または参照を取得します。
 Vector3 Camera::GetForward() const
 {
     float cp = cosf(m_CameraPitch);
@@ -275,7 +267,6 @@ Vector3 Camera::GetForward() const
     return forward;
 }
 
-// 処理内容: 現在の状態が条件を満たすか返します。
 bool Camera::IsSphereVisible(
     const Vector3& center,
     float radius,
@@ -340,7 +331,6 @@ bool Camera::IsSphereVisible(
     return true;
 }
 
-// 処理内容: Cameraの「StartMovieLook」処理を担当します。
 void Camera::StartMovieLook(
     const Vector3& endPos,
     const Vector3& endTarget,

@@ -1,10 +1,10 @@
 // ============================================================================
 // ファイルの役割: 天井照明の形状、点灯状態、故障時のちらつきを管理します。
 // 主な技術: 動的ライティング、エミッシブ表現、疑似乱数、時間ベースの蛍光灯演出
-// 読み方: 上位処理から呼ばれる順に、初期化・更新・描画・解放を追うと流れを確認できます。
 // ============================================================================
 
 #include "Game.h"
+#include "Application.h"
 #include "CeilingLight.h"
 
 #include <array>
@@ -12,7 +12,6 @@
 
 using namespace DirectX::SimpleMath;
 
-// 処理内容: 必要な状態とGPU・音声リソースを初期化します。
 void CeilingLight::Init()
 {
     m_Vertices.reserve(48);
@@ -108,10 +107,9 @@ void CeilingLight::Init()
     m_LightMaterial->Create(panel);
 }
 
-// 処理内容: 経過時間と入力を使い、このフレームの状態を更新します。
 void CeilingLight::Update()
 {
-    constexpr float deltaTime = 1.0f / 60.0f;
+    const float deltaTime = Application::GetDeltaTime();
     m_Time += deltaTime;
 
     const bool powerRestored =
@@ -236,10 +234,12 @@ void CeilingLight::Update()
     const float response = powerRestored
         ? (startingUp ? 0.48f : (voltageDip ? 0.24f : 0.08f))
         : 0.32f;
-    m_Brightness += (targetBrightness - m_Brightness) * response;
+    const float deltaResponse = 1.0f - std::pow(
+        1.0f - response, deltaTime * 60.0f);
+    m_Brightness +=
+        (targetBrightness - m_Brightness) * deltaResponse;
 }
 
-// 処理内容: 現在の状態に対応する描画命令を発行します。
 void CeilingLight::Draw(Camera* camera)
 {
     camera->SetCamera();
@@ -301,7 +301,6 @@ void CeilingLight::Draw(Camera* camera)
         0);
 }
 
-// 処理内容: 所有するリソースを依存関係の逆順で解放します。
 void CeilingLight::Uninit()
 {
     m_Vertices.clear();
