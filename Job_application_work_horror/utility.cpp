@@ -3,6 +3,9 @@
 // 主な技術: std::filesystem、UTF文字列、再利用可能な純粋関数
 // ============================================================================
 
+#include	"utility.h"
+
+#include	<cstdlib>
 #include	<filesystem>
 #include	<string>
 #include	<Windows.h>
@@ -77,5 +80,25 @@ namespace utility {
 		auto const wide = utf8_to_wide_winapi(src);
 		return wide_to_multi_winapi(wide);
 	}
+
+    void ReportFatalError(std::string const& utf8Message)
+    {
+        ::OutputDebugStringA((utf8Message + "\n").c_str());
+
+        std::wstring message;
+        try
+        {
+            message = utf8_to_wide_winapi(utf8Message);
+        }
+        catch (...)
+        {
+            message = L"Fatal error";
+        }
+        ::MessageBoxW(
+            ::GetActiveWindow(), message.c_str(), L"起動エラー", MB_OK | MB_ICONERROR);
+
+        // 読み込み途中のSceneやObjectは不完全な状態のため、デストラクタを走らせず終了します。
+        ::ExitProcess(EXIT_FAILURE);
+    }
 }
 

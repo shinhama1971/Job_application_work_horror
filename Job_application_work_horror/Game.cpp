@@ -31,16 +31,22 @@ namespace Core
     }
 
     // サブシステムを依存順に初期化し、最初のタイトルシーンを生成します。
-    void Game::Init()
+    bool Game::Init()
     {
         if (m_Instance)
         {
-            return;
+            return true;
         }
 
         m_Instance = std::make_unique<Game>();
 
-        Renderer::Init();
+        // D3Dデバイスが無いと以降の全システムが動作しないため、ここで中断します。
+        if (FAILED(Renderer::Init()))
+        {
+            Renderer::Uninit();
+            m_Instance.reset();
+            return false;
+        }
         m_Instance->m_GpuTimer.Init(Renderer::GetDevice());
         Debug::UI::Init(Application::GetWindow());
 
@@ -70,6 +76,7 @@ namespace Core
         m_Instance->m_PostProcess.SetUserEffectScale(
             effectScales[m_Instance->m_Settings.GetEffectLevel()]);
         m_Instance->ChangeScene(SceneName::Title);
+        return true;
     }
 
     // 1フレームの更新順:

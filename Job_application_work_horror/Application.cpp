@@ -156,7 +156,14 @@ void Application::MainLoop()
 {
     MSG msg = {};
 
-    Core::Game::Init();
+    if (!Core::Game::Init())
+    {
+        MessageBoxA(m_hWnd,
+            "DirectX 11の初期化に失敗しました。\n"
+            "グラフィックドライバーとDirectX 11対応環境を確認してください。",
+            "起動エラー", MB_OK | MB_ICONERROR);
+        return;
+    }
 
     using Clock = std::chrono::steady_clock;
     auto previousTime = Clock::now();
@@ -221,7 +228,11 @@ LRESULT CALLBACK Application::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
         // マウスカーソルを一時的に表示
         ShowCursor(TRUE);
 
-        int res = MessageBoxA(NULL, "終了しますか？", "確認", MB_OKCANCEL);
+        // 確認ダイアログへフォーカスが移るとWM_ACTIVATE(WA_INACTIVE)が届くため、
+        // 表示中はフラグを立てて最小化処理を抑止します。
+        isMessageBoxShowed = true;
+        int res = MessageBoxA(hWnd, "終了しますか？", "確認", MB_OKCANCEL);
+        isMessageBoxShowed = false;
         if (res == IDOK) {
             DestroyWindow(hWnd);  // 「WM_DESTROY」メッセージを送る
         }

@@ -78,7 +78,8 @@ namespace Core
         Game();
         ~Game();
 
-        static void Init();
+        // 描画デバイスを初期化できなかった場合はfalseを返します。
+        static bool Init();
         static void Update();
         static void Draw();
         static void Uninit();

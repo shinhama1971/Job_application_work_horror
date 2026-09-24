@@ -11,4 +11,8 @@ namespace utility
 	std::string wide_to_multi_winapi(std::wstring const& src);
 	std::wstring utf8_to_wide_winapi(std::string const& src);
 	std::string utf8_to_multi_winapi(std::string const& src);
+
+    // 続行できない初期化失敗をダイアログで通知し、プロセスを終了します。
+    // assertはReleaseで消えるため、アセット欠落などはこちらで扱います。
+    [[noreturn]] void ReportFatalError(std::string const& utf8Message);
 };
