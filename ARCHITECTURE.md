@@ -144,6 +144,12 @@ Game::Draw
 - Release x64: 警告0、エラー0
 - Debug x64: 警告0、エラー0
 - Debug実行ファイルの起動スモークテスト済み
-- シーケンス状態クラスは発火時刻、順序、キャンセルを単体確認済み
+- 単体テスト（`Tests/Tests.vcxproj`、Microsoft C++ Unit Test Framework）：41件すべて成功
+  - `GameState`：進行値の初期化、ベスト記録の更新条件、2面やり直し時の巻き戻し（回帰テスト）
+  - `GameSettings`：設定範囲の検証、段階値から倍率への変換
+  - `ScareLightSequence` / `StagePowerSequence` / `ExitOmenSequence` / `CaughtSequence`：発火時刻、順序、重複発火しないこと、キャンセル
+  - `SignalPuzzle` / `PuzzleFeedback` / `QuietRecovery`：正誤判定、失敗通知の間隔、静止判定とクールダウン
+
+描画・入力・音声に依存しない状態クラスへ進行ロジックを分離しているため、ゲームを起動せずにテストできます。
 
 リファクタリングではゲームの見た目、操作感、シーン進行、演出タイミングを変更していません。

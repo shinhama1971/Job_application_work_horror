@@ -72,6 +72,7 @@ Debug構成では `F1` でImGuiデバッグ画面を表示できます。
 Game
   ├─ GameState
   ├─ GameSettings
+  ├─ PauseMenu
   ├─ ObjectManager
   ├─ StageScene
   │   ├─ ScareLightSequence
@@ -97,6 +98,7 @@ Game
 - Release x64：警告0、エラー0
 - Debug x64：警告0、エラー0
 - Debug実行ファイル：起動スモークテスト済み
+- 単体テスト：41件すべて成功（`Tests/Tests.vcxproj`。Visual Studioの「テスト エクスプローラー」から実行できます）
 
 ## 提出時の注意
 

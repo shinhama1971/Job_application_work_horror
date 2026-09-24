@@ -43,7 +43,14 @@ public:
         return true;
     }
 
-    void Advance(float deltaTime) noexcept { m_Timer += deltaTime; }
+    // 停止中に呼ばれても捕獲演出が再開しないよう、実行中だけ進めます。
+    void Advance(float deltaTime) noexcept
+    {
+        if (IsActive())
+        {
+            m_Timer += deltaTime;
+        }
+    }
     void Complete() noexcept { m_Timer = -1.0f; }
 
     bool IsActive() const noexcept { return m_Timer >= 0.0f; }
