@@ -399,3 +399,7 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# 実行時に生成・更新されるファイル（セーブデータ、ImGuiのレイアウト）
+Job_application_work_horror/save/
+Job_application_work_horror/imgui_debug_layout.ini

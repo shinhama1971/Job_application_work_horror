@@ -4,10 +4,22 @@
 // ============================================================================
 
 #pragma once
+#include	<filesystem>
 #include	<string>
 
 namespace utility
 {
+    // セーブデータの保存先（%LOCALAPPDATA%\SignalLost）を返します。
+    // 起動時の作業フォルダに左右されず、書き込み権限のある場所に保存するためです。
+    std::filesystem::path GetSaveDirectory();
+
+    // 旧バージョンが作業フォルダ直下の save フォルダへ保存していたファイルのパスです。
+    // 新しい保存先にファイルが無い場合だけ、読み込み元として使います。
+    std::filesystem::path GetLegacySavePath(std::string const& fileName);
+
+    // 読み込み用のパス。新しい保存先にあればそれを、無ければ旧保存先を返します。
+    std::filesystem::path ResolveSaveFileForRead(std::string const& fileName);
+
 	std::string wide_to_multi_winapi(std::wstring const& src);
 	std::wstring utf8_to_wide_winapi(std::string const& src);
 	std::string utf8_to_multi_winapi(std::string const& src);

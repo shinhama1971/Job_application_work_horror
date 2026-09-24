@@ -16,6 +16,7 @@ Application
       ├─ ObjectManager            Objectの所有・検索・遅延追加削除
       ├─ GameState                プレイ進行と成績
       ├─ GameSettings             設定値と永続化
+      ├─ PauseMenu                ポーズ中の入力解釈と設定変更
       ├─ Camera
       ├─ PostProcess
       ├─ ShadowMap
@@ -36,7 +37,8 @@ Application
   XAudio2 のボイスは COM オブジェクトではないため、`Sound::Uninit` で `DestroyVoice` を呼んで解放します。
 - 手動の `delete` は行いません。
 - 共有所有（`std::shared_ptr`）は `ModelCache` だけに限定しています。同じモデルを複数の Object で使うとき、
-  頂点バッファ・テクスチャ・バウンディング情報を1つだけ読み込んで共有し、最後の利用者が破棄されたときに解放するためです。
+  頂点バッファ・テクスチャ・バウンディング情報を1つだけ読み込んで共有するためです。
+  キャッシュ自身も参照を保持し、終了時に `ModelCache::Clear` でD3Dデバイス破棄前にまとめて解放します。
   Scene・Object の所有は引き続き `std::unique_ptr` による単一所有です。
 
 ## Gameから分離した責務

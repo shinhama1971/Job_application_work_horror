@@ -8,11 +8,14 @@
 #include <filesystem>
 #include <fstream>
 
+#include "utility.h"
+
 namespace Core
 {
     void GameSettings::Load()
     {
-        std::ifstream settingsFile("save/settings.txt");
+        std::ifstream settingsFile(
+            utility::ResolveSaveFileForRead("settings.txt"));
         int brightnessLevel = 2;
         int effectLevel = 1;
         int lookSensitivityLevel = 2;
@@ -47,14 +50,15 @@ namespace Core
     void GameSettings::Save() const
     {
         std::error_code directoryError;
-        std::filesystem::create_directories("save", directoryError);
+        const std::filesystem::path saveDirectory = utility::GetSaveDirectory();
+        std::filesystem::create_directories(saveDirectory, directoryError);
         if (directoryError)
         {
             return;
         }
 
         std::ofstream settingsFile(
-            "save/settings.txt", std::ios::trunc);
+            saveDirectory / "settings.txt", std::ios::trunc);
         if (!settingsFile)
         {
             return;
