@@ -16,7 +16,7 @@ namespace Effect
     void PlanarReflection::Init()
     {
 		// 水面には波の歪みとフレネル反射が掛かる。
-		// 各辺を1/2にし、反射パスの画素数を約1/4に抑えます。
+		// 各辺を1/2にし、反射パスの画素数を約1/4に抑える。
 		constexpr uint32_t reflectionDivisor = 2u;
 		const uint32_t reflectionWidth =
 			(Application::GetWidth() + reflectionDivisor - 1u) / reflectionDivisor;
