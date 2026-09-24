@@ -60,6 +60,12 @@ void StageScene::Init()
     m_EntranceEventTriggered = false;
     m_EntranceEventTimer = -1.0f;
     m_EntranceEventPhase = -1;
+    m_StorageScarePhase = 0;
+    m_StorageScareTimer = 0.0f;
+    m_StorageScareNoticeTimer = 0.0f;
+    m_EvidenceScarePhase = 0;
+    m_EvidenceScareTimer = 0.0f;
+    m_EvidenceScareNoticeTimer = 0.0f;
     m_ScareLightSequence.Reset();
     m_PowerSequence.Reset();
     m_StageVisualTimer = 0.0f;
@@ -396,6 +402,16 @@ void StageScene::Init()
     fuseWatcher->SetDeactivateOnExpire(true);
     fuseWatcher->SetActive(false);
 
+    ShadowMan* storageShadow =
+        game->CreateObj<ShadowMan>("Stage1StorageShadow");
+    storageShadow->SetDeactivateOnExpire(true);
+    storageShadow->SetActive(false);
+
+    ShadowMan* evidenceShadow =
+        game->CreateObj<ShadowMan>("Stage1EvidenceShadow");
+    evidenceShadow->SetDeactivateOnExpire(true);
+    evidenceShadow->SetActive(false);
+
     // シーン変更後の初回描画前にカメラとライトを更新します。
     // ImGuiでゲームを停止した場合も、面全体が黒くなることを防ぎます。
     player->Update();
@@ -434,6 +450,10 @@ void StageScene::Update()
         0.0f, m_ChargerNoticeTimer - deltaTime);
     m_EvidenceNoticeTimer = (std::max)(
         0.0f, m_EvidenceNoticeTimer - deltaTime);
+    m_StorageScareNoticeTimer = (std::max)(
+        0.0f, m_StorageScareNoticeTimer - deltaTime);
+    m_EvidenceScareNoticeTimer = (std::max)(
+        0.0f, m_EvidenceScareNoticeTimer - deltaTime);
     const int currentFuseCount = game->GetItemCount();
     if (currentFuseCount > m_LastFuseCount)
     {
@@ -483,6 +503,8 @@ void StageScene::Update()
         evidenceTerminal->IsActivated())
     {
         m_EvidenceHandled = true;
+        m_EvidenceScarePhase = 1;
+        m_EvidenceScareTimer = 0.0f;
         m_EvidenceNoticeTimer = 3.2f;
         game->RegisterEvidenceCollected();
         player->AddBattery(8.0f);
@@ -499,6 +521,8 @@ void StageScene::Update()
     }
     UpdateCorridorLoop(*player);
     UpdateEntranceThresholdEvent(*player);
+    UpdateStorageScare(*player);
+    UpdateEvidenceScare(*player);
     UpdateScareLightSequence();
     UpdatePowerRestoreSequence();
     UpdateExitPowerSequence();
@@ -720,4 +744,6 @@ void StageScene::Uninit()
     game->DestroyObj("ScareTrigger_Corridor");
     game->DestroyObj("Stage1ExitOmen");
     game->DestroyObj("Stage1FuseWatcher");
+    game->DestroyObj("Stage1StorageShadow");
+    game->DestroyObj("Stage1EvidenceShadow");
 }

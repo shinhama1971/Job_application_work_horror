@@ -81,6 +81,20 @@ void StageScene::Draw(Camera* camera)
     {
         objectiveText = "残された記録を回収した 1 / 3";
     }
+    else if (m_StorageScareNoticeTimer > 0.0f)
+    {
+        objectiveText = m_StorageScarePhase == 1
+            ? "背後で金属音がした"
+            : (m_StorageScarePhase == 2
+                ? "背後に気配がある"
+                : "影は光の中へ消えた");
+    }
+    else if (m_EvidenceScareNoticeTimer > 0.0f)
+    {
+        objectiveText = m_EvidenceScarePhase == 2
+            ? "端末の後ろに気配がある"
+            : "監視者の姿が消えた";
+    }
     else if (m_FuseNoticeTimer > 0.0f)
     {
         if (m_FuseWatcherState == 1)

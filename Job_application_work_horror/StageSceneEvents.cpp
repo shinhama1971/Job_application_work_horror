@@ -102,6 +102,153 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
     }
 }
 
+void StageScene::UpdateStorageScare(Player& player)
+{
+    if (m_StorageScarePhase >= 2)
+    {
+        return;
+    }
+
+    Core::Game* game = Core::Game::GetInstance();
+    const Vector3 position = player.GetPosition();
+    if (game->IsPowerRestored() || game->GetItemCount() >= 2)
+    {
+        m_StorageScarePhase = 3;
+        return;
+    }
+
+    if (m_StorageScarePhase == 0)
+    {
+        // 二周目の左倉庫へ踏み込んだとき、先に物音と照明で背後を意識させます。
+        if (m_CorridorLoopCount < 1 || game->GetItemCount() != 1 ||
+            position.x > -110.0f || position.z > -108.0f)
+        {
+            return;
+        }
+
+        m_StorageScarePhase = 1;
+        m_StorageScareTimer = 0.0f;
+        m_StorageScareNoticeTimer = 2.1f;
+        game->PlayAudioCue(SOUND_CUE_DOOR, 0.68f);
+        CeilingLight* light = game->GetObj<CeilingLight>("CeilingLight2");
+        if (light != nullptr)
+        {
+            light->TriggerEventFlicker(0.42f, 0.62f);
+        }
+        return;
+    }
+
+    m_StorageScareTimer += Application::GetDeltaTime();
+    if (m_StorageScareTimer < 0.8f)
+    {
+        return;
+    }
+    m_StorageScarePhase = 2;
+
+    // 倉庫から離れた場合は出現させず、視界の外に突然残る人影を防ぎます。
+    if (position.x > -100.0f || position.z > -90.0f)
+    {
+        m_StorageScarePhase = 3;
+        return;
+    }
+
+    ShadowMan* shadow = game->GetObj<ShadowMan>("Stage1StorageShadow");
+    if (shadow == nullptr)
+    {
+        m_StorageScarePhase = 3;
+        return;
+    }
+    shadow->SetPosition(-155.0f, -99.0f, -88.0f);
+    shadow->SetActive(true);
+    shadow->EnableGazeScare(5.0f);
+    m_StorageScareNoticeTimer = 2.0f;
+    shadow->SetOnObserved([this]()
+    {
+        Core::Game* currentGame = Core::Game::GetInstance();
+        currentGame->RegisterAnomalyHandled();
+        m_StorageScarePhase = 3;
+        m_StorageScareNoticeTimer = 1.8f;
+        CeilingLight* light =
+            currentGame->GetObj<CeilingLight>("CeilingLight2");
+        if (light != nullptr)
+        {
+            light->TriggerEventFlicker(0.75f, 0.88f);
+        }
+        currentGame->PlayAudioCue(SOUND_CUE_SCARE, 0.82f);
+        currentGame->GetPostProcess()->TriggerHorrorPulse(0.24f, 0.26f);
+        Input::SetVibration(7, 0.15f);
+    });
+}
+
+void StageScene::UpdateEvidenceScare(Player& player)
+{
+    if (m_EvidenceScarePhase != 1)
+    {
+        return;
+    }
+
+    m_EvidenceScareTimer += Application::GetDeltaTime();
+    if (m_EvidenceScareTimer < 0.85f)
+    {
+        return;
+    }
+
+    m_EvidenceScarePhase = 2;
+    const Vector3 position = player.GetPosition();
+    if (position.x < 145.0f || std::abs(position.z + 42.0f) > 72.0f)
+    {
+        m_EvidenceScarePhase = 3;
+        return;
+    }
+
+    Core::Game* game = Core::Game::GetInstance();
+    ShadowMan* shadow = game->GetObj<ShadowMan>("Stage1EvidenceShadow");
+    if (shadow == nullptr)
+    {
+        m_EvidenceScarePhase = 3;
+        return;
+    }
+
+    // 端末へ向いているプレイヤーの背後に置き、操作後に振り返ったときだけ見せます。
+    shadow->SetPosition(148.0f, -99.0f, -42.0f);
+    shadow->SetActive(true);
+    shadow->EnableGazeScare(5.4f);
+    m_EvidenceScareNoticeTimer = 2.0f;
+
+    CeilingLight* roomLight = game->GetObj<CeilingLight>("CeilingLight3");
+    if (roomLight != nullptr)
+    {
+        roomLight->TriggerEventFlicker(0.56f, 0.68f);
+    }
+    game->PlayAudioCue(SOUND_CUE_DOOR, 0.62f);
+    game->GetPostProcess()->TriggerHorrorPulse(0.12f, 0.20f);
+
+    shadow->SetOnObserved([this]()
+    {
+        Core::Game* currentGame = Core::Game::GetInstance();
+        currentGame->RegisterAnomalyHandled();
+        m_EvidenceScarePhase = 3;
+        m_EvidenceScareNoticeTimer = 1.8f;
+
+        ShadowMan* activeShadow =
+            currentGame->GetObj<ShadowMan>("Stage1EvidenceShadow");
+        if (activeShadow != nullptr)
+        {
+            activeShadow->SetActive(false);
+        }
+
+        CeilingLight* light =
+            currentGame->GetObj<CeilingLight>("CeilingLight3");
+        if (light != nullptr)
+        {
+            light->TriggerEventFlicker(0.84f, 0.92f);
+        }
+        currentGame->PlayAudioCue(SOUND_CUE_SCARE, 0.76f);
+        currentGame->GetPostProcess()->TriggerHorrorPulse(0.34f, 0.32f);
+        Input::SetVibration(9, 0.19f);
+    });
+}
+
 void StageScene::UpdateCorridorLoop(Player& player)
 {
     const float deltaTime = Application::GetDeltaTime();

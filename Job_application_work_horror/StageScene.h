@@ -23,6 +23,8 @@ private:
     // 各演出はphaseとtimerで管理し、Updateを止めずに段階的に進めます。
     void UpdateCorridorLoop(class Player& player);
     void UpdateEntranceThresholdEvent(class Player& player);
+    void UpdateStorageScare(class Player& player);
+    void UpdateEvidenceScare(class Player& player);
     void AdvanceCorridorLoop(class Player& player);
     void StartScareLightSequence();
     void UpdateScareLightSequence();
@@ -53,6 +55,12 @@ private:
     bool m_EntranceEventTriggered = false;
     float m_EntranceEventTimer = -1.0f;
     int m_EntranceEventPhase = -1;
+    int m_StorageScarePhase = 0;
+    float m_StorageScareTimer = 0.0f;
+    float m_StorageScareNoticeTimer = 0.0f;
+    int m_EvidenceScarePhase = 0;
+    float m_EvidenceScareTimer = 0.0f;
+    float m_EvidenceScareNoticeTimer = 0.0f;
     float m_StageVisualTimer = 0.0f;
     float m_ProgressHintTimer = 0.0f;
 public:
