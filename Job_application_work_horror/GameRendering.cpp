@@ -10,7 +10,6 @@
 #include "ScreenDustOverlay.h"
 #include "Player.h"
 #include "DebugUI.h"
-#include "StageScene.h"
 
 #include <algorithm>
 #include <cmath>
@@ -90,8 +89,7 @@ namespace Core
     {
         for (auto& object : m_ObjectManager.GetAllObjects())
         {
-            if (object->IsDestroy() ||
-                dynamic_cast<ScreenDustOverlay*>(object.get()) != nullptr)
+            if (object->IsDestroy() || !object->DrawsInAuxiliaryView())
             {
                 continue;
             }
@@ -249,10 +247,10 @@ namespace Core
             m_Instance->m_HasReflectionCameraPose = false;
         }
 
-        if (m_Instance->m_CurrentScene == SceneName::Stage)
+        // 監視映像などSceneが持つ補助カメラは、本描画の前に描いておきます。
+        if (m_Instance->m_Scene)
         {
-            static_cast<StageScene*>(m_Instance->m_Scene.get())
-                ->RenderOffscreen();
+            m_Instance->m_Scene->RenderOffscreen();
         }
 
         m_Instance->m_GpuTimer.BeginPass(GpuPass::MainScene, context);

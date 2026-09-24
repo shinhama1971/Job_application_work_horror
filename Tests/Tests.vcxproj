@@ -71,6 +71,7 @@
     <ClCompile Include="GameSettingsTests.cpp" />
     <ClCompile Include="SequenceTests.cpp" />
     <ClCompile Include="PuzzleTests.cpp" />
+    <ClCompile Include="SurveillancePatrolTests.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

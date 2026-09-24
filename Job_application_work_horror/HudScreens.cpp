@@ -413,6 +413,13 @@ void Hud::DrawSurveillanceFeed(
     ID3D11ShaderResourceView* feed,
     Shader& textureShader,
     float elapsedSeconds,
+    std::string_view cameraLabel,
+    int cameraIndex,
+    int cameraCount,
+    int roundsCleared,
+    int requiredRounds,
+    int mistakes,
+    int mistakesUntilCaught,
     bool reportReady,
     bool wrongReportVisible)
 {
@@ -443,7 +450,47 @@ void Hud::DrawSurveillanceFeed(
     AddRectangle(feedX + feedWidth, feedY, 5.0f, feedHeight, green);
     AddRectangle(feedX, feedY, feedWidth, 38.0f, dark);
     AddText(feedX + 18.0f, feedY + 10.0f,
-        "CAM 01   右側倉庫   LIVE", 2.0f, green);
+        std::string(cameraLabel) + "   LIVE", 2.0f, green);
+
+    // 右上に巡回の進み具合と、捕獲までの残り猶予を表示します。
+    const std::string status =
+        "巡回 " + std::to_string(roundsCleared) + " / " +
+        std::to_string(requiredRounds);
+    constexpr float statusSize = 2.0f;
+    const float statusWidth =
+        static_cast<float>(CountDisplayedCharacters(status)) * statusSize * 6.0f;
+    const float warningBoxSize = 12.0f;
+    const float warningWidth =
+        static_cast<float>(mistakesUntilCaught) * (warningBoxSize + 6.0f);
+    const float statusRight = feedX + feedWidth - 18.0f;
+    AddText(statusRight - warningWidth - 16.0f - statusWidth,
+        feedY + 10.0f, status, statusSize, pale);
+    for (int warning = 0; warning < mistakesUntilCaught; ++warning)
+    {
+        const bool used = warning < mistakes;
+        AddRectangle(
+            statusRight - warningWidth +
+                static_cast<float>(warning) * (warningBoxSize + 6.0f),
+            feedY + 13.0f, warningBoxSize, warningBoxSize,
+            used
+                ? Color(1.0f, 0.24f, 0.18f, 0.96f)
+                : Color(0.20f, 0.34f, 0.26f, 0.80f));
+    }
+
+    // 下端にカメラの並びを表示し、切り替えられることを伝えます。
+    const float indicatorWidth = 28.0f;
+    const float indicatorGap = 8.0f;
+    const float indicatorsWidth =
+        static_cast<float>(cameraCount) * (indicatorWidth + indicatorGap) -
+        indicatorGap;
+    for (int camera = 0; camera < cameraCount; ++camera)
+    {
+        AddRectangle(
+            (screenWidth - indicatorsWidth) * 0.5f +
+                static_cast<float>(camera) * (indicatorWidth + indicatorGap),
+            feedY + feedHeight - 14.0f, indicatorWidth, 5.0f,
+            camera == cameraIndex ? green : Color(0.20f, 0.34f, 0.26f, 0.70f));
+    }
 
     for (int line = 0; line < 8; ++line)
     {
@@ -459,8 +506,8 @@ void Hud::DrawSurveillanceFeed(
         ? "判定不一致   映像をもう一度確認"
         : (reportReady
             ? (Input::IsControllerConnected()
-                ? "A 異常あり      B 異常なし"
-                : "E 異常あり      Q 異常なし")
+                ? "LB RB 切替   A このカメラに異常   B 異常なし"
+                : "← → 切替   E このカメラに異常   Q 異常なし")
             : "監視映像を受信中...");
     constexpr float promptSize = 2.5f;
     const float promptWidth =

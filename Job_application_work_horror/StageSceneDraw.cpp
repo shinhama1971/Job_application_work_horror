@@ -28,7 +28,7 @@ using namespace DirectX::SimpleMath;
 
 void StageScene::RenderOffscreen()
 {
-    if (m_EvidenceScarePhase != 1)
+    if (m_Patrol.GetState() != SurveillancePatrol::State::Viewing)
     {
         return;
     }
@@ -40,9 +40,13 @@ void StageScene::RenderOffscreen()
         return;
     }
 
-    // 右側倉庫を天井付近から見下ろし、人影を背景から判別できる画角にします。
-    const Vector3 cameraPosition(150.0f, -57.0f, -82.0f);
-    const Vector3 cameraTarget(150.0f, -82.0f, -150.0f);
+    // 選択中の監視カメラを天井付近から見下ろす画角で描きます。
+    const StageSurveillanceCamera& spot =
+        StageSurveillanceCameras[m_Patrol.GetSelectedCamera()];
+    const Vector3 cameraPosition(
+        spot.Position[0], spot.Position[1], spot.Position[2]);
+    const Vector3 cameraTarget(
+        spot.Target[0], spot.Target[1], spot.Target[2]);
     const Matrix view = Matrix::CreateLookAt(
         cameraPosition,
         cameraTarget,
@@ -71,14 +75,22 @@ void StageScene::Draw(Camera* camera)
         return;
     }
 
-    if (m_EvidenceScarePhase == 1)
+    if (m_Patrol.GetState() == SurveillancePatrol::State::Viewing)
     {
+        const int selectedCamera = m_Patrol.GetSelectedCamera();
         m_Hud.DrawSurveillanceFeed(
             m_SurveillanceFeed.GetSRV(),
             m_SurveillanceShader,
-            m_EvidenceScareTimer,
-            m_EvidenceScareTimer >= 0.65f,
-            m_SurveillanceFeedbackTimer > 0.0f);
+            m_PatrolViewTimer,
+            StageSurveillanceCameras[selectedCamera].Label,
+            selectedCamera,
+            StageSurveillanceCameraCount,
+            m_Patrol.GetRoundsCleared(),
+            SurveillancePatrol::RequiredRounds,
+            m_Patrol.GetMistakes(),
+            SurveillancePatrol::MistakesUntilCaught,
+            m_PatrolViewTimer >= 0.65f,
+            m_PatrolWrongTimer > 0.0f);
         if (game->IsPaused())
         {
             m_Hud.DrawPause(
@@ -121,11 +133,26 @@ void StageScene::Draw(Camera* camera)
     {
         objectiveText = "左の部屋にある配電盤を調べる";
     }
+    // 現地確認中の残り時間は毎フレーム変わるため、表示用の文字列をここで組み立てます。
+    std::string patrolObjective;
     ExitTrigger* exitTrigger =
         m_Objects.exitTrigger;
     if (exitTrigger != nullptr && exitTrigger->IsEscaping())
     {
         objectiveText = "ドアの先へ移動中";
+    }
+    else if (m_Patrol.GetState() == SurveillancePatrol::State::Dispatched)
+    {
+        const int remainingSeconds = static_cast<int>(
+            std::ceil(m_Patrol.GetRemainingTime()));
+        patrolObjective =
+            std::string(StageSurveillanceCameras[m_Patrol.GetAnomaly().camera].Label) +
+            " の異常を確認する  残り " + std::to_string(remainingSeconds) + "秒";
+        objectiveText = patrolObjective;
+    }
+    else if (m_PatrolNoticeTimer > 0.0f)
+    {
+        objectiveText = m_PatrolNoticeText;
     }
     else if (m_ChargerNoticeTimer > 0.0f)
     {
@@ -135,7 +162,7 @@ void StageScene::Draw(Camera* camera)
     }
     else if (m_EvidenceNoticeTimer > 0.0f)
     {
-        objectiveText = "監視映像の異常を報告した 1 / 1";
+        objectiveText = "監視カメラの巡回を終えた";
     }
     else if (m_StorageScareNoticeTimer > 0.0f)
     {
@@ -144,12 +171,6 @@ void StageScene::Draw(Camera* camera)
             : (m_StorageScarePhase == 2
                 ? "背後に気配がある"
                 : "影は光の中へ消えた");
-    }
-    else if (m_EvidenceScareNoticeTimer > 0.0f)
-    {
-        objectiveText = m_EvidenceScarePhase == 2
-            ? "端末の後ろに気配がある"
-            : "監視者の姿が消えた";
     }
     else if (m_FuseNoticeTimer > 0.0f)
     {
@@ -335,6 +356,10 @@ void StageScene::Draw(Camera* camera)
     {
         m_Hud.DrawChapterCard(
             "1階", "ヒューズを集めて電力を復旧する", m_StageVisualTimer);
+    }
+    if (m_PatrolCaught.IsActive())
+    {
+        m_Hud.DrawBlink(m_PatrolCaught.GetFadeRate() * 0.96f);
     }
 
     if (game->IsPaused())

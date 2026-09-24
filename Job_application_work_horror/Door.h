@@ -59,6 +59,16 @@ public:
         DirectX::SimpleMath::Vector3& position,
         float radius) const;
     void ResetClosed(int loopPhase = 0);
+    // 監視カメラの異常用に、操作されないまま開いた状態へ切り替えます。
+    // 音や画面効果は呼び出し側で出します。
+    void ForceOpen()
+    {
+        m_IsOpen = true;
+        m_IsOpening = false;
+        m_OpenAngle = 1.50f;
+        m_LockedRattleTimer = 0.0f;
+        m_OpenDelayTimer = 0.0f;
+    }
     void SetLocked(bool locked) { m_IsLocked = locked; }
     bool IsLocked() const { return m_IsLocked; }
 

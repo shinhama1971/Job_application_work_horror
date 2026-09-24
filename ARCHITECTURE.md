@@ -64,8 +64,18 @@ Application
 - `StagePowerSequence`: 電力復旧と出口通電
 - `ExitOmenSequence`: 出口前兆演出
 
+- `SurveillancePatrol`: 監視カメラ巡回（映像で異常のあるカメラを報告し、現地で異常を見て確認する）
+
 各クラスは時間・フェーズのみを管理します。照明、振動、PostProcess、Objectへの命令は
 `StageScene` が行うため、演出対象の所有権をシーケンスへ渡しません。
+
+#### 監視カメラ巡回
+
+- カメラの設置位置と、各カメラで起こせる異常（人影・消灯・開かずの扉）は `StageSurveillanceCameras.h` のテーブルで定義します。
+- `SurveillancePatrol` は状態（待機・映像確認・現地確認・完了）、正誤判定、制限時間、捕獲判定だけを持ち、
+  乱数で決めた異常と視線判定の結果をSceneから受け取ります。描画に依存しないため単体テストで検証しています。
+- 映像は `Scene::RenderOffscreen` で本描画の前に別カメラからRenderTextureへ描き、HUDへ貼ります。
+  別視点に含めないObject（画面全体のノイズなど）は `Object::DrawsInAuxiliaryView` で除外し、型判定は行いません。
 
 ### Stage2Scene
 
@@ -157,11 +167,12 @@ Game::Draw
 - Release x64: 警告レベル /W4 で警告0、エラー0
 - Debug x64: 警告レベル /W4 で警告0、エラー0
 - Debug実行ファイルの起動スモークテスト済み
-- 単体テスト（`Tests/Tests.vcxproj`、Microsoft C++ Unit Test Framework）：41件すべて成功
+- 単体テスト（`Tests/Tests.vcxproj`、Microsoft C++ Unit Test Framework）：53件すべて成功
   - `GameState`：進行値の初期化、ベスト記録の更新条件、2面やり直し時の巻き戻し（回帰テスト）
   - `GameSettings`：設定範囲の検証、段階値から倍率への変換
   - `ScareLightSequence` / `StagePowerSequence` / `ExitOmenSequence` / `CaughtSequence`：発火時刻、順序、重複発火しないこと、キャンセル
   - `SignalPuzzle` / `PuzzleFeedback` / `QuietRecovery`：正誤判定、失敗通知の間隔、静止判定とクールダウン
+  - `SurveillancePatrol`：カメラ選択、報告の正誤、現地確認、時間切れ、捕獲、巡回完了
 
 描画・入力・音声に依存しない状態クラスへ進行ロジックを分離しているため、ゲームを起動せずにテストできます。
 

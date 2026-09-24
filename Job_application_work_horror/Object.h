@@ -34,6 +34,8 @@ public:
 	// 描画パスへの参加可否は型判定ではなく各Object自身が宣言します。
 	virtual bool UsesCameraCulling() const { return false; }
 	virtual bool ContributesToPlanarReflection() const { return false; }
+	// 監視カメラなど、プレイヤー以外の視点で描くワールドに含めるかどうか。
+	virtual bool DrawsInAuxiliaryView() const { return true; }
 	virtual bool IsPlanarReflectionSurfaceVisible(const Camera&) const
 	{
 		return false;

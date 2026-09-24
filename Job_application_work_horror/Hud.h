@@ -56,6 +56,13 @@ public:
         ID3D11ShaderResourceView* feed,
         Shader& textureShader,
         float elapsedSeconds,
+        std::string_view cameraLabel,
+        int cameraIndex,
+        int cameraCount,
+        int roundsCleared,
+        int requiredRounds,
+        int mistakes,
+        int mistakesUntilCaught,
         bool reportReady,
         bool wrongReportVisible);
     void DrawQuietRecovery(float progressRate, float cooldown, bool success, bool tooClose);

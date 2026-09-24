@@ -331,6 +331,8 @@
     <ClInclude Include="sound.h" />
     <ClInclude Include="SpriteRenderer.h" />
     <ClInclude Include="StageScene.h" />
+    <ClInclude Include="StageSurveillanceCameras.h" />
+    <ClInclude Include="SurveillancePatrol.h" />
     <ClInclude Include="Stage2Scene.h" />
     <ClInclude Include="Stage2SceneConstants.h" />
     <ClInclude Include="QuietRecovery.h" />

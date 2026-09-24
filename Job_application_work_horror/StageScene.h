@@ -12,9 +12,13 @@
 #include "StagePowerSequence.h"
 #include "ExitOmenSequence.h"
 #include "RenderTexture.h"
+#include "SurveillancePatrol.h"
+#include "CaughtSequence.h"
+#include "StageSurveillanceCameras.h"
 
 #include <array>
 #include <cstddef>
+#include <random>
 
 class Player;
 class ShadowMan;
@@ -49,6 +53,7 @@ struct StageObjects
     Item* secondFuse = nullptr;
     Item* thirdFuse = nullptr;
     std::array<CeilingLight*, CeilingLightCount> ceilingLights{};
+    std::array<Door*, StageSealedDoorCount> sealedDoors{};
 
     // 配置名"CeilingLight1"〜"CeilingLight8"と同じ1始まりの番号で照明を取得します。
     CeilingLight* CeilingLightAt(int number) const
@@ -72,8 +77,20 @@ private:
     void UpdateCorridorLoop(class Player& player);
     void UpdateEntranceThresholdEvent(class Player& player);
     void UpdateStorageScare(class Player& player);
-    void UpdateEvidenceScare(class Player& player);
     void AdvanceCorridorLoop(class Player& player);
+
+    // 監視カメラ巡回。進行判定はSurveillancePatrol、見た目の異常と入力・演出はSceneが担当します。
+    void UpdateSurveillancePatrol(class Player& player, float deltaTime);
+    void UpdatePatrolViewing(class Player& player);
+    void UpdatePatrolDispatch(class Player& player, float deltaTime);
+    SurveillancePatrol::Anomaly ChoosePatrolAnomaly();
+    void SetPatrolAnomalyVisible(const SurveillancePatrol::Anomaly& anomaly, bool visible);
+    bool IsLookingAtPatrolAnomaly(const class Player& player) const;
+    void EndPatrolViewing(class Player& player);
+    void StartPatrolCaught(class Player& player);
+    void UpdatePatrolCaught(class Player& player, float deltaTime);
+    void CompletePatrol(class Player& player);
+    void ShowPatrolNotice(const char* text, float seconds);
     void StartScareLightSequence();
     void UpdateScareLightSequence();
     void UpdatePowerRestoreSequence();
@@ -108,10 +125,15 @@ private:
     int m_StorageScarePhase = 0;
     float m_StorageScareTimer = 0.0f;
     float m_StorageScareNoticeTimer = 0.0f;
-    int m_EvidenceScarePhase = 0;
-    float m_EvidenceScareTimer = 0.0f;
-    float m_EvidenceScareNoticeTimer = 0.0f;
-    float m_SurveillanceFeedbackTimer = 0.0f;
+    SurveillancePatrol m_Patrol;
+    CaughtSequence m_PatrolCaught;
+    std::mt19937 m_PatrolRandom{ std::random_device{}() };
+    // 映像を開いてからの経過秒。開いた直後の誤入力を防ぐために使います。
+    float m_PatrolViewTimer = 0.0f;
+    float m_PatrolWrongTimer = 0.0f;
+    float m_PatrolWarningCooldown = 0.0f;
+    float m_PatrolNoticeTimer = 0.0f;
+    const char* m_PatrolNoticeText = "";
     float m_StageVisualTimer = 0.0f;
     float m_ProgressHintTimer = 0.0f;
 public:
@@ -119,6 +141,6 @@ public:
     ~StageScene();
 
     void Update() override;
-    void RenderOffscreen();
+    void RenderOffscreen() override;
     void Draw(Camera* camera) override;
 };

@@ -63,10 +63,13 @@ void StageScene::Init()
     m_StorageScarePhase = 0;
     m_StorageScareTimer = 0.0f;
     m_StorageScareNoticeTimer = 0.0f;
-    m_EvidenceScarePhase = 0;
-    m_EvidenceScareTimer = 0.0f;
-    m_EvidenceScareNoticeTimer = 0.0f;
-    m_SurveillanceFeedbackTimer = 0.0f;
+    m_Patrol.Reset();
+    m_PatrolCaught.Reset();
+    m_PatrolViewTimer = 0.0f;
+    m_PatrolWrongTimer = 0.0f;
+    m_PatrolWarningCooldown = 0.0f;
+    m_PatrolNoticeTimer = 0.0f;
+    m_PatrolNoticeText = "";
     m_ScareLightSequence.Reset();
     m_PowerSequence.Reset();
     m_StageVisualTimer = 0.0f;
@@ -360,6 +363,16 @@ void StageScene::Init()
     stageExitDoor->SetScale(Vector3(60.0f, 50.0f, 4.0f));
     stageExitDoor->SetLocked(true);
 
+    // 監視カメラの異常用に、壁際へ開かずの扉を置きます。開いても先は壁です。
+    for (const StageSealedDoor& sealed : StageSealedDoors)
+    {
+        Door* sealedDoor = game->CreateObj<Door>(sealed.Name);
+        sealedDoor->SetPosition(
+            sealed.Position[0], sealed.Position[1], sealed.Position[2]);
+        sealedDoor->ResetClosed(0);
+        sealedDoor->SetLocked(true);
+    }
+
     Wall* stageExitSign = createStageProp(
         "PropStage1ExitSign",
         Vector3(198.0f, -51.5f, 307.5f),
@@ -459,6 +472,11 @@ void StageScene::CacheObjects()
         objects.ceilingLights[static_cast<std::size_t>(number - 1)] =
             game->RequireObj<CeilingLight>("CeilingLight" + std::to_string(number));
     }
+    for (int index = 0; index < StageSealedDoorCount; ++index)
+    {
+        objects.sealedDoors[static_cast<std::size_t>(index)] =
+            game->RequireObj<Door>(StageSealedDoors[index].Name);
+    }
 }
 
 // ヒューズ数と電力状態を基準に目的表示とイベント段階を更新します。
@@ -472,7 +490,8 @@ void StageScene::Update()
         return;
     }
 
-    UpdateEvidenceScare(*player);
+    // 映像確認中と捕獲中は操作不能なので、操作可否の判定より前に更新します。
+    UpdateSurveillancePatrol(*player, Application::GetDeltaTime());
     if (!player->CanControl())
     {
         return;
@@ -499,8 +518,6 @@ void StageScene::Update()
         0.0f, m_EvidenceNoticeTimer - deltaTime);
     m_StorageScareNoticeTimer = (std::max)(
         0.0f, m_StorageScareNoticeTimer - deltaTime);
-    m_EvidenceScareNoticeTimer = (std::max)(
-        0.0f, m_EvidenceScareNoticeTimer - deltaTime);
     const int currentFuseCount = game->GetItemCount();
     if (currentFuseCount > m_LastFuseCount)
     {
@@ -771,4 +788,8 @@ void StageScene::Uninit()
     game->DestroyObj("Stage1FuseWatcher");
     game->DestroyObj("Stage1StorageShadow");
     game->DestroyObj("Stage1EvidenceShadow");
+    for (const StageSealedDoor& sealed : StageSealedDoors)
+    {
+        game->DestroyObj(sealed.Name);
+    }
 }
