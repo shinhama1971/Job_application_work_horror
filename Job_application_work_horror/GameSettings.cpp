@@ -21,24 +21,24 @@ namespace Core
         {
             return;
         }
-        if (brightnessLevel < 0 || brightnessLevel > 4)
+        if (brightnessLevel < 0 || brightnessLevel > MaxBrightnessLevel)
         {
             return;
         }
 
         m_BrightnessLevel = brightnessLevel;
         if (settingsFile >> effectLevel &&
-            effectLevel >= 0 && effectLevel <= 2)
+            effectLevel >= 0 && effectLevel <= MaxEffectLevel)
         {
             m_EffectLevel = effectLevel;
         }
         if (settingsFile >> lookSensitivityLevel &&
-            lookSensitivityLevel >= 0 && lookSensitivityLevel <= 4)
+            lookSensitivityLevel >= 0 && lookSensitivityLevel <= MaxLookSensitivityLevel)
         {
             m_LookSensitivityLevel = lookSensitivityLevel;
         }
         if (settingsFile >> volumeLevel &&
-            volumeLevel >= 0 && volumeLevel <= 4)
+            volumeLevel >= 0 && volumeLevel <= MaxVolumeLevel)
         {
             m_VolumeLevel = volumeLevel;
         }

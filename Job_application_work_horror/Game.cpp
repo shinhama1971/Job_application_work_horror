@@ -62,20 +62,10 @@ namespace Core
         }
 
         m_Instance->m_Camera.Init();
-        m_Instance->m_Camera.SetLookSensitivityScale(
-            0.60f +
-            static_cast<float>(
-                m_Instance->m_Settings.GetLookSensitivityLevel()) * 0.20f);
-
         m_Instance->m_PlanarReflection.Init();
         m_Instance->m_ShadowMap.Init();
         m_Instance->m_PostProcess.Init();
-        m_Instance->m_PostProcess.SetUserBrightnessOffset(
-            static_cast<float>(
-                m_Instance->m_Settings.GetBrightnessLevel() - 2) * 0.055f);
-        constexpr float effectScales[] = { 0.70f, 1.0f, 1.25f };
-        m_Instance->m_PostProcess.SetUserEffectScale(
-            effectScales[m_Instance->m_Settings.GetEffectLevel()]);
+        m_Instance->ApplyVisualSettings();
         m_Instance->ChangeScene(SceneName::Title);
         return true;
     }
@@ -97,155 +87,23 @@ namespace Core
             Input::GetButtonTrigger(XINPUT_START);
         if (gameplayScene && !Debug::UI::IsVisible() && pausePressed)
         {
-            m_Instance->m_IsPaused = !m_Instance->m_IsPaused;
-            if (m_Instance->m_IsPaused)
+            PauseMenu& pauseMenu = m_Instance->m_PauseMenu;
+            if (pauseMenu.IsOpen())
             {
-                m_Instance->m_PauseSettingIndex = 0;
+                pauseMenu.Close();
             }
-            m_Instance->ApplyAudioVolume(m_Instance->m_IsPaused);
+            else
+            {
+                pauseMenu.Open();
+            }
+            m_Instance->ApplyAudioVolume(pauseMenu.IsOpen());
             Input::SetVibration(2, 0.06f);
             return;
         }
 
-        if (m_Instance->m_IsPaused)
+        if (m_Instance->m_PauseMenu.IsOpen())
         {
-            int selectionDelta = 0;
-            if (Input::GetKeyTrigger(VK_UP) ||
-                Input::GetButtonTrigger(XINPUT_UP))
-            {
-                selectionDelta = -1;
-            }
-            else if (Input::GetKeyTrigger(VK_DOWN) ||
-                Input::GetButtonTrigger(XINPUT_DOWN))
-            {
-                selectionDelta = 1;
-            }
-            if (selectionDelta != 0)
-            {
-                m_Instance->m_PauseSettingIndex = (std::clamp)(
-                m_Instance->m_PauseSettingIndex + selectionDelta,
-                    0, 3);
-                Input::SetVibration(1, 0.03f);
-            }
-
-            int settingDelta = 0;
-            if (Input::GetKeyTrigger(VK_LEFT) ||
-                Input::GetButtonTrigger(XINPUT_LEFT))
-            {
-                settingDelta = -1;
-            }
-            else if (Input::GetKeyTrigger(VK_RIGHT) ||
-                Input::GetButtonTrigger(XINPUT_RIGHT))
-            {
-                settingDelta = 1;
-            }
-            bool settingChanged = false;
-            if (settingDelta != 0 &&
-                m_Instance->m_PauseSettingIndex == 0)
-            {
-                const int newBrightnessLevel = (std::clamp)(
-                    m_Instance->m_Settings.GetBrightnessLevel() + settingDelta,
-                    0, 4);
-                if (m_Instance->m_Settings.SetBrightnessLevel(
-                    newBrightnessLevel))
-                {
-                    const float brightnessOffset =
-                        static_cast<float>(
-                            m_Instance->m_Settings.GetBrightnessLevel() - 2) *
-                        0.055f;
-                    m_Instance->m_PostProcess.SetUserBrightnessOffset(
-                        brightnessOffset);
-                    settingChanged = true;
-                }
-            }
-            else if (settingDelta != 0 &&
-                m_Instance->m_PauseSettingIndex == 1)
-            {
-                const int newEffectLevel = (std::clamp)(
-                    m_Instance->m_Settings.GetEffectLevel() + settingDelta,
-                    0, 2);
-                if (m_Instance->m_Settings.SetEffectLevel(newEffectLevel))
-                {
-                    constexpr float effectScales[] =
-                    {
-                        0.70f, 1.0f, 1.25f
-                    };
-                    m_Instance->m_PostProcess.SetUserEffectScale(
-                        effectScales[m_Instance->m_Settings.GetEffectLevel()]);
-                    settingChanged = true;
-                }
-            }
-            else if (settingDelta != 0 &&
-                m_Instance->m_PauseSettingIndex == 2)
-            {
-                const int newSensitivityLevel = (std::clamp)(
-                    m_Instance->m_Settings.GetLookSensitivityLevel() +
-                    settingDelta, 0, 4);
-                if (m_Instance->m_Settings.SetLookSensitivityLevel(
-                    newSensitivityLevel))
-                {
-                    m_Instance->m_Camera.SetLookSensitivityScale(
-                        0.60f +
-                        static_cast<float>(
-                            m_Instance->m_Settings.GetLookSensitivityLevel()) *
-                        0.20f);
-                    settingChanged = true;
-                }
-            }
-            else if (settingDelta != 0)
-            {
-                const int newVolumeLevel = (std::clamp)(
-                    m_Instance->m_Settings.GetVolumeLevel() + settingDelta,
-                    0, 4);
-                if (m_Instance->m_Settings.SetVolumeLevel(newVolumeLevel))
-                {
-                    m_Instance->ApplyAudioVolume(true);
-                    settingChanged = true;
-                }
-            }
-            if (settingChanged)
-            {
-                m_Instance->m_Settings.Save();
-                Input::SetVibration(2, 0.045f);
-                if (m_Instance->m_PauseSettingIndex == 3)
-                {
-                    m_Instance->PlayAudioCue(SOUND_CUE_PICKUP);
-                }
-            }
-
-            const bool restartPressed =
-                Input::GetKeyTrigger(VK_R) ||
-                Input::GetButtonTrigger(XINPUT_Y);
-            const bool titlePressed =
-                Input::GetKeyTrigger(VK_T) ||
-                Input::GetButtonTrigger(XINPUT_B);
-            const bool quitPressed =
-                Input::GetKeyTrigger(VK_Q) ||
-                Input::GetButtonTrigger(XINPUT_BACK);
-            if (restartPressed)
-            {
-                const SceneName currentScene = m_Instance->m_CurrentScene;
-                m_Instance->m_IsPaused = false;
-                // 1面はBeginRunで全体を初期化するため、2面だけ開始時点へ戻します。
-                if (currentScene == SceneName::Stage2)
-                {
-                    m_Instance->m_State.RestoreStage2Start();
-                }
-                m_Instance->ChangeScene(currentScene);
-                return;
-            }
-            if (titlePressed)
-            {
-                m_Instance->m_IsPaused = false;
-                m_Instance->ChangeScene(SceneName::Title);
-                return;
-            }
-            if (quitPressed)
-            {
-                PostMessage(Application::GetWindow(), WM_CLOSE, 0, 0);
-                return;
-            }
-
+            m_Instance->UpdatePauseMenu();
             return;
         }
 
@@ -327,6 +185,50 @@ namespace Core
         return m_Instance.get();
     }
 
+    // ポーズ中の入力はPauseMenuが解釈し、設定の反映とシーン操作だけをここで行います。
+    void Game::UpdatePauseMenu()
+    {
+        const PauseMenu::Result result = m_PauseMenu.Update(m_Settings);
+        if (result.settingsChanged)
+        {
+            ApplyVisualSettings();
+            ApplyAudioVolume(true);
+            m_Settings.Save();
+            if (result.changedItem == PauseMenu::Item::Volume)
+            {
+                // 変更後の音量を確認できるよう、短い効果音を鳴らします。
+                PlayAudioCue(SOUND_CUE_PICKUP);
+            }
+        }
+
+        switch (result.command)
+        {
+        case PauseMenu::Command::RestartStage:
+            // 1面はBeginRunで全体を初期化するため、2面だけ開始時点へ戻します。
+            if (m_CurrentScene == SceneName::Stage2)
+            {
+                m_State.RestoreStage2Start();
+            }
+            ChangeScene(m_CurrentScene);
+            break;
+        case PauseMenu::Command::ReturnToTitle:
+            ChangeScene(SceneName::Title);
+            break;
+        case PauseMenu::Command::Quit:
+            PostMessage(Application::GetWindow(), WM_CLOSE, 0, 0);
+            break;
+        case PauseMenu::Command::None:
+            break;
+        }
+    }
+
+    void Game::ApplyVisualSettings()
+    {
+        m_PostProcess.SetUserBrightnessOffset(m_Settings.GetBrightnessOffset());
+        m_PostProcess.SetUserEffectScale(m_Settings.GetEffectScale());
+        m_Camera.SetLookSensitivityScale(m_Settings.GetLookSensitivityScale());
+    }
+
     // シーン遷移は予約のみ。実際の破棄・生成はUpdate末尾の安全な位置で行います。
     void Game::RequestSceneChange(SceneName sName)
     {
@@ -349,7 +251,7 @@ namespace Core
         }
 
         m_CurrentScene = sName;
-        m_IsPaused = false;
+        m_PauseMenu.Close();
         ApplyAudioVolume(false);
         m_Scene.reset();
         m_ReflectionFrameIndex = 0;

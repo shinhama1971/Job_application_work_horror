@@ -147,6 +147,9 @@
     <ClCompile Include="GameSettings.cpp">
       <Filter>ソース ファイル\Core</Filter>
     </ClCompile>
+    <ClCompile Include="PauseMenu.cpp">
+      <Filter>ソース ファイル\Core</Filter>
+    </ClCompile>
     <ClCompile Include="GameRendering.cpp">
       <Filter>ソース ファイル\Core</Filter>
     </ClCompile>
@@ -288,6 +291,9 @@
       <Filter>ソース ファイル\Rendering</Filter>
     </ClInclude>
     <ClInclude Include="GameSettings.h">
+      <Filter>ソース ファイル\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="PauseMenu.h">
       <Filter>ソース ファイル\Core</Filter>
     </ClInclude>
     <ClInclude Include="GameState.h">

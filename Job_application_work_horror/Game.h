@@ -20,6 +20,7 @@
 #include "PlanarReflection.h"
 #include "GameState.h"
 #include "GameSettings.h"
+#include "PauseMenu.h"
 #include "ObjectManager.h"
 #include "GpuTimer.h"
 #include "sound.h"
@@ -60,19 +61,21 @@ namespace Core
         GameState m_State;
         GameSettings m_Settings;
         SceneName m_CurrentScene = SceneName::Title;
-        bool m_IsPaused = false;
         unsigned int m_ReflectionFrameIndex = 0;
         unsigned int m_ShadowFrameIndex = 0;
 		bool m_WasReflectionVisible = false;
         DirectX::SimpleMath::Vector3 m_LastReflectionCameraPosition{};
         DirectX::SimpleMath::Vector3 m_LastReflectionCameraForward{ 0.0f, 0.0f, 1.0f };
         bool m_HasReflectionCameraPose = false;
-        int m_PauseSettingIndex = 0;
+        PauseMenu m_PauseMenu;
 
         void ChangeScene(SceneName sName);
         void LoadBestRecord();
         void SaveBestRecord() const;
         void ApplyAudioVolume(bool paused);
+        // 明るさ・演出強度・視点感度をPostProcessとCameraへ反映します。
+        void ApplyVisualSettings();
+        void UpdatePauseMenu();
 
     public:
         Game();
@@ -168,7 +171,7 @@ namespace Core
 
         bool IsPaused() const
         {
-            return m_IsPaused;
+            return m_PauseMenu.IsOpen();
         }
 
         int GetBrightnessLevel() const
@@ -193,7 +196,7 @@ namespace Core
 
         int GetPauseSettingIndex() const
         {
-            return m_PauseSettingIndex;
+            return m_PauseMenu.GetSelectedIndex();
         }
 
         float GetLastClearTimeSeconds() const

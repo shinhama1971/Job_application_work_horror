@@ -17,13 +17,9 @@ namespace Core
             return;
         }
 
-        constexpr float volumeScales[] =
-        {
-            0.0f, 0.28f, 0.52f, 0.76f, 1.0f
-        };
         const float pauseScale = paused ? 0.42f : 1.0f;
         m_Sound.SetMasterVolume(
-            volumeScales[m_Settings.GetVolumeLevel()] * pauseScale);
+            m_Settings.GetVolumeScale() * pauseScale);
     }
 
     void Game::LoadBestRecord()
