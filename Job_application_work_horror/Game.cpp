@@ -224,6 +224,11 @@ namespace Core
             {
                 const SceneName currentScene = m_Instance->m_CurrentScene;
                 m_Instance->m_IsPaused = false;
+                // 1面はBeginRunで全体を初期化するため、2面だけ開始時点へ戻します。
+                if (currentScene == SceneName::Stage2)
+                {
+                    m_Instance->m_State.RestoreStage2Start();
+                }
                 m_Instance->ChangeScene(currentScene);
                 return;
             }
