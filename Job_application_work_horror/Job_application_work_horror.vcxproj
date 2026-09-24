@@ -197,7 +197,6 @@
     <ClCompile Include="ComputeShader.cpp" />
     <ClCompile Include="Door.cpp" />
     <ClCompile Include="ExitTrigger.cpp" />
-    <ClCompile Include="ExplanationScene.cpp" />
     <ClCompile Include="FullScreenQuad.cpp" />
     <ClCompile Include="FuseBox.cpp" />
     <ClCompile Include="Game.cpp" />
@@ -213,7 +212,6 @@
     <ClCompile Include="InteractionSystem.cpp" />
     <ClCompile Include="Item.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="MovieTrigger.cpp" />
     <ClCompile Include="ObjectManager.cpp" />
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="Player.cpp" />
@@ -245,7 +243,7 @@
     <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Texture2D.cpp" />
-    <ClCompile Include="TestPipe.cpp" />
+    <ClCompile Include="PipeProp.cpp" />
     <ClCompile Include="TitleScene.cpp" />
     <ClCompile Include="utility.cpp" />
     <ClCompile Include="Wall.cpp" />
@@ -269,7 +267,6 @@
     <ClInclude Include="ComputeShader.h" />
     <ClInclude Include="Door.h" />
     <ClInclude Include="ExitTrigger.h" />
-    <ClInclude Include="ExplanationScene.h" />
     <ClInclude Include="FlashlightSystem.h" />
     <ClInclude Include="FullScreenQuad.h" />
     <ClInclude Include="FuseBox.h" />
@@ -291,7 +288,6 @@
     <ClInclude Include="MeshRenderer.h" />
     <ClInclude Include="ModelBounds.h" />
     <ClInclude Include="ModelCache.h" />
-    <ClInclude Include="MovieTrigger.h" />
     <ClInclude Include="ObjectManager.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="Player.h" />
@@ -332,7 +328,7 @@
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="Texture2D.h" />
-    <ClInclude Include="TestPipe.h" />
+    <ClInclude Include="PipeProp.h" />
     <ClInclude Include="TitleScene.h" />
     <ClInclude Include="utility.h" />
     <ClInclude Include="VertexBuffer.h" />

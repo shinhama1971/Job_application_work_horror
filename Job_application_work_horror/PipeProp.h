@@ -1,5 +1,5 @@
 // ============================================================================
-// ファイルの役割: 外部FBXを既存のAssimp描画経路で確認するテスト用Objectです。
+// ファイルの役割: 外部FBXの配管モデルを配置する背景用Objectです。
 // 主な技術: Assimp、静的メッシュ、Diffuse Texture、Shadow Map
 // ============================================================================
 
@@ -12,7 +12,7 @@
 #include <memory>
 #include <vector>
 
-class TestPipe final : public Object
+class PipeProp final : public Object
 {
 private:
     std::shared_ptr<ModelData> m_ModelData;

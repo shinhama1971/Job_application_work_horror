@@ -20,7 +20,7 @@
 #include "ScreenDustOverlay.h"
 #include "ScareTrigger.h"
 #include "ShadowMan.h"
-#include "TestPipe.h"
+#include "PipeProp.h"
 #include <SimpleMath.h>
 #include <algorithm>
 #include <cmath>
@@ -76,21 +76,21 @@ void StageScene::Init()
     Player* player = game->CreateObj<Player>("Player");
     player->SetPosition(Vector3(0.0f, -99.0f, -120.0f));
 
-    // 外部FBXの表示確認用。進行や当たり判定には参加させません。
-    TestPipe* testPipe = game->CreateObj<TestPipe>("TestPipe");
-    testPipe->SetPosition(Vector3(22.0f, -87.54f, -105.0f));
-    testPipe->SetRotation(Vector3(0.0f, 0.45f, 0.0f));
-    testPipe->SetScale(Vector3(8.0f, 8.0f, 8.0f));
+    // 外部FBXの配管モデル（背景装飾）。進行や当たり判定には参加させません。
+    PipeProp* pipe = game->CreateObj<PipeProp>("PipeProp");
+    pipe->SetPosition(Vector3(22.0f, -87.54f, -105.0f));
+    pipe->SetRotation(Vector3(0.0f, 0.45f, 0.0f));
+    pipe->SetScale(Vector3(8.0f, 8.0f, 8.0f));
 
-    TestPipe* testPipe2 = game->CreateObj<TestPipe>("TestPipe2");
-    testPipe2->SetPosition(Vector3(-22.0f, -87.54f, -105.0f));
-    testPipe2->SetRotation(Vector3(0.0f, -0.45f, 0.0f));
-    testPipe2->SetScale(Vector3(8.0f, 8.0f, 8.0f));
+    PipeProp* pipe2 = game->CreateObj<PipeProp>("PipeProp2");
+    pipe2->SetPosition(Vector3(-22.0f, -87.54f, -105.0f));
+    pipe2->SetRotation(Vector3(0.0f, -0.45f, 0.0f));
+    pipe2->SetScale(Vector3(8.0f, 8.0f, 8.0f));
 
-    TestPipe* testPipe3 = game->CreateObj<TestPipe>("TestPipe3");
-    testPipe3->SetPosition(Vector3(0.0f, -87.54f, -155.0f));
-    testPipe3->SetRotation(Vector3(0.0f, 1.57f, 0.0f));
-    testPipe3->SetScale(Vector3(8.0f, 8.0f, 8.0f));
+    PipeProp* pipe3 = game->CreateObj<PipeProp>("PipeProp3");
+    pipe3->SetPosition(Vector3(0.0f, -87.54f, -155.0f));
+    pipe3->SetRotation(Vector3(0.0f, 1.57f, 0.0f));
+    pipe3->SetScale(Vector3(8.0f, 8.0f, 8.0f));
 
     // 地面
     Ground* ground = game->CreateObj<Ground>("Ground");
@@ -673,9 +673,9 @@ void StageScene::Uninit()
     Core::Game* game = Core::Game::GetInstance();
 
     game->DestroyObj("Player");
-    game->DestroyObj("TestPipe");
-    game->DestroyObj("TestPipe2");
-    game->DestroyObj("TestPipe3");
+    game->DestroyObj("PipeProp");
+    game->DestroyObj("PipeProp2");
+    game->DestroyObj("PipeProp3");
     game->DestroyObj("Ground");
 
     game->DestroyObj("Wall1");

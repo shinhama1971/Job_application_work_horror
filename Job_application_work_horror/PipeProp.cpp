@@ -3,16 +3,16 @@
 // 主な技術: Assimp、静的メッシュ、Diffuse Texture、Shadow Map
 // ============================================================================
 
-#include "TestPipe.h"
+#include "PipeProp.h"
 
 #include "Game.h"
 #include "Renderer.h"
 
 using namespace DirectX::SimpleMath;
 
-void TestPipe::Init()
+void PipeProp::Init()
 {
-    const std::string modelDirectory = "assets/model/test_pipe";
+    const std::string modelDirectory = "assets/model/pipe";
     m_ModelData = ModelCache::Load(
         modelDirectory + "/Pipe90.fbx",
         modelDirectory,
@@ -51,7 +51,7 @@ void TestPipe::Init()
     }
 }
 
-Matrix TestPipe::GetWorldMatrix() const
+Matrix PipeProp::GetWorldMatrix() const
 {
     const Matrix scale = Matrix::CreateScale(m_Scale);
     const Matrix rotation = Matrix::CreateFromYawPitchRoll(
@@ -60,7 +60,7 @@ Matrix TestPipe::GetWorldMatrix() const
     return scale * rotation * translation;
 }
 
-void TestPipe::Draw(Camera* camera)
+void PipeProp::Draw(Camera* camera)
 {
     camera->SetCamera();
     Matrix world = GetWorldMatrix();
@@ -83,7 +83,7 @@ void TestPipe::Draw(Camera* camera)
     }
 }
 
-void TestPipe::DrawShadow()
+void PipeProp::DrawShadow()
 {
     Matrix world = GetWorldMatrix();
     Renderer::SetWorldMatrix(&world);
@@ -99,7 +99,7 @@ void TestPipe::DrawShadow()
     }
 }
 
-void TestPipe::Uninit()
+void PipeProp::Uninit()
 {
     m_Materials.clear();
     m_ModelData.reset();
