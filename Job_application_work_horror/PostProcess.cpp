@@ -198,10 +198,9 @@ namespace Effect
         // 出力先に設定中のリソースは安全にコピーできないため、描画先から解除します。
         context->OMSetRenderTargets(0, nullptr, nullptr);
 
-        ID3D11Resource* backBufferResource = nullptr;
-        Renderer::GetBackBufferRTV()->GetResource(&backBufferResource);
-        context->CopyResource(m_RenderTexture.GetTexture(), backBufferResource);
-        SAFE_RELEASE(backBufferResource);
+        Microsoft::WRL::ComPtr<ID3D11Resource> backBufferResource;
+        Renderer::GetBackBufferRTV()->GetResource(backBufferResource.GetAddressOf());
+        context->CopyResource(m_RenderTexture.GetTexture(), backBufferResource.Get());
 
         Renderer::SetBackBufferRenderTarget();
     }

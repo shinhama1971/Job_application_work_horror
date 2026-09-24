@@ -5,7 +5,6 @@
 // ============================================================================
 
 #pragma once
-#define _CRT_SECURE_NO_WARNINGS
 #include	<d3d11.h>
 #include	<DirectXMath.h>
 #include	<SimpleMath.h>
@@ -21,8 +20,6 @@
 #pragma comment(lib,"d3d11.lib")
 #pragma comment(lib,"d3dcompiler.lib")
 
-// Direct3D解放の簡略化マクロ
-#define SAFE_RELEASE(p) { if( NULL != p ) { p->Release(); p = NULL; } }
 
 // ３Ｄ頂点データ
 struct VERTEX_3D

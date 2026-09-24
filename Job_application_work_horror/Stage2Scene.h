@@ -21,6 +21,8 @@
 #include "LightZoneProgress.h"
 #include "PuzzleFeedback.h"
 
+#include <optional>
+
 class Player;
 
 class Stage2Scene : public Scene
@@ -87,7 +89,8 @@ private:
     bool m_EvidenceHandled[2] = { false, false };
     bool m_FinalSequenceArmed = false;
     bool m_FinalDoorReady = false;
-    int m_DebugCommand = 0;
+    // デバッグUIから予約された操作。次の操作可能フレームで実行します。
+    std::optional<SceneDebugAction> m_PendingDebugAction;
 
 public:
     Stage2Scene();

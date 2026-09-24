@@ -26,11 +26,8 @@ float      Application::m_DeltaTime = 1.0f / 60.0f;
 //-----------------------------------------------------------------------------
 // コンストラクタ
 //-----------------------------------------------------------------------------
-Application::Application(uint32_t width, uint32_t height)
-{ 
-    m_Height = height;
-    m_Width = width;
-
+Application::Application()
+{
     timeBeginPeriod(1); //タイマー精度を1ミリ秒に設定
 }
 

@@ -89,7 +89,7 @@ void StageScene::Init()
 
     PipeProp* pipe3 = game->CreateObj<PipeProp>("PipeProp3");
     pipe3->SetPosition(Vector3(0.0f, -87.54f, -155.0f));
-    pipe3->SetRotation(Vector3(0.0f, 1.57f, 0.0f));
+    pipe3->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
     pipe3->SetScale(Vector3(8.0f, 8.0f, 8.0f));
 
     // 地面
@@ -330,7 +330,7 @@ void StageScene::Init()
     emergencyCharger->SetManualControl("非常用充電器を使う");
     emergencyCharger->SetManualInteractionAllowed(true);
     emergencyCharger->SetPosition(-205.0f, -90.0f, -112.0f);
-    emergencyCharger->SetRotation(Vector3(0.0f, 1.5707963f, 0.0f));
+    emergencyCharger->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
 
     // 任意探索の報酬は最短経路から外して配置します。
     // 素早い脱出と完全探索のどちらを選ぶか判断させるためです。
@@ -339,7 +339,7 @@ void StageScene::Init()
     evidenceTerminal->SetManualControl("残された記録を回収する");
     evidenceTerminal->SetManualInteractionAllowed(true);
     evidenceTerminal->SetPosition(205.0f, -90.0f, -42.0f);
-    evidenceTerminal->SetRotation(Vector3(0.0f, -1.5707963f, 0.0f));
+    evidenceTerminal->SetRotation(Vector3(0.0f, -DirectX::XM_PIDIV2, 0.0f));
     Wall* evidenceMarker = createStageProp(
         "Stage1EvidenceMarker",
         Vector3(217.2f, -65.0f, -42.0f),
@@ -355,7 +355,7 @@ void StageScene::Init()
     // 廊下を歩きながら操作キーを押すだけで透明トリガーが反応する問題を防ぎます。
     Door* stageExitDoor = game->CreateObj<Door>("Stage1ExitDoor");
     stageExitDoor->SetPosition(202.0f, -74.0f, 307.5f);
-    stageExitDoor->SetRotation(Vector3(0.0f, 1.5707963f, 0.0f));
+    stageExitDoor->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
     stageExitDoor->SetScale(Vector3(60.0f, 50.0f, 4.0f));
     stageExitDoor->SetLocked(true);
 

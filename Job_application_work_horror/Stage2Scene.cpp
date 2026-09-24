@@ -50,18 +50,8 @@ bool Stage2Scene::TryGetDebugInfo(SceneDebugInfo& info) const
 
 void Stage2Scene::RequestDebugAction(SceneDebugAction action)
 {
-    switch (action)
-    {
-    case SceneDebugAction::AdvanceProgression:
-        m_DebugCommand = 1;
-        break;
-    case SceneDebugAction::PlayFinalSequence:
-        m_DebugCommand = 2;
-        break;
-    case SceneDebugAction::PlayLightingEvent:
-        m_DebugCommand = 3;
-        break;
-    }
+    // 操作可能なフレームのUpdateで1回だけ実行します。
+    m_PendingDebugAction = action;
 }
 
 // ループ廊下の基本形と、周回によって表示を切り替える異変Objectを準備します。
@@ -106,7 +96,7 @@ void Stage2Scene::Init()
     m_SignalPuzzle.Reset();
     m_FinalSequenceArmed = false;
     m_FinalDoorReady = false;
-    m_DebugCommand = 0;
+    m_PendingDebugAction.reset();
 
     Player* player = game->CreateObj<Player>("Player");
     player->SetPosition(Vector3(0.0f, -99.0f, -125.0f));
@@ -127,28 +117,28 @@ void Stage2Scene::Init()
     confirmationPanel->SetManualControl("異常確認スイッチを押す");
     confirmationPanel->SetManualInteractionAllowed(false);
     confirmationPanel->SetPosition(35.5f, -90.0f, 112.0f);
-    confirmationPanel->SetRotation(Vector3(0.0f, -1.5707963f, 0.0f));
+    confirmationPanel->SetRotation(Vector3(0.0f, -DirectX::XM_PIDIV2, 0.0f));
 
     FuseBox* emergencyCharger =
         game->CreateObj<FuseBox>("Stage2EmergencyCharger");
     emergencyCharger->SetManualControl("非常用充電器を使う");
     emergencyCharger->SetManualInteractionAllowed(true);
     emergencyCharger->SetPosition(-35.5f, -90.0f, -106.0f);
-    emergencyCharger->SetRotation(Vector3(0.0f, 1.5707963f, 0.0f));
+    emergencyCharger->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
 
     FuseBox* evidenceTerminal1 =
         game->CreateObj<FuseBox>("Stage2EvidenceTerminal1");
     evidenceTerminal1->SetManualControl("残された記録を回収する");
     evidenceTerminal1->SetManualInteractionAllowed(true);
     evidenceTerminal1->SetPosition(35.5f, -90.0f, -76.0f);
-    evidenceTerminal1->SetRotation(Vector3(0.0f, -1.5707963f, 0.0f));
+    evidenceTerminal1->SetRotation(Vector3(0.0f, -DirectX::XM_PIDIV2, 0.0f));
 
     FuseBox* evidenceTerminal2 =
         game->CreateObj<FuseBox>("Stage2EvidenceTerminal2");
     evidenceTerminal2->SetManualControl("残された記録を回収する");
     evidenceTerminal2->SetManualInteractionAllowed(true);
     evidenceTerminal2->SetPosition(-35.5f, -90.0f, 108.0f);
-    evidenceTerminal2->SetRotation(Vector3(0.0f, 1.5707963f, 0.0f));
+    evidenceTerminal2->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
 
     constexpr const char* signalTerminalNames[] =
     {
@@ -180,7 +170,7 @@ void Stage2Scene::Init()
             signalPositions[signalIndex].z);
         signalTerminal->SetRotation(Vector3(
             0.0f,
-            signalIndex == 1 ? 1.5707963f : -1.5707963f,
+            signalIndex == 1 ? DirectX::XM_PIDIV2 : -DirectX::XM_PIDIV2,
             0.0f));
     }
 
@@ -543,28 +533,34 @@ void Stage2Scene::Update()
         return;
     }
 
-    const int debugCommand = m_DebugCommand;
-    m_DebugCommand = 0;
-    if (debugCommand == 1 && m_LoopCount < 3)
+    if (m_PendingDebugAction.has_value())
     {
-        AdvanceLoop(*player);
-    }
-    else if (debugCommand == 2)
-    {
-        while (m_LoopCount < 3)
+        const SceneDebugAction debugAction = *m_PendingDebugAction;
+        m_PendingDebugAction.reset();
+        switch (debugAction)
         {
-            AdvanceLoop(*player);
+        case SceneDebugAction::AdvanceProgression:
+            if (m_LoopCount < 3)
+            {
+                AdvanceLoop(*player);
+            }
+            break;
+        case SceneDebugAction::PlayFinalSequence:
+            while (m_LoopCount < 3)
+            {
+                AdvanceLoop(*player);
+            }
+            m_SignalPuzzle.ForceComplete();
+            m_FinalSequenceArmed = true;
+            if (!m_FinalSequence.IsSequenceActive())
+            {
+                StartFinalSequence();
+            }
+            break;
+        case SceneDebugAction::PlayLightingEvent:
+            StartObservedScare();
+            break;
         }
-        m_SignalPuzzle.ForceComplete();
-        m_FinalSequenceArmed = true;
-        if (m_FinalSequenceArmed && !m_FinalSequence.IsSequenceActive())
-        {
-            StartFinalSequence();
-        }
-    }
-    else if (debugCommand == 3)
-    {
-        StartObservedScare();
     }
 
     m_VisualTimer += deltaTime;

@@ -18,7 +18,7 @@ int main(void)
 	//FreeConsole();
 
 	// アプリケーション実行
-	Application app(SCREEN_WIDTH, SCREEN_HEIGHT);
+	Application app;
 	app.Run();
 
 	return 0;
