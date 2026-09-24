@@ -41,10 +41,59 @@ namespace
 void Hud::Init()
 {
     m_Shader.Create("shader/hudVS.hlsl", "shader/hudPS.hlsl");
-
     std::vector<VERTEX_3D> initialVertices(MaxVertices);
     m_VertexBuffer.Create(initialVertices);
     m_Vertices.reserve(MaxVertices);
+}
+
+void Hud::DrawTextureRectangle(
+    ID3D11ShaderResourceView* texture,
+    Shader& textureShader,
+    float x,
+    float y,
+    float width,
+    float height)
+{
+    if (texture == nullptr)
+    {
+        return;
+    }
+
+    const float right = x + width;
+    const float bottom = y + height;
+    const auto makeVertex = [](float px, float py, float u, float v)
+    {
+        VERTEX_3D vertex{};
+        vertex.position = Vector3(px, py, 0.0f);
+        vertex.color = Color(1.0f, 1.0f, 1.0f, 1.0f);
+        vertex.uv = Vector2(u, v);
+        return vertex;
+    };
+
+    m_Vertices.clear();
+    m_Vertices.push_back(makeVertex(x, y, 0.0f, 0.0f));
+    m_Vertices.push_back(makeVertex(right, y, 1.0f, 0.0f));
+    m_Vertices.push_back(makeVertex(x, bottom, 0.0f, 1.0f));
+    m_Vertices.push_back(makeVertex(x, bottom, 0.0f, 1.0f));
+    m_Vertices.push_back(makeVertex(right, y, 1.0f, 0.0f));
+    m_Vertices.push_back(makeVertex(right, bottom, 1.0f, 1.0f));
+    m_VertexBuffer.Modify(m_Vertices);
+
+    Renderer::SetWorldViewProjection2D();
+    Renderer::SetDepthEnable(false);
+    Renderer::SetBlendState(BS_NONE);
+    Renderer::SetUV(0.0f, 0.0f, 1.0f, 1.0f);
+    textureShader.SetGPU();
+    m_VertexBuffer.SetGPU();
+
+    ID3D11DeviceContext* context = Renderer::GetDeviceContext();
+    context->PSSetShaderResources(0, 1, &texture);
+    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    context->Draw(static_cast<UINT>(m_Vertices.size()), 0);
+
+    ID3D11ShaderResourceView* nullResource = nullptr;
+    context->PSSetShaderResources(0, 1, &nullResource);
+    Renderer::SetDepthEnable(true);
 }
 
 void Hud::Draw(

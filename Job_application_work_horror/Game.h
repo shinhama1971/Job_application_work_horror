@@ -88,6 +88,9 @@ namespace Core
         static void Draw();
         static void Uninit();
 
+        // Sceneが所有する補助カメラへ、現在の3D Objectだけを描画します。
+        void DrawWorldForAuxiliaryCamera(Camera& camera);
+
         static Game* GetInstance();
 
         Scene* GetScene() const

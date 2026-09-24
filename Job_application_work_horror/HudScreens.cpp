@@ -409,6 +409,73 @@ void Hud::DrawResult(
     Flush();
 }
 
+void Hud::DrawSurveillanceFeed(
+    ID3D11ShaderResourceView* feed,
+    Shader& textureShader,
+    float elapsedSeconds,
+    bool reportReady,
+    bool wrongReportVisible)
+{
+    const float screenWidth = static_cast<float>(Application::GetWidth());
+    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float feedWidth = (std::min)(screenWidth * 0.82f, 1040.0f);
+    const float feedHeight = feedWidth * 9.0f / 16.0f;
+    const float feedX = (screenWidth - feedWidth) * 0.5f;
+    const float feedY = (screenHeight - feedHeight) * 0.5f + 8.0f;
+
+    m_Vertices.clear();
+    AddRectangle(0.0f, 0.0f, screenWidth, screenHeight,
+        Color(0.0f, 0.004f, 0.003f, 0.94f));
+    Flush();
+
+    DrawTextureRectangle(
+        feed, textureShader, feedX, feedY, feedWidth, feedHeight);
+
+    m_Vertices.clear();
+    const Color green(0.38f, 0.94f, 0.55f, 0.96f);
+    const Color pale(0.76f, 0.88f, 0.80f, 0.94f);
+    const Color dark(0.005f, 0.018f, 0.012f, 0.88f);
+    AddRectangle(feedX - 5.0f, feedY - 5.0f,
+        feedWidth + 10.0f, 5.0f, green);
+    AddRectangle(feedX - 5.0f, feedY + feedHeight,
+        feedWidth + 10.0f, 5.0f, green);
+    AddRectangle(feedX - 5.0f, feedY, 5.0f, feedHeight, green);
+    AddRectangle(feedX + feedWidth, feedY, 5.0f, feedHeight, green);
+    AddRectangle(feedX, feedY, feedWidth, 38.0f, dark);
+    AddText(feedX + 18.0f, feedY + 10.0f,
+        "CAM 01   右側倉庫   LIVE", 2.0f, green);
+
+    for (int line = 0; line < 8; ++line)
+    {
+        const float offset = std::fmod(
+            static_cast<float>(line * 73) + elapsedSeconds * 46.0f,
+            (std::max)(feedHeight - 45.0f, 1.0f));
+        AddRectangle(feedX, feedY + 40.0f + offset,
+            feedWidth, 1.0f,
+            Color(0.38f, 0.85f, 0.52f, 0.10f));
+    }
+
+    const std::string_view prompt = wrongReportVisible
+        ? "判定不一致   映像をもう一度確認"
+        : (reportReady
+            ? (Input::IsControllerConnected()
+                ? "A 異常あり      B 異常なし"
+                : "E 異常あり      Q 異常なし")
+            : "監視映像を受信中...");
+    constexpr float promptSize = 2.5f;
+    const float promptWidth =
+        static_cast<float>(CountDisplayedCharacters(prompt)) *
+        promptSize * 6.0f;
+    AddRectangle(feedX, feedY + feedHeight + 18.0f,
+        feedWidth, 54.0f, dark);
+    AddText((screenWidth - promptWidth) * 0.5f,
+        feedY + feedHeight + 34.0f, prompt, promptSize,
+        wrongReportVisible
+            ? Color(1.0f, 0.30f, 0.22f, 0.96f)
+            : (reportReady ? pale : green));
+    Flush();
+}
+
 void Hud::DrawChapterCard(
     std::string_view chapter,
     std::string_view subtitle,

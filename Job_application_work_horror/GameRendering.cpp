@@ -10,6 +10,7 @@
 #include "ScreenDustOverlay.h"
 #include "Player.h"
 #include "DebugUI.h"
+#include "StageScene.h"
 
 #include <algorithm>
 #include <cmath>
@@ -85,8 +86,22 @@ namespace
 
 namespace Core
 {
+    void Game::DrawWorldForAuxiliaryCamera(Camera& camera)
+    {
+        for (auto& object : m_ObjectManager.GetAllObjects())
+        {
+            if (object->IsDestroy() ||
+                dynamic_cast<ScreenDustOverlay*>(object.get()) != nullptr)
+            {
+                continue;
+            }
+            object->Draw(&camera);
+        }
+    }
+
     // 影・反射などの事前パスを必要なフレームだけ更新し、
     // 本描画をPostProcessへ取り込んでからHUDとデバッグUIを重ねます。
+    //
     void Game::Draw()
     {
         Debug::UI::BeginFrame();
@@ -232,6 +247,12 @@ namespace Core
             m_Instance->m_GpuTimer.SkipPass(GpuPass::Reflection);
             m_Instance->m_WasReflectionVisible = false;
             m_Instance->m_HasReflectionCameraPose = false;
+        }
+
+        if (m_Instance->m_CurrentScene == SceneName::Stage)
+        {
+            static_cast<StageScene*>(m_Instance->m_Scene.get())
+                ->RenderOffscreen();
         }
 
         m_Instance->m_GpuTimer.BeginPass(GpuPass::MainScene, context);

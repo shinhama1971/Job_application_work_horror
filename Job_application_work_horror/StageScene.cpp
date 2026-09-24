@@ -66,6 +66,7 @@ void StageScene::Init()
     m_EvidenceScarePhase = 0;
     m_EvidenceScareTimer = 0.0f;
     m_EvidenceScareNoticeTimer = 0.0f;
+    m_SurveillanceFeedbackTimer = 0.0f;
     m_ScareLightSequence.Reset();
     m_PowerSequence.Reset();
     m_StageVisualTimer = 0.0f;
@@ -336,7 +337,7 @@ void StageScene::Init()
     // 素早い脱出と完全探索のどちらを選ぶか判断させるためです。
     FuseBox* evidenceTerminal =
         game->CreateObj<FuseBox>("Stage1EvidenceTerminal");
-    evidenceTerminal->SetManualControl("残された記録を回収する");
+    evidenceTerminal->SetManualControl("監視カメラを確認する");
     evidenceTerminal->SetManualInteractionAllowed(true);
     evidenceTerminal->SetPosition(205.0f, -90.0f, -42.0f);
     evidenceTerminal->SetRotation(Vector3(0.0f, -DirectX::XM_PIDIV2, 0.0f));
@@ -418,6 +419,10 @@ void StageScene::Init()
 
 
     m_Hud.Init();
+    m_SurveillanceShader.Create(
+        "shader/unlitTextureVS.hlsl",
+        "shader/unlitTexturePS.hlsl");
+    m_SurveillanceFeed.Init(640, 360);
     CacheObjects();
 }
 
@@ -462,7 +467,13 @@ void StageScene::Update()
     Player* player =
         m_Objects.player;
 
-    if (player == nullptr || !player->CanControl())
+    if (player == nullptr)
+    {
+        return;
+    }
+
+    UpdateEvidenceScare(*player);
+    if (!player->CanControl())
     {
         return;
     }
@@ -533,32 +544,9 @@ void StageScene::Update()
         Input::SetVibration(6, 0.14f);
     }
 
-    FuseBox* evidenceTerminal =
-        m_Objects.evidenceTerminal;
-    if (!m_EvidenceHandled && evidenceTerminal != nullptr &&
-        evidenceTerminal->IsActivated())
-    {
-        m_EvidenceHandled = true;
-        m_EvidenceScarePhase = 1;
-        m_EvidenceScareTimer = 0.0f;
-        m_EvidenceNoticeTimer = 3.2f;
-        game->RegisterEvidenceCollected();
-        player->AddBattery(8.0f);
-        Wall* evidenceMarker = m_Objects.evidenceMarker;
-        if (evidenceMarker != nullptr)
-        {
-            evidenceMarker->SetAppearance(
-                Color(0.08f, 0.18f, 0.10f, 1.0f),
-                Color(0.16f, 0.52f, 0.22f, 1.0f),
-                44.0f);
-        }
-        game->GetPostProcess()->TriggerBloomPulse(0.42f, 0.20f);
-        Input::SetVibration(4, 0.09f);
-    }
     UpdateCorridorLoop(*player);
     UpdateEntranceThresholdEvent(*player);
     UpdateStorageScare(*player);
-    UpdateEvidenceScare(*player);
     UpdateScareLightSequence();
     UpdatePowerRestoreSequence();
     UpdateExitPowerSequence();
@@ -704,6 +692,7 @@ void StageScene::Uninit()
     Core::Game::GetInstance()->GetPostProcess()->SetLensDistortionStrength(0.20f);
     Core::Game::GetInstance()->GetPostProcess()->SetFilmGradeStrength(0.55f);
     Core::Game::GetInstance()->GetPostProcess()->SetLensDirtStrength(0.10f);
+    m_SurveillanceFeed.Uninit();
     m_Hud.Uninit();
 
     Core::Game* game = Core::Game::GetInstance();

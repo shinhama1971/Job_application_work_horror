@@ -182,71 +182,104 @@ void StageScene::UpdateStorageScare(Player& player)
 
 void StageScene::UpdateEvidenceScare(Player& player)
 {
+    FuseBox* terminal = m_Objects.evidenceTerminal;
+    if (m_EvidenceScarePhase == 0)
+    {
+        if (m_EvidenceHandled || terminal == nullptr ||
+            !terminal->IsActivated())
+        {
+            return;
+        }
+
+        ShadowMan* shadow = m_Objects.evidenceShadow;
+        if (shadow == nullptr)
+        {
+            m_EvidenceScarePhase = 3;
+            return;
+        }
+
+        // 監視映像の中で初めて異常を見せ、端末を調べる行為を遊びへつなげます。
+        m_EvidenceScarePhase = 1;
+        m_EvidenceScareTimer = 0.0f;
+        m_SurveillanceFeedbackTimer = 0.0f;
+        player.SetCanControl(false);
+        shadow->SetPosition(150.0f, -99.0f, -148.0f);
+        shadow->SetActive(true);
+        shadow->EnableGazeScare(45.0f);
+
+        Core::Game* game = Core::Game::GetInstance();
+        game->PlayAudioCue(SOUND_CUE_POWER, 0.72f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.12f, 0.20f);
+        return;
+    }
+
     if (m_EvidenceScarePhase != 1)
     {
         return;
     }
 
-    m_EvidenceScareTimer += Application::GetDeltaTime();
-    if (m_EvidenceScareTimer < 0.85f)
+    const float deltaTime = Application::GetDeltaTime();
+    m_EvidenceScareTimer += deltaTime;
+    m_SurveillanceFeedbackTimer = (std::max)(
+        0.0f, m_SurveillanceFeedbackTimer - deltaTime);
+    if (m_EvidenceScareTimer < 0.65f ||
+        m_SurveillanceFeedbackTimer > 0.0f)
     {
         return;
     }
 
-    m_EvidenceScarePhase = 2;
-    const Vector3 position = player.GetPosition();
-    if (position.x < 145.0f || std::abs(position.z + 42.0f) > 72.0f)
+    const bool reportedAnomaly =
+        Input::GetKeyTrigger(VK_E) ||
+        Input::GetButtonTrigger(XINPUT_A);
+    const bool reportedNormal =
+        Input::GetKeyTrigger(VK_Q) ||
+        Input::GetButtonTrigger(XINPUT_B);
+    if (reportedNormal)
     {
-        m_EvidenceScarePhase = 3;
+        Core::Game* game = Core::Game::GetInstance();
+        game->RegisterPuzzleMistake();
+        m_SurveillanceFeedbackTimer = 1.35f;
+        game->PlayAudioCue(SOUND_CUE_DOOR, 0.54f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.22f, 0.24f);
+        Input::SetVibration(5, 0.11f);
+        return;
+    }
+    if (!reportedAnomaly)
+    {
         return;
     }
 
+    m_EvidenceHandled = true;
+    m_EvidenceScarePhase = 3;
+    m_EvidenceNoticeTimer = 3.2f;
+    m_EvidenceScareNoticeTimer = 1.8f;
+    player.SetCanControl(true);
+    player.AddBattery(8.0f);
     Core::Game* game = Core::Game::GetInstance();
     ShadowMan* shadow = m_Objects.evidenceShadow;
-    if (shadow == nullptr)
+    if (shadow != nullptr)
     {
-        m_EvidenceScarePhase = 3;
-        return;
+        shadow->SetActive(false);
     }
-
-    // 端末へ向いているプレイヤーの背後に置き、操作後に振り返ったときだけ見せます。
-    shadow->SetPosition(148.0f, -99.0f, -42.0f);
-    shadow->SetActive(true);
-    shadow->EnableGazeScare(5.4f);
-    m_EvidenceScareNoticeTimer = 2.0f;
-
+    Wall* marker = m_Objects.evidenceMarker;
+    if (marker != nullptr)
+    {
+        marker->SetAppearance(
+            Color(0.08f, 0.18f, 0.10f, 1.0f),
+            Color(0.16f, 0.52f, 0.22f, 1.0f),
+            44.0f);
+    }
     CeilingLight* roomLight = m_Objects.CeilingLightAt(3);
     if (roomLight != nullptr)
     {
-        roomLight->TriggerEventFlicker(0.56f, 0.68f);
+        roomLight->TriggerEventFlicker(0.84f, 0.92f);
     }
-    game->PlayAudioCue(SOUND_CUE_DOOR, 0.62f);
-    game->GetPostProcess()->TriggerHorrorPulse(0.12f, 0.20f);
-
-    shadow->SetOnObserved([this]()
-    {
-        Core::Game* currentGame = Core::Game::GetInstance();
-        currentGame->RegisterAnomalyHandled();
-        m_EvidenceScarePhase = 3;
-        m_EvidenceScareNoticeTimer = 1.8f;
-
-        ShadowMan* activeShadow =
-            m_Objects.evidenceShadow;
-        if (activeShadow != nullptr)
-        {
-            activeShadow->SetActive(false);
-        }
-
-        CeilingLight* light =
-            m_Objects.CeilingLightAt(3);
-        if (light != nullptr)
-        {
-            light->TriggerEventFlicker(0.84f, 0.92f);
-        }
-        currentGame->PlayAudioCue(SOUND_CUE_SCARE, 0.76f);
-        currentGame->GetPostProcess()->TriggerHorrorPulse(0.34f, 0.32f);
-        Input::SetVibration(9, 0.19f);
-    });
+    game->RegisterAnomalyHandled();
+    game->RegisterEvidenceCollected();
+    game->PlayAudioCue(SOUND_CUE_SCARE, 0.76f);
+    game->GetPostProcess()->TriggerHorrorPulse(0.34f, 0.32f);
+    game->GetPostProcess()->TriggerBloomPulse(0.42f, 0.20f);
+    Input::SetVibration(9, 0.19f);
 }
 
 void StageScene::UpdateCorridorLoop(Player& player)

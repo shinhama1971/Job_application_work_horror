@@ -26,15 +26,71 @@
 
 using namespace DirectX::SimpleMath;
 
+void StageScene::RenderOffscreen()
+{
+    if (m_EvidenceScarePhase != 1)
+    {
+        return;
+    }
+
+    Core::Game* game = Core::Game::GetInstance();
+    Camera* camera = game->GetCamera();
+    if (camera == nullptr)
+    {
+        return;
+    }
+
+    // 右側倉庫を天井付近から見下ろし、人影を背景から判別できる画角にします。
+    const Vector3 cameraPosition(150.0f, -57.0f, -82.0f);
+    const Vector3 cameraTarget(150.0f, -82.0f, -150.0f);
+    const Matrix view = Matrix::CreateLookAt(
+        cameraPosition,
+        cameraTarget,
+        Vector3::Up);
+    const Matrix projection = Matrix::CreatePerspectiveFieldOfView(
+        DirectX::XMConvertToRadians(56.0f),
+        16.0f / 9.0f,
+        1.0f,
+        420.0f);
+
+    m_SurveillanceFeed.SetRenderTarget();
+    m_SurveillanceFeed.Clear(0.005f, 0.012f, 0.008f, 1.0f);
+    camera->SetOverrideMatrices(view, projection);
+    game->DrawWorldForAuxiliaryCamera(*camera);
+    camera->ClearOverrideMatrices();
+    Renderer::SetBackBufferRenderTarget();
+}
+
 void StageScene::Draw(Camera* camera)
 {
-    (void)camera;
-
     Core::Game* game = Core::Game::GetInstance();
     Player* player = m_Objects.player;
 
     if (player == nullptr)
     {
+        return;
+    }
+
+    if (m_EvidenceScarePhase == 1)
+    {
+        m_Hud.DrawSurveillanceFeed(
+            m_SurveillanceFeed.GetSRV(),
+            m_SurveillanceShader,
+            m_EvidenceScareTimer,
+            m_EvidenceScareTimer >= 0.65f,
+            m_SurveillanceFeedbackTimer > 0.0f);
+        if (game->IsPaused())
+        {
+            m_Hud.DrawPause(
+                game->GetBrightnessLevel(),
+                game->GetEffectLevel(),
+                game->GetLookSensitivityLevel(),
+                game->GetVolumeLevel(),
+                game->GetPauseSettingIndex(),
+                1,
+                game->GetRunTimeSeconds(),
+                game->GetCaughtCount());
+        }
         return;
     }
 
@@ -79,7 +135,7 @@ void StageScene::Draw(Camera* camera)
     }
     else if (m_EvidenceNoticeTimer > 0.0f)
     {
-        objectiveText = "残された記録を回収した 1 / 3";
+        objectiveText = "監視映像の異常を報告した 1 / 1";
     }
     else if (m_StorageScareNoticeTimer > 0.0f)
     {

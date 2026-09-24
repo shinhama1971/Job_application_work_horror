@@ -11,6 +11,7 @@
 #include "ScareLightSequence.h"
 #include "StagePowerSequence.h"
 #include "ExitOmenSequence.h"
+#include "RenderTexture.h"
 
 #include <array>
 #include <cstddef>
@@ -83,6 +84,8 @@ private:
     // InteractionSystemは視線先、Hudは現在目的と操作ヒントを担当します。
     InteractionSystem m_InteractionSystem;
     Hud m_Hud;
+    Graphics::RenderTexture m_SurveillanceFeed;
+    Shader m_SurveillanceShader;
     ScareLightSequence m_ScareLightSequence;
     StagePowerSequence m_PowerSequence;
     ExitOmenSequence m_ExitOmenSequence;
@@ -108,6 +111,7 @@ private:
     int m_EvidenceScarePhase = 0;
     float m_EvidenceScareTimer = 0.0f;
     float m_EvidenceScareNoticeTimer = 0.0f;
+    float m_SurveillanceFeedbackTimer = 0.0f;
     float m_StageVisualTimer = 0.0f;
     float m_ProgressHintTimer = 0.0f;
 public:
@@ -115,5 +119,6 @@ public:
     ~StageScene();
 
     void Update() override;
+    void RenderOffscreen();
     void Draw(Camera* camera) override;
 };
