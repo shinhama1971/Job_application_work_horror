@@ -87,6 +87,17 @@ Application
 `Stage2Scene` に残るループ番号、最終イベント許可、出口状態はステージ進行そのものなので、
 別クラスへ移さず統括責務として保持します。
 
+### SceneからのObject参照
+
+各Sceneは `Init` の最後に一度だけ名前で `Game::RequireObj<T>` を呼び、以後使うObjectの非所有ポインタを
+`StageObjects` / `Stage2Objects` にまとめて保持します。
+
+- 毎フレームの文字列ハッシュ検索をなくします。
+- 名前の打ち間違いや生成漏れは、実行中に黙って `nullptr` になるのではなく、起動直後にObject名を示して検出します。
+- 2面の照明は `Stage2Light` 列挙型で指定し、演出テーブルに名前文字列を持たせません。
+- 保持するObjectはどれもSceneの終了までObjectManagerから破棄されないため、ポインタが無効になることはありません
+  （名前付き `ShadowMan` は期限切れで非表示になるだけで破棄されません）。
+
 ## PlayerとGround
 
 ### Player

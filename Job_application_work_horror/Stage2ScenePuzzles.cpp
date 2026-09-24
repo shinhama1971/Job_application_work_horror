@@ -34,8 +34,7 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         m_QuietRecovery.Reset();
         m_NoiseThreatSystem.SetThreat((std::max)(0.0f,
             m_NoiseThreatSystem.GetThreat() - deltaTime * 0.8f));
-        ShadowMan* noiseShadow = Core::Game::GetInstance()->GetObj<ShadowMan>(
-            "Stage2NoiseShadow");
+        ShadowMan* noiseShadow = m_Objects.noiseShadow;
         if (noiseShadow != nullptr)
         {
             noiseShadow->SetActive(false);
@@ -49,8 +48,7 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
     {
         m_NoiseThreatSystem.SetThreat((std::max)(0.0f,
             m_NoiseThreatSystem.GetThreat() - deltaTime * 0.8f));
-        ShadowMan* noiseShadow = Core::Game::GetInstance()->GetObj<ShadowMan>(
-            "Stage2NoiseShadow");
+        ShadowMan* noiseShadow = m_Objects.noiseShadow;
         if (noiseShadow != nullptr)
         {
             noiseShadow->SetActive(false);
@@ -78,7 +76,7 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
 
     Core::Game* game = Core::Game::GetInstance();
     ShadowMan* noiseShadow =
-        game->GetObj<ShadowMan>("Stage2NoiseShadow");
+        m_Objects.noiseShadow;
     if (noiseShadow != nullptr && noiseShadow->IsActive())
     {
         Vector3 toShadow = noiseShadow->GetPosition() - player.GetPosition();
@@ -149,9 +147,8 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         noiseShadow->EnableGazeScare(7.5f);
         noiseShadow->SetOnObserved([this]()
         {
-            Core::Game* currentGame = Core::Game::GetInstance();
             ShadowMan* currentShadow =
-                currentGame->GetObj<ShadowMan>("Stage2NoiseShadow");
+                m_Objects.noiseShadow;
             if (currentShadow != nullptr)
             {
                 currentShadow->SetActive(false);
@@ -192,14 +189,13 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
     }
 
     const float playerZ = player.GetPosition().z;
-    const char* reactionLightName = playerZ < -55.0f
-        ? "Stage2Light1"
+    const Stage2Light reactionLightId = playerZ < -55.0f
+        ? Stage2Light::Light1
         : (playerZ < 18.0f
-            ? "Stage2Light2"
-            : (playerZ < 88.0f ? "Stage2Light3" : "CeilingLight4"));
+            ? Stage2Light::Light2
+            : (playerZ < 88.0f ? Stage2Light::Light3 : Stage2Light::DoorLight));
 
-    CeilingLight* reactionLight =
-        game->GetObj<CeilingLight>(reactionLightName);
+    CeilingLight* reactionLight = m_Objects.Light(reactionLightId);
     if (reactionLight != nullptr)
     {
         reactionLight->TriggerEventFlicker(
@@ -241,20 +237,20 @@ void Stage2Scene::AdvanceLoop(Player& player)
     m_NoiseThreatSystem.SetStalkerCooldown(2.0f);
     m_NoiseThreatSystem.SetStalkerNoticeTimer(0.0f);
     ShadowMan* noiseShadow =
-        game->GetObj<ShadowMan>("Stage2NoiseShadow");
+        m_Objects.noiseShadow;
     if (noiseShadow != nullptr)
     {
         noiseShadow->SetActive(false);
     }
     FuseBox* confirmationPanel =
-        game->GetObj<FuseBox>("Stage2ConfirmationPanel");
+        m_Objects.confirmationPanel;
     if (confirmationPanel != nullptr)
     {
         confirmationPanel->ResetActivation();
         confirmationPanel->SetManualInteractionAllowed(false);
     }
     player.SetPosition(Vector3(0.0f, -99.0f, -125.0f));
-    Door* loopDoor = game->GetObj<Door>("Stage2Door");
+    Door* loopDoor = m_Objects.door;
     if (loopDoor != nullptr)
     {
         loopDoor->ResetClosed(m_LoopCount);
@@ -263,14 +259,8 @@ void Stage2Scene::AdvanceLoop(Player& player)
         loopDoor->SetLocked(m_LoopCount > 0);
     }
 
-    constexpr const char* corridorLightNames[] =
+    for (CeilingLight* light : m_Objects.lights)
     {
-        "Stage2Light1", "Stage2Light2",
-        "Stage2Light3", "CeilingLight4"
-    };
-    for (const char* lightName : corridorLightNames)
-    {
-        CeilingLight* light = game->GetObj<CeilingLight>(lightName);
         if (light != nullptr)
         {
             light->SetForcedOff(false);
@@ -287,16 +277,9 @@ void Stage2Scene::AdvanceLoop(Player& player)
         0.26f);
     Input::SetVibration(6 + m_LoopCount * 3, 0.18f);
 
-    const char* cycleMarkNames[] =
-    {
-        "Stage2CycleMark1",
-        "Stage2CycleMark2",
-        "Stage2CycleMark3"
-    };
     for (int markIndex = 0; markIndex < 3; ++markIndex)
     {
-        Wall* cycleMark =
-            game->GetObj<Wall>(cycleMarkNames[markIndex]);
+        Wall* cycleMark = m_Objects.cycleMarks[static_cast<std::size_t>(markIndex)];
         if (cycleMark == nullptr)
         {
             continue;
@@ -315,22 +298,22 @@ void Stage2Scene::AdvanceLoop(Player& player)
         }
     }
 
-    Wall* loopMark = game->GetObj<Wall>("Stage2LoopMark");
-    Wall* portrait = game->GetObj<Wall>("Stage2Portrait");
-    CeilingLight* light2 = game->GetObj<CeilingLight>("Stage2Light2");
-    CeilingLight* light3 = game->GetObj<CeilingLight>("Stage2Light3");
+    Wall* loopMark = m_Objects.loopMark;
+    Wall* portrait = m_Objects.portrait;
+    CeilingLight* light2 = m_Objects.Light(Stage2Light::Light2);
+    CeilingLight* light3 = m_Objects.Light(Stage2Light::Light3);
 
     if (m_LoopCount == 1)
     {
         SetFalseDoorState(true, false);
         CeilingLight* failingLight =
-            game->GetObj<CeilingLight>("Stage2Light2");
+            m_Objects.Light(Stage2Light::Light2);
         if (failingLight != nullptr)
         {
             failingLight->SetFaulted(true);
         }
         RevealScratchPieces(0, 3, 0.10f);
-        BatteryItem* battery = game->GetObj<BatteryItem>("Stage2Battery");
+        BatteryItem* battery = m_Objects.battery;
         if (battery != nullptr)
         {
             battery->SetActive(true);
@@ -351,9 +334,9 @@ void Stage2Scene::AdvanceLoop(Player& player)
     {
         SetFalseDoorState(false, false);
         CeilingLight* entranceLight =
-            game->GetObj<CeilingLight>("Stage2Light1");
+            m_Objects.Light(Stage2Light::Light1);
         CeilingLight* farLight =
-            game->GetObj<CeilingLight>("Stage2Light3");
+            m_Objects.Light(Stage2Light::Light3);
         if (entranceLight != nullptr)
         {
             entranceLight->SetFaulted(true);
@@ -373,7 +356,7 @@ void Stage2Scene::AdvanceLoop(Player& player)
         {
             light3->SetEmergencyLight(true, 7.1f);
         }
-        ShadowMan* shadow = game->GetObj<ShadowMan>("Stage2Shadow");
+        ShadowMan* shadow = m_Objects.shadow;
         if (shadow != nullptr)
         {
             shadow->SetActive(true);
@@ -392,7 +375,7 @@ void Stage2Scene::AdvanceLoop(Player& player)
         // 最終周では三つの信号パネルを復旧する必要があります。
         // 廊下を探索して表示された色順を正しく入力した後だけ追跡を開始します。
         m_FinalSequenceArmed = false;
-        CeilingLight* doorLight = game->GetObj<CeilingLight>("CeilingLight4");
+        CeilingLight* doorLight = m_Objects.Light(Stage2Light::DoorLight);
         if (doorLight != nullptr)
         {
             doorLight->TriggerEventFlicker(1.5f, 0.94f);
@@ -406,8 +389,7 @@ void Stage2Scene::ConfigureClockForLoop()
     m_ClockAnomaly.ConfigureForLoop(m_LoopCount);
     if (m_LoopCount >= 3)
     {
-        Core::Game* game = Core::Game::GetInstance();
-        Wall* face = game->GetObj<Wall>("Stage2ClockFace");
+        Wall* face = m_Objects.clockFace;
         if (face != nullptr)
         {
             face->SetAppearance(
@@ -427,9 +409,8 @@ void Stage2Scene::UpdateClock(float deltaTime)
     const float displayedMinuteAngle =
         m_ClockAnomaly.GetDisplayedMinuteAngle(m_LoopCount);
 
-    Core::Game* game = Core::Game::GetInstance();
-    Wall* hourHand = game->GetObj<Wall>("Stage2ClockHourHand");
-    Wall* minuteHand = game->GetObj<Wall>("Stage2ClockMinuteHand");
+    Wall* hourHand = m_Objects.clockHourHand;
+    Wall* minuteHand = m_Objects.clockMinuteHand;
     if (hourHand != nullptr)
     {
         hourHand->SetRotation(Vector3(displayedHourAngle, 0.0f, 0.0f));
@@ -465,7 +446,7 @@ void Stage2Scene::UpdateClockObservation()
         return;
     }
 
-    Player* player = game->GetObj<Player>("Player");
+    Player* player = m_Objects.player;
     if (m_LoopCount == 2 && player != nullptr && player->IsFlashlightOn())
     {
         RegisterPuzzleMistake(2);
@@ -479,7 +460,7 @@ void Stage2Scene::UpdateClockObservation()
         m_NoticeTimer = 2.8f;
 
         CeilingLight* doorLight =
-            game->GetObj<CeilingLight>("CeilingLight4");
+            m_Objects.Light(Stage2Light::DoorLight);
         if (doorLight != nullptr)
         {
             doorLight->TriggerEventFlicker(0.90f, 0.76f);
@@ -488,7 +469,7 @@ void Stage2Scene::UpdateClockObservation()
     }
 
     CeilingLight* clockLight =
-        game->GetObj<CeilingLight>("Stage2Light2");
+        m_Objects.Light(Stage2Light::Light2);
     if (clockLight != nullptr)
     {
         clockLight->TriggerEventFlicker(
@@ -510,8 +491,8 @@ void Stage2Scene::RegisterPuzzleMistake(int type)
 
     Core::Game* game = Core::Game::GetInstance();
     game->RegisterPuzzleMistake();
-    CeilingLight* warningLight = game->GetObj<CeilingLight>(
-        type == 1 ? "Stage2Light3" : "Stage2Light2");
+    CeilingLight* warningLight = m_Objects.Light(
+        type == 1 ? Stage2Light::Light3 : Stage2Light::Light2);
     const int mistakeCount = m_PuzzleFeedback.GetMistakeCount();
     const float mistakeRate = static_cast<float>(mistakeCount) / 3.0f;
     if (warningLight != nullptr)
@@ -544,21 +525,13 @@ void Stage2Scene::ResetSignalPuzzle()
         m_FinalSequenceArmed = false;
     }
 
-    Core::Game* game = Core::Game::GetInstance();
-    ShadowMan* signalShadow = game->GetObj<ShadowMan>("Stage2Shadow");
+    ShadowMan* signalShadow = m_Objects.shadow;
     if (signalShadow != nullptr && !m_FinalSequence.IsPursuitActive())
     {
         signalShadow->SetActive(false);
     }
-    constexpr const char* terminalNames[] =
+    for (FuseBox* terminal : m_Objects.signalTerminals)
     {
-        "Stage2SignalTerminalBlue",
-        "Stage2SignalTerminalAmber",
-        "Stage2SignalTerminalRed"
-    };
-    for (const char* terminalName : terminalNames)
-    {
-        FuseBox* terminal = game->GetObj<FuseBox>(terminalName);
         if (terminal != nullptr)
         {
             terminal->ResetActivation();
@@ -571,18 +544,6 @@ void Stage2Scene::ResetSignalPuzzle()
 void Stage2Scene::UpdateSignalPuzzle()
 {
     Core::Game* game = Core::Game::GetInstance();
-    constexpr const char* terminalNames[] =
-    {
-        "Stage2SignalTerminalBlue",
-        "Stage2SignalTerminalAmber",
-        "Stage2SignalTerminalRed"
-    };
-    constexpr const char* markerNames[] =
-    {
-        "Stage2SignalMarkerBlue",
-        "Stage2SignalMarkerAmber",
-        "Stage2SignalMarkerRed"
-    };
     const Color baseDiffuse[] =
     {
         Color(0.015f, 0.055f, 0.13f, 1.0f),
@@ -600,7 +561,7 @@ void Stage2Scene::UpdateSignalPuzzle()
         m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete();
     for (int signalIndex = 0; signalIndex < 3; ++signalIndex)
     {
-        FuseBox* terminal = game->GetObj<FuseBox>(terminalNames[signalIndex]);
+        FuseBox* terminal = m_Objects.signalTerminals[static_cast<std::size_t>(signalIndex)];
         if (terminal != nullptr)
         {
             terminal->SetManualInteractionAllowed(puzzleActive);
@@ -611,7 +572,7 @@ void Stage2Scene::UpdateSignalPuzzle()
     {
         for (int signalIndex = 0; signalIndex < 3; ++signalIndex)
         {
-            FuseBox* terminal = game->GetObj<FuseBox>(terminalNames[signalIndex]);
+            FuseBox* terminal = m_Objects.signalTerminals[static_cast<std::size_t>(signalIndex)];
             if (terminal == nullptr || !terminal->IsActivated() ||
                 m_SignalPuzzle.IsAccepted(signalIndex))
             {
@@ -647,9 +608,9 @@ void Stage2Scene::UpdateSignalPuzzle()
             Input::SetVibration(
                 4 + m_SignalPuzzle.GetStep() * 2, 0.10f);
 
-            CeilingLight* responseLight = game->GetObj<CeilingLight>(
-                signalIndex == 0 ? "Stage2Light3" :
-                signalIndex == 1 ? "Stage2Light2" : "Stage2Light1");
+            CeilingLight* responseLight = m_Objects.Light(
+                signalIndex == 0 ? Stage2Light::Light3 :
+                signalIndex == 1 ? Stage2Light::Light2 : Stage2Light::Light1);
             if (responseLight != nullptr)
             {
                 responseLight->TriggerEventFlicker(0.54f, 0.48f);
@@ -663,15 +624,13 @@ void Stage2Scene::UpdateSignalPuzzle()
                 ApplySignalLightingState();
                 game->RegisterAnomalyHandled();
                 ShadowMan* signalShadow =
-                    game->GetObj<ShadowMan>("Stage2Shadow");
+                    m_Objects.shadow;
                 if (signalShadow != nullptr)
                 {
                     signalShadow->SetActive(false);
                 }
-                for (const char* terminalName : terminalNames)
+                for (FuseBox* completedTerminal : m_Objects.signalTerminals)
                 {
-                    FuseBox* completedTerminal =
-                        game->GetObj<FuseBox>(terminalName);
                     if (completedTerminal != nullptr)
                     {
                         completedTerminal->SetManualInteractionAllowed(false);
@@ -682,9 +641,9 @@ void Stage2Scene::UpdateSignalPuzzle()
             }
             else
             {
-                Player* player = game->GetObj<Player>("Player");
+                Player* player = m_Objects.player;
                 ShadowMan* signalShadow =
-                    game->GetObj<ShadowMan>("Stage2Shadow");
+                    m_Objects.shadow;
                 if (player != nullptr && signalShadow != nullptr)
                 {
                     const Vector3 playerPosition = player->GetPosition();
@@ -718,7 +677,7 @@ void Stage2Scene::UpdateSignalPuzzle()
                             Core::Game* currentGame =
                                 Core::Game::GetInstance();
                             ShadowMan* currentShadow =
-                                currentGame->GetObj<ShadowMan>("Stage2Shadow");
+                                m_Objects.shadow;
                             if (currentShadow != nullptr)
                             {
                                 currentShadow->SetActive(false);
@@ -739,7 +698,7 @@ void Stage2Scene::UpdateSignalPuzzle()
     const float pulse = std::sin(m_VisualTimer * 5.4f) * 0.5f + 0.5f;
     for (int signalIndex = 0; signalIndex < 3; ++signalIndex)
     {
-        Wall* marker = game->GetObj<Wall>(markerNames[signalIndex]);
+        Wall* marker = m_Objects.signalMarkers[static_cast<std::size_t>(signalIndex)];
         if (marker == nullptr)
         {
             continue;
@@ -773,19 +732,17 @@ void Stage2Scene::ApplySignalLightingState()
         return;
     }
 
-    Core::Game* game = Core::Game::GetInstance();
-    constexpr const char* restorationLights[] =
+    constexpr Stage2Light restorationLights[] =
     {
-        "Stage2Light3",
-        "Stage2Light2",
-        "Stage2Light1"
+        Stage2Light::Light3,
+        Stage2Light::Light2,
+        Stage2Light::Light1
     };
     constexpr float flickerOffsets[] = { 2.8f, 1.4f, 0.2f };
 
     for (int lightIndex = 0; lightIndex < 3; ++lightIndex)
     {
-        CeilingLight* light =
-            game->GetObj<CeilingLight>(restorationLights[lightIndex]);
+        CeilingLight* light = m_Objects.Light(restorationLights[lightIndex]);
         if (light == nullptr)
         {
             continue;
@@ -799,7 +756,7 @@ void Stage2Scene::ApplySignalLightingState()
         light->SetEmergencyLight(!restored, flickerOffsets[lightIndex]);
     }
 
-    CeilingLight* exitLight = game->GetObj<CeilingLight>("CeilingLight4");
+    CeilingLight* exitLight = m_Objects.Light(Stage2Light::DoorLight);
     if (exitLight != nullptr)
     {
         exitLight->SetForcedOff(false);
@@ -823,8 +780,8 @@ void Stage2Scene::UpdateSignalStalker()
     }
 
     Core::Game* game = Core::Game::GetInstance();
-    Player* player = game->GetObj<Player>("Player");
-    ShadowMan* shadow = game->GetObj<ShadowMan>("Stage2Shadow");
+    Player* player = m_Objects.player;
+    ShadowMan* shadow = m_Objects.shadow;
     if (player == nullptr || shadow == nullptr || !shadow->IsActive())
     {
         return;
@@ -857,17 +814,16 @@ void Stage2Scene::UpdateSignalStalker()
 void Stage2Scene::SetFalseDoorState(bool visible, bool rightSide)
 {
     m_FalseDoorAnomaly.SetVisualState(visible, rightSide);
-    Core::Game* game = Core::Game::GetInstance();
     const float surfaceX = rightSide ? 39.3f : -39.3f;
     const float frameX = rightSide ? 39.0f : -39.0f;
     const float handleX = rightSide ? 38.3f : -38.3f;
     const float centerZ = rightSide ? -88.0f : 70.0f;
 
-    Wall* panel = game->GetObj<Wall>("Stage2FalseDoorPanel");
-    Wall* frameNear = game->GetObj<Wall>("Stage2FalseDoorFrameNear");
-    Wall* frameFar = game->GetObj<Wall>("Stage2FalseDoorFrameFar");
-    Wall* frameTop = game->GetObj<Wall>("Stage2FalseDoorFrameTop");
-    Wall* handle = game->GetObj<Wall>("Stage2FalseDoorHandle");
+    Wall* panel = m_Objects.falseDoorPanel;
+    Wall* frameNear = m_Objects.falseDoorFrameNear;
+    Wall* frameFar = m_Objects.falseDoorFrameFar;
+    Wall* frameTop = m_Objects.falseDoorFrameTop;
+    Wall* handle = m_Objects.falseDoorHandle;
     if (panel == nullptr || frameNear == nullptr || frameFar == nullptr ||
         frameTop == nullptr || handle == nullptr)
     {
@@ -880,12 +836,8 @@ void Stage2Scene::SetFalseDoorState(bool visible, bool rightSide)
     frameTop->SetPosition(frameX, -54.0f, centerZ);
     handle->SetPosition(handleX, -76.0f, centerZ - 8.0f);
 
-    for (const char* name : Stage2FalseDoorNames)
+    for (Wall* piece : { panel, frameNear, frameFar, frameTop, handle })
     {
-        Wall* piece = game->GetObj<Wall>(name);
-        if (piece != nullptr)
-        {
-            piece->SetVisible(visible);
-        }
+        piece->SetVisible(visible);
     }
 }

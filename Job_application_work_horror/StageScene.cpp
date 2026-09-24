@@ -418,13 +418,49 @@ void StageScene::Init()
 
 
     m_Hud.Init();
+    CacheObjects();
+}
+
+// 以後の更新で使うObjectをここで一度だけ名前検索し、見つからなければ起動時に通知します。
+void StageScene::CacheObjects()
+{
+    Core::Game* game = Core::Game::GetInstance();
+    StageObjects& objects = m_Objects;
+
+    objects.player = game->RequireObj<Player>("Player");
+    objects.fuseWatcher = game->RequireObj<ShadowMan>("Stage1FuseWatcher");
+    objects.storageShadow = game->RequireObj<ShadowMan>("Stage1StorageShadow");
+    objects.evidenceShadow = game->RequireObj<ShadowMan>("Stage1EvidenceShadow");
+    objects.exitOmen = game->RequireObj<ShadowMan>("Stage1ExitOmen");
+    objects.emergencyCharger = game->RequireObj<FuseBox>("Stage1EmergencyCharger");
+    objects.evidenceTerminal = game->RequireObj<FuseBox>("Stage1EvidenceTerminal");
+    objects.exitPowerPanel = game->RequireObj<FuseBox>("ExitPowerPanel");
+    objects.evidenceMarker = game->RequireObj<Wall>("Stage1EvidenceMarker");
+    objects.exitSign = game->RequireObj<Wall>("PropStage1ExitSign");
+    objects.doorIndicator = game->RequireObj<Wall>("PropDoorIndicator");
+    objects.loopDoor = game->RequireObj<Door>("Door");
+    objects.exitDoor = game->RequireObj<Door>("Stage1ExitDoor");
+    objects.exitTrigger = game->RequireObj<ExitTrigger>("ExitTrigger");
+    objects.secondFuse = game->RequireObj<Item>("Item2");
+    objects.thirdFuse = game->RequireObj<Item>("Item3");
+
+    for (int markerIndex = 0; markerIndex < static_cast<int>(objects.loopMarkers.size()); ++markerIndex)
+    {
+        objects.loopMarkers[static_cast<std::size_t>(markerIndex)] = game->RequireObj<Wall>(
+            "PropLoopMarker" + std::to_string(markerIndex + 1));
+    }
+    for (int number = 1; number <= StageObjects::CeilingLightCount; ++number)
+    {
+        objects.ceilingLights[static_cast<std::size_t>(number - 1)] =
+            game->RequireObj<CeilingLight>("CeilingLight" + std::to_string(number));
+    }
 }
 
 // ヒューズ数と電力状態を基準に目的表示とイベント段階を更新します。
 void StageScene::Update()
 {
     Player* player =
-        Core::Game::GetInstance()->GetObj<Player>("Player");
+        m_Objects.player;
 
     if (player == nullptr || !player->CanControl())
     {
@@ -471,13 +507,13 @@ void StageScene::Update()
 
     if (game->IsPowerRestored())
     {
-        ShadowMan* watcher = game->GetObj<ShadowMan>("Stage1FuseWatcher");
+        ShadowMan* watcher = m_Objects.fuseWatcher;
         if (watcher != nullptr) watcher->SetActive(false);
         m_FuseWatcherState = 0;
     }
 
     FuseBox* emergencyCharger =
-        game->GetObj<FuseBox>("Stage1EmergencyCharger");
+        m_Objects.emergencyCharger;
     if (!m_ChargerHandled && emergencyCharger != nullptr &&
         emergencyCharger->IsActivated())
     {
@@ -488,7 +524,7 @@ void StageScene::Update()
         StartFuseWatcher(2);
 
         CeilingLight* chargerLight =
-            game->GetObj<CeilingLight>("CeilingLight2");
+            m_Objects.CeilingLightAt(2);
         if (chargerLight != nullptr)
         {
             chargerLight->TriggerEventFlicker(0.92f, 0.84f);
@@ -498,7 +534,7 @@ void StageScene::Update()
     }
 
     FuseBox* evidenceTerminal =
-        game->GetObj<FuseBox>("Stage1EvidenceTerminal");
+        m_Objects.evidenceTerminal;
     if (!m_EvidenceHandled && evidenceTerminal != nullptr &&
         evidenceTerminal->IsActivated())
     {
@@ -508,7 +544,7 @@ void StageScene::Update()
         m_EvidenceNoticeTimer = 3.2f;
         game->RegisterEvidenceCollected();
         player->AddBattery(8.0f);
-        Wall* evidenceMarker = game->GetObj<Wall>("Stage1EvidenceMarker");
+        Wall* evidenceMarker = m_Objects.evidenceMarker;
         if (evidenceMarker != nullptr)
         {
             evidenceMarker->SetAppearance(
@@ -528,8 +564,8 @@ void StageScene::Update()
     UpdateExitPowerSequence();
     UpdateExitOmen(*player);
 
-    Door* stageExitDoor = game->GetObj<Door>("Stage1ExitDoor");
-    ExitTrigger* stageExit = game->GetObj<ExitTrigger>("ExitTrigger");
+    Door* stageExitDoor = m_Objects.exitDoor;
+    ExitTrigger* stageExit = m_Objects.exitTrigger;
     const bool exitPowerReady = m_PowerSequence.IsExitComplete();
     if (stageExitDoor != nullptr)
     {
@@ -545,7 +581,7 @@ void StageScene::Update()
         }
     }
 
-    Wall* stageExitSign = game->GetObj<Wall>("PropStage1ExitSign");
+    Wall* stageExitSign = m_Objects.exitSign;
     if (stageExitSign != nullptr)
     {
         const float pulse = 0.78f +
@@ -567,7 +603,7 @@ void StageScene::Update()
         }
     }
 
-    Wall* exitIndicator = game->GetObj<Wall>("PropDoorIndicator");
+    Wall* exitIndicator = m_Objects.doorIndicator;
     if (exitIndicator != nullptr)
     {
         const float omenRate = m_ExitOmenSequence.IsTriggered()

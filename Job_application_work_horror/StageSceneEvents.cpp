@@ -51,7 +51,7 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
         m_EntranceEventPhase = 0;
 
         CeilingLight* lightBehind =
-            game->GetObj<CeilingLight>("CeilingLight4");
+            m_Objects.CeilingLightAt(4);
         if (lightBehind != nullptr)
         {
             lightBehind->TriggerEventFlicker(0.38f, 0.52f);
@@ -77,7 +77,7 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
     if (m_EntranceEventPhase == 0 && m_EntranceEventTimer >= 0.38f)
     {
         CeilingLight* lightAhead =
-            game->GetObj<CeilingLight>("CeilingLight5");
+            m_Objects.CeilingLightAt(5);
         if (lightAhead != nullptr)
         {
             lightAhead->TriggerEventFlicker(0.62f, 0.72f);
@@ -91,7 +91,7 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
         m_EntranceEventTimer >= 1.12f)
     {
         CeilingLight* lightBehind =
-            game->GetObj<CeilingLight>("CeilingLight4");
+            m_Objects.CeilingLightAt(4);
         if (lightBehind != nullptr)
         {
             lightBehind->TriggerEventFlicker(0.20f, 0.28f);
@@ -130,7 +130,7 @@ void StageScene::UpdateStorageScare(Player& player)
         m_StorageScareTimer = 0.0f;
         m_StorageScareNoticeTimer = 2.1f;
         game->PlayAudioCue(SOUND_CUE_DOOR, 0.68f);
-        CeilingLight* light = game->GetObj<CeilingLight>("CeilingLight2");
+        CeilingLight* light = m_Objects.CeilingLightAt(2);
         if (light != nullptr)
         {
             light->TriggerEventFlicker(0.42f, 0.62f);
@@ -152,7 +152,7 @@ void StageScene::UpdateStorageScare(Player& player)
         return;
     }
 
-    ShadowMan* shadow = game->GetObj<ShadowMan>("Stage1StorageShadow");
+    ShadowMan* shadow = m_Objects.storageShadow;
     if (shadow == nullptr)
     {
         m_StorageScarePhase = 3;
@@ -169,7 +169,7 @@ void StageScene::UpdateStorageScare(Player& player)
         m_StorageScarePhase = 3;
         m_StorageScareNoticeTimer = 1.8f;
         CeilingLight* light =
-            currentGame->GetObj<CeilingLight>("CeilingLight2");
+            m_Objects.CeilingLightAt(2);
         if (light != nullptr)
         {
             light->TriggerEventFlicker(0.75f, 0.88f);
@@ -202,7 +202,7 @@ void StageScene::UpdateEvidenceScare(Player& player)
     }
 
     Core::Game* game = Core::Game::GetInstance();
-    ShadowMan* shadow = game->GetObj<ShadowMan>("Stage1EvidenceShadow");
+    ShadowMan* shadow = m_Objects.evidenceShadow;
     if (shadow == nullptr)
     {
         m_EvidenceScarePhase = 3;
@@ -215,7 +215,7 @@ void StageScene::UpdateEvidenceScare(Player& player)
     shadow->EnableGazeScare(5.4f);
     m_EvidenceScareNoticeTimer = 2.0f;
 
-    CeilingLight* roomLight = game->GetObj<CeilingLight>("CeilingLight3");
+    CeilingLight* roomLight = m_Objects.CeilingLightAt(3);
     if (roomLight != nullptr)
     {
         roomLight->TriggerEventFlicker(0.56f, 0.68f);
@@ -231,14 +231,14 @@ void StageScene::UpdateEvidenceScare(Player& player)
         m_EvidenceScareNoticeTimer = 1.8f;
 
         ShadowMan* activeShadow =
-            currentGame->GetObj<ShadowMan>("Stage1EvidenceShadow");
+            m_Objects.evidenceShadow;
         if (activeShadow != nullptr)
         {
             activeShadow->SetActive(false);
         }
 
         CeilingLight* light =
-            currentGame->GetObj<CeilingLight>("CeilingLight3");
+            m_Objects.CeilingLightAt(3);
         if (light != nullptr)
         {
             light->TriggerEventFlicker(0.84f, 0.92f);
@@ -295,9 +295,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
 
     for (int markerIndex = 1; markerIndex <= 3; ++markerIndex)
     {
-        const std::string markerName =
-            "PropLoopMarker" + std::to_string(markerIndex);
-        Wall* marker = game->GetObj<Wall>(markerName);
+        Wall* marker = m_Objects.loopMarkers[static_cast<std::size_t>(markerIndex - 1)];
         if (marker != nullptr)
         {
             marker->SetVisible(markerIndex <= loopPhase);
@@ -316,22 +314,22 @@ void StageScene::AdvanceCorridorLoop(Player& player)
 
     // 入口へ戻すときに廊下の扉も復元します。同じ境界を再び開けさせることで、
     // 各周回が意図的な反復として感じられるようにします。
-    Door* loopDoor = game->GetObj<Door>("Door");
+    Door* loopDoor = m_Objects.loopDoor;
     if (loopDoor != nullptr)
     {
         loopDoor->ResetClosed(loopPhase);
     }
 
     CeilingLight* entranceLight =
-        game->GetObj<CeilingLight>("CeilingLight1");
+        m_Objects.CeilingLightAt(1);
     CeilingLight* middleLight =
-        game->GetObj<CeilingLight>("CeilingLight4");
+        m_Objects.CeilingLightAt(4);
     CeilingLight* cornerLight =
-        game->GetObj<CeilingLight>("CeilingLight8");
+        m_Objects.CeilingLightAt(8);
 
     if (loopPhase == 1)
     {
-        Item* secondFuse = game->GetObj<Item>("Item2");
+        Item* secondFuse = m_Objects.secondFuse;
         if (secondFuse != nullptr && !secondFuse->IsCollected())
         {
             secondFuse->SetActive(true);
@@ -344,7 +342,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     }
     else if (loopPhase == 2)
     {
-        Item* thirdFuse = game->GetObj<Item>("Item3");
+        Item* thirdFuse = m_Objects.thirdFuse;
         if (thirdFuse != nullptr && !thirdFuse->IsCollected())
         {
             thirdFuse->SetActive(true);
@@ -409,15 +407,15 @@ void StageScene::StartScareLightSequence()
     m_ScareLightSequence.Start();
 
     CeilingLight* entrance =
-        game->GetObj<CeilingLight>("CeilingLight1");
+        m_Objects.CeilingLightAt(1);
     CeilingLight* middle =
-        game->GetObj<CeilingLight>("CeilingLight4");
+        m_Objects.CeilingLightAt(4);
     CeilingLight* hall =
-        game->GetObj<CeilingLight>("CeilingLight5");
+        m_Objects.CeilingLightAt(5);
     CeilingLight* corner =
-        game->GetObj<CeilingLight>("CeilingLight8");
+        m_Objects.CeilingLightAt(8);
     CeilingLight* loopExit =
-        game->GetObj<CeilingLight>("CeilingLight7");
+        m_Objects.CeilingLightAt(7);
 
     if (entrance != nullptr)
     {
@@ -461,15 +459,15 @@ void StageScene::UpdateScareLightSequence()
     m_ScareLightSequence.Advance(deltaTime);
 
     CeilingLight* entrance =
-        game->GetObj<CeilingLight>("CeilingLight1");
+        m_Objects.CeilingLightAt(1);
     CeilingLight* middle =
-        game->GetObj<CeilingLight>("CeilingLight4");
+        m_Objects.CeilingLightAt(4);
     CeilingLight* hall =
-        game->GetObj<CeilingLight>("CeilingLight5");
+        m_Objects.CeilingLightAt(5);
     CeilingLight* corner =
-        game->GetObj<CeilingLight>("CeilingLight8");
+        m_Objects.CeilingLightAt(8);
     CeilingLight* loopExit =
-        game->GetObj<CeilingLight>("CeilingLight7");
+        m_Objects.CeilingLightAt(7);
 
     switch (m_ScareLightSequence.ConsumePendingBeat())
     {
@@ -549,7 +547,7 @@ void StageScene::StartFuseWatcher(int fuseCount)
     }
 
     Core::Game* game = Core::Game::GetInstance();
-    ShadowMan* watcher = game->GetObj<ShadowMan>("Stage1FuseWatcher");
+    ShadowMan* watcher = m_Objects.fuseWatcher;
     if (watcher == nullptr)
     {
         return;
@@ -571,14 +569,14 @@ void StageScene::StartFuseWatcher(int fuseCount)
             Core::Game* game = Core::Game::GetInstance();
             game->RegisterAnomalyHandled();
             ShadowMan* activeWatcher =
-                game->GetObj<ShadowMan>("Stage1FuseWatcher");
+                m_Objects.fuseWatcher;
             if (activeWatcher != nullptr)
             {
                 activeWatcher->SetActive(false);
             }
 
             CeilingLight* reactionLight =
-                game->GetObj<CeilingLight>("CeilingLight4");
+                m_Objects.CeilingLightAt(4);
             if (reactionLight != nullptr)
             {
                 reactionLight->TriggerEventFlicker(0.72f, 0.74f);
@@ -608,15 +606,9 @@ void StageScene::UpdatePowerRestoreSequence()
         m_ScareLightSequence.Cancel();
         m_ScareLightSequence.ClearNotice();
 
-        for (int markerIndex = 1; markerIndex <= 3; ++markerIndex)
+        for (Wall* marker : m_Objects.loopMarkers)
         {
-            const std::string markerName =
-                "PropLoopMarker" + std::to_string(markerIndex);
-            Wall* marker = game->GetObj<Wall>(markerName);
-            if (marker != nullptr)
-            {
-                marker->SetVisible(false);
-            }
+            marker->SetVisible(false);
         }
     }
 
@@ -650,7 +642,7 @@ void StageScene::UpdateExitPowerSequence()
 {
     const float deltaTime = Application::GetDeltaTime();
     Core::Game* game = Core::Game::GetInstance();
-    FuseBox* panel = game->GetObj<FuseBox>("ExitPowerPanel");
+    FuseBox* panel = m_Objects.exitPowerPanel;
     if (panel == nullptr || !panel->IsActivated())
     {
         return;
@@ -660,8 +652,8 @@ void StageScene::UpdateExitPowerSequence()
     {
         m_ProgressHintTimer = 0.0f;
 
-        CeilingLight* corner = game->GetObj<CeilingLight>("CeilingLight7");
-        CeilingLight* exitLight = game->GetObj<CeilingLight>("CeilingLight8");
+        CeilingLight* corner = m_Objects.CeilingLightAt(7);
+        CeilingLight* exitLight = m_Objects.CeilingLightAt(8);
         if (corner != nullptr) corner->SetForcedOff(true);
         if (exitLight != nullptr) exitLight->SetForcedOff(true);
         game->GetPostProcess()->TriggerHorrorPulse(0.30f, 0.28f);
@@ -678,7 +670,7 @@ void StageScene::UpdateExitPowerSequence()
     {
     case 0:
     {
-        CeilingLight* corner = game->GetObj<CeilingLight>("CeilingLight7");
+        CeilingLight* corner = m_Objects.CeilingLightAt(7);
         if (corner != nullptr)
         {
             corner->SetForcedOff(false);
@@ -691,7 +683,7 @@ void StageScene::UpdateExitPowerSequence()
     }
     case 1:
     {
-        CeilingLight* exitLight = game->GetObj<CeilingLight>("CeilingLight8");
+        CeilingLight* exitLight = m_Objects.CeilingLightAt(8);
         if (exitLight != nullptr)
         {
             exitLight->SetForcedOff(false);
@@ -723,7 +715,7 @@ void StageScene::UpdateExitOmen(Player& player)
         case 0:
         {
             CeilingLight* lightBehind =
-                game->GetObj<CeilingLight>("CeilingLight8");
+                m_Objects.CeilingLightAt(8);
             if (lightBehind != nullptr)
             {
                 lightBehind->SetForcedOff(true);
@@ -735,7 +727,7 @@ void StageScene::UpdateExitOmen(Player& player)
         case 1:
         {
             CeilingLight* exitLight =
-                game->GetObj<CeilingLight>("CeilingLight7");
+                m_Objects.CeilingLightAt(7);
             if (exitLight != nullptr)
             {
                 exitLight->SetFaulted(true);
@@ -762,21 +754,16 @@ void StageScene::UpdateExitOmen(Player& player)
     m_ExitOmenSequence.Start();
 
     ShadowMan* shadow =
-        game->GetObj<ShadowMan>("Stage1ExitOmen");
+        m_Objects.exitOmen;
     if (shadow != nullptr)
     {
         shadow->SetActive(true);
         shadow->EnableGazeScare(4.2f);
     }
 
-    const char* exitLightNames[] =
+    for (int lightNumber : { 7, 8 })
     {
-        "CeilingLight7", "CeilingLight8"
-    };
-    for (const char* lightName : exitLightNames)
-    {
-        CeilingLight* light =
-            game->GetObj<CeilingLight>(lightName);
+        CeilingLight* light = m_Objects.CeilingLightAt(lightNumber);
         if (light != nullptr)
         {
             light->TriggerEventFlicker(0.82f, 0.78f);

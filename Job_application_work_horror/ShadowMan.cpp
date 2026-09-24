@@ -146,7 +146,11 @@ void ShadowMan::Update()
     }
 
     Core::Game* game = Core::Game::GetInstance();
-    Player* player = game->GetObj<Player>("Player");
+    if (m_Player == nullptr)
+    {
+        m_Player = game->GetObj<Player>("Player");
+    }
+    Player* player = m_Player;
     if (player == nullptr)
     {
         return;

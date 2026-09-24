@@ -30,16 +30,16 @@ void Stage2Scene::Draw(Camera* camera)
 {
     (void)camera;
     Core::Game* game = Core::Game::GetInstance();
-    Player* player = game->GetObj<Player>("Player");
+    Player* player = m_Objects.player;
     if (player == nullptr)
     {
         return;
     }
 
-    ExitTrigger* exit = game->GetObj<ExitTrigger>("Stage2Exit");
-    Door* finalDoor = game->GetObj<Door>("Stage2Door");
+    ExitTrigger* exit = m_Objects.exit;
+    Door* finalDoor = m_Objects.door;
     FuseBox* confirmationPanel =
-        game->GetObj<FuseBox>("Stage2ConfirmationPanel");
+        m_Objects.confirmationPanel;
     const bool confirmationPending =
         (m_LoopCount == 1 || m_LoopCount == 2) &&
         confirmationPanel != nullptr &&
@@ -164,7 +164,7 @@ void Stage2Scene::Draw(Camera* camera)
     else if (m_NoiseThreatSystem.GetStalkerNoticeTimer() > 0.0f)
     {
         ShadowMan* noiseShadow =
-            game->GetObj<ShadowMan>("Stage2NoiseShadow");
+            m_Objects.noiseShadow;
         objective = noiseShadow != nullptr && noiseShadow->IsActive()
             ? "水音を聞いた影が来る 振り返ってライトを当てる"
             : "影を追い払った 静かに進む";
@@ -363,7 +363,7 @@ void Stage2Scene::Draw(Camera* camera)
     }
     if (m_FinalSequence.IsPursuitActive())
     {
-        ShadowMan* shadow = game->GetObj<ShadowMan>("Stage2Shadow");
+        ShadowMan* shadow = m_Objects.shadow;
         if (shadow != nullptr)
         {
             Vector3 toShadow = shadow->GetPosition() - player->GetPosition();
@@ -373,7 +373,7 @@ void Stage2Scene::Draw(Camera* camera)
                 (distance - 18.0f) / 92.0f, 0.0f, 1.0f);
         }
     }
-    ShadowMan* noiseShadow = game->GetObj<ShadowMan>("Stage2NoiseShadow");
+    ShadowMan* noiseShadow = m_Objects.noiseShadow;
     if (noiseShadow != nullptr && noiseShadow->IsActive())
     {
         Vector3 toShadow = noiseShadow->GetPosition() - player->GetPosition();

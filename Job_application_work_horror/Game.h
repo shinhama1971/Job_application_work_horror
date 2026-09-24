@@ -24,6 +24,7 @@
 #include "ObjectManager.h"
 #include "GpuTimer.h"
 #include "sound.h"
+#include "utility.h"
 enum class SceneName
 {
     Title,
@@ -140,6 +141,20 @@ namespace Core
         T* GetObj(const std::string& name)
         {
             return m_ObjectManager.FindNamedObject<T>(name);
+        }
+
+        // Sceneの初期化時に、以後使い続けるObjectを取得します。
+        // 名前の打ち間違いや生成漏れは、その場でObject名を示して終了します。
+        template<typename T>
+        T* RequireObj(const std::string& name)
+        {
+            T* object = m_ObjectManager.FindNamedObject<T>(name);
+            if (object == nullptr)
+            {
+                utility::ReportFatalError(
+                    "シーンに必要なObjectが見つかりません: " + name);
+            }
+            return object;
         }
 
         template<typename T>

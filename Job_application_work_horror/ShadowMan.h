@@ -41,6 +41,9 @@ private:
     bool m_IsActive = true;
     bool m_DeactivateOnExpire = false;
     std::function<void()> m_OnObserved;
+    // 初回のUpdateで名前検索し、以後は保持します。PlayerとShadowManは同じSceneで生成され、
+    // Scene切り替え時にまとめて破棄されるため、Playerだけが先に無効になることはありません。
+    class Player* m_Player = nullptr;
 
     float m_LifeTime = 2.0f;
     float m_ChaseSpeed = 0.0f;

@@ -31,14 +31,14 @@ void StageScene::Draw(Camera* camera)
     (void)camera;
 
     Core::Game* game = Core::Game::GetInstance();
-    Player* player = game->GetObj<Player>("Player");
+    Player* player = m_Objects.player;
 
     if (player == nullptr)
     {
         return;
     }
 
-    FuseBox* exitPowerPanel = game->GetObj<FuseBox>("ExitPowerPanel");
+    FuseBox* exitPowerPanel = m_Objects.exitPowerPanel;
     const bool exitPowerActivated =
         exitPowerPanel != nullptr && exitPowerPanel->IsActivated();
     const bool exitPowerReady = m_PowerSequence.IsExitComplete();
@@ -66,7 +66,7 @@ void StageScene::Draw(Camera* camera)
         objectiveText = "左の部屋にある配電盤を調べる";
     }
     ExitTrigger* exitTrigger =
-        game->GetObj<ExitTrigger>("ExitTrigger");
+        m_Objects.exitTrigger;
     if (exitTrigger != nullptr && exitTrigger->IsEscaping())
     {
         objectiveText = "ドアの先へ移動中";
@@ -224,7 +224,7 @@ void StageScene::Draw(Camera* camera)
     }
     else if (game->IsPowerRestored())
     {
-        Door* stageExitDoor = game->GetObj<Door>("Stage1ExitDoor");
+        Door* stageExitDoor = m_Objects.exitDoor;
         objectiveText = stageExitDoor != nullptr && stageExitDoor->IsOpen()
             ? "開いた出口ドアを通り抜ける"
             : "右奥の出口ドアを開ける";
