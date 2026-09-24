@@ -53,7 +53,7 @@ void Input::Update()
 	m_Instance->controllerState_old = m_Instance->controllerState;
 
 	//キー入力を更新
-	BOOL hr = GetKeyboardState(m_Instance->keyState);
+	GetKeyboardState(m_Instance->keyState);
 
 	//コントローラー入力を更新(XInput)
 	XINPUT_STATE nextControllerState{};

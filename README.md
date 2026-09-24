@@ -95,8 +95,8 @@ Game
 
 ## ビルド確認状況
 
-- Release x64：警告0、エラー0
-- Debug x64：警告0、エラー0
+- Release x64：警告レベル /W4 で警告0、エラー0
+- Debug x64：警告レベル /W4 で警告0、エラー0
 - Debug実行ファイル：起動スモークテスト済み
 - 単体テスト：41件すべて成功（`Tests/Tests.vcxproj`。Visual Studioの「テスト エクスプローラー」から実行できます）
 

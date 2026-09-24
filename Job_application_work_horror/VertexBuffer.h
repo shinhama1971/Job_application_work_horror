@@ -7,6 +7,7 @@
 #include	<vector>
 #include	<wrl/client.h>
 #include	"Renderer.h"
+#include	"utility.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -26,13 +27,17 @@ public:
 		assert(device); //deviceは存在することを確認
 
 		// 頂点バッファ作成
-		bool sts = Renderer::CreateVertexBufferWrite(
+		const bool created = Renderer::CreateVertexBufferWrite(
 			sizeof(T),						// 1頂点当たりバイト数
 			(unsigned int)vertices.size(),	// 頂点数
 			(void*)vertices.data(),			// 頂点データ格納メモリ先頭アドレス
 			m_VertexBuffer.ReleaseAndGetAddressOf());				// 頂点バッファ
 
-		assert(sts == true); //結果を確認
+		// assertはReleaseで消えるため、作成失敗は明示的に通知して終了します。
+		if (!created)
+		{
+			utility::ReportFatalError("頂点バッファを作成できませんでした。");
+		}
 	}
 
 	// GPUにセット

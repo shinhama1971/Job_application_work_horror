@@ -73,7 +73,7 @@ void ScreenDustOverlay::Update()
     }
 }
 
-void ScreenDustOverlay::Draw(Camera* cam)
+void ScreenDustOverlay::Draw(Camera* /*camera*/)
 {
     if (!m_IsActive) return;
 

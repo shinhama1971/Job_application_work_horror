@@ -141,8 +141,8 @@ Game::Draw
 
 ## 検証
 
-- Release x64: 警告0、エラー0
-- Debug x64: 警告0、エラー0
+- Release x64: 警告レベル /W4 で警告0、エラー0
+- Debug x64: 警告レベル /W4 で警告0、エラー0
 - Debug実行ファイルの起動スモークテスト済み
 - 単体テスト（`Tests/Tests.vcxproj`、Microsoft C++ Unit Test Framework）：41件すべて成功
   - `GameState`：進行値の初期化、ベスト記録の更新条件、2面やり直し時の巻き戻し（回帰テスト）

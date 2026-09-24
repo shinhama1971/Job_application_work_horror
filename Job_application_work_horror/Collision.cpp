@@ -439,58 +439,6 @@ namespace Collision
 	}
 
 	//==================================
-	// 球体を当たった後の地点に動かす
-	//==================================
-	Vector3 moveSphere(const Segment& segment, const float& radius, const Polygon& polygon, const Vector3& contact, float& distance)
-	{
-		// 線分の方向ベクトル
-		Vector3 direction = segment.end - segment.start;
-		float length = direction.Length();
-		direction.Normalize();
-
-		// 線分の長さが0の場合は計算不能
-		if (length == 0.0f) return segment.start;
-
-		// 二次方程式を計算する (a*t^2 + b*t + c = 0)
-		float a = 1.0f; // directionは正規化されているのでa=1
-		float b = 2.0f * Collision::Dot((segment.start - contact), direction);
-		float c = (segment.start - contact).LengthSquared() - radius * radius;
-		float discriminant = b * b - 4.0f * a * c;
-
-		// 解があれば
-		if (discriminant >= 0.0f) {
-
-			// 解を求める
-			float sqrt_discriminant = std::sqrt(discriminant);
-			float t1 = (-b + sqrt_discriminant) / (2.0f * a);
-			float t2 = (-b - sqrt_discriminant) / (2.0f * a);
-
-			// 線分上の解を判定
-			if (t1 < t2)
-			{
-				distance = t1;
-				return  segment.start + t1 * direction;;
-			}
-			else
-			{
-				distance = t2;
-				return  segment.start + t2 * direction;
-			}
-		}
-
-		return segment.start;
-	}
-	Vector3 moveSphere(const Sphere& sphere, const Polygon& polygon, const Vector3& contact)
-	{
-		//Vector3 normal =  GetNormal(polygon);
-
-		Vector3 v = sphere.center - contact;
-		v.Normalize();
-
-		return contact + v * sphere.radius;
-	}
-
-	//==================================
 	// AABBを設定
 	//==================================
 	AABB SetAABB(Vector3 centerposition, float width, float height, float depth)
