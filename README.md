@@ -50,8 +50,9 @@ Debug構成では `F1` でImGuiデバッグ画面を表示できます。
 - Assimp 5.2.5：`external/assimp` にヘッダー、Debug/Release用のlibとDLLを同梱しています。
   公式ソースを `v143`・静的CRT（`USE_STATIC_CRT=ON`）でビルドしたもので、VC++ランタイムのインストールは不要です。
   DLLはビルド後に実行ファイルと同じフォルダへ自動でコピーされます。
-- DirectXTK：NuGetパッケージ `directxtk_desktop_2019`（2025.10.28.2）を
-  NuGetのグローバルパッケージフォルダから参照しています。
+- DirectXTK：使用しているのは `SimpleMath` のみです。現在は静的CRTでビルドした DirectXTK を
+  `C:\directxtk`（`include` と `lib\x64\Debug|Release`）に配置して参照しています。
+  他のPCでソースからビルドする場合は、同じ場所に配置してください（同梱は今後の対応予定）。
 
 ## 技術的な見どころ
 

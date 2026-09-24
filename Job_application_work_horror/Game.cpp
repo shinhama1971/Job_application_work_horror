@@ -12,6 +12,7 @@
 #include "Stage2Scene.h"
 #include "ResultScene.h"
 #include "Shader.h"
+#include "ModelCache.h"
 #include "DebugUI.h"
 #include "Application.h"
 
@@ -80,7 +81,8 @@ namespace Core
     }
 
     // 1フレームの更新順:
-    // 入力 → シーン → カメラ/画面効果 → Object → 破棄 → 遅延追加 → シーン変更。
+    // 入力 → シーン → カメラ/画面効果 → Object → 破棄 → シーン変更 → 遅延追加。
+    // シーンを切り替えるフレームでは遅延追加を破棄します。
     // 遅延処理を最後に置くことで、Object配列の走査中に要素が増減しません。
     void Game::Update()
     {
@@ -314,6 +316,7 @@ namespace Core
         // これによりRenderer::Uninitのデバッグ出力が、Gameに残った参照ではなく
         // 本当のリークだけを報告できます。
         Shader::ClearCache();
+        ModelCache::Clear();
         m_Instance.reset();
 
         Renderer::Uninit();

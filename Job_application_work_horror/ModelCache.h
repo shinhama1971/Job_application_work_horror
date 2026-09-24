@@ -41,4 +41,6 @@ public:
         const std::string& textureDirectory = "",
         const std::string& albedoOverridePath = "");
     static ModelCacheStats GetStats();
+    // D3Dデバイス破棄前に呼び、キャッシュが保持するGPUリソースを解放します。
+    static void Clear();
 };

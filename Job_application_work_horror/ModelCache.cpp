@@ -109,6 +109,11 @@ std::shared_ptr<ModelData> ModelCache::Load(
     return modelData;
 }
 
+void ModelCache::Clear()
+{
+    g_ModelCache.clear();
+}
+
 ModelCacheStats ModelCache::GetStats()
 {
     ModelCacheStats stats;

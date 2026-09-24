@@ -32,8 +32,12 @@ Application
 - `ObjectManager` が `std::vector<std::unique_ptr<Object>>` でObjectの実体を所有します。
 - 名前検索用Mapと外部へ返すポインタは非所有です。
 - Objectの追加・削除は走査終了後に遅延実行し、コンテナ走査中の無効化を防ぎます。
-- DirectXリソースは `Microsoft::WRL::ComPtr` で管理します。
-- 手動の `delete` や共有所有への置き換えは行いません。
+- DirectXリソースと XAudio2 本体（`IXAudio2`）は `Microsoft::WRL::ComPtr` で管理します。
+  XAudio2 のボイスは COM オブジェクトではないため、`Sound::Uninit` で `DestroyVoice` を呼んで解放します。
+- 手動の `delete` は行いません。
+- 共有所有（`std::shared_ptr`）は `ModelCache` だけに限定しています。同じモデルを複数の Object で使うとき、
+  頂点バッファ・テクスチャ・バウンディング情報を1つだけ読み込んで共有し、最後の利用者が破棄されたときに解放するためです。
+  Scene・Object の所有は引き続き `std::unique_ptr` による単一所有です。
 
 ## Gameから分離した責務
 
