@@ -44,8 +44,14 @@ Debug構成では `F1` でImGuiデバッグ画面を表示できます。
 2. 構成を `Release`、プラットフォームを `x64` にします。
 3. 「ソリューションのビルド」を実行します。
 
-プロジェクト設定はC++20、Platform Toolset `v145`、Windows SDK `10.0.26100.0`です。
+プロジェクト設定はC++20、Platform Toolset `v143`、Windows SDK `10.0.26100.0`です。
 `external` 以下にDear ImGuiなど必要なサードパーティーファイルを同梱しています。
+
+- Assimp 5.2.5：`external/assimp` にヘッダー、Debug/Release用のlibとDLLを同梱しています。
+  公式ソースを `v143`・静的CRT（`USE_STATIC_CRT=ON`）でビルドしたもので、VC++ランタイムのインストールは不要です。
+  DLLはビルド後に実行ファイルと同じフォルダへ自動でコピーされます。
+- DirectXTK：NuGetパッケージ `directxtk_desktop_2019`（2025.10.28.2）を
+  NuGetのグローバルパッケージフォルダから参照しています。
 
 ## 技術的な見どころ
 
