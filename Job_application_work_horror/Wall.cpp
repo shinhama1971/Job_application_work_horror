@@ -310,3 +310,26 @@ void Wall::SetAppearance(
         m_Material->SetMaterial(m_SurfaceMaterial);
     }
 }
+
+// 発光色をそのまま光の色にし、明るさは発光の強さに比例させます。
+void Wall::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const
+{
+    if (!m_Visible || m_GlowRange <= 0.0f || m_GlowStrength <= 0.0f)
+    {
+        return;
+    }
+
+    const Color& emission = m_SurfaceMaterial.Emission;
+    const float peak = (std::max)(emission.R(), (std::max)(emission.G(), emission.B()));
+    if (peak <= 0.01f)
+    {
+        return;
+    }
+
+    ENVIRONMENT_POINT_LIGHT light{};
+    light.PositionRange = Vector4(m_Position.x, m_Position.y, m_Position.z, m_GlowRange);
+    light.ColorIntensity = Vector4(
+        emission.R() / peak, emission.G() / peak, emission.B() / peak,
+        peak * m_GlowStrength);
+    lights.push_back(light);
+}

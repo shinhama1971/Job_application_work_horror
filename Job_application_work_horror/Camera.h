@@ -64,6 +64,9 @@ public:
 
     void SetTarget(DirectX::SimpleMath::Vector3 target);
 
+    void GetMainMatrices(
+        DirectX::SimpleMath::Matrix& view,
+        DirectX::SimpleMath::Matrix& projection) const;
     void SetOverrideMatrices(
         const DirectX::SimpleMath::Matrix& view,
         const DirectX::SimpleMath::Matrix& projection);

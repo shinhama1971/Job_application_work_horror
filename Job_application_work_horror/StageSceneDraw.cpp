@@ -60,8 +60,9 @@ void StageScene::RenderOffscreen()
     }
 
     const LIGHT previousLight = Renderer::GetLight();
-    const ENVIRONMENT_LIGHTS previousEnvironment =
-        Renderer::GetEnvironmentLights();
+    Effect::TiledLighting* tiledLighting = game->GetTiledLighting();
+    const std::vector<ENVIRONMENT_POINT_LIGHT> previousPointLights =
+        tiledLighting->GetLights();
     const auto drawCamera = [&](int index, bool zoomed,
         Graphics::RenderTexture& output)
     {
@@ -87,16 +88,14 @@ void StageScene::RenderOffscreen()
         surveillanceLight.Ambient = Color(0.16f, 0.19f, 0.17f, 1.0f);
         Renderer::SetLight(surveillanceLight);
 
-        ENVIRONMENT_LIGHTS surveillanceEnvironment = previousEnvironment;
-        const int helperIndex = surveillanceEnvironment.Count < MAX_ENVIRONMENT_LIGHTS
-            ? surveillanceEnvironment.Count++
-            : MAX_ENVIRONMENT_LIGHTS - 1;
-        ENVIRONMENT_POINT_LIGHT& helper =
-            surveillanceEnvironment.Lights[helperIndex];
+        // 光源数の上限が大きくなったため、既存の照明を押し出さずに補助光を足せます。
+        std::vector<ENVIRONMENT_POINT_LIGHT> surveillanceLights = previousPointLights;
+        ENVIRONMENT_POINT_LIGHT helper{};
         helper.PositionRange = Vector4(
             cameraPosition.x, cameraPosition.y, cameraPosition.z, 260.0f);
         helper.ColorIntensity = Vector4(0.72f, 0.92f, 0.78f, 0.52f);
-        Renderer::SetEnvironmentLights(surveillanceEnvironment);
+        surveillanceLights.push_back(helper);
+        tiledLighting->SetLights(surveillanceLights);
 
         game->DrawWorldForAuxiliaryCamera(*camera);
     };
@@ -117,7 +116,7 @@ void StageScene::RenderOffscreen()
     drawCamera(m_Patrol.GetSelectedCamera(), m_PatrolZoomed,
         m_SurveillanceFeed);
     Renderer::SetLight(previousLight);
-    Renderer::SetEnvironmentLights(previousEnvironment);
+    tiledLighting->SetLights(previousPointLights);
     camera->ClearOverrideMatrices();
     Renderer::SetBackBufferRenderTarget();
 }

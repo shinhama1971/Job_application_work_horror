@@ -54,25 +54,16 @@ struct LIGHT
 
 static_assert(sizeof(LIGHT) == 80, "LIGHT must match the HLSL constant-buffer layout");
 
-static constexpr int MAX_ENVIRONMENT_LIGHTS = 8;
-
+// 点光源1個分。StructuredBufferでシェーダーへ渡すため、HLSLのPOINT_LIGHTと同じ並びにします。
+// PositionRange.w は影響半径で、この距離で明るさが0になるようにシェーダー側で減衰させます。
 struct ENVIRONMENT_POINT_LIGHT
 {
 	DirectX::SimpleMath::Vector4 PositionRange;
 	DirectX::SimpleMath::Vector4 ColorIntensity;
 };
 
-struct ENVIRONMENT_LIGHTS
-{
-	ENVIRONMENT_POINT_LIGHT Lights[MAX_ENVIRONMENT_LIGHTS];
-	int Count;
-	float Padding[3];
-};
-
 static_assert(sizeof(ENVIRONMENT_POINT_LIGHT) == 32,
 	"Environment point light must match HLSL layout");
-static_assert(sizeof(ENVIRONMENT_LIGHTS) == 272,
-	"Environment light buffer must match HLSL layout");
 
 struct DEBUG_VIEW_BUFFER
 {
@@ -126,11 +117,9 @@ private:
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pProjectionBuffer;
 
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pLightBuffer;
-	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pEnvironmentLightBuffer;
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pDebugViewBuffer;
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pMaterialBuffer;
 	static LIGHT m_Light;
-	static ENVIRONMENT_LIGHTS m_EnvironmentLights;
 	static bool m_LightEnable;
 
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pTextureBuffer;
@@ -182,12 +171,7 @@ public:
 
 	static void SetLight(LIGHT Light);
 	static void SetPointLight(LIGHT Light);
-	static void SetEnvironmentLights(const ENVIRONMENT_LIGHTS& lights);
 	static LIGHT GetLight() { return m_Light; }
-	static ENVIRONMENT_LIGHTS GetEnvironmentLights()
-	{
-		return m_EnvironmentLights;
-	}
 	static void SetDebugViewMode(
 		int mode, float wallDampStrength = 1.0f);
 	static void SetLightEnable(bool Enable);

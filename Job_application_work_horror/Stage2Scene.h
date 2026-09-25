@@ -92,6 +92,8 @@ class Stage2Scene : public Scene
 {
 private:
     void CacheObjects();
+    // 看板・表示灯などの小さな光源を設定します（タイルベースライティングで数を増やせるため）。
+    void SetupPracticalLights();
 
     // 2面は同じ廊下を周回するたびに異変が追加される。
     // AdvanceLoopが周回段階を進め、個別Update関数が異変と謎解きを更新します。

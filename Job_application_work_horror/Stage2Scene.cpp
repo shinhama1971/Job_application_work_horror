@@ -501,6 +501,26 @@ void Stage2Scene::Init()
     player->Update();
     m_Hud.Init();
     CacheObjects();
+    SetupPracticalLights();
+}
+
+// 信号盤のマーカーや扉の表示灯、肖像の目が、自分の発光色で廊下を照らすようにします。
+// 色の変化（正解で緑になる、異変で赤く光るなど）がそのまま周囲の光の色になります。
+void Stage2Scene::SetupPracticalLights()
+{
+    m_Objects.doorIndicator->SetGlowLight(45.0f, 2.0f);
+    for (Wall* marker : m_Objects.signalMarkers)
+    {
+        marker->SetGlowLight(40.0f, 1.8f);
+    }
+    for (Wall* marker : m_Objects.evidenceMarkers)
+    {
+        marker->SetGlowLight(40.0f, 1.8f);
+    }
+    for (Wall* eye : m_Objects.portraitEyes)
+    {
+        eye->SetGlowLight(30.0f, 2.4f);
+    }
 }
 
 // 以後の更新で使うObjectをここで一度だけ名前検索し、見つからなければ起動時に通知します。

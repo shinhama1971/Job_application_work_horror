@@ -446,6 +446,20 @@ void StageScene::Init()
         reference.Init(960, 540);
     }
     CacheObjects();
+    SetupPracticalLights();
+}
+
+// 看板や表示灯が自分の発光色で周囲の床と壁を照らすようにします。
+// 天井照明だけだった頃は光源数の上限(8個)で足せなかった小さな光です。
+void StageScene::SetupPracticalLights()
+{
+    m_Objects.exitSign->SetGlowLight(60.0f, 2.2f);
+    m_Objects.doorIndicator->SetGlowLight(45.0f, 2.0f);
+    m_Objects.evidenceMarker->SetGlowLight(45.0f, 2.0f);
+    for (Wall* marker : m_Objects.loopMarkers)
+    {
+        marker->SetGlowLight(40.0f, 1.8f);
+    }
 }
 
 // 以後の更新で使うObjectをここで一度だけ名前検索し、見つからなければ起動時に通知します。

@@ -136,13 +136,32 @@ Game::Update
   5. Sceneを維持する場合だけ追加予約を反映
 
 Game::Draw
+  0. 全Objectから点光源を収集してGPUへ転送
   1. ShadowMap更新
   2. 必要な場合のみPlanarReflection更新
-  3. ワールドObject描画
-  4. PostProcess
-  5. SceneのHUD・画面演出
-  6. Debug UI
+  3. 監視映像などSceneの補助カメラ描画
+  4. タイル別ライトリスト作成（Compute Shader）→ ワールドObject描画
+  5. PostProcess
+  6. SceneのHUD・画面演出
+  7. Debug UI
 ```
+
+### タイルベースライティング（`Effect::TiledLighting`）
+
+点光源は Compute Shader で画面のタイル（16x16ピクセル）ごとに絞り込み、各ピクセルは
+自分のタイルに影響する光源だけを計算します。G-Bufferを使う完全なDeferredにはせず、
+既存のForwardシェーダー（濡れ床・半透明・ボリュームライト）を保ったまま光源を増やせる
+Forward+（Tiled Forward）の構成です。
+
+1. `Game::Draw` の最初に、全Objectの `CollectPointLights` から点光源を集めて StructuredBuffer（SRV）へ転送
+   （天井照明のほか、看板・表示灯・信号マーカーなども自分の発光色で光源を出します。上限256個）
+2. 本描画の直前に `tiledLightCullingCS.hlsl` を Dispatch（1タイル = 1スレッドグループ64スレッド）
+   - 代表スレッドがタイルの視錐台（左右上下の4平面）を作り、64スレッドで光源を分担して影響球と判定
+   - 当たった光源番号を `groupshared` の配列へ `InterlockedAdd` で追加し、タイル別リスト（UAV）へ書き出し
+3. ピクセルシェーダーは `SV_Position` から自分のタイルを求め、リストの光源だけを計算
+4. 反射・監視映像など別視点の描画では、タイルがプレイヤー視点と一致しないため全光源を計算
+
+Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと、タイルごとの光源数を色で確認できます。
 
 描画パスへの参加可否は `Object` の仮想関数で問い合わせます。Rendererが具象型を列挙して
 `dynamic_cast` する構造にはしていません。

@@ -306,3 +306,35 @@ void CeilingLight::Uninit()
     m_Vertices.clear();
     m_Indices.clear();
 }
+
+// 見えている天井照明を実ライトとして登録し、部屋の形状へ光を当てます。
+// 以前はPlayerがまとめて作っていた処理で、照明自身が自分の光を申告する形にしました。
+void CeilingLight::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const
+{
+    const float brightness = GetBrightness();
+    if (brightness <= 0.01f)
+    {
+        return;
+    }
+
+    const bool powerRestored = Core::Game::GetInstance()->IsPowerRestored();
+    ENVIRONMENT_POINT_LIGHT pointLight{};
+
+    // 発光パネルより少し下へライトを置き、天井に埋もれず室内を照らすようにします。
+    pointLight.PositionRange = Vector4(
+        m_Position.x, m_Position.y - 3.0f, m_Position.z,
+        powerRestored ? 165.0f : 115.0f);
+
+    if (powerRestored)
+    {
+        pointLight.ColorIntensity = IsFaulted()
+            ? Vector4(0.70f, 0.78f, 0.56f, brightness * 1.08f)
+            : Vector4(0.84f, 0.91f, 1.0f, brightness * 1.32f);
+    }
+    else
+    {
+        pointLight.ColorIntensity = Vector4(
+            1.0f, 0.055f, 0.025f, brightness * 1.05f);
+    }
+    lights.push_back(pointLight);
+}

@@ -65,6 +65,7 @@ namespace Core
         m_Instance->m_PlanarReflection.Init();
         m_Instance->m_ShadowMap.Init();
         m_Instance->m_PostProcess.Init();
+        m_Instance->m_TiledLighting.Init();
         m_Instance->ApplyVisualSettings();
         m_Instance->ChangeScene(SceneName::Title);
         return true;
@@ -159,6 +160,7 @@ namespace Core
         m_Instance->m_Scene.reset();
 
         m_Instance->m_ObjectManager.DeleteAll();
+        m_Instance->m_TiledLighting.Uninit();
         m_Instance->m_PostProcess.Uninit();
         m_Instance->m_ShadowMap.Uninit();
         m_Instance->m_PlanarReflection.Uninit();

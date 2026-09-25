@@ -69,6 +69,8 @@ private:
     void Init();
     void Uninit();
     void CacheObjects();
+    // 看板・表示灯などの小さな光源を設定します（タイルベースライティングで数を増やせるため）。
+    void SetupPracticalLights();
 
     StageObjects m_Objects;
 

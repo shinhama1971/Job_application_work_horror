@@ -18,6 +18,7 @@
 #include"PostProcess.h"
 #include "ShadowMap.h"
 #include "PlanarReflection.h"
+#include "TiledLighting.h"
 #include "GameState.h"
 #include "GameSettings.h"
 #include "PauseMenu.h"
@@ -52,6 +53,9 @@ namespace Core
         Effect::PostProcess m_PostProcess;
         Effect::ShadowMap m_ShadowMap;
         Effect::PlanarReflection m_PlanarReflection;
+        Effect::TiledLighting m_TiledLighting;
+        // 毎フレームObjectから集める点光源。確保し直しを避けるため使い回します。
+        std::vector<ENVIRONMENT_POINT_LIGHT> m_FramePointLights;
         GpuTimer m_GpuTimer;
         Sound m_Sound;
         bool m_SoundReady = false;
@@ -287,6 +291,11 @@ namespace Core
         Effect::PostProcess* GetPostProcess()
         {
             return &m_PostProcess;
+        }
+
+        Effect::TiledLighting* GetTiledLighting()
+        {
+            return &m_TiledLighting;
         }
 
         Effect::ShadowMap* GetShadowMap()

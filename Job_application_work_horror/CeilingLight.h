@@ -45,6 +45,7 @@ public:
     void Uninit() override;
 
     float GetBrightness() const { return m_Brightness; }
+    void CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const override;
     bool IsEmergencyLight() const { return m_IsEmergencyLight; }
     bool IsFaulted() const { return m_IsFaulted; }
     bool IsForcedOff() const { return m_IsForcedOff; }

@@ -9,6 +9,8 @@
 #include"Texture.h"
 #include "ModelBounds.h"
 #include <memory>
+#include <vector>
+#include "Renderer.h"
 class Object {
 protected:
 	// SRT情報（姿勢情報）
@@ -36,6 +38,12 @@ public:
 	virtual bool ContributesToPlanarReflection() const { return false; }
 	// 監視カメラなど、プレイヤー以外の視点で描くワールドに含めるかどうか。
 	virtual bool DrawsInAuxiliaryView() const { return true; }
+	// 光を放つObjectは、このフレームの点光源を追加します。
+	// Gameが毎フレーム全Objectから集め、タイルベースのライトカリングへ渡します。
+	virtual void CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const
+	{
+		(void)lights;
+	}
 	virtual bool IsPlanarReflectionSurfaceVisible(const Camera&) const
 	{
 		return false;

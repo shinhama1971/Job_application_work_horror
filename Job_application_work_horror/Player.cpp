@@ -341,51 +341,6 @@ void Player::Update()
 
     Renderer::SetLight(light);
 
-    // 見えている天井照明を実ライトとして登録し、部屋の形状へ光を当てます。
-    ENVIRONMENT_LIGHTS environmentLights{};
-    const bool powerRestored = Core::Game::GetInstance()->IsPowerRestored();
-    for (CeilingLight* fixture : Core::Game::GetInstance()->GetObjects<CeilingLight>())
-    {
-        if (environmentLights.Count >= MAX_ENVIRONMENT_LIGHTS)
-        {
-            break;
-        }
-
-        const float brightness = fixture->GetBrightness();
-        if (brightness <= 0.01f)
-        {
-            continue;
-        }
-
-        const Vector3 fixturePosition = fixture->GetPosition();
-        ENVIRONMENT_POINT_LIGHT& pointLight =
-            environmentLights.Lights[environmentLights.Count++];
-
-        // 発光パネルより少し下へライトを置き、天井に埋もれず室内を照らすようにします。
-        pointLight.PositionRange = Vector4(
-            fixturePosition.x, fixturePosition.y - 3.0f, fixturePosition.z,
-            powerRestored ? 165.0f : 115.0f);
-
-        if (powerRestored)
-        {
-            if (fixture->IsFaulted())
-            {
-                pointLight.ColorIntensity = Vector4(
-                    0.70f, 0.78f, 0.56f, brightness * 1.08f);
-            }
-            else
-            {
-                pointLight.ColorIntensity = Vector4(
-                    0.84f, 0.91f, 1.0f, brightness * 1.32f);
-            }
-        }
-        else
-        {
-            pointLight.ColorIntensity = Vector4(
-                1.0f, 0.055f, 0.025f, brightness * 1.05f);
-        }
-    }
-    Renderer::SetEnvironmentLights(environmentLights);
 	// カメラの位置と向きを更新
     m_Movement.UpdateHeadBob(deltaTime);
 

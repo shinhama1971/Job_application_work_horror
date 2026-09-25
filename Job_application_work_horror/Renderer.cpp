@@ -30,11 +30,9 @@ Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pViewBuffer;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pProjectionBuffer;
 
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pLightBuffer;
-Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pEnvironmentLightBuffer;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pDebugViewBuffer;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pMaterialBuffer;
 LIGHT Renderer::m_Light{};
-ENVIRONMENT_LIGHTS Renderer::m_EnvironmentLights{};
 bool Renderer::m_LightEnable = true;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pTextureBuffer;
 // デプスステンシルステート
@@ -252,14 +250,6 @@ HRESULT Renderer::Init()
 
 	SetLight(light);
 
-	bufferDesc.ByteWidth = sizeof(ENVIRONMENT_LIGHTS);
-	hr = m_pDevice->CreateBuffer(
-		&bufferDesc, NULL, m_pEnvironmentLightBuffer.ReleaseAndGetAddressOf());
-	if (FAILED(hr)) return hr;
-	m_pDeviceContext->PSSetConstantBuffers(
-		6, 1, m_pEnvironmentLightBuffer.GetAddressOf());
-	SetEnvironmentLights(ENVIRONMENT_LIGHTS{});
-
 	bufferDesc.ByteWidth = sizeof(DEBUG_VIEW_BUFFER);
 	hr = m_pDevice->CreateBuffer(
 		&bufferDesc, NULL, m_pDebugViewBuffer.ReleaseAndGetAddressOf());
@@ -365,7 +355,6 @@ void Renderer::Uninit()
     }
 
 	m_pLightBuffer.Reset();
-	m_pEnvironmentLightBuffer.Reset();
 	m_pDebugViewBuffer.Reset();
 	m_pMaterialBuffer.Reset();
 	m_pTextureBuffer.Reset();
