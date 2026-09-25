@@ -100,6 +100,7 @@ void Stage2Scene::Init()
 
     Player* player = game->CreateObj<Player>("Player");
     player->SetPosition(Vector3(0.0f, -99.0f, -125.0f));
+    player->SetSprintAllowed(false);
 
     ShadowMan* stageShadow = game->CreateObj<ShadowMan>("Stage2Shadow");
     stageShadow->SetPosition(0.0f, -99.0f, 62.0f);
@@ -605,6 +606,11 @@ void Stage2Scene::Update()
     {
         return;
     }
+
+    // 周回中は歩くだけにし、最後の追跡が始まったときだけ走れるようにします。
+    // 静かに歩き続ける緊張と、追跡での解放感を分けるためです。
+    player->SetSprintAllowed(
+        m_FinalSequence.IsSequenceActive() || m_FinalSequence.IsPursuitActive());
 
     ExitTrigger* exit = m_Objects.exit;
     if (exit != nullptr && exit->IsEscaping())

@@ -351,7 +351,9 @@ void Stage2Scene::Draw(Camera* camera)
         objective = "廊下の奥にある出口へ向かう";
     }
 
-    m_Hud.Draw(*player, -1, m_InteractionSystem.GetPrompt(), objective);
+    // 目的表示なしの設定では、何をすべきかを説明しない静かな画面にします。
+    m_Hud.Draw(*player, -1, m_InteractionSystem.GetPrompt(),
+        game->IsGuideEnabled() ? objective : std::string_view{});
     float threatRate = 0.0f;
     threatRate = (std::max)(
         threatRate, m_NoiseThreatSystem.GetThreat() * 0.78f);
@@ -383,7 +385,8 @@ void Stage2Scene::Draw(Camera* camera)
             (distance - 14.0f) / 72.0f, 0.0f, 1.0f);
         threatRate = (std::max)(threatRate, noiseShadowDanger);
     }
-    if (m_VisualTimer >= 4.20f &&
+    if (game->IsGuideEnabled() &&
+        m_VisualTimer >= 4.20f &&
         !m_CaughtSequence.IsActive() &&
         (exit == nullptr || !exit->IsEscaping()))
     {
@@ -505,6 +508,7 @@ void Stage2Scene::Draw(Camera* camera)
             game->GetEffectLevel(),
             game->GetLookSensitivityLevel(),
             game->GetVolumeLevel(),
+            game->IsGuideEnabled(),
             game->GetPauseSettingIndex(),
             2,
             game->GetRunTimeSeconds(),

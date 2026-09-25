@@ -101,9 +101,9 @@ void Player::Update()
     moveDir += right * leftStick.x;
     moveDir += forward * leftStick.y;
 
-    const bool wantsToSprint =
-        Input::GetKeyPress(VK_SHIFT) ||
-        Input::GetButtonPress(XINPUT_LEFT_THUMB);
+    const bool wantsToSprint = m_SprintAllowed &&
+        (Input::GetKeyPress(VK_SHIFT) ||
+            Input::GetButtonPress(XINPUT_LEFT_THUMB));
     if (m_Movement.Update(moveDir, wantsToSprint, deltaTime))
     {
         Input::SetVibration(5, 0.10f);

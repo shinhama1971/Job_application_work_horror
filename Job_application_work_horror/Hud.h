@@ -73,6 +73,7 @@ public:
         int effectLevel,
         int lookSensitivityLevel,
         int volumeLevel,
+        bool guideEnabled,
         int selectedSetting,
         int floorNumber,
         float runTimeSeconds,

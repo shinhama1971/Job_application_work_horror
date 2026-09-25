@@ -159,6 +159,7 @@ void StageScene::Draw(Camera* camera)
                 game->GetEffectLevel(),
                 game->GetLookSensitivityLevel(),
                 game->GetVolumeLevel(),
+                game->IsGuideEnabled(),
                 game->GetPauseSettingIndex(),
                 1,
                 game->GetRunTimeSeconds(),
@@ -388,13 +389,15 @@ void StageScene::Draw(Camera* camera)
             : "右奥の出口ドアを開ける";
     }
 
+    // 目的表示なしの設定では、何をすべきかを説明しない静かな画面にします。
     m_Hud.Draw(
         *player,
         fuseCount,
         m_InteractionSystem.GetPrompt(),
-        objectiveText);
+        game->IsGuideEnabled() ? objectiveText : std::string_view{});
 
-    if (m_StageVisualTimer >= 4.20f &&
+    if (game->IsGuideEnabled() &&
+        m_StageVisualTimer >= 4.20f &&
         (exitTrigger == nullptr || !exitTrigger->IsEscaping()))
     {
         Vector3 guideTarget(0.0f, -99.0f, 315.0f);
@@ -450,6 +453,7 @@ void StageScene::Draw(Camera* camera)
             game->GetEffectLevel(),
             game->GetLookSensitivityLevel(),
             game->GetVolumeLevel(),
+            game->IsGuideEnabled(),
             game->GetPauseSettingIndex(),
             1,
             game->GetRunTimeSeconds(),

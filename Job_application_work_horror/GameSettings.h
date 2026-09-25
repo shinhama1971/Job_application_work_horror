@@ -15,12 +15,15 @@ namespace Core
         static constexpr int MaxEffectLevel = 2;
         static constexpr int MaxLookSensitivityLevel = 4;
         static constexpr int MaxVolumeLevel = 4;
+        static constexpr int MaxGuideLevel = 1;
 
     private:
         int m_BrightnessLevel = 2;
         int m_EffectLevel = 1;
         int m_LookSensitivityLevel = 2;
         int m_VolumeLevel = 3;
+        // 1で目的表示・目的地ガイドを出し、0で何も説明しないP.T.寄りの遊び方にします。
+        int m_GuideLevel = 1;
 
         static bool TrySetLevel(int& current, int level, int maxLevel)
         {
@@ -57,10 +60,17 @@ namespace Core
             return TrySetLevel(m_VolumeLevel, level, MaxVolumeLevel);
         }
 
+        bool SetGuideLevel(int level)
+        {
+            return TrySetLevel(m_GuideLevel, level, MaxGuideLevel);
+        }
+
         int GetBrightnessLevel() const { return m_BrightnessLevel; }
         int GetEffectLevel() const { return m_EffectLevel; }
         int GetLookSensitivityLevel() const { return m_LookSensitivityLevel; }
         int GetVolumeLevel() const { return m_VolumeLevel; }
+        int GetGuideLevel() const { return m_GuideLevel; }
+        bool IsGuideEnabled() const { return m_GuideLevel > 0; }
 
         // 段階値を各システムへ渡す倍率へ変換します。変換式はここだけに置きます。
         // 明るさは中央(2)を0とし、1段階ごとに露出を0.055ずらします。

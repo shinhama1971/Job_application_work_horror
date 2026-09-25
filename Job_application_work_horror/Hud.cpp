@@ -229,15 +229,19 @@ void Hud::Draw(
         staminaColor = Color(0.90f, 0.62f, 0.16f, 0.95f);
     }
 
-    AddRectangle(34.0f, screenHeight - 32.0f, 230.0f, 24.0f, dark);
-    AddText(43.0f, screenHeight - 26.0f,
-        "スタミナ", 1.5f, white);
-    AddRectangle(barFillX, screenHeight - 25.0f,
-        barFillWidth, 10.0f, inactive);
-    if (staminaRate > 0.0f)
+    // 走れない間はスタミナを使わないため、ゲージ自体を出しません。
+    if (player.IsSprintAllowed())
     {
+        AddRectangle(34.0f, screenHeight - 32.0f, 230.0f, 24.0f, dark);
+        AddText(43.0f, screenHeight - 26.0f,
+            "スタミナ", 1.5f, white);
         AddRectangle(barFillX, screenHeight - 25.0f,
-            barFillWidth * staminaRate, 10.0f, staminaColor);
+            barFillWidth, 10.0f, inactive);
+        if (staminaRate > 0.0f)
+        {
+            AddRectangle(barFillX, screenHeight - 25.0f,
+                barFillWidth * staminaRate, 10.0f, staminaColor);
+        }
     }
 
     // 入力キーと実行される操作名を同時に表示します。

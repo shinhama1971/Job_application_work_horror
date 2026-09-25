@@ -89,6 +89,9 @@ namespace Core
         case Item::Volume:
             return settings.SetVolumeLevel(
                 settings.GetVolumeLevel() + delta);
+        case Item::Guide:
+            return settings.SetGuideLevel(
+                settings.GetGuideLevel() + delta);
         default:
             return false;
         }

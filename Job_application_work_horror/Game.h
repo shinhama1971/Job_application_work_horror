@@ -212,6 +212,12 @@ namespace Core
             return m_Settings.GetVolumeLevel();
         }
 
+        // falseのとき、Sceneは目的表示と目的地ガイドを出しません。
+        bool IsGuideEnabled() const
+        {
+            return m_Settings.IsGuideEnabled();
+        }
+
         int GetPauseSettingIndex() const
         {
             return m_PauseMenu.GetSelectedIndex();

@@ -20,6 +20,7 @@ namespace Core
             Effect,
             LookSensitivity,
             Volume,
+            Guide,       // 目的表示・目的地ガイドの表示あり/なし
             Count
         };
 

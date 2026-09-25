@@ -45,6 +45,13 @@ namespace Core
         {
             m_VolumeLevel = volumeLevel;
         }
+        // 旧形式の設定ファイルには無い項目なので、読めなければ既定値（表示あり）のままにします。
+        int guideLevel = 1;
+        if (settingsFile >> guideLevel &&
+            guideLevel >= 0 && guideLevel <= MaxGuideLevel)
+        {
+            m_GuideLevel = guideLevel;
+        }
     }
 
     void GameSettings::Save() const
@@ -66,6 +73,7 @@ namespace Core
         settingsFile << m_BrightnessLevel << ' '
             << m_EffectLevel << ' '
             << m_LookSensitivityLevel << ' '
-            << m_VolumeLevel << '\n';
+            << m_VolumeLevel << ' '
+            << m_GuideLevel << '\n';
     }
 }

@@ -765,6 +765,7 @@ void Hud::DrawPause(
     int effectLevel,
     int lookSensitivityLevel,
     int volumeLevel,
+    bool guideEnabled,
     int selectedSetting,
     int floorNumber,
     float runTimeSeconds,
@@ -775,7 +776,7 @@ void Hud::DrawPause(
     const float screenWidth = static_cast<float>(Application::GetWidth());
     const float screenHeight = static_cast<float>(Application::GetHeight());
     const float panelWidth = 660.0f;
-    const float panelHeight = 520.0f;
+    const float panelHeight = 560.0f;
     const float panelX = (screenWidth - panelWidth) * 0.5f;
     const float panelY = (screenHeight - panelHeight) * 0.5f;
     const Color shade(0.0f, 0.004f, 0.004f, 0.78f);
@@ -816,7 +817,7 @@ void Hud::DrawPause(
         (std::clamp)(lookSensitivityLevel, 0, 4);
     const int safeVolumeLevel = (std::clamp)(volumeLevel, 0, 4);
     const int safeSelectedSetting =
-        (std::clamp)(selectedSetting, 0, 3);
+        (std::clamp)(selectedSetting, 0, 4);
     const std::string brightnessText =
         "明るさ " + std::to_string(safeBrightnessLevel + 1) +
         " OF 5";
@@ -845,30 +846,33 @@ void Hud::DrawPause(
     addCenteredText(panelY + 228.0f,
         volumeText, 2.5f,
         safeSelectedSetting == 3 ? green : pale);
+    addCenteredText(panelY + 268.0f,
+        guideEnabled ? "目的表示 あり" : "目的表示 なし", 2.5f,
+        safeSelectedSetting == 4 ? green : pale);
     if (Input::IsControllerConnected())
     {
-        addCenteredText(panelY + 270.0f,
+        addCenteredText(panelY + 310.0f,
             "十字キーで選択と調整", 2.0f, pale);
-        addCenteredText(panelY + 312.0f,
+        addCenteredText(panelY + 352.0f,
             "START ゲームに戻る", 2.5f, pale);
-        addCenteredText(panelY + 354.0f,
+        addCenteredText(panelY + 394.0f,
             "Y この階をやり直す", 2.5f, pale);
-        addCenteredText(panelY + 396.0f,
+        addCenteredText(panelY + 436.0f,
             "B タイトルへ戻る", 2.5f, pale);
-        addCenteredText(panelY + 438.0f,
+        addCenteredText(panelY + 478.0f,
             "BACK ゲーム終了", 2.5f, pale);
     }
     else
     {
-        addCenteredText(panelY + 270.0f,
+        addCenteredText(panelY + 310.0f,
             "矢印キーで選択と調整", 2.0f, pale);
-        addCenteredText(panelY + 312.0f,
+        addCenteredText(panelY + 352.0f,
             "ESC または P ゲームに戻る", 2.5f, pale);
-        addCenteredText(panelY + 354.0f,
+        addCenteredText(panelY + 394.0f,
             "R この階をやり直す", 2.5f, pale);
-        addCenteredText(panelY + 396.0f,
+        addCenteredText(panelY + 436.0f,
             "T タイトルへ戻る", 2.5f, pale);
-        addCenteredText(panelY + 438.0f,
+        addCenteredText(panelY + 478.0f,
             "Q ゲーム終了", 2.5f, pale);
     }
 
