@@ -26,6 +26,25 @@
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+    const char* GetPatrolAnomalyLabel(SurveillancePatrol::AnomalyType type)
+    {
+        switch (type)
+        {
+        case SurveillancePatrol::AnomalyType::Figure:
+            return "人影";
+        case SurveillancePatrol::AnomalyType::LightOut:
+            return "消えた照明";
+        case SurveillancePatrol::AnomalyType::DoorOpen:
+            return "開いた扉";
+        case SurveillancePatrol::AnomalyType::None:
+            return "異常";
+        }
+        return "異常";
+    }
+}
+
 void StageScene::RenderOffscreen()
 {
     if (m_Patrol.GetState() != SurveillancePatrol::State::Viewing)
@@ -40,27 +59,65 @@ void StageScene::RenderOffscreen()
         return;
     }
 
-    // 選択中の監視カメラを天井付近から見下ろす画角で描きます。
-    const StageSurveillanceCamera& spot =
-        StageSurveillanceCameras[m_Patrol.GetSelectedCamera()];
-    const Vector3 cameraPosition(
-        spot.Position[0], spot.Position[1], spot.Position[2]);
-    const Vector3 cameraTarget(
-        spot.Target[0], spot.Target[1], spot.Target[2]);
-    const Matrix view = Matrix::CreateLookAt(
-        cameraPosition,
-        cameraTarget,
-        Vector3::Up);
-    const Matrix projection = Matrix::CreatePerspectiveFieldOfView(
-        DirectX::XMConvertToRadians(56.0f),
-        16.0f / 9.0f,
-        1.0f,
-        420.0f);
+    const LIGHT previousLight = Renderer::GetLight();
+    const ENVIRONMENT_LIGHTS previousEnvironment =
+        Renderer::GetEnvironmentLights();
+    const auto drawCamera = [&](int index, bool zoomed,
+        Graphics::RenderTexture& output)
+    {
+        const StageSurveillanceCamera& spot = StageSurveillanceCameras[index];
+        const Vector3 cameraPosition(
+            spot.Position[0], spot.Position[1], spot.Position[2]);
+        const Vector3 cameraTarget(
+            spot.Target[0], spot.Target[1], spot.Target[2]);
+        const Matrix view = Matrix::CreateLookAt(
+            cameraPosition, cameraTarget, Vector3::Up);
+        const Matrix projection = Matrix::CreatePerspectiveFieldOfView(
+            DirectX::XMConvertToRadians(zoomed ? 32.0f : 56.0f),
+            16.0f / 9.0f, 1.0f, 420.0f);
 
-    m_SurveillanceFeed.SetRenderTarget();
-    m_SurveillanceFeed.Clear(0.005f, 0.012f, 0.008f, 1.0f);
-    camera->SetOverrideMatrices(view, projection);
-    game->DrawWorldForAuxiliaryCamera(*camera);
+        output.SetRenderTarget();
+        output.Clear(0.018f, 0.028f, 0.022f, 1.0f);
+        camera->SetOverrideMatrices(view, projection);
+
+        // 本編の照明を変更せず、監視映像だけに補助環境光を使います。
+        LIGHT surveillanceLight = previousLight;
+        surveillanceLight.Enable = TRUE;
+        surveillanceLight.FlashlightEnabled = FALSE;
+        surveillanceLight.Ambient = Color(0.16f, 0.19f, 0.17f, 1.0f);
+        Renderer::SetLight(surveillanceLight);
+
+        ENVIRONMENT_LIGHTS surveillanceEnvironment = previousEnvironment;
+        const int helperIndex = surveillanceEnvironment.Count < MAX_ENVIRONMENT_LIGHTS
+            ? surveillanceEnvironment.Count++
+            : MAX_ENVIRONMENT_LIGHTS - 1;
+        ENVIRONMENT_POINT_LIGHT& helper =
+            surveillanceEnvironment.Lights[helperIndex];
+        helper.PositionRange = Vector4(
+            cameraPosition.x, cameraPosition.y, cameraPosition.z, 260.0f);
+        helper.ColorIntensity = Vector4(0.72f, 0.92f, 0.78f, 0.52f);
+        Renderer::SetEnvironmentLights(surveillanceEnvironment);
+
+        game->DrawWorldForAuxiliaryCamera(*camera);
+    };
+
+    if (m_PatrolReferenceCapturePending)
+    {
+        // 1フレームに1台ずつ記録し、端末を開いた瞬間の描画負荷を分散します。
+        drawCamera(m_PatrolReferenceCaptureIndex, false,
+            m_SurveillanceReferences[m_PatrolReferenceCaptureIndex]);
+        ++m_PatrolReferenceCaptureIndex;
+        if (m_PatrolReferenceCaptureIndex == StageSurveillanceCameraCount)
+        {
+            SetPatrolAnomalyVisible(m_Patrol.GetAnomaly(), true);
+            m_PatrolReferenceCapturePending = false;
+        }
+    }
+
+    drawCamera(m_Patrol.GetSelectedCamera(), m_PatrolZoomed,
+        m_SurveillanceFeed);
+    Renderer::SetLight(previousLight);
+    Renderer::SetEnvironmentLights(previousEnvironment);
     camera->ClearOverrideMatrices();
     Renderer::SetBackBufferRenderTarget();
 }
@@ -79,7 +136,9 @@ void StageScene::Draw(Camera* camera)
     {
         const int selectedCamera = m_Patrol.GetSelectedCamera();
         m_Hud.DrawSurveillanceFeed(
-            m_SurveillanceFeed.GetSRV(),
+            m_PatrolShowReference
+                ? m_SurveillanceReferences[selectedCamera].GetSRV()
+                : m_SurveillanceFeed.GetSRV(),
             m_SurveillanceShader,
             m_PatrolViewTimer,
             StageSurveillanceCameras[selectedCamera].Label,
@@ -89,7 +148,9 @@ void StageScene::Draw(Camera* camera)
             SurveillancePatrol::RequiredRounds,
             m_Patrol.GetMistakes(),
             SurveillancePatrol::MistakesUntilCaught,
-            m_PatrolViewTimer >= 0.65f,
+            m_PatrolZoomed,
+            m_PatrolShowReference,
+            m_PatrolViewTimer >= 0.65f && !m_PatrolReferenceCapturePending,
             m_PatrolWrongTimer > 0.0f);
         if (game->IsPaused())
         {
@@ -145,9 +206,29 @@ void StageScene::Draw(Camera* camera)
     {
         const int remainingSeconds = static_cast<int>(
             std::ceil(m_Patrol.GetRemainingTime()));
-        patrolObjective =
-            std::string(StageSurveillanceCameras[m_Patrol.GetAnomaly().camera].Label) +
-            " の異常を確認する  残り " + std::to_string(remainingSeconds) + "秒";
+        const std::string cameraLabel =
+            StageSurveillanceCameras[m_Patrol.GetAnomaly().camera].Label;
+        const std::string anomalyLabel =
+            GetPatrolAnomalyLabel(m_Patrol.GetAnomaly().type);
+        const int confirmPercent = static_cast<int>(
+            std::round(m_Patrol.GetConfirmRate() * 100.0f));
+        if (!player->IsFlashlightOn())
+        {
+            patrolObjective = cameraLabel +
+                " へ向かい " + anomalyLabel + "をライトで照らす  残り " +
+                std::to_string(remainingSeconds) + "秒";
+        }
+        else if (confirmPercent > 0)
+        {
+            patrolObjective = "異常を光で除去中  " +
+                std::to_string(confirmPercent) + "%";
+        }
+        else
+        {
+            patrolObjective = cameraLabel +
+                " の" + anomalyLabel + "をライトで探す  残り " +
+                std::to_string(remainingSeconds) + "秒";
+        }
         objectiveText = patrolObjective;
     }
     else if (m_PatrolNoticeTimer > 0.0f)

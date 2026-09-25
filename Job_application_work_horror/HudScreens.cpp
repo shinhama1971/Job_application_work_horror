@@ -420,12 +420,18 @@ void Hud::DrawSurveillanceFeed(
     int requiredRounds,
     int mistakes,
     int mistakesUntilCaught,
+    bool zoomed,
+    bool showingReference,
     bool reportReady,
     bool wrongReportVisible)
 {
     const float screenWidth = static_cast<float>(Application::GetWidth());
     const float screenHeight = static_cast<float>(Application::GetHeight());
-    const float feedWidth = (std::min)(screenWidth * 0.82f, 1040.0f);
+    const float availableHeight = (std::max)(screenHeight - 156.0f, 300.0f);
+    const float feedWidth = (std::min)({
+        screenWidth * 0.90f,
+        1280.0f,
+        availableHeight * 16.0f / 9.0f });
     const float feedHeight = feedWidth * 9.0f / 16.0f;
     const float feedX = (screenWidth - feedWidth) * 0.5f;
     const float feedY = (screenHeight - feedHeight) * 0.5f + 8.0f;
@@ -448,9 +454,18 @@ void Hud::DrawSurveillanceFeed(
         feedWidth + 10.0f, 5.0f, green);
     AddRectangle(feedX - 5.0f, feedY, 5.0f, feedHeight, green);
     AddRectangle(feedX + feedWidth, feedY, 5.0f, feedHeight, green);
-    AddRectangle(feedX, feedY, feedWidth, 38.0f, dark);
+    AddRectangle(feedX, feedY, feedWidth, 62.0f, dark);
     AddText(feedX + 18.0f, feedY + 10.0f,
-        std::string(cameraLabel) + "   LIVE", 2.0f, green);
+        std::string(cameraLabel) +
+            (showingReference ? "   基準映像" : "   LIVE"),
+        2.5f, green);
+    AddText(feedX + 18.0f, feedY + 37.0f,
+        showingReference
+            ? "異常発生前の映像   C / Y でライブへ戻る"
+            : (zoomed
+                ? "暗視補正 ON   拡大中   Z / X で標準画角へ"
+                : "暗視補正 ON   C / Y 基準映像   Z / X 拡大"),
+        1.9f, Color(0.66f, 0.85f, 0.71f, 0.95f));
 
     // 右上に巡回の進み具合と、捕獲までの残り猶予を表示します。
     const std::string status =
@@ -496,20 +511,24 @@ void Hud::DrawSurveillanceFeed(
     {
         const float offset = std::fmod(
             static_cast<float>(line * 73) + elapsedSeconds * 46.0f,
-            (std::max)(feedHeight - 45.0f, 1.0f));
-        AddRectangle(feedX, feedY + 40.0f + offset,
+            (std::max)(feedHeight - 69.0f, 1.0f));
+        AddRectangle(feedX, feedY + 64.0f + offset,
             feedWidth, 1.0f,
             Color(0.38f, 0.85f, 0.52f, 0.10f));
     }
 
-    const std::string_view prompt = wrongReportVisible
+    const std::string_view prompt = showingReference
+        ? (Input::IsControllerConnected()
+            ? "記録映像   Y ライブ映像へ戻る"
+            : "記録映像   C ライブ映像へ戻る")
+        : wrongReportVisible
         ? "判定不一致   映像をもう一度確認"
         : (reportReady
             ? (Input::IsControllerConnected()
                 ? "LB RB 切替   A このカメラに異常   B 異常なし"
                 : "← → 切替   E このカメラに異常   Q 異常なし")
             : "監視映像を受信中...");
-    constexpr float promptSize = 2.5f;
+    constexpr float promptSize = 2.8f;
     const float promptWidth =
         static_cast<float>(CountDisplayedCharacters(prompt)) *
         promptSize * 6.0f;

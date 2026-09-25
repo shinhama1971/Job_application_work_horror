@@ -66,6 +66,10 @@ void StageScene::Init()
     m_Patrol.Reset();
     m_PatrolCaught.Reset();
     m_PatrolViewTimer = 0.0f;
+    m_PatrolZoomed = false;
+    m_PatrolShowReference = false;
+    m_PatrolReferenceCapturePending = false;
+    m_PatrolReferenceCaptureIndex = 0;
     m_PatrolWrongTimer = 0.0f;
     m_PatrolWarningCooldown = 0.0f;
     m_PatrolNoticeTimer = 0.0f;
@@ -434,8 +438,13 @@ void StageScene::Init()
     m_Hud.Init();
     m_SurveillanceShader.Create(
         "shader/unlitTextureVS.hlsl",
-        "shader/unlitTexturePS.hlsl");
-    m_SurveillanceFeed.Init(640, 360);
+        "shader/surveillanceFeedPS.hlsl");
+    // 大きく表示しても異常の輪郭が潰れない解像度を確保します。
+    m_SurveillanceFeed.Init(960, 540);
+    for (Graphics::RenderTexture& reference : m_SurveillanceReferences)
+    {
+        reference.Init(960, 540);
+    }
     CacheObjects();
 }
 
@@ -710,6 +719,10 @@ void StageScene::Uninit()
     Core::Game::GetInstance()->GetPostProcess()->SetFilmGradeStrength(0.55f);
     Core::Game::GetInstance()->GetPostProcess()->SetLensDirtStrength(0.10f);
     m_SurveillanceFeed.Uninit();
+    for (Graphics::RenderTexture& reference : m_SurveillanceReferences)
+    {
+        reference.Uninit();
+    }
     m_Hud.Uninit();
 
     Core::Game* game = Core::Game::GetInstance();

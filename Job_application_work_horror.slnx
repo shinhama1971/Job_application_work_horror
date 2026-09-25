@@ -4,5 +4,4 @@
     <Platform Name="x86" />
   </Configurations>
   <Project Path="Job_application_work_horror/Job_application_work_horror.vcxproj" Id="764a1f43-2e96-499f-8de9-96db96d3fa9f" />
-  <Project Path="Tests/Tests.vcxproj" Id="dda77dbf-9444-4360-bc7e-a2c41d1811cc" />
 </Solution>

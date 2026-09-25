@@ -63,6 +63,8 @@ public:
         int requiredRounds,
         int mistakes,
         int mistakesUntilCaught,
+        bool zoomed,
+        bool showingReference,
         bool reportReady,
         bool wrongReportVisible);
     void DrawQuietRecovery(float progressRate, float cooldown, bool success, bool tooClose);

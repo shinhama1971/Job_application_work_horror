@@ -85,7 +85,7 @@ private:
     void UpdatePatrolDispatch(class Player& player, float deltaTime);
     SurveillancePatrol::Anomaly ChoosePatrolAnomaly();
     void SetPatrolAnomalyVisible(const SurveillancePatrol::Anomaly& anomaly, bool visible);
-    bool IsLookingAtPatrolAnomaly(const class Player& player) const;
+    bool IsIlluminatingPatrolAnomaly(const class Player& player) const;
     void EndPatrolViewing(class Player& player);
     void StartPatrolCaught(class Player& player);
     void UpdatePatrolCaught(class Player& player, float deltaTime);
@@ -102,6 +102,8 @@ private:
     InteractionSystem m_InteractionSystem;
     Hud m_Hud;
     Graphics::RenderTexture m_SurveillanceFeed;
+    std::array<Graphics::RenderTexture, StageSurveillanceCameraCount>
+        m_SurveillanceReferences;
     Shader m_SurveillanceShader;
     ScareLightSequence m_ScareLightSequence;
     StagePowerSequence m_PowerSequence;
@@ -130,6 +132,10 @@ private:
     std::mt19937 m_PatrolRandom{ std::random_device{}() };
     // 映像を開いてからの経過秒。開いた直後の誤入力を防ぐために使います。
     float m_PatrolViewTimer = 0.0f;
+    bool m_PatrolZoomed = false;
+    bool m_PatrolShowReference = false;
+    bool m_PatrolReferenceCapturePending = false;
+    int m_PatrolReferenceCaptureIndex = 0;
     float m_PatrolWrongTimer = 0.0f;
     float m_PatrolWarningCooldown = 0.0f;
     float m_PatrolNoticeTimer = 0.0f;

@@ -55,7 +55,8 @@ public:
     static constexpr int RequiredRounds = 3;
     static constexpr int MistakesUntilCaught = 2;
     static constexpr float DispatchTimeLimit = 45.0f;
-    static constexpr float ConfirmSeconds = 0.6f;
+    // 偶然視線が横切っただけで対処済みにならないよう、光を当て続ける時間を設けます。
+    static constexpr float ConfirmSeconds = 1.2f;
 
 private:
     State m_State = State::Idle;
@@ -148,15 +149,15 @@ public:
         return RegisterMistake() ? ReportResult::Caught : ReportResult::Wrong;
     }
 
-    // 現地確認中に毎フレーム呼びます。異常を見続けると確認完了になります。
-    DispatchResult UpdateDispatch(float deltaTime, bool lookingAtAnomaly) noexcept
+    // 現地確認中に毎フレーム呼びます。懐中電灯で照らし続けると対処完了になります。
+    DispatchResult UpdateDispatch(float deltaTime, bool illuminatingAnomaly) noexcept
     {
         if (m_State != State::Dispatched)
         {
             return DispatchResult::None;
         }
 
-        m_ConfirmTime = lookingAtAnomaly
+        m_ConfirmTime = illuminatingAnomaly
             ? m_ConfirmTime + deltaTime
             : 0.0f;
         if (m_ConfirmTime >= ConfirmSeconds)

@@ -183,6 +183,11 @@ public:
 	static void SetLight(LIGHT Light);
 	static void SetPointLight(LIGHT Light);
 	static void SetEnvironmentLights(const ENVIRONMENT_LIGHTS& lights);
+	static LIGHT GetLight() { return m_Light; }
+	static ENVIRONMENT_LIGHTS GetEnvironmentLights()
+	{
+		return m_EnvironmentLights;
+	}
 	static void SetDebugViewMode(
 		int mode, float wallDampStrength = 1.0f);
 	static void SetLightEnable(bool Enable);

@@ -182,7 +182,7 @@ void StageScene::UpdateStorageScare(Player& player)
 
 // ----------------------------------------------------------------------------
 // 監視カメラ巡回
-// 端末で監視映像を確認して異常のあるカメラを報告し、現地で異常を見て確認します。
+// 端末で監視映像を確認して異常のあるカメラを報告し、現地で懐中電灯を当てて対処します。
 // 誤った報告や時間切れが続くと捕獲され、端末の前へ戻されます。
 // ----------------------------------------------------------------------------
 namespace
@@ -221,11 +221,14 @@ void StageScene::UpdateSurveillancePatrol(Player& player, float deltaTime)
             return;
         }
 
-        // 端末を操作した瞬間に今回の異常を決め、映像にも現地にも同時に反映します。
+        // 基準映像を記録してから異常を出すため、ここでは種類だけ確定します。
         const SurveillancePatrol::Anomaly anomaly = ChoosePatrolAnomaly();
         m_Patrol.BeginViewing(anomaly);
-        SetPatrolAnomalyVisible(anomaly, true);
         m_PatrolViewTimer = 0.0f;
+        m_PatrolZoomed = false;
+        m_PatrolShowReference = false;
+        m_PatrolReferenceCapturePending = true;
+        m_PatrolReferenceCaptureIndex = 0;
         m_PatrolWrongTimer = 0.0f;
         player.SetCanControl(false);
 
@@ -250,7 +253,8 @@ void StageScene::UpdatePatrolViewing(Player& player)
 {
     m_PatrolWrongTimer = (std::max)(
         0.0f, m_PatrolWrongTimer - Application::GetDeltaTime());
-    if (m_PatrolViewTimer < PatrolInputDelay || m_PatrolWrongTimer > 0.0f)
+    if (m_PatrolReferenceCapturePending ||
+        m_PatrolViewTimer < PatrolInputDelay || m_PatrolWrongTimer > 0.0f)
     {
         return;
     }
@@ -268,6 +272,28 @@ void StageScene::UpdatePatrolViewing(Player& player)
     {
         m_Patrol.SelectCamera(1, StageSurveillanceCameraCount);
         Input::SetVibration(1, 0.03f);
+    }
+
+    if (Input::GetKeyTrigger(VK_C) || Input::GetButtonTrigger(XINPUT_Y))
+    {
+        m_PatrolShowReference = !m_PatrolShowReference;
+        // 記録映像は標準画角なので、切替時にライブも同じ画角へ戻します。
+        m_PatrolZoomed = false;
+        Input::SetVibration(1, 0.03f);
+    }
+
+    // 広い画角で場所を把握し、必要なときだけ中央を拡大して小さな変化を調べます。
+    if (!m_PatrolShowReference &&
+        (Input::GetKeyTrigger(VK_Z) || Input::GetButtonTrigger(XINPUT_X)))
+    {
+        m_PatrolZoomed = !m_PatrolZoomed;
+        Input::SetVibration(1, 0.03f);
+    }
+
+    // 基準映像からの誤報告を防ぐため、報告はライブ画面でのみ受け付けます。
+    if (m_PatrolShowReference)
+    {
+        return;
     }
 
     SurveillancePatrol::ReportResult result =
@@ -320,7 +346,7 @@ void StageScene::UpdatePatrolDispatch(Player& player, float deltaTime)
 {
     const SurveillancePatrol::Anomaly anomaly = m_Patrol.GetAnomaly();
     const SurveillancePatrol::DispatchResult result =
-        m_Patrol.UpdateDispatch(deltaTime, IsLookingAtPatrolAnomaly(player));
+        m_Patrol.UpdateDispatch(deltaTime, IsIlluminatingPatrolAnomaly(player));
 
     Core::Game* game = Core::Game::GetInstance();
     switch (result)
@@ -394,7 +420,14 @@ SurveillancePatrol::Anomaly StageScene::ChoosePatrolAnomaly()
         SurveillancePatrol::AnomalyType::Figure
     };
     int candidateCount = 1;
-    if (camera.LightNumber > 0)
+    CeilingLight* anomalyLight = camera.LightNumber > 0
+        ? m_Objects.CeilingLightAt(camera.LightNumber)
+        : nullptr;
+    // 停電中に元から消えている通常照明を選ぶと映像に差が出ないため、
+    // 通電前は点灯している非常灯だけを消灯異常の候補にします。
+    if (anomalyLight != nullptr &&
+        (Core::Game::GetInstance()->IsPowerRestored() ||
+         anomalyLight->IsEmergencyLight()))
     {
         candidates[candidateCount++] = SurveillancePatrol::AnomalyType::LightOut;
     }
@@ -460,9 +493,13 @@ void StageScene::SetPatrolAnomalyVisible(
     }
 }
 
-bool StageScene::IsLookingAtPatrolAnomaly(const Player& player) const
+bool StageScene::IsIlluminatingPatrolAnomaly(const Player& player) const
 {
-    (void)player;
+    // ライトを点けて自分で異常を探す操作を必須にし、現地到着だけでは完了させません。
+    if (!player.IsFlashlightOn())
+    {
+        return false;
+    }
     const SurveillancePatrol::Anomaly& anomaly = m_Patrol.GetAnomaly();
     if (!anomaly.Exists())
     {
@@ -487,7 +524,7 @@ bool StageScene::IsLookingAtPatrolAnomaly(const Player& player) const
         return false;
     }
 
-    // 壁越しの判定は行わず、近くで異常の方向を向いていれば確認できたとみなします。
+    // 光が届く距離まで近づき、ライトの中心で照らしている場合だけ対処を進めます。
     Camera* viewCamera = Core::Game::GetInstance()->GetCamera();
     Vector3 toTarget = target - viewCamera->GetPosition();
     const float distance = toTarget.Length();
