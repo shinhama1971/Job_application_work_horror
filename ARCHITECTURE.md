@@ -93,6 +93,7 @@ Application
 - `LightZoneProgress`: ライトゾーン通過状況
 - `PuzzleFeedback`: パズル失敗通知と再試行補助
 - `QuietRecovery`: 静止・消灯による危険回復
+- `BehindPresence`: 背後の気配（視界の外に出現し、見ていない間だけ近づく）の出現間隔と判定
 
 `Stage2Scene` に残るループ番号、最終イベント許可、出口状態はステージ進行そのものなので、
 別クラスへ移さず統括責務として保持します。

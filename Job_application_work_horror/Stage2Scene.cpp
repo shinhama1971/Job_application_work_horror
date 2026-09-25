@@ -80,6 +80,8 @@ void Stage2Scene::Init()
     m_ClockAnomaly.Reset();
     m_PuzzleFeedback.Reset();
     m_NoiseThreatSystem.Reset();
+    // 最初の気配は周回に慣れた頃に出します。
+    m_BehindPresence.Reset(BehindPresence::MaxInterval);
     m_ChargerNoticeTimer = 0.0f;
     m_EvidenceNoticeTimer = 0.0f;
     m_SignalNoticeTimer = 0.0f;
@@ -112,6 +114,11 @@ void Stage2Scene::Init()
     noiseShadow->SetPosition(0.0f, -99.0f, -145.0f);
     noiseShadow->SetDeactivateOnExpire(true);
     noiseShadow->SetActive(false);
+
+    // 2周目以降、視界の外から静かに近づく「背後の気配」です。
+    ShadowMan* presence = game->CreateObj<ShadowMan>("Stage2Presence");
+    presence->SetDeactivateOnExpire(true);
+    presence->SetActive(false);
 
     FuseBox* confirmationPanel =
         game->CreateObj<FuseBox>("Stage2ConfirmationPanel");
@@ -507,6 +514,7 @@ void Stage2Scene::CacheObjects()
     objects.door = game->RequireObj<Door>("Stage2Door");
     objects.shadow = game->RequireObj<ShadowMan>("Stage2Shadow");
     objects.noiseShadow = game->RequireObj<ShadowMan>("Stage2NoiseShadow");
+    objects.presence = game->RequireObj<ShadowMan>("Stage2Presence");
     objects.confirmationPanel =
         game->RequireObj<FuseBox>("Stage2ConfirmationPanel");
     objects.emergencyCharger =
@@ -626,6 +634,7 @@ void Stage2Scene::Update()
         {
             noiseShadow->SetActive(false);
         }
+        m_Objects.presence->SetActive(false);
         return;
     }
 
@@ -779,6 +788,7 @@ void Stage2Scene::Update()
     UpdateClock(deltaTime);
     UpdateClockObservation();
     UpdateNoiseThreat(*player, deltaTime);
+    UpdateBehindPresence(*player, deltaTime);
 
     FuseBox* emergencyCharger =
         m_Objects.emergencyCharger;
@@ -973,7 +983,7 @@ void Stage2Scene::Uninit()
 
     const char* objectNames[] =
     {
-        "Player", "Stage2Shadow", "Stage2NoiseShadow", "Stage2ConfirmationPanel",
+        "Player", "Stage2Shadow", "Stage2NoiseShadow", "Stage2Presence", "Stage2ConfirmationPanel",
         "Stage2EmergencyCharger",
         "Stage2EvidenceTerminal1", "Stage2EvidenceTerminal2",
         "Stage2EvidenceMarker1", "Stage2EvidenceMarker2",

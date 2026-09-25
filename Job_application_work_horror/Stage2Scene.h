@@ -20,12 +20,14 @@
 #include "FinalSequence.h"
 #include "LightZoneProgress.h"
 #include "PuzzleFeedback.h"
+#include "BehindPresence.h"
 
 #include "Stage2SceneConstants.h"
 
 #include <array>
 #include <cstddef>
 #include <optional>
+#include <random>
 
 class Player;
 class ExitTrigger;
@@ -55,6 +57,7 @@ struct Stage2Objects
     Door* door = nullptr;
     ShadowMan* shadow = nullptr;
     ShadowMan* noiseShadow = nullptr;
+    ShadowMan* presence = nullptr;      // 背後の気配
     FuseBox* confirmationPanel = nullptr;
     FuseBox* emergencyCharger = nullptr;
     BatteryItem* battery = nullptr;
@@ -117,6 +120,8 @@ private:
     void UpdateSignalStalker();
     void ApplySignalLightingState();
     void ResetSignalPuzzle();
+    void UpdateBehindPresence(Player& player, float deltaTime);
+    bool IsBehindPresenceAllowed() const;
 
     Stage2Objects m_Objects;
 
@@ -135,6 +140,8 @@ private:
     FinalSequence m_FinalSequence;
     LightZoneProgress m_LightZoneProgress;
     PuzzleFeedback m_PuzzleFeedback;
+    BehindPresence m_BehindPresence;
+    std::mt19937 m_PresenceRandom{ std::random_device{}() };
 
     // timerが負数なら未実行、0以上なら対応する演出シーケンスが進行中です。
     int m_LoopCount = 0;

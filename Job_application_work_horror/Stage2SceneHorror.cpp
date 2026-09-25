@@ -395,6 +395,9 @@ void Stage2Scene::StartCaughtSequence(
     {
         noiseShadow->SetActive(false);
     }
+    // 捕獲中はUpdateBehindPresenceが呼ばれないため、ここで背後の気配も消します。
+    m_Objects.presence->SetActive(false);
+    m_BehindPresence.Postpone(BehindPresence::MaxInterval);
 
     game->GetPostProcess()->TriggerHorrorPulse(1.0f, 0.72f);
     game->GetPostProcess()->TriggerBloomPulse(0.18f, 0.16f);
@@ -684,4 +687,119 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player)
         0.18f + static_cast<float>(m_LoopCount) * 0.10f,
         0.30f);
     Input::SetVibration(6, 0.17f);
+}
+
+// ----------------------------------------------------------------------------
+// 背後の気配
+// 視界の外に人影を出し、見ていない間だけ近づけます。振り向けば消え、
+// 気づかずに背後まで近づかれると足音の危険度が一気に上がります。
+// ----------------------------------------------------------------------------
+namespace
+{
+    constexpr float PresenceSpawnDistance = 58.0f;
+    constexpr float PresenceCreepSpeed = 17.0f;     // 歩く速さ(30)より遅く、止まれば迫る速さ
+    constexpr float PresenceLookDistance = 170.0f;
+    constexpr float PresenceLookAlignment = 0.88f;
+    constexpr float PresenceReachThreat = 0.35f;
+    // 廊下の内側に収め、壁の中に出現しないようにします。
+    constexpr float CorridorHalfWidth = 30.0f;
+    constexpr float CorridorMinZ = -150.0f;
+    constexpr float CorridorMaxZ = 130.0f;
+}
+
+bool Stage2Scene::IsBehindPresenceAllowed() const
+{
+    // 他の人影や大きな演出と重ねず、周回そのものの静けさの中でだけ出します。
+    const bool otherFigureActive =
+        (m_Objects.shadow != nullptr && m_Objects.shadow->IsActive()) ||
+        (m_Objects.noiseShadow != nullptr && m_Objects.noiseShadow->IsActive());
+    return m_LoopCount >= 1 &&
+        !otherFigureActive &&
+        m_LoopTransitionTimer < 0.0f &&
+        !m_ObservedScareSequence.IsActive() &&
+        !m_FinalSequence.IsSequenceActive() &&
+        !m_FinalSequence.IsPursuitActive() &&
+        !m_CaughtSequence.IsActive();
+}
+
+void Stage2Scene::UpdateBehindPresence(Player& player, float deltaTime)
+{
+    ShadowMan* presence = m_Objects.presence;
+    Core::Game* game = Core::Game::GetInstance();
+    const Camera* camera = game->GetCamera();
+
+    bool looking = false;
+    float distance = 1000.0f;
+    if (m_BehindPresence.IsFollowing())
+    {
+        Vector3 toPlayer = player.GetPosition() - presence->GetPosition();
+        toPlayer.y = 0.0f;
+        distance = toPlayer.Length();
+
+        Vector3 toPresence = presence->GetPosition() + Vector3(0.0f, 17.0f, 0.0f) -
+            camera->GetPosition();
+        const float viewDistance = toPresence.Length();
+        if (viewDistance > 0.001f && viewDistance < PresenceLookDistance)
+        {
+            toPresence /= viewDistance;
+            looking = camera->GetForward().Dot(toPresence) > PresenceLookAlignment;
+        }
+    }
+
+    std::uniform_real_distribution<float> roll(0.0f, 1.0f);
+    const BehindPresence::Event presenceEvent = m_BehindPresence.Update(
+        deltaTime, IsBehindPresenceAllowed(), looking, distance,
+        roll(m_PresenceRandom));
+
+    switch (presenceEvent)
+    {
+    case BehindPresence::Event::None:
+        break;
+    case BehindPresence::Event::Spawn:
+    {
+        // カメラの真後ろへ置きます。廊下の外に出る場合は、次の機会に回します。
+        Vector3 backward = -camera->GetForward();
+        backward.y = 0.0f;
+        if (backward.LengthSquared() < 0.001f)
+        {
+            m_BehindPresence.Postpone(3.0f);
+            break;
+        }
+        backward.Normalize();
+        const Vector3 spawn = player.GetPosition() + backward * PresenceSpawnDistance;
+        if (std::abs(spawn.x) > CorridorHalfWidth ||
+            spawn.z < CorridorMinZ || spawn.z > CorridorMaxZ)
+        {
+            m_BehindPresence.Postpone(3.0f);
+            break;
+        }
+
+        presence->SetPosition(spawn.x, -99.0f, spawn.z);
+        presence->SetActive(true);
+        presence->EnableGazeScare(BehindPresence::MaxFollowSeconds + 10.0f);
+        presence->EnableChase(PresenceCreepSpeed, 8.0f);
+        break;
+    }
+    case BehindPresence::Event::Seen:
+        // 振り向いた瞬間に消し、見間違いだったのかと思わせる程度の反応にとどめます。
+        presence->SetActive(false);
+        game->GetPostProcess()->TriggerHorrorPulse(0.14f, 0.18f);
+        Input::SetVibration(2, 0.05f);
+        break;
+    case BehindPresence::Event::Reached:
+        presence->SetActive(false);
+        for (CeilingLight* light : m_Objects.lights)
+        {
+            light->TriggerEventFlicker(0.60f, 0.86f);
+        }
+        m_NoiseThreatSystem.SetThreat((std::min)(
+            1.0f, m_NoiseThreatSystem.GetThreat() + PresenceReachThreat));
+        game->PlayAudioCue(SOUND_CUE_SCARE, 0.58f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.62f, 0.42f);
+        Input::SetVibration(10, 0.26f);
+        break;
+    case BehindPresence::Event::Vanished:
+        presence->SetActive(false);
+        break;
+    }
 }

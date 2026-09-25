@@ -337,6 +337,7 @@
     <ClInclude Include="StageSurveillanceCameras.h" />
     <ClInclude Include="SurveillancePatrol.h" />
     <ClInclude Include="Stage2Scene.h" />
+    <ClInclude Include="BehindPresence.h" />
     <ClInclude Include="Stage2SceneConstants.h" />
     <ClInclude Include="QuietRecovery.h" />
     <ClInclude Include="StaticMesh.h" />

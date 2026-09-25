@@ -485,6 +485,9 @@
     <ClInclude Include="Stage2Scene.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
+    <ClInclude Include="BehindPresence.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
     <ClInclude Include="Stage2SceneConstants.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
