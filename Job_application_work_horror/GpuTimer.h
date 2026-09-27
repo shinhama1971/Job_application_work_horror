@@ -19,6 +19,7 @@ enum class GpuPass : std::size_t
     MainScene,
     Bloom,
     PostProcess,
+    Particles,
     Count
 };
 

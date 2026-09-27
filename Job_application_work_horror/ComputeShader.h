@@ -15,6 +15,7 @@ private:
 
 public:
     bool Create(const char* fileName);
+    bool IsCreated() const { return m_Shader != nullptr; }
     void SetGPU() const;
     void Uninit();
 };

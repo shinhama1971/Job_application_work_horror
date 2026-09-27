@@ -66,6 +66,7 @@ namespace Core
         m_Instance->m_ShadowMap.Init();
         m_Instance->m_PostProcess.Init();
         m_Instance->m_TiledLighting.Init();
+        m_Instance->m_DustParticles.Init();
         m_Instance->ApplyVisualSettings();
         m_Instance->ChangeScene(SceneName::Title);
         return true;
@@ -119,6 +120,9 @@ namespace Core
         {
             m_Instance->m_State.AddRunTime(Application::GetDeltaTime());
         }
+        // 埃のGPUシミュレーションは描画時に行うため、進めてよい時間だけを溜めます。
+        // ポーズ中はここへ来ないので、埃も空中で止まります。
+        m_Instance->m_PendingDustTime += Application::GetDeltaTime();
 
 
         if (m_Instance->m_Scene)
@@ -160,6 +164,7 @@ namespace Core
         m_Instance->m_Scene.reset();
 
         m_Instance->m_ObjectManager.DeleteAll();
+        m_Instance->m_DustParticles.Uninit();
         m_Instance->m_TiledLighting.Uninit();
         m_Instance->m_PostProcess.Uninit();
         m_Instance->m_ShadowMap.Uninit();
@@ -260,6 +265,9 @@ namespace Core
         m_ShadowFrameIndex = 0;
 		m_WasReflectionVisible = false;
         m_HasReflectionCameraPose = false;
+        // 前の場所の埃を持ち越さないよう、GPU上の粒子一覧を空にします。
+        m_DustParticles.Reset();
+        m_PendingDustTime = 0.0f;
 
         DeleteAllObject();
 

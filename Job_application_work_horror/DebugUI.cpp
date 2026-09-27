@@ -273,6 +273,8 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
                 drawGpuTiming("Bloom", gpuTimer->GetTiming(GpuPass::Bloom));
                 drawGpuTiming(
                     "PostProcess", gpuTimer->GetTiming(GpuPass::PostProcess));
+                drawGpuTiming(
+                    "GPU dust sim", gpuTimer->GetTiming(GpuPass::Particles));
                 ImGui::TextDisabled("4-frame query ring / no GPU wait");
             }
         }
@@ -288,6 +290,12 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
                 tiledLighting->GetLightCount(),
                 Effect::TiledLighting::MaxLights,
                 tiledLighting->GetTileCount());
+            // GPUパーティクル: 生存数はGPUから数フレーム遅れで読み戻した値です。
+            const Effect::GpuDustParticles* dust = currentGame->GetDustParticles();
+            ImGui::Text("GPU dust: %u / %u alive   emit %u / frame",
+                dust->GetAliveCountForDebug(),
+                Effect::GpuDustParticles::MaxParticles,
+                dust->GetLastEmitCount());
         }
         const ModelCacheStats modelCacheStats = ModelCache::GetStats();
         ImGui::Text("Model cache: %zu loaded / %llu hit / %llu miss",

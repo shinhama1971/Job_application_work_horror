@@ -60,6 +60,7 @@ Debug構成では `F1` でImGuiデバッグ画面を表示できます。
 
 - HLSLによる懐中電灯、濡れ床、ブルーム、ビネット、フィルムグレインなどの画面表現
 - Compute Shaderによるタイルベースライティング（画面を16x16のタイルに分け、タイルごとに影響する点光源だけを計算。光源数の上限を8個から256個へ拡張）
+- GPUパーティクルによる空気中の埃（最大32,768個。生成・更新・削除をAppend StructuredBufferで行い、個数はDispatchIndirect / DrawIndexedInstancedIndirectでGPUが決定。頂点バッファなしでビルボードを生成し、懐中電灯の円錐と点光源の近くでだけ光る）
 - Planar Reflectionによる水たまりの反射
 - Shadow Mapと描画対象ごとのカリング
 - 視界内に水面がある場合だけ反射パスを更新する負荷制御

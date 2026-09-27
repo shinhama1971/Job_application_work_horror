@@ -183,6 +183,21 @@
     <FxCompile Include="shader\tiledLightCullingCS.hlsl">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
+    <FxCompile Include="shader\dustEmitCS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\dustUpdateCS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\dustArgsCS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\dustVS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\dustPS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="AssimpPerse.cpp" />
     <ClCompile Include="BatteryItem.cpp" />
@@ -259,6 +274,7 @@
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Texture2D.cpp" />
     <ClCompile Include="TiledLighting.cpp" />
+    <ClCompile Include="GpuDustParticles.cpp" />
     <ClCompile Include="PipeProp.cpp" />
     <ClCompile Include="TitleScene.cpp" />
     <ClCompile Include="utility.cpp" />
@@ -349,6 +365,7 @@
     <ClInclude Include="Texture.h" />
     <ClInclude Include="Texture2D.h" />
     <ClInclude Include="TiledLighting.h" />
+    <ClInclude Include="GpuDustParticles.h" />
     <ClInclude Include="PipeProp.h" />
     <ClInclude Include="TitleScene.h" />
     <ClInclude Include="utility.h" />
@@ -357,6 +374,7 @@
     <ClInclude Include="shader\fastNoise.hlsli" />
     <ClInclude Include="shader\flashlightShadow.hlsli" />
     <ClInclude Include="shader\flashlightLighting.hlsli" />
+    <ClInclude Include="shader\dustParticleCommon.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="shader\wetFloorPS.hlsl">
