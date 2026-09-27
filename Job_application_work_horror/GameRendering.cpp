@@ -266,28 +266,6 @@ namespace Core
             m_Instance->m_Scene->RenderOffscreen();
         }
 
-        // 空気中の埃は探索するステージだけに出します。生成・更新はCompute Shaderで行い、
-        // 何個生き残ったかはGPUの中だけで決まります（CPUへ読み戻して待つことはしません）。
-        const bool dustScene =
-            m_Instance->m_CurrentScene == SceneName::Stage ||
-            m_Instance->m_CurrentScene == SceneName::Stage2;
-        if (dustScene && m_Instance->m_PendingDustTime > 0.0f)
-        {
-            // 演出品質が低いときは埃の量を減らし、GPUの負荷を下げます。
-            const int effectLevel = m_Instance->m_Settings.GetEffectLevel();
-            const float dustDensity =
-                effectLevel >= 2 ? 1.0f : (effectLevel == 1 ? 0.65f : 0.35f);
-            m_Instance->m_GpuTimer.BeginPass(GpuPass::Particles, context);
-            m_Instance->m_DustParticles.Simulate(
-                m_Instance->m_Camera, m_Instance->m_PendingDustTime, dustDensity);
-            m_Instance->m_GpuTimer.EndPass(GpuPass::Particles, context);
-        }
-        else
-        {
-            m_Instance->m_GpuTimer.SkipPass(GpuPass::Particles);
-        }
-        m_Instance->m_PendingDustTime = 0.0f;
-
         m_Instance->m_GpuTimer.BeginPass(GpuPass::MainScene, context);
         Renderer::DrawStart();
         // プレイヤー視点のタイル別ライトリストをCompute Shaderで作ってから描きます。
@@ -306,11 +284,6 @@ namespace Core
                 ++mainDrawn;
                 o->Draw(&m_Instance->m_Camera);
             }
-        }
-        // 不透明な物の後に、加算合成の埃を重ねます（深度テストのみ行い、深度は書きません）。
-        if (dustScene)
-        {
-            m_Instance->m_DustParticles.Draw(m_Instance->m_Camera);
         }
         m_Instance->m_GpuTimer.EndPass(GpuPass::MainScene, context);
 

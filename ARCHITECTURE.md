@@ -140,11 +140,10 @@ Game::Draw
   1. ShadowMap更新
   2. 必要な場合のみPlanarReflection更新
   3. 監視映像などSceneの補助カメラ描画
-  4. 埃のGPUパーティクルの生成・更新（Compute Shader、ステージのみ）
-  5. タイル別ライトリスト作成（Compute Shader）→ ワールドObject描画 → 埃（加算合成）
-  6. PostProcess
-  7. SceneのHUD・画面演出
-  8. Debug UI
+  4. タイル別ライトリスト作成（Compute Shader）→ ワールドObject描画
+  5. PostProcess
+  6. SceneのHUD・画面演出
+  7. Debug UI
 ```
 
 ### タイルベースライティング（`Effect::TiledLighting`）
@@ -163,29 +162,6 @@ Forward+（Tiled Forward）の構成です。
 4. 反射・監視映像など別視点の描画では、タイルがプレイヤー視点と一致しないため全光源を計算
 
 Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと、タイルごとの光源数を色で確認できます。
-
-### GPUパーティクル（`Effect::GpuDustParticles`）
-
-空気中を漂う埃を、生成から描画数の決定までGPUだけで処理します。CPUが渡すのは
-「このフレームに作りたい個数」と経過時間だけで、生きている粒子の数はCPUへ読み戻しません。
-
-1. Emit（`dustEmitCS.hlsl`）: カメラを囲む箱の中へ新しい粒子を `AppendStructuredBuffer` に追加
-   - 乱数はスレッドごとのXorshift状態を `RWStructuredBuffer` に保存して毎フレーム進めます
-   - 前フレームの生存数を見て、バッファ容量を超える分は生成しません（Appendのあふれは未定義動作のため）
-2. `CopyStructureCount` で内部カウンターを普通のバッファへ写し、`dustArgsCS.hlsl` で
-   「粒子数」→「スレッドグループ数」へ単位変換（引数バッファへ直接写すとY/Zが不定になるため）
-3. Update（`dustUpdateCS.hlsl`）を `DispatchIndirect` で起動し、生き残った粒子だけを
-   もう1本のAppendバッファへ追加（寿命切れ・箱の外に出た粒子は追加しない＝削除。配列に穴が空かない）
-   - 入力と出力は同じバッファにできないため、2本を毎フレーム入れ替えます
-4. 更新後の個数を再び写し、`DrawIndexedInstancedIndirect` の引数（個数×6インデックス）へ変換
-5. 描画（`dustVS.hlsl` / `dustPS.hlsl`）は頂点バッファ・Input Layoutを使わず、`SV_VertexID` から
-   粒子番号と四隅を求めて StructuredBuffer を直接読みます。インスタンス描画とGeometry Shaderは使わず、
-   最大数分のフラットなインデックス配列を事前に用意しています
-   - 埃は自分では光らず、懐中電灯の円錐（シャドウマップで遮蔽）とタイル別リストの点光源から明るさを決めます
-   - 加算合成のため、奥から順に並べ替える（Zソート）必要がありません
-
-プレイヤーが歩くと近くの埃が引きずられ、ポーズ中は空中で止まります。演出品質の設定で量を減らせます。
-Debug構成では生存数（数フレーム遅れの読み戻し）と、シミュレーションのGPU時間を確認できます。
 
 描画パスへの参加可否は `Object` の仮想関数で問い合わせます。Rendererが具象型を列挙して
 `dynamic_cast` する構造にはしていません。

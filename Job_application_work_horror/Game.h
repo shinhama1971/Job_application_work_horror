@@ -19,7 +19,6 @@
 #include "ShadowMap.h"
 #include "PlanarReflection.h"
 #include "TiledLighting.h"
-#include "GpuDustParticles.h"
 #include "GameState.h"
 #include "GameSettings.h"
 #include "PauseMenu.h"
@@ -57,9 +56,6 @@ namespace Core
         Effect::TiledLighting m_TiledLighting;
         // 毎フレームObjectから集める点光源。確保し直しを避けるため使い回します。
         std::vector<ENVIRONMENT_POINT_LIGHT> m_FramePointLights;
-        // 空気中の埃。生成・更新・描画数の決定までGPUだけで行います。
-        Effect::GpuDustParticles m_DustParticles;
-        float m_PendingDustTime = 0.0f;
         GpuTimer m_GpuTimer;
         Sound m_Sound;
         bool m_SoundReady = false;
@@ -300,11 +296,6 @@ namespace Core
         Effect::TiledLighting* GetTiledLighting()
         {
             return &m_TiledLighting;
-        }
-
-        const Effect::GpuDustParticles* GetDustParticles() const
-        {
-            return &m_DustParticles;
         }
 
         Effect::ShadowMap* GetShadowMap()

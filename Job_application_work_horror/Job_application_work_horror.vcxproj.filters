@@ -96,9 +96,6 @@
     <ClCompile Include="TiledLighting.cpp">
       <Filter>ソース ファイル\Rendering</Filter>
     </ClCompile>
-    <ClCompile Include="GpuDustParticles.cpp">
-      <Filter>ソース ファイル\Rendering</Filter>
-    </ClCompile>
     <ClCompile Include="Camera.cpp">
       <Filter>ソース ファイル\Camera</Filter>
     </ClCompile>
@@ -275,9 +272,6 @@
     <ClInclude Include="shader\flashlightLighting.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="shader\dustParticleCommon.hlsli">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="ScareTrigger.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -372,9 +366,6 @@
       <Filter>ソース ファイル\Rendering</Filter>
     </ClInclude>
     <ClInclude Include="TiledLighting.h">
-      <Filter>ソース ファイル\Rendering</Filter>
-    </ClInclude>
-    <ClInclude Include="GpuDustParticles.h">
       <Filter>ソース ファイル\Rendering</Filter>
     </ClInclude>
     <ClInclude Include="Camera.h">
