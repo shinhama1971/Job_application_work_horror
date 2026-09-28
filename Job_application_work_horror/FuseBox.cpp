@@ -161,7 +161,7 @@ void FuseBox::Interact(Player& player)
         }
 
         m_IsPowered = true;
-        game->PlayAudioCue(SOUND_CUE_POWER);
+        game->PlayAudioCueAt(SOUND_CUE_POWER, m_Position);
         BuildGeometry();
         m_VertexBuffer.Modify(m_Vertices);
         game->GetPostProcess()->TriggerBloomPulse(0.72f, 0.28f);
@@ -178,7 +178,7 @@ void FuseBox::Interact(Player& player)
         }
 
         m_IsPowered = true;
-        game->PlayAudioCue(SOUND_CUE_POWER);
+        game->PlayAudioCueAt(SOUND_CUE_POWER, m_Position);
         game->GetPostProcess()->TriggerBloomPulse(1.25f, 0.72f);
         game->GetPostProcess()->TriggerHorrorPulse(0.32f, 0.36f);
 
@@ -202,7 +202,7 @@ void FuseBox::Interact(Player& player)
     }
 
     m_IsPowered = true;
-    game->PlayAudioCue(SOUND_CUE_POWER);
+    game->PlayAudioCueAt(SOUND_CUE_POWER, m_Position);
     game->SetPowerRestored(true);
     game->GetPostProcess()->TriggerBloomPulse(1.65f, 1.35f);
     game->GetPostProcess()->TriggerHorrorPulse(0.55f, 0.75f);

@@ -58,6 +58,10 @@ public:
     void ResolveCollision(
         DirectX::SimpleMath::Vector3& position,
         float radius) const;
+    // 閉じた扉板が線分を遮るかを返します。立体音響で扉の向こうの音をこもらせるために使います。
+    bool BlocksSoundSegment(
+        const DirectX::SimpleMath::Vector3& start,
+        const DirectX::SimpleMath::Vector3& end) const;
     void ResetClosed(int loopPhase = 0);
     // 監視カメラの異常用に、操作されないまま開いた状態へ切り替えます。
     // 音や画面効果は呼び出し側で出します。

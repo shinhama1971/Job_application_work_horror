@@ -81,6 +81,10 @@ namespace Core
         // 明るさ・演出強度・視点感度をPostProcessとCameraへ反映します。
         void ApplyVisualSettings();
         void UpdatePauseMenu();
+        // 聞き手と音源の間にある壁・閉じた扉の量（0〜1）を返します。
+        float ComputeSoundOcclusion(
+            const DirectX::SimpleMath::Vector3& listener,
+            const DirectX::SimpleMath::Vector3& emitter);
 
     public:
         Game();
@@ -111,6 +115,24 @@ namespace Core
             {
                 m_Sound.Play(label, pitch);
             }
+        }
+
+        // ワールド上の位置から鳴らします。カメラとの位置関係で左右・距離・壁越しの聞こえ方が変わります。
+        void PlayAudioCueAt(
+            SOUND_LABEL label,
+            const DirectX::SimpleMath::Vector3& position,
+            float pitch = 1.0f,
+            float volume = 1.0f)
+        {
+            if (m_SoundReady)
+            {
+                m_Sound.PlayAt(label, position, pitch, volume);
+            }
+        }
+
+        size_t GetActiveSpatialVoiceCount() const
+        {
+            return m_SoundReady ? m_Sound.GetActiveSpatialVoiceCount() : 0;
         }
 
         void StopAudioCue(SOUND_LABEL label)

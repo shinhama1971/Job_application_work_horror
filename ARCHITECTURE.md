@@ -166,6 +166,19 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 描画パスへの参加可否は `Object` の仮想関数で問い合わせます。Rendererが具象型を列挙して
 `dynamic_cast` する構造にはしていません。
 
+## 立体音響（`Sound` + X3DAudio）
+
+環境音やUIの音は従来どおり位置を持たずに鳴らし、ワールド上で起きる音だけを `Game::PlayAudioCueAt` で
+位置付きで鳴らします。
+
+- `Sound::PlayAt` は最大16音の枠を持ち、同じ効果音が重なっても別々の位置で鳴らせます
+- 毎フレーム `Game::Update` がカメラの位置と向きを `Sound::UpdateListener` へ渡し、
+  X3DAudioで各音の左右・距離の出力行列を計算し直します（振り向くと聞こえる方向が変わる）
+- 聞き手と音源の間の遮蔽量は `Game::ComputeSoundOcclusion` が壁（`Wall`）と閉じた扉（`Door`）との
+  線分判定で求めます。`Sound` は壁や扉の型を知らず、`std::function` で結果だけを受け取ります
+- 遮蔽された音は音量を下げ、ローパスフィルターで高音を削ってこもらせます。遠い音も少し高音を落とします
+- 追ってくる人影（`ShadowMan`）は、進んだ距離に合わせて自分の足元から足音を鳴らします
+
 ## dynamic_castの方針
 
 描画判定やデバッグScene判定に使われていた `dynamic_cast` は削除しました。
