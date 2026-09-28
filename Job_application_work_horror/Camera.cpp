@@ -173,39 +173,11 @@ void Camera::SetCamera(int mode)
             return;
         }
 
-        Vector3 forward = GetForward();
+        m_Target = m_Position + GetForward();
 
-        m_Target = m_Position + forward;
-
-        Vector3 up = Vector3(0.0f, 1.0f, 0.0f);
-
-        m_ViewMatrix =
-            DirectX::XMMatrixLookAtLH(
-                m_Position,
-                m_Target,
-                up
-            );
-
+        Matrix projectionMatrix;
+        GetMainMatrices(m_ViewMatrix, projectionMatrix);
         Renderer::SetViewMatrix(&m_ViewMatrix);
-
-        constexpr float fieldOfView =
-            DirectX::XMConvertToRadians(60.0f);
-
-        float aspectRatio =
-            static_cast<float>(Application::GetWidth()) /
-            static_cast<float>(Application::GetHeight());
-
-        float nearPlane = 1.0f;
-        float farPlane = 1000.0f;
-
-        Matrix projectionMatrix =
-            DirectX::XMMatrixPerspectiveFovLH(
-                fieldOfView,
-                aspectRatio,
-                nearPlane,
-                farPlane
-            );
-
         Renderer::SetProjectionMatrix(&projectionMatrix);
     }
     else
@@ -236,6 +208,23 @@ void Camera::Uninit()
 void Camera::SetTarget(Vector3 target)
 {
     m_Target = target;
+}
+
+// プレイヤー視点の本描画に使うビュー・射影行列です。
+// タイルベースのライトカリングも、同じ行列から各タイルの視錐台を作ります。
+void Camera::GetMainMatrices(Matrix& view, Matrix& projection) const
+{
+    const Vector3 up(0.0f, 1.0f, 0.0f);
+    view = DirectX::XMMatrixLookAtLH(m_Position, m_Position + GetForward(), up);
+
+    constexpr float fieldOfView = DirectX::XMConvertToRadians(60.0f);
+    constexpr float nearPlane = 1.0f;
+    constexpr float farPlane = 1000.0f;
+    const float aspectRatio =
+        static_cast<float>(Application::GetWidth()) /
+        static_cast<float>(Application::GetHeight());
+    projection = DirectX::XMMatrixPerspectiveFovLH(
+        fieldOfView, aspectRatio, nearPlane, farPlane);
 }
 
 void Camera::SetOverrideMatrices(

@@ -20,7 +20,7 @@
 #include "ScreenDustOverlay.h"
 #include "ScareTrigger.h"
 #include "ShadowMan.h"
-#include "TestPipe.h"
+#include "PipeProp.h"
 #include <SimpleMath.h>
 #include <algorithm>
 #include <cmath>
@@ -63,9 +63,17 @@ void StageScene::Init()
     m_StorageScarePhase = 0;
     m_StorageScareTimer = 0.0f;
     m_StorageScareNoticeTimer = 0.0f;
-    m_EvidenceScarePhase = 0;
-    m_EvidenceScareTimer = 0.0f;
-    m_EvidenceScareNoticeTimer = 0.0f;
+    m_Patrol.Reset();
+    m_PatrolCaught.Reset();
+    m_PatrolViewTimer = 0.0f;
+    m_PatrolZoomed = false;
+    m_PatrolShowReference = false;
+    m_PatrolReferenceCapturePending = false;
+    m_PatrolReferenceCaptureIndex = 0;
+    m_PatrolWrongTimer = 0.0f;
+    m_PatrolWarningCooldown = 0.0f;
+    m_PatrolNoticeTimer = 0.0f;
+    m_PatrolNoticeText = "";
     m_ScareLightSequence.Reset();
     m_PowerSequence.Reset();
     m_StageVisualTimer = 0.0f;
@@ -76,21 +84,21 @@ void StageScene::Init()
     Player* player = game->CreateObj<Player>("Player");
     player->SetPosition(Vector3(0.0f, -99.0f, -120.0f));
 
-    // 外部FBXの表示確認用。進行や当たり判定には参加させません。
-    TestPipe* testPipe = game->CreateObj<TestPipe>("TestPipe");
-    testPipe->SetPosition(Vector3(22.0f, -87.54f, -105.0f));
-    testPipe->SetRotation(Vector3(0.0f, 0.45f, 0.0f));
-    testPipe->SetScale(Vector3(8.0f, 8.0f, 8.0f));
+    // 外部FBXの配管モデル（背景装飾）。進行や当たり判定には参加させません。
+    PipeProp* pipe = game->CreateObj<PipeProp>("PipeProp");
+    pipe->SetPosition(Vector3(22.0f, -87.54f, -105.0f));
+    pipe->SetRotation(Vector3(0.0f, 0.45f, 0.0f));
+    pipe->SetScale(Vector3(8.0f, 8.0f, 8.0f));
 
-    TestPipe* testPipe2 = game->CreateObj<TestPipe>("TestPipe2");
-    testPipe2->SetPosition(Vector3(-22.0f, -87.54f, -105.0f));
-    testPipe2->SetRotation(Vector3(0.0f, -0.45f, 0.0f));
-    testPipe2->SetScale(Vector3(8.0f, 8.0f, 8.0f));
+    PipeProp* pipe2 = game->CreateObj<PipeProp>("PipeProp2");
+    pipe2->SetPosition(Vector3(-22.0f, -87.54f, -105.0f));
+    pipe2->SetRotation(Vector3(0.0f, -0.45f, 0.0f));
+    pipe2->SetScale(Vector3(8.0f, 8.0f, 8.0f));
 
-    TestPipe* testPipe3 = game->CreateObj<TestPipe>("TestPipe3");
-    testPipe3->SetPosition(Vector3(0.0f, -87.54f, -155.0f));
-    testPipe3->SetRotation(Vector3(0.0f, 1.57f, 0.0f));
-    testPipe3->SetScale(Vector3(8.0f, 8.0f, 8.0f));
+    PipeProp* pipe3 = game->CreateObj<PipeProp>("PipeProp3");
+    pipe3->SetPosition(Vector3(0.0f, -87.54f, -155.0f));
+    pipe3->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
+    pipe3->SetScale(Vector3(8.0f, 8.0f, 8.0f));
 
     // 地面
     Ground* ground = game->CreateObj<Ground>("Ground");
@@ -330,16 +338,16 @@ void StageScene::Init()
     emergencyCharger->SetManualControl("非常用充電器を使う");
     emergencyCharger->SetManualInteractionAllowed(true);
     emergencyCharger->SetPosition(-205.0f, -90.0f, -112.0f);
-    emergencyCharger->SetRotation(Vector3(0.0f, 1.5707963f, 0.0f));
+    emergencyCharger->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
 
     // 任意探索の報酬は最短経路から外して配置します。
     // 素早い脱出と完全探索のどちらを選ぶか判断させるためです。
     FuseBox* evidenceTerminal =
         game->CreateObj<FuseBox>("Stage1EvidenceTerminal");
-    evidenceTerminal->SetManualControl("残された記録を回収する");
+    evidenceTerminal->SetManualControl("監視カメラを確認する");
     evidenceTerminal->SetManualInteractionAllowed(true);
     evidenceTerminal->SetPosition(205.0f, -90.0f, -42.0f);
-    evidenceTerminal->SetRotation(Vector3(0.0f, -1.5707963f, 0.0f));
+    evidenceTerminal->SetRotation(Vector3(0.0f, -DirectX::XM_PIDIV2, 0.0f));
     Wall* evidenceMarker = createStageProp(
         "Stage1EvidenceMarker",
         Vector3(217.2f, -65.0f, -42.0f),
@@ -355,9 +363,19 @@ void StageScene::Init()
     // 廊下を歩きながら操作キーを押すだけで透明トリガーが反応する問題を防ぎます。
     Door* stageExitDoor = game->CreateObj<Door>("Stage1ExitDoor");
     stageExitDoor->SetPosition(202.0f, -74.0f, 307.5f);
-    stageExitDoor->SetRotation(Vector3(0.0f, 1.5707963f, 0.0f));
+    stageExitDoor->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
     stageExitDoor->SetScale(Vector3(60.0f, 50.0f, 4.0f));
     stageExitDoor->SetLocked(true);
+
+    // 監視カメラの異常用に、壁際へ開かずの扉を置きます。開いても先は壁です。
+    for (const StageSealedDoor& sealed : StageSealedDoors)
+    {
+        Door* sealedDoor = game->CreateObj<Door>(sealed.Name);
+        sealedDoor->SetPosition(
+            sealed.Position[0], sealed.Position[1], sealed.Position[2]);
+        sealedDoor->ResetClosed(0);
+        sealedDoor->SetLocked(true);
+    }
 
     Wall* stageExitSign = createStageProp(
         "PropStage1ExitSign",
@@ -418,15 +436,86 @@ void StageScene::Init()
 
 
     m_Hud.Init();
+    m_SurveillanceShader.Create(
+        "shader/unlitTextureVS.hlsl",
+        "shader/surveillanceFeedPS.hlsl");
+    // 大きく表示しても異常の輪郭が潰れない解像度を確保します。
+    m_SurveillanceFeed.Init(960, 540);
+    for (Graphics::RenderTexture& reference : m_SurveillanceReferences)
+    {
+        reference.Init(960, 540);
+    }
+    CacheObjects();
+    SetupPracticalLights();
+}
+
+// 看板や表示灯が自分の発光色で周囲の床と壁を照らすようにします。
+// 天井照明だけだった頃は光源数の上限(8個)で足せなかった小さな光です。
+void StageScene::SetupPracticalLights()
+{
+    m_Objects.exitSign->SetGlowLight(60.0f, 2.2f);
+    m_Objects.doorIndicator->SetGlowLight(45.0f, 2.0f);
+    m_Objects.evidenceMarker->SetGlowLight(45.0f, 2.0f);
+    for (Wall* marker : m_Objects.loopMarkers)
+    {
+        marker->SetGlowLight(40.0f, 1.8f);
+    }
+}
+
+// 以後の更新で使うObjectをここで一度だけ名前検索し、見つからなければ起動時に通知します。
+void StageScene::CacheObjects()
+{
+    Core::Game* game = Core::Game::GetInstance();
+    StageObjects& objects = m_Objects;
+
+    objects.player = game->RequireObj<Player>("Player");
+    objects.fuseWatcher = game->RequireObj<ShadowMan>("Stage1FuseWatcher");
+    objects.storageShadow = game->RequireObj<ShadowMan>("Stage1StorageShadow");
+    objects.evidenceShadow = game->RequireObj<ShadowMan>("Stage1EvidenceShadow");
+    objects.exitOmen = game->RequireObj<ShadowMan>("Stage1ExitOmen");
+    objects.emergencyCharger = game->RequireObj<FuseBox>("Stage1EmergencyCharger");
+    objects.evidenceTerminal = game->RequireObj<FuseBox>("Stage1EvidenceTerminal");
+    objects.exitPowerPanel = game->RequireObj<FuseBox>("ExitPowerPanel");
+    objects.evidenceMarker = game->RequireObj<Wall>("Stage1EvidenceMarker");
+    objects.exitSign = game->RequireObj<Wall>("PropStage1ExitSign");
+    objects.doorIndicator = game->RequireObj<Wall>("PropDoorIndicator");
+    objects.loopDoor = game->RequireObj<Door>("Door");
+    objects.exitDoor = game->RequireObj<Door>("Stage1ExitDoor");
+    objects.exitTrigger = game->RequireObj<ExitTrigger>("ExitTrigger");
+    objects.secondFuse = game->RequireObj<Item>("Item2");
+    objects.thirdFuse = game->RequireObj<Item>("Item3");
+
+    for (int markerIndex = 0; markerIndex < static_cast<int>(objects.loopMarkers.size()); ++markerIndex)
+    {
+        objects.loopMarkers[static_cast<std::size_t>(markerIndex)] = game->RequireObj<Wall>(
+            "PropLoopMarker" + std::to_string(markerIndex + 1));
+    }
+    for (int number = 1; number <= StageObjects::CeilingLightCount; ++number)
+    {
+        objects.ceilingLights[static_cast<std::size_t>(number - 1)] =
+            game->RequireObj<CeilingLight>("CeilingLight" + std::to_string(number));
+    }
+    for (int index = 0; index < StageSealedDoorCount; ++index)
+    {
+        objects.sealedDoors[static_cast<std::size_t>(index)] =
+            game->RequireObj<Door>(StageSealedDoors[index].Name);
+    }
 }
 
 // ヒューズ数と電力状態を基準に目的表示とイベント段階を更新します。
 void StageScene::Update()
 {
     Player* player =
-        Core::Game::GetInstance()->GetObj<Player>("Player");
+        m_Objects.player;
 
-    if (player == nullptr || !player->CanControl())
+    if (player == nullptr)
+    {
+        return;
+    }
+
+    // 映像確認中と捕獲中は操作不能なので、操作可否の判定より前に更新します。
+    UpdateSurveillancePatrol(*player, Application::GetDeltaTime());
+    if (!player->CanControl())
     {
         return;
     }
@@ -452,8 +541,6 @@ void StageScene::Update()
         0.0f, m_EvidenceNoticeTimer - deltaTime);
     m_StorageScareNoticeTimer = (std::max)(
         0.0f, m_StorageScareNoticeTimer - deltaTime);
-    m_EvidenceScareNoticeTimer = (std::max)(
-        0.0f, m_EvidenceScareNoticeTimer - deltaTime);
     const int currentFuseCount = game->GetItemCount();
     if (currentFuseCount > m_LastFuseCount)
     {
@@ -471,13 +558,13 @@ void StageScene::Update()
 
     if (game->IsPowerRestored())
     {
-        ShadowMan* watcher = game->GetObj<ShadowMan>("Stage1FuseWatcher");
+        ShadowMan* watcher = m_Objects.fuseWatcher;
         if (watcher != nullptr) watcher->SetActive(false);
         m_FuseWatcherState = 0;
     }
 
     FuseBox* emergencyCharger =
-        game->GetObj<FuseBox>("Stage1EmergencyCharger");
+        m_Objects.emergencyCharger;
     if (!m_ChargerHandled && emergencyCharger != nullptr &&
         emergencyCharger->IsActivated())
     {
@@ -488,7 +575,7 @@ void StageScene::Update()
         StartFuseWatcher(2);
 
         CeilingLight* chargerLight =
-            game->GetObj<CeilingLight>("CeilingLight2");
+            m_Objects.CeilingLightAt(2);
         if (chargerLight != nullptr)
         {
             chargerLight->TriggerEventFlicker(0.92f, 0.84f);
@@ -497,39 +584,16 @@ void StageScene::Update()
         Input::SetVibration(6, 0.14f);
     }
 
-    FuseBox* evidenceTerminal =
-        game->GetObj<FuseBox>("Stage1EvidenceTerminal");
-    if (!m_EvidenceHandled && evidenceTerminal != nullptr &&
-        evidenceTerminal->IsActivated())
-    {
-        m_EvidenceHandled = true;
-        m_EvidenceScarePhase = 1;
-        m_EvidenceScareTimer = 0.0f;
-        m_EvidenceNoticeTimer = 3.2f;
-        game->RegisterEvidenceCollected();
-        player->AddBattery(8.0f);
-        Wall* evidenceMarker = game->GetObj<Wall>("Stage1EvidenceMarker");
-        if (evidenceMarker != nullptr)
-        {
-            evidenceMarker->SetAppearance(
-                Color(0.08f, 0.18f, 0.10f, 1.0f),
-                Color(0.16f, 0.52f, 0.22f, 1.0f),
-                44.0f);
-        }
-        game->GetPostProcess()->TriggerBloomPulse(0.42f, 0.20f);
-        Input::SetVibration(4, 0.09f);
-    }
     UpdateCorridorLoop(*player);
     UpdateEntranceThresholdEvent(*player);
     UpdateStorageScare(*player);
-    UpdateEvidenceScare(*player);
     UpdateScareLightSequence();
     UpdatePowerRestoreSequence();
     UpdateExitPowerSequence();
     UpdateExitOmen(*player);
 
-    Door* stageExitDoor = game->GetObj<Door>("Stage1ExitDoor");
-    ExitTrigger* stageExit = game->GetObj<ExitTrigger>("ExitTrigger");
+    Door* stageExitDoor = m_Objects.exitDoor;
+    ExitTrigger* stageExit = m_Objects.exitTrigger;
     const bool exitPowerReady = m_PowerSequence.IsExitComplete();
     if (stageExitDoor != nullptr)
     {
@@ -545,7 +609,7 @@ void StageScene::Update()
         }
     }
 
-    Wall* stageExitSign = game->GetObj<Wall>("PropStage1ExitSign");
+    Wall* stageExitSign = m_Objects.exitSign;
     if (stageExitSign != nullptr)
     {
         const float pulse = 0.78f +
@@ -567,7 +631,7 @@ void StageScene::Update()
         }
     }
 
-    Wall* exitIndicator = game->GetObj<Wall>("PropDoorIndicator");
+    Wall* exitIndicator = m_Objects.doorIndicator;
     if (exitIndicator != nullptr)
     {
         const float omenRate = m_ExitOmenSequence.IsTriggered()
@@ -668,14 +732,19 @@ void StageScene::Uninit()
     Core::Game::GetInstance()->GetPostProcess()->SetLensDistortionStrength(0.20f);
     Core::Game::GetInstance()->GetPostProcess()->SetFilmGradeStrength(0.55f);
     Core::Game::GetInstance()->GetPostProcess()->SetLensDirtStrength(0.10f);
+    m_SurveillanceFeed.Uninit();
+    for (Graphics::RenderTexture& reference : m_SurveillanceReferences)
+    {
+        reference.Uninit();
+    }
     m_Hud.Uninit();
 
     Core::Game* game = Core::Game::GetInstance();
 
     game->DestroyObj("Player");
-    game->DestroyObj("TestPipe");
-    game->DestroyObj("TestPipe2");
-    game->DestroyObj("TestPipe3");
+    game->DestroyObj("PipeProp");
+    game->DestroyObj("PipeProp2");
+    game->DestroyObj("PipeProp3");
     game->DestroyObj("Ground");
 
     game->DestroyObj("Wall1");
@@ -746,4 +815,8 @@ void StageScene::Uninit()
     game->DestroyObj("Stage1FuseWatcher");
     game->DestroyObj("Stage1StorageShadow");
     game->DestroyObj("Stage1EvidenceShadow");
+    for (const StageSealedDoor& sealed : StageSealedDoors)
+    {
+        game->DestroyObj(sealed.Name);
+    }
 }

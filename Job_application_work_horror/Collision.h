@@ -82,9 +82,5 @@ namespace Collision
 	DirectX::SimpleMath::Vector3 ClosestPointOnTriangle(const DirectX::SimpleMath::Vector3& point, const Polygon& polygon);
 	DirectX::SimpleMath::Vector3 GetNormal(const Polygon& polygon);
 
-	//球体を当たった後の地点に動かす
-	DirectX::SimpleMath::Vector3 moveSphere(const Segment& capsule, const float& radius, const Polygon& polygon, const DirectX::SimpleMath::Vector3& contact, float& distance);
-	DirectX::SimpleMath::Vector3 moveSphere(const Sphere& sphere, const Polygon& polygon, const DirectX::SimpleMath::Vector3& contact);
-
 	AABB SetAABB(DirectX::SimpleMath::Vector3 centerposition, float width, float height, float depth);
 }

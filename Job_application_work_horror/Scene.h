@@ -33,6 +33,8 @@ public:
 
     virtual void Update() = 0;
     virtual void Draw(Camera* camera) { (void)camera; }
+    // 本描画の前に、監視映像などのオフスクリーン描画が必要なSceneだけが実装します。
+    virtual void RenderOffscreen() {}
     virtual bool TryGetDebugInfo(SceneDebugInfo&) const { return false; }
     virtual void RequestDebugAction(SceneDebugAction) {}
 };

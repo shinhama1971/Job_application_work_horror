@@ -1,11 +1,10 @@
 // ============================================================================
 // ファイルの役割: Windowsエントリーポイントからアプリケーションを起動します。
-// 主な技術: WinMain、例外境界、アプリケーションライフサイクル
+// 主な技術: main関数（Release構成はmainCRTStartup経由でWindowsサブシステム起動）、アプリケーションライフサイクル
 // ============================================================================
 
 #pragma once
 
-#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <windows.h>
 #include <assert.h>
@@ -13,12 +12,5 @@
 #include <locale.h>
 #include <string>
 
-#pragma warning(push)
-#pragma warning(disable:4005)
-
-#pragma warning(pop)
-
 #pragma comment (lib,"winmm.lib")
 
-constexpr uint32_t SCREEN_WIDTH = 640;
-constexpr uint32_t SCREEN_HEIGHT = 360;

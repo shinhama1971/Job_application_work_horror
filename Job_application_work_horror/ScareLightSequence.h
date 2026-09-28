@@ -44,7 +44,14 @@ public:
         }
     }
 
-    void Advance(float deltaTime) noexcept { m_Timer += deltaTime; }
+    // 停止中に呼ばれてもフェーズ-1のまま再開しないよう、実行中だけ進めます。
+    void Advance(float deltaTime) noexcept
+    {
+        if (IsActive())
+        {
+            m_Timer += deltaTime;
+        }
+    }
 
     int ConsumePendingBeat() noexcept
     {

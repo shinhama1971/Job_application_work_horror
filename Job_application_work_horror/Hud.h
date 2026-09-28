@@ -52,12 +52,28 @@ public:
         bool exitReady,
         int signalStep,
         bool signalActive);
+    void DrawSurveillanceFeed(
+        ID3D11ShaderResourceView* feed,
+        Shader& textureShader,
+        float elapsedSeconds,
+        std::string_view cameraLabel,
+        int cameraIndex,
+        int cameraCount,
+        int roundsCleared,
+        int requiredRounds,
+        int mistakes,
+        int mistakesUntilCaught,
+        bool zoomed,
+        bool showingReference,
+        bool reportReady,
+        bool wrongReportVisible);
     void DrawQuietRecovery(float progressRate, float cooldown, bool success, bool tooClose);
     void DrawPause(
         int brightnessLevel,
         int effectLevel,
         int lookSensitivityLevel,
         int volumeLevel,
+        bool guideEnabled,
         int selectedSetting,
         int floorNumber,
         float runTimeSeconds,
@@ -78,6 +94,13 @@ private:
         float pixelSize,
         const DirectX::SimpleMath::Color& color);
     void Flush();
+    void DrawTextureRectangle(
+        ID3D11ShaderResourceView* texture,
+        Shader& textureShader,
+        float x,
+        float y,
+        float width,
+        float height);
 
     Shader m_Shader;
     VertexBuffer<VERTEX_3D> m_VertexBuffer;

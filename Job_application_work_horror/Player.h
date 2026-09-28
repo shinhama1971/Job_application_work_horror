@@ -63,6 +63,7 @@ private:
     bool m_IsFPS = true;                    // trueなら一人称視点
     bool m_SpawnAdjusted = false;           // 初期位置の床補正が完了したか
     bool m_CanControl = true;
+    bool m_SprintAllowed = true;
 public:
     void Init() override;
     void Update() override;
@@ -107,6 +108,17 @@ public:
     bool IsSprinting() const
     {
         return m_Movement.IsSprinting();
+    }
+
+    // falseの間は走る入力を無視し、歩きだけにします（2面の周回中など）。
+    void SetSprintAllowed(bool allowed)
+    {
+        m_SprintAllowed = allowed;
+    }
+
+    bool IsSprintAllowed() const
+    {
+        return m_SprintAllowed;
     }
 
     bool IsMovingHorizontally() const

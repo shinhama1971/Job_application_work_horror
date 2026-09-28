@@ -18,14 +18,6 @@ void Renderer::SetLight(LIGHT Light)
 
 }
 
-void Renderer::SetEnvironmentLights(const ENVIRONMENT_LIGHTS& lights)
-{
-	m_EnvironmentLights = lights;
-	m_pDeviceContext->UpdateSubresource(
-		m_pEnvironmentLightBuffer.Get(),
-		0, NULL, &m_EnvironmentLights, 0, 0);
-}
-
 void Renderer::SetDebugViewMode(int mode, float wallDampStrength)
 {
 	DEBUG_VIEW_BUFFER buffer{};

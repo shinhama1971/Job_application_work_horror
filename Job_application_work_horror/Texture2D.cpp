@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "Texture2D.h"
+#include "utility.h"
 
 using namespace std;
 using namespace DirectX::SimpleMath;
@@ -121,8 +122,11 @@ void Texture2D::Uninit()
 void Texture2D::SetTexture(const char* imgname)
 {
 	// テクスチャロード
-	bool sts = m_Texture.Load(imgname);
-	assert(sts == true);
+    if (!m_Texture.Load(imgname))
+    {
+        utility::ReportFatalError(
+            std::string("テクスチャを読み込めませんでした。\n") + imgname);
+    }
 }
 
 // 位置を指定

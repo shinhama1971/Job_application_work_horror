@@ -100,7 +100,7 @@ const char* ExitTrigger::GetInteractionPrompt() const
         : "電力が必要";
 }
 
-void ExitTrigger::Draw(Camera* cam)
+void ExitTrigger::Draw(Camera* /*camera*/)
 {
     //これで終了しますか？
 }

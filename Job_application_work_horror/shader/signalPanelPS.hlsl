@@ -44,24 +44,25 @@ float4 main(SIGNAL_PS_IN input) : SV_Target
 
     float3 lighting = Light.Ambient.rgb + 0.12f;
     const float3 normal = normalize(input.worldNormal);
-    [unroll]
-    for (int lightIndex = 0; lightIndex < 8; ++lightIndex)
+    uint pointLightListOffset;
+    const uint pointLightCount =
+        GetPixelLightCount(input.pos.xy, pointLightListOffset);
+    [loop]
+    for (uint lightIndex = 0; lightIndex < pointLightCount; ++lightIndex)
     {
-        if (lightIndex >= EnvironmentLightCount)
-        {
-            break;
-        }
+        const ENVIRONMENT_POINT_LIGHT pointLight =
+            GetPixelLight(pointLightListOffset, lightIndex);
         const float3 toLight =
-            EnvironmentLights[lightIndex].PositionRange.xyz - input.worldPos;
+            pointLight.PositionRange.xyz - input.worldPos;
         const float distanceToLight = length(toLight);
         const float range = max(
-            EnvironmentLights[lightIndex].PositionRange.w, 0.001f);
+            pointLight.PositionRange.w, 0.001f);
         float attenuation = saturate(1.0f - distanceToLight / range);
         attenuation *= attenuation;
         const float lambert = 0.24f + 0.76f * saturate(dot(
             normal, toLight / max(distanceToLight, 0.001f)));
-        lighting += EnvironmentLights[lightIndex].ColorIntensity.rgb *
-            EnvironmentLights[lightIndex].ColorIntensity.a *
+        lighting += pointLight.ColorIntensity.rgb *
+            pointLight.ColorIntensity.a *
             attenuation * lambert;
     }
 

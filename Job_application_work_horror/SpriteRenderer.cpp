@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "SpriteRenderer.h"
+#include "utility.h"
 using namespace std;
 using namespace DirectX::SimpleMath;
 
@@ -118,8 +119,11 @@ void SpriteRenderer::Uninit()
 void SpriteRenderer::SetTexture(const char* imgname)
 {
 	// テクスチャロード
-	bool sts = m_Texture.Load(imgname);
-	assert(sts == true);
+    if (!m_Texture.Load(imgname))
+    {
+        utility::ReportFatalError(
+            std::string("テクスチャを読み込めませんでした。\n") + imgname);
+    }
 }
 
 void SpriteRenderer::SetUV(const float& nu, const float& nv, const float& sx, const float& sy)

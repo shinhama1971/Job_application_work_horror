@@ -21,7 +21,6 @@ Texture::~Texture()
 // テクスチャをロード
 bool Texture::Load(const std::string& filename)
 {
-	bool sts = true;
 	unsigned char* pixels=nullptr;
 
 	// 画像読み込み
@@ -75,7 +74,6 @@ bool Texture::Load(const std::string& filename)
 // テクスチャをメモリからロード
 bool Texture::LoadFromMemory(const unsigned char* Data,int len) {
 
-	bool sts = true;
 	unsigned char* pixels=nullptr;
 
 	// 画像読み込み

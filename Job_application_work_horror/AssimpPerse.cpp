@@ -9,6 +9,7 @@
 #include	<cassert>
 #include	"Texture.h"
 #include	"AssimpPerse.h"
+#include	"utility.h"
 
 // Assimp側のCRT構成と一致させ、Release版がデバッグランタイムへ依存するのを防ぎます。
 #if defined(_DEBUG)
@@ -194,12 +195,13 @@ namespace AssimpPerse
 			aiProcess_ConvertToLeftHanded |	// 左手座標系に変換する
 			aiProcess_Triangulate);			// 三角形化する
 
+        // assertはReleaseで消えるため、欠落時はファイル名を示して終了します。
 		if (pScene == nullptr)
 		{
-			std::cout << "load error" << filename.c_str() << importer.GetErrorString() << std::endl;
+            utility::ReportFatalError(
+                "モデルを読み込めませんでした。\n" + filename + "\n" +
+                importer.GetErrorString());
 		}
-		// Debugでは読み込み失敗を即座に止めます。Releaseは有効なパスが渡る前提です。
-		assert(pScene != nullptr);
 
 		// マテリアル情報取得
 		GetMaterialData(pScene, texturedirectory);

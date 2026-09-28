@@ -30,11 +30,13 @@ C++ / DirectX 11 / HLSLで制作した、一人称視点の短編ホラーゲー
 | 視点操作 | マウス | 右スティック |
 | 調べる・操作する | `E` | A |
 | 懐中電灯 | `F` | Y |
-| 走る | `Shift` | 左スティック押し込み |
+| 走る（2面は最後の追跡のみ） | `Shift` | 左スティック押し込み |
 | 目的ヒント | `H` | LB |
 | ポーズ | `Esc` または `P` | START |
 | タイトル開始 | `Enter` | A または START |
 | タイトル終了 | `Q` | B |
+
+ポーズ画面の「目的表示」を「なし」にすると、目的の文章と目的地の矢印を出さない、説明のない遊び方になります。
 
 Debug構成では `F1` でImGuiデバッグ画面を表示できます。
 
@@ -44,12 +46,20 @@ Debug構成では `F1` でImGuiデバッグ画面を表示できます。
 2. 構成を `Release`、プラットフォームを `x64` にします。
 3. 「ソリューションのビルド」を実行します。
 
-プロジェクト設定はC++20、Platform Toolset `v145`、Windows SDK `10.0.26100.0`です。
+プロジェクト設定はC++20、Platform Toolset `v143`、Windows SDK `10.0.26100.0`です。
 `external` 以下にDear ImGuiなど必要なサードパーティーファイルを同梱しています。
+
+- Assimp 5.2.5：`external/assimp` にヘッダー、Debug/Release用のlibとDLLを同梱しています。
+  公式ソースを `v143`・静的CRT（`USE_STATIC_CRT=ON`）でビルドしたもので、VC++ランタイムのインストールは不要です。
+  DLLはビルド後に実行ファイルと同じフォルダへ自動でコピーされます。
+- DirectXTK：使用しているのは `SimpleMath` のみです。現在は静的CRTでビルドした DirectXTK を
+  `C:\directxtk`（`include` と `lib\x64\Debug|Release`）に配置して参照しています。
+  他のPCでソースからビルドする場合は、同じ場所に配置してください（同梱は今後の対応予定）。
 
 ## 技術的な見どころ
 
 - HLSLによる懐中電灯、濡れ床、ブルーム、ビネット、フィルムグレインなどの画面表現
+- Compute Shaderによるタイルベースライティング（画面を16x16のタイルに分け、タイルごとに影響する点光源だけを計算。光源数の上限を8個から256個へ拡張）
 - Planar Reflectionによる水たまりの反射
 - Shadow Mapと描画対象ごとのカリング
 - 視界内に水面がある場合だけ反射パスを更新する負荷制御
@@ -65,6 +75,7 @@ Debug構成では `F1` でImGuiデバッグ画面を表示できます。
 Game
   ├─ GameState
   ├─ GameSettings
+  ├─ PauseMenu
   ├─ ObjectManager
   ├─ StageScene
   │   ├─ ScareLightSequence
@@ -87,9 +98,15 @@ Game
 
 ## ビルド確認状況
 
-- Release x64：警告0、エラー0
-- Debug x64：警告0、エラー0
+- Release x64：警告レベル /W4 で警告0、エラー0
+- Debug x64：警告レベル /W4 で警告0、エラー0
 - Debug実行ファイル：起動スモークテスト済み
+
+## セーブデータ
+
+設定（`settings.txt`）とベスト記録（`best_record.txt`）は `%LOCALAPPDATA%\SignalLost\` に保存します。
+起動したフォルダに関係なく同じ場所を使います。旧バージョンが作業フォルダ直下の `save\` に保存したファイルがある場合は、
+新しい保存先にファイルが無いときだけそちらから読み込みます。
 
 ## 提出時の注意
 

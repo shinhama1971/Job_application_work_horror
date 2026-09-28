@@ -67,7 +67,7 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
     m_NoticeTimer = 2.8f;
 
     CeilingLight* doorLight =
-        game->GetObj<CeilingLight>("CeilingLight4");
+        m_Objects.Light(Stage2Light::DoorLight);
     if (doorLight != nullptr)
     {
         doorLight->TriggerEventFlicker(0.90f, 0.76f);
@@ -75,7 +75,7 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
     game->GetPostProcess()->TriggerBloomPulse(0.58f, 0.24f);
 
     CeilingLight* oldDoorLight =
-        game->GetObj<CeilingLight>("Stage2Light3");
+        m_Objects.Light(Stage2Light::Light3);
     if (oldDoorLight != nullptr)
     {
         oldDoorLight->TriggerEventFlicker(0.72f, 0.68f);
@@ -109,23 +109,23 @@ void Stage2Scene::UpdateObservedScare(float deltaTime)
 
     struct LightBeat
     {
-        const char* Name;
+        Stage2Light Light;
         float Strength;
     };
 
     constexpr LightBeat beats[] =
     {
-        { "CeilingLight4", 0.94f },
-        { "Stage2Light3", 0.90f },
-        { "Stage2Light2", 0.86f },
-        { "Stage2Light1", 0.80f }
+        { Stage2Light::DoorLight, 0.94f },
+        { Stage2Light::Light3, 0.90f },
+        { Stage2Light::Light2, 0.86f },
+        { Stage2Light::Light1, 0.80f }
     };
 
     int pendingBeat = m_ObservedScareSequence.ConsumePendingBeat();
     while (pendingBeat >= 0)
     {
         const LightBeat& beat = beats[pendingBeat];
-        CeilingLight* light = game->GetObj<CeilingLight>(beat.Name);
+        CeilingLight* light = m_Objects.Light(beat.Light);
         if (light != nullptr)
         {
             light->TriggerEventFlicker(0.82f, beat.Strength);
@@ -159,9 +159,9 @@ void Stage2Scene::StartFinalSequence()
     m_NoticeTimer = 2.8f;
 
     Core::Game* game = Core::Game::GetInstance();
-    Player* player = game->GetObj<Player>("Player");
-    ShadowMan* shadow = game->GetObj<ShadowMan>("Stage2Shadow");
-    ShadowMan* noiseShadow = game->GetObj<ShadowMan>("Stage2NoiseShadow");
+    Player* player = m_Objects.player;
+    ShadowMan* shadow = m_Objects.shadow;
+    ShadowMan* noiseShadow = m_Objects.noiseShadow;
     if (noiseShadow != nullptr)
     {
         noiseShadow->SetActive(false);
@@ -193,15 +193,8 @@ void Stage2Scene::StartFinalSequence()
 
                 m_NoticeTimer = 1.65f;
                 Core::Game* game = Core::Game::GetInstance();
-                const char* lightNames[] =
+                for (CeilingLight* light : m_Objects.lights)
                 {
-                    "Stage2Light1", "Stage2Light2",
-                    "Stage2Light3", "CeilingLight4"
-                };
-                for (const char* lightName : lightNames)
-                {
-                    CeilingLight* light =
-                        game->GetObj<CeilingLight>(lightName);
                     if (light != nullptr)
                     {
                         light->TriggerEventFlicker(0.72f, 0.92f);
@@ -227,19 +220,11 @@ void Stage2Scene::UpdateFinalSequence(float deltaTime)
     m_FinalSequence.AdvanceSequence(deltaTime);
     Core::Game* game = Core::Game::GetInstance();
 
-    constexpr const char* lightNames[] =
-    {
-        "Stage2Light1",
-        "Stage2Light2",
-        "Stage2Light3",
-        "CeilingLight4"
-    };
-
     int pendingBeat = m_FinalSequence.ConsumePendingBeat();
     while (pendingBeat >= 0)
     {
-        CeilingLight* light = game->GetObj<CeilingLight>(
-            lightNames[pendingBeat]);
+        // 最終演出の拍は入口側から出口扉の上へ順に非常灯を点けます。
+        CeilingLight* light = m_Objects.lights[static_cast<std::size_t>(pendingBeat)];
         if (light != nullptr)
         {
             light->SetEmergencyLight(
@@ -269,19 +254,19 @@ void Stage2Scene::UpdateFinalSequence(float deltaTime)
     m_FinalSequenceArmed = false;
     m_NoticeTimer = 3.0f;
 
-    Door* finalDoor = game->GetObj<Door>("Stage2Door");
+    Door* finalDoor = m_Objects.door;
     if (finalDoor != nullptr)
     {
         finalDoor->SetLocked(false);
     }
 
-    ExitTrigger* exit = game->GetObj<ExitTrigger>("Stage2Exit");
+    ExitTrigger* exit = m_Objects.exit;
     if (exit != nullptr)
     {
         exit->SetInteractionEnabled(true);
     }
 
-    Wall* doorIndicator = game->GetObj<Wall>("Stage2DoorIndicator");
+    Wall* doorIndicator = m_Objects.doorIndicator;
     if (doorIndicator != nullptr)
     {
         doorIndicator->SetAppearance(
@@ -298,7 +283,7 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
     if (!m_FinalSequence.IsPursuitActive())
     {
         ShadowMan* shadow =
-            Core::Game::GetInstance()->GetObj<ShadowMan>("Stage2Shadow");
+            m_Objects.shadow;
         if (shadow != nullptr)
         {
             shadow->SetActive(false);
@@ -308,8 +293,8 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
     }
 
     Core::Game* game = Core::Game::GetInstance();
-    Player* player = game->GetObj<Player>("Player");
-    ShadowMan* shadow = game->GetObj<ShadowMan>("Stage2Shadow");
+    Player* player = m_Objects.player;
+    ShadowMan* shadow = m_Objects.shadow;
     if (player == nullptr || shadow == nullptr)
     {
         return;
@@ -400,16 +385,19 @@ void Stage2Scene::StartCaughtSequence(
     Core::Game* game = Core::Game::GetInstance();
     game->RegisterCaught();
     game->PlayAudioCue(SOUND_CUE_SCARE);
-    ShadowMan* shadow = game->GetObj<ShadowMan>("Stage2Shadow");
+    ShadowMan* shadow = m_Objects.shadow;
     if (shadow != nullptr)
     {
         shadow->SetActive(false);
     }
-    ShadowMan* noiseShadow = game->GetObj<ShadowMan>("Stage2NoiseShadow");
+    ShadowMan* noiseShadow = m_Objects.noiseShadow;
     if (noiseShadow != nullptr)
     {
         noiseShadow->SetActive(false);
     }
+    // 捕獲中はUpdateBehindPresenceが呼ばれないため、ここで背後の気配も消します。
+    m_Objects.presence->SetActive(false);
+    m_BehindPresence.Postpone(BehindPresence::MaxInterval);
 
     game->GetPostProcess()->TriggerHorrorPulse(1.0f, 0.72f);
     game->GetPostProcess()->TriggerBloomPulse(0.18f, 0.16f);
@@ -454,20 +442,20 @@ void Stage2Scene::UpdateCaughtSequence(Player& player, float deltaTime)
     }
     m_NoticeTimer = 3.2f;
 
-    Door* door = game->GetObj<Door>("Stage2Door");
+    Door* door = m_Objects.door;
     if (door != nullptr && !wasNoiseCatch)
     {
         door->ResetClosed(3);
         door->SetLocked(true);
     }
 
-    ExitTrigger* exit = game->GetObj<ExitTrigger>("Stage2Exit");
+    ExitTrigger* exit = m_Objects.exit;
     if (exit != nullptr && !wasNoiseCatch)
     {
         exit->SetInteractionEnabled(false);
     }
 
-    Wall* indicator = game->GetObj<Wall>("Stage2DoorIndicator");
+    Wall* indicator = m_Objects.doorIndicator;
     if (indicator != nullptr && !wasNoiseCatch)
     {
         indicator->SetAppearance(
@@ -482,13 +470,12 @@ void Stage2Scene::UpdateCaughtSequence(Player& player, float deltaTime)
 
 void Stage2Scene::RevealScratchPieces(int first, int last, float emission)
 {
-    Core::Game* game = Core::Game::GetInstance();
     first = (std::clamp)(first, 0, Stage2ScratchCount);
     last = (std::clamp)(last, first, Stage2ScratchCount);
 
     for (int index = first; index < last; ++index)
     {
-        Wall* scratch = game->GetObj<Wall>(Stage2ScratchNames[index]);
+        Wall* scratch = m_Objects.scratches[static_cast<std::size_t>(index)];
         if (scratch == nullptr)
         {
             continue;
@@ -513,14 +500,14 @@ void Stage2Scene::UpdateLightZones(const Player& player)
     struct LightZone
     {
         float TriggerZ;
-        const char* LightName;
+        Stage2Light Light;
     };
     constexpr LightZone zones[] =
     {
-        { -88.0f, "Stage2Light1" },
-        { -14.0f, "Stage2Light2" },
-        {  60.0f, "Stage2Light3" },
-        { 108.0f, "CeilingLight4" }
+        { -88.0f, Stage2Light::Light1 },
+        { -14.0f, Stage2Light::Light2 },
+        {  60.0f, Stage2Light::Light3 },
+        { 108.0f, Stage2Light::DoorLight }
     };
     constexpr int zoneCount =
         static_cast<int>(sizeof(zones) / sizeof(zones[0]));
@@ -533,7 +520,7 @@ void Stage2Scene::UpdateLightZones(const Player& player)
         {
             continue;
         }
-        CeilingLight* light = game->GetObj<CeilingLight>(zones[index].LightName);
+        CeilingLight* light = m_Objects.Light(zones[index].Light);
         const float loopStrength = static_cast<float>(m_LoopCount) * 0.17f;
         const float strength = (std::clamp)(
             0.40f + loopStrength + static_cast<float>(index) * 0.035f,
@@ -548,8 +535,7 @@ void Stage2Scene::UpdateLightZones(const Player& player)
         // 次の周回開始時に照明を戻し、同じ廊下を再利用できる状態にします。
         if (m_LoopCount > 0 && index > 0)
         {
-            CeilingLight* lightBehind = game->GetObj<CeilingLight>(
-                zones[index - 1].LightName);
+            CeilingLight* lightBehind = m_Objects.Light(zones[index - 1].Light);
             if (lightBehind != nullptr)
             {
                 lightBehind->SetForcedOff(true);
@@ -668,14 +654,8 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player)
     m_PortraitAnomaly.MarkChanged();
 
     const float emission = m_LoopCount == 1 ? 0.10f : 0.28f;
-    const char* eyeNames[] =
+    for (Wall* eye : m_Objects.portraitEyes)
     {
-        "Stage2PortraitEyeLeft",
-        "Stage2PortraitEyeRight"
-    };
-    for (const char* name : eyeNames)
-    {
-        Wall* eye = game->GetObj<Wall>(name);
         if (eye != nullptr)
         {
             eye->SetVisible(true);
@@ -686,7 +666,7 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player)
         }
     }
 
-    Wall* portrait = game->GetObj<Wall>("Stage2Portrait");
+    Wall* portrait = m_Objects.portrait;
     if (portrait != nullptr)
     {
         portrait->SetAppearance(
@@ -695,8 +675,8 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player)
             12.0f);
     }
 
-    CeilingLight* nearbyLight = game->GetObj<CeilingLight>(
-        m_LoopCount == 1 ? "Stage2Light2" : "Stage2Light3");
+    CeilingLight* nearbyLight = m_Objects.Light(
+        m_LoopCount == 1 ? Stage2Light::Light2 : Stage2Light::Light3);
     if (nearbyLight != nullptr)
     {
         nearbyLight->TriggerEventFlicker(
@@ -707,4 +687,119 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player)
         0.18f + static_cast<float>(m_LoopCount) * 0.10f,
         0.30f);
     Input::SetVibration(6, 0.17f);
+}
+
+// ----------------------------------------------------------------------------
+// 背後の気配
+// 視界の外に人影を出し、見ていない間だけ近づけます。振り向けば消え、
+// 気づかずに背後まで近づかれると足音の危険度が一気に上がります。
+// ----------------------------------------------------------------------------
+namespace
+{
+    constexpr float PresenceSpawnDistance = 58.0f;
+    constexpr float PresenceCreepSpeed = 17.0f;     // 歩く速さ(30)より遅く、止まれば迫る速さ
+    constexpr float PresenceLookDistance = 170.0f;
+    constexpr float PresenceLookAlignment = 0.88f;
+    constexpr float PresenceReachThreat = 0.35f;
+    // 廊下の内側に収め、壁の中に出現しないようにします。
+    constexpr float CorridorHalfWidth = 30.0f;
+    constexpr float CorridorMinZ = -150.0f;
+    constexpr float CorridorMaxZ = 130.0f;
+}
+
+bool Stage2Scene::IsBehindPresenceAllowed() const
+{
+    // 他の人影や大きな演出と重ねず、周回そのものの静けさの中でだけ出します。
+    const bool otherFigureActive =
+        (m_Objects.shadow != nullptr && m_Objects.shadow->IsActive()) ||
+        (m_Objects.noiseShadow != nullptr && m_Objects.noiseShadow->IsActive());
+    return m_LoopCount >= 1 &&
+        !otherFigureActive &&
+        m_LoopTransitionTimer < 0.0f &&
+        !m_ObservedScareSequence.IsActive() &&
+        !m_FinalSequence.IsSequenceActive() &&
+        !m_FinalSequence.IsPursuitActive() &&
+        !m_CaughtSequence.IsActive();
+}
+
+void Stage2Scene::UpdateBehindPresence(Player& player, float deltaTime)
+{
+    ShadowMan* presence = m_Objects.presence;
+    Core::Game* game = Core::Game::GetInstance();
+    const Camera* camera = game->GetCamera();
+
+    bool looking = false;
+    float distance = 1000.0f;
+    if (m_BehindPresence.IsFollowing())
+    {
+        Vector3 toPlayer = player.GetPosition() - presence->GetPosition();
+        toPlayer.y = 0.0f;
+        distance = toPlayer.Length();
+
+        Vector3 toPresence = presence->GetPosition() + Vector3(0.0f, 17.0f, 0.0f) -
+            camera->GetPosition();
+        const float viewDistance = toPresence.Length();
+        if (viewDistance > 0.001f && viewDistance < PresenceLookDistance)
+        {
+            toPresence /= viewDistance;
+            looking = camera->GetForward().Dot(toPresence) > PresenceLookAlignment;
+        }
+    }
+
+    std::uniform_real_distribution<float> roll(0.0f, 1.0f);
+    const BehindPresence::Event presenceEvent = m_BehindPresence.Update(
+        deltaTime, IsBehindPresenceAllowed(), looking, distance,
+        roll(m_PresenceRandom));
+
+    switch (presenceEvent)
+    {
+    case BehindPresence::Event::None:
+        break;
+    case BehindPresence::Event::Spawn:
+    {
+        // カメラの真後ろへ置きます。廊下の外に出る場合は、次の機会に回します。
+        Vector3 backward = -camera->GetForward();
+        backward.y = 0.0f;
+        if (backward.LengthSquared() < 0.001f)
+        {
+            m_BehindPresence.Postpone(3.0f);
+            break;
+        }
+        backward.Normalize();
+        const Vector3 spawn = player.GetPosition() + backward * PresenceSpawnDistance;
+        if (std::abs(spawn.x) > CorridorHalfWidth ||
+            spawn.z < CorridorMinZ || spawn.z > CorridorMaxZ)
+        {
+            m_BehindPresence.Postpone(3.0f);
+            break;
+        }
+
+        presence->SetPosition(spawn.x, -99.0f, spawn.z);
+        presence->SetActive(true);
+        presence->EnableGazeScare(BehindPresence::MaxFollowSeconds + 10.0f);
+        presence->EnableChase(PresenceCreepSpeed, 8.0f);
+        break;
+    }
+    case BehindPresence::Event::Seen:
+        // 振り向いた瞬間に消し、見間違いだったのかと思わせる程度の反応にとどめます。
+        presence->SetActive(false);
+        game->GetPostProcess()->TriggerHorrorPulse(0.14f, 0.18f);
+        Input::SetVibration(2, 0.05f);
+        break;
+    case BehindPresence::Event::Reached:
+        presence->SetActive(false);
+        for (CeilingLight* light : m_Objects.lights)
+        {
+            light->TriggerEventFlicker(0.60f, 0.86f);
+        }
+        m_NoiseThreatSystem.SetThreat((std::min)(
+            1.0f, m_NoiseThreatSystem.GetThreat() + PresenceReachThreat));
+        game->PlayAudioCue(SOUND_CUE_SCARE, 0.58f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.62f, 0.42f);
+        Input::SetVibration(10, 0.26f);
+        break;
+    case BehindPresence::Event::Vanished:
+        presence->SetActive(false);
+        break;
+    }
 }

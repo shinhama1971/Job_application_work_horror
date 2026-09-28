@@ -15,7 +15,8 @@
 class Application
 {
 public:
-    Application(uint32_t width, uint32_t height);
+    // ウィンドウサイズは起動時のデスクトップ解像度（全画面）で決まります。
+    Application();
     ~Application();
     void Run();
 

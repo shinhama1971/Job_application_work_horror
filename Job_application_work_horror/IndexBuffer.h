@@ -8,6 +8,7 @@
 #include	<vector>
 #include	<wrl/client.h>
 #include	"Renderer.h"
+#include	"utility.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -27,12 +28,16 @@ public:
 		assert(device); //deviceが存在することを確認
 
 		// インデックスバッファ作成
-		bool sts = Renderer::CreateIndexBuffer(
+		const bool created = Renderer::CreateIndexBuffer(
 			(unsigned int)(indices.size()),				// インデックス数
 			(void*)indices.data(),						// インデックスデータ先頭アドレス
 			m_IndexBuffer.ReleaseAndGetAddressOf());							// インデックスバッファ
 
-		assert(sts == true); //結果を確認
+		// assertはReleaseで消えるため、作成失敗は明示的に通知して終了します。
+		if (!created)
+		{
+			utility::ReportFatalError("インデックスバッファを作成できませんでした。");
+		}
 	}
 
 	void SetGPU()

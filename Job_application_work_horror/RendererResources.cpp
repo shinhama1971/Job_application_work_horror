@@ -6,6 +6,8 @@
 #include "Renderer.h"
 #include "Application.h"
 
+#include <filesystem>
+
 using namespace DirectX::SimpleMath;
 
 // シェーダーをファイル拡張子に合わせてコンパイルします。
@@ -16,22 +18,14 @@ HRESULT Renderer::CompileShader(
 	std::vector<unsigned char>& shaderObject)
 {
 	shaderObject.clear();
-	//拡張子csoのファイル名を作成
-	char csoFileName[256];
-	const char* dot = strrchr(szFileName, '.');  // 最後の '.' を探す
-	if (dot) {
-		int basenameLen =(int)( dot - szFileName);
-		strncpy(csoFileName, szFileName, basenameLen); // 拡張子がある場合は拡張子を除いたファイル名をコピー
-		csoFileName[basenameLen] = '\0';   // 終端文字を追加
-	}
-	else {
-		strcpy(csoFileName, szFileName);   // 拡張子がない場合はそのままコピー
-	}
-	strcat(csoFileName, ".cso");// ".cso" 拡張子を付加
+	// 拡張子をcsoに置き換えたファイル名を作成します。
+	// 固定長バッファを使わないため、長いパスでもあふれません。
+	std::filesystem::path csoPath(szFileName);
+	csoPath.replace_extension(".cso");
 
 	//csoファイルがあれば開く
 	FILE* fp;
-	int ret = fopen_s(&fp, csoFileName, "rb");
+	int ret = fopen_s(&fp, csoPath.string().c_str(), "rb");
 	if (ret == 0)
 	{
 		// ファイルサイズを取得
@@ -75,8 +69,8 @@ HRESULT Renderer::CompileShader(
 #endif
 
 		// コンパイル結果およびエラー情報格納用のBlob
-		ID3DBlob* pErrorBlob = nullptr;
-		ID3DBlob* pBlob = nullptr;
+		Microsoft::WRL::ComPtr<ID3DBlob> pErrorBlob;
+		Microsoft::WRL::ComPtr<ID3DBlob> pBlob;
 
 		// HLSLファイルをコンパイル
 		hr = D3DCompileFromFile(
@@ -87,32 +81,24 @@ HRESULT Renderer::CompileShader(
 			szShaderModel,						// シェーダーモデル
 			dwShaderFlags,						// コンパイルフラグ
 			0,									// エフェクトフラグ
-			&pBlob,								// 成功時のコンパイル結果
-			&pErrorBlob);						// コンパイルエラー出力
+			pBlob.GetAddressOf(),				// 成功時のコンパイル結果
+			pErrorBlob.GetAddressOf());			// コンパイルエラー出力
 
 		// コンパイル失敗時のエラーメッセージを表示
 		if (FAILED(hr))
 		{
 			if (pErrorBlob != nullptr) {
-				MessageBoxA(NULL, (char*)pErrorBlob->GetBufferPointer(), "Error", MB_OK);
+				MessageBoxA(NULL, static_cast<const char*>(pErrorBlob->GetBufferPointer()), "Error", MB_OK);
 			}
-			
-			SAFE_RELEASE(pErrorBlob);
-			SAFE_RELEASE(pBlob);
 			return E_FAIL;
 		}
 
-		// エラーブロブがあれば解放
-		if (pErrorBlob) pErrorBlob->Release();
-
 		// コンパイル成功時のバイナリデータコピーして呼び出し元に渡す
-		
 		shaderObject.resize(pBlob->GetBufferSize());
 		memcpy(
 			shaderObject.data(),
 			pBlob->GetBufferPointer(),
 			shaderObject.size());
-		SAFE_RELEASE(pBlob);
 	}
 
 	return S_OK;

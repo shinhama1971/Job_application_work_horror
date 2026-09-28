@@ -45,6 +45,8 @@ public:
     void Update() override;
     void Draw(Camera* cam) override;
     void Uninit() override;
+    // 画面全体へ重ねるノイズなので、監視カメラなど別視点の描画には含めません。
+    bool DrawsInAuxiliaryView() const override { return false; }
 
     void SetPower(float power)
     {

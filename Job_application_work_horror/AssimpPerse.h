@@ -5,10 +5,19 @@
 // ============================================================================
 
 #pragma once
+
+// Assimp 5.2.5のヘッダーはstd::minを括弧なしで呼ぶため、先にWindows.hが
+// 読み込まれているとmin/maxマクロと衝突します。読み込み中だけ一時的に外します。
+#pragma push_macro("min")
+#pragma push_macro("max")
+#undef min
+#undef max
 #include	<assimp/Importer.hpp>
 #include	<assimp/scene.h>
 #include	<assimp/postprocess.h>
 #include	<assimp/cimport.h>
+#pragma pop_macro("max")
+#pragma pop_macro("min")
 
 namespace AssimpPerse
 {

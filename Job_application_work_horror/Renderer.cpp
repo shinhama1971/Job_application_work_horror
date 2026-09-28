@@ -30,11 +30,9 @@ Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pViewBuffer;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pProjectionBuffer;
 
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pLightBuffer;
-Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pEnvironmentLightBuffer;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pDebugViewBuffer;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pMaterialBuffer;
 LIGHT Renderer::m_Light{};
-ENVIRONMENT_LIGHTS Renderer::m_EnvironmentLights{};
 bool Renderer::m_LightEnable = true;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pTextureBuffer;
 // デプスステンシルステート
@@ -132,11 +130,10 @@ HRESULT Renderer::Init()
 	//rasterizerDesc.CullMode = D3D11_CULL_NONE; //カリングしない(裏も表も表示される)
 	rasterizerDesc.DepthClipEnable = TRUE;
 	rasterizerDesc.MultisampleEnable = FALSE;
-	ID3D11RasterizerState* rs{};
-	hr = m_pDevice->CreateRasterizerState(&rasterizerDesc, &rs);
+	Microsoft::WRL::ComPtr<ID3D11RasterizerState> rs;
+	hr = m_pDevice->CreateRasterizerState(&rasterizerDesc, rs.GetAddressOf());
 	if (FAILED(hr)) return hr;
-	m_pDeviceContext->RSSetState(rs);
-	rs->Release();
+	m_pDeviceContext->RSSetState(rs.Get());
 	// ブレンド ステート生成
 	D3D11_BLEND_DESC BlendDesc{};
 	BlendDesc.AlphaToCoverageEnable = FALSE;                     // アルファ・トゥ・カバレッジを無効化（透明度をカバレッジとして利用しない）
@@ -201,12 +198,11 @@ HRESULT Renderer::Init()
 	smpDesc.MaxAnisotropy = 4;
 	smpDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
-	ID3D11SamplerState* samplerState{};
-	hr = m_pDevice->CreateSamplerState(&smpDesc, &samplerState);
+	Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerState;
+	hr = m_pDevice->CreateSamplerState(&smpDesc, samplerState.GetAddressOf());
 	if (FAILED(hr)) return hr;
 
-	m_pDeviceContext->PSSetSamplers(0, 1, &samplerState);
-	samplerState->Release();
+	m_pDeviceContext->PSSetSamplers(0, 1, samplerState.GetAddressOf());
 
 	// 定数バッファ生成
 	D3D11_BUFFER_DESC bufferDesc{};
@@ -253,14 +249,6 @@ HRESULT Renderer::Init()
 		cosf(DirectX::XMConvertToRadians(32.0f)), 1.35f, 0.0f);
 
 	SetLight(light);
-
-	bufferDesc.ByteWidth = sizeof(ENVIRONMENT_LIGHTS);
-	hr = m_pDevice->CreateBuffer(
-		&bufferDesc, NULL, m_pEnvironmentLightBuffer.ReleaseAndGetAddressOf());
-	if (FAILED(hr)) return hr;
-	m_pDeviceContext->PSSetConstantBuffers(
-		6, 1, m_pEnvironmentLightBuffer.GetAddressOf());
-	SetEnvironmentLights(ENVIRONMENT_LIGHTS{});
 
 	bufferDesc.ByteWidth = sizeof(DEBUG_VIEW_BUFFER);
 	hr = m_pDevice->CreateBuffer(
@@ -367,7 +355,6 @@ void Renderer::Uninit()
     }
 
 	m_pLightBuffer.Reset();
-	m_pEnvironmentLightBuffer.Reset();
 	m_pDebugViewBuffer.Reset();
 	m_pMaterialBuffer.Reset();
 	m_pTextureBuffer.Reset();

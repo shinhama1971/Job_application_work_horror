@@ -8,11 +8,14 @@
 #include <filesystem>
 #include <fstream>
 
+#include "utility.h"
+
 namespace Core
 {
     void GameSettings::Load()
     {
-        std::ifstream settingsFile("save/settings.txt");
+        std::ifstream settingsFile(
+            utility::ResolveSaveFileForRead("settings.txt"));
         int brightnessLevel = 2;
         int effectLevel = 1;
         int lookSensitivityLevel = 2;
@@ -21,40 +24,48 @@ namespace Core
         {
             return;
         }
-        if (brightnessLevel < 0 || brightnessLevel > 4)
+        if (brightnessLevel < 0 || brightnessLevel > MaxBrightnessLevel)
         {
             return;
         }
 
         m_BrightnessLevel = brightnessLevel;
         if (settingsFile >> effectLevel &&
-            effectLevel >= 0 && effectLevel <= 2)
+            effectLevel >= 0 && effectLevel <= MaxEffectLevel)
         {
             m_EffectLevel = effectLevel;
         }
         if (settingsFile >> lookSensitivityLevel &&
-            lookSensitivityLevel >= 0 && lookSensitivityLevel <= 4)
+            lookSensitivityLevel >= 0 && lookSensitivityLevel <= MaxLookSensitivityLevel)
         {
             m_LookSensitivityLevel = lookSensitivityLevel;
         }
         if (settingsFile >> volumeLevel &&
-            volumeLevel >= 0 && volumeLevel <= 4)
+            volumeLevel >= 0 && volumeLevel <= MaxVolumeLevel)
         {
             m_VolumeLevel = volumeLevel;
+        }
+        // 旧形式の設定ファイルには無い項目なので、読めなければ既定値（表示あり）のままにします。
+        int guideLevel = 1;
+        if (settingsFile >> guideLevel &&
+            guideLevel >= 0 && guideLevel <= MaxGuideLevel)
+        {
+            m_GuideLevel = guideLevel;
         }
     }
 
     void GameSettings::Save() const
     {
         std::error_code directoryError;
-        std::filesystem::create_directories("save", directoryError);
+        const std::filesystem::path saveDirectory = utility::GetSaveDirectory();
+        std::filesystem::create_directories(saveDirectory, directoryError);
         if (directoryError)
         {
             return;
         }
 
         std::ofstream settingsFile(
-            "save/settings.txt", std::ios::trunc);
+            saveDirectory / "settings.txt", std::ios::trunc);
         if (!settingsFile)
         {
             return;
@@ -62,6 +73,7 @@ namespace Core
         settingsFile << m_BrightnessLevel << ' '
             << m_EffectLevel << ' '
             << m_LookSensitivityLevel << ' '
-            << m_VolumeLevel << '\n';
+            << m_VolumeLevel << ' '
+            << m_GuideLevel << '\n';
     }
 }

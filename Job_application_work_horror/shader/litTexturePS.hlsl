@@ -172,17 +172,18 @@ float4 main(in LIT_PS_IN input) : SV_Target
     const float distanceFromCamera = length(input.viewPos);
 
     // 天井の点光源はパネルだけでなく、近くの床と壁も照らします。
-    [unroll]
-    for (int i = 0; i < 8; ++i)
+    uint pointLightListOffset;
+    const uint pointLightCount =
+        GetPixelLightCount(input.pos.xy, pointLightListOffset);
+    [loop]
+    for (uint i = 0; i < pointLightCount; ++i)
     {
-        if (i >= EnvironmentLightCount)
-        {
-            break;
-        }
+        const ENVIRONMENT_POINT_LIGHT pointLight =
+            GetPixelLight(pointLightListOffset, i);
 
         const float3 offsetToLight =
-            EnvironmentLights[i].PositionRange.xyz - input.worldPos;
-        const float lightRange = max(EnvironmentLights[i].PositionRange.w, 0.001f);
+            pointLight.PositionRange.xyz - input.worldPos;
+        const float lightRange = max(pointLight.PositionRange.w, 0.001f);
         const float distanceSquaredToLight = dot(offsetToLight, offsetToLight);
         [branch]
         if (distanceSquaredToLight >= lightRange * lightRange)
@@ -206,8 +207,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
             1.0f,
             smoothstep(0.04f, 0.72f, downwardAmount));
 
-        lighting += EnvironmentLights[i].ColorIntensity.rgb
-            * EnvironmentLights[i].ColorIntensity.a
+        lighting += pointLight.ColorIntensity.rgb
+            * pointLight.ColorIntensity.a
             * pointAttenuation
             * softPointLambert
             * fixtureDistribution;
@@ -296,6 +297,10 @@ float4 main(in LIT_PS_IN input) : SV_Target
     if (DebugViewMode == 6)
     {
         return float4(saturate(grime).xxx, 1.0f);
+    }
+    if (DebugViewMode == 7)
+    {
+        return GetLightTileHeatmap(input.pos.xy, pointLightCount);
     }
     if (DebugViewMode >= 4)
     {

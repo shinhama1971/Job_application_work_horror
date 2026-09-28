@@ -9,6 +9,7 @@
 #include "stb_image.h"
 #include "Game.h"
 #include "Player.h"
+#include "utility.h"
 #include <algorithm>
 #include <cmath>
 using namespace DirectX::SimpleMath;
@@ -176,8 +177,12 @@ void Ground::Init()
 		m_WetFloorBuffer.ReleaseAndGetAddressOf());
 
 	//テクスチャロード
-	bool sts = m_Texture.Load("assets/texture/field.jpg");
-	assert(sts == true);
+    constexpr const char* fieldTexturePath = "assets/texture/field.jpg";
+    if (!m_Texture.Load(fieldTexturePath))
+    {
+        utility::ReportFatalError(
+            std::string("テクスチャを読み込めませんでした。\n") + fieldTexturePath);
+    }
 
 	//マテリアル情報取得
 	m_Material = std::make_unique<Material>();

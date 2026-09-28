@@ -8,6 +8,8 @@
 #include <filesystem>
 #include <fstream>
 
+#include "utility.h"
+
 namespace Core
 {
     void Game::ApplyAudioVolume(bool paused)
@@ -17,18 +19,15 @@ namespace Core
             return;
         }
 
-        constexpr float volumeScales[] =
-        {
-            0.0f, 0.28f, 0.52f, 0.76f, 1.0f
-        };
         const float pauseScale = paused ? 0.42f : 1.0f;
         m_Sound.SetMasterVolume(
-            volumeScales[m_Settings.GetVolumeLevel()] * pauseScale);
+            m_Settings.GetVolumeScale() * pauseScale);
     }
 
     void Game::LoadBestRecord()
     {
-        std::ifstream recordFile("save/best_record.txt");
+        std::ifstream recordFile(
+            utility::ResolveSaveFileForRead("best_record.txt"));
         float clearTime = 0.0f;
         int caughtCount = 0;
         if (!(recordFile >> clearTime >> caughtCount))
@@ -47,14 +46,15 @@ namespace Core
     void Game::SaveBestRecord() const
     {
         std::error_code directoryError;
-        std::filesystem::create_directories("save", directoryError);
+        const std::filesystem::path saveDirectory = utility::GetSaveDirectory();
+        std::filesystem::create_directories(saveDirectory, directoryError);
         if (directoryError)
         {
             return;
         }
 
         std::ofstream recordFile(
-            "save/best_record.txt", std::ios::trunc);
+            saveDirectory / "best_record.txt", std::ios::trunc);
         if (!recordFile)
         {
             return;

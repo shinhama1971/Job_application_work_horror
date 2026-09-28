@@ -280,6 +280,15 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             g_MainDrawn, g_MainCulled);
         ImGui::Text("Shadow casters: %u drawn / %u culled",
             g_ShadowDrawn, g_ShadowCulled);
+        if (Core::Game* currentGame = Core::Game::GetInstance())
+        {
+            // タイルベースライティング: 光源数と、Compute Shaderで判定したタイル数です。
+            const Effect::TiledLighting* tiledLighting = currentGame->GetTiledLighting();
+            ImGui::Text("Point lights: %u / %u   Light tiles: %u (16x16)",
+                tiledLighting->GetLightCount(),
+                Effect::TiledLighting::MaxLights,
+                tiledLighting->GetTileCount());
+        }
         const ModelCacheStats modelCacheStats = ModelCache::GetStats();
         ImGui::Text("Model cache: %zu loaded / %llu hit / %llu miss",
             modelCacheStats.LoadedModels,
@@ -337,7 +346,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             ImGui::Separator();
         }
 
-        const char* debugViews[] = { "Final", "World normals", "Flashlight shadow", "Lighting only", "Puddle mask", "Planar reflection", "Wall damp mask" };
+        const char* debugViews[] = { "Final", "World normals", "Flashlight shadow", "Lighting only", "Puddle mask", "Planar reflection", "Wall damp mask", "Light tiles (lights per 16x16 tile)" };
         ImGui::Combo("Shader debug view", &g_DebugViewMode,
             debugViews, IM_ARRAYSIZE(debugViews));
         const char* reflectionRates[] =

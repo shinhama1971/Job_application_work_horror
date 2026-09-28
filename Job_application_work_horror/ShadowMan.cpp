@@ -146,7 +146,11 @@ void ShadowMan::Update()
     }
 
     Core::Game* game = Core::Game::GetInstance();
-    Player* player = game->GetObj<Player>("Player");
+    if (m_Player == nullptr)
+    {
+        m_Player = game->GetObj<Player>("Player");
+    }
+    Player* player = m_Player;
     if (player == nullptr)
     {
         return;
@@ -269,8 +273,14 @@ void ShadowMan::Draw(Camera* camera)
         0,
         0);
     ID3D11Buffer* dissolveBuffer = m_DissolveBuffer.Get();
+    // b7は通常の材質シェーダーではデバッグ表示設定にも使います。
+    // 人影を描いた後に戻さないと、次のフレームの部屋全体が黒くなる場合があります。
+    Microsoft::WRL::ComPtr<ID3D11Buffer> previousBuffer;
+    context->PSGetConstantBuffers(7, 1, previousBuffer.GetAddressOf());
     context->PSSetConstantBuffers(7, 1, &dissolveBuffer);
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
+    ID3D11Buffer* restoredBuffer = previousBuffer.Get();
+    context->PSSetConstantBuffers(7, 1, &restoredBuffer);
 }
 
 void ShadowMan::Uninit()

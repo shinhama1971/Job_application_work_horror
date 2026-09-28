@@ -51,7 +51,7 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
         m_EntranceEventPhase = 0;
 
         CeilingLight* lightBehind =
-            game->GetObj<CeilingLight>("CeilingLight4");
+            m_Objects.CeilingLightAt(4);
         if (lightBehind != nullptr)
         {
             lightBehind->TriggerEventFlicker(0.38f, 0.52f);
@@ -77,7 +77,7 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
     if (m_EntranceEventPhase == 0 && m_EntranceEventTimer >= 0.38f)
     {
         CeilingLight* lightAhead =
-            game->GetObj<CeilingLight>("CeilingLight5");
+            m_Objects.CeilingLightAt(5);
         if (lightAhead != nullptr)
         {
             lightAhead->TriggerEventFlicker(0.62f, 0.72f);
@@ -91,7 +91,7 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
         m_EntranceEventTimer >= 1.12f)
     {
         CeilingLight* lightBehind =
-            game->GetObj<CeilingLight>("CeilingLight4");
+            m_Objects.CeilingLightAt(4);
         if (lightBehind != nullptr)
         {
             lightBehind->TriggerEventFlicker(0.20f, 0.28f);
@@ -130,7 +130,7 @@ void StageScene::UpdateStorageScare(Player& player)
         m_StorageScareTimer = 0.0f;
         m_StorageScareNoticeTimer = 2.1f;
         game->PlayAudioCue(SOUND_CUE_DOOR, 0.68f);
-        CeilingLight* light = game->GetObj<CeilingLight>("CeilingLight2");
+        CeilingLight* light = m_Objects.CeilingLightAt(2);
         if (light != nullptr)
         {
             light->TriggerEventFlicker(0.42f, 0.62f);
@@ -152,7 +152,7 @@ void StageScene::UpdateStorageScare(Player& player)
         return;
     }
 
-    ShadowMan* shadow = game->GetObj<ShadowMan>("Stage1StorageShadow");
+    ShadowMan* shadow = m_Objects.storageShadow;
     if (shadow == nullptr)
     {
         m_StorageScarePhase = 3;
@@ -169,7 +169,7 @@ void StageScene::UpdateStorageScare(Player& player)
         m_StorageScarePhase = 3;
         m_StorageScareNoticeTimer = 1.8f;
         CeilingLight* light =
-            currentGame->GetObj<CeilingLight>("CeilingLight2");
+            m_Objects.CeilingLightAt(2);
         if (light != nullptr)
         {
             light->TriggerEventFlicker(0.75f, 0.88f);
@@ -180,73 +180,448 @@ void StageScene::UpdateStorageScare(Player& player)
     });
 }
 
-void StageScene::UpdateEvidenceScare(Player& player)
+// ----------------------------------------------------------------------------
+// 監視カメラ巡回
+// 端末で監視映像を確認して異常のあるカメラを報告し、現地で懐中電灯を当てて対処します。
+// 誤った報告や時間切れが続くと捕獲され、端末の前へ戻されます。
+// ----------------------------------------------------------------------------
+namespace
 {
-    if (m_EvidenceScarePhase != 1)
+    constexpr float PatrolInputDelay = 0.65f;
+    constexpr float PatrolWrongFeedbackSeconds = 1.35f;
+    constexpr float PatrolWarningTime = 12.0f;
+    constexpr float PatrolLookDistance = 110.0f;
+    constexpr float PatrolLookAlignment = 0.90f;
+    // 異常なしの回の割合です。常に異常がある状態では報告が作業になってしまうためです。
+    constexpr float PatrolNoAnomalyChance = 0.25f;
+
+    Vector3 ToVector3(const float (&value)[3])
+    {
+        return Vector3(value[0], value[1], value[2]);
+    }
+}
+
+void StageScene::UpdateSurveillancePatrol(Player& player, float deltaTime)
+{
+    m_PatrolNoticeTimer = (std::max)(0.0f, m_PatrolNoticeTimer - deltaTime);
+
+    if (m_PatrolCaught.IsActive())
+    {
+        UpdatePatrolCaught(player, deltaTime);
+        return;
+    }
+
+    switch (m_Patrol.GetState())
+    {
+    case SurveillancePatrol::State::Idle:
+    {
+        FuseBox* terminal = m_Objects.evidenceTerminal;
+        if (terminal == nullptr || !terminal->IsActivated())
+        {
+            return;
+        }
+
+        // 基準映像を記録してから異常を出すため、ここでは種類だけ確定します。
+        const SurveillancePatrol::Anomaly anomaly = ChoosePatrolAnomaly();
+        m_Patrol.BeginViewing(anomaly);
+        m_PatrolViewTimer = 0.0f;
+        m_PatrolZoomed = false;
+        m_PatrolShowReference = false;
+        m_PatrolReferenceCapturePending = true;
+        m_PatrolReferenceCaptureIndex = 0;
+        m_PatrolWrongTimer = 0.0f;
+        player.SetCanControl(false);
+
+        Core::Game* game = Core::Game::GetInstance();
+        game->PlayAudioCue(SOUND_CUE_POWER, 0.72f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.12f, 0.20f);
+        break;
+    }
+    case SurveillancePatrol::State::Viewing:
+        m_PatrolViewTimer += deltaTime;
+        UpdatePatrolViewing(player);
+        break;
+    case SurveillancePatrol::State::Dispatched:
+        UpdatePatrolDispatch(player, deltaTime);
+        break;
+    case SurveillancePatrol::State::Completed:
+        break;
+    }
+}
+
+void StageScene::UpdatePatrolViewing(Player& player)
+{
+    m_PatrolWrongTimer = (std::max)(
+        0.0f, m_PatrolWrongTimer - Application::GetDeltaTime());
+    if (m_PatrolReferenceCapturePending ||
+        m_PatrolViewTimer < PatrolInputDelay || m_PatrolWrongTimer > 0.0f)
     {
         return;
     }
 
-    m_EvidenceScareTimer += Application::GetDeltaTime();
-    if (m_EvidenceScareTimer < 0.85f)
+    if (Input::GetKeyTrigger(VK_LEFT) ||
+        Input::GetButtonTrigger(XINPUT_LEFT) ||
+        Input::GetButtonTrigger(XINPUT_LEFT_SHOULDER))
+    {
+        m_Patrol.SelectCamera(-1, StageSurveillanceCameraCount);
+        Input::SetVibration(1, 0.03f);
+    }
+    else if (Input::GetKeyTrigger(VK_RIGHT) ||
+        Input::GetButtonTrigger(XINPUT_RIGHT) ||
+        Input::GetButtonTrigger(XINPUT_RIGHT_SHOULDER))
+    {
+        m_Patrol.SelectCamera(1, StageSurveillanceCameraCount);
+        Input::SetVibration(1, 0.03f);
+    }
+
+    if (Input::GetKeyTrigger(VK_C) || Input::GetButtonTrigger(XINPUT_Y))
+    {
+        m_PatrolShowReference = !m_PatrolShowReference;
+        // 記録映像は標準画角なので、切替時にライブも同じ画角へ戻します。
+        m_PatrolZoomed = false;
+        Input::SetVibration(1, 0.03f);
+    }
+
+    // 広い画角で場所を把握し、必要なときだけ中央を拡大して小さな変化を調べます。
+    if (!m_PatrolShowReference &&
+        (Input::GetKeyTrigger(VK_Z) || Input::GetButtonTrigger(XINPUT_X)))
+    {
+        m_PatrolZoomed = !m_PatrolZoomed;
+        Input::SetVibration(1, 0.03f);
+    }
+
+    // 基準映像からの誤報告を防ぐため、報告はライブ画面でのみ受け付けます。
+    if (m_PatrolShowReference)
     {
         return;
     }
 
-    m_EvidenceScarePhase = 2;
-    const Vector3 position = player.GetPosition();
-    if (position.x < 145.0f || std::abs(position.z + 42.0f) > 72.0f)
+    SurveillancePatrol::ReportResult result =
+        SurveillancePatrol::ReportResult::Ignored;
+    if (Input::GetKeyTrigger(VK_E) || Input::GetButtonTrigger(XINPUT_A))
     {
-        m_EvidenceScarePhase = 3;
-        return;
+        result = m_Patrol.ReportSelectedCamera();
+    }
+    else if (Input::GetKeyTrigger(VK_Q) || Input::GetButtonTrigger(XINPUT_B))
+    {
+        result = m_Patrol.ReportNoAnomaly();
     }
 
     Core::Game* game = Core::Game::GetInstance();
-    ShadowMan* shadow = game->GetObj<ShadowMan>("Stage1EvidenceShadow");
-    if (shadow == nullptr)
+    switch (result)
     {
-        m_EvidenceScarePhase = 3;
+    case SurveillancePatrol::ReportResult::Ignored:
+        break;
+    case SurveillancePatrol::ReportResult::Dispatched:
+        m_PatrolWarningCooldown = 0.0f;
+        EndPatrolViewing(player);
+        game->PlayAudioCue(SOUND_CUE_DOOR, 0.62f);
+        break;
+    case SurveillancePatrol::ReportResult::ClearedNoAnomaly:
+        EndPatrolViewing(player);
+        if (m_Patrol.IsCompleted())
+        {
+            CompletePatrol(player);
+        }
+        else
+        {
+            ShowPatrolNotice("異常なしを確認した", 2.2f);
+        }
+        break;
+    case SurveillancePatrol::ReportResult::Wrong:
+        game->RegisterPuzzleMistake();
+        m_PatrolWrongTimer = PatrolWrongFeedbackSeconds;
+        game->PlayAudioCue(SOUND_CUE_DOOR, 0.54f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.22f, 0.24f);
+        Input::SetVibration(5, 0.11f);
+        break;
+    case SurveillancePatrol::ReportResult::Caught:
+        game->RegisterPuzzleMistake();
+        StartPatrolCaught(player);
+        break;
+    }
+}
+
+void StageScene::UpdatePatrolDispatch(Player& player, float deltaTime)
+{
+    const SurveillancePatrol::Anomaly anomaly = m_Patrol.GetAnomaly();
+    const SurveillancePatrol::DispatchResult result =
+        m_Patrol.UpdateDispatch(deltaTime, IsIlluminatingPatrolAnomaly(player));
+
+    Core::Game* game = Core::Game::GetInstance();
+    switch (result)
+    {
+    case SurveillancePatrol::DispatchResult::None:
+        // 残り時間が少ないほど、端末から離れている不安を画面と振動で強めます。
+        m_PatrolWarningCooldown -= deltaTime;
+        if (m_Patrol.GetRemainingTime() <= PatrolWarningTime &&
+            m_PatrolWarningCooldown <= 0.0f)
+        {
+            m_PatrolWarningCooldown = 3.0f;
+            game->GetPostProcess()->TriggerHorrorPulse(0.16f, 0.30f);
+            Input::SetVibration(4, 0.08f);
+        }
+        break;
+    case SurveillancePatrol::DispatchResult::Resolved:
+        SetPatrolAnomalyVisible(anomaly, false);
+        game->RegisterAnomalyHandled();
+        game->GetPostProcess()->TriggerBloomPulse(0.36f, 0.18f);
+        Input::SetVibration(4, 0.09f);
+        if (m_Patrol.IsCompleted())
+        {
+            CompletePatrol(player);
+        }
+        else
+        {
+            ShowPatrolNotice("異常を確認した 端末へ戻る", 2.6f);
+            if (FuseBox* terminal = m_Objects.evidenceTerminal)
+            {
+                terminal->SetManualInteractionAllowed(true);
+            }
+        }
+        break;
+    case SurveillancePatrol::DispatchResult::TimedOut:
+        SetPatrolAnomalyVisible(anomaly, false);
+        game->RegisterPuzzleMistake();
+        ShowPatrolNotice("映像の反応が途絶えた 端末へ戻る", 2.8f);
+        game->PlayAudioCue(SOUND_CUE_SCARE, 0.62f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.32f, 0.30f);
+        if (FuseBox* terminal = m_Objects.evidenceTerminal)
+        {
+            terminal->SetManualInteractionAllowed(true);
+        }
+        break;
+    case SurveillancePatrol::DispatchResult::Caught:
+        SetPatrolAnomalyVisible(anomaly, false);
+        game->RegisterPuzzleMistake();
+        StartPatrolCaught(player);
+        break;
+    }
+}
+
+SurveillancePatrol::Anomaly StageScene::ChoosePatrolAnomaly()
+{
+    std::uniform_real_distribution<float> chance(0.0f, 1.0f);
+    if (chance(m_PatrolRandom) < PatrolNoAnomalyChance)
+    {
+        return SurveillancePatrol::Anomaly{};
+    }
+
+    std::uniform_int_distribution<int> cameraDistribution(
+        0, StageSurveillanceCameraCount - 1);
+    SurveillancePatrol::Anomaly anomaly;
+    anomaly.camera = cameraDistribution(m_PatrolRandom);
+
+    // カメラごとに、その場所で起こせる異常だけを候補にします。
+    const StageSurveillanceCamera& camera =
+        StageSurveillanceCameras[anomaly.camera];
+    SurveillancePatrol::AnomalyType candidates[3] =
+    {
+        SurveillancePatrol::AnomalyType::Figure
+    };
+    int candidateCount = 1;
+    CeilingLight* anomalyLight = camera.LightNumber > 0
+        ? m_Objects.CeilingLightAt(camera.LightNumber)
+        : nullptr;
+    // 停電中に元から消えている通常照明を選ぶと映像に差が出ないため、
+    // 通電前は点灯している非常灯だけを消灯異常の候補にします。
+    if (anomalyLight != nullptr &&
+        (Core::Game::GetInstance()->IsPowerRestored() ||
+         anomalyLight->IsEmergencyLight()))
+    {
+        candidates[candidateCount++] = SurveillancePatrol::AnomalyType::LightOut;
+    }
+    if (camera.SealedDoorIndex >= 0)
+    {
+        candidates[candidateCount++] = SurveillancePatrol::AnomalyType::DoorOpen;
+    }
+    std::uniform_int_distribution<int> typeDistribution(0, candidateCount - 1);
+    anomaly.type = candidates[typeDistribution(m_PatrolRandom)];
+    return anomaly;
+}
+
+void StageScene::SetPatrolAnomalyVisible(
+    const SurveillancePatrol::Anomaly& anomaly, bool visible)
+{
+    if (!anomaly.Exists())
+    {
         return;
     }
 
-    // 端末へ向いているプレイヤーの背後に置き、操作後に振り返ったときだけ見せます。
-    shadow->SetPosition(148.0f, -99.0f, -42.0f);
-    shadow->SetActive(true);
-    shadow->EnableGazeScare(5.4f);
-    m_EvidenceScareNoticeTimer = 2.0f;
-
-    CeilingLight* roomLight = game->GetObj<CeilingLight>("CeilingLight3");
-    if (roomLight != nullptr)
+    const StageSurveillanceCamera& camera =
+        StageSurveillanceCameras[anomaly.camera];
+    switch (anomaly.type)
     {
-        roomLight->TriggerEventFlicker(0.56f, 0.68f);
+    case SurveillancePatrol::AnomalyType::Figure:
+        if (ShadowMan* figure = m_Objects.evidenceShadow)
+        {
+            figure->SetActive(false);
+            if (visible)
+            {
+                const Vector3 position = ToVector3(camera.FigurePosition);
+                figure->SetPosition(position.x, position.y, position.z);
+                figure->SetActive(true);
+                // 現地確認の制限時間より長く残し、見つける前に消えないようにします。
+                figure->EnableGazeScare(
+                    SurveillancePatrol::DispatchTimeLimit + 60.0f);
+            }
+        }
+        break;
+    case SurveillancePatrol::AnomalyType::LightOut:
+        if (CeilingLight* light = m_Objects.CeilingLightAt(camera.LightNumber))
+        {
+            light->SetForcedOff(visible);
+        }
+        break;
+    case SurveillancePatrol::AnomalyType::DoorOpen:
+        if (Door* door = m_Objects.sealedDoors[
+            static_cast<std::size_t>(camera.SealedDoorIndex)])
+        {
+            if (visible)
+            {
+                door->ForceOpen();
+            }
+            else
+            {
+                door->ResetClosed(0);
+                door->SetLocked(true);
+            }
+        }
+        break;
+    case SurveillancePatrol::AnomalyType::None:
+        break;
     }
-    game->PlayAudioCue(SOUND_CUE_DOOR, 0.62f);
-    game->GetPostProcess()->TriggerHorrorPulse(0.12f, 0.20f);
+}
 
-    shadow->SetOnObserved([this]()
+bool StageScene::IsIlluminatingPatrolAnomaly(const Player& player) const
+{
+    // ライトを点けて自分で異常を探す操作を必須にし、現地到着だけでは完了させません。
+    if (!player.IsFlashlightOn())
     {
-        Core::Game* currentGame = Core::Game::GetInstance();
-        currentGame->RegisterAnomalyHandled();
-        m_EvidenceScarePhase = 3;
-        m_EvidenceScareNoticeTimer = 1.8f;
+        return false;
+    }
+    const SurveillancePatrol::Anomaly& anomaly = m_Patrol.GetAnomaly();
+    if (!anomaly.Exists())
+    {
+        return false;
+    }
 
-        ShadowMan* activeShadow =
-            currentGame->GetObj<ShadowMan>("Stage1EvidenceShadow");
-        if (activeShadow != nullptr)
-        {
-            activeShadow->SetActive(false);
-        }
+    const StageSurveillanceCamera& camera =
+        StageSurveillanceCameras[anomaly.camera];
+    Vector3 target;
+    switch (anomaly.type)
+    {
+    case SurveillancePatrol::AnomalyType::Figure:
+        target = ToVector3(camera.FigurePosition) + Vector3(0.0f, 17.0f, 0.0f);
+        break;
+    case SurveillancePatrol::AnomalyType::LightOut:
+        target = m_Objects.CeilingLightAt(camera.LightNumber)->GetPosition();
+        break;
+    case SurveillancePatrol::AnomalyType::DoorOpen:
+        target = ToVector3(StageSealedDoors[camera.SealedDoorIndex].Position);
+        break;
+    case SurveillancePatrol::AnomalyType::None:
+        return false;
+    }
 
-        CeilingLight* light =
-            currentGame->GetObj<CeilingLight>("CeilingLight3");
-        if (light != nullptr)
-        {
-            light->TriggerEventFlicker(0.84f, 0.92f);
-        }
-        currentGame->PlayAudioCue(SOUND_CUE_SCARE, 0.76f);
-        currentGame->GetPostProcess()->TriggerHorrorPulse(0.34f, 0.32f);
-        Input::SetVibration(9, 0.19f);
-    });
+    // 光が届く距離まで近づき、ライトの中心で照らしている場合だけ対処を進めます。
+    Camera* viewCamera = Core::Game::GetInstance()->GetCamera();
+    Vector3 toTarget = target - viewCamera->GetPosition();
+    const float distance = toTarget.Length();
+    if (distance > PatrolLookDistance || distance < 0.001f)
+    {
+        return false;
+    }
+    toTarget /= distance;
+    return viewCamera->GetForward().Dot(toTarget) > PatrolLookAlignment;
+}
+
+void StageScene::EndPatrolViewing(Player& player)
+{
+    player.SetCanControl(true);
+    if (FuseBox* terminal = m_Objects.evidenceTerminal)
+    {
+        terminal->ResetActivation();
+        // 現地確認中は端末を操作できないようにし、確認後に戻ってから次の映像を見せます。
+        terminal->SetManualInteractionAllowed(
+            m_Patrol.GetState() == SurveillancePatrol::State::Idle);
+    }
+}
+
+void StageScene::StartPatrolCaught(Player& player)
+{
+    SetPatrolAnomalyVisible(m_Patrol.GetAnomaly(), false);
+    if (!m_PatrolCaught.Start(CaughtSequence::Reason::FinalPursuit))
+    {
+        return;
+    }
+
+    player.SetCanControl(false);
+    Core::Game* game = Core::Game::GetInstance();
+    game->RegisterCaught();
+    game->PlayAudioCue(SOUND_CUE_SCARE);
+    game->GetPostProcess()->TriggerHorrorPulse(1.0f, 0.72f);
+    Input::SetVibration(24, 0.72f);
+}
+
+void StageScene::UpdatePatrolCaught(Player& player, float deltaTime)
+{
+    m_PatrolCaught.Advance(deltaTime);
+    if (!m_PatrolCaught.IsReadyToRecover())
+    {
+        return;
+    }
+
+    // 暗転中に端末の前へ戻し、巡回はやり直せる状態にします（対処済みの回数は保持）。
+    m_PatrolCaught.Complete();
+    player.SetPosition(Vector3(190.0f, -99.0f, -42.0f));
+    player.SetCanControl(true);
+    if (ShadowMan* figure = m_Objects.evidenceShadow)
+    {
+        figure->SetActive(false);
+    }
+    if (FuseBox* terminal = m_Objects.evidenceTerminal)
+    {
+        terminal->ResetActivation();
+        terminal->SetManualInteractionAllowed(true);
+    }
+    ShowPatrolNotice("気がつくと端末の前にいた", 3.0f);
+}
+
+void StageScene::CompletePatrol(Player& player)
+{
+    m_EvidenceHandled = true;
+    m_EvidenceNoticeTimer = 3.2f;
+    player.AddBattery(8.0f);
+
+    if (FuseBox* terminal = m_Objects.evidenceTerminal)
+    {
+        terminal->SetManualInteractionAllowed(false);
+    }
+    if (Wall* marker = m_Objects.evidenceMarker)
+    {
+        marker->SetAppearance(
+            Color(0.08f, 0.18f, 0.10f, 1.0f),
+            Color(0.16f, 0.52f, 0.22f, 1.0f),
+            44.0f);
+    }
+    if (CeilingLight* roomLight = m_Objects.CeilingLightAt(3))
+    {
+        roomLight->TriggerEventFlicker(0.84f, 0.92f);
+    }
+
+    Core::Game* game = Core::Game::GetInstance();
+    game->RegisterEvidenceCollected();
+    game->PlayAudioCue(SOUND_CUE_SCARE, 0.76f);
+    game->GetPostProcess()->TriggerHorrorPulse(0.34f, 0.32f);
+    game->GetPostProcess()->TriggerBloomPulse(0.42f, 0.20f);
+    Input::SetVibration(9, 0.19f);
+}
+
+void StageScene::ShowPatrolNotice(const char* text, float seconds)
+{
+    m_PatrolNoticeText = text;
+    m_PatrolNoticeTimer = seconds;
 }
 
 void StageScene::UpdateCorridorLoop(Player& player)
@@ -295,9 +670,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
 
     for (int markerIndex = 1; markerIndex <= 3; ++markerIndex)
     {
-        const std::string markerName =
-            "PropLoopMarker" + std::to_string(markerIndex);
-        Wall* marker = game->GetObj<Wall>(markerName);
+        Wall* marker = m_Objects.loopMarkers[static_cast<std::size_t>(markerIndex - 1)];
         if (marker != nullptr)
         {
             marker->SetVisible(markerIndex <= loopPhase);
@@ -316,22 +689,22 @@ void StageScene::AdvanceCorridorLoop(Player& player)
 
     // 入口へ戻すときに廊下の扉も復元します。同じ境界を再び開けさせることで、
     // 各周回が意図的な反復として感じられるようにします。
-    Door* loopDoor = game->GetObj<Door>("Door");
+    Door* loopDoor = m_Objects.loopDoor;
     if (loopDoor != nullptr)
     {
         loopDoor->ResetClosed(loopPhase);
     }
 
     CeilingLight* entranceLight =
-        game->GetObj<CeilingLight>("CeilingLight1");
+        m_Objects.CeilingLightAt(1);
     CeilingLight* middleLight =
-        game->GetObj<CeilingLight>("CeilingLight4");
+        m_Objects.CeilingLightAt(4);
     CeilingLight* cornerLight =
-        game->GetObj<CeilingLight>("CeilingLight8");
+        m_Objects.CeilingLightAt(8);
 
     if (loopPhase == 1)
     {
-        Item* secondFuse = game->GetObj<Item>("Item2");
+        Item* secondFuse = m_Objects.secondFuse;
         if (secondFuse != nullptr && !secondFuse->IsCollected())
         {
             secondFuse->SetActive(true);
@@ -344,7 +717,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     }
     else if (loopPhase == 2)
     {
-        Item* thirdFuse = game->GetObj<Item>("Item3");
+        Item* thirdFuse = m_Objects.thirdFuse;
         if (thirdFuse != nullptr && !thirdFuse->IsCollected())
         {
             thirdFuse->SetActive(true);
@@ -409,15 +782,15 @@ void StageScene::StartScareLightSequence()
     m_ScareLightSequence.Start();
 
     CeilingLight* entrance =
-        game->GetObj<CeilingLight>("CeilingLight1");
+        m_Objects.CeilingLightAt(1);
     CeilingLight* middle =
-        game->GetObj<CeilingLight>("CeilingLight4");
+        m_Objects.CeilingLightAt(4);
     CeilingLight* hall =
-        game->GetObj<CeilingLight>("CeilingLight5");
+        m_Objects.CeilingLightAt(5);
     CeilingLight* corner =
-        game->GetObj<CeilingLight>("CeilingLight8");
+        m_Objects.CeilingLightAt(8);
     CeilingLight* loopExit =
-        game->GetObj<CeilingLight>("CeilingLight7");
+        m_Objects.CeilingLightAt(7);
 
     if (entrance != nullptr)
     {
@@ -461,15 +834,15 @@ void StageScene::UpdateScareLightSequence()
     m_ScareLightSequence.Advance(deltaTime);
 
     CeilingLight* entrance =
-        game->GetObj<CeilingLight>("CeilingLight1");
+        m_Objects.CeilingLightAt(1);
     CeilingLight* middle =
-        game->GetObj<CeilingLight>("CeilingLight4");
+        m_Objects.CeilingLightAt(4);
     CeilingLight* hall =
-        game->GetObj<CeilingLight>("CeilingLight5");
+        m_Objects.CeilingLightAt(5);
     CeilingLight* corner =
-        game->GetObj<CeilingLight>("CeilingLight8");
+        m_Objects.CeilingLightAt(8);
     CeilingLight* loopExit =
-        game->GetObj<CeilingLight>("CeilingLight7");
+        m_Objects.CeilingLightAt(7);
 
     switch (m_ScareLightSequence.ConsumePendingBeat())
     {
@@ -549,7 +922,7 @@ void StageScene::StartFuseWatcher(int fuseCount)
     }
 
     Core::Game* game = Core::Game::GetInstance();
-    ShadowMan* watcher = game->GetObj<ShadowMan>("Stage1FuseWatcher");
+    ShadowMan* watcher = m_Objects.fuseWatcher;
     if (watcher == nullptr)
     {
         return;
@@ -571,14 +944,14 @@ void StageScene::StartFuseWatcher(int fuseCount)
             Core::Game* game = Core::Game::GetInstance();
             game->RegisterAnomalyHandled();
             ShadowMan* activeWatcher =
-                game->GetObj<ShadowMan>("Stage1FuseWatcher");
+                m_Objects.fuseWatcher;
             if (activeWatcher != nullptr)
             {
                 activeWatcher->SetActive(false);
             }
 
             CeilingLight* reactionLight =
-                game->GetObj<CeilingLight>("CeilingLight4");
+                m_Objects.CeilingLightAt(4);
             if (reactionLight != nullptr)
             {
                 reactionLight->TriggerEventFlicker(0.72f, 0.74f);
@@ -608,15 +981,9 @@ void StageScene::UpdatePowerRestoreSequence()
         m_ScareLightSequence.Cancel();
         m_ScareLightSequence.ClearNotice();
 
-        for (int markerIndex = 1; markerIndex <= 3; ++markerIndex)
+        for (Wall* marker : m_Objects.loopMarkers)
         {
-            const std::string markerName =
-                "PropLoopMarker" + std::to_string(markerIndex);
-            Wall* marker = game->GetObj<Wall>(markerName);
-            if (marker != nullptr)
-            {
-                marker->SetVisible(false);
-            }
+            marker->SetVisible(false);
         }
     }
 
@@ -650,7 +1017,7 @@ void StageScene::UpdateExitPowerSequence()
 {
     const float deltaTime = Application::GetDeltaTime();
     Core::Game* game = Core::Game::GetInstance();
-    FuseBox* panel = game->GetObj<FuseBox>("ExitPowerPanel");
+    FuseBox* panel = m_Objects.exitPowerPanel;
     if (panel == nullptr || !panel->IsActivated())
     {
         return;
@@ -660,8 +1027,8 @@ void StageScene::UpdateExitPowerSequence()
     {
         m_ProgressHintTimer = 0.0f;
 
-        CeilingLight* corner = game->GetObj<CeilingLight>("CeilingLight7");
-        CeilingLight* exitLight = game->GetObj<CeilingLight>("CeilingLight8");
+        CeilingLight* corner = m_Objects.CeilingLightAt(7);
+        CeilingLight* exitLight = m_Objects.CeilingLightAt(8);
         if (corner != nullptr) corner->SetForcedOff(true);
         if (exitLight != nullptr) exitLight->SetForcedOff(true);
         game->GetPostProcess()->TriggerHorrorPulse(0.30f, 0.28f);
@@ -678,7 +1045,7 @@ void StageScene::UpdateExitPowerSequence()
     {
     case 0:
     {
-        CeilingLight* corner = game->GetObj<CeilingLight>("CeilingLight7");
+        CeilingLight* corner = m_Objects.CeilingLightAt(7);
         if (corner != nullptr)
         {
             corner->SetForcedOff(false);
@@ -691,7 +1058,7 @@ void StageScene::UpdateExitPowerSequence()
     }
     case 1:
     {
-        CeilingLight* exitLight = game->GetObj<CeilingLight>("CeilingLight8");
+        CeilingLight* exitLight = m_Objects.CeilingLightAt(8);
         if (exitLight != nullptr)
         {
             exitLight->SetForcedOff(false);
@@ -723,7 +1090,7 @@ void StageScene::UpdateExitOmen(Player& player)
         case 0:
         {
             CeilingLight* lightBehind =
-                game->GetObj<CeilingLight>("CeilingLight8");
+                m_Objects.CeilingLightAt(8);
             if (lightBehind != nullptr)
             {
                 lightBehind->SetForcedOff(true);
@@ -735,7 +1102,7 @@ void StageScene::UpdateExitOmen(Player& player)
         case 1:
         {
             CeilingLight* exitLight =
-                game->GetObj<CeilingLight>("CeilingLight7");
+                m_Objects.CeilingLightAt(7);
             if (exitLight != nullptr)
             {
                 exitLight->SetFaulted(true);
@@ -762,21 +1129,16 @@ void StageScene::UpdateExitOmen(Player& player)
     m_ExitOmenSequence.Start();
 
     ShadowMan* shadow =
-        game->GetObj<ShadowMan>("Stage1ExitOmen");
+        m_Objects.exitOmen;
     if (shadow != nullptr)
     {
         shadow->SetActive(true);
         shadow->EnableGazeScare(4.2f);
     }
 
-    const char* exitLightNames[] =
+    for (int lightNumber : { 7, 8 })
     {
-        "CeilingLight7", "CeilingLight8"
-    };
-    for (const char* lightName : exitLightNames)
-    {
-        CeilingLight* light =
-            game->GetObj<CeilingLight>(lightName);
+        CeilingLight* light = m_Objects.CeilingLightAt(lightNumber);
         if (light != nullptr)
         {
             light->TriggerEventFlicker(0.82f, 0.78f);

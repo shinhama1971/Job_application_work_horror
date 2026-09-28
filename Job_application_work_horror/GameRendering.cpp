@@ -85,13 +85,39 @@ namespace
 
 namespace Core
 {
+    void Game::DrawWorldForAuxiliaryCamera(Camera& camera)
+    {
+        for (auto& object : m_ObjectManager.GetAllObjects())
+        {
+            if (object->IsDestroy() || !object->DrawsInAuxiliaryView())
+            {
+                continue;
+            }
+            object->Draw(&camera);
+        }
+    }
+
     // 影・反射などの事前パスを必要なフレームだけ更新し、
     // 本描画をPostProcessへ取り込んでからHUDとデバッグUIを重ねます。
+    //
     void Game::Draw()
     {
         Debug::UI::BeginFrame();
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
         m_Instance->m_GpuTimer.BeginFrame(context);
+
+        // 光を放つObjectから、このフレームの点光源を集めてGPUへ送ります。
+        // 以降の反射・監視映像パスでは全光源を、本描画ではタイル別リストを使います。
+        m_Instance->m_FramePointLights.clear();
+        for (const auto& object : m_Instance->m_ObjectManager.GetAllObjects())
+        {
+            if (!object->IsDestroy())
+            {
+                object->CollectPointLights(m_Instance->m_FramePointLights);
+            }
+        }
+        m_Instance->m_TiledLighting.SetLights(m_Instance->m_FramePointLights);
+
         unsigned int mainDrawn = 0;
         unsigned int mainCulled = 0;
         unsigned int shadowDrawn = 0;
@@ -234,8 +260,16 @@ namespace Core
             m_Instance->m_HasReflectionCameraPose = false;
         }
 
+        // 監視映像などSceneが持つ補助カメラは、本描画の前に描いておきます。
+        if (m_Instance->m_Scene)
+        {
+            m_Instance->m_Scene->RenderOffscreen();
+        }
+
         m_Instance->m_GpuTimer.BeginPass(GpuPass::MainScene, context);
         Renderer::DrawStart();
+        // プレイヤー視点のタイル別ライトリストをCompute Shaderで作ってから描きます。
+        m_Instance->m_TiledLighting.BuildTiles(m_Instance->m_Camera);
 
         for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
         {

@@ -28,6 +28,8 @@ private:
     bool m_CollisionEnabled = true;
     bool m_CastsShadow = true;
     bool m_Visible = true;
+    float m_GlowRange = 0.0f;
+    float m_GlowStrength = 0.0f;
 
 public:
     void Init() override;
@@ -71,6 +73,16 @@ public:
     {
         m_CastsShadow = castsShadow;
     }
+
+    // 看板や表示灯のように、自分の発光色で周囲を照らす点光源を出します。
+    // rangeが0なら出しません。発光色が変わると照らす色も自動で追従します。
+    void SetGlowLight(float range, float strength)
+    {
+        m_GlowRange = range;
+        m_GlowStrength = strength;
+    }
+
+    void CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const override;
 
     void SetVisible(bool visible)
     {

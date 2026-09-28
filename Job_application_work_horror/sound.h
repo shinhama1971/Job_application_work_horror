@@ -7,6 +7,7 @@
 #include <memory>
 
 #include <xaudio2.h>
+#include <wrl/client.h>
 
 // サウンドファイル
 typedef enum
@@ -47,7 +48,8 @@ private:
 		{"assets/Audio/flashlight_click.wav", false, 0.54f},
 	};
 
-	IXAudio2* m_pXAudio2 = NULL;
+	// XAudio2本体はCOMのためComPtrで管理します。ボイスはCOMではなくDestroyVoiceで解放します。
+	Microsoft::WRL::ComPtr<IXAudio2> m_pXAudio2;
 	IXAudio2MasteringVoice* m_pMasteringVoice = NULL;
 	IXAudio2SourceVoice* m_pSourceVoice[SOUND_LABEL_MAX]{};
 	WAVEFORMATEXTENSIBLE m_wfx[SOUND_LABEL_MAX]{}; // WAVフォーマット

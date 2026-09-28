@@ -9,13 +9,14 @@
 #include"Texture.h"
 #include "ModelBounds.h"
 #include <memory>
-using namespace DirectX::SimpleMath;
+#include <vector>
+#include "Renderer.h"
 class Object {
 protected:
 	// SRT情報（姿勢情報）
-	Vector3 m_Position = DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
-	Vector3 m_Rotation = DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
-	Vector3 m_Scale = DirectX::SimpleMath::Vector3(1.0f, 1.0f, 1.0f);
+	DirectX::SimpleMath::Vector3 m_Position = DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
+	DirectX::SimpleMath::Vector3 m_Rotation = DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
+	DirectX::SimpleMath::Vector3 m_Scale = DirectX::SimpleMath::Vector3(1.0f, 1.0f, 1.0f);
 	bool m_IsDestroy = false;
 	std::shared_ptr<const ModelBounds> m_ModelBounds;
 
@@ -35,6 +36,14 @@ public:
 	// 描画パスへの参加可否は型判定ではなく各Object自身が宣言します。
 	virtual bool UsesCameraCulling() const { return false; }
 	virtual bool ContributesToPlanarReflection() const { return false; }
+	// 監視カメラなど、プレイヤー以外の視点で描くワールドに含めるかどうか。
+	virtual bool DrawsInAuxiliaryView() const { return true; }
+	// 光を放つObjectは、このフレームの点光源を追加します。
+	// Gameが毎フレーム全Objectから集め、タイルベースのライトカリングへ渡します。
+	virtual void CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const
+	{
+		(void)lights;
+	}
 	virtual bool IsPlanarReflectionSurfaceVisible(const Camera&) const
 	{
 		return false;

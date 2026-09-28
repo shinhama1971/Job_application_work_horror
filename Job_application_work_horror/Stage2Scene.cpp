@@ -50,18 +50,8 @@ bool Stage2Scene::TryGetDebugInfo(SceneDebugInfo& info) const
 
 void Stage2Scene::RequestDebugAction(SceneDebugAction action)
 {
-    switch (action)
-    {
-    case SceneDebugAction::AdvanceProgression:
-        m_DebugCommand = 1;
-        break;
-    case SceneDebugAction::PlayFinalSequence:
-        m_DebugCommand = 2;
-        break;
-    case SceneDebugAction::PlayLightingEvent:
-        m_DebugCommand = 3;
-        break;
-    }
+    // 操作可能なフレームのUpdateで1回だけ実行します。
+    m_PendingDebugAction = action;
 }
 
 // ループ廊下の基本形と、周回によって表示を切り替える異変Objectを準備します。
@@ -90,6 +80,8 @@ void Stage2Scene::Init()
     m_ClockAnomaly.Reset();
     m_PuzzleFeedback.Reset();
     m_NoiseThreatSystem.Reset();
+    // 最初の気配は周回に慣れた頃に出します。
+    m_BehindPresence.Reset(BehindPresence::MaxInterval);
     m_ChargerNoticeTimer = 0.0f;
     m_EvidenceNoticeTimer = 0.0f;
     m_SignalNoticeTimer = 0.0f;
@@ -106,10 +98,11 @@ void Stage2Scene::Init()
     m_SignalPuzzle.Reset();
     m_FinalSequenceArmed = false;
     m_FinalDoorReady = false;
-    m_DebugCommand = 0;
+    m_PendingDebugAction.reset();
 
     Player* player = game->CreateObj<Player>("Player");
     player->SetPosition(Vector3(0.0f, -99.0f, -125.0f));
+    player->SetSprintAllowed(false);
 
     ShadowMan* stageShadow = game->CreateObj<ShadowMan>("Stage2Shadow");
     stageShadow->SetPosition(0.0f, -99.0f, 62.0f);
@@ -122,33 +115,38 @@ void Stage2Scene::Init()
     noiseShadow->SetDeactivateOnExpire(true);
     noiseShadow->SetActive(false);
 
+    // 2周目以降、視界の外から静かに近づく「背後の気配」です。
+    ShadowMan* presence = game->CreateObj<ShadowMan>("Stage2Presence");
+    presence->SetDeactivateOnExpire(true);
+    presence->SetActive(false);
+
     FuseBox* confirmationPanel =
         game->CreateObj<FuseBox>("Stage2ConfirmationPanel");
     confirmationPanel->SetManualControl("異常確認スイッチを押す");
     confirmationPanel->SetManualInteractionAllowed(false);
     confirmationPanel->SetPosition(35.5f, -90.0f, 112.0f);
-    confirmationPanel->SetRotation(Vector3(0.0f, -1.5707963f, 0.0f));
+    confirmationPanel->SetRotation(Vector3(0.0f, -DirectX::XM_PIDIV2, 0.0f));
 
     FuseBox* emergencyCharger =
         game->CreateObj<FuseBox>("Stage2EmergencyCharger");
     emergencyCharger->SetManualControl("非常用充電器を使う");
     emergencyCharger->SetManualInteractionAllowed(true);
     emergencyCharger->SetPosition(-35.5f, -90.0f, -106.0f);
-    emergencyCharger->SetRotation(Vector3(0.0f, 1.5707963f, 0.0f));
+    emergencyCharger->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
 
     FuseBox* evidenceTerminal1 =
         game->CreateObj<FuseBox>("Stage2EvidenceTerminal1");
     evidenceTerminal1->SetManualControl("残された記録を回収する");
     evidenceTerminal1->SetManualInteractionAllowed(true);
     evidenceTerminal1->SetPosition(35.5f, -90.0f, -76.0f);
-    evidenceTerminal1->SetRotation(Vector3(0.0f, -1.5707963f, 0.0f));
+    evidenceTerminal1->SetRotation(Vector3(0.0f, -DirectX::XM_PIDIV2, 0.0f));
 
     FuseBox* evidenceTerminal2 =
         game->CreateObj<FuseBox>("Stage2EvidenceTerminal2");
     evidenceTerminal2->SetManualControl("残された記録を回収する");
     evidenceTerminal2->SetManualInteractionAllowed(true);
     evidenceTerminal2->SetPosition(-35.5f, -90.0f, 108.0f);
-    evidenceTerminal2->SetRotation(Vector3(0.0f, 1.5707963f, 0.0f));
+    evidenceTerminal2->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
 
     constexpr const char* signalTerminalNames[] =
     {
@@ -180,7 +178,7 @@ void Stage2Scene::Init()
             signalPositions[signalIndex].z);
         signalTerminal->SetRotation(Vector3(
             0.0f,
-            signalIndex == 1 ? 1.5707963f : -1.5707963f,
+            signalIndex == 1 ? DirectX::XM_PIDIV2 : -DirectX::XM_PIDIV2,
             0.0f));
     }
 
@@ -502,32 +500,161 @@ void Stage2Scene::Init()
 
     player->Update();
     m_Hud.Init();
+    CacheObjects();
+    SetupPracticalLights();
+}
+
+// 信号盤のマーカーや扉の表示灯、肖像の目が、自分の発光色で廊下を照らすようにします。
+// 色の変化（正解で緑になる、異変で赤く光るなど）がそのまま周囲の光の色になります。
+void Stage2Scene::SetupPracticalLights()
+{
+    m_Objects.doorIndicator->SetGlowLight(45.0f, 2.0f);
+    for (Wall* marker : m_Objects.signalMarkers)
+    {
+        marker->SetGlowLight(40.0f, 1.8f);
+    }
+    for (Wall* marker : m_Objects.evidenceMarkers)
+    {
+        marker->SetGlowLight(40.0f, 1.8f);
+    }
+    for (Wall* eye : m_Objects.portraitEyes)
+    {
+        eye->SetGlowLight(30.0f, 2.4f);
+    }
+}
+
+// 以後の更新で使うObjectをここで一度だけ名前検索し、見つからなければ起動時に通知します。
+void Stage2Scene::CacheObjects()
+{
+    Core::Game* game = Core::Game::GetInstance();
+    Stage2Objects& objects = m_Objects;
+
+    objects.player = game->RequireObj<Player>("Player");
+    objects.exit = game->RequireObj<ExitTrigger>("Stage2Exit");
+    objects.door = game->RequireObj<Door>("Stage2Door");
+    objects.shadow = game->RequireObj<ShadowMan>("Stage2Shadow");
+    objects.noiseShadow = game->RequireObj<ShadowMan>("Stage2NoiseShadow");
+    objects.presence = game->RequireObj<ShadowMan>("Stage2Presence");
+    objects.confirmationPanel =
+        game->RequireObj<FuseBox>("Stage2ConfirmationPanel");
+    objects.emergencyCharger =
+        game->RequireObj<FuseBox>("Stage2EmergencyCharger");
+    objects.battery = game->RequireObj<BatteryItem>("Stage2Battery");
+    objects.doorIndicator = game->RequireObj<Wall>("Stage2DoorIndicator");
+    objects.portrait = game->RequireObj<Wall>("Stage2Portrait");
+    objects.loopMark = game->RequireObj<Wall>("Stage2LoopMark");
+    objects.clockFace = game->RequireObj<Wall>("Stage2ClockFace");
+    objects.clockHourHand = game->RequireObj<Wall>("Stage2ClockHourHand");
+    objects.clockMinuteHand = game->RequireObj<Wall>("Stage2ClockMinuteHand");
+    objects.falseDoorPanel = game->RequireObj<Wall>("Stage2FalseDoorPanel");
+    objects.falseDoorFrameNear =
+        game->RequireObj<Wall>("Stage2FalseDoorFrameNear");
+    objects.falseDoorFrameFar =
+        game->RequireObj<Wall>("Stage2FalseDoorFrameFar");
+    objects.falseDoorFrameTop =
+        game->RequireObj<Wall>("Stage2FalseDoorFrameTop");
+    objects.falseDoorHandle = game->RequireObj<Wall>("Stage2FalseDoorHandle");
+
+    constexpr const char* lightNames[] =
+    {
+        "Stage2Light1", "Stage2Light2", "Stage2Light3", "CeilingLight4"
+    };
+    static_assert(std::size(lightNames) ==
+        static_cast<std::size_t>(Stage2Light::Count));
+    for (std::size_t index = 0; index < objects.lights.size(); ++index)
+    {
+        objects.lights[index] = game->RequireObj<CeilingLight>(lightNames[index]);
+    }
+
+    constexpr const char* puddleNames[] =
+    {
+        "Stage2Puddle1", "Stage2Puddle2", "Stage2Puddle3"
+    };
+    constexpr const char* evidenceTerminalNames[] =
+    {
+        "Stage2EvidenceTerminal1", "Stage2EvidenceTerminal2"
+    };
+    constexpr const char* evidenceMarkerNames[] =
+    {
+        "Stage2EvidenceMarker1", "Stage2EvidenceMarker2"
+    };
+    constexpr const char* portraitEyeNames[] =
+    {
+        "Stage2PortraitEyeLeft", "Stage2PortraitEyeRight"
+    };
+    constexpr const char* cycleMarkNames[] =
+    {
+        "Stage2CycleMark1", "Stage2CycleMark2", "Stage2CycleMark3"
+    };
+    constexpr const char* signalTerminalNames[] =
+    {
+        "Stage2SignalTerminalBlue",
+        "Stage2SignalTerminalAmber",
+        "Stage2SignalTerminalRed"
+    };
+    constexpr const char* signalMarkerNames[] =
+    {
+        "Stage2SignalMarkerBlue",
+        "Stage2SignalMarkerAmber",
+        "Stage2SignalMarkerRed"
+    };
+    for (std::size_t index = 0; index < objects.puddles.size(); ++index)
+    {
+        objects.puddles[index] = game->RequireObj<Wall>(puddleNames[index]);
+    }
+    for (std::size_t index = 0; index < objects.evidenceTerminals.size(); ++index)
+    {
+        objects.evidenceTerminals[index] =
+            game->RequireObj<FuseBox>(evidenceTerminalNames[index]);
+        objects.evidenceMarkers[index] =
+            game->RequireObj<Wall>(evidenceMarkerNames[index]);
+        objects.portraitEyes[index] =
+            game->RequireObj<Wall>(portraitEyeNames[index]);
+    }
+    for (std::size_t index = 0; index < objects.signalTerminals.size(); ++index)
+    {
+        objects.cycleMarks[index] = game->RequireObj<Wall>(cycleMarkNames[index]);
+        objects.signalTerminals[index] =
+            game->RequireObj<FuseBox>(signalTerminalNames[index]);
+        objects.signalMarkers[index] =
+            game->RequireObj<Wall>(signalMarkerNames[index]);
+    }
+    for (std::size_t index = 0; index < objects.scratches.size(); ++index)
+    {
+        objects.scratches[index] = game->RequireObj<Wall>(Stage2ScratchNames[index]);
+    }
 }
 
 // 周回数、視線、騒音、信号パズル、追跡演出を同時に監視して進行を更新します。
 void Stage2Scene::Update()
 {
     Core::Game* game = Core::Game::GetInstance();
-    Player* player = game->GetObj<Player>("Player");
+    Player* player = m_Objects.player;
     if (player == nullptr)
     {
         return;
     }
 
-    ExitTrigger* exit = game->GetObj<ExitTrigger>("Stage2Exit");
+    // 周回中は歩くだけにし、最後の追跡が始まったときだけ走れるようにします。
+    // 静かに歩き続ける緊張と、追跡での解放感を分けるためです。
+    player->SetSprintAllowed(
+        m_FinalSequence.IsSequenceActive() || m_FinalSequence.IsPursuitActive());
+
+    ExitTrigger* exit = m_Objects.exit;
     if (exit != nullptr && exit->IsEscaping())
     {
         m_FinalSequence.StopPursuit();
-        ShadowMan* shadow = game->GetObj<ShadowMan>("Stage2Shadow");
+        ShadowMan* shadow = m_Objects.shadow;
         if (shadow != nullptr)
         {
             shadow->SetActive(false);
         }
-        ShadowMan* noiseShadow = game->GetObj<ShadowMan>("Stage2NoiseShadow");
+        ShadowMan* noiseShadow = m_Objects.noiseShadow;
         if (noiseShadow != nullptr)
         {
             noiseShadow->SetActive(false);
         }
+        m_Objects.presence->SetActive(false);
         return;
     }
 
@@ -543,28 +670,34 @@ void Stage2Scene::Update()
         return;
     }
 
-    const int debugCommand = m_DebugCommand;
-    m_DebugCommand = 0;
-    if (debugCommand == 1 && m_LoopCount < 3)
+    if (m_PendingDebugAction.has_value())
     {
-        AdvanceLoop(*player);
-    }
-    else if (debugCommand == 2)
-    {
-        while (m_LoopCount < 3)
+        const SceneDebugAction debugAction = *m_PendingDebugAction;
+        m_PendingDebugAction.reset();
+        switch (debugAction)
         {
-            AdvanceLoop(*player);
+        case SceneDebugAction::AdvanceProgression:
+            if (m_LoopCount < 3)
+            {
+                AdvanceLoop(*player);
+            }
+            break;
+        case SceneDebugAction::PlayFinalSequence:
+            while (m_LoopCount < 3)
+            {
+                AdvanceLoop(*player);
+            }
+            m_SignalPuzzle.ForceComplete();
+            m_FinalSequenceArmed = true;
+            if (!m_FinalSequence.IsSequenceActive())
+            {
+                StartFinalSequence();
+            }
+            break;
+        case SceneDebugAction::PlayLightingEvent:
+            StartObservedScare();
+            break;
         }
-        m_SignalPuzzle.ForceComplete();
-        m_FinalSequenceArmed = true;
-        if (m_FinalSequenceArmed && !m_FinalSequence.IsSequenceActive())
-        {
-            StartFinalSequence();
-        }
-    }
-    else if (debugCommand == 3)
-    {
-        StartObservedScare();
     }
 
     m_VisualTimer += deltaTime;
@@ -605,13 +738,9 @@ void Stage2Scene::Update()
     player->SetWetSurface(onWetSurface);
 
     // 濡れ面は静止画にせず、微細な反射の揺れと危険時の照明反射を与えます。
-    const char* puddleNames[] =
+    for (int puddleIndex = 0; puddleIndex < static_cast<int>(m_Objects.puddles.size()); ++puddleIndex)
     {
-        "Stage2Puddle1", "Stage2Puddle2", "Stage2Puddle3"
-    };
-    for (int puddleIndex = 0; puddleIndex < 3; ++puddleIndex)
-    {
-        Wall* puddle = game->GetObj<Wall>(puddleNames[puddleIndex]);
+        Wall* puddle = m_Objects.puddles[puddleIndex];
         if (puddle == nullptr)
         {
             continue;
@@ -642,16 +771,14 @@ void Stage2Scene::Update()
     m_GuidancePulseCooldown = (std::max)(
         0.0f, m_GuidancePulseCooldown - deltaTime);
 
-    Door* corridorDoor = game->GetObj<Door>("Stage2Door");
+    Door* corridorDoor = m_Objects.door;
     if (corridorDoor != nullptr && corridorDoor->IsLocked() &&
         m_ProgressHintTimer >= 15.0f &&
         m_GuidancePulseCooldown <= 0.0f)
     {
-        const char* guideLightName = m_LoopCount == 1
-            ? "Stage2Light3"
-            : "Stage2Light2";
-        CeilingLight* guideLight =
-            game->GetObj<CeilingLight>(guideLightName);
+        CeilingLight* guideLight = m_Objects.Light(m_LoopCount == 1
+            ? Stage2Light::Light3
+            : Stage2Light::Light2);
         if (guideLight != nullptr)
         {
             guideLight->TriggerEventFlicker(0.72f, 0.58f);
@@ -681,9 +808,10 @@ void Stage2Scene::Update()
     UpdateClock(deltaTime);
     UpdateClockObservation();
     UpdateNoiseThreat(*player, deltaTime);
+    UpdateBehindPresence(*player, deltaTime);
 
     FuseBox* emergencyCharger =
-        game->GetObj<FuseBox>("Stage2EmergencyCharger");
+        m_Objects.emergencyCharger;
     if (!m_ChargerHandled && emergencyCharger != nullptr &&
         emergencyCharger->IsActivated())
     {
@@ -697,7 +825,7 @@ void Stage2Scene::Update()
         game->RegisterChargerUsed();
 
         CeilingLight* startLight =
-            game->GetObj<CeilingLight>("Stage2Light1");
+            m_Objects.Light(Stage2Light::Light1);
         if (startLight != nullptr)
         {
             startLight->TriggerEventFlicker(1.10f, 0.88f);
@@ -706,14 +834,9 @@ void Stage2Scene::Update()
         Input::SetVibration(7, 0.16f);
     }
 
-    constexpr const char* evidenceNames[] =
-    {
-        "Stage2EvidenceTerminal1",
-        "Stage2EvidenceTerminal2"
-    };
     for (int evidenceIndex = 0; evidenceIndex < 2; ++evidenceIndex)
     {
-        FuseBox* evidence = game->GetObj<FuseBox>(evidenceNames[evidenceIndex]);
+        FuseBox* evidence = m_Objects.evidenceTerminals[evidenceIndex];
         if (!m_EvidenceHandled[evidenceIndex] && evidence != nullptr &&
             evidence->IsActivated())
         {
@@ -723,10 +846,7 @@ void Stage2Scene::Update()
             player->AddBattery(6.0f);
             m_NoiseThreatSystem.SetThreat((std::max)(
                 0.0f, m_NoiseThreatSystem.GetThreat() - 0.18f));
-            const char* markerName = evidenceIndex == 0
-                ? "Stage2EvidenceMarker1"
-                : "Stage2EvidenceMarker2";
-            Wall* marker = game->GetObj<Wall>(markerName);
+            Wall* marker = m_Objects.evidenceMarkers[evidenceIndex];
             if (marker != nullptr)
             {
                 marker->SetAppearance(
@@ -743,7 +863,7 @@ void Stage2Scene::Update()
     UpdateSignalStalker();
 
     FuseBox* confirmationPanel =
-        game->GetObj<FuseBox>("Stage2ConfirmationPanel");
+        m_Objects.confirmationPanel;
     const bool evidenceConfirmed =
         (m_LoopCount == 1 && m_FalseDoorAnomaly.HasMoved()) ||
         (m_LoopCount == 2 && m_ClockAnomaly.WasObservedThisLoop());
@@ -765,7 +885,7 @@ void Stage2Scene::Update()
             }
 
             CeilingLight* doorLight =
-                game->GetObj<CeilingLight>("CeilingLight4");
+                m_Objects.Light(Stage2Light::DoorLight);
             if (doorLight != nullptr)
             {
                 doorLight->TriggerEventFlicker(0.90f, 0.78f);
@@ -776,15 +896,9 @@ void Stage2Scene::Update()
     }
 
     const float loopRate = static_cast<float>(m_LoopCount) / 3.0f;
-    const char* stageLightNames[] =
-    {
-        "Stage2Light1", "Stage2Light2",
-        "Stage2Light3", "CeilingLight4"
-    };
     float localFixtureLight = 0.0f;
-    for (const char* lightName : stageLightNames)
+    for (CeilingLight* fixture : m_Objects.lights)
     {
-        CeilingLight* fixture = game->GetObj<CeilingLight>(lightName);
         if (fixture == nullptr)
         {
             continue;
@@ -824,7 +938,7 @@ void Stage2Scene::Update()
     const float unresolvedSignalRate =
         1.0f - static_cast<float>(m_SignalPuzzle.GetStep()) / 3.0f;
     ShadowMan* activeNoiseShadow =
-        game->GetObj<ShadowMan>("Stage2NoiseShadow");
+        m_Objects.noiseShadow;
     const float stalkerInterference =
         activeNoiseShadow != nullptr && activeNoiseShadow->IsActive()
             ? (std::clamp)((m_NoiseThreatSystem.GetThreat() - 0.52f) * 0.72f,
@@ -842,7 +956,7 @@ void Stage2Scene::Update()
     UpdateFinalPursuit(deltaTime);
     UpdateFinalSequence(deltaTime);
 
-    Wall* doorIndicator = game->GetObj<Wall>("Stage2DoorIndicator");
+    Wall* doorIndicator = m_Objects.doorIndicator;
     if (doorIndicator != nullptr && !m_FinalDoorReady)
     {
         const bool locked = corridorDoor != nullptr && corridorDoor->IsLocked();
@@ -889,7 +1003,7 @@ void Stage2Scene::Uninit()
 
     const char* objectNames[] =
     {
-        "Player", "Stage2Shadow", "Stage2NoiseShadow", "Stage2ConfirmationPanel",
+        "Player", "Stage2Shadow", "Stage2NoiseShadow", "Stage2Presence", "Stage2ConfirmationPanel",
         "Stage2EmergencyCharger",
         "Stage2EvidenceTerminal1", "Stage2EvidenceTerminal2",
         "Stage2EvidenceMarker1", "Stage2EvidenceMarker2",

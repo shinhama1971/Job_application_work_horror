@@ -18,11 +18,14 @@
 #include"PostProcess.h"
 #include "ShadowMap.h"
 #include "PlanarReflection.h"
+#include "TiledLighting.h"
 #include "GameState.h"
 #include "GameSettings.h"
+#include "PauseMenu.h"
 #include "ObjectManager.h"
 #include "GpuTimer.h"
 #include "sound.h"
+#include "utility.h"
 enum class SceneName
 {
     Title,
@@ -50,6 +53,9 @@ namespace Core
         Effect::PostProcess m_PostProcess;
         Effect::ShadowMap m_ShadowMap;
         Effect::PlanarReflection m_PlanarReflection;
+        Effect::TiledLighting m_TiledLighting;
+        // 毎フレームObjectから集める点光源。確保し直しを避けるため使い回します。
+        std::vector<ENVIRONMENT_POINT_LIGHT> m_FramePointLights;
         GpuTimer m_GpuTimer;
         Sound m_Sound;
         bool m_SoundReady = false;
@@ -60,28 +66,34 @@ namespace Core
         GameState m_State;
         GameSettings m_Settings;
         SceneName m_CurrentScene = SceneName::Title;
-        bool m_IsPaused = false;
         unsigned int m_ReflectionFrameIndex = 0;
         unsigned int m_ShadowFrameIndex = 0;
 		bool m_WasReflectionVisible = false;
         DirectX::SimpleMath::Vector3 m_LastReflectionCameraPosition{};
         DirectX::SimpleMath::Vector3 m_LastReflectionCameraForward{ 0.0f, 0.0f, 1.0f };
         bool m_HasReflectionCameraPose = false;
-        int m_PauseSettingIndex = 0;
+        PauseMenu m_PauseMenu;
 
         void ChangeScene(SceneName sName);
         void LoadBestRecord();
         void SaveBestRecord() const;
         void ApplyAudioVolume(bool paused);
+        // 明るさ・演出強度・視点感度をPostProcessとCameraへ反映します。
+        void ApplyVisualSettings();
+        void UpdatePauseMenu();
 
     public:
         Game();
         ~Game();
 
-        static void Init();
+        // 描画デバイスを初期化できなかった場合はfalseを返します。
+        static bool Init();
         static void Update();
         static void Draw();
         static void Uninit();
+
+        // Sceneが所有する補助カメラへ、現在の3D Objectだけを描画します。
+        void DrawWorldForAuxiliaryCamera(Camera& camera);
 
         static Game* GetInstance();
 
@@ -138,6 +150,20 @@ namespace Core
             return m_ObjectManager.FindNamedObject<T>(name);
         }
 
+        // Sceneの初期化時に、以後使い続けるObjectを取得します。
+        // 名前の打ち間違いや生成漏れは、その場でObject名を示して終了します。
+        template<typename T>
+        T* RequireObj(const std::string& name)
+        {
+            T* object = m_ObjectManager.FindNamedObject<T>(name);
+            if (object == nullptr)
+            {
+                utility::ReportFatalError(
+                    "シーンに必要なObjectが見つかりません: " + name);
+            }
+            return object;
+        }
+
         template<typename T>
         std::vector<T*> GetObjects()
         {
@@ -167,7 +193,7 @@ namespace Core
 
         bool IsPaused() const
         {
-            return m_IsPaused;
+            return m_PauseMenu.IsOpen();
         }
 
         int GetBrightnessLevel() const
@@ -190,9 +216,15 @@ namespace Core
             return m_Settings.GetVolumeLevel();
         }
 
+        // falseのとき、Sceneは目的表示と目的地ガイドを出しません。
+        bool IsGuideEnabled() const
+        {
+            return m_Settings.IsGuideEnabled();
+        }
+
         int GetPauseSettingIndex() const
         {
-            return m_PauseSettingIndex;
+            return m_PauseMenu.GetSelectedIndex();
         }
 
         float GetLastClearTimeSeconds() const
@@ -259,6 +291,11 @@ namespace Core
         Effect::PostProcess* GetPostProcess()
         {
             return &m_PostProcess;
+        }
+
+        Effect::TiledLighting* GetTiledLighting()
+        {
+            return &m_TiledLighting;
         }
 
         Effect::ShadowMap* GetShadowMap()

@@ -71,18 +71,78 @@ struct MATERIAL
     bool TextureEnable;
     bool2 Dummy;
 };
+// ----------------------------------------------------------------------------
+// タイルベースライティング
+// 点光源はStructuredBufferで受け取り、本描画ではCompute Shaderが作った
+// 「そのピクセルのタイルに影響する光源の番号リスト」だけを計算します。
+// 反射・監視映像など別視点の描画では、全光源を順に計算します。
+// ----------------------------------------------------------------------------
 struct ENVIRONMENT_POINT_LIGHT
 {
-    float4 PositionRange;
+    float4 PositionRange;   // xyz = 位置, w = 影響半径（この距離で0になるよう減衰させる）
     float4 ColorIntensity;
 };
 
-cbuffer EnvironmentLightBuffer : register(b6)
+cbuffer TiledLightBuffer : register(b6)
 {
-    ENVIRONMENT_POINT_LIGHT EnvironmentLights[8];
-    int EnvironmentLightCount;
-    float3 EnvironmentLightPadding;
+    uint PointLightCount;
+    uint TiledLightMode;        // 0: 全光源、1: タイル別リスト
+    uint LightTilesX;
+    uint LightTilesY;
+    float2 LightViewportOffset;
+    float2 TiledLightPadding;
 };
+
+StructuredBuffer<ENVIRONMENT_POINT_LIGHT> g_PointLights : register(t10);
+StructuredBuffer<uint> g_TileLightIndices : register(t11);
+StructuredBuffer<uint> g_TileLightCounts : register(t12);
+
+static const uint LIGHT_TILE_SIZE = 16;
+static const uint MAX_LIGHTS_PER_TILE = 64;
+
+// このピクセルで計算する光源の数と、タイル別リストの先頭位置を返します。
+uint GetPixelLightCount(float2 pixelPosition, out uint listOffset)
+{
+    listOffset = 0;
+    if (TiledLightMode == 0)
+    {
+        return PointLightCount;
+    }
+
+    const float2 localPixel = max(pixelPosition - LightViewportOffset, 0.0f);
+    const uint2 tile = min(
+        uint2(localPixel) / LIGHT_TILE_SIZE,
+        uint2(LightTilesX - 1, LightTilesY - 1));
+    const uint tileIndex = tile.y * LightTilesX + tile.x;
+    listOffset = tileIndex * MAX_LIGHTS_PER_TILE;
+    return g_TileLightCounts[tileIndex];
+}
+
+// デバッグ表示: タイルごとの光源数を色で表します（0=暗い青、1=緑、2=黄、4以上=赤）。
+// タイルの境界線も重ね、画面がどう分割されているかを確認できるようにします。
+float4 GetLightTileHeatmap(float2 pixelPosition, uint lightCount)
+{
+    const float amount = saturate(float(lightCount) / 4.0f);
+    float3 heat = lightCount == 0
+        ? float3(0.02f, 0.03f, 0.10f)
+        : lerp(float3(0.10f, 0.75f, 0.20f), float3(1.0f, 0.85f, 0.10f),
+            saturate(amount * 2.0f - 0.5f));
+    heat = lerp(heat, float3(1.0f, 0.12f, 0.08f), saturate(amount * 2.0f - 1.0f));
+
+    const float2 localPixel = pixelPosition - LightViewportOffset;
+    const float2 inTile = fmod(max(localPixel, 0.0f), float(LIGHT_TILE_SIZE));
+    const bool onEdge = inTile.x < 1.0f || inTile.y < 1.0f;
+    return float4(onEdge ? heat * 0.45f : heat, 1.0f);
+}
+
+ENVIRONMENT_POINT_LIGHT GetPixelLight(uint listOffset, uint lightNumber)
+{
+    if (TiledLightMode == 0)
+    {
+        return g_PointLights[lightNumber];
+    }
+    return g_PointLights[g_TileLightIndices[listOffset + lightNumber]];
+}
 
 cbuffer MaterialBuffer : register(b4)
 {

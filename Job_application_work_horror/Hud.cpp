@@ -41,10 +41,59 @@ namespace
 void Hud::Init()
 {
     m_Shader.Create("shader/hudVS.hlsl", "shader/hudPS.hlsl");
-
     std::vector<VERTEX_3D> initialVertices(MaxVertices);
     m_VertexBuffer.Create(initialVertices);
     m_Vertices.reserve(MaxVertices);
+}
+
+void Hud::DrawTextureRectangle(
+    ID3D11ShaderResourceView* texture,
+    Shader& textureShader,
+    float x,
+    float y,
+    float width,
+    float height)
+{
+    if (texture == nullptr)
+    {
+        return;
+    }
+
+    const float right = x + width;
+    const float bottom = y + height;
+    const auto makeVertex = [](float px, float py, float u, float v)
+    {
+        VERTEX_3D vertex{};
+        vertex.position = Vector3(px, py, 0.0f);
+        vertex.color = Color(1.0f, 1.0f, 1.0f, 1.0f);
+        vertex.uv = Vector2(u, v);
+        return vertex;
+    };
+
+    m_Vertices.clear();
+    m_Vertices.push_back(makeVertex(x, y, 0.0f, 0.0f));
+    m_Vertices.push_back(makeVertex(right, y, 1.0f, 0.0f));
+    m_Vertices.push_back(makeVertex(x, bottom, 0.0f, 1.0f));
+    m_Vertices.push_back(makeVertex(x, bottom, 0.0f, 1.0f));
+    m_Vertices.push_back(makeVertex(right, y, 1.0f, 0.0f));
+    m_Vertices.push_back(makeVertex(right, bottom, 1.0f, 1.0f));
+    m_VertexBuffer.Modify(m_Vertices);
+
+    Renderer::SetWorldViewProjection2D();
+    Renderer::SetDepthEnable(false);
+    Renderer::SetBlendState(BS_NONE);
+    Renderer::SetUV(0.0f, 0.0f, 1.0f, 1.0f);
+    textureShader.SetGPU();
+    m_VertexBuffer.SetGPU();
+
+    ID3D11DeviceContext* context = Renderer::GetDeviceContext();
+    context->PSSetShaderResources(0, 1, &texture);
+    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    context->Draw(static_cast<UINT>(m_Vertices.size()), 0);
+
+    ID3D11ShaderResourceView* nullResource = nullptr;
+    context->PSSetShaderResources(0, 1, &nullResource);
+    Renderer::SetDepthEnable(true);
 }
 
 void Hud::Draw(
@@ -180,15 +229,19 @@ void Hud::Draw(
         staminaColor = Color(0.90f, 0.62f, 0.16f, 0.95f);
     }
 
-    AddRectangle(34.0f, screenHeight - 32.0f, 230.0f, 24.0f, dark);
-    AddText(43.0f, screenHeight - 26.0f,
-        "スタミナ", 1.5f, white);
-    AddRectangle(barFillX, screenHeight - 25.0f,
-        barFillWidth, 10.0f, inactive);
-    if (staminaRate > 0.0f)
+    // 走れない間はスタミナを使わないため、ゲージ自体を出しません。
+    if (player.IsSprintAllowed())
     {
+        AddRectangle(34.0f, screenHeight - 32.0f, 230.0f, 24.0f, dark);
+        AddText(43.0f, screenHeight - 26.0f,
+            "スタミナ", 1.5f, white);
         AddRectangle(barFillX, screenHeight - 25.0f,
-            barFillWidth * staminaRate, 10.0f, staminaColor);
+            barFillWidth, 10.0f, inactive);
+        if (staminaRate > 0.0f)
+        {
+            AddRectangle(barFillX, screenHeight - 25.0f,
+                barFillWidth * staminaRate, 10.0f, staminaColor);
+        }
     }
 
     // 入力キーと実行される操作名を同時に表示します。

@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <DirectXMath.h>
 
 class ClockAnomaly final
 {
@@ -41,8 +42,8 @@ public:
         }
         else if (loopCount >= 3)
         {
-            m_HourAngle = 3.14159265f;
-            m_MinuteAngle = 3.14159265f;
+            m_HourAngle = DirectX::XM_PI;
+            m_MinuteAngle = DirectX::XM_PI;
         }
     }
 
