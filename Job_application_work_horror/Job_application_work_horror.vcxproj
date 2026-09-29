@@ -247,6 +247,7 @@
     <ClCompile Include="sound.cpp" />
     <ClCompile Include="SpriteRenderer.cpp" />
     <ClCompile Include="StageScene.cpp" />
+    <ClCompile Include="Stage1Layout.cpp" />
     <ClCompile Include="StageSceneEvents.cpp" />
     <ClCompile Include="StageSceneDraw.cpp" />
     <ClCompile Include="Stage2Scene.cpp" />
@@ -339,6 +340,8 @@
     <ClInclude Include="sound.h" />
     <ClInclude Include="SpriteRenderer.h" />
     <ClInclude Include="StageScene.h" />
+    <ClInclude Include="Stage1Layout.h" />
+    <ClInclude Include="SceneLayoutBuilder.h" />
     <ClInclude Include="StageSurveillanceCameras.h" />
     <ClInclude Include="SurveillancePatrol.h" />
     <ClInclude Include="Stage2Scene.h" />

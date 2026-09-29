@@ -72,7 +72,8 @@ struct Stage2Objects
     std::array<Wall*, Stage2ScratchCount> scratches{};
 
     // 生成したすべてのObjectの名前。Sceneの終了時にこの一覧で破棄します。
-    // 途中で消えるObject（拾った電池など）があっても安全なよう、ポインタではなく名前で持ちます。
+    // 名前での破棄は、すでに破棄されたObjectに対しても安全です。将来、途中で破棄されるObjectを
+    // 配置に加えても壊れないよう、ポインタではなく名前で持ちます。
     std::vector<std::string> objectNames;
 
     CeilingLight* Light(Stage2Light light) const

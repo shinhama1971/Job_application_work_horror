@@ -228,6 +228,9 @@
     <ClCompile Include="StageScene.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="Stage1Layout.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="ResultScene.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
@@ -510,6 +513,12 @@
       <Filter>ソース ファイル\Gameplay</Filter>
     </ClInclude>
     <ClInclude Include="StageScene.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Stage1Layout.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneLayoutBuilder.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="StageSurveillanceCameras.h">
