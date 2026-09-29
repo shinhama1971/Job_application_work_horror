@@ -288,6 +288,9 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
                 tiledLighting->GetLightCount(),
                 Effect::TiledLighting::MaxLights,
                 tiledLighting->GetTileCount());
+            ImGui::Text("Spatial voices: %zu / %zu (X3DAudio)",
+                currentGame->GetActiveSpatialVoiceCount(),
+                Sound::MaxSpatialVoices);
         }
         const ModelCacheStats modelCacheStats = ModelCache::GetStats();
         ImGui::Text("Model cache: %zu loaded / %llu hit / %llu miss",

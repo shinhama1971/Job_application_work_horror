@@ -28,8 +28,6 @@ void Ground::Init()
 	// 頂点データ
 	m_SizeX = 50;
 	m_SizeZ = 50;
-	/*m_SizeX=10
-	  m_SizeZ=30　　縦長の地形になる*/
 	m_Vertices.resize(6 * m_SizeX * m_SizeZ);
 
 	for (int z = 0; z < m_SizeZ; z++)

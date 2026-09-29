@@ -15,6 +15,8 @@
 #include "ModelCache.h"
 #include "DebugUI.h"
 #include "Application.h"
+#include "Wall.h"
+#include "Door.h"
 
 namespace Core
 {
@@ -59,6 +61,13 @@ namespace Core
         if (m_Instance->m_SoundReady)
         {
             m_Instance->ApplyAudioVolume(false);
+            // 位置付きの音が壁や閉じた扉の向こうにあるかを、ステージのObjectで判定させます。
+            m_Instance->m_Sound.SetOcclusionQuery(
+                [](const DirectX::SimpleMath::Vector3& listener,
+                    const DirectX::SimpleMath::Vector3& emitter)
+                {
+                    return m_Instance->ComputeSoundOcclusion(listener, emitter);
+                });
         }
 
         m_Instance->m_Camera.Init();
@@ -134,6 +143,15 @@ namespace Core
 
         m_Instance->m_ObjectManager.UpdateAll();
         m_Instance->m_ObjectManager.RemoveDestroyed();
+
+        // Playerがカメラを動かした後の位置と向きで、鳴っている音の聞こえ方を更新します。
+        if (m_Instance->m_SoundReady)
+        {
+            SoundListener listener;
+            listener.Position = m_Instance->m_Camera.GetPosition();
+            listener.Forward = m_Instance->m_Camera.GetForward();
+            m_Instance->m_Sound.UpdateListener(listener, Application::GetDeltaTime());
+        }
 
         if (m_Instance->m_PendingScene.has_value())
         {
@@ -242,6 +260,43 @@ namespace Core
         m_PendingScene = sName;
     }
 
+    float Game::ComputeSoundOcclusion(
+        const DirectX::SimpleMath::Vector3& listener,
+        const DirectX::SimpleMath::Vector3& emitter)
+    {
+        // 音源の少し手前までを調べ、扉の音が扉自身に遮られないようにします。
+        DirectX::SimpleMath::Vector3 toEmitter = emitter - listener;
+        const float distance = toEmitter.Length();
+        constexpr float EmitterClearance = 6.0f;
+        if (distance <= EmitterClearance)
+        {
+            return 0.0f;
+        }
+        toEmitter /= distance;
+        const DirectX::SimpleMath::Vector3 end =
+            listener + toEmitter * (distance - EmitterClearance);
+
+        // 壁1枚でほぼこもり、2枚以上で完全に向こう側の音になります。
+        int blockers = 0;
+        for (const Wall* wall : GetObjects<Wall>())
+        {
+            float hitDistance = 0.0f;
+            if (wall->IntersectsInteractionSegment(listener, end, hitDistance) &&
+                ++blockers >= 2)
+            {
+                return 1.0f;
+            }
+        }
+        for (const Door* door : GetObjects<Door>())
+        {
+            if (door->BlocksSoundSegment(listener, end) && ++blockers >= 2)
+            {
+                return 1.0f;
+            }
+        }
+        return blockers == 0 ? 0.0f : 0.8f;
+    }
+
     // 現在のSceneとObjectを終了してから、指定された次Sceneを一つだけ生成します。
     void Game::ChangeScene(SceneName sName)
     {
@@ -260,6 +315,11 @@ namespace Core
         m_ShadowFrameIndex = 0;
 		m_WasReflectionVisible = false;
         m_HasReflectionCameraPose = false;
+        // 前の場所で鳴っていた位置付きの音（足音・扉など）を持ち越さないよう止めます。
+        if (m_SoundReady)
+        {
+            m_Sound.StopAllSpatial();
+        }
 
         DeleteAllObject();
 

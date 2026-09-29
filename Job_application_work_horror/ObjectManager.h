@@ -48,6 +48,8 @@ namespace Core
         }
 
     public:
+        // その場で生成してInitまで行います。UpdateAllの走査中に呼ぶとm_Objectsが再配置されるため、
+        // SceneのInitなど更新ループの外でだけ使います。更新中はRequestAddObjectを使います。
         template<typename T>
         T* AddObject()
         {
@@ -58,6 +60,8 @@ namespace Core
             return result;
         }
 
+        // 更新ループ中に生成したいときの予約です。FlushPendingCommandsで走査後に生成し、
+        // setupで位置などを設定します。シーンを切り替えるフレームの予約は破棄されます。
         template<typename T, typename Setup>
         void RequestAddObject(Setup&& setup)
         {
@@ -69,6 +73,7 @@ namespace Core
                 });
         }
 
+        // 名前付きで生成します。SceneはInitでこの名前をRequireObjに渡し、ポインタを保持します。
         template<typename T>
         T* CreateNamedObject(const std::string& name)
         {
@@ -77,6 +82,7 @@ namespace Core
             return result;
         }
 
+        // 名前が見つからない、または型が違う場合はnullptrを返します。
         template<typename T>
         T* FindNamedObject(const std::string& name)
         {
@@ -88,6 +94,8 @@ namespace Core
             return CastObject<T>(it->second);
         }
 
+        // 破棄予約されていない、指定型のObjectをすべて返します。全Objectを走査するため、
+        // 毎フレーム多数回呼ぶ用途ではSceneで結果を保持してください。
         template<typename T>
         std::vector<T*> FindObjects()
         {
@@ -107,11 +115,16 @@ namespace Core
         }
 
         void UpdateAll();
+        // Destroy済みのObjectをUninitして実体を解放します。UpdateAllの後に呼びます。
         void RemoveDestroyed();
+        // 破棄を予約し、名前検索からも外します。実体はRemoveDestroyedで解放されます。
         void DeleteObject(Object* object);
+        // 名前で指定して破棄を予約します（DeleteObjectの名前版）。
         void DestroyNamedObject(const std::string& name);
+        // 全Objectをその場でUninitして解放します。シーン切り替え時だけ使います。
         void DeleteAll();
         void ClearPendingCommands();
+        // RequestAddObjectで予約された生成を実行します。
         void FlushPendingCommands();
 
         std::vector<std::unique_ptr<Object>>& GetAllObjects()

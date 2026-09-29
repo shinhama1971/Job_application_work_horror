@@ -75,20 +75,31 @@ namespace Effect
         void Uninit();
         void Update();
 
+        // Begin/Endは描画先をオフスクリーンへ切り替える方式の入口です。
+        // 現在の描画順ではCaptureBackBufferを使っており、どちらも呼ばれていません。
         void Begin(); // 以降の3D描画先をオフスクリーンへ切り替えます。
         void End();   // 描画先をバックバッファへ戻します。
+        // 本描画が終わったバックバッファをコピーし、画面効果の入力にします。
         void CaptureBackBuffer();
         void Draw(GpuTimer* gpuTimer); // 保存したシーンへ画面効果を合成します。
 
+        // 一時的な演出。指定した強さから始まり、durationかけて元に戻ります。
+        // BloomPulse: 停電復旧などで一瞬強く光らせます。
+        // HorrorPulse: 驚かせる瞬間に、ノイズ・周辺減光・色ずれ・画面の裂けを強めます。
+        // LensMoisture: 水しぶきなどでレンズが濡れたように見せます（0〜1）。
         void TriggerBloomPulse(float peakIntensity, float duration);
         void TriggerHorrorPulse(float strength, float duration);
         void TriggerLensMoisture(float strength, float duration);
 
+        // 緊張度・ノイズ・周辺減光・露出・ボリューム光・電波障害は目標値を設定し、
+        // Updateで少しずつ近づけます（急に切り替わりません）。それ以外のSet系はその場で反映します。
+        // 廊下の緊張度（0〜1）。高いほどノイズと画面の暗さが増します。
         void SetCorridorTension(float tension)
         {
             m_TargetCorridorTension = (std::clamp)(tension, 0.0f, 1.0f);
         }
 
+        // 常時かかるノイズと周辺減光の強さです。
         void SetAtmosphere(float noiseAmount, float vignetteStrength)
         {
             m_TargetNoiseAmount = noiseAmount;
@@ -121,6 +132,7 @@ namespace Effect
             m_TargetExposure = (std::clamp)(exposure, 0.85f, 1.20f);
         }
 
+        // ポーズメニューの「明るさ」「演出強度」の設定値です。
         void SetUserBrightnessOffset(float offset)
         {
             m_UserBrightnessOffset =
@@ -148,6 +160,7 @@ namespace Effect
             m_LensDirtStrength = (std::clamp)(strength, 0.0f, 1.0f);
         }
 
+        // 監視映像の電波障害のような横線と色ずれ（0〜1）です。
         void SetSignalInterference(float strength)
         {
             m_TargetSignalInterference =
@@ -159,6 +172,7 @@ namespace Effect
             return m_EnableNoise;
         }
 
+        // デバッグUIからの調整用。目標値ではなく、その場で値を変えます。
         void SetBloomIntensity(float intensity)
         {
             m_BloomBaseIntensity = intensity;

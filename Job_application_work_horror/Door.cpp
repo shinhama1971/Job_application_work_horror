@@ -195,7 +195,7 @@ void Door::Interact(Player& player)
 
     if (m_IsLocked)
     {
-        Core::Game::GetInstance()->PlayAudioCue(SOUND_CUE_DOOR);
+        Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_DOOR, m_Position);
         m_LockedRattleTimer = 0.28f;
         Core::Game::GetInstance()->GetPostProcess()->TriggerHorrorPulse(
             0.10f,
@@ -208,7 +208,7 @@ void Door::Interact(Player& player)
     // 最終出口だけは別の条件で通電ロックを維持します。
     if (!m_IsOpen && !m_IsOpening)
     {
-        Core::Game::GetInstance()->PlayAudioCue(SOUND_CUE_DOOR);
+        Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_DOOR, m_Position);
         m_IsOpening = true;
         m_OpenDelayTimer = m_OpenDelayDuration;
 
@@ -269,6 +269,44 @@ void Door::ResetClosed(int loopPhase)
         m_OpenSpeedPerSecond = 2.76f;
         m_OpenDelayDuration = 0.58f;
     }
+}
+
+bool Door::BlocksSoundSegment(const Vector3& start, const Vector3& end) const
+{
+    if (m_IsOpen || m_IsOpening)
+    {
+        return false;
+    }
+
+    // 扉の回転を打ち消した空間で、扉板の長方形（床に投影したもの）と線分を判定します。
+    // 高さは当たり判定と同じく考えず、扉の前後で鳴る音を遮るものとして扱います。
+    const Matrix inverseRotation = Matrix::CreateFromYawPitchRoll(
+        m_Rotation.y, m_Rotation.x, m_Rotation.z).Invert();
+    const Vector3 localStart = Vector3::Transform(start - m_Position, inverseRotation);
+    const Vector3 localEnd = Vector3::Transform(end - m_Position, inverseRotation);
+    const Vector3 delta = localEnd - localStart;
+
+    float minimumTime = 0.0f;
+    float maximumTime = 1.0f;
+    const auto clipAxis = [&](float origin, float direction, float halfExtent)
+    {
+        constexpr float epsilon = 0.000001f;
+        if (std::abs(direction) <= epsilon)
+        {
+            return std::abs(origin) <= halfExtent;
+        }
+        float enter = (-halfExtent - origin) / direction;
+        float exit = (halfExtent - origin) / direction;
+        if (enter > exit)
+        {
+            std::swap(enter, exit);
+        }
+        minimumTime = (std::max)(minimumTime, enter);
+        maximumTime = (std::min)(maximumTime, exit);
+        return minimumTime <= maximumTime;
+    };
+    return clipAxis(localStart.x, delta.x, std::abs(m_Scale.x) * 0.5f) &&
+        clipAxis(localStart.z, delta.z, std::abs(m_Scale.z) * 0.5f);
 }
 
 void Door::ResolveCollision(Vector3& position, float radius) const

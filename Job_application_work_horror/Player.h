@@ -70,6 +70,7 @@ public:
     void Draw(Camera* cam) override;
     void Uninit() override;
 
+    // カメラの水平方向の向き（上下の傾きを除いた単位ベクトル）です。
     DirectX::SimpleMath::Vector3 GetForward() const;
     void AddBattery(float value)
     {
@@ -81,6 +82,7 @@ public:
         return m_Flashlight.GetBattery();
     }
 
+    // 電池が少なくなった通知をHUDに出す残り時間です（0なら表示しない）。
     float GetBatteryNoticeTimer() const
     {
         return m_Flashlight.GetBatteryNoticeTimer();
@@ -95,6 +97,7 @@ public:
     
     bool IsFPS() const { return m_IsFPS; }
 
+    // falseの間はPlayerの更新を止め、移動と操作を受け付けません（捕獲演出や監視映像を見ている間など）。
     void SetCanControl(bool enable)
     {
         m_CanControl = enable;
@@ -128,6 +131,7 @@ public:
 
     // Sceneが持つ特殊な床（水たまり等）を次のUpdateへ通知します。
     void SetWetSurface(bool wet) { m_WetSurfaceOverride = wet; }
+    // 直前の足音がどれだけ大きかったか（0〜1）。水たまりや走りで大きくなり、2面の危険度に加算されます。
     float GetSurfaceNoisePulse() const { return m_SurfaceNoisePulse; }
 
     float GetStamina() const

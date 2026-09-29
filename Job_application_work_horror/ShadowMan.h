@@ -48,6 +48,9 @@ private:
     float m_LifeTime = 2.0f;
     float m_ChaseSpeed = 0.0f;
     float m_ChaseStopDistance = 28.0f;
+    // 追ってくる間、実際に進んだ距離に合わせて自分の位置から足音を鳴らします。
+    float m_ChaseStepDistance = 0.0f;
+    bool m_ChaseStepLeft = false;
 
 public:
     void Init() override;
@@ -83,6 +86,7 @@ public:
             m_GazeScareEnabled = false;
             m_ChaseEnabled = false;
             m_ChaseSpeed = 0.0f;
+            m_ChaseStepDistance = 0.0f;
             m_LifeTime = 2.0f;
             m_OnObserved = nullptr;
         }

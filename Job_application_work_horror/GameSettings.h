@@ -36,8 +36,10 @@ namespace Core
         }
 
     public:
+        // %LOCALAPPDATA%\SignalLost\settings.txt から読み込み・保存します。
         void Load();
         void Save() const;
+        // Set系は範囲外の値や同じ値なら何もせずfalseを返します。trueのときだけ保存と反映を行います。
 
         bool SetBrightnessLevel(int level)
         {

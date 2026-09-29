@@ -151,7 +151,6 @@ HRESULT Renderer::Init()
 	if (FAILED(hr)) return hr;
 
 	// ブレンド ステート生成 (アルファ ブレンド用)
-	//BlendDesc.AlphaToCoverageEnable = TRUE;
 	BlendDesc.RenderTarget[0].BlendEnable = TRUE;
 	hr = m_pDevice->CreateBlendState(
 		&BlendDesc, m_pBlendState[1].ReleaseAndGetAddressOf());
@@ -398,7 +397,7 @@ void Renderer::Uninit()
 void Renderer::DrawStart()
 {
 	// 画面塗りつぶし色
-	float clearColor[4] = { 0.003f, 0.005f, 0.008f, 1.0f }; // dark background
+	float clearColor[4] = { 0.003f, 0.005f, 0.008f, 1.0f }; // 背景色（わずかに青みのある黒）
 
 	// 描画先のキャンバスと使用する深度バッファを指定する
 	m_pDeviceContext->OMSetRenderTargets(
@@ -421,7 +420,8 @@ void Renderer::DrawEnd()
 }
 
 //--------------------------------------------------------------------------------------
-//ライトを設定
+// ウィンドウの大きさに合わせて、バックバッファと深度バッファを作り直します
+//--------------------------------------------------------------------------------------
 HRESULT Renderer::ResizeWindow(int width, int height)
 {
 	// スワップチェインが存在しない場合は処理しない
