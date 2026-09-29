@@ -130,7 +130,6 @@ private:
 
 	static Microsoft::WRL::ComPtr<ID3D11BlendState>
 		m_pBlendState[MAX_BLENDSTATE];
-	static Microsoft::WRL::ComPtr<ID3D11BlendState> m_pBlendStateATC;
 
 	static HRESULT CreateRenderAndDepthResources();
 
@@ -148,9 +147,6 @@ public:
 
 	// falseでも深度テストは続け、深度の書き込みだけを止めます（半透明・加算合成の描画用）。
 	static void SetDepthEnable(bool Enable);
-
-	// アルファ・トゥ・カバレッジ用。現在はどこからも呼ばれておらず、専用のブレンドステートも作成していません。
-	static void SetATCEnable(bool Enable);
 
 	// HUDなどの2D描画用に、左上原点・ピクセル単位の行列を設定します。
 	static void SetWorldViewProjection2D();
@@ -182,7 +178,6 @@ public:
 
 	// 懐中電灯と環境光を設定します。Enableは SetLightEnable の状態が優先されます。
 	static void SetLight(LIGHT Light);
-	static void SetPointLight(LIGHT Light);
 	static LIGHT GetLight() { return m_Light; }
 	// デバッグ用のシェーダー表示（法線・光源タイルなど）を切り替えます。0で通常表示です。
 	static void SetDebugViewMode(

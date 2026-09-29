@@ -41,7 +41,6 @@ Microsoft::WRL::ComPtr<ID3D11DepthStencilState> Renderer::m_pDepthStateDisable;
 
 Microsoft::WRL::ComPtr<ID3D11BlendState>
 	Renderer::m_pBlendState[MAX_BLENDSTATE];
-Microsoft::WRL::ComPtr<ID3D11BlendState> Renderer::m_pBlendStateATC;
 
 
 
@@ -368,7 +367,6 @@ void Renderer::Uninit()
 	{
 		m_pBlendState[i].Reset();
 	}
-	m_pBlendStateATC.Reset();
 	m_pDepthStencilView.Reset();
 	m_pRenderTargetView.Reset();
 	m_pSwapChain.Reset();

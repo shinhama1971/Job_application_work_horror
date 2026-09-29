@@ -75,10 +75,6 @@ namespace Effect
         void Uninit();
         void Update();
 
-        // Begin/Endは描画先をオフスクリーンへ切り替える方式の入口です。
-        // 現在の描画順ではCaptureBackBufferを使っており、どちらも呼ばれていません。
-        void Begin(); // 以降の3D描画先をオフスクリーンへ切り替えます。
-        void End();   // 描画先をバックバッファへ戻します。
         // 本描画が終わったバックバッファをコピーし、画面効果の入力にします。
         void CaptureBackBuffer();
         void Draw(GpuTimer* gpuTimer); // 保存したシーンへ画面効果を合成します。

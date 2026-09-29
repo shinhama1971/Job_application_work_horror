@@ -176,19 +176,6 @@ namespace Effect
         m_LensMoisture = m_LensMoisturePeak;
     }
 
-    // 3Dシーンを直接中間テクスチャへ描くための入口です。
-    // 現在のGame::DrawはBackBufferを複製するため、この経路を使用していません。
-    void PostProcess::Begin()
-    {
-        m_RenderTexture.SetRenderTarget();
-        m_RenderTexture.Clear(0.0f, 0.0f, 0.0f, 1.0f);
-    }
-
-    void PostProcess::End()
-    {
-        Renderer::SetBackBufferRenderTarget();
-    }
-
     // 現行構成では3DシーンをBackBufferへ描くため、画面効果の入力として
     // 同じ寸法・形式の中間テクスチャへ複製します。
     void PostProcess::CaptureBackBuffer()
