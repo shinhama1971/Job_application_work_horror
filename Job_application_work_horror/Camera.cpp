@@ -31,27 +31,6 @@ void Camera::Update()
 {
     const float deltaTime = Application::GetDeltaTime();
 
-    if (m_IsMovie)
-    {
-        m_MovieTimer += deltaTime;
-
-        float t = m_MovieTimer / m_MovieDuration;
-        if (t > 1.0f) t = 1.0f;
-
-        // なめらかに動くようにする補間
-        t = t * t * (3.0f - 2.0f * t);
-
-        m_Position = Vector3::Lerp(m_MovieStartPos, m_MovieEndPos, t);
-        m_Target = Vector3::Lerp(m_MovieStartTarget, m_MovieEndTarget, t);
-
-        if (m_MovieTimer >= m_MovieDuration)
-        {
-            m_IsMovie = false;
-        }
-
-        return;
-    }
-
     // ESCでマウス視点ON/OFF
     if (Input::GetKeyTrigger(VK_ESCAPE))
     {
@@ -318,21 +297,4 @@ bool Camera::IsSphereVisible(
     }
 
     return true;
-}
-
-void Camera::StartMovieLook(
-    const Vector3& endPos,
-    const Vector3& endTarget,
-    float duration
-)
-{
-    m_IsMovie = true;
-    m_MovieTimer = 0.0f;
-    m_MovieDuration = duration;
-
-    m_MovieStartPos = m_Position;
-    m_MovieEndPos = endPos;
-
-    m_MovieStartTarget = m_Target;
-    m_MovieEndTarget = endTarget;
 }

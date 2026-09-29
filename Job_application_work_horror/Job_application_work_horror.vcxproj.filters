@@ -198,9 +198,6 @@
     <ClCompile Include="ObjectManager.cpp">
       <Filter>ソース ファイル\Core</Filter>
     </ClCompile>
-    <ClCompile Include="Pole.cpp">
-      <Filter>ソース ファイル\Warld</Filter>
-    </ClCompile>
     <ClCompile Include="Stage2Scene.cpp">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClCompile>
@@ -473,9 +470,6 @@
     <ClInclude Include="ObjectManager.h">
       <Filter>ソース ファイル\Core</Filter>
     </ClInclude>
-    <ClInclude Include="Pole.h">
-      <Filter>ソース ファイル\ImGui</Filter>
-    </ClInclude>
     <ClInclude Include="external\imgui\imconfig.h">
       <Filter>ソース ファイル\ImGui</Filter>
     </ClInclude>
@@ -590,9 +584,6 @@
       <Filter>リソース ファイル</Filter>
     </FxCompile>
     <FxCompile Include="shader\unlitTextureVS.hlsl">
-      <Filter>リソース ファイル</Filter>
-    </FxCompile>
-    <FxCompile Include="PS_HorrorDust.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>
     <FxCompile Include="shader\bloomCompositePS.hlsl" />

@@ -6,7 +6,6 @@
 
 #include "Ground.h"
 #include "Application.h"
-#include "stb_image.h"
 #include "Game.h"
 #include "Player.h"
 #include "utility.h"
@@ -63,57 +62,6 @@ void Ground::Init()
 			m_Vertices[n + 4].normal = Vector3(0, 1, 0);
 			m_Vertices[n + 5].normal = Vector3(0, 1, 0);
 		}
-	}
-
-	//読み込む画像ファイルのパス
-	const char* filename = "assets/texture/teran.png";
-
-	//画像データを格納するポインタ
-	unsigned char* imageDate = nullptr;
-	int width, height, channels;
-
-	//グレースケール(1チャネル)で画像を読み込む
-	imageDate = stbi_load(filename, &width, &height, &channels, 1);
-	if (imageDate)
-	{
-		for (int z = 0; z <= m_SizeZ; z++)
-		{
-			for (int x = 0; x <= m_SizeX; x++)
-			{
-				//高さを計算
-				int picX = (int)(1 + x * (float)(width - 2) / m_SizeX);//左右ピクセルを無視
-				int picY = (int)(1 + z * (float)(height - 2) / m_SizeZ);//上下1ピクセルを無視
-				unsigned char pixelValue = imageDate[picY * width + picX];
-				float h = (float)pixelValue / 4.0f;//土地のデコボコ具合を調整Y座標
-
-				//頂点座標に高さを代入
-				int n = z * m_SizeX * 6 + x * 6;
-				if (x != m_SizeX && z != m_SizeZ)
-				{
-					m_Vertices[n].position.y = h;
-				}
-
-				if (x != 0 && z != m_SizeZ)//左隣のポリゴン
-				{
-					m_Vertices[n - 2].position.y = h;
-					m_Vertices[n - 5].position.y = h;
-				}
-
-				if (x != m_SizeX && z != 0)//上隣のポリゴン
-				{
-					m_Vertices[n - m_SizeX * 6 + 2].position.y = h;
-					m_Vertices[n - m_SizeX * 6 + 3].position.y = h;
-				}
-
-				if (x != 0 && z != 0)//左上隣のポリゴン
-				{
-					m_Vertices[n - m_SizeX * 6 - 1].position.y = h;
-				}
-			}
-		}
-
-		//メモリを解放
-		stbi_image_free(imageDate);
 	}
 
 	//法線ベクトルを更新

@@ -230,7 +230,6 @@
     <ClCompile Include="ObjectManager.cpp" />
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="Player.cpp" />
-    <ClCompile Include="Pole.cpp" />
     <ClCompile Include="PlanarReflection.cpp" />
     <ClCompile Include="PostProcess.cpp" />
     <ClCompile Include="Renderer.cpp" />
@@ -314,7 +313,6 @@
     <ClInclude Include="Object.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="PlayerMovement.h" />
-    <ClInclude Include="Pole.h" />
     <ClInclude Include="PlanarReflection.h" />
     <ClInclude Include="PostProcess.h" />
     <ClInclude Include="Renderer.h" />
@@ -393,12 +391,6 @@
     </FxCompile>
     <FxCompile Include="shader\bloomExtractCS.hlsl">
       <ExcludedFromBuild>true</ExcludedFromBuild>
-    </FxCompile>
-    <FxCompile Include="PS_HorrorDust.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\hudPS.hlsl">
       <ExcludedFromBuild>true</ExcludedFromBuild>

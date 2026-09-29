@@ -26,7 +26,6 @@ protected:
 	// 描画の為の情報（見た目に関わる部分）
 	Shader m_Shader; // シェーダー
 	Texture m_Texture;//テクスチャ
-	bool m_IsFPS = true;
 public:
 	Object() {}
 	virtual ~Object() {}

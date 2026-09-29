@@ -91,28 +91,6 @@ void Renderer::SetDepthEnable(bool Enable)
 }
 
 //--------------------------------------------------------------------------------------
-// アルファテストとカバレッジ（ATC）の有効・無効を設定
-//--------------------------------------------------------------------------------------
-void Renderer::SetATCEnable(bool Enable)
-{
-	// ブレンドファクター（透明度などの調整に使用）
-	float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-
-	if (Enable)
-	{
-		// アルファテストとカバレッジ (ATC) を有効にするブレンドステートをセット
-		m_pDeviceContext->OMSetBlendState(
-			m_pBlendStateATC.Get(), blendFactor, 0xffffffff);
-	}
-	else 
-	{
-		// 通常のブレンドステートをセット
-		m_pDeviceContext->OMSetBlendState(
-			m_pBlendState[0].Get(), blendFactor, 0xffffffff);
-	}
-}
-
-//--------------------------------------------------------------------------------------
 //
 //--------------------------------------------------------------------------------------
 void Renderer::SetWorldViewProjection2D()

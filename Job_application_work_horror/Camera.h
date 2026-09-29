@@ -38,16 +38,6 @@ private:
     float m_CameraDirection = 0.0f;
     float m_CameraPitch = 0.0f;
 
-    bool m_IsMovie = false;
-    float m_MovieTimer = 0.0f;
-    float m_MovieDuration = 2.0f;
-
-    DirectX::SimpleMath::Vector3 m_MovieStartPos;
-    DirectX::SimpleMath::Vector3 m_MovieEndPos;
-
-    DirectX::SimpleMath::Vector3 m_MovieStartTarget;
-    DirectX::SimpleMath::Vector3 m_MovieEndTarget;
-
 
 public:
     void Init();
@@ -99,19 +89,6 @@ public:
     float GetCameraPitch() const
     {
         return m_CameraPitch;
-    }
-
-    // 現在の位置・注視点から、指定した位置・注視点へdurationかけて滑らかにカメラを動かします。
-    // 現在は呼び出し元がありません（注視点の補間はGetMainMatricesに反映されない古い仕組みです）。
-    void StartMovieLook(
-        const DirectX::SimpleMath::Vector3& endPos,
-        const DirectX::SimpleMath::Vector3& endTarget,
-        float duration
-    );
-
-    bool IsMovie() const
-    {
-        return m_IsMovie;
     }
 
     // ヨーとピッチから求めた、視線の向きの単位ベクトルです。

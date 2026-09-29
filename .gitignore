@@ -75,6 +75,8 @@ StyleCopReport.xml
 *.ilk
 *.meta
 *.obj
+# ビルドの中間ファイル(.obj)は除外しますが、ゲームが読み込む3Dモデル(.obj)は管理対象に戻します。
+!Job_application_work_horror/assets/model/golf_ball/golf_ball.obj
 *.iobj
 *.pch
 *.pdb
