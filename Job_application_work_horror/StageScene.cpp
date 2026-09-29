@@ -61,6 +61,7 @@ void StageScene::Init()
     m_PowerSequence.Reset();
     m_StageVisualTimer = 0.0f;
     m_ExitOmenSequence.Reset();
+    m_AmbientSounds.Reset();
     m_ProgressHintTimer = 0.0f;
 
     // 壁・照明・ヒューズ・扉などの配置はStage1Layoutが担当し、使うObjectのポインタをまとめて返します。
@@ -106,6 +107,8 @@ void StageScene::Update()
         // 巡回をすべて終えたら、記録端末の完了通知を出します。
         m_EvidenceNoticeTimer = 3.2f;
     }
+    // 操作できない間（映像確認・捕獲中）も呼び、途中の物音を打ち切れるようにします。
+    UpdateAmbientSounds();
     if (!player->CanControl())
     {
         return;

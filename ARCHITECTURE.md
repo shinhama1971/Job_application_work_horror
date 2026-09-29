@@ -65,6 +65,8 @@ Application
 - `ExitOmenSequence`: 出口前兆演出
 
 - `SurveillancePatrol`: 監視カメラ巡回（映像で異常のあるカメラを報告し、現地で異常を見て確認する）
+- `Stage1AmbientSounds`: 姿の見えない物音（天井裏の足音・配管を叩く音・遠くの扉）の間隔・種類・場所の決定。
+  視線の外にある場所だけを選び、時間差で鳴らす足音や打音を予約します。鳴らしてよいか（演出中でないか）はSceneが判断して渡します
 
 各クラスは時間・フェーズのみを管理します（監視カメラ巡回の実行役 `StageSurveillanceController` を除く）。照明、振動、PostProcess、Objectへの命令は
 `StageScene` が行うため、演出対象の所有権をシーケンスへ渡しません。

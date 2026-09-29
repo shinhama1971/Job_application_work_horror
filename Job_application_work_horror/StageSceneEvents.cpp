@@ -705,3 +705,47 @@ void StageScene::UpdateExitOmen(Player& player)
     game->GetPostProcess()->TriggerBloomPulse(0.54f, 0.24f);
     Input::SetVibration(10, 0.22f);
 }
+
+// ----------------------------------------------------------------------------
+// 姿の見えない物音
+// 台本の演出（照明連鎖・倉庫の気配・出口の前兆など）の最中や、監視映像を見ている間は鳴らしません。
+// 演出の驚きを物音で打ち消さず、何も起きていない静かな時間にだけ不安を足すためです。
+// ----------------------------------------------------------------------------
+bool StageScene::IsAmbientSoundAllowed() const
+{
+    const Player* player = m_Objects.player;
+    const ExitTrigger* exit = m_Objects.exitTrigger;
+    const bool powerRestoring =
+        m_PowerSequence.IsRestoreActive() && m_PowerSequence.GetRestoreTimer() < 6.0f;
+    return player != nullptr &&
+        player->CanControl() &&
+        !m_Surveillance.IsViewing() &&
+        !m_Surveillance.IsCaughtActive() &&
+        !m_ScareLightSequence.IsActive() &&
+        m_EntranceEventTimer < 0.0f &&
+        m_StorageScarePhase != 1 &&
+        m_FuseWatcherState != 1 &&
+        m_ExitOmenSequence.GetTimer() <= 0.0f &&
+        !powerRestoring &&
+        (exit == nullptr || !exit->IsEscaping());
+}
+
+void StageScene::UpdateAmbientSounds()
+{
+    Core::Game* game = Core::Game::GetInstance();
+    const Camera* camera = game->GetCamera();
+
+    m_AmbientCues.clear();
+    m_AmbientSounds.Update(
+        Application::GetDeltaTime(),
+        IsAmbientSoundAllowed(),
+        game->IsPowerRestored(),
+        camera->GetPosition(),
+        camera->GetForward(),
+        m_AmbientCues);
+    for (const AmbientSoundCue& cue : m_AmbientCues)
+    {
+        game->PlayAudioCueAt(
+            cue.Label, cue.Position, cue.Pitch, cue.Volume, cue.MinimumOcclusion);
+    }
+}

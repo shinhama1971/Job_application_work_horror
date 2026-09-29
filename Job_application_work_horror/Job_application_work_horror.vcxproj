@@ -249,6 +249,7 @@
     <ClCompile Include="Stage1Layout.cpp" />
     <ClCompile Include="Stage1Objective.cpp" />
     <ClCompile Include="StageSurveillanceController.cpp" />
+    <ClCompile Include="Stage1AmbientSounds.cpp" />
     <ClCompile Include="StageSceneEvents.cpp" />
     <ClCompile Include="StageSceneDraw.cpp" />
     <ClCompile Include="Stage2Scene.cpp" />
@@ -344,6 +345,7 @@
     <ClInclude Include="Stage1Layout.h" />
     <ClInclude Include="Stage1Objective.h" />
     <ClInclude Include="StageSurveillanceController.h" />
+    <ClInclude Include="Stage1AmbientSounds.h" />
     <ClInclude Include="SceneLayoutBuilder.h" />
     <ClInclude Include="StageSurveillanceCameras.h" />
     <ClInclude Include="SurveillancePatrol.h" />
