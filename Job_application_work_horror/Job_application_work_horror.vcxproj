@@ -250,6 +250,7 @@
     <ClCompile Include="StageSceneEvents.cpp" />
     <ClCompile Include="StageSceneDraw.cpp" />
     <ClCompile Include="Stage2Scene.cpp" />
+    <ClCompile Include="Stage2Layout.cpp" />
     <ClCompile Include="Stage2ScenePuzzles.cpp" />
     <ClCompile Include="Stage2SceneHorror.cpp" />
     <ClCompile Include="Stage2SceneDraw.cpp" />
@@ -341,6 +342,7 @@
     <ClInclude Include="StageSurveillanceCameras.h" />
     <ClInclude Include="SurveillancePatrol.h" />
     <ClInclude Include="Stage2Scene.h" />
+    <ClInclude Include="Stage2Layout.h" />
     <ClInclude Include="BehindPresence.h" />
     <ClInclude Include="Stage2SceneConstants.h" />
     <ClInclude Include="QuietRecovery.h" />

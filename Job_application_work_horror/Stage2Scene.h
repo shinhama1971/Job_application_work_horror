@@ -23,6 +23,7 @@
 #include "BehindPresence.h"
 
 #include "Stage2SceneConstants.h"
+#include "Stage2Layout.h"
 
 #include <array>
 #include <cstddef>
@@ -38,60 +39,9 @@ class Wall;
 class BatteryItem;
 class CeilingLight;
 
-// 2面の廊下照明。演出テーブルは名前文字列ではなくこの値で照明を指定します。
-enum class Stage2Light
-{
-    Light1,         // 入口側（"Stage2Light1"）
-    Light2,         // 中央（"Stage2Light2"）
-    Light3,         // 奥（"Stage2Light3"）
-    DoorLight,      // 出口扉の上（"CeilingLight4"）
-    Count
-};
-
-// Init直後に名前で一度だけ取得し、以後は毎フレームの名前検索をせずに使うObject群です。
-// 実体はObjectManagerが所有し、どれもSceneの終了まで破棄されないため非所有ポインタで保持します。
-struct Stage2Objects
-{
-    Player* player = nullptr;
-    ExitTrigger* exit = nullptr;
-    Door* door = nullptr;
-    ShadowMan* shadow = nullptr;
-    ShadowMan* noiseShadow = nullptr;
-    ShadowMan* presence = nullptr;      // 背後の気配
-    FuseBox* confirmationPanel = nullptr;
-    FuseBox* emergencyCharger = nullptr;
-    BatteryItem* battery = nullptr;
-    Wall* doorIndicator = nullptr;
-    Wall* portrait = nullptr;
-    Wall* loopMark = nullptr;
-    Wall* clockFace = nullptr;
-    Wall* clockHourHand = nullptr;
-    Wall* clockMinuteHand = nullptr;
-    Wall* falseDoorPanel = nullptr;
-    Wall* falseDoorFrameNear = nullptr;
-    Wall* falseDoorFrameFar = nullptr;
-    Wall* falseDoorFrameTop = nullptr;
-    Wall* falseDoorHandle = nullptr;
-    std::array<CeilingLight*, static_cast<std::size_t>(Stage2Light::Count)> lights{};
-    std::array<Wall*, 3> puddles{};
-    std::array<FuseBox*, 2> evidenceTerminals{};
-    std::array<Wall*, 2> evidenceMarkers{};
-    std::array<Wall*, 2> portraitEyes{};
-    std::array<Wall*, 3> cycleMarks{};
-    std::array<FuseBox*, 3> signalTerminals{};
-    std::array<Wall*, 3> signalMarkers{};
-    std::array<Wall*, Stage2ScratchCount> scratches{};
-
-    CeilingLight* Light(Stage2Light light) const
-    {
-        return lights[static_cast<std::size_t>(light)];
-    }
-};
-
 class Stage2Scene : public Scene
 {
 private:
-    void CacheObjects();
     // 看板・表示灯などの小さな光源を設定します（タイルベースライティングで数を増やせるため）。
     void SetupPracticalLights();
 

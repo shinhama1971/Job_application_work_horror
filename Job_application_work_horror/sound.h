@@ -42,7 +42,7 @@ private:
 	typedef struct
 	{
 		LPCSTR filename;	// 音声ファイルまでのパスを設定
-		bool bLoop;			// trueでループ。通常BGMはture、SEはfalse。
+		bool bLoop;			// trueでループ再生（環境音）、falseで1回だけ再生（効果音）。
 		float volume;      // 0.0～1.0。素材ごとの音量差をここで吸収する。
 	} PARAM;
 

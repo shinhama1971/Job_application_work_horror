@@ -1,5 +1,5 @@
 // ============================================================================
-// ファイルの役割: XAudio2による効果音・環境音の読み込み、再生、解放を管理します。仮テスト用にBGMも含めています。
+// ファイルの役割: XAudio2による効果音・環境音の読み込み、再生、解放を管理します。
 // 主な技術: XAudio2、X3DAudio（立体音響）、ローパスフィルター、RIFF/WAVE解析、Source Voice、RAII
 // ============================================================================
 
@@ -81,16 +81,16 @@ HRESULT Sound::Init()
 	m_IsComInitialized = true;
 
 	/**** Create XAudio2 ****/
-	hr = XAudio2Create(m_pXAudio2.ReleaseAndGetAddressOf(), 0);		// 第二引数は､動作フラグ デバッグモードの指定(現在は未使用なので0にする)
-	//hr=XAudio2Create(&g_pXAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);		// 第三引数は、windowsでは無視
+	// 第2引数の動作フラグはWindowsでは使わないため0を渡します。
+	hr = XAudio2Create(m_pXAudio2.ReleaseAndGetAddressOf(), 0);
 	if (FAILED(hr)) {
 		Uninit();
 		return hr;
 	}
 
 	/**** Create Mastering Voice ****/
-	hr = m_pXAudio2->CreateMasteringVoice(&m_pMasteringVoice);			// 今回はＰＣのデフォルト設定に任せている
-	/*, XAUDIO2_DEFAULT_CHANNELS, XAUDIO2_DEFAULT_SAMPLERATE, 0, 0, NULL*/		// 本当６個の引数を持っている
+	// チャンネル数・サンプリング周波数は既定値にし、PCの出力設定（ステレオ・5.1chなど）に合わせます。
+	hr = m_pXAudio2->CreateMasteringVoice(&m_pMasteringVoice);
 	if (FAILED(hr)) {
 		Uninit();
 		return hr;
@@ -182,7 +182,7 @@ HRESULT Sound::Init()
 
 		CloseHandle(hFile);
 
-		// 	サブミットボイスで利用するサブミットバッファの設定
+		// ソースボイスへ渡す再生用バッファ。ループ指定の素材（環境音）は無限に繰り返します。
 		m_buffer[i].AudioBytes = dwChunkSize;
 		m_buffer[i].pAudioData = m_DataBuffer[i].get();
 		m_buffer[i].Flags = XAUDIO2_END_OF_STREAM;
@@ -317,7 +317,7 @@ void Sound::Stop(SOUND_LABEL label)
 }
 
 //=============================================================================
-// 一時停止
+// 再開（Stopで止めた音を続きから鳴らす）
 //=============================================================================
 void Sound::Resume(SOUND_LABEL label)
 {

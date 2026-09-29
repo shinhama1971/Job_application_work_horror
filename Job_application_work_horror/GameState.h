@@ -11,17 +11,17 @@ namespace Core
     class GameState final
     {
     private:
-        // 1プレイ分の進行値。階のやり直しで丸ごと巻き戻せるようにまとめています。
+        // 1プレイ分の進行値。面のやり直しで丸ごと巻き戻せるようにまとめています。
         struct RunProgress
         {
-            int ItemCount = 0;
-            bool PowerRestored = false;
-            float RunTimeSeconds = 0.0f;
-            int CaughtCount = 0;
-            int AnomaliesHandled = 0;
-            int PuzzleMistakes = 0;
-            int ChargersUsed = 0;
-            int EvidenceCollected = 0;
+            int ItemCount = 0;           // 1面で拾ったヒューズの数
+            bool PowerRestored = false;  // 1面の分電盤で電力を復旧したか
+            float RunTimeSeconds = 0.0f; // ポーズ中を除いたプレイ時間
+            int CaughtCount = 0;         // 捕まった回数
+            int AnomaliesHandled = 0;    // 2面で対処した異変の数
+            int PuzzleMistakes = 0;      // 2面の信号盤パズルなどでの失敗回数
+            int ChargersUsed = 0;        // 2面で懐中電灯の充電器を使った回数
+            int EvidenceCollected = 0;   // 2面で回収した記録の数
         };
 
         RunProgress m_Run;
@@ -80,6 +80,7 @@ namespace Core
             m_HasClearRecord = true;
         }
 
+        // 保存ファイルから読んだベスト記録を反映します。
         void LoadBestRecord(float clearTimeSeconds, int caughtCount)
         {
             m_BestClearTimeSeconds = clearTimeSeconds;

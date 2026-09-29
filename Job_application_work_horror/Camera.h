@@ -52,9 +52,12 @@ private:
 public:
     void Init();
     void Update();
+    // 描画に使う行列をシェーダーへ設定します。0=プレイヤー視点の3D（上書き行列があればそれを使用）、
+    // それ以外=画面中央原点の2D正射影です。
     void SetCamera(int mode = 0);
     void Uninit();
 
+    // ポーズメニューの視点感度を反映します（0.55〜1.55倍に制限）。
     void SetLookSensitivityScale(float scale)
     {
         m_LookSensitivityScale = scale < 0.55f
@@ -64,9 +67,13 @@ public:
 
     void SetTarget(DirectX::SimpleMath::Vector3 target);
 
+    // プレイヤー視点のビュー・射影行列を返します（左手系、画角60度、near 1、far 1000）。
+    // タイルベースのライトカリングも同じ行列を使います。
     void GetMainMatrices(
         DirectX::SimpleMath::Matrix& view,
         DirectX::SimpleMath::Matrix& projection) const;
+    // 反射や監視カメラなど別視点で描く間だけ、SetCamera(0)が使う行列を差し替えます。
+    // 描き終えたらClearOverrideMatricesで元に戻します。
     void SetOverrideMatrices(
         const DirectX::SimpleMath::Matrix& view,
         const DirectX::SimpleMath::Matrix& projection);
@@ -82,16 +89,20 @@ public:
         return m_Position;
     }
 
+    // 水平方向の向き（ヨー、ラジアン）です。
     float GetCameraDirection() const
     {
         return m_CameraDirection;
     }
 
+    // 上下の向き（ピッチ、ラジアン）です。
     float GetCameraPitch() const
     {
         return m_CameraPitch;
     }
 
+    // 現在の位置・注視点から、指定した位置・注視点へdurationかけて滑らかにカメラを動かします。
+    // 現在は呼び出し元がありません（注視点の補間はGetMainMatricesに反映されない古い仕組みです）。
     void StartMovieLook(
         const DirectX::SimpleMath::Vector3& endPos,
         const DirectX::SimpleMath::Vector3& endTarget,
@@ -103,6 +114,7 @@ public:
         return m_IsMovie;
     }
 
+    // ヨーとピッチから求めた、視線の向きの単位ベクトルです。
     DirectX::SimpleMath::Vector3 GetForward() const;
 
     // 境界球が現在のカメラ視野に入るかを保守的に判定します。

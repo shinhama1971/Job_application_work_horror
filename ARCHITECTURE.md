@@ -100,9 +100,12 @@ Application
 
 ### SceneからのObject参照
 
-各Sceneは `Init` の最後に一度だけ名前で `Game::RequireObj<T>` を呼び、以後使うObjectの非所有ポインタを
-`StageObjects` / `Stage2Objects` にまとめて保持します。
+各Sceneは以後使うObjectの非所有ポインタを `StageObjects` / `Stage2Objects` にまとめて保持します。
 
+- 2面は配置を `Stage2Layout` に分離しています。`Stage2Layout::Build` がObjectを生成して配置し、
+  生成したポインタをそのまま `Stage2Objects` に入れて返します。名前を書くのは生成時の1か所だけで、
+  生成した名前の一覧も記録して返すため、Sceneの終了時はその一覧で破棄します。
+- 1面は `Init` の最後に一度だけ名前で `Game::RequireObj<T>` を呼んで取得します。
 - 毎フレームの文字列ハッシュ検索をなくします。
 - 名前の打ち間違いや生成漏れは、実行中に黙って `nullptr` になるのではなく、起動直後にObject名を示して検出します。
 - 2面の照明は `Stage2Light` 列挙型で指定し、演出テーブルに名前文字列を持たせません。
