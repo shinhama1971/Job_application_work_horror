@@ -30,7 +30,7 @@ void Renderer::SetDebugViewMode(int mode, float wallDampStrength)
 }
 
 //--------------------------------------------------------------------------------------
-// 
+// ライトの有効・無効を切り替えます（2D描画など、照明を使わない描画で無効にします）
 //--------------------------------------------------------------------------------------
 void Renderer::SetLightEnable(bool Enable)
 {
@@ -70,19 +70,21 @@ void Renderer::SetUV(float u, float v, float uw, float vh)
 }
 
 //--------------------------------------------------------------------------------------
-// 深度ステンシルの有効・無効を設定
+// 深度バッファへの書き込みの有効・無効を設定します。
+// falseでも深度テスト（手前の物に隠れる判定）は続け、書き込みだけを止めます。
+// 半透明・加算合成の物が、後から描く奥の物を隠してしまわないようにするために使います。
 //--------------------------------------------------------------------------------------
 void Renderer::SetDepthEnable(bool Enable)
 {
 	if (Enable) 
 	{
-		// 深度テストを有効にするステンシルステートをセット
+		// 深度テストと書き込みの両方を行う
 		m_pDeviceContext->OMSetDepthStencilState(
 			m_pDepthStateEnable.Get(), NULL);
 	}
 	else
 	{
-		// 深度テストを無効にするステンシルステートをセット
+		// 深度テストは行い、書き込みだけを止める
 		m_pDeviceContext->OMSetDepthStencilState(
 			m_pDepthStateDisable.Get(), NULL);
 	}

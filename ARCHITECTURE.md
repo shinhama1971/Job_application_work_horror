@@ -66,16 +66,26 @@ Application
 
 - `SurveillancePatrol`: 監視カメラ巡回（映像で異常のあるカメラを報告し、現地で異常を見て確認する）
 
-各クラスは時間・フェーズのみを管理します。照明、振動、PostProcess、Objectへの命令は
+各クラスは時間・フェーズのみを管理します（監視カメラ巡回の実行役 `StageSurveillanceController` を除く）。照明、振動、PostProcess、Objectへの命令は
 `StageScene` が行うため、演出対象の所有権をシーケンスへ渡しません。
 
 #### 監視カメラ巡回
 
 - カメラの設置位置と、各カメラで起こせる異常（人影・消灯・開かずの扉）は `StageSurveillanceCameras.h` のテーブルで定義します。
 - `SurveillancePatrol` は状態（待機・映像確認・現地確認・完了）、正誤判定、制限時間、捕獲判定だけを持ち、
-  乱数で決めた異常と視線判定の結果をSceneから受け取ります。描画・入力に依存しないため、進行ルールだけを取り出して読めます。
+  乱数で決めた異常と視線判定の結果を受け取ります。描画・入力に依存しないため、進行ルールだけを取り出して読めます。
+- `StageSurveillanceController` は巡回の実行役です。入力を `SurveillancePatrol` へ渡し、異常の見た目（人影・消灯・扉）、
+  監視映像の描画、通知、捕獲演出を担当します。`StageScene` は `Update`・`RenderFeeds`・`DrawFeed` を呼ぶだけで、
+  巡回を終えたフレームに `Update` が返す `true` を見て記録端末の完了通知を出します。
 - 映像は `Scene::RenderOffscreen` で本描画の前に別カメラからRenderTextureへ描き、HUDへ貼ります。
   別視点に含めないObject（画面全体のノイズなど）は `Object::DrawsInAuxiliaryView` で除外し、型判定は行いません。
+
+#### 目的表示
+
+- 画面上部の目的・通知・ヒントの文章は、1面は `SelectStage1Objective`、2面は `SelectStage2Objective` が選びます。
+  どちらも状態を受け取って文章を返すだけの関数で、優先順位はこの関数の中だけで決まります。
+- Sceneは `MakeObjectiveInput` で状態を集めて渡します。1面は監視カメラの残り秒数などを含む文章を組み立てるため、
+  `std::string` で返します（2面は固定の文章だけなので `std::string_view`）。
 
 ### Stage2Scene
 
@@ -94,17 +104,25 @@ Application
 - `PuzzleFeedback`: パズル失敗通知と再試行補助
 - `QuietRecovery`: 静止・消灯による危険回復
 - `BehindPresence`: 背後の気配（視界の外に出現し、見ていない間だけ近づく）の出現間隔と判定
+- `SelectStage2Objective`: 画面上部の目的・通知・ヒントの文章の選択（状態を受け取り文章を返す純粋関数。
+  優先順位はこの関数だけで決まり、Sceneは `MakeObjectiveInput` で状態を集めて渡すだけです）
+- `Stage2Notices`: Sceneが持つ一時的な通知（周回・充電器・記録・信号盤）の残り時間
 
 `Stage2Scene` に残るループ番号、最終イベント許可、出口状態はステージ進行そのものなので、
 別クラスへ移さず統括責務として保持します。
 
 ### SceneからのObject参照
 
-各Sceneは `Init` の最後に一度だけ名前で `Game::RequireObj<T>` を呼び、以後使うObjectの非所有ポインタを
-`StageObjects` / `Stage2Objects` にまとめて保持します。
+各Sceneは以後使うObjectの非所有ポインタを `StageObjects` / `Stage2Objects` にまとめて保持します。
 
+- 配置は `Stage1Layout` / `Stage2Layout` に分離しています。`Build` がObjectを生成して配置し、
+  生成したポインタをそのまま `StageObjects` / `Stage2Objects` に入れて返します。
+- 名前を書くのは生成時の1か所だけです（`SceneLayoutBuilder` が生成と同時に名前を記録します）。
+  Sceneの終了時はその一覧で破棄するため、生成・取得・破棄で名前の一覧が食い違うことはありません。
+- 破棄を名前で行うのは、すでに破棄されたObjectに対しても安全だからです。将来、途中で破棄される
+  Objectを配置に加えても、解放済みのポインタに触れることがありません。
 - 毎フレームの文字列ハッシュ検索をなくします。
-- 名前の打ち間違いや生成漏れは、実行中に黙って `nullptr` になるのではなく、起動直後にObject名を示して検出します。
+- ポインタは生成時に受け取るため、名前の打ち間違いでObjectを取得し損ねることがありません。
 - 2面の照明は `Stage2Light` 列挙型で指定し、演出テーブルに名前文字列を持たせません。
 - 保持するObjectはどれもSceneの終了までObjectManagerから破棄されないため、ポインタが無効になることはありません
   （名前付き `ShadowMan` は期限切れで非表示になるだけで破棄されません）。
@@ -165,6 +183,19 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 
 描画パスへの参加可否は `Object` の仮想関数で問い合わせます。Rendererが具象型を列挙して
 `dynamic_cast` する構造にはしていません。
+
+## 立体音響（`Sound` + X3DAudio）
+
+環境音やUIの音は従来どおり位置を持たずに鳴らし、ワールド上で起きる音だけを `Game::PlayAudioCueAt` で
+位置付きで鳴らします。
+
+- `Sound::PlayAt` は最大16音の枠を持ち、同じ効果音が重なっても別々の位置で鳴らせます
+- 毎フレーム `Game::Update` がカメラの位置と向きを `Sound::UpdateListener` へ渡し、
+  X3DAudioで各音の左右・距離の出力行列を計算し直します（振り向くと聞こえる方向が変わる）
+- 聞き手と音源の間の遮蔽量は `Game::ComputeSoundOcclusion` が壁（`Wall`）と閉じた扉（`Door`）との
+  線分判定で求めます。`Sound` は壁や扉の型を知らず、`std::function` で結果だけを受け取ります
+- 遮蔽された音は音量を下げ、ローパスフィルターで高音を削ってこもらせます。遠い音も少し高音を落とします
+- 追ってくる人影（`ShadowMan`）は、進んだ距離に合わせて自分の足元から足音を鳴らします
 
 ## dynamic_castの方針
 

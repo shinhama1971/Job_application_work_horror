@@ -28,6 +28,7 @@ void ShadowMan::Init()
 	m_LifeTime = 4.0f;
 	m_ChaseSpeed = 0.0f;
 	m_ChaseStopDistance = 28.0f;
+	m_ChaseStepDistance = 0.0f;
 
     m_Vertices.reserve(144);
     m_Indices.reserve(432);
@@ -170,6 +171,22 @@ void ShadowMan::Update()
                 horizontalDistance - m_ChaseStopDistance);
             m_Position += horizontalDirection * travel;
             toPlayer = player->GetPosition() - m_Position;
+
+            // 一定の歩幅ごとに、この人影の足元から足音を鳴らします。
+            // 立体音響で、見えていなくても背後のどこから近づいてくるかが分かります。
+            constexpr float ChaseStrideLength = 22.0f;
+            m_ChaseStepDistance += travel;
+            if (m_ChaseStepDistance >= ChaseStrideLength)
+            {
+                m_ChaseStepDistance -= ChaseStrideLength;
+                m_ChaseStepLeft = !m_ChaseStepLeft;
+                // プレイヤーより低く重い足音にし、左右の足で少しだけ高さを変えます。
+                game->PlayAudioCueAt(
+                    SOUND_CUE_FOOTSTEP,
+                    m_Position + Vector3(0.0f, 4.0f, 0.0f),
+                    m_ChaseStepLeft ? 0.72f : 0.77f,
+                    1.7f);
+            }
         }
     }
     if (toPlayer.LengthSquared() > 0.0001f)

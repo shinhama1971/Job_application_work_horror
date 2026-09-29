@@ -172,7 +172,7 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         ResetSignalPuzzle();
         RegisterPuzzleMistake(4);
         m_PuzzleFeedback.Set(4, 2.8f);
-        m_SignalNoticeTimer = 3.0f;
+        m_Notices.signal = 3.0f;
         m_NoiseThreatSystem.SetWarningTimer(3.0f);
         m_NoiseThreatSystem.SetThreat(0.30f);
         m_NoiseThreatSystem.SetEventCooldown(2.8f);
@@ -223,7 +223,7 @@ void Stage2Scene::AdvanceLoop(Player& player)
     m_GuidancePulseCooldown = 1.2f;
     m_LoopBlinkTimer = 0.28f;
     m_LoopTransitionTimer = 0.0f;
-    m_NoticeTimer = 3.0f;
+    m_Notices.loop = 3.0f;
     m_LightZoneProgress.Reset();
     m_ScratchAnomaly.ResetProgressForLoop();
     m_PortraitAnomaly.ResetProgressForLoop();
@@ -457,7 +457,7 @@ void Stage2Scene::UpdateClockObservation()
 
     if (m_LoopCount == 2)
     {
-        m_NoticeTimer = 2.8f;
+        m_Notices.loop = 2.8f;
 
         CeilingLight* doorLight =
             m_Objects.Light(Stage2Light::DoorLight);
@@ -588,7 +588,7 @@ void Stage2Scene::UpdateSignalPuzzle()
                     m_FinalSequenceArmed = false;
                 }
                 RegisterPuzzleMistake(3);
-                m_SignalNoticeTimer = 2.8f;
+                m_Notices.signal = 2.8f;
                 m_NoiseThreatSystem.SetThreat(0.92f);
                 game->GetPostProcess()->TriggerHorrorPulse(0.62f, 0.42f);
                 Input::SetVibration(11, 0.24f);
@@ -602,7 +602,7 @@ void Stage2Scene::UpdateSignalPuzzle()
                 1.0f,
                 m_NoiseThreatSystem.GetThreat() + 0.12f -
                     retryAssist * 0.025f));
-            m_SignalNoticeTimer = 2.4f;
+            m_Notices.signal = 2.4f;
             m_ProgressHintTimer = 0.0f;
             game->GetPostProcess()->TriggerBloomPulse(0.52f, 0.20f);
             Input::SetVibration(
@@ -620,7 +620,7 @@ void Stage2Scene::UpdateSignalPuzzle()
             if (acceptResult == SignalPuzzle::AcceptResult::Completed)
             {
                 m_FinalSequenceArmed = true;
-                m_NoticeTimer = 3.2f;
+                m_Notices.loop = 3.2f;
                 ApplySignalLightingState();
                 game->RegisterAnomalyHandled();
                 ShadowMan* signalShadow =
@@ -685,7 +685,7 @@ void Stage2Scene::UpdateSignalPuzzle()
                             m_NoiseThreatSystem.SetThreat((std::max)(0.12f,
                                 m_NoiseThreatSystem.GetThreat() - 0.24f));
                             m_PuzzleFeedback.Set(6, 2.0f);
-                            m_SignalNoticeTimer = 2.4f;
+                            m_Notices.signal = 2.4f;
                             currentGame->GetPostProcess()->TriggerBloomPulse(0.72f, 0.22f);
                             Input::SetVibration(4, 0.10f);
                         });
@@ -803,7 +803,7 @@ void Stage2Scene::UpdateSignalStalker()
     ResetSignalPuzzle();
     RegisterPuzzleMistake(5);
     m_PuzzleFeedback.Set(5, 2.8f);
-    m_SignalNoticeTimer = 3.0f;
+    m_Notices.signal = 3.0f;
     m_NoiseThreatSystem.SetThreat(0.38f);
     m_NoiseThreatSystem.SetEventCooldown(2.8f);
     game->GetPostProcess()->TriggerHorrorPulse(0.88f, 0.48f);

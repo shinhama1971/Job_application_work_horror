@@ -26,99 +26,10 @@
 
 using namespace DirectX::SimpleMath;
 
-namespace
-{
-    const char* GetPatrolAnomalyLabel(SurveillancePatrol::AnomalyType type)
-    {
-        switch (type)
-        {
-        case SurveillancePatrol::AnomalyType::Figure:
-            return "人影";
-        case SurveillancePatrol::AnomalyType::LightOut:
-            return "消えた照明";
-        case SurveillancePatrol::AnomalyType::DoorOpen:
-            return "開いた扉";
-        case SurveillancePatrol::AnomalyType::None:
-            return "異常";
-        }
-        return "異常";
-    }
-}
-
 void StageScene::RenderOffscreen()
 {
-    if (m_Patrol.GetState() != SurveillancePatrol::State::Viewing)
-    {
-        return;
-    }
-
-    Core::Game* game = Core::Game::GetInstance();
-    Camera* camera = game->GetCamera();
-    if (camera == nullptr)
-    {
-        return;
-    }
-
-    const LIGHT previousLight = Renderer::GetLight();
-    Effect::TiledLighting* tiledLighting = game->GetTiledLighting();
-    const std::vector<ENVIRONMENT_POINT_LIGHT> previousPointLights =
-        tiledLighting->GetLights();
-    const auto drawCamera = [&](int index, bool zoomed,
-        Graphics::RenderTexture& output)
-    {
-        const StageSurveillanceCamera& spot = StageSurveillanceCameras[index];
-        const Vector3 cameraPosition(
-            spot.Position[0], spot.Position[1], spot.Position[2]);
-        const Vector3 cameraTarget(
-            spot.Target[0], spot.Target[1], spot.Target[2]);
-        const Matrix view = Matrix::CreateLookAt(
-            cameraPosition, cameraTarget, Vector3::Up);
-        const Matrix projection = Matrix::CreatePerspectiveFieldOfView(
-            DirectX::XMConvertToRadians(zoomed ? 32.0f : 56.0f),
-            16.0f / 9.0f, 1.0f, 420.0f);
-
-        output.SetRenderTarget();
-        output.Clear(0.018f, 0.028f, 0.022f, 1.0f);
-        camera->SetOverrideMatrices(view, projection);
-
-        // 本編の照明を変更せず、監視映像だけに補助環境光を使います。
-        LIGHT surveillanceLight = previousLight;
-        surveillanceLight.Enable = TRUE;
-        surveillanceLight.FlashlightEnabled = FALSE;
-        surveillanceLight.Ambient = Color(0.16f, 0.19f, 0.17f, 1.0f);
-        Renderer::SetLight(surveillanceLight);
-
-        // 光源数の上限が大きくなったため、既存の照明を押し出さずに補助光を足せます。
-        std::vector<ENVIRONMENT_POINT_LIGHT> surveillanceLights = previousPointLights;
-        ENVIRONMENT_POINT_LIGHT helper{};
-        helper.PositionRange = Vector4(
-            cameraPosition.x, cameraPosition.y, cameraPosition.z, 260.0f);
-        helper.ColorIntensity = Vector4(0.72f, 0.92f, 0.78f, 0.52f);
-        surveillanceLights.push_back(helper);
-        tiledLighting->SetLights(surveillanceLights);
-
-        game->DrawWorldForAuxiliaryCamera(*camera);
-    };
-
-    if (m_PatrolReferenceCapturePending)
-    {
-        // 1フレームに1台ずつ記録し、端末を開いた瞬間の描画負荷を分散します。
-        drawCamera(m_PatrolReferenceCaptureIndex, false,
-            m_SurveillanceReferences[m_PatrolReferenceCaptureIndex]);
-        ++m_PatrolReferenceCaptureIndex;
-        if (m_PatrolReferenceCaptureIndex == StageSurveillanceCameraCount)
-        {
-            SetPatrolAnomalyVisible(m_Patrol.GetAnomaly(), true);
-            m_PatrolReferenceCapturePending = false;
-        }
-    }
-
-    drawCamera(m_Patrol.GetSelectedCamera(), m_PatrolZoomed,
-        m_SurveillanceFeed);
-    Renderer::SetLight(previousLight);
-    tiledLighting->SetLights(previousPointLights);
-    camera->ClearOverrideMatrices();
-    Renderer::SetBackBufferRenderTarget();
+    // 監視映像を見ている間だけ、選んだカメラの視点を本描画の前に描きます。
+    m_Surveillance.RenderFeeds();
 }
 
 void StageScene::Draw(Camera* camera)
@@ -131,26 +42,9 @@ void StageScene::Draw(Camera* camera)
         return;
     }
 
-    if (m_Patrol.GetState() == SurveillancePatrol::State::Viewing)
+    if (m_Surveillance.IsViewing())
     {
-        const int selectedCamera = m_Patrol.GetSelectedCamera();
-        m_Hud.DrawSurveillanceFeed(
-            m_PatrolShowReference
-                ? m_SurveillanceReferences[selectedCamera].GetSRV()
-                : m_SurveillanceFeed.GetSRV(),
-            m_SurveillanceShader,
-            m_PatrolViewTimer,
-            StageSurveillanceCameras[selectedCamera].Label,
-            selectedCamera,
-            StageSurveillanceCameraCount,
-            m_Patrol.GetRoundsCleared(),
-            SurveillancePatrol::RequiredRounds,
-            m_Patrol.GetMistakes(),
-            SurveillancePatrol::MistakesUntilCaught,
-            m_PatrolZoomed,
-            m_PatrolShowReference,
-            m_PatrolViewTimer >= 0.65f && !m_PatrolReferenceCapturePending,
-            m_PatrolWrongTimer > 0.0f);
+        m_Surveillance.DrawFeed(m_Hud);
         if (game->IsPaused())
         {
             m_Hud.DrawPause(
@@ -170,230 +64,18 @@ void StageScene::Draw(Camera* camera)
     FuseBox* exitPowerPanel = m_Objects.exitPowerPanel;
     const bool exitPowerActivated =
         exitPowerPanel != nullptr && exitPowerPanel->IsActivated();
-    const bool exitPowerReady = m_PowerSequence.IsExitComplete();
 
     const int fuseCount = game->GetItemCount();
-    std::string_view objectiveText;
-    if (fuseCount <= 0)
-    {
-        objectiveText = "開始地点の近くでヒューズを探す";
-    }
-    else if (fuseCount == 1)
-    {
-        objectiveText = m_CorridorLoopCount < 1
-            ? "中央のドアを開けて廊下の奥へ進む"
-            : "左側の部屋でヒューズを探す";
-    }
-    else if (fuseCount == 2)
-    {
-        objectiveText = m_CorridorLoopCount < 2
-            ? "もう一度廊下の奥まで進む"
-            : "右側の部屋でヒューズを探す";
-    }
-    else
-    {
-        objectiveText = "左の部屋にある配電盤を調べる";
-    }
-    // 現地確認中の残り時間は毎フレーム変わるため、表示用の文字列をここで組み立てます。
-    std::string patrolObjective;
-    ExitTrigger* exitTrigger =
-        m_Objects.exitTrigger;
-    if (exitTrigger != nullptr && exitTrigger->IsEscaping())
-    {
-        objectiveText = "ドアの先へ移動中";
-    }
-    else if (m_Patrol.GetState() == SurveillancePatrol::State::Dispatched)
-    {
-        const int remainingSeconds = static_cast<int>(
-            std::ceil(m_Patrol.GetRemainingTime()));
-        const std::string cameraLabel =
-            StageSurveillanceCameras[m_Patrol.GetAnomaly().camera].Label;
-        const std::string anomalyLabel =
-            GetPatrolAnomalyLabel(m_Patrol.GetAnomaly().type);
-        const int confirmPercent = static_cast<int>(
-            std::round(m_Patrol.GetConfirmRate() * 100.0f));
-        if (!player->IsFlashlightOn())
-        {
-            patrolObjective = cameraLabel +
-                " へ向かい " + anomalyLabel + "をライトで照らす  残り " +
-                std::to_string(remainingSeconds) + "秒";
-        }
-        else if (confirmPercent > 0)
-        {
-            patrolObjective = "異常を光で除去中  " +
-                std::to_string(confirmPercent) + "%";
-        }
-        else
-        {
-            patrolObjective = cameraLabel +
-                " の" + anomalyLabel + "をライトで探す  残り " +
-                std::to_string(remainingSeconds) + "秒";
-        }
-        objectiveText = patrolObjective;
-    }
-    else if (m_PatrolNoticeTimer > 0.0f)
-    {
-        objectiveText = m_PatrolNoticeText;
-    }
-    else if (m_ChargerNoticeTimer > 0.0f)
-    {
-        objectiveText = m_FuseWatcherState == 1
-            ? "充電音で影が現れた ライトを向ける"
-            : "バッテリーを充電した";
-    }
-    else if (m_EvidenceNoticeTimer > 0.0f)
-    {
-        objectiveText = "監視カメラの巡回を終えた";
-    }
-    else if (m_StorageScareNoticeTimer > 0.0f)
-    {
-        objectiveText = m_StorageScarePhase == 1
-            ? "背後で金属音がした"
-            : (m_StorageScarePhase == 2
-                ? "背後に気配がある"
-                : "影は光の中へ消えた");
-    }
-    else if (m_FuseNoticeTimer > 0.0f)
-    {
-        if (m_FuseWatcherState == 1)
-            objectiveText = "影に懐中電灯を向ける";
-        else if (fuseCount == 1) objectiveText = "ヒューズを1本入手";
-        else if (fuseCount == 2) objectiveText = "ヒューズを2本入手";
-        else objectiveText = "ヒューズを3本入手";
-    }
-    else if (m_FuseWatcherNoticeTimer > 0.0f)
-    {
-        objectiveText = m_FuseWatcherState == 1
-            ? "影を正面から懐中電灯で照らす"
-            : "影が光の中へ消えた";
-    }
-    else if (m_ExitOmenSequence.GetTimer() > 0.0f)
-    {
-        objectiveText = m_ExitOmenSequence.GetTimer() > 1.75f
-            ? "何かが待っている"
-            : "立ち止まらず進む";
-    }
-    else if (game->IsPowerRestored() &&
-        m_PowerSequence.IsRestoreActive() &&
-        m_PowerSequence.GetRestoreTimer() < 4.5f)
-    {
-        objectiveText = m_PowerSequence.GetRestoreTimer() < 1.55f
-            ? "電力が復旧した"
-            : "出口側の非常送電盤へ向かう";
-    }
-    else if (exitPowerActivated && !exitPowerReady)
-    {
-        objectiveText = "非常電源を送電中";
-    }
-    else if (m_ScareLightSequence.GetNoticeTimer() > 0.0f)
-    {
-        objectiveText = m_ScareLightSequence.GetNoticeTimer() > 2.65f
-            ? "何かに見られている"
-            : "点灯した照明をたどる";
-    }
-    else if (m_LoopNoticeTimer > 0.0f)
-    {
-        if (m_CorridorLoopCount == 1)
-        {
-            objectiveText = "廊下の様子が変わった";
-        }
-        else if (m_CorridorLoopCount == 2)
-        {
-            objectiveText = "そのまま歩き続ける";
-        }
-        else
-        {
-            objectiveText = "後ろを振り返らない";
-        }
-    }
-    else if (m_ProgressHintTimer >= 35.0f)
-    {
-        if (game->IsPowerRestored() && !exitPowerActivated)
-        {
-            objectiveText = "ヒント 右奥の赤い送電盤を調べる";
-        }
-        else if (game->IsPowerRestored())
-        {
-            objectiveText = "ヒント 右奥の緑色の出口へ向かう";
-        }
-        else if (fuseCount <= 0)
-        {
-            objectiveText = "ヒント 最初の壁付近を探す";
-        }
-        else if (fuseCount == 1 && m_CorridorLoopCount < 1)
-        {
-            objectiveText = "ヒント 中央のドアを開け廊下の奥へ進む";
-        }
-        else if (fuseCount == 1)
-        {
-            objectiveText = "ヒント 左奥の部屋を探す";
-        }
-        else if (fuseCount == 2 && m_CorridorLoopCount < 2)
-        {
-            objectiveText = "ヒント もう一度廊下の奥まで進む";
-        }
-        else if (fuseCount == 2)
-        {
-            objectiveText = "ヒント 右奥の部屋を探す";
-        }
-        else
-        {
-            objectiveText = "ヒント 左の部屋の配電盤を調べる";
-        }
-    }
-    else if (m_ProgressHintTimer >= 18.0f)
-    {
-        if (game->IsPowerRestored() && !exitPowerActivated)
-        {
-            objectiveText = "ヒント 出口手前の送電盤へ向かう";
-        }
-        else if (game->IsPowerRestored())
-        {
-            objectiveText = "ヒント 緑色の出口灯をたどる";
-        }
-        else if (fuseCount <= 0)
-        {
-            objectiveText = "ヒント 開始地点の周囲を探す";
-        }
-        else if (fuseCount == 1 && m_CorridorLoopCount < 1)
-        {
-            objectiveText = "ヒント 中央のドアが進行ルート";
-        }
-        else if (fuseCount == 1)
-        {
-            objectiveText = "ヒント 左側の部屋を確認する";
-        }
-        else if (fuseCount == 2 && m_CorridorLoopCount < 2)
-        {
-            objectiveText = "ヒント 長い廊下をもう一度進む";
-        }
-        else if (fuseCount == 2)
-        {
-            objectiveText = "ヒント 右側の部屋を確認する";
-        }
-        else
-        {
-            objectiveText = "ヒント 配電盤へ戻る";
-        }
-    }
-    else if (game->IsPowerRestored() && !exitPowerActivated)
-    {
-        objectiveText = "出口手前の非常送電盤を操作する";
-    }
-    else if (game->IsPowerRestored())
-    {
-        Door* stageExitDoor = m_Objects.exitDoor;
-        objectiveText = stageExitDoor != nullptr && stageExitDoor->IsOpen()
-            ? "開いた出口ドアを通り抜ける"
-            : "右奥の出口ドアを開ける";
-    }
+    ExitTrigger* exitTrigger = m_Objects.exitTrigger;
+    // どの目的・通知・ヒントを出すかの優先順位はSelectStage1Objectiveにまとめています。
+    const std::string objectiveText = SelectStage1Objective(MakeObjectiveInput());
 
     // 目的表示なしの設定では、何をすべきかを説明しない静かな画面にします。
     m_Hud.Draw(
         *player,
         fuseCount,
         m_InteractionSystem.GetPrompt(),
-        game->IsGuideEnabled() ? objectiveText : std::string_view{});
+        game->IsGuideEnabled() ? std::string_view(objectiveText) : std::string_view{});
 
     if (game->IsGuideEnabled() &&
         m_StageVisualTimer >= 4.20f &&
@@ -440,9 +122,9 @@ void StageScene::Draw(Camera* camera)
         m_Hud.DrawChapterCard(
             "1階", "ヒューズを集めて電力を復旧する", m_StageVisualTimer);
     }
-    if (m_PatrolCaught.IsActive())
+    if (m_Surveillance.IsCaughtActive())
     {
-        m_Hud.DrawBlink(m_PatrolCaught.GetFadeRate() * 0.96f);
+        m_Hud.DrawBlink(m_Surveillance.GetCaughtFadeRate() * 0.96f);
     }
 
     if (game->IsPaused())
@@ -458,4 +140,42 @@ void StageScene::Draw(Camera* camera)
             game->GetRunTimeSeconds(),
             game->GetCaughtCount());
     }
+}
+
+// 目的表示の文章を選ぶための状態を、各仕組みから読み取って集めます。
+Stage1ObjectiveInput StageScene::MakeObjectiveInput() const
+{
+    const Core::Game* game = Core::Game::GetInstance();
+    Stage1ObjectiveInput input;
+    input.fuseCount = game->GetItemCount();
+    input.corridorLoopCount = m_CorridorLoopCount;
+    input.progressHintSeconds = m_ProgressHintTimer;
+
+    input.powerRestored = game->IsPowerRestored();
+    input.powerRestoreActive = m_PowerSequence.IsRestoreActive();
+    input.powerRestoreSeconds = m_PowerSequence.GetRestoreTimer();
+    input.exitPowerActivated =
+        m_Objects.exitPowerPanel != nullptr && m_Objects.exitPowerPanel->IsActivated();
+    input.exitPowerReady = m_PowerSequence.IsExitComplete();
+    input.exitDoorOpen = m_Objects.exitDoor != nullptr && m_Objects.exitDoor->IsOpen();
+    input.escaping =
+        m_Objects.exitTrigger != nullptr && m_Objects.exitTrigger->IsEscaping();
+
+    if (m_Objects.player != nullptr)
+    {
+        m_Surveillance.FillObjectiveInput(input, *m_Objects.player);
+    }
+
+    input.fuseWatcherState = m_FuseWatcherState;
+    input.storageScarePhase = m_StorageScarePhase;
+    input.exitOmenSeconds = m_ExitOmenSequence.GetTimer();
+    input.scareLightNoticeSeconds = m_ScareLightSequence.GetNoticeTimer();
+
+    input.chargerNotice = m_ChargerNoticeTimer > 0.0f;
+    input.evidenceNotice = m_EvidenceNoticeTimer > 0.0f;
+    input.storageScareNotice = m_StorageScareNoticeTimer > 0.0f;
+    input.fuseNotice = m_FuseNoticeTimer > 0.0f;
+    input.fuseWatcherNotice = m_FuseWatcherNoticeTimer > 0.0f;
+    input.loopNotice = m_LoopNoticeTimer > 0.0f;
+    return input;
 }

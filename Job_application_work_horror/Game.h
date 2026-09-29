@@ -81,6 +81,10 @@ namespace Core
         // 明るさ・演出強度・視点感度をPostProcessとCameraへ反映します。
         void ApplyVisualSettings();
         void UpdatePauseMenu();
+        // 聞き手と音源の間にある壁・閉じた扉の量（0〜1）を返します。
+        float ComputeSoundOcclusion(
+            const DirectX::SimpleMath::Vector3& listener,
+            const DirectX::SimpleMath::Vector3& emitter);
 
     public:
         Game();
@@ -88,7 +92,9 @@ namespace Core
 
         // 描画デバイスを初期化できなかった場合はfalseを返します。
         static bool Init();
+        // 1フレーム分の入力・Scene・Objectの更新と、遅延していた追加・削除・シーン切り替えを行います。
         static void Update();
+        // 影・反射などの事前パス、本描画、ポストプロセス、HUDの順に描画します（GameRendering.cpp）。
         static void Draw();
         static void Uninit();
 
@@ -102,6 +108,8 @@ namespace Core
             return m_Scene.get();
         }
 
+        // シーン切り替えを予約します。実際の切り替えはUpdateの最後に行うため、
+        // Objectの更新中に呼んでも安全です。同じフレームの2回目以降の予約は無視します。
         void RequestSceneChange(SceneName sName);
 
         // 音声初期化に失敗したPCでもゲームを続行できる安全な再生窓口です。
@@ -113,6 +121,26 @@ namespace Core
             }
         }
 
+        // ワールド上の位置から鳴らします。カメラとの位置関係で左右・距離・壁越しの聞こえ方が変わります。
+        void PlayAudioCueAt(
+            SOUND_LABEL label,
+            const DirectX::SimpleMath::Vector3& position,
+            float pitch = 1.0f,
+            float volume = 1.0f)
+        {
+            if (m_SoundReady)
+            {
+                m_Sound.PlayAt(label, position, pitch, volume);
+            }
+        }
+
+        // デバッグ表示用。いま鳴っている位置付きの音の数です。
+        size_t GetActiveSpatialVoiceCount() const
+        {
+            return m_SoundReady ? m_Sound.GetActiveSpatialVoiceCount() : 0;
+        }
+
+        // 環境音のループなど、PlayAudioCueで鳴らした音を止めます。
         void StopAudioCue(SOUND_LABEL label)
         {
             if (m_SoundReady)
@@ -121,16 +149,22 @@ namespace Core
             }
         }
 
+        // --- Objectの生成・破棄・検索（実体はObjectManagerが所有します） ---
+        // 破棄の予約です。実体はUpdateの破棄処理（RemoveDestroyed）で解放されます。
         void DeleteObject(Object* pt);
+        // 名前で指定して破棄を予約します。
         void DestroyObj(const std::string& name);
+        // 全Objectをその場で解放します。シーン切り替え時とGameの終了時だけ使います。
         void DeleteAllObject();
 
+        // その場で生成します。更新ループの外（SceneのInitなど）で使います。
         template<typename T>
         T* AddObject()
         {
             return m_ObjectManager.AddObject<T>();
         }
 
+        // 更新ループの中から生成したいときの予約です。setupは生成直後に呼ばれます。
         template<typename T, typename Setup>
         void RequestAddObject(Setup&& setup)
         {
@@ -138,12 +172,15 @@ namespace Core
                 std::forward<Setup>(setup));
         }
 
+        // 名前付きで生成します。SceneのInitで配置し、RequireObjで取得し直して使います。
         template<typename T>
         T* CreateObj(const std::string& name)
         {
             return m_ObjectManager.CreateNamedObject<T>(name);
         }
 
+        // 見つからなくてもよい場合の名前検索です（無い場合はnullptr）。
+        // 必ず存在するはずのObjectにはRequireObjを使い、打ち間違いを起動時に検出します。
         template<typename T>
         T* GetObj(const std::string& name)
         {
@@ -164,13 +201,14 @@ namespace Core
             return object;
         }
 
+        // 指定型のObjectをすべて返します。全Objectを走査するため、頻繁に使う場合は結果を保持します。
         template<typename T>
         std::vector<T*> GetObjects()
         {
             return m_ObjectManager.FindObjects<T>();
         }
 
-
+        // --- プレイの進行と成績（GameStateへの委譲） ---
         void AddItemCount()
         {
             m_State.AddItem();
@@ -196,6 +234,7 @@ namespace Core
             return m_PauseMenu.IsOpen();
         }
 
+        // --- 設定値（GameSettingsへの委譲）。値はポーズメニューの段階番号です ---
         int GetBrightnessLevel() const
         {
             return m_Settings.GetBrightnessLevel();
@@ -222,11 +261,13 @@ namespace Core
             return m_Settings.IsGuideEnabled();
         }
 
+        // ポーズメニューで選択中の項目番号です（HUDの強調表示に使います）。
         int GetPauseSettingIndex() const
         {
             return m_PauseMenu.GetSelectedIndex();
         }
 
+        // --- 結果画面・ベスト記録用の成績 ---
         float GetLastClearTimeSeconds() const
         {
             return m_State.GetLastClearTimeSeconds();
@@ -281,8 +322,7 @@ namespace Core
         void RegisterEvidenceCollected() { m_State.RegisterEvidenceCollected(); }
         int GetEvidenceCollected() const { return m_State.GetEvidenceCollected(); }
 
-
-
+        // --- 描画システムへのアクセス。所有権はGameにあり、返すポインタは非所有です ---
         Camera* GetCamera()
         {
             return &m_Camera;

@@ -21,7 +21,8 @@ void Player::Init()
 {
     StaticMesh staticmesh;
 
-	//今は仮モデルでゴルフボールのモデルを読み込む
+    // 三人称のデバッグ表示でだけ見える仮モデルです（一人称では描かず、影・反射にも映りません）。
+    // 人型のモデルに差し替える予定です。
     std::u8string modelFile = u8"assets/model/golf_ball/golf_ball.obj";
     std::string texDirectory = "assets/model/golf_ball";
 
@@ -398,7 +399,7 @@ void Player::Draw(Camera* cam)
 {
     cam->SetCamera();
 
-	// FPSモードの時はプレイヤーのモデルを描画しない(仮作成）
+    // 一人称では自分の体を描きません。三人称はデバッグ用の表示です。
     if (m_IsFPS) return;
 
     Matrix r = Matrix::CreateFromYawPitchRoll(

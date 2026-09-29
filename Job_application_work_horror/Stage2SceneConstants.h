@@ -1,11 +1,7 @@
 ﻿// ============================================================================
-// ファイルの役割: 2面で共有する座標、距離、時間などの定数を定義します。
-// 主な技術: constexpr、名前空間、マジックナンバーの集約
-// ============================================================================
-
-// ============================================================================
-// 2面で複数の処理から参照するオブジェクト名と要素数をまとめます。
-// 配置名を変更するときは、このファイルだけを修正してください。
+// ファイルの役割: 2面の壁の引っかき傷（文字を形作る小片）の名前と個数を定義します。
+// 主な技術: constexpr、配列の要素数の自動計算
+// 個数は配置（Stage2Layout）と、傷を少しずつ見せる進行（Stage2Scene）の両方で使います。
 // ============================================================================
 
 #pragma once
@@ -21,24 +17,4 @@ inline constexpr const char* Stage2ScratchNames[] =
 inline constexpr int Stage2ScratchCount =
     static_cast<int>(sizeof(Stage2ScratchNames) /
         sizeof(Stage2ScratchNames[0]));
-
-inline constexpr const char* Stage2FalseDoorNames[] =
-{
-    "Stage2FalseDoorPanel",
-    "Stage2FalseDoorFrameNear",
-    "Stage2FalseDoorFrameFar",
-    "Stage2FalseDoorFrameTop",
-    "Stage2FalseDoorHandle"
-};
-
-inline constexpr const char* Stage2ClockNames[] =
-{
-    "Stage2ClockFace",
-    "Stage2ClockFrameTop",
-    "Stage2ClockFrameBottom",
-    "Stage2ClockFrameNear",
-    "Stage2ClockFrameFar",
-    "Stage2ClockHourHand",
-    "Stage2ClockMinuteHand"
-};
 
