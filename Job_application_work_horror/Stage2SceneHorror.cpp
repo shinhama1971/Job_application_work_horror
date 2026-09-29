@@ -64,7 +64,7 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
     m_FalseDoorAnomaly.MarkMoved();
     SetFalseDoorState(true, true);
 
-    m_NoticeTimer = 2.8f;
+    m_Notices.loop = 2.8f;
 
     CeilingLight* doorLight =
         m_Objects.Light(Stage2Light::DoorLight);
@@ -156,7 +156,7 @@ void Stage2Scene::StartFinalSequence()
     m_FinalSequence.Start();
     m_NoiseThreatSystem.SetThreat(0.0f);
     m_NoiseThreatSystem.SetWarningTimer(0.0f);
-    m_NoticeTimer = 2.8f;
+    m_Notices.loop = 2.8f;
 
     Core::Game* game = Core::Game::GetInstance();
     Player* player = m_Objects.player;
@@ -191,7 +191,7 @@ void Stage2Scene::StartFinalSequence()
                     return;
                 }
 
-                m_NoticeTimer = 1.65f;
+                m_Notices.loop = 1.65f;
                 Core::Game* game = Core::Game::GetInstance();
                 for (CeilingLight* light : m_Objects.lights)
                 {
@@ -252,7 +252,7 @@ void Stage2Scene::UpdateFinalSequence(float deltaTime)
 
     m_FinalDoorReady = true;
     m_FinalSequenceArmed = false;
-    m_NoticeTimer = 3.0f;
+    m_Notices.loop = 3.0f;
 
     Door* finalDoor = m_Objects.door;
     if (finalDoor != nullptr)
@@ -440,7 +440,7 @@ void Stage2Scene::UpdateCaughtSequence(Player& player, float deltaTime)
         m_NoiseThreatSystem.SetStalkerCooldown(7.0f);
         m_NoiseThreatSystem.SetStalkerNoticeTimer(3.0f);
     }
-    m_NoticeTimer = 3.2f;
+    m_Notices.loop = 3.2f;
 
     Door* door = m_Objects.door;
     if (door != nullptr && !wasNoiseCatch)

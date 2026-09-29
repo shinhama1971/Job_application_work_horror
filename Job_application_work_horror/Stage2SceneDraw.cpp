@@ -46,310 +46,9 @@ void Stage2Scene::Draw(Camera* camera)
         !confirmationPanel->IsActivated() &&
         ((m_LoopCount == 1 && m_FalseDoorAnomaly.HasMoved()) ||
          (m_LoopCount == 2 && m_ClockAnomaly.WasObservedThisLoop()));
-    constexpr std::string_view closedLoopObjectives[] =
-    {
-        "奥のドアを開ける 1回目",
-        "奥のドアを開ける 2回目",
-        "奥のドアを開ける 3回目"
-    };
-    constexpr std::string_view openLoopObjectives[] =
-    {
-        "開いたドアを通り抜ける 1回目",
-        "開いたドアを通り抜ける 2回目",
-        "開いたドアを通り抜ける 3回目"
-    };
-
-    std::string_view objective = "廊下の奥にある出口へ向かう";
-    if (m_LoopCount < 3)
-    {
-        const size_t loopIndex = static_cast<size_t>(m_LoopCount);
-        objective = finalDoor != nullptr && finalDoor->IsOpen()
-            ? openLoopObjectives[loopIndex]
-            : closedLoopObjectives[loopIndex];
-    }
-    if (m_LoopCount == 1 && !m_FalseDoorAnomaly.HasMoved())
-    {
-        objective = m_FalseDoorAnomaly.WasObserved()
-            ? "偽物のドアから視線を外す"
-            : "懐中電灯で左の偽物のドアを照らす";
-    }
-    else if (m_LoopCount == 2 && !m_ClockAnomaly.WasObservedThisLoop())
-    {
-        objective = "ライトを消して左の時計を見る";
-    }
-    else if (confirmationPending)
-    {
-        objective = "奥の異常確認スイッチを押す";
-    }
-    else if (m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete())
-    {
-        if (m_SignalPuzzle.GetStep() == 0)
-        {
-            objective = m_PuzzleFeedback.GetMistakeCount() >= 2
-                ? "再試行補助中 奥の青い信号盤からやり直す"
-                : "信号復旧 まず奥の青い信号盤を操作する";
-        }
-        else if (m_SignalPuzzle.GetStep() == 1)
-        {
-            objective = "信号復旧 黄色へ戻る 背後の影はライトで追い払う";
-        }
-        else
-        {
-            objective = "信号復旧 赤へ戻る 背後の影はライトで追い払う";
-        }
-    }
-    if (exit != nullptr && exit->IsEscaping())
-    {
-        objective = "脱出中";
-    }
-    else if (m_ObservedScareSequence.GetNoticeTimer() > 0.0f)
-    {
-        objective = "止まらず奥のドアへ進む";
-    }
-    else if (m_CaughtSequence.IsActive())
-    {
-        objective = "捕まった チェックポイントへ戻る";
-    }
-    else if (m_QuietRecovery.tooClose)
-    {
-        objective = "影が近すぎる 距離を取りライトを消して止まる";
-    }
-    else if (m_QuietRecovery.successNotice > 0.0f)
-    {
-        objective = "気配が遠のいた 静かに探索を続ける";
-    }
-    else if (m_QuietRecovery.progress > 0.0f)
-    {
-        objective = "息を潜めている 消灯したまま動かない";
-    }
-    else if (m_ChargerNoticeTimer > 0.0f)
-    {
-        objective = "充電器の音で廊下が反応した";
-    }
-    else if (m_EvidenceNoticeTimer > 0.0f)
-    {
-        objective = "残された記録を回収した";
-    }
-    else if (m_SignalNoticeTimer > 0.0f)
-    {
-        if (m_SignalPuzzle.IsComplete())
-        {
-            objective = "信号復旧完了 廊下の中央へ進む";
-        }
-        else if (m_PuzzleFeedback.GetType() == 3)
-        {
-            objective = "順番が違う 青からやり直す";
-        }
-        else if (m_PuzzleFeedback.GetType() == 4)
-        {
-            objective = "走る音で同期が切れた 歩いて青からやり直す";
-        }
-        else if (m_PuzzleFeedback.GetType() == 5)
-        {
-            objective = "影に追いつかれた 青からやり直す";
-        }
-        else if (m_PuzzleFeedback.GetType() == 6)
-        {
-            objective = "影を追い払った 次の信号盤へ進む";
-        }
-        else if (m_SignalPuzzle.GetStep() == 1)
-        {
-            objective = "青を確認 黄色へ戻る 背後に注意";
-        }
-        else
-        {
-            objective = "黄色を確認 赤へ戻る 背後に注意";
-        }
-    }
-    else if (m_NoiseThreatSystem.GetStalkerNoticeTimer() > 0.0f)
-    {
-        ShadowMan* noiseShadow =
-            m_Objects.noiseShadow;
-        objective = noiseShadow != nullptr && noiseShadow->IsActive()
-            ? "水音を聞いた影が来る 振り返ってライトを当てる"
-            : "影を追い払った 静かに進む";
-    }
-    else if (m_NoiseThreatSystem.GetWetStepNoticeTimer() > 0.0f)
-    {
-        objective = "水音が廊下に響いた 水たまりは歩いて渡る";
-    }
-    else if (m_NoiseThreatSystem.GetWarningTimer() > 0.0f)
-    {
-        objective = "足音が響いている 歩いて静める";
-    }
-    else if (m_PuzzleFeedback.IsVisible())
-    {
-        if (m_PuzzleFeedback.GetType() == 5)
-        {
-            objective = "影に追いつかれた 青からやり直す";
-        }
-        else if (m_PuzzleFeedback.GetType() == 6)
-        {
-            objective = "影を追い払った 次の信号盤へ進む";
-        }
-        else if (m_PuzzleFeedback.GetMistakeCount() >= 3)
-        {
-            objective = "照明が消えた 正しい方法を試す";
-        }
-        else
-        {
-            if (m_PuzzleFeedback.GetType() == 1)
-            {
-                objective = "光が必要だ 懐中電灯でドアを照らす";
-            }
-            else if (m_PuzzleFeedback.GetType() == 2)
-            {
-                objective = "光が邪魔だ 懐中電灯を消して時計を見る";
-            }
-            else if (m_PuzzleFeedback.GetType() == 3)
-            {
-                objective = "信号の順番が違う 青からやり直す";
-            }
-            else
-            {
-                objective = "走る音で同期が切れた 歩いて青からやり直す";
-            }
-        }
-    }
-    else if (m_FinalSequence.HasGazePenalty())
-    {
-        objective = "それを見てはいけない";
-    }
-    else if (m_FinalSequence.IsSequenceActive() && !m_FinalDoorReady)
-    {
-        objective = Input::IsControllerConnected()
-            ? "左スティック押し込みで出口まで走る"
-            : "SHIFTを押して出口まで走る";
-    }
-    else if (m_FinalSequence.IsPursuitActive())
-    {
-        objective = Input::IsControllerConnected()
-            ? "左スティック押し込みで出口まで走る"
-            : "SHIFTを押して出口まで走る";
-    }
-    else if (m_FinalDoorReady)
-    {
-        objective = finalDoor != nullptr && !finalDoor->IsOpen()
-            ? "奥のドアを開ける"
-            : "開いた出口を通り抜ける";
-    }
-    else if (m_ScratchAnomaly.GetNoticeTimer() > 0.0f)
-    {
-        objective = "止まらず奥のドアへ進む";
-    }
-    else if (m_FalseDoorAnomaly.GetNoticeTimer() > 0.0f)
-    {
-        objective = "異常を確認した 奥のスイッチへ進む";
-    }
-    else if (m_ClockAnomaly.GetNoticeTimer() > 0.0f)
-    {
-        objective = m_LoopCount == 2
-            ? "逆回転を確認した 奥のスイッチへ進む"
-            : "時計の時刻が変わった";
-    }
-    else if (m_PortraitAnomaly.GetNoticeTimer() > 0.0f)
-    {
-        objective = "止まらず奥のドアへ進む";
-    }
-    else if (m_NoticeTimer > 0.0f)
-    {
-        if (m_LoopCount == 0) objective = "1回目 奥のドアを開ける";
-        else if (m_LoopCount == 1) objective = m_FalseDoorAnomaly.HasMoved()
-            ? (m_ConfirmationHandledThisLoop
-                ? "鍵が開いた 奥のドアへ進む"
-                : "奥の異常確認スイッチを押す")
-            : "2回目 廊下の変化を探す";
-        else if (m_LoopCount == 2) objective = m_ClockAnomaly.WasObservedThisLoop()
-            ? (m_ConfirmationHandledThisLoop
-                ? "鍵が開いた 後ろを見ずに進む"
-                : "奥の異常確認スイッチを押す")
-            : "3回目 左の時計を調べる";
-        else objective = m_SignalPuzzle.IsComplete()
-            ? "信号が復旧した 廊下の中央へ進む"
-            : "奥の青い信号盤から復旧する";
-    }
-    else if (m_ProgressHintTimer >= 30.0f)
-    {
-        if (m_LoopCount == 1 && !m_FalseDoorAnomaly.HasMoved())
-        {
-            objective = "ヒント ライトで偽物のドアを照らして視線を外す";
-        }
-        else if (m_LoopCount == 2 && !m_ClockAnomaly.WasObservedThisLoop())
-        {
-            objective = "ヒント ライトを消して左の時計を正面から見る";
-        }
-        else if (confirmationPending)
-        {
-            objective = "ヒント 奥の壁にある赤い確認スイッチを押す";
-        }
-        else if (m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete())
-        {
-            objective = m_SignalPuzzle.GetStep() == 0
-                ? "ヒント 青は廊下の奥の右壁"
-                : m_SignalPuzzle.GetStep() == 1
-                    ? "ヒント 黄色は中央左 影は振り返ってライトを当てる"
-                    : "ヒント 赤は入口右 影は振り返ってライトを当てる";
-        }
-        else if (m_FinalDoorReady)
-        {
-            objective = finalDoor != nullptr && finalDoor->IsOpen()
-                ? "ヒント 開いた出口を通り抜ける"
-                : "ヒント 今すぐ奥のドアを開ける";
-        }
-        else if (m_FinalSequenceArmed)
-        {
-            objective = "ヒント 廊下の中央より先へ進む";
-        }
-        else if (finalDoor != nullptr && finalDoor->IsOpen())
-        {
-            objective = "ヒント 開いた奥のドアを通り抜ける";
-        }
-        else
-        {
-            objective = "ヒント まっすぐ進み奥のドアを開ける";
-        }
-    }
-    else if (m_ProgressHintTimer >= 15.0f)
-    {
-        if (m_LoopCount == 1 && !m_FalseDoorAnomaly.HasMoved())
-        {
-            objective = m_FalseDoorAnomaly.WasObserved()
-                ? "ヒント 偽物のドアから視線を外す"
-                : "ヒント ライトを点け前方左側の壁を探す";
-        }
-        else if (m_LoopCount == 2 && !m_ClockAnomaly.WasObservedThisLoop())
-        {
-            objective = "ヒント ライトを消して左の時計を見る";
-        }
-        else if (confirmationPending)
-        {
-            objective = "ヒント ドア手前の確認スイッチへ進む";
-        }
-        else if (m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete())
-        {
-            objective = "ヒント 発光している信号盤を 青 黄 赤 の順で操作する";
-        }
-        else if (m_FinalDoorReady)
-        {
-            objective = "ヒント 廊下の奥にある出口が開いている";
-        }
-        else if (m_FinalSequenceArmed)
-        {
-            objective = "ヒント 廊下をそのまま歩き続ける";
-        }
-        else if (finalDoor != nullptr && finalDoor->IsOpen())
-        {
-            objective = "ヒント 奥のドアを開けると次へ進む";
-        }
-        else
-        {
-            objective = "ヒント 奥のドアを通り抜ける";
-        }
-    }
-    else if (m_FinalSequenceArmed)
-    {
-        objective = "廊下の奥にある出口へ向かう";
-    }
+    // どの目的・通知・ヒントを出すかの優先順位はSelectStage2Objectiveにまとめています。
+    const std::string_view objective =
+        SelectStage2Objective(MakeObjectiveInput(confirmationPending));
 
     // 目的表示なしの設定では、何をすべきかを説明しない静かな画面にします。
     m_Hud.Draw(*player, -1, m_InteractionSystem.GetPrompt(),
@@ -514,4 +213,54 @@ void Stage2Scene::Draw(Camera* camera)
             game->GetRunTimeSeconds(),
             game->GetCaughtCount());
     }
+}
+
+// 目的表示の文章を選ぶための状態を、各仕組みから読み取って集めます。
+Stage2ObjectiveInput Stage2Scene::MakeObjectiveInput(bool confirmationPending) const
+{
+    Stage2ObjectiveInput input;
+    input.loopCount = m_LoopCount;
+    input.progressHintSeconds = m_ProgressHintTimer;
+    input.controllerConnected = Input::IsControllerConnected();
+
+    input.finalDoorOpen = m_Objects.door != nullptr && m_Objects.door->IsOpen();
+    input.escaping = m_Objects.exit != nullptr && m_Objects.exit->IsEscaping();
+    input.finalDoorReady = m_FinalDoorReady;
+    input.confirmationPending = confirmationPending;
+    input.confirmationHandledThisLoop = m_ConfirmationHandledThisLoop;
+
+    input.falseDoorMoved = m_FalseDoorAnomaly.HasMoved();
+    input.falseDoorObserved = m_FalseDoorAnomaly.WasObserved();
+    input.clockObservedThisLoop = m_ClockAnomaly.WasObservedThisLoop();
+
+    input.signalPuzzleComplete = m_SignalPuzzle.IsComplete();
+    input.signalPuzzleStep = m_SignalPuzzle.GetStep();
+    input.puzzleFeedbackVisible = m_PuzzleFeedback.IsVisible();
+    input.puzzleFeedbackType = m_PuzzleFeedback.GetType();
+    input.puzzleMistakeCount = m_PuzzleFeedback.GetMistakeCount();
+
+    input.caught = m_CaughtSequence.IsActive();
+    input.presenceTooClose = m_QuietRecovery.tooClose;
+    input.quietRecoverySucceeded = m_QuietRecovery.successNotice > 0.0f;
+    input.quietRecoveryInProgress = m_QuietRecovery.progress > 0.0f;
+    input.noiseShadowActive =
+        m_Objects.noiseShadow != nullptr && m_Objects.noiseShadow->IsActive();
+    input.finalGazePenalty = m_FinalSequence.HasGazePenalty();
+    input.finalSequenceActive = m_FinalSequence.IsSequenceActive();
+    input.finalPursuitActive = m_FinalSequence.IsPursuitActive();
+    input.finalSequenceArmed = m_FinalSequenceArmed;
+
+    input.observedScareNotice = m_ObservedScareSequence.GetNoticeTimer() > 0.0f;
+    input.chargerNotice = m_Notices.charger > 0.0f;
+    input.evidenceNotice = m_Notices.evidence > 0.0f;
+    input.signalNotice = m_Notices.signal > 0.0f;
+    input.stalkerNotice = m_NoiseThreatSystem.GetStalkerNoticeTimer() > 0.0f;
+    input.wetStepNotice = m_NoiseThreatSystem.GetWetStepNoticeTimer() > 0.0f;
+    input.noiseWarning = m_NoiseThreatSystem.GetWarningTimer() > 0.0f;
+    input.scratchNotice = m_ScratchAnomaly.GetNoticeTimer() > 0.0f;
+    input.falseDoorNotice = m_FalseDoorAnomaly.GetNoticeTimer() > 0.0f;
+    input.clockNotice = m_ClockAnomaly.GetNoticeTimer() > 0.0f;
+    input.portraitNotice = m_PortraitAnomaly.GetNoticeTimer() > 0.0f;
+    input.loopNotice = m_Notices.loop > 0.0f;
+    return input;
 }

@@ -66,16 +66,26 @@ Application
 
 - `SurveillancePatrol`: 監視カメラ巡回（映像で異常のあるカメラを報告し、現地で異常を見て確認する）
 
-各クラスは時間・フェーズのみを管理します。照明、振動、PostProcess、Objectへの命令は
+各クラスは時間・フェーズのみを管理します（監視カメラ巡回の実行役 `StageSurveillanceController` を除く）。照明、振動、PostProcess、Objectへの命令は
 `StageScene` が行うため、演出対象の所有権をシーケンスへ渡しません。
 
 #### 監視カメラ巡回
 
 - カメラの設置位置と、各カメラで起こせる異常（人影・消灯・開かずの扉）は `StageSurveillanceCameras.h` のテーブルで定義します。
 - `SurveillancePatrol` は状態（待機・映像確認・現地確認・完了）、正誤判定、制限時間、捕獲判定だけを持ち、
-  乱数で決めた異常と視線判定の結果をSceneから受け取ります。描画・入力に依存しないため、進行ルールだけを取り出して読めます。
+  乱数で決めた異常と視線判定の結果を受け取ります。描画・入力に依存しないため、進行ルールだけを取り出して読めます。
+- `StageSurveillanceController` は巡回の実行役です。入力を `SurveillancePatrol` へ渡し、異常の見た目（人影・消灯・扉）、
+  監視映像の描画、通知、捕獲演出を担当します。`StageScene` は `Update`・`RenderFeeds`・`DrawFeed` を呼ぶだけで、
+  巡回を終えたフレームに `Update` が返す `true` を見て記録端末の完了通知を出します。
 - 映像は `Scene::RenderOffscreen` で本描画の前に別カメラからRenderTextureへ描き、HUDへ貼ります。
   別視点に含めないObject（画面全体のノイズなど）は `Object::DrawsInAuxiliaryView` で除外し、型判定は行いません。
+
+#### 目的表示
+
+- 画面上部の目的・通知・ヒントの文章は、1面は `SelectStage1Objective`、2面は `SelectStage2Objective` が選びます。
+  どちらも状態を受け取って文章を返すだけの関数で、優先順位はこの関数の中だけで決まります。
+- Sceneは `MakeObjectiveInput` で状態を集めて渡します。1面は監視カメラの残り秒数などを含む文章を組み立てるため、
+  `std::string` で返します（2面は固定の文章だけなので `std::string_view`）。
 
 ### Stage2Scene
 
@@ -94,6 +104,9 @@ Application
 - `PuzzleFeedback`: パズル失敗通知と再試行補助
 - `QuietRecovery`: 静止・消灯による危険回復
 - `BehindPresence`: 背後の気配（視界の外に出現し、見ていない間だけ近づく）の出現間隔と判定
+- `SelectStage2Objective`: 画面上部の目的・通知・ヒントの文章の選択（状態を受け取り文章を返す純粋関数。
+  優先順位はこの関数だけで決まり、Sceneは `MakeObjectiveInput` で状態を集めて渡すだけです）
+- `Stage2Notices`: Sceneが持つ一時的な通知（周回・充電器・記録・信号盤）の残り時間
 
 `Stage2Scene` に残るループ番号、最終イベント許可、出口状態はステージ進行そのものなので、
 別クラスへ移さず統括責務として保持します。

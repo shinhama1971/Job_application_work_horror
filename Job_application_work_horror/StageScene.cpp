@@ -49,7 +49,6 @@ void StageScene::Init()
     m_ChargerNoticeTimer = 0.0f;
     m_ChargerHandled = false;
     m_EvidenceNoticeTimer = 0.0f;
-    m_EvidenceHandled = false;
     m_LoopCooldown = 0.0f;
     m_LoopNoticeTimer = 0.0f;
     m_EntranceEventTriggered = false;
@@ -58,17 +57,6 @@ void StageScene::Init()
     m_StorageScarePhase = 0;
     m_StorageScareTimer = 0.0f;
     m_StorageScareNoticeTimer = 0.0f;
-    m_Patrol.Reset();
-    m_PatrolCaught.Reset();
-    m_PatrolViewTimer = 0.0f;
-    m_PatrolZoomed = false;
-    m_PatrolShowReference = false;
-    m_PatrolReferenceCapturePending = false;
-    m_PatrolReferenceCaptureIndex = 0;
-    m_PatrolWrongTimer = 0.0f;
-    m_PatrolWarningCooldown = 0.0f;
-    m_PatrolNoticeTimer = 0.0f;
-    m_PatrolNoticeText = "";
     m_ScareLightSequence.Reset();
     m_PowerSequence.Reset();
     m_StageVisualTimer = 0.0f;
@@ -83,15 +71,8 @@ void StageScene::Init()
     m_Objects.player->Update();
 
     m_Hud.Init();
-    m_SurveillanceShader.Create(
-        "shader/unlitTextureVS.hlsl",
-        "shader/surveillanceFeedPS.hlsl");
-    // 大きく表示しても異常の輪郭が潰れない解像度を確保します。
-    m_SurveillanceFeed.Init(960, 540);
-    for (Graphics::RenderTexture& reference : m_SurveillanceReferences)
-    {
-        reference.Init(960, 540);
-    }
+    // 監視カメラ巡回は配置済みのObjectを使うため、配置の後に準備します。
+    m_Surveillance.Init(m_Objects);
     SetupPracticalLights();
 }
 
@@ -120,7 +101,11 @@ void StageScene::Update()
     }
 
     // 映像確認中と捕獲中は操作不能なので、操作可否の判定より前に更新します。
-    UpdateSurveillancePatrol(*player, Application::GetDeltaTime());
+    if (m_Surveillance.Update(*player, Application::GetDeltaTime()))
+    {
+        // 巡回をすべて終えたら、記録端末の完了通知を出します。
+        m_EvidenceNoticeTimer = 3.2f;
+    }
     if (!player->CanControl())
     {
         return;
@@ -338,11 +323,7 @@ void StageScene::Uninit()
     Core::Game::GetInstance()->GetPostProcess()->SetLensDistortionStrength(0.20f);
     Core::Game::GetInstance()->GetPostProcess()->SetFilmGradeStrength(0.55f);
     Core::Game::GetInstance()->GetPostProcess()->SetLensDirtStrength(0.10f);
-    m_SurveillanceFeed.Uninit();
-    for (Graphics::RenderTexture& reference : m_SurveillanceReferences)
-    {
-        reference.Uninit();
-    }
+    m_Surveillance.Uninit();
     m_Hud.Uninit();
 
     Core::Game* game = Core::Game::GetInstance();

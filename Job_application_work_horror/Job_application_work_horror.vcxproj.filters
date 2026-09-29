@@ -207,6 +207,9 @@
     <ClCompile Include="Stage2Layout.cpp">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClCompile>
+    <ClCompile Include="Stage2Objective.cpp">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClCompile>
     <ClCompile Include="Stage2SceneDraw.cpp">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClCompile>
@@ -229,6 +232,12 @@
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
     <ClCompile Include="Stage1Layout.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Stage1Objective.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="StageSurveillanceController.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
     <ClCompile Include="ResultScene.cpp">
@@ -500,6 +509,9 @@
     <ClInclude Include="Stage2Layout.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
+    <ClInclude Include="Stage2Objective.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
     <ClInclude Include="BehindPresence.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
@@ -516,6 +528,12 @@
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="Stage1Layout.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Stage1Objective.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="StageSurveillanceController.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="SceneLayoutBuilder.h">

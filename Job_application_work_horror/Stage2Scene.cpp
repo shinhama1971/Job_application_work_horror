@@ -70,7 +70,8 @@ void Stage2Scene::Init()
 
     m_LoopCount = 0;
     m_LoopCooldown = 0.0f;
-    m_NoticeTimer = 2.8f;
+    m_Notices.Reset();
+    m_Notices.loop = 2.8f;
     m_VisualTimer = 0.0f;
     m_ObservedScareSequence.Reset();
     m_FinalSequence.Reset();
@@ -82,9 +83,6 @@ void Stage2Scene::Init()
     m_NoiseThreatSystem.Reset();
     // 最初の気配は周回に慣れた頃に出します。
     m_BehindPresence.Reset(BehindPresence::MaxInterval);
-    m_ChargerNoticeTimer = 0.0f;
-    m_EvidenceNoticeTimer = 0.0f;
-    m_SignalNoticeTimer = 0.0f;
     m_LoopBlinkTimer = 0.0f;
     m_LoopTransitionTimer = -1.0f;
     m_CaughtSequence.Reset();
@@ -221,7 +219,7 @@ void Stage2Scene::Update()
     }
 
     m_LoopCooldown = (std::max)(0.0f, m_LoopCooldown - deltaTime);
-    m_NoticeTimer = (std::max)(0.0f, m_NoticeTimer - deltaTime);
+    m_Notices.Tick(deltaTime);
     m_ObservedScareSequence.UpdateNoticeTimer(deltaTime);
     m_ScratchAnomaly.UpdateNoticeTimer(deltaTime);
     m_PortraitAnomaly.UpdateNoticeTimer(deltaTime);
@@ -262,12 +260,6 @@ void Stage2Scene::Update()
                 0.095f + shimmer * 0.025f, 1.0f),
             96.0f + shimmer * 28.0f);
     }
-    m_ChargerNoticeTimer =
-        (std::max)(0.0f, m_ChargerNoticeTimer - deltaTime);
-    m_EvidenceNoticeTimer =
-        (std::max)(0.0f, m_EvidenceNoticeTimer - deltaTime);
-    m_SignalNoticeTimer =
-        (std::max)(0.0f, m_SignalNoticeTimer - deltaTime);
     m_LoopBlinkTimer =
         (std::max)(0.0f, m_LoopBlinkTimer - deltaTime);
     m_FinalSequence.UpdateCountdowns(deltaTime);
@@ -319,7 +311,7 @@ void Stage2Scene::Update()
         emergencyCharger->IsActivated())
     {
         m_ChargerHandled = true;
-        m_ChargerNoticeTimer = 2.8f;
+        m_Notices.charger = 2.8f;
         m_NoiseThreatSystem.SetWarningTimer(3.2f);
         m_NoiseThreatSystem.SetThreat((std::max)(
             m_NoiseThreatSystem.GetThreat(), 0.76f));
@@ -344,7 +336,7 @@ void Stage2Scene::Update()
             evidence->IsActivated())
         {
             m_EvidenceHandled[evidenceIndex] = true;
-            m_EvidenceNoticeTimer = 3.2f;
+            m_Notices.evidence = 3.2f;
             game->RegisterEvidenceCollected();
             player->AddBattery(6.0f);
             m_NoiseThreatSystem.SetThreat((std::max)(
@@ -378,7 +370,7 @@ void Stage2Scene::Update()
         {
             m_ConfirmationHandledThisLoop = true;
             game->RegisterAnomalyHandled();
-            m_NoticeTimer = 2.8f;
+            m_Notices.loop = 2.8f;
             m_FalseDoorAnomaly.ClearNotice();
             m_ClockAnomaly.ClearNotice();
             m_ProgressHintTimer = 0.0f;

@@ -24,6 +24,7 @@
 
 #include "Stage2SceneConstants.h"
 #include "Stage2Layout.h"
+#include "Stage2Objective.h"
 
 #include <array>
 #include <cstddef>
@@ -44,6 +45,8 @@ class Stage2Scene : public Scene
 private:
     // 看板・表示灯などの小さな光源を設定します（タイルベースライティングで数を増やせるため）。
     void SetupPracticalLights();
+    // 目的表示の文章を選ぶために、今の状態を集めます（Stage2SceneDraw.cpp）。
+    Stage2ObjectiveInput MakeObjectiveInput(bool confirmationPending) const;
 
     // 2面は同じ廊下を周回するたびに異変が追加される。
     // AdvanceLoopが周回段階を進め、個別Update関数が異変と謎解きを更新します。
@@ -98,11 +101,9 @@ private:
     // timerが負数なら未実行、0以上なら対応する演出シーケンスが進行中です。
     int m_LoopCount = 0;
     float m_LoopCooldown = 0.0f;
-    float m_NoticeTimer = 0.0f;
+    // 周回・充電器・記録・信号盤の一時的な通知。表示する文章はSelectStage2Objectiveが選びます。
+    Stage2Notices m_Notices;
     float m_VisualTimer = 0.0f;
-    float m_ChargerNoticeTimer = 0.0f;
-    float m_EvidenceNoticeTimer = 0.0f;
-    float m_SignalNoticeTimer = 0.0f;
     float m_LoopBlinkTimer = 0.0f;
     float m_LoopTransitionTimer = -1.0f;
     float m_ProgressHintTimer = 0.0f;
