@@ -71,6 +71,8 @@ private:
     std::vector<AmbientSoundCue> m_AmbientCues;
     // 壁の文字を読んだか、いつ書き換えるかを管理します（文字のObjectはStage1Layoutが配置）。
     Stage1WallWritings m_WallWritings;
+    // 暗証番号の扉。入力画面の操作と、番号の手がかりの配置を管理します。
+    Stage1KeypadDoor m_KeypadDoor;
     ScareLightSequence m_ScareLightSequence;
     StagePowerSequence m_PowerSequence;
     ExitOmenSequence m_ExitOmenSequence;

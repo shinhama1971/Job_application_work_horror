@@ -21,8 +21,8 @@ using System.Runtime.InteropServices;
 
 public static class WallWritingGenerator
 {
-    const int Width = 1024;
-    const int Height = 256;
+    static int Width = 1024;
+    static int Height = 256;
 
     static float Hash(int x, int y, int seed)
     {
@@ -50,8 +50,10 @@ public static class WallWritingGenerator
         return (a + (b - a) * fx) + ((c + (d - c) * fx) - (a + (b - a) * fx)) * fy;
     }
 
-    public static void Generate(string text, string outputPath, int seed)
+    public static void Generate(string text, string outputPath, int seed, int width, int height)
     {
+        Width = width;
+        Height = height;
         Random random = new Random(seed);
         using (Bitmap bitmap = new Bitmap(Width, Height, PixelFormat.Format32bppArgb))
         {
@@ -66,8 +68,9 @@ public static class WallWritingGenerator
                 try { family = new FontFamily("HGGyoshotai"); }
                 catch (ArgumentException) { family = new FontFamily("Yu Mincho"); }
 
-                // 文字数に合わせて大きさを決め、横幅に収めます。
-                float emSize = Math.Min(170.0f, 900.0f / Math.Max(text.Length, 1));
+                // 文字数に合わせ、左右に余白を残して横幅に収めます（1024幅なら900ピクセル。数字は全角で大きく描きます）。
+                float margin = Width >= 1024 ? 124.0f : Width * 0.1f;
+                float emSize = Math.Min(Height * 0.66f, (Width - margin) / Math.Max(text.Length, 1));
                 float step = emSize * 1.02f;
                 float totalWidth = step * text.Length;
                 float x = (Width - totalWidth) * 0.5f;
@@ -137,10 +140,10 @@ public static class WallWritingGenerator
                 }
                 if (start < 0) continue;
                 int length = 18 + random.Next(Math.Max(Height - start - 12, 20));
-                float width = 3.0f + (float)random.NextDouble() * 3.0f;
+                float dripWidth = 3.0f + (float)random.NextDouble() * 3.0f;
                 for (int i = 0; i < length && start + i < Height; ++i)
                 {
-                    float taper = width * (1.0f - 0.55f * i / (float)length);
+                    float taper = dripWidth * (1.0f - 0.55f * i / (float)length);
                     float wobble = (float)Math.Sin((start + i) * 0.11f + n) * 0.8f;
                     for (int dx = -4; dx <= 4; ++dx)
                     {
@@ -198,12 +201,28 @@ $writings = @(
     @{ Name = 'writing_three';   Text = 'みっつ もどせば でられる'; Seed = 1972 },
     @{ Name = 'writing_power';   Text = 'でんきが つくと みえなくなる'; Seed = 1973 },
     @{ Name = 'writing_turn';    Text = 'ふりかえるな'; Seed = 1974 },
-    @{ Name = 'writing_turned';  Text = 'ふりかえったな'; Seed = 1975 }
+    @{ Name = 'writing_turned';  Text = 'ふりかえったな'; Seed = 1975 },
+    # 暗証番号の扉（Stage1KeypadDoor）の手がかり。「何桁目か」と数字を別の画像にし、
+    # 番号はプレイごとにランダムに決めて、対応する数字の画像を貼ります。
+    @{ Name = 'writing_order1'; Text = 'ひとつめ'; Seed = 2001 },
+    @{ Name = 'writing_order2'; Text = 'ふたつめ'; Seed = 2002 },
+    @{ Name = 'writing_order3'; Text = 'みっつめ'; Seed = 2003 },
+    @{ Name = 'writing_order4'; Text = 'よっつめ'; Seed = 2004 }
+)
+for ($digit = 1; $digit -le 9; ++$digit)
+{
+    $writings += @{ Name = "writing_digit$digit"; Text = [string][char](0xFF10 + $digit); Seed = 2100 + $digit; Width = 256; Height = 256 }
+}
+$writings += @(
+    # 暗証番号の扉の先の部屋
+    @{ Name = 'writing_watched'; Text = 'ずっと みていた'; Seed = 2201 }
 )
 
 foreach ($writing in $writings)
 {
     $path = Join-Path $outputDirectory ($writing.Name + '.png')
-    [WallWritingGenerator]::Generate($writing.Text, $path, $writing.Seed)
+    $width = if ($writing.Width) { $writing.Width } else { 1024 }
+    $height = if ($writing.Height) { $writing.Height } else { 256 }
+    [WallWritingGenerator]::Generate($writing.Text, $path, $writing.Seed, $width, $height)
     Write-Host "生成: $path"
 }

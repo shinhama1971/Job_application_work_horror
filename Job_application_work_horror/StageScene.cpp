@@ -67,6 +67,7 @@ void StageScene::Init()
     // 壁・照明・ヒューズ・扉などの配置はStage1Layoutが担当し、使うObjectのポインタをまとめて返します。
     m_Objects = Stage1Layout::Build(*game);
     m_WallWritings.Init(m_Objects.writings);
+    m_KeypadDoor.Init(m_Objects.keypad);
 
     // シーン変更後の初回描画前にカメラとライトを更新します。
     // ImGuiでゲームを停止した場合も、面全体が黒くなることを防ぎます。
@@ -108,6 +109,8 @@ void StageScene::Update()
         // 巡回をすべて終えたら、記録端末の完了通知を出します。
         m_EvidenceNoticeTimer = 3.2f;
     }
+    // 暗証番号の入力画面も操作不能の間に入力を受け取るため、操作可否の判定より前に更新します。
+    m_KeypadDoor.Update(*player, Application::GetDeltaTime());
     // 操作できない間（映像確認・捕獲中）も呼び、途中の物音を打ち切れるようにします。
     UpdateAmbientSounds();
     if (!player->CanControl())

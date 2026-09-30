@@ -739,6 +739,93 @@ void Hud::DrawStage2Status(
     Flush();
 }
 
+// 画面中央に4桁の入力盤を出します。選択中の桁は緑の枠で示し、上下の三角で増減できることを伝えます。
+void Hud::DrawKeypad(
+    const std::array<int, 4>& entered,
+    int cursor,
+    float wrongRate,
+    int mistakes)
+{
+    m_Vertices.clear();
+    const float screenWidth = static_cast<float>(Application::GetWidth());
+    const float screenHeight = static_cast<float>(Application::GetHeight());
+    constexpr float panelWidth = 440.0f;
+    constexpr float panelHeight = 300.0f;
+    const float panelX = (screenWidth - panelWidth) * 0.5f;
+    const float panelY = (screenHeight - panelHeight) * 0.5f;
+
+    const Color green(0.48f, 0.90f, 0.58f, 0.96f);
+    const Color pale(0.72f, 0.82f, 0.74f, 0.92f);
+    const Color dim(0.30f, 0.38f, 0.33f, 0.90f);
+    const Color red(0.96f, 0.22f, 0.14f, 0.96f);
+    // 不正解の直後は枠を赤く点滅させます。
+    const bool wrongFlash = wrongRate > 0.0f &&
+        static_cast<int>(wrongRate * 7.0f) % 2 == 0;
+    const Color frame = wrongFlash ? red : green;
+
+    AddRectangle(0.0f, 0.0f, screenWidth, screenHeight, Color(0.0f, 0.004f, 0.004f, 0.55f));
+    AddRectangle(panelX, panelY, panelWidth, panelHeight, Color(0.012f, 0.020f, 0.017f, 0.96f));
+    AddRectangle(panelX, panelY, panelWidth, 3.0f, frame);
+    AddRectangle(panelX, panelY + panelHeight - 3.0f, panelWidth, 3.0f, frame);
+
+    const auto addCenteredText = [this, screenWidth](
+        float y, std::string_view text, float pixelSize, const Color& color)
+    {
+        const float width =
+            static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * 6.0f;
+        AddText((screenWidth - width) * 0.5f, y, text, pixelSize, color);
+    };
+    addCenteredText(panelY + 20.0f, "暗証番号", 3.4f, pale);
+
+    constexpr float boxWidth = 70.0f;
+    constexpr float boxHeight = 92.0f;
+    constexpr float boxGap = 20.0f;
+    constexpr float digitPixelSize = 9.0f;
+    const float rowWidth = boxWidth * 4.0f + boxGap * 3.0f;
+    const float rowX = (screenWidth - rowWidth) * 0.5f;
+    const float boxY = panelY + 88.0f;
+    for (int index = 0; index < 4; ++index)
+    {
+        const float boxX = rowX + static_cast<float>(index) * (boxWidth + boxGap);
+        const bool selected = index == cursor;
+        const Color border = selected ? frame : dim;
+        const float thickness = selected ? 4.0f : 2.0f;
+        AddRectangle(boxX, boxY, boxWidth, boxHeight, Color(0.005f, 0.010f, 0.008f, 1.0f));
+        AddRectangle(boxX, boxY, boxWidth, thickness, border);
+        AddRectangle(boxX, boxY + boxHeight - thickness, boxWidth, thickness, border);
+        AddRectangle(boxX, boxY, thickness, boxHeight, border);
+        AddRectangle(boxX + boxWidth - thickness, boxY, thickness, boxHeight, border);
+
+        const char digitText[2] = {
+            static_cast<char>('0' + entered[static_cast<std::size_t>(index)]), '\0' };
+        AddText(boxX + (boxWidth - digitPixelSize * 5.0f) * 0.5f,
+            boxY + (boxHeight - digitPixelSize * 7.0f) * 0.5f,
+            digitText, digitPixelSize, selected ? green : pale);
+
+        if (selected)
+        {
+            // 上下の三角（増減できる合図）を、横幅の違う長方形を重ねて描きます。
+            const float centerX = boxX + boxWidth * 0.5f;
+            for (int step = 0; step < 4; ++step)
+            {
+                const float halfWidth = 2.0f + static_cast<float>(step) * 3.0f;
+                AddRectangle(centerX - halfWidth, boxY - 22.0f + static_cast<float>(step) * 3.0f,
+                    halfWidth * 2.0f, 3.0f, green);
+                AddRectangle(centerX - halfWidth, boxY + boxHeight + 19.0f - static_cast<float>(step) * 3.0f,
+                    halfWidth * 2.0f, 3.0f, green);
+            }
+        }
+    }
+
+    const std::string_view message = wrongRate > 0.0f
+        ? (mistakes >= 3 ? "扉の向こうで何かが動いた" : "番号が違う")
+        : "壁の数字を懐中電灯で探す";
+    addCenteredText(panelY + 222.0f, message, 2.4f, wrongRate > 0.0f ? red : pale);
+    addCenteredText(panelY + 256.0f,
+        "←→ 桁  ↑↓ 数字  E 決定  Q 戻る", 2.0f, dim);
+    Flush();
+}
+
 void Hud::DrawQuietRecovery(float progressRate, float cooldown, bool success, bool tooClose)
 {
     m_Vertices.clear();

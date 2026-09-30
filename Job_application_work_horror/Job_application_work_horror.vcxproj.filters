@@ -246,6 +246,9 @@
     <ClCompile Include="FlashlightWriting.cpp">
       <Filter>ソース ファイル\Gameplay</Filter>
     </ClCompile>
+    <ClCompile Include="Stage1KeypadDoor.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="ResultScene.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
@@ -546,6 +549,12 @@
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="FlashlightWriting.h">
+      <Filter>ソース ファイル\Gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="Stage1KeypadDoor.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="KeypadLock.h">
       <Filter>ソース ファイル\Gameplay</Filter>
     </ClInclude>
     <ClInclude Include="SceneLayoutBuilder.h">
