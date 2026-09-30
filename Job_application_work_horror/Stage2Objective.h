@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "Stage2AnomalyPlan.h"
+
 #include <string_view>
 
 // 2面のSceneが持つ一時的な通知の残り時間です。まとめて進め、まとめてリセットします。
@@ -48,10 +50,12 @@ struct Stage2ObjectiveInput
     bool confirmationPending = false;
     bool confirmationHandledThisLoop = false;
 
-    // 異変
-    bool falseDoorMoved = false;
-    bool falseDoorObserved = false;
-    bool clockObservedThisLoop = false;
+    // 異変。この周回で探す異変（Stage2AnomalyPlanが決めたもの）と、見つけたかどうか
+    Stage2Anomaly requiredAnomaly = Stage2Anomaly::None;
+    bool requiredAnomalyFound = false;
+    bool falseDoorObserved = false;     // 偽ドアを照らした（あとは目を離すだけ）
+    bool portraitStaring = false;       // 肖像画を見つめている途中
+    bool knockListening = false;        // ノックの出どころの壁の前で耳を澄ませている途中
 
     // 信号盤パズル
     bool signalPuzzleComplete = false;
@@ -83,6 +87,7 @@ struct Stage2ObjectiveInput
     bool falseDoorNotice = false;
     bool clockNotice = false;
     bool portraitNotice = false;
+    bool knockNotice = false;
     bool loopNotice = false;
 };
 

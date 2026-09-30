@@ -227,6 +227,7 @@ void Stage2Scene::AdvanceLoop(Player& player)
     m_LightZoneProgress.Reset();
     m_ScratchAnomaly.ResetProgressForLoop();
     m_PortraitAnomaly.ResetProgressForLoop();
+    m_KnockingAnomaly.ResetProgressForLoop();
     m_FalseDoorAnomaly.ResetProgressForLoop();
     m_ConfirmationHandledThisLoop = false;
     ResetSignalPuzzle();
@@ -305,7 +306,9 @@ void Stage2Scene::AdvanceLoop(Player& player)
 
     if (m_LoopCount == 1)
     {
-        SetFalseDoorState(true, false);
+        // 偽ドアは、偽ドアを見つける周回（Stage2AnomalyPlanが決める）だけ出します。
+        SetFalseDoorState(
+            m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::FalseDoor), false);
         CeilingLight* failingLight =
             m_Objects.Light(Stage2Light::Light2);
         if (failingLight != nullptr)
@@ -332,7 +335,8 @@ void Stage2Scene::AdvanceLoop(Player& player)
     }
     else if (m_LoopCount == 2)
     {
-        SetFalseDoorState(false, false);
+        SetFalseDoorState(
+            m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::FalseDoor), false);
         CeilingLight* entranceLight =
             m_Objects.Light(Stage2Light::Light1);
         CeilingLight* farLight =
@@ -386,7 +390,8 @@ void Stage2Scene::AdvanceLoop(Player& player)
 
 void Stage2Scene::ConfigureClockForLoop()
 {
-    m_ClockAnomaly.ConfigureForLoop(m_LoopCount);
+    m_ClockAnomaly.ConfigureForLoop(
+        m_LoopCount, m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Clock));
     if (m_LoopCount >= 3)
     {
         Wall* face = m_Objects.clockFace;
@@ -403,11 +408,12 @@ void Stage2Scene::ConfigureClockForLoop()
 void Stage2Scene::UpdateClock(float deltaTime)
 {
     // 針の進み方と逆回転時の刻み表示は時計異変自身が管理します。
-    m_ClockAnomaly.Update(m_LoopCount, deltaTime);
+    const bool clockLoop = m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Clock);
+    m_ClockAnomaly.Update(m_LoopCount, clockLoop, deltaTime);
     const float displayedHourAngle =
-        m_ClockAnomaly.GetDisplayedHourAngle(m_LoopCount);
+        m_ClockAnomaly.GetDisplayedHourAngle(clockLoop);
     const float displayedMinuteAngle =
-        m_ClockAnomaly.GetDisplayedMinuteAngle(m_LoopCount);
+        m_ClockAnomaly.GetDisplayedMinuteAngle(clockLoop);
 
     Wall* hourHand = m_Objects.clockHourHand;
     Wall* minuteHand = m_Objects.clockMinuteHand;
@@ -423,7 +429,8 @@ void Stage2Scene::UpdateClock(float deltaTime)
 
 void Stage2Scene::UpdateClockObservation()
 {
-    if (m_LoopCount <= 0 || m_LoopCount >= 3 ||
+    // 時計を見つける周回（Stage2AnomalyPlanが決める）だけ観察を受け付けます。
+    if (!m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Clock) ||
         m_ClockAnomaly.WasObservedThisLoop())
     {
         return;
@@ -447,39 +454,31 @@ void Stage2Scene::UpdateClockObservation()
     }
 
     Player* player = m_Objects.player;
-    if (m_LoopCount == 2 && player != nullptr && player->IsFlashlightOn())
+    if (player != nullptr && player->IsFlashlightOn())
     {
         RegisterPuzzleMistake(2);
         return;
     }
 
     m_ClockAnomaly.MarkObserved();
+    m_Notices.loop = 2.8f;
 
-    if (m_LoopCount == 2)
+    CeilingLight* doorLight =
+        m_Objects.Light(Stage2Light::DoorLight);
+    if (doorLight != nullptr)
     {
-        m_Notices.loop = 2.8f;
-
-        CeilingLight* doorLight =
-            m_Objects.Light(Stage2Light::DoorLight);
-        if (doorLight != nullptr)
-        {
-            doorLight->TriggerEventFlicker(0.90f, 0.76f);
-        }
-        game->GetPostProcess()->TriggerBloomPulse(0.58f, 0.24f);
+        doorLight->TriggerEventFlicker(0.90f, 0.76f);
     }
+    game->GetPostProcess()->TriggerBloomPulse(0.58f, 0.24f);
 
     CeilingLight* clockLight =
         m_Objects.Light(Stage2Light::Light2);
     if (clockLight != nullptr)
     {
-        clockLight->TriggerEventFlicker(
-            m_LoopCount == 1 ? 0.46f : 0.82f,
-            m_LoopCount == 1 ? 0.42f : 0.72f);
+        clockLight->TriggerEventFlicker(0.82f, 0.72f);
     }
-    game->GetPostProcess()->TriggerHorrorPulse(
-        m_LoopCount == 1 ? 0.14f : 0.28f,
-        0.32f);
-    Input::SetVibration(m_LoopCount == 1 ? 3 : 6, 0.14f);
+    game->GetPostProcess()->TriggerHorrorPulse(0.28f, 0.32f);
+    Input::SetVibration(6, 0.14f);
 }
 
 void Stage2Scene::RegisterPuzzleMistake(int type)

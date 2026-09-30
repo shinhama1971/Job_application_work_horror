@@ -7,6 +7,55 @@
 
 #include <cstddef>
 
+namespace
+{
+    // この周回で探す異変が、まだ見つかっていないか。
+    bool IsSearchingAnomaly(const Stage2ObjectiveInput& in)
+    {
+        return in.requiredAnomaly != Stage2Anomaly::None && !in.requiredAnomalyFound;
+    }
+
+    // 15秒止まったときのヒント。どの異変を探す周回かは毎回変わるため、ここで初めて場所と方法を伝えます。
+    std::string_view GetAnomalyHint(const Stage2ObjectiveInput& in)
+    {
+        switch (in.requiredAnomaly)
+        {
+        case Stage2Anomaly::FalseDoor:
+            return in.falseDoorObserved
+                ? "ヒント 偽物のドアから視線を外す"
+                : "ヒント ライトを点け前方左側の壁を探す";
+        case Stage2Anomaly::Clock:
+            return "ヒント ライトを消して左の時計を見る";
+        case Stage2Anomaly::Portrait:
+            return "ヒント 右の肖像画をライトで照らす";
+        case Stage2Anomaly::Knocking:
+            return "ヒント 立ち止まって壁を叩く音の方向を探す";
+        case Stage2Anomaly::None:
+            break;
+        }
+        return "ヒント 廊下の変化を探す";
+    }
+
+    // 30秒止まったときのヒント。解き方をそのまま伝えます。
+    std::string_view GetAnomalyStrongHint(const Stage2ObjectiveInput& in)
+    {
+        switch (in.requiredAnomaly)
+        {
+        case Stage2Anomaly::FalseDoor:
+            return "ヒント ライトで偽物のドアを照らして視線を外す";
+        case Stage2Anomaly::Clock:
+            return "ヒント ライトを消して左の時計を正面から見る";
+        case Stage2Anomaly::Portrait:
+            return "ヒント ライトで右の肖像画を照らしたまま見つめ続ける";
+        case Stage2Anomaly::Knocking:
+            return "ヒント 音のする壁の前で止まり 壁の方を向いて耳を澄ます";
+        case Stage2Anomaly::None:
+            break;
+        }
+        return "ヒント 廊下の変化を探す";
+    }
+}
+
 std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
 {
     constexpr std::string_view closedLoopObjectives[] =
@@ -30,15 +79,26 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
             ? openLoopObjectives[loopIndex]
             : closedLoopObjectives[loopIndex];
     }
-    if (in.loopCount == 1 && !in.falseDoorMoved)
+    if (IsSearchingAnomaly(in))
     {
-        objective = in.falseDoorObserved
-            ? "偽物のドアから視線を外す"
-            : "懐中電灯で左の偽物のドアを照らす";
-    }
-    else if (in.loopCount == 2 && !in.clockObservedThisLoop)
-    {
-        objective = "ライトを消して左の時計を見る";
+        // どの異変が出るかは毎回変わるため、普段の目的では答えを言わず、探させます。
+        // 解き方の途中まで進んでいるときだけ、次の一手を伝えます。
+        if (in.requiredAnomaly == Stage2Anomaly::FalseDoor && in.falseDoorObserved)
+        {
+            objective = "偽物のドアから視線を外す";
+        }
+        else if (in.requiredAnomaly == Stage2Anomaly::Portrait && in.portraitStaring)
+        {
+            objective = "肖像画から目を離さない";
+        }
+        else if (in.requiredAnomaly == Stage2Anomaly::Knocking && in.knockListening)
+        {
+            objective = "動かずに耳を澄ます";
+        }
+        else
+        {
+            objective = "廊下のどこかが変わっている 異常を探す";
+        }
     }
     else if (in.confirmationPending)
     {
@@ -204,40 +264,40 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
     }
     else if (in.clockNotice)
     {
-        objective = in.loopCount == 2
+        objective = in.requiredAnomaly == Stage2Anomaly::Clock
             ? "逆回転を確認した 奥のスイッチへ進む"
             : "時計の時刻が変わった";
     }
     else if (in.portraitNotice)
     {
-        objective = "止まらず奥のドアへ進む";
+        objective = "目が開いた 奥のスイッチへ進む";
+    }
+    else if (in.knockNotice)
+    {
+        objective = "音の出どころを見つけた 奥のスイッチへ進む";
     }
     else if (in.loopNotice)
     {
         if (in.loopCount == 0) objective = "1回目 奥のドアを開ける";
-        else if (in.loopCount == 1) objective = in.falseDoorMoved
+        else if (in.loopCount == 1) objective = in.requiredAnomalyFound
             ? (in.confirmationHandledThisLoop
                 ? "鍵が開いた 奥のドアへ進む"
                 : "奥の異常確認スイッチを押す")
             : "2回目 廊下の変化を探す";
-        else if (in.loopCount == 2) objective = in.clockObservedThisLoop
+        else if (in.loopCount == 2) objective = in.requiredAnomalyFound
             ? (in.confirmationHandledThisLoop
                 ? "鍵が開いた 後ろを見ずに進む"
                 : "奥の異常確認スイッチを押す")
-            : "3回目 左の時計を調べる";
+            : "3回目 前と違うところを探す";
         else objective = in.signalPuzzleComplete
             ? "信号が復旧した 廊下の中央へ進む"
             : "奥の青い信号盤から復旧する";
     }
     else if (in.progressHintSeconds >= 30.0f)
     {
-        if (in.loopCount == 1 && !in.falseDoorMoved)
+        if (IsSearchingAnomaly(in))
         {
-            objective = "ヒント ライトで偽物のドアを照らして視線を外す";
-        }
-        else if (in.loopCount == 2 && !in.clockObservedThisLoop)
-        {
-            objective = "ヒント ライトを消して左の時計を正面から見る";
+            objective = GetAnomalyStrongHint(in);
         }
         else if (in.confirmationPending)
         {
@@ -272,15 +332,9 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
     }
     else if (in.progressHintSeconds >= 15.0f)
     {
-        if (in.loopCount == 1 && !in.falseDoorMoved)
+        if (IsSearchingAnomaly(in))
         {
-            objective = in.falseDoorObserved
-                ? "ヒント 偽物のドアから視線を外す"
-                : "ヒント ライトを点け前方左側の壁を探す";
-        }
-        else if (in.loopCount == 2 && !in.clockObservedThisLoop)
-        {
-            objective = "ヒント ライトを消して左の時計を見る";
+            objective = GetAnomalyHint(in);
         }
         else if (in.confirmationPending)
         {

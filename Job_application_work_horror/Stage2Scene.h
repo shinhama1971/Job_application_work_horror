@@ -14,6 +14,7 @@
 #include "ClockAnomaly.h"
 #include "FalseDoorAnomaly.h"
 #include "PortraitAnomaly.h"
+#include "KnockingAnomaly.h"
 #include "ScratchAnomaly.h"
 #include "ObservedScareSequence.h"
 #include "CaughtSequence.h"
@@ -21,6 +22,7 @@
 #include "LightZoneProgress.h"
 #include "PuzzleFeedback.h"
 #include "BehindPresence.h"
+#include "Stage2AnomalyPlan.h"
 
 #include "Stage2SceneConstants.h"
 #include "Stage2Layout.h"
@@ -63,7 +65,11 @@ private:
     void RevealScratchPieces(int first, int last, float emission);
     void UpdateLightZones(const Player& player);
     void UpdateScratchMessage(const Player& player, float deltaTime);
-    void UpdatePortraitAnomaly(const Player& player);
+    void UpdatePortraitAnomaly(const Player& player, float deltaTime);
+    // この周回で見つけるべき異変（Stage2AnomalyPlanが決めたもの）を見つけ終えたか。
+    bool IsRequiredAnomalyFound() const;
+    void UpdateKnockingAnomaly(const Player& player, float deltaTime);
+    DirectX::SimpleMath::Vector3 GetKnockListenPoint() const;
     void UpdateFalseDoorAnomaly(const Player& player);
     void SetFalseDoorState(bool visible, bool rightSide);
     void ConfigureClockForLoop();
@@ -89,6 +95,7 @@ private:
     ClockAnomaly m_ClockAnomaly;
     FalseDoorAnomaly m_FalseDoorAnomaly;
     PortraitAnomaly m_PortraitAnomaly;
+    KnockingAnomaly m_KnockingAnomaly;
     ScratchAnomaly m_ScratchAnomaly;
     ObservedScareSequence m_ObservedScareSequence;
     CaughtSequence m_CaughtSequence;
@@ -96,6 +103,8 @@ private:
     LightZoneProgress m_LightZoneProgress;
     PuzzleFeedback m_PuzzleFeedback;
     BehindPresence m_BehindPresence;
+    // 1周目・2周目にどの異変を探させるか。プレイごとにランダムに決めます。
+    Stage2AnomalyPlan m_AnomalyPlan;
     std::mt19937 m_PresenceRandom{ std::random_device{}() };
 
     // timerが負数なら未実行、0以上なら対応する演出シーケンスが進行中です。

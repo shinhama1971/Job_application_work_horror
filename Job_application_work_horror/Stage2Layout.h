@@ -36,6 +36,15 @@ enum class Stage2Light
     Count
 };
 
+// 廊下の奥行き（z）に一番近い天井照明です。照明はz=-112, -38, 38, 112に並んでいます。
+inline Stage2Light Stage2NearestLight(float z)
+{
+    if (z < -75.0f) return Stage2Light::Light1;
+    if (z < 0.0f) return Stage2Light::Light2;
+    if (z < 75.0f) return Stage2Light::Light3;
+    return Stage2Light::DoorLight;
+}
+
 // 2面の進行で使うObjectです。Stage2Layout::Buildが生成と同時にポインタを入れて返すため、
 // 名前での検索や打ち間違いは起きません。
 // 実体はObjectManagerが所有し、どれもSceneの終了まで破棄されないため非所有ポインタで保持します。

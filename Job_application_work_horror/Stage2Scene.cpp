@@ -45,7 +45,27 @@ bool Stage2Scene::TryGetDebugInfo(SceneDebugInfo& info) const
     info.threatLevel = m_NoiseThreatSystem.GetThreat();
     info.finalSequenceArmed = m_FinalSequenceArmed;
     info.exitReady = m_FinalDoorReady;
+    info.firstAnomaly = Stage2AnomalyPlan::GetName(m_AnomalyPlan.GetRequired(1));
+    info.secondAnomaly = Stage2AnomalyPlan::GetName(m_AnomalyPlan.GetRequired(2));
     return true;
+}
+
+bool Stage2Scene::IsRequiredAnomalyFound() const
+{
+    switch (m_AnomalyPlan.GetRequired(m_LoopCount))
+    {
+    case Stage2Anomaly::FalseDoor:
+        return m_FalseDoorAnomaly.HasMoved();
+    case Stage2Anomaly::Clock:
+        return m_ClockAnomaly.WasObservedThisLoop();
+    case Stage2Anomaly::Portrait:
+        return m_PortraitAnomaly.HasChangedThisLoop();
+    case Stage2Anomaly::Knocking:
+        return m_KnockingAnomaly.WasFound();
+    case Stage2Anomaly::None:
+        break;
+    }
+    return false;
 }
 
 void Stage2Scene::RequestDebugAction(SceneDebugAction action)
@@ -77,8 +97,11 @@ void Stage2Scene::Init()
     m_FinalSequence.Reset();
     m_ScratchAnomaly.Reset();
     m_PortraitAnomaly.Reset();
+    m_KnockingAnomaly.Reset();
     m_FalseDoorAnomaly.Reset();
     m_ClockAnomaly.Reset();
+    // 1周目・2周目に探させる異変を、偽ドア・時計・肖像画から毎回ランダムに選びます。
+    m_AnomalyPlan.Randomize(m_PresenceRandom);
     m_PuzzleFeedback.Reset();
     m_NoiseThreatSystem.Reset();
     // 最初の気配は周回に慣れた頃に出します。
@@ -223,6 +246,7 @@ void Stage2Scene::Update()
     m_ObservedScareSequence.UpdateNoticeTimer(deltaTime);
     m_ScratchAnomaly.UpdateNoticeTimer(deltaTime);
     m_PortraitAnomaly.UpdateNoticeTimer(deltaTime);
+    m_KnockingAnomaly.UpdateNoticeTimer(deltaTime);
     m_FalseDoorAnomaly.UpdateNoticeTimer(deltaTime);
     m_ClockAnomaly.UpdateNoticeTimer(deltaTime);
     m_PuzzleFeedback.Update(deltaTime);
@@ -271,9 +295,14 @@ void Stage2Scene::Update()
         m_ProgressHintTimer >= 15.0f &&
         m_GuidancePulseCooldown <= 0.0f)
     {
-        CeilingLight* guideLight = m_Objects.Light(m_LoopCount == 1
-            ? Stage2Light::Light3
-            : Stage2Light::Light2);
+        // 探すべき異変の近くの照明を揺らします（偽ドアは奥寄り、時計と肖像画は中央付近、
+        // ノックは音の出どころの近く）。
+        const Stage2Anomaly requiredAnomaly = m_AnomalyPlan.GetRequired(m_LoopCount);
+        CeilingLight* guideLight = m_Objects.Light(
+            requiredAnomaly == Stage2Anomaly::FalseDoor ? Stage2Light::Light3 :
+            requiredAnomaly == Stage2Anomaly::Knocking
+                ? Stage2NearestLight(GetKnockListenPoint().z)
+                : Stage2Light::Light2);
         if (guideLight != nullptr)
         {
             guideLight->TriggerEventFlicker(0.72f, 0.58f);
@@ -298,7 +327,8 @@ void Stage2Scene::Update()
     }
     UpdateLightZones(*player);
     UpdateScratchMessage(*player, deltaTime);
-    UpdatePortraitAnomaly(*player);
+    UpdatePortraitAnomaly(*player, deltaTime);
+    UpdateKnockingAnomaly(*player, deltaTime);
     UpdateFalseDoorAnomaly(*player);
     UpdateClock(deltaTime);
     UpdateClockObservation();
@@ -359,9 +389,7 @@ void Stage2Scene::Update()
 
     FuseBox* confirmationPanel =
         m_Objects.confirmationPanel;
-    const bool evidenceConfirmed =
-        (m_LoopCount == 1 && m_FalseDoorAnomaly.HasMoved()) ||
-        (m_LoopCount == 2 && m_ClockAnomaly.WasObservedThisLoop());
+    const bool evidenceConfirmed = IsRequiredAnomalyFound();
     if (confirmationPanel != nullptr)
     {
         confirmationPanel->SetManualInteractionAllowed(evidenceConfirmed);

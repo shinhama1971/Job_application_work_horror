@@ -353,6 +353,9 @@
     <ClInclude Include="PortraitAnomaly.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
+    <ClInclude Include="KnockingAnomaly.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
     <ClInclude Include="ScratchAnomaly.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
@@ -516,6 +519,9 @@
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
     <ClInclude Include="Stage2Objective.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="Stage2AnomalyPlan.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
     <ClInclude Include="BehindPresence.h">
