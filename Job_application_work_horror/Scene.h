@@ -16,6 +16,9 @@ struct SceneDebugInfo
     float threatLevel = 0.0f;
     bool finalSequenceArmed = false;
     bool exitReady = false;
+    // 1周目・2周目に探す異変の名前（2面のみ。文字列リテラルを指します）。
+    const char* firstAnomaly = "";
+    const char* secondAnomaly = "";
 };
 
 enum class SceneDebugAction

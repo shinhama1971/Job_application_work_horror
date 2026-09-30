@@ -319,6 +319,8 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             "2面 イベント確認", ImGuiTreeNodeFlags_DefaultOpen))
         {
             ImGui::Text("ループ %d / 3", sceneDebugInfo.progressionStep);
+            ImGui::Text("探す異変  1周目: %s  2周目: %s",
+                sceneDebugInfo.firstAnomaly, sceneDebugInfo.secondAnomaly);
             ImGui::Text("信号 %d / 3  足音危険度 %.0f%%",
                 sceneDebugInfo.puzzleStep, sceneDebugInfo.threatLevel * 100.0f);
             ImGui::Text("失敗回数 %d  再試行補助 %s",

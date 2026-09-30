@@ -27,37 +27,39 @@ public:
         m_ObservedThisLoop = false;
     }
 
-    void ConfigureForLoop(int loopCount) noexcept
+    // anomalyLoopは「この周回で見つけるべき異変が時計か」です（Stage2AnomalyPlanが決めます）。
+    // 時計の周回では針が逆回りし、それ以外の1〜2周目は時計が止まっています。
+    void ConfigureForLoop(int loopCount, bool anomalyLoop) noexcept
     {
         m_ObservedThisLoop = false;
-        if (loopCount == 1)
-        {
-            m_HourAngle = 1.18f;
-            m_MinuteAngle = -2.34f;
-        }
-        else if (loopCount == 2)
-        {
-            m_HourAngle = -0.62f;
-            m_MinuteAngle = 2.72f;
-        }
-        else if (loopCount >= 3)
+        if (loopCount >= 3)
         {
             m_HourAngle = DirectX::XM_PI;
             m_MinuteAngle = DirectX::XM_PI;
         }
+        else if (anomalyLoop)
+        {
+            m_HourAngle = -0.62f;
+            m_MinuteAngle = 2.72f;
+        }
+        else if (loopCount >= 1)
+        {
+            m_HourAngle = 1.18f;
+            m_MinuteAngle = -2.34f;
+        }
     }
 
-    void Update(int loopCount, float deltaTime) noexcept
+    void Update(int loopCount, bool anomalyLoop, float deltaTime) noexcept
     {
-        if (loopCount == 0)
-        {
-            m_MinuteAngle += deltaTime * 0.035f;
-            m_HourAngle += deltaTime * 0.0029f;
-        }
-        else if (loopCount == 2)
+        if (anomalyLoop)
         {
             m_MinuteAngle -= deltaTime * 0.82f;
             m_HourAngle -= deltaTime * 0.068f;
+        }
+        else if (loopCount == 0)
+        {
+            m_MinuteAngle += deltaTime * 0.035f;
+            m_HourAngle += deltaTime * 0.0029f;
         }
     }
 
@@ -69,14 +71,15 @@ public:
     float GetHourAngle() const noexcept { return m_HourAngle; }
     float GetMinuteAngle() const noexcept { return m_MinuteAngle; }
 
-    float GetDisplayedHourAngle(int loopCount) const noexcept
+    // 逆回りしている周回だけ、針を一定の刻みで飛ばして機械が狂った動きにします。
+    float GetDisplayedHourAngle(bool anomalyLoop) const noexcept
     {
-        return loopCount == 2 ? QuantizeAngle(m_HourAngle) : m_HourAngle;
+        return anomalyLoop ? QuantizeAngle(m_HourAngle) : m_HourAngle;
     }
 
-    float GetDisplayedMinuteAngle(int loopCount) const noexcept
+    float GetDisplayedMinuteAngle(bool anomalyLoop) const noexcept
     {
-        return loopCount == 2 ? QuantizeAngle(m_MinuteAngle) : m_MinuteAngle;
+        return anomalyLoop ? QuantizeAngle(m_MinuteAngle) : m_MinuteAngle;
     }
 
     bool WasObservedThisLoop() const noexcept { return m_ObservedThisLoop; }

@@ -28,7 +28,9 @@ using namespace DirectX::SimpleMath;
 
 void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
 {
-    if (m_LoopCount != 1 || m_FalseDoorAnomaly.HasMoved())
+    // 偽ドアを見つける周回（Stage2AnomalyPlanが決める）だけ判定します。
+    if (!m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::FalseDoor) ||
+        m_FalseDoorAnomaly.HasMoved())
     {
         return;
     }
@@ -617,9 +619,12 @@ void Stage2Scene::UpdateScratchMessage(
     }
 }
 
-void Stage2Scene::UpdatePortraitAnomaly(const Player& player)
+// 肖像画を見つける周回（Stage2AnomalyPlanが決める）だけ判定します。
+// 懐中電灯で照らしたまま見つめ続けると、閉じていた目がゆっくり浮かび、やがて開きます。
+// 途中で目を離すと、目は消えて最初からやり直しです。
+void Stage2Scene::UpdatePortraitAnomaly(const Player& player, float deltaTime)
 {
-    if (m_LoopCount <= 0 || m_LoopCount >= 3 ||
+    if (!m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Portrait) ||
         m_PortraitAnomaly.HasChangedThisLoop())
     {
         return;
@@ -639,21 +644,31 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player)
         game->GetCamera()->GetForward().Dot(cameraToPortrait);
     const bool lookingAtPortrait =
         player.IsFlashlightOn() && distance < 105.0f && facing > 0.91f;
-    if (lookingAtPortrait)
+    const bool wasStaring = m_PortraitAnomaly.IsStaring();
+    if (!m_PortraitAnomaly.UpdateStare(lookingAtPortrait, deltaTime))
     {
-        m_PortraitAnomaly.MarkObserved();
+        // 見つめている間は目がかすかに浮かび、目を離すと消えます。
+        const float stareRate = m_PortraitAnomaly.GetStareRate();
+        if (m_PortraitAnomaly.IsStaring() || wasStaring)
+        {
+            for (Wall* eye : m_Objects.portraitEyes)
+            {
+                if (eye != nullptr)
+                {
+                    eye->SetVisible(m_PortraitAnomaly.IsStaring());
+                    eye->SetAppearance(
+                        Color(0.05f + stareRate * 0.08f, 0.004f, 0.002f, 1.0f),
+                        Color(stareRate * stareRate * 0.05f, 0.0f, 0.0f, 1.0f),
+                        28.0f);
+                }
+            }
+        }
         return;
     }
 
-    if (!m_PortraitAnomaly.WasObserved() ||
-        (facing > 0.55f && distance < 112.0f))
-    {
-        return;
-    }
-
-    m_PortraitAnomaly.MarkChanged();
-
-    const float emission = m_LoopCount == 1 ? 0.10f : 0.28f;
+    // 見つめ続けた: 目が開き、奥の確認スイッチが押せるようになります。
+    m_Notices.loop = 2.8f;
+    constexpr float emission = 0.28f;
     for (Wall* eye : m_Objects.portraitEyes)
     {
         if (eye != nullptr)
@@ -675,17 +690,18 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player)
             12.0f);
     }
 
-    CeilingLight* nearbyLight = m_Objects.Light(
-        m_LoopCount == 1 ? Stage2Light::Light2 : Stage2Light::Light3);
+    // 肖像画は時計の向かい（z=-25）にあるため、近くの照明と奥の扉の照明を揺らします。
+    CeilingLight* nearbyLight = m_Objects.Light(Stage2Light::Light2);
     if (nearbyLight != nullptr)
     {
-        nearbyLight->TriggerEventFlicker(
-            0.62f + static_cast<float>(m_LoopCount) * 0.18f,
-            0.58f + static_cast<float>(m_LoopCount) * 0.12f);
+        nearbyLight->TriggerEventFlicker(0.82f, 0.72f);
     }
-    game->GetPostProcess()->TriggerHorrorPulse(
-        0.18f + static_cast<float>(m_LoopCount) * 0.10f,
-        0.30f);
+    CeilingLight* doorLight = m_Objects.Light(Stage2Light::DoorLight);
+    if (doorLight != nullptr)
+    {
+        doorLight->TriggerEventFlicker(0.90f, 0.76f);
+    }
+    game->GetPostProcess()->TriggerHorrorPulse(0.36f, 0.30f);
     Input::SetVibration(6, 0.17f);
 }
 
