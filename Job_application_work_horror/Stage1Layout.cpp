@@ -24,6 +24,7 @@
 #include "Wall.h"
 
 #include <SimpleMath.h>
+#include <random>
 
 using namespace DirectX::SimpleMath;
 
@@ -272,16 +273,48 @@ namespace Stage1Layout
         light8->SetScale(20.0f, 2.0f, 8.0f);
         light8->SetEmergencyLight(true, 6.2f);
 
-        // アイテム
+        // ヒューズ。どの部屋にあるかは固定し（目的表示と演出の流れを保つため）、
+        // 部屋の中のどこに落ちているかを、プレイごとに候補からランダムに選びます。
+        // 覚えた場所へ走るのではなく、毎回ライトで部屋を探させるためです。
+        std::mt19937 fuseRandom{ std::random_device{}() };
+        const auto placeFuse = [&fuseRandom](Item* fuse, const std::array<Vector3, 3>& candidates)
+        {
+            std::uniform_int_distribution<std::size_t> pick(0, candidates.size() - 1);
+            const Vector3& spot = candidates[pick(fuseRandom)];
+            fuse->SetPosition(spot.x, spot.y, spot.z);
+        };
+        // 1本目: 開始地点の区画（配管の陰・左奥・右奥）
+        const std::array<Vector3, 3> firstFuseSpots =
+        {
+            Vector3(0.0f, -95.0f, -155.0f),
+            Vector3(-62.0f, -95.0f, -168.0f),
+            Vector3(64.0f, -95.0f, -160.0f)
+        };
+        // 2本目: 左の倉庫。倉庫の演出（StageScene::UpdateStorageScare）が始まる
+        // x<-110, z<-108 の範囲の中だけから選びます。
+        const std::array<Vector3, 3> secondFuseSpots =
+        {
+            Vector3(-150.0f, -95.0f, -140.0f),
+            Vector3(-196.0f, -95.0f, -160.0f),
+            Vector3(-128.0f, -95.0f, -166.0f)
+        };
+        // 3本目: 右の倉庫（棚の陰・奥の角・入口寄り）
+        const std::array<Vector3, 3> thirdFuseSpots =
+        {
+            Vector3(150.0f, -95.0f, -140.0f),
+            Vector3(196.0f, -95.0f, -164.0f),
+            Vector3(122.0f, -95.0f, -98.0f)
+        };
+
         Item* item1 = builder.Create<Item>("Item1");
-        item1->SetPosition(0.0f, -95.0f, -155.0f);
+        placeFuse(item1, firstFuseSpots);
 
         Item* item2 = builder.Create<Item>("Item2");
-        item2->SetPosition(-150.0f, -95.0f, -140.0f);
+        placeFuse(item2, secondFuseSpots);
         item2->SetActive(false);
 
         Item* item3 = builder.Create<Item>("Item3");
-        item3->SetPosition(150.0f, -95.0f, -140.0f);
+        placeFuse(item3, thirdFuseSpots);
         item3->SetActive(false);
 
         // ドア
@@ -488,6 +521,7 @@ namespace Stage1Layout
         objects.loopDoor = door;
         objects.exitDoor = stageExitDoor;
         objects.exitTrigger = exit;
+        objects.firstFuse = item1;
         objects.secondFuse = item2;
         objects.thirdFuse = item3;
         objects.ceilingLights = {

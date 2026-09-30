@@ -50,6 +50,8 @@ struct StageObjects
     Door* loopDoor = nullptr;
     Door* exitDoor = nullptr;
     ExitTrigger* exitTrigger = nullptr;
+    // ヒューズ。部屋の中の位置はプレイごとに変わるため、案内の矢印はここから位置を読みます。
+    Item* firstFuse = nullptr;
     Item* secondFuse = nullptr;
     Item* thirdFuse = nullptr;
     std::array<CeilingLight*, CeilingLightCount> ceilingLights{};

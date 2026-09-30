@@ -90,17 +90,18 @@ void StageScene::Draw(Camera* camera)
         {
             guideTarget = Vector3(202.0f, -74.0f, 307.5f);
         }
-        else if (fuseCount <= 0)
+        // ヒューズの位置はプレイごとに変わるため、配置したObjectから読みます。
+        else if (fuseCount <= 0 && m_Objects.firstFuse != nullptr)
         {
-            guideTarget = Vector3(0.0f, -95.0f, -155.0f);
+            guideTarget = m_Objects.firstFuse->GetPosition();
         }
-        else if (fuseCount == 1 && m_CorridorLoopCount >= 1)
+        else if (fuseCount == 1 && m_CorridorLoopCount >= 1 && m_Objects.secondFuse != nullptr)
         {
-            guideTarget = Vector3(-150.0f, -95.0f, -140.0f);
+            guideTarget = m_Objects.secondFuse->GetPosition();
         }
-        else if (fuseCount == 2 && m_CorridorLoopCount >= 2)
+        else if (fuseCount == 2 && m_CorridorLoopCount >= 2 && m_Objects.thirdFuse != nullptr)
         {
-            guideTarget = Vector3(150.0f, -95.0f, -140.0f);
+            guideTarget = m_Objects.thirdFuse->GetPosition();
         }
         else if (fuseCount >= 3)
         {
