@@ -115,11 +115,12 @@ void Stage2Scene::Draw(Camera* camera)
         const Stage2Anomaly requiredAnomaly = m_AnomalyPlan.GetRequired(m_LoopCount);
         if (requiredAnomaly != Stage2Anomaly::None && !IsRequiredAnomalyFound())
         {
-            // 探すべき異変の場所を指します（偽ドア・時計・肖像画）。
+            // 探すべき異変の場所を指します（偽ドア・時計・肖像画・ノックの出どころ）。
             guideTarget =
                 requiredAnomaly == Stage2Anomaly::FalseDoor ? Vector3(-38.3f, -72.0f, 70.0f) :
                 requiredAnomaly == Stage2Anomaly::Clock ? Vector3(-38.0f, -70.0f, -25.0f) :
-                Vector3(38.72f, -69.0f, -25.0f);
+                requiredAnomaly == Stage2Anomaly::Portrait ? Vector3(38.72f, -69.0f, -25.0f) :
+                GetKnockListenPoint();
         }
         else if (confirmationPending)
         {
@@ -232,6 +233,7 @@ Stage2ObjectiveInput Stage2Scene::MakeObjectiveInput(bool confirmationPending) c
     input.requiredAnomalyFound = IsRequiredAnomalyFound();
     input.falseDoorObserved = m_FalseDoorAnomaly.WasObserved();
     input.portraitStaring = m_PortraitAnomaly.IsStaring();
+    input.knockListening = m_KnockingAnomaly.IsListening();
 
     input.signalPuzzleComplete = m_SignalPuzzle.IsComplete();
     input.signalPuzzleStep = m_SignalPuzzle.GetStep();
@@ -261,6 +263,7 @@ Stage2ObjectiveInput Stage2Scene::MakeObjectiveInput(bool confirmationPending) c
     input.falseDoorNotice = m_FalseDoorAnomaly.GetNoticeTimer() > 0.0f;
     input.clockNotice = m_ClockAnomaly.GetNoticeTimer() > 0.0f;
     input.portraitNotice = m_PortraitAnomaly.GetNoticeTimer() > 0.0f;
+    input.knockNotice = m_KnockingAnomaly.GetNoticeTimer() > 0.0f;
     input.loopNotice = m_Notices.loop > 0.0f;
     return input;
 }

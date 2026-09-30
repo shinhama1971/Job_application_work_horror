@@ -353,6 +353,9 @@
     <ClInclude Include="PortraitAnomaly.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
+    <ClInclude Include="KnockingAnomaly.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
     <ClInclude Include="ScratchAnomaly.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>

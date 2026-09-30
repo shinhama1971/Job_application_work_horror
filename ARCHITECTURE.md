@@ -102,7 +102,8 @@ Application
 - `ClockAnomaly`: 時計異変
 - `FalseDoorAnomaly`: 偽ドア異変
 - `PortraitAnomaly`: 肖像異変（ライトで照らしたまま見つめ続けた時間の計測）
-- `Stage2AnomalyPlan`: 1周目・2周目に見つける必要がある異変を、偽ドア・時計・肖像画から毎回ランダムに2つ選ぶ（入力や描画に依存しない純粋な状態クラス）
+- `Stage2AnomalyPlan`: 1周目・2周目に見つける必要がある異変を、偽ドア・時計・肖像画・ノックから毎回ランダムに2つ選ぶ（入力や描画に依存しない純粋な状態クラス）
+- `KnockingAnomaly`: 壁の向こうのノック異変（音の出どころの選択、ノックの間隔、出どころの壁の前で耳を澄ませた時間）
 - `ScratchAnomaly`: 引っかき傷メッセージ
 - `ObservedScareSequence`: 注視時の照明演出
 - `CaughtSequence`: 捕獲後の暗転と復帰

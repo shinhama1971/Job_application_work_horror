@@ -14,6 +14,7 @@
 #include "ClockAnomaly.h"
 #include "FalseDoorAnomaly.h"
 #include "PortraitAnomaly.h"
+#include "KnockingAnomaly.h"
 #include "ScratchAnomaly.h"
 #include "ObservedScareSequence.h"
 #include "CaughtSequence.h"
@@ -67,6 +68,8 @@ private:
     void UpdatePortraitAnomaly(const Player& player, float deltaTime);
     // この周回で見つけるべき異変（Stage2AnomalyPlanが決めたもの）を見つけ終えたか。
     bool IsRequiredAnomalyFound() const;
+    void UpdateKnockingAnomaly(const Player& player, float deltaTime);
+    DirectX::SimpleMath::Vector3 GetKnockListenPoint() const;
     void UpdateFalseDoorAnomaly(const Player& player);
     void SetFalseDoorState(bool visible, bool rightSide);
     void ConfigureClockForLoop();
@@ -92,6 +95,7 @@ private:
     ClockAnomaly m_ClockAnomaly;
     FalseDoorAnomaly m_FalseDoorAnomaly;
     PortraitAnomaly m_PortraitAnomaly;
+    KnockingAnomaly m_KnockingAnomaly;
     ScratchAnomaly m_ScratchAnomaly;
     ObservedScareSequence m_ObservedScareSequence;
     CaughtSequence m_CaughtSequence;

@@ -18,3 +18,15 @@ inline constexpr int Stage2ScratchCount =
     static_cast<int>(sizeof(Stage2ScratchNames) /
         sizeof(Stage2ScratchNames[0]));
 
+// 「壁の向こうのノック」異変の音の出どころ（KnockingAnomalyが周回ごとに1つ選びます）。
+// 廊下の壁（x=±42、厚さ4）の裏側に置き、壁越しにこもった音になるようにしています。
+// 遮蔽の判定は音源の6手前までの線分で行うため（Game::ComputeSoundOcclusion）、線分が壁を
+// 必ず通るよう、壁から少し離した x=±50 にしています。
+// 偽ドア・時計・肖像画・端末と重ならない高さ・位置を選んでいます。
+inline constexpr float Stage2KnockSpots[4][3] =
+{
+    { -50.0f, -78.0f, -60.0f },
+    { 50.0f, -78.0f, 15.0f },
+    { -50.0f, -78.0f, 40.0f },
+    { 50.0f, -78.0f, 85.0f }
+};

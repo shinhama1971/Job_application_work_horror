@@ -2,7 +2,7 @@
 // ファイルの役割: 2面の1周目・2周目に、どの異変を「見つけないと扉が開かない異変」にするかを決めます。
 // 主な技術: プレイごとのランダムな組み合わせ、入力や描画に依存しない純粋な状態クラス
 //
-// 偽ドア・時計・肖像画の3つから2つを選んで並べます。毎回違う組み合わせになるため、
+// 偽ドア・時計・肖像画・壁の向こうのノックの4つから2つを選んで並べます。毎回違う組み合わせになるため、
 // 答えを覚えて進むのではなく、周回ごとに廊下を観察して変化を探す遊びになります。
 // 3周目以降（信号盤パズル）は固定です。
 // ============================================================================
@@ -18,7 +18,8 @@ enum class Stage2Anomaly
     None,
     FalseDoor,  // 偽ドア: ライトで照らしてから目を離すと、反対側の壁へ移っている
     Clock,      // 時計: ライトを消して見ると、針が逆回りしている
-    Portrait    // 肖像画: ライトで照らしたまま見つめ続けると、目が開く
+    Portrait,   // 肖像画: ライトで照らしたまま見つめ続けると、目が開く
+    Knocking    // ノック: 壁の向こうから叩く音がする。音を頼りに出どころの壁を探し、耳を澄ます
 };
 
 class Stage2AnomalyPlan final
@@ -30,9 +31,10 @@ public:
     template<typename RandomEngine>
     void Randomize(RandomEngine& random)
     {
-        std::array<Stage2Anomaly, 3> candidates =
+        std::array<Stage2Anomaly, 4> candidates =
         {
-            Stage2Anomaly::FalseDoor, Stage2Anomaly::Clock, Stage2Anomaly::Portrait
+            Stage2Anomaly::FalseDoor, Stage2Anomaly::Clock,
+            Stage2Anomaly::Portrait, Stage2Anomaly::Knocking
         };
         std::shuffle(candidates.begin(), candidates.end(), random);
         m_Loops = { candidates[0], candidates[1] };
@@ -61,6 +63,7 @@ public:
         case Stage2Anomaly::FalseDoor: return "FalseDoor";
         case Stage2Anomaly::Clock: return "Clock";
         case Stage2Anomaly::Portrait: return "Portrait";
+        case Stage2Anomaly::Knocking: return "Knocking";
         case Stage2Anomaly::None: break;
         }
         return "None";

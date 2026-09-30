@@ -356,6 +356,7 @@
     <ClInclude Include="Stage2Layout.h" />
     <ClInclude Include="Stage2Objective.h" />
     <ClInclude Include="Stage2AnomalyPlan.h" />
+    <ClInclude Include="KnockingAnomaly.h" />
     <ClInclude Include="BehindPresence.h" />
     <ClInclude Include="Stage2SceneConstants.h" />
     <ClInclude Include="QuietRecovery.h" />

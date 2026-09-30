@@ -28,6 +28,8 @@ namespace
             return "ヒント ライトを消して左の時計を見る";
         case Stage2Anomaly::Portrait:
             return "ヒント 右の肖像画をライトで照らす";
+        case Stage2Anomaly::Knocking:
+            return "ヒント 立ち止まって壁を叩く音の方向を探す";
         case Stage2Anomaly::None:
             break;
         }
@@ -45,6 +47,8 @@ namespace
             return "ヒント ライトを消して左の時計を正面から見る";
         case Stage2Anomaly::Portrait:
             return "ヒント ライトで右の肖像画を照らしたまま見つめ続ける";
+        case Stage2Anomaly::Knocking:
+            return "ヒント 音のする壁の前で止まり 壁の方を向いて耳を澄ます";
         case Stage2Anomaly::None:
             break;
         }
@@ -86,6 +90,10 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
         else if (in.requiredAnomaly == Stage2Anomaly::Portrait && in.portraitStaring)
         {
             objective = "肖像画から目を離さない";
+        }
+        else if (in.requiredAnomaly == Stage2Anomaly::Knocking && in.knockListening)
+        {
+            objective = "動かずに耳を澄ます";
         }
         else
         {
@@ -263,6 +271,10 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
     else if (in.portraitNotice)
     {
         objective = "目が開いた 奥のスイッチへ進む";
+    }
+    else if (in.knockNotice)
+    {
+        objective = "音の出どころを見つけた 奥のスイッチへ進む";
     }
     else if (in.loopNotice)
     {

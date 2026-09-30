@@ -60,6 +60,8 @@ bool Stage2Scene::IsRequiredAnomalyFound() const
         return m_ClockAnomaly.WasObservedThisLoop();
     case Stage2Anomaly::Portrait:
         return m_PortraitAnomaly.HasChangedThisLoop();
+    case Stage2Anomaly::Knocking:
+        return m_KnockingAnomaly.WasFound();
     case Stage2Anomaly::None:
         break;
     }
@@ -95,6 +97,7 @@ void Stage2Scene::Init()
     m_FinalSequence.Reset();
     m_ScratchAnomaly.Reset();
     m_PortraitAnomaly.Reset();
+    m_KnockingAnomaly.Reset();
     m_FalseDoorAnomaly.Reset();
     m_ClockAnomaly.Reset();
     // 1周目・2周目に探させる異変を、偽ドア・時計・肖像画から毎回ランダムに選びます。
@@ -243,6 +246,7 @@ void Stage2Scene::Update()
     m_ObservedScareSequence.UpdateNoticeTimer(deltaTime);
     m_ScratchAnomaly.UpdateNoticeTimer(deltaTime);
     m_PortraitAnomaly.UpdateNoticeTimer(deltaTime);
+    m_KnockingAnomaly.UpdateNoticeTimer(deltaTime);
     m_FalseDoorAnomaly.UpdateNoticeTimer(deltaTime);
     m_ClockAnomaly.UpdateNoticeTimer(deltaTime);
     m_PuzzleFeedback.Update(deltaTime);
@@ -291,10 +295,13 @@ void Stage2Scene::Update()
         m_ProgressHintTimer >= 15.0f &&
         m_GuidancePulseCooldown <= 0.0f)
     {
-        // 探すべき異変の近くの照明を揺らします（偽ドアは奥寄り、時計と肖像画は中央付近）。
+        // 探すべき異変の近くの照明を揺らします（偽ドアは奥寄り、時計と肖像画は中央付近、
+        // ノックは音の出どころの近く）。
+        const Stage2Anomaly requiredAnomaly = m_AnomalyPlan.GetRequired(m_LoopCount);
         CeilingLight* guideLight = m_Objects.Light(
-            m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::FalseDoor)
-                ? Stage2Light::Light3
+            requiredAnomaly == Stage2Anomaly::FalseDoor ? Stage2Light::Light3 :
+            requiredAnomaly == Stage2Anomaly::Knocking
+                ? Stage2NearestLight(GetKnockListenPoint().z)
                 : Stage2Light::Light2);
         if (guideLight != nullptr)
         {
@@ -321,6 +328,7 @@ void Stage2Scene::Update()
     UpdateLightZones(*player);
     UpdateScratchMessage(*player, deltaTime);
     UpdatePortraitAnomaly(*player, deltaTime);
+    UpdateKnockingAnomaly(*player, deltaTime);
     UpdateFalseDoorAnomaly(*player);
     UpdateClock(deltaTime);
     UpdateClockObservation();
