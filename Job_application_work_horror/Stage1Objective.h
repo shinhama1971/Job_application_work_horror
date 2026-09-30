@@ -49,6 +49,9 @@ struct Stage1ObjectiveInput
     bool fuseNotice = false;
     bool fuseWatcherNotice = false;
     bool loopNotice = false;
+
+    // 隠し部屋の閉じ込めイベントの文章（空なら出しません）
+    std::string_view hiddenRoomText;
 };
 
 // 状態に応じた目的表示の文章を返します。上に書いた条件ほど優先されます

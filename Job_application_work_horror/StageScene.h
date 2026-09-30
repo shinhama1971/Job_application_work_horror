@@ -73,6 +73,8 @@ private:
     Stage1WallWritings m_WallWritings;
     // 暗証番号の扉。入力画面の操作と、番号の手がかりの配置を管理します。
     Stage1KeypadDoor m_KeypadDoor;
+    // 暗証番号の扉の先の部屋で、閉じ込められて鍵を探すイベントです。
+    Stage1HiddenRoomEvent m_HiddenRoom;
     ScareLightSequence m_ScareLightSequence;
     StagePowerSequence m_PowerSequence;
     ExitOmenSequence m_ExitOmenSequence;

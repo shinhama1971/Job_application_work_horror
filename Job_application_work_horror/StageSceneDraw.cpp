@@ -19,6 +19,7 @@
 #include "ScreenDustOverlay.h"
 #include "ScareTrigger.h"
 #include "ShadowMan.h"
+#include "KeyItem.h"
 #include <SimpleMath.h>
 #include <algorithm>
 #include <cmath>
@@ -82,7 +83,12 @@ void StageScene::Draw(Camera* camera)
         (exitTrigger == nullptr || !exitTrigger->IsEscaping()))
     {
         Vector3 guideTarget(0.0f, -99.0f, 315.0f);
-        if (game->IsPowerRestored() && !exitPowerActivated)
+        if (m_HiddenRoom.IsTrapped() && m_Objects.hiddenRoom.key != nullptr)
+        {
+            // 隠し部屋に閉じ込められている間は、鍵の場所を指します。
+            guideTarget = m_Objects.hiddenRoom.key->GetPosition();
+        }
+        else if (game->IsPowerRestored() && !exitPowerActivated)
         {
             guideTarget = Vector3(145.0f, -90.0f, 270.0f);
         }
@@ -179,5 +185,6 @@ Stage1ObjectiveInput StageScene::MakeObjectiveInput() const
     input.fuseNotice = m_FuseNoticeTimer > 0.0f;
     input.fuseWatcherNotice = m_FuseWatcherNoticeTimer > 0.0f;
     input.loopNotice = m_LoopNoticeTimer > 0.0f;
+    input.hiddenRoomText = m_HiddenRoom.GetObjectiveText();
     return input;
 }

@@ -16,6 +16,7 @@
 #include "Game.h"
 #include "Ground.h"
 #include "Item.h"
+#include "KeyItem.h"
 #include "PipeProp.h"
 #include "Player.h"
 #include "ScareTrigger.h"
@@ -463,6 +464,27 @@ namespace Stage1Layout
         hiddenBattery->SetPosition(140.0f, -95.0f, 110.0f);
         createWriting("Stage1KeypadRoomWriting", "assets/texture/writing_watched.png", "",
             Vector3(218.0f, -70.0f, 70.0f), Vector3(-1.0f, 0.0f, 0.0f), 64.0f);
+
+        // 閉じ込めイベント（Stage1HiddenRoomEvent）で使う、鍵・記録端末・影。
+        // 鍵は閉じ込めた瞬間に、部屋の隅の候補からランダムな位置へ置きます。
+        KeyItem* hiddenRoomKey = builder.Create<KeyItem>("Stage1HiddenRoomKey");
+        hiddenRoomKey->SetPosition(140.0f, -95.0f, 60.0f);
+        hiddenRoomKey->SetActive(false);
+
+        FuseBox* hiddenRoomRecord = builder.Create<FuseBox>("Stage1HiddenRoomRecord");
+        hiddenRoomRecord->SetManualControl("記録を読む");
+        hiddenRoomRecord->SetManualInteractionAllowed(true);
+        hiddenRoomRecord->SetPosition(213.0f, -82.0f, 150.0f);
+        hiddenRoomRecord->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
+
+        ShadowMan* hiddenRoomShadow = builder.Create<ShadowMan>("Stage1HiddenRoomShadow");
+        hiddenRoomShadow->SetDeactivateOnExpire(true);
+        hiddenRoomShadow->SetActive(false);
+
+        objects.hiddenRoom.door = keypadDoor;
+        objects.hiddenRoom.key = hiddenRoomKey;
+        objects.hiddenRoom.record = hiddenRoomRecord;
+        objects.hiddenRoom.shadow = hiddenRoomShadow;
 
         ExitTrigger* exit = builder.Create<ExitTrigger>("ExitTrigger");
         exit->SetPosition(207.0f, -80.0f, 307.5f);
