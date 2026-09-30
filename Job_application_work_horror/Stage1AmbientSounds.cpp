@@ -124,6 +124,20 @@ void Stage1AmbientSounds::Update(
     });
 }
 
+bool Stage1AmbientSounds::StartCeilingStepsNow(
+    bool powerRestored,
+    const Vector3& listenerPosition,
+    const Vector3& listenerForward)
+{
+    if (!ScheduleCeilingSteps(listenerPosition, listenerForward))
+    {
+        return false;
+    }
+    m_LastKind = Kind::CeilingSteps;
+    m_WaitTimer = NextInterval(powerRestored);
+    return true;
+}
+
 bool Stage1AmbientSounds::TryStartEvent(
     bool powerRestored,
     const Vector3& listenerPosition,

@@ -11,6 +11,7 @@
 #include "CeilingLight.h"
 #include "Door.h"
 #include "ExitTrigger.h"
+#include "FlashlightWriting.h"
 #include "FuseBox.h"
 #include "Game.h"
 #include "Ground.h"
@@ -343,6 +344,36 @@ namespace Stage1Layout
             30.0f,
             false);
         stageExitSign->SetCastsShadow(false);
+
+        // 懐中電灯で照らしたときだけ浮かぶ壁の文字。進む道筋に沿って、目的の手がかりと不安を置きます。
+        // 位置は壁の表面、向きは壁から通路側へ向かう法線です。画像は横長(4:1)です。
+        const auto createWriting = [&builder](
+            const char* name,
+            const char* texture,
+            const char* alternateTexture,
+            const Vector3& surfaceCenter,
+            const Vector3& outwardNormal,
+            float width)
+        {
+            FlashlightWriting* writing = builder.Create<FlashlightWriting>(name);
+            writing->SetTextures(texture, alternateTexture);
+            writing->Place(surfaceCenter, outwardNormal, width, width * 0.25f);
+            return writing;
+        };
+        objects.writings[Stage1WallWritings::Warning] = createWriting(
+            "Stage1WritingWarning", "assets/texture/writing_warning.png", "",
+            Vector3(0.0f, -71.0f, -178.0f), Vector3(0.0f, 0.0f, 1.0f), 56.0f);
+        objects.writings[Stage1WallWritings::Three] = createWriting(
+            "Stage1WritingThree", "assets/texture/writing_three.png", "",
+            Vector3(-150.0f, -70.0f, -72.0f), Vector3(0.0f, 0.0f, -1.0f), 64.0f);
+        objects.writings[Stage1WallWritings::Power] = createWriting(
+            "Stage1WritingPower", "assets/texture/writing_power.png", "",
+            Vector3(-128.0f, -69.0f, 38.0f), Vector3(0.0f, 0.0f, -1.0f), 64.0f);
+        // ループ廊下を北へ進むと正面に見える突き当たりの壁。右へ曲がると目を離すことになります。
+        objects.writings[Stage1WallWritings::Turn] = createWriting(
+            "Stage1WritingTurn", "assets/texture/writing_turn.png",
+            "assets/texture/writing_turned.png",
+            Vector3(0.0f, -70.0f, 273.0f), Vector3(0.0f, 0.0f, -1.0f), 60.0f);
 
         ExitTrigger* exit = builder.Create<ExitTrigger>("ExitTrigger");
         exit->SetPosition(207.0f, -80.0f, 307.5f);

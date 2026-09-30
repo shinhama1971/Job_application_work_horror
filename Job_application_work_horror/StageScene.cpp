@@ -66,6 +66,7 @@ void StageScene::Init()
 
     // 壁・照明・ヒューズ・扉などの配置はStage1Layoutが担当し、使うObjectのポインタをまとめて返します。
     m_Objects = Stage1Layout::Build(*game);
+    m_WallWritings.Init(m_Objects.writings);
 
     // シーン変更後の初回描画前にカメラとライトを更新します。
     // ImGuiでゲームを停止した場合も、面全体が黒くなることを防ぎます。
@@ -185,6 +186,7 @@ void StageScene::Update()
     UpdatePowerRestoreSequence();
     UpdateExitPowerSequence();
     UpdateExitOmen(*player);
+    UpdateWallWritings(*player);
 
     Door* stageExitDoor = m_Objects.exitDoor;
     ExitTrigger* stageExit = m_Objects.exitTrigger;

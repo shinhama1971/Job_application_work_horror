@@ -749,3 +749,29 @@ void StageScene::UpdateAmbientSounds()
             cue.Label, cue.Position, cue.Pitch, cue.Volume, cue.MinimumOcclusion);
     }
 }
+
+// ----------------------------------------------------------------------------
+// 懐中電灯で照らすと浮かぶ壁の文字
+// ループ廊下の「ふりかえるな」は、目を離した隙に「ふりかえったな」へ書き換わります。
+// それを読んだ瞬間、背後の天井裏を何かが歩いていき、振り返らせる流れを作ります。
+// ----------------------------------------------------------------------------
+void StageScene::UpdateWallWritings(Player& player)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    const Camera* camera = game->GetCamera();
+    const bool changedWritingRead = m_WallWritings.Update(
+        Application::GetDeltaTime(),
+        camera->GetPosition(),
+        camera->GetForward(),
+        player.IsFlashlightOn(),
+        game->IsPowerRestored());
+    if (!changedWritingRead)
+    {
+        return;
+    }
+
+    m_AmbientSounds.StartCeilingStepsNow(
+        game->IsPowerRestored(), camera->GetPosition(), camera->GetForward());
+    game->GetPostProcess()->TriggerHorrorPulse(0.22f, 0.36f);
+    Input::SetVibration(5, 0.16f);
+}

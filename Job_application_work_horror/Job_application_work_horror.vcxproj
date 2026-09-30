@@ -250,6 +250,8 @@
     <ClCompile Include="Stage1Objective.cpp" />
     <ClCompile Include="StageSurveillanceController.cpp" />
     <ClCompile Include="Stage1AmbientSounds.cpp" />
+    <ClCompile Include="Stage1WallWritings.cpp" />
+    <ClCompile Include="FlashlightWriting.cpp" />
     <ClCompile Include="StageSceneEvents.cpp" />
     <ClCompile Include="StageSceneDraw.cpp" />
     <ClCompile Include="Stage2Scene.cpp" />
@@ -346,6 +348,8 @@
     <ClInclude Include="Stage1Objective.h" />
     <ClInclude Include="StageSurveillanceController.h" />
     <ClInclude Include="Stage1AmbientSounds.h" />
+    <ClInclude Include="Stage1WallWritings.h" />
+    <ClInclude Include="FlashlightWriting.h" />
     <ClInclude Include="SceneLayoutBuilder.h" />
     <ClInclude Include="StageSurveillanceCameras.h" />
     <ClInclude Include="SurveillancePatrol.h" />
@@ -407,6 +411,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\litTexturePS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\flashlightRevealPS.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>

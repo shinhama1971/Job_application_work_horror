@@ -53,6 +53,13 @@ public:
         const DirectX::SimpleMath::Vector3& listenerForward,
         std::vector<AmbientSoundCue>& cues);
 
+    // 台本の演出から、天井裏の足音をすぐに始めます（壁の文字が書き換わった後など）。
+    // 次のランダムな物音はそこから数え直し、続けて鳴りすぎないようにします。
+    bool StartCeilingStepsNow(
+        bool powerRestored,
+        const DirectX::SimpleMath::Vector3& listenerPosition,
+        const DirectX::SimpleMath::Vector3& listenerForward);
+
     // デバッグ表示用。次の物音までの秒数です。
     float GetSecondsUntilNext() const { return m_WaitTimer; }
 
