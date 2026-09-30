@@ -722,6 +722,7 @@ bool StageScene::IsAmbientSoundAllowed() const
         !m_Surveillance.IsViewing() &&
         !m_Surveillance.IsCaughtActive() &&
         !m_ScareLightSequence.IsActive() &&
+        !m_HiddenRoom.IsTrapped() &&
         m_EntranceEventTimer < 0.0f &&
         m_StorageScarePhase != 1 &&
         m_FuseWatcherState != 1 &&

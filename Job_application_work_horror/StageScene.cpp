@@ -68,6 +68,7 @@ void StageScene::Init()
     m_Objects = Stage1Layout::Build(*game);
     m_WallWritings.Init(m_Objects.writings);
     m_KeypadDoor.Init(m_Objects.keypad);
+    m_HiddenRoom.Init(m_Objects.hiddenRoom);
 
     // シーン変更後の初回描画前にカメラとライトを更新します。
     // ImGuiでゲームを停止した場合も、面全体が黒くなることを防ぎます。
@@ -190,6 +191,7 @@ void StageScene::Update()
     UpdateExitPowerSequence();
     UpdateExitOmen(*player);
     UpdateWallWritings(*player);
+    m_HiddenRoom.Update(*player, deltaTime, m_KeypadDoor.IsSolved());
 
     Door* stageExitDoor = m_Objects.exitDoor;
     ExitTrigger* stageExit = m_Objects.exitTrigger;

@@ -249,6 +249,8 @@
     <ClCompile Include="Stage1WallWritings.cpp" />
     <ClCompile Include="FlashlightWriting.cpp" />
     <ClCompile Include="Stage1KeypadDoor.cpp" />
+    <ClCompile Include="Stage1HiddenRoomEvent.cpp" />
+    <ClCompile Include="KeyItem.cpp" />
     <ClCompile Include="StageSceneEvents.cpp" />
     <ClCompile Include="StageSceneDraw.cpp" />
     <ClCompile Include="Stage2Scene.cpp" />
@@ -348,6 +350,8 @@
     <ClInclude Include="Stage1WallWritings.h" />
     <ClInclude Include="FlashlightWriting.h" />
     <ClInclude Include="Stage1KeypadDoor.h" />
+    <ClInclude Include="Stage1HiddenRoomEvent.h" />
+    <ClInclude Include="KeyItem.h" />
     <ClInclude Include="KeypadLock.h" />
     <ClInclude Include="SceneLayoutBuilder.h" />
     <ClInclude Include="StageSurveillanceCameras.h" />

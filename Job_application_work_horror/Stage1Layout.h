@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "Stage1HiddenRoomEvent.h"
 #include "Stage1KeypadDoor.h"
 #include "Stage1WallWritings.h"
 #include "StageSurveillanceCameras.h"
@@ -60,6 +61,8 @@ struct StageObjects
     Stage1WallWritings::Writings writings{};
     // 暗証番号の扉・入力盤・番号の手がかり（任意探索）
     Stage1KeypadDoor::Parts keypad;
+    // 暗証番号の扉の先の部屋の閉じ込めイベント（鍵・記録端末・影。扉はkeypad.doorと同じ）
+    Stage1HiddenRoomEvent::Parts hiddenRoom;
 
     // 生成したすべてのObjectの名前。Sceneの終了時にこの一覧で破棄します。
     // 名前での破棄は、すでに破棄されたObjectに対しても安全です。将来、途中で破棄されるObjectを

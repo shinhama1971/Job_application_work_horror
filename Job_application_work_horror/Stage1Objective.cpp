@@ -32,6 +32,11 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
     {
         objectiveText = "ドアの先へ移動中";
     }
+    else if (!in.hiddenRoomText.empty())
+    {
+        // 隠し部屋に閉じ込められている間は、その場の状況だけを伝えます。
+        objectiveText = std::string(in.hiddenRoomText);
+    }
     else if (in.patrolDispatched)
     {
         // 現地確認中の残り時間と除去の進み具合は毎フレーム変わるため、ここで文章を組み立てます。
