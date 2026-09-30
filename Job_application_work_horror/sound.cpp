@@ -347,7 +347,8 @@ void Sound::SetMasterVolume(float volume)
 //=============================================================================
 // 立体音響（X3DAudio）
 //=============================================================================
-void Sound::PlayAt(SOUND_LABEL label, const Vector3& position, float pitch, float volume)
+void Sound::PlayAt(
+	SOUND_LABEL label, const Vector3& position, float pitch, float volume, float minimumOcclusion)
 {
 	if (!IsValidLabel(label) || m_pXAudio2 == nullptr)
 	{
@@ -409,7 +410,8 @@ void Sound::PlayAt(SOUND_LABEL label, const Vector3& position, float pitch, floa
 	slot->Label = label;
 	slot->Position = position;
 	// 鳴り始めから壁の向こうの音として聞こえるよう、最初の遮蔽量はその場で求めます。
-	slot->Occlusion = QueryOcclusion(position);
+	slot->MinimumOcclusion = (std::clamp)(minimumOcclusion, 0.0f, 1.0f);
+	slot->Occlusion = (std::max)(QueryOcclusion(position), slot->MinimumOcclusion);
 	slot->Voice->SetVolume(m_param[index].volume * (std::max)(volume, 0.0f));
 	slot->Voice->SetFrequencyRatio((std::clamp)(pitch, 0.50f, 1.50f));
 	ApplySpatialMix(*slot);
@@ -440,7 +442,8 @@ void Sound::UpdateListener(const SoundListener& listener, float deltaTime)
 		}
 
 		// 振り向いたり歩いたりして位置関係が変わった分を、鳴っている途中の音にも反映します。
-		const float targetOcclusion = QueryOcclusion(spatial.Position);
+		const float targetOcclusion =
+			(std::max)(QueryOcclusion(spatial.Position), spatial.MinimumOcclusion);
 		spatial.Occlusion += (targetOcclusion - spatial.Occlusion) * response;
 		ApplySpatialMix(spatial);
 	}
@@ -537,6 +540,7 @@ void Sound::ReleaseSpatialVoice(SpatialVoice& spatial)
 		spatial.Voice = nullptr;
 	}
 	spatial.Occlusion = 0.0f;
+	spatial.MinimumOcclusion = 0.0f;
 }
 
 void Sound::StopAllSpatial()

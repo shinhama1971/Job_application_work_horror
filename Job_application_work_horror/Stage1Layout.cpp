@@ -11,6 +11,7 @@
 #include "CeilingLight.h"
 #include "Door.h"
 #include "ExitTrigger.h"
+#include "FlashlightWriting.h"
 #include "FuseBox.h"
 #include "Game.h"
 #include "Ground.h"
@@ -110,9 +111,15 @@ namespace Stage1Layout
         wall12->SetPosition(-45.0f, -74.0f, 155.0f);
         wall12->SetScale(4.0f, 50.0f, 50.0f);
 
+        // 東側の壁は、暗証番号の扉（z=95〜125）の分だけ開けて2枚に分けます。
+        // 扉の先は、それまで入れなかった東側の部屋です。
         Wall* wall13 = builder.Create<Wall>("Wall13");
-        wall13->SetPosition(45.0f, -74.0f, 110.0f);
-        wall13->SetScale(4.0f, 50.0f, 140.0f);
+        wall13->SetPosition(45.0f, -74.0f, 67.5f);
+        wall13->SetScale(4.0f, 50.0f, 55.0f);
+
+        Wall* wall13North = builder.Create<Wall>("Wall13North");
+        wall13North->SetPosition(45.0f, -74.0f, 152.5f);
+        wall13North->SetScale(4.0f, 50.0f, 55.0f);
 
         // 脱出ホールを区切り、中央の開口部を廊下へ接続します。
         Wall* wall14 = builder.Create<Wall>("Wall14");
@@ -343,6 +350,86 @@ namespace Stage1Layout
             30.0f,
             false);
         stageExitSign->SetCastsShadow(false);
+
+        // 懐中電灯で照らしたときだけ浮かぶ壁の文字。進む道筋に沿って、目的の手がかりと不安を置きます。
+        // 位置は壁の表面、向きは壁から通路側へ向かう法線です。画像は横長(4:1)です。
+        const auto createWriting = [&builder](
+            const char* name,
+            const char* texture,
+            const char* alternateTexture,
+            const Vector3& surfaceCenter,
+            const Vector3& outwardNormal,
+            float width)
+        {
+            FlashlightWriting* writing = builder.Create<FlashlightWriting>(name);
+            writing->SetTextures(texture, alternateTexture);
+            writing->Place(surfaceCenter, outwardNormal, width, width * 0.25f);
+            return writing;
+        };
+        objects.writings[Stage1WallWritings::Warning] = createWriting(
+            "Stage1WritingWarning", "assets/texture/writing_warning.png", "",
+            Vector3(0.0f, -71.0f, -178.0f), Vector3(0.0f, 0.0f, 1.0f), 56.0f);
+        objects.writings[Stage1WallWritings::Three] = createWriting(
+            "Stage1WritingThree", "assets/texture/writing_three.png", "",
+            Vector3(-150.0f, -70.0f, -72.0f), Vector3(0.0f, 0.0f, -1.0f), 64.0f);
+        objects.writings[Stage1WallWritings::Power] = createWriting(
+            "Stage1WritingPower", "assets/texture/writing_power.png", "",
+            Vector3(-128.0f, -69.0f, 38.0f), Vector3(0.0f, 0.0f, -1.0f), 64.0f);
+        // ループ廊下を北へ進むと正面に見える突き当たりの壁。右へ曲がると目を離すことになります。
+        objects.writings[Stage1WallWritings::Turn] = createWriting(
+            "Stage1WritingTurn", "assets/texture/writing_turn.png",
+            "assets/texture/writing_turned.png",
+            Vector3(0.0f, -70.0f, 273.0f), Vector3(0.0f, 0.0f, -1.0f), 60.0f);
+
+        // 暗証番号の扉（任意探索）。中央の扉の先の細い廊下の東の壁にあり、ループ廊下へ向かうたびに目に入ります。
+        Door* keypadDoor = builder.Create<Door>("Stage1KeypadDoor");
+        keypadDoor->SetPosition(45.0f, -74.0f, 110.0f);
+        keypadDoor->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
+        keypadDoor->SetLocked(true);
+
+        FuseBox* keypadPanel = builder.Create<FuseBox>("Stage1KeypadPanel");
+        keypadPanel->SetManualControl("暗証番号を入力する");
+        keypadPanel->SetManualInteractionAllowed(true);
+        keypadPanel->SetPosition(41.5f, -80.0f, 135.0f);
+        keypadPanel->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
+
+        // 番号の手がかり。「ひとつめ」などの文字の右に、その桁の数字を書きます。
+        // 数字の画像は、番号を決めるStage1KeypadDoor::Initで差し替えます。
+        const auto createDigitClue = [&builder](
+            int order,
+            const Vector3& surfaceCenter,
+            const Vector3& outwardNormal)
+        {
+            const std::string number = std::to_string(order);
+            FlashlightWriting* label = builder.Create<FlashlightWriting>(
+                "Stage1KeypadClueLabel" + number);
+            label->SetTextures("assets/texture/writing_order" + number + ".png");
+            label->Place(surfaceCenter, outwardNormal, 40.0f, 10.0f);
+
+            // 文字を正面から見たときの右方向です。
+            const Vector3 right(-outwardNormal.z, 0.0f, outwardNormal.x);
+            FlashlightWriting* digit = builder.Create<FlashlightWriting>(
+                "Stage1KeypadClueDigit" + number);
+            digit->Place(surfaceCenter + right * 30.0f, outwardNormal, 20.0f, 20.0f);
+            return digit;
+        };
+        objects.keypad.panel = keypadPanel;
+        objects.keypad.door = keypadDoor;
+        objects.keypad.digitWritings = {
+            // 開始地点の東の壁（右の倉庫との仕切り）
+            createDigitClue(1, Vector3(88.0f, -70.0f, -130.0f), Vector3(-1.0f, 0.0f, 0.0f)),
+            // 左の倉庫の西の壁
+            createDigitClue(2, Vector3(-218.0f, -70.0f, -155.0f), Vector3(1.0f, 0.0f, 0.0f)),
+            // 中央ホールの南の壁
+            createDigitClue(3, Vector3(120.0f, -70.0f, -68.0f), Vector3(0.0f, 0.0f, 1.0f)),
+            // 右の倉庫の東の壁
+            createDigitClue(4, Vector3(218.0f, -70.0f, -135.0f), Vector3(-1.0f, 0.0f, 0.0f)) };
+
+        // 扉の先の部屋: 予備の電池と、入った者を迎える文字を置きます。
+        BatteryItem* hiddenBattery = builder.Create<BatteryItem>("Stage1KeypadRoomBattery");
+        hiddenBattery->SetPosition(140.0f, -95.0f, 110.0f);
+        createWriting("Stage1KeypadRoomWriting", "assets/texture/writing_watched.png", "",
+            Vector3(218.0f, -70.0f, 70.0f), Vector3(-1.0f, 0.0f, 0.0f), 64.0f);
 
         ExitTrigger* exit = builder.Create<ExitTrigger>("ExitTrigger");
         exit->SetPosition(207.0f, -80.0f, 307.5f);

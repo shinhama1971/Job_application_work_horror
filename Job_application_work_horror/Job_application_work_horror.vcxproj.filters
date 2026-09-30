@@ -237,6 +237,18 @@
     <ClCompile Include="StageSurveillanceController.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="Stage1AmbientSounds.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Stage1WallWritings.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="FlashlightWriting.cpp">
+      <Filter>ソース ファイル\Gameplay</Filter>
+    </ClCompile>
+    <ClCompile Include="Stage1KeypadDoor.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="ResultScene.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
@@ -530,6 +542,21 @@
     <ClInclude Include="StageSurveillanceController.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
+    <ClInclude Include="Stage1AmbientSounds.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Stage1WallWritings.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="FlashlightWriting.h">
+      <Filter>ソース ファイル\Gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="Stage1KeypadDoor.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="KeypadLock.h">
+      <Filter>ソース ファイル\Gameplay</Filter>
+    </ClInclude>
     <ClInclude Include="SceneLayoutBuilder.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
@@ -575,6 +602,9 @@
       <Filter>リソース ファイル</Filter>
     </FxCompile>
     <FxCompile Include="shader\signalPanelPS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\flashlightRevealPS.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>
     <FxCompile Include="shader\litTextureVS.hlsl">

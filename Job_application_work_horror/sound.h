@@ -25,6 +25,7 @@ typedef enum
 	SOUND_CUE_FOOTSTEP,     // 歩行・走行に同期する足音
 	SOUND_CUE_WATER_STEP,   // 水たまりを踏んだときの水音
 	SOUND_CUE_FLASHLIGHT,   // 懐中電灯スイッチのクリック音
+	SOUND_CUE_PIPE_KNOCK,   // 配管を叩いたような金属音（tools/generate-pipe-knock.ps1で合成）
 
 	SOUND_LABEL_MAX,
 } SOUND_LABEL;
@@ -57,6 +58,7 @@ private:
 		{"assets/Audio/footstep.wav", false, 0.40f},
 		{"assets/Audio/water_step.wav", false, 0.52f},
 		{"assets/Audio/flashlight_click.wav", false, 0.54f},
+		{"assets/Audio/pipe_knock.wav", false, 0.50f},
 	};
 
 	// XAudio2本体はCOMのためComPtrで管理します。ボイスはCOMではなくDestroyVoiceで解放します。
@@ -92,6 +94,7 @@ private:
 		SOUND_LABEL Label = SOUND_CUE_AMBIENCE_STAGE1;
 		DirectX::SimpleMath::Vector3 Position;
 		float Occlusion = 0.0f;		// 急に切り替わらないよう、毎フレーム目標値へ近づけます
+		float MinimumOcclusion = 0.0f;	// 壁の判定に関係なく、最低でもこれだけこもらせます（天井裏の音など）
 	};
 
 	X3DAUDIO_HANDLE m_X3DAudio{};
@@ -133,11 +136,13 @@ public:
 
 	// ワールド上の位置から効果音を鳴らします。聞き手との位置関係で左右・距離・遮蔽が変わります。
 	// volume は素材ごとの音量に掛ける倍率です。
+	// minimumOcclusion（0〜1）を指定すると、壁がなくてもその分こもって聞こえます（天井裏・床下の音など）。
 	void PlayAt(
 		SOUND_LABEL label,
 		const DirectX::SimpleMath::Vector3& position,
 		float pitch = 1.0f,
-		float volume = 1.0f);
+		float volume = 1.0f,
+		float minimumOcclusion = 0.0f);
 
 	// 毎フレーム、カメラの位置と向きを渡して、鳴っている音の聞こえ方を更新します。
 	void UpdateListener(const SoundListener& listener, float deltaTime);

@@ -14,6 +14,7 @@
 #include "StageSurveillanceController.h"
 #include "Stage1Layout.h"
 #include "Stage1Objective.h"
+#include "Stage1AmbientSounds.h"
 
 #include <array>
 #include <cstddef>
@@ -38,6 +39,11 @@ private:
     void SetupPracticalLights();
     // 目的表示の文章を選ぶために、今の状態を集めます（StageSceneDraw.cpp）。
     Stage1ObjectiveInput MakeObjectiveInput() const;
+    // 姿の見えない物音を鳴らしてよいか（台本の演出や監視映像と重ならないか）を判断します。
+    bool IsAmbientSoundAllowed() const;
+    void UpdateAmbientSounds();
+    // 懐中電灯で照らすと浮かぶ壁の文字。書き換わった文字を読んだら物音の演出を起こします。
+    void UpdateWallWritings(class Player& player);
 
     StageObjects m_Objects;
 
@@ -60,6 +66,13 @@ private:
     Hud m_Hud;
     // 監視カメラ巡回（映像・報告・現地確認・捕獲）はこのクラスに任せ、Sceneは呼び出すだけです。
     StageSurveillanceController m_Surveillance;
+    // 天井裏の足音・配管を叩く音・遠くの扉。いつどこで鳴らすかはこのクラスが決めます。
+    Stage1AmbientSounds m_AmbientSounds;
+    std::vector<AmbientSoundCue> m_AmbientCues;
+    // 壁の文字を読んだか、いつ書き換えるかを管理します（文字のObjectはStage1Layoutが配置）。
+    Stage1WallWritings m_WallWritings;
+    // 暗証番号の扉。入力画面の操作と、番号の手がかりの配置を管理します。
+    Stage1KeypadDoor m_KeypadDoor;
     ScareLightSequence m_ScareLightSequence;
     StagePowerSequence m_PowerSequence;
     ExitOmenSequence m_ExitOmenSequence;

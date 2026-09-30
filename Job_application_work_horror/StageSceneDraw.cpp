@@ -126,6 +126,7 @@ void StageScene::Draw(Camera* camera)
     {
         m_Hud.DrawBlink(m_Surveillance.GetCaughtFadeRate() * 0.96f);
     }
+    m_KeypadDoor.Draw(m_Hud);
 
     if (game->IsPaused())
     {

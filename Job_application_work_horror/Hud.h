@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <array>
 #include <string_view>
 #include <vector>
 
@@ -67,6 +68,12 @@ public:
         bool showingReference,
         bool reportReady,
         bool wrongReportVisible);
+    // 暗証番号の入力画面。wrongRateは不正解の直後に1から0へ下がり、枠を赤く点滅させます。
+    void DrawKeypad(
+        const std::array<int, 4>& entered,
+        int cursor,
+        float wrongRate,
+        int mistakes);
     void DrawQuietRecovery(float progressRate, float cooldown, bool success, bool tooClose);
     void DrawPause(
         int brightnessLevel,

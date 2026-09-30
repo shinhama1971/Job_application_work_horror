@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "Stage1KeypadDoor.h"
+#include "Stage1WallWritings.h"
 #include "StageSurveillanceCameras.h"
 
 #include <array>
@@ -52,6 +54,10 @@ struct StageObjects
     Item* thirdFuse = nullptr;
     std::array<CeilingLight*, CeilingLightCount> ceilingLights{};
     std::array<Door*, StageSealedDoorCount> sealedDoors{};
+    // 懐中電灯で照らすと浮かぶ壁の文字（並びはStage1WallWritings::Index）
+    Stage1WallWritings::Writings writings{};
+    // 暗証番号の扉・入力盤・番号の手がかり（任意探索）
+    Stage1KeypadDoor::Parts keypad;
 
     // 生成したすべてのObjectの名前。Sceneの終了時にこの一覧で破棄します。
     // 名前での破棄は、すでに破棄されたObjectに対しても安全です。将来、途中で破棄されるObjectを

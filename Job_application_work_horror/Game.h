@@ -122,15 +122,17 @@ namespace Core
         }
 
         // ワールド上の位置から鳴らします。カメラとの位置関係で左右・距離・壁越しの聞こえ方が変わります。
+        // minimumOcclusion を指定すると、壁がなくても天井越しのようにこもって聞こえます。
         void PlayAudioCueAt(
             SOUND_LABEL label,
             const DirectX::SimpleMath::Vector3& position,
             float pitch = 1.0f,
-            float volume = 1.0f)
+            float volume = 1.0f,
+            float minimumOcclusion = 0.0f)
         {
             if (m_SoundReady)
             {
-                m_Sound.PlayAt(label, position, pitch, volume);
+                m_Sound.PlayAt(label, position, pitch, volume, minimumOcclusion);
             }
         }
 
