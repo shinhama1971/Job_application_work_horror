@@ -102,6 +102,10 @@ void Stage2Scene::Init()
     m_ClockAnomaly.Reset();
     // 1周目・2周目に探させる異変を、偽ドア・時計・肖像画から毎回ランダムに選びます。
     m_AnomalyPlan.Randomize(m_PresenceRandom);
+    // 今回出る異変は、リザルト画面の「今回の異変」に出します。
+    game->SetStage2Anomalies(
+        static_cast<int>(m_AnomalyPlan.GetRequired(1)),
+        static_cast<int>(m_AnomalyPlan.GetRequired(2)));
     m_PuzzleFeedback.Reset();
     m_NoiseThreatSystem.Reset();
     // 最初の気配は周回に慣れた頃に出します。

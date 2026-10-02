@@ -10,6 +10,12 @@ namespace Core
 {
     class GameState final
     {
+    public:
+        // 残された記録の総数（1面の監視カメラ巡回・1面の隠し部屋の記録端末・2面の端末2台）。
+        static constexpr int TotalEvidenceCount = 4;
+        // 1面の懐中電灯で浮かぶ壁の文字のうち、読んだ数を数える対象の数（Stage1WallWritings::Count）。
+        static constexpr int TotalWallWritingCount = 4;
+
     private:
         // 1プレイ分の進行値。面のやり直しで丸ごと巻き戻せるようにまとめています。
         struct RunProgress
@@ -21,7 +27,11 @@ namespace Core
             int AnomaliesHandled = 0;    // 2面で対処した異変の数
             int PuzzleMistakes = 0;      // 2面の信号盤パズルなどでの失敗回数
             int ChargersUsed = 0;        // 2面で懐中電灯の充電器を使った回数
-            int EvidenceCollected = 0;   // 2面で回収した記録の数
+            int EvidenceCollected = 0;   // 1面・2面で回収した記録の数（TotalEvidenceCount個まで）
+            int WallWritingsRead = 0;    // 1面で読んだ壁の文字の数
+            bool HiddenRoomEscaped = false; // 1面の隠し部屋から鍵で脱出したか
+            int Stage2FirstAnomaly = 0;  // 2面の1周目・2周目に出た異変（Stage2Anomalyの値）
+            int Stage2SecondAnomaly = 0;
         };
 
         RunProgress m_Run;
@@ -96,6 +106,17 @@ namespace Core
         void RegisterPuzzleMistake() { ++m_Run.PuzzleMistakes; }
         void RegisterChargerUsed() { ++m_Run.ChargersUsed; }
         void RegisterEvidenceCollected() { ++m_Run.EvidenceCollected; }
+        // 読んだ数は減らないため、多い方だけを残します。
+        void SetWallWritingsRead(int count)
+        {
+            m_Run.WallWritingsRead = count > m_Run.WallWritingsRead ? count : m_Run.WallWritingsRead;
+        }
+        void RegisterHiddenRoomEscaped() { m_Run.HiddenRoomEscaped = true; }
+        void SetStage2Anomalies(int first, int second)
+        {
+            m_Run.Stage2FirstAnomaly = first;
+            m_Run.Stage2SecondAnomaly = second;
+        }
 
         int GetItemCount() const { return m_Run.ItemCount; }
         bool IsPowerRestored() const { return m_Run.PowerRestored; }
@@ -106,6 +127,10 @@ namespace Core
         int GetPuzzleMistakes() const { return m_Run.PuzzleMistakes; }
         int GetChargersUsed() const { return m_Run.ChargersUsed; }
         int GetEvidenceCollected() const { return m_Run.EvidenceCollected; }
+        int GetWallWritingsRead() const { return m_Run.WallWritingsRead; }
+        bool IsHiddenRoomEscaped() const { return m_Run.HiddenRoomEscaped; }
+        int GetStage2FirstAnomaly() const { return m_Run.Stage2FirstAnomaly; }
+        int GetStage2SecondAnomaly() const { return m_Run.Stage2SecondAnomaly; }
         float GetBestClearTimeSeconds() const { return m_BestClearTimeSeconds; }
         int GetBestCaughtCount() const { return m_BestCaughtCount; }
         bool HasClearRecord() const { return m_HasClearRecord; }

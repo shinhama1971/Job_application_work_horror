@@ -323,6 +323,13 @@ namespace Core
         int GetChargersUsed() const { return m_State.GetChargersUsed(); }
         void RegisterEvidenceCollected() { m_State.RegisterEvidenceCollected(); }
         int GetEvidenceCollected() const { return m_State.GetEvidenceCollected(); }
+        void SetWallWritingsRead(int count) { m_State.SetWallWritingsRead(count); }
+        int GetWallWritingsRead() const { return m_State.GetWallWritingsRead(); }
+        void RegisterHiddenRoomEscaped() { m_State.RegisterHiddenRoomEscaped(); }
+        bool IsHiddenRoomEscaped() const { return m_State.IsHiddenRoomEscaped(); }
+        void SetStage2Anomalies(int first, int second) { m_State.SetStage2Anomalies(first, second); }
+        int GetStage2FirstAnomaly() const { return m_State.GetStage2FirstAnomaly(); }
+        int GetStage2SecondAnomaly() const { return m_State.GetStage2SecondAnomaly(); }
 
         // --- 描画システムへのアクセス。所有権はGameにあり、返すポインタは非所有です ---
         Camera* GetCamera()
