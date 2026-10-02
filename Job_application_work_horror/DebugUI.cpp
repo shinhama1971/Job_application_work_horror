@@ -351,7 +351,8 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             ImGui::Separator();
         }
 
-        const char* debugViews[] = { "Final", "World normals", "Flashlight shadow", "Lighting only", "Puddle mask", "Planar reflection", "Wall damp mask", "Light tiles (lights per 16x16 tile)" };
+        // 番号はシェーダーのDebugViewModeと対応します（8のフルブライトはcommon.hlslのDEBUG_VIEW_FULLBRIGHT）。
+        const char* debugViews[] = { "Final", "World normals", "Flashlight shadow", "Lighting only", "Puddle mask", "Planar reflection", "Wall damp mask", "Light tiles (lights per 16x16 tile)", "Fullbright (照明・影・霧なしで全体を明るく)" };
         ImGui::Combo("Shader debug view", &g_DebugViewMode,
             debugViews, IM_ARRAYSIZE(debugViews));
         const char* reflectionRates[] =

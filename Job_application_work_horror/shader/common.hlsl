@@ -154,3 +154,17 @@ cbuffer TextureBuffer : register(b5)
 {
     matrix matrixTex;
 }
+
+// ----------------------------------------------------------------------------
+// デバッグ表示8: フルブライト（DebugUIの「Shader debug view」で選択）
+// 照明・影・霧を無視し、元の色に「面がカメラを向いているか」だけの陰影を付けて表示します。
+// 暗い場所の配置（アイテムが埋まっていないか、壁の文字の位置など）を確認するためのものです。
+// DebugUIはDebug構成だけなので、Release版の見た目には影響しません。
+// ----------------------------------------------------------------------------
+static const int DEBUG_VIEW_FULLBRIGHT = 8;
+
+float4 GetFullbrightColor(float3 baseColor, float3 viewNormal, float3 viewPosition)
+{
+    const float facing = abs(dot(normalize(viewNormal), normalize(-viewPosition)));
+    return float4(baseColor * (0.60f + 0.40f * facing) * 1.35f + Material.Emission.rgb, 1.0f);
+}
