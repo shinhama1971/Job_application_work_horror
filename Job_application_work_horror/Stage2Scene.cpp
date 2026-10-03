@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "Stage2Scene.h"
+#include "Locker.h"
 #include "Application.h"
 
 #include "BatteryItem.h"
@@ -332,6 +333,16 @@ void Stage2Scene::Update()
     UpdateFalseDoorAnomaly(*player);
     UpdateClock(deltaTime);
     UpdateClockObservation();
+    // ロッカーは周回中だけ使えます（信号盤パズルと最後の追跡では、隠れずに対処させるため）。
+    const bool lockersUsable = m_LoopCount < 3 &&
+        !m_FinalSequence.IsSequenceActive() && !m_FinalSequence.IsPursuitActive();
+    for (Locker* locker : m_Objects.lockers)
+    {
+        if (locker != nullptr)
+        {
+            locker->SetUsable(lockersUsable);
+        }
+    }
     UpdateNoiseThreat(*player, deltaTime);
     UpdateBehindPresence(*player, deltaTime);
 

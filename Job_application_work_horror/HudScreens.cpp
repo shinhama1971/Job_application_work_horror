@@ -826,6 +826,48 @@ void Hud::DrawKeypad(
     Flush();
 }
 
+void Hud::DrawHidingView(float elapsedSeconds, float dangerRate)
+{
+    m_Vertices.clear();
+    const float screenWidth = static_cast<float>(Application::GetWidth());
+    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float danger = (std::clamp)(dangerRate, 0.0f, 1.0f);
+    const Color dark(0.0f, 0.0f, 0.0f, 0.94f);
+    const Color edge(0.10f + danger * 0.35f, 0.02f, 0.02f, 0.55f);
+
+    // 画面の中央付近に4本の横長の隙間を残し、それ以外を扉の内側の暗さで覆います。
+    // 呼吸に合わせて、隙間がわずかに上下します。
+    constexpr int SlitCount = 4;
+    const float slitHeight = screenHeight * 0.055f;
+    const float slitGap = screenHeight * 0.035f;
+    const float breath = std::sin(elapsedSeconds * 1.6f) * screenHeight * 0.004f;
+    const float firstSlitY = screenHeight * 0.36f + breath;
+    const float slitInset = screenWidth * 0.12f;
+
+    float coveredY = 0.0f;
+    for (int index = 0; index < SlitCount; ++index)
+    {
+        const float slitY = firstSlitY + static_cast<float>(index) * (slitHeight + slitGap);
+        AddRectangle(0.0f, coveredY, screenWidth, slitY - coveredY, dark);
+        AddRectangle(0.0f, slitY, slitInset, slitHeight, dark);
+        AddRectangle(screenWidth - slitInset, slitY, slitInset, slitHeight, dark);
+        AddRectangle(slitInset, slitY, screenWidth - slitInset * 2.0f, 2.0f, edge);
+        AddRectangle(slitInset, slitY + slitHeight - 2.0f, screenWidth - slitInset * 2.0f, 2.0f, edge);
+        coveredY = slitY + slitHeight;
+    }
+    AddRectangle(0.0f, coveredY, screenWidth, screenHeight - coveredY, dark);
+
+    const std::string_view prompt = Input::IsControllerConnected()
+        ? "A 外に出る"
+        : "E 外に出る";
+    constexpr float promptPixelSize = 2.2f;
+    const float promptWidth =
+        static_cast<float>(CountDisplayedCharacters(prompt)) * promptPixelSize * 6.0f;
+    AddText((screenWidth - promptWidth) * 0.5f, screenHeight - 90.0f,
+        prompt, promptPixelSize, Color(0.62f, 0.70f, 0.66f, 0.80f));
+    Flush();
+}
+
 void Hud::DrawQuietRecovery(float progressRate, float cooldown, bool success, bool tooClose)
 {
     m_Vertices.clear();

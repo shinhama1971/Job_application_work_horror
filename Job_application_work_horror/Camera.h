@@ -85,6 +85,12 @@ public:
         return m_CameraDirection;
     }
 
+    // 隠れ場所に入ったときなど、向きを直接決めるときに使います。
+    void SetCameraDirection(float direction)
+    {
+        m_CameraDirection = direction;
+    }
+
     // 上下の向き（ピッチ、ラジアン）です。
     float GetCameraPitch() const
     {

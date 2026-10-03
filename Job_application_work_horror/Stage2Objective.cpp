@@ -133,6 +133,16 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
     {
         objective = "捕まった チェックポイントへ戻る";
     }
+    else if (in.hiding)
+    {
+        objective = in.noiseShadowActive
+            ? "息を潜める 影が去るまで動かない"
+            : "ロッカーに隠れている";
+    }
+    else if (in.hidingNotice)
+    {
+        objective = "影は見失って去った 外へ出て進む";
+    }
     else if (in.presenceTooClose)
     {
         objective = "影が近すぎる 距離を取りライトを消して止まる";
@@ -187,7 +197,7 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
     else if (in.stalkerNotice)
     {
         objective = in.noiseShadowActive
-            ? "水音を聞いた影が来る 振り返ってライトを当てる"
+            ? "水音を聞いた影が来る ライトを当てるかロッカーに隠れる"
             : "影を追い払った 静かに進む";
     }
     else if (in.wetStepNotice)

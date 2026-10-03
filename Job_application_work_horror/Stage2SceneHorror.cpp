@@ -382,6 +382,9 @@ void Stage2Scene::StartCaughtSequence(
 
     m_QuietRecovery.Reset();
     m_FinalSequence.StopForCaught();
+    // ロッカーの中で捕まった場合も、外へ出た扱いにしてからチェックポイントへ戻します。
+    player.ForceExitHiding();
+    m_HiddenStalkerTimer = -1.0f;
     player.SetCanControl(false);
 
     Core::Game* game = Core::Game::GetInstance();
@@ -804,8 +807,10 @@ bool Stage2Scene::IsBehindPresenceAllowed() const
     const bool otherFigureActive =
         (m_Objects.shadow != nullptr && m_Objects.shadow->IsActive()) ||
         (m_Objects.noiseShadow != nullptr && m_Objects.noiseShadow->IsActive());
+    const bool hiding = m_Objects.player != nullptr && m_Objects.player->IsHiding();
     return m_LoopCount >= 1 &&
         !otherFigureActive &&
+        !hiding &&
         m_LoopTransitionTimer < 0.0f &&
         !m_ObservedScareSequence.IsActive() &&
         !m_FinalSequence.IsSequenceActive() &&

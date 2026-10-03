@@ -64,6 +64,18 @@ private:
     bool m_SpawnAdjusted = false;           // 初期位置の床補正が完了したか
     bool m_CanControl = true;
     bool m_SprintAllowed = true;
+
+    // ===== 隠れ場所（ロッカー） =====
+    // 隠れている間は移動できず、懐中電灯も点けられません。視点は扉の正面から左右に少しだけ動かせます。
+    static constexpr float HidingLookRange = 0.65f;     // 扉の正面から左右に見回せる角度（ラジアン）
+    static constexpr float HidingInputDelay = 0.35f;    // 入った直後・出た直後に同じキーで出入りしないための待ち
+    bool m_IsHiding = false;
+    DirectX::SimpleMath::Vector3 m_HidePosition;        // 隠れている間の足元の位置
+    DirectX::SimpleMath::Vector3 m_HideExitPosition;    // 外へ出たときに立つ位置
+    float m_HideFacing = 0.0f;                          // 扉の正面の向き（ヨー）
+    float m_HidingInputTimer = 0.0f;
+
+    void UpdateHiding(Camera& camera, float deltaTime);
 public:
     void Init() override;
     void Update() override;
@@ -147,5 +159,19 @@ public:
     bool IsFlashlightOn() const
     {
         return m_Flashlight.IsOn();
+    }
+
+    // ロッカーに入ります。hidePositionは隠れている間の足元、exitPositionは出たときに立つ位置、
+    // facingは扉の正面の向き（ヨー）です。懐中電灯は自動で消えます。
+    void EnterHiding(
+        const DirectX::SimpleMath::Vector3& hidePosition,
+        const DirectX::SimpleMath::Vector3& exitPosition,
+        float facing);
+    bool IsHiding() const { return m_IsHiding; }
+    // 捕まったときなど、その場でロッカーから出た扱いにします（位置は呼び出し側が決めます）。
+    void ForceExitHiding()
+    {
+        m_IsHiding = false;
+        m_HidingInputTimer = HidingInputDelay;
     }
 };

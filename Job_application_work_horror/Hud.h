@@ -74,6 +74,9 @@ public:
         int cursor,
         float wrongRate,
         int mistakes);
+    // ロッカーに隠れている間の視界。扉の横長の隙間以外を暗くし、出る操作を表示します。
+    // dangerRateは影の近さ（0〜1）で、近いほど隙間の縁が赤くにじみます。
+    void DrawHidingView(float elapsedSeconds, float dangerRate);
     void DrawQuietRecovery(float progressRate, float cooldown, bool success, bool tooClose);
     void DrawPause(
         int brightnessLevel,

@@ -25,6 +25,7 @@ class FuseBox;
 class Wall;
 class BatteryItem;
 class CeilingLight;
+class Locker;
 
 // 2面の廊下照明。演出テーブルは名前文字列ではなくこの値で照明を指定します。
 enum class Stage2Light
@@ -56,6 +57,8 @@ struct Stage2Objects
     ShadowMan* shadow = nullptr;
     ShadowMan* noiseShadow = nullptr;
     ShadowMan* presence = nullptr;      // 背後の気配
+    // 隠れられるロッカー（左の壁と右の壁に1つずつ）
+    std::array<Locker*, 2> lockers{};
     FuseBox* confirmationPanel = nullptr;
     FuseBox* emergencyCharger = nullptr;
     BatteryItem* battery = nullptr;

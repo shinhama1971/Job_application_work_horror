@@ -83,6 +83,8 @@ private:
     void ResetSignalPuzzle();
     void UpdateBehindPresence(Player& player, float deltaTime);
     bool IsBehindPresenceAllowed() const;
+    // ロッカーに隠れている間の足音の影の振る舞い。trueを返したらUpdateNoiseThreatを終えます。
+    bool UpdateHiddenFromStalker(Player& player, float deltaTime);
 
     Stage2Objects m_Objects;
 
@@ -109,6 +111,8 @@ private:
 
     // timerが負数なら未実行、0以上なら対応する演出シーケンスが進行中です。
     int m_LoopCount = 0;
+    // ロッカーに隠れて影に見失わせてから、影が去るまでの残り秒数（負なら見失わせていない）。
+    float m_HiddenStalkerTimer = -1.0f;
     float m_LoopCooldown = 0.0f;
     // 周回・充電器・記録・信号盤の一時的な通知。表示する文章はSelectStage2Objectiveが選びます。
     Stage2Notices m_Notices;
