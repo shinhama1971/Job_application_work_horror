@@ -258,6 +258,9 @@
     <ClCompile Include="Locker.cpp">
       <Filter>ソース ファイル\Gameplay</Filter>
     </ClCompile>
+    <ClCompile Include="CaptureMode.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="ResultScene.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
@@ -577,6 +580,9 @@
     </ClInclude>
     <ClInclude Include="Locker.h">
       <Filter>ソース ファイル\Gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="CaptureMode.h">
+      <Filter>ソース ファイル</Filter>
     </ClInclude>
     <ClInclude Include="KeypadLock.h">
       <Filter>ソース ファイル\Gameplay</Filter>

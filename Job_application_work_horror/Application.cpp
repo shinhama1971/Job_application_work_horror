@@ -9,6 +9,8 @@
 #include "Application.h"
 #include "Game.h"
 #include "DebugUI.h"
+#include "CaptureMode.h"
+#include <objbase.h>
 
 namespace
 {
@@ -44,6 +46,14 @@ Application::~Application()
 //-----------------------------------------------------------------------------
 void Application::Run()
 {
+    // 起動オプション --capture <出力フォルダ> があれば、自動撮影モードにします。
+    Tools::CaptureMode::ConfigureFromCommandLine();
+    if (Tools::CaptureMode::IsActive())
+    {
+        // スクリーンショットの保存（WIC）にCOMを使います。
+        (void)CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    }
+
     //初期化
     bool okfg = InitApp();
     if (okfg) { MainLoop(); }
@@ -88,6 +98,13 @@ bool Application::InitApp()
     // 全画面時も全レンダーターゲットを同じ大きさに保つためです。
     m_Width = static_cast<uint32_t>(GetSystemMetrics(SM_CXSCREEN));
     m_Height = static_cast<uint32_t>(GetSystemMetrics(SM_CYSCREEN));
+    // 自動撮影モードは、動画の大きさ（720p）で描きます。計測モードは実際に遊ぶときと同じモニターの解像度のままです。
+    const bool capturing = Tools::CaptureMode::IsActive();
+    if (capturing && !Tools::CaptureMode::IsBenchmark())
+    {
+        m_Width = Tools::CaptureMode::Width;
+        m_Height = Tools::CaptureMode::Height;
+    }
 
     // ウィンドウのサイズを設定
     RECT rc = {};
@@ -97,13 +114,18 @@ bool Application::InitApp()
     // ウィンドウサイズを調整
     auto style = WS_POPUP | WS_MINIMIZEBOX;
 
+    // 自動撮影モードは、作業の邪魔にならないよう画面の外（全モニターの左端よりさらに左）に置きます。
+    const int windowX = capturing
+        ? GetSystemMetrics(SM_XVIRTUALSCREEN) - static_cast<int>(m_Width) - 64
+        : 0;
+
     // ウィンドウを生成
     m_hWnd = CreateWindowEx(
         WS_EX_APPWINDOW,
         ClassName,
         WindowName,
         style,
-        0,
+        windowX,
         0,
         rc.right - rc.left,
         rc.bottom - rc.top,
@@ -117,14 +139,17 @@ bool Application::InitApp()
         return false;
     }
 
-    // ウィンドウを表示
-    ShowWindow(m_hWnd, SW_SHOW);
+    // ウィンドウを表示（自動撮影モードは前面に出さず、フォーカスも奪いません）
+    ShowWindow(m_hWnd, capturing ? SW_SHOWNOACTIVATE : SW_SHOW);
 
     // ウィンドウを更新
     UpdateWindow(m_hWnd);
 
     // ウィンドウにフォーカスを設定
-    SetFocus(m_hWnd);
+    if (!capturing)
+    {
+        SetFocus(m_hWnd);
+    }
 
     // 正常終了
     return true;
@@ -195,6 +220,11 @@ void Application::MainLoop()
         }
 
         m_DeltaTime = static_cast<float>(frameTime.count());
+        // 自動撮影モードは1フレーム=1/30秒で進め、動画が実際の速さで再生されるようにします。
+        if (Tools::CaptureMode::IsActive())
+        {
+            m_DeltaTime = Tools::CaptureMode::FrameSeconds;
+        }
         Core::Game::Update();
         Core::Game::Draw();
     }

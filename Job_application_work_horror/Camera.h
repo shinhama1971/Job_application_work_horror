@@ -91,6 +91,17 @@ public:
         m_CameraDirection = direction;
     }
 
+    void SetCameraPitch(float pitch)
+    {
+        m_CameraPitch = pitch;
+    }
+
+    // falseの間はマウスで視点を動かしません（自動撮影モードで使います）。
+    void SetMouseLookEnabled(bool enabled)
+    {
+        m_MouseLookEnable = enabled;
+    }
+
     // 上下の向き（ピッチ、ラジアン）です。
     float GetCameraPitch() const
     {

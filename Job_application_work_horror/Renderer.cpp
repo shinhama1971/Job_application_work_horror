@@ -6,7 +6,9 @@
 
 #include "Renderer.h"
 #include "Application.h"
+#include "CaptureMode.h"
 #include <wrl/client.h>
+#include <chrono>
 
 
 using namespace DirectX::SimpleMath;
@@ -413,7 +415,26 @@ void Renderer::DrawStart()
 //--------------------------------------------------------------------------------------
 void Renderer::DrawEnd()
 {
+	// 自動撮影モード（--capture）のときだけ、描き終えた画面を動画と静止画に書き出します。
+	if (Tools::CaptureMode::IsActive())
+	{
+		Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
+		if (SUCCEEDED(m_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer))))
+		{
+			Tools::CaptureMode::OnFrameRendered(m_pDeviceContext.Get(), backBuffer.Get());
+		}
+	}
+
 	// ダブルバッファの切り替えを行い画面を更新する
+	// 計測モード（--benchmark）は垂直同期を待たず、本来の処理時間を測れるようにします。
+	if (Tools::CaptureMode::IsBenchmark())
+	{
+		const auto presentStart = std::chrono::steady_clock::now();
+		m_pSwapChain->Present(0, 0);
+		Tools::CaptureMode::OnPresentTimed(std::chrono::duration<double, std::milli>(
+			std::chrono::steady_clock::now() - presentStart).count());
+		return;
+	}
 	m_pSwapChain->Present(1, 0);
 }
 

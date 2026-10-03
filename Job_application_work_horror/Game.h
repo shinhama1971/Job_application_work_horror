@@ -111,6 +111,7 @@ namespace Core
         // シーン切り替えを予約します。実際の切り替えはUpdateの最後に行うため、
         // Objectの更新中に呼んでも安全です。同じフレームの2回目以降の予約は無視します。
         void RequestSceneChange(SceneName sName);
+        SceneName GetCurrentSceneName() const { return m_CurrentScene; }
 
         // 音声初期化に失敗したPCでもゲームを続行できる安全な再生窓口です。
         void PlayAudioCue(SOUND_LABEL label, float pitch = 1.0f)

@@ -109,6 +109,22 @@ Game
 - Debug x64：警告レベル /W4 で警告0、エラー0
 - Debug実行ファイル：起動スモークテスト済み
 
+## 作業報告用の自動撮影
+
+`tools/capture-daily.ps1` を実行すると、Release版を `--capture` オプション付きで起動し、1面・2面を決めた道順で自動で見て回りながら、
+プレイ動画（MP4）とスクリーンショット（PNG）を `daily_report\<日付>\` に保存します（`CaptureMode`）。
+キー入力を送らずゲーム内でプレイヤーと視点を動かし、ウィンドウは画面の外に置いて音も出さないため、撮影中も他の作業を続けられます。
+
+## 処理の重さの計測
+
+`--benchmark <出力フォルダ>` を付けて起動すると、モニターと同じ解像度・垂直同期なしで1面の6地点に順に立ち、
+懐中電灯を消した状態と点けた状態のフレーム時間・CPU時間・描画の段階ごとのGPU時間（Timestamp Query）を測って
+`benchmark_result.txt` に書き出します。画面の外で動くため、計測中も他の作業を続けられます。
+
+```bash
+x64/Release/Job_application_work_horror.exe --benchmark ../benchmark
+```
+
 ## セーブデータ
 
 設定（`settings.txt`）とベスト記録（`best_record.txt`）は `%LOCALAPPDATA%\SignalLost\` に保存します。

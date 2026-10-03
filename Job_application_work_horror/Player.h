@@ -168,6 +168,14 @@ public:
         const DirectX::SimpleMath::Vector3& exitPosition,
         float facing);
     bool IsHiding() const { return m_IsHiding; }
+    // 懐中電灯を点けた状態・消した状態にします（自動撮影モードで使います。音は鳴らしません）。
+    void SetFlashlightOn(bool on)
+    {
+        if (m_Flashlight.IsOn() != on)
+        {
+            m_Flashlight.Toggle();
+        }
+    }
     // 捕まったときなど、その場でロッカーから出た扱いにします（位置は呼び出し側が決めます）。
     void ForceExitHiding()
     {
