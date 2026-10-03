@@ -125,6 +125,10 @@ Game
 x64/Release/Job_application_work_horror.exe --benchmark ../benchmark
 ```
 
+この計測で、内蔵GPUと単体GPUを持つノートPCでは内蔵GPUで描画されていたことが分かりました
+（ライトON時に1フレーム18〜35ms）。現在は起動時に高性能なGPUを選ぶため（`IDXGIFactory6::EnumAdapterByGpuPreference`）、
+同じPC（RTX 3050 Laptop）では1フレーム1.7〜2.8msで描画できます。
+
 ## セーブデータ
 
 設定（`settings.txt`）とベスト記録（`best_record.txt`）は `%LOCALAPPDATA%\SignalLost\` に保存します。

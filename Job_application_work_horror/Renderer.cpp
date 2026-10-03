@@ -8,10 +8,44 @@
 #include "Application.h"
 #include "CaptureMode.h"
 #include <wrl/client.h>
+#include <dxgi1_6.h>
 #include <chrono>
+
+#pragma comment(lib, "dxgi.lib")
 
 
 using namespace DirectX::SimpleMath;
+
+namespace
+{
+	// 高性能なGPUを探します。内蔵GPUと単体GPUの両方を持つノートPCでは、何も指定しないと
+	// 消費電力の少ない内蔵GPUで描画されることがあり、ライトや画面効果で大きく重くなるためです。
+	// 見つからない（古いWindowsなど）ときはnullptrを返し、従来どおり既定のGPUを使います。
+	Microsoft::WRL::ComPtr<IDXGIAdapter1> FindHighPerformanceAdapter()
+	{
+		Microsoft::WRL::ComPtr<IDXGIFactory6> factory;
+		if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))))
+		{
+			return nullptr;
+		}
+		Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+		for (UINT index = 0;
+			SUCCEEDED(factory->EnumAdapterByGpuPreference(
+				index, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
+				IID_PPV_ARGS(adapter.ReleaseAndGetAddressOf())));
+			++index)
+		{
+			DXGI_ADAPTER_DESC1 description{};
+			// ソフトウェア描画（Microsoft Basic Render Driver）は除きます。
+			if (SUCCEEDED(adapter->GetDesc1(&description)) &&
+				(description.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0)
+			{
+				return adapter;
+			}
+		}
+		return nullptr;
+	}
+}
 
 //Direct3Dのバージョン
 D3D_FEATURE_LEVEL Renderer::m_FeatureLevel = D3D_FEATURE_LEVEL_11_0;
@@ -72,39 +106,45 @@ HRESULT Renderer::Init()
     deviceCreationFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
-    // デバイスとスワップチェインを同時に作成する関数の呼び出し
-    hr = D3D11CreateDeviceAndSwapChain(NULL,
-		D3D_DRIVER_TYPE_HARDWARE, // ドライバータイプ(ハードウェアGPUを使用)
-		NULL,               // ソフトウェアラスタライザを指定しないのでNULL
-        deviceCreationFlags,
-		NULL,               // 機能レベルの配列。NULLならデフォルトの機能レベルセットが使われる
-		0,                  // 機能レベルの配列の要素数(NULLなら0でOK)
-		D3D11_SDK_VERSION,  // SDKのバージョン 常に「D3D11_SDK_VERSION」を指定
-		&swapChainDesc,     // スワップチェーンの設定構造体へのポインタ
-		m_pSwapChain.ReleaseAndGetAddressOf(),
-		m_pDevice.ReleaseAndGetAddressOf(),
-        &m_FeatureLevel,    // 作成されたデバイスの機能レベルを受け取る変数へのポインタ
-		m_pDeviceContext.ReleaseAndGetAddressOf());
+    // 高性能なGPUがあればそれを使います。GPUを指定するときはドライバータイプをUNKNOWNにする決まりです。
+    const Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter = FindHighPerformanceAdapter();
+    const auto createDevice = [&](IDXGIAdapter* targetAdapter, UINT flags)
+    {
+        // デバイスとスワップチェインを同時に作成する関数の呼び出し
+        return D3D11CreateDeviceAndSwapChain(
+            targetAdapter,      // 使うGPU。nullptrなら既定のGPU
+            targetAdapter != nullptr ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE,
+            NULL,               // ソフトウェアラスタライザを指定しないのでNULL
+            flags,
+            NULL,               // 機能レベルの配列。NULLならデフォルトの機能レベルセットが使われる
+            0,                  // 機能レベルの配列の要素数(NULLなら0でOK)
+            D3D11_SDK_VERSION,  // SDKのバージョン 常に「D3D11_SDK_VERSION」を指定
+            &swapChainDesc,     // スワップチェーンの設定構造体へのポインタ
+            m_pSwapChain.ReleaseAndGetAddressOf(),
+            m_pDevice.ReleaseAndGetAddressOf(),
+            &m_FeatureLevel,    // 作成されたデバイスの機能レベルを受け取る変数へのポインタ
+            m_pDeviceContext.ReleaseAndGetAddressOf());
+    };
 
+    hr = createDevice(adapter.Get(), deviceCreationFlags);
 #if defined(DEBUG) || defined(_DEBUG)
     // 任意のグラフィックスデバッグ機能が使えないPCでもゲームを起動できるようにします。
     if (hr == DXGI_ERROR_SDK_COMPONENT_MISSING)
     {
-        hr = D3D11CreateDeviceAndSwapChain(
-            NULL,
-            D3D_DRIVER_TYPE_HARDWARE,
-            NULL,
-            0,
-            NULL,
-            0,
-            D3D11_SDK_VERSION,
-            &swapChainDesc,
-			m_pSwapChain.ReleaseAndGetAddressOf(),
-			m_pDevice.ReleaseAndGetAddressOf(),
-            &m_FeatureLevel,
-			m_pDeviceContext.ReleaseAndGetAddressOf());
+        hr = createDevice(adapter.Get(), 0);
     }
 #endif
+    // 選んだGPUで作れなかったときは、既定のGPUでもう一度試します。
+    if (FAILED(hr) && adapter != nullptr)
+    {
+        hr = createDevice(nullptr, deviceCreationFlags);
+#if defined(DEBUG) || defined(_DEBUG)
+        if (hr == DXGI_ERROR_SDK_COMPONENT_MISSING)
+        {
+            hr = createDevice(nullptr, 0);
+        }
+#endif
+    }
     if (FAILED(hr)) return hr;
 
 	// レンダーターゲットビュー・デプスステンシルバッファ・デプスステンシルビュー作成
