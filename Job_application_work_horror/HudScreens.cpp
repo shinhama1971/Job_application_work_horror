@@ -46,8 +46,8 @@ void Hud::DrawTitle(
 {
     m_Vertices.clear();
 
-    const float screenWidth = static_cast<float>(Application::GetWidth());
-    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
     const Color background(0.002f, 0.004f, 0.004f, 1.0f);
     const Color dimGreen(0.08f, 0.20f, 0.14f, 0.50f);
     const Color titleGreen(0.48f, 0.90f, 0.58f, 0.96f);
@@ -198,8 +198,8 @@ void Hud::DrawResult(
     m_Vertices.clear();
 
     const float reveal = (std::clamp)(revealAmount, 0.0f, 1.0f);
-    const float screenWidth = static_cast<float>(Application::GetWidth());
-    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
     const Color background(0.004f, 0.007f, 0.006f, 1.0f);
     const Color panel(0.018f, 0.028f, 0.025f, 0.94f * reveal);
     const Color green(0.48f, 0.90f, 0.56f, 0.96f * reveal);
@@ -425,8 +425,8 @@ void Hud::DrawSurveillanceFeed(
     bool reportReady,
     bool wrongReportVisible)
 {
-    const float screenWidth = static_cast<float>(Application::GetWidth());
-    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
     const float availableHeight = (std::max)(screenHeight - 156.0f, 300.0f);
     const float feedWidth = (std::min)({
         screenWidth * 0.90f,
@@ -568,8 +568,8 @@ void Hud::DrawChapterCard(
     }
 
     m_Vertices.clear();
-    const float screenWidth = static_cast<float>(Application::GetWidth());
-    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
     const float panelWidth = (std::min)(screenWidth * 0.72f, 760.0f);
     const float panelHeight = 142.0f;
     const float panelX = (screenWidth - panelWidth) * 0.5f;
@@ -665,7 +665,7 @@ void Hud::DrawStage2Status(
 {
     m_Vertices.clear();
 
-    const float screenWidth = static_cast<float>(Application::GetWidth());
+    const float screenWidth = GetCanvasWidth();
     constexpr float panelWidth = 214.0f;
     constexpr float panelHeight = 58.0f;
     const float panelX = screenWidth - panelWidth - 34.0f;
@@ -747,8 +747,8 @@ void Hud::DrawKeypad(
     int mistakes)
 {
     m_Vertices.clear();
-    const float screenWidth = static_cast<float>(Application::GetWidth());
-    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
     constexpr float panelWidth = 440.0f;
     constexpr float panelHeight = 300.0f;
     const float panelX = (screenWidth - panelWidth) * 0.5f;
@@ -829,8 +829,8 @@ void Hud::DrawKeypad(
 void Hud::DrawHidingView(float elapsedSeconds, float dangerRate)
 {
     m_Vertices.clear();
-    const float screenWidth = static_cast<float>(Application::GetWidth());
-    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
     const float danger = (std::clamp)(dangerRate, 0.0f, 1.0f);
     const Color dark(0.0f, 0.0f, 0.0f, 0.94f);
     const Color edge(0.10f + danger * 0.35f, 0.02f, 0.02f, 0.55f);
@@ -871,7 +871,7 @@ void Hud::DrawHidingView(float elapsedSeconds, float dangerRate)
 void Hud::DrawQuietRecovery(float progressRate, float cooldown, bool success, bool tooClose)
 {
     m_Vertices.clear();
-    const float x = (std::max)(12.0f, static_cast<float>(Application::GetWidth()) - 330.0f);
+    const float x = (std::max)(12.0f, GetCanvasWidth() - 330.0f);
     constexpr float y = 150.0f;
     const Color color = tooClose ? Color(0.96f, 0.38f, 0.25f, 1.0f)
         : Color(0.64f, 0.84f, 0.78f, 1.0f);
@@ -895,6 +895,7 @@ void Hud::DrawPause(
     int lookSensitivityLevel,
     int volumeLevel,
     bool guideEnabled,
+    int resolutionLevel,
     int selectedSetting,
     int floorNumber,
     float runTimeSeconds,
@@ -902,10 +903,10 @@ void Hud::DrawPause(
 {
     m_Vertices.clear();
 
-    const float screenWidth = static_cast<float>(Application::GetWidth());
-    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
     const float panelWidth = 660.0f;
-    const float panelHeight = 560.0f;
+    const float panelHeight = 600.0f;
     const float panelX = (screenWidth - panelWidth) * 0.5f;
     const float panelY = (screenHeight - panelHeight) * 0.5f;
     const Color shade(0.0f, 0.004f, 0.004f, 0.78f);
@@ -946,7 +947,7 @@ void Hud::DrawPause(
         (std::clamp)(lookSensitivityLevel, 0, 4);
     const int safeVolumeLevel = (std::clamp)(volumeLevel, 0, 4);
     const int safeSelectedSetting =
-        (std::clamp)(selectedSetting, 0, 4);
+        (std::clamp)(selectedSetting, 0, 5);
     const std::string brightnessText =
         "明るさ " + std::to_string(safeBrightnessLevel + 1) +
         " OF 5";
@@ -978,30 +979,42 @@ void Hud::DrawPause(
     addCenteredText(panelY + 268.0f,
         guideEnabled ? "目的表示 あり" : "目的表示 なし", 2.5f,
         safeSelectedSetting == 4 ? green : pale);
+    // 描画解像度は次回起動から反映されるため、起動時と違う段階を選んでいるときはそのことを表示します。
+    constexpr std::string_view resolutionNames[] = { "自動", "100%", "75%", "67%" };
+    const int safeResolutionLevel = (std::clamp)(resolutionLevel, 0, 3);
+    const std::string resolutionText =
+        "描画解像度 " + std::string(resolutionNames[safeResolutionLevel]) +
+        (safeResolutionLevel == Application::GetLaunchResolutionLevel()
+            ? "  " + std::to_string(Application::GetWidth()) + "x" +
+                std::to_string(Application::GetHeight())
+            : std::string("  次回起動から"));
+    addCenteredText(panelY + 308.0f,
+        resolutionText, 2.5f,
+        safeSelectedSetting == 5 ? green : pale);
     if (Input::IsControllerConnected())
     {
-        addCenteredText(panelY + 310.0f,
+        addCenteredText(panelY + 350.0f,
             "十字キーで選択と調整", 2.0f, pale);
-        addCenteredText(panelY + 352.0f,
+        addCenteredText(panelY + 392.0f,
             "START ゲームに戻る", 2.5f, pale);
-        addCenteredText(panelY + 394.0f,
+        addCenteredText(panelY + 434.0f,
             "Y この階をやり直す", 2.5f, pale);
-        addCenteredText(panelY + 436.0f,
+        addCenteredText(panelY + 476.0f,
             "B タイトルへ戻る", 2.5f, pale);
-        addCenteredText(panelY + 478.0f,
+        addCenteredText(panelY + 518.0f,
             "BACK ゲーム終了", 2.5f, pale);
     }
     else
     {
-        addCenteredText(panelY + 310.0f,
+        addCenteredText(panelY + 350.0f,
             "矢印キーで選択と調整", 2.0f, pale);
-        addCenteredText(panelY + 352.0f,
+        addCenteredText(panelY + 392.0f,
             "ESC または P ゲームに戻る", 2.5f, pale);
-        addCenteredText(panelY + 394.0f,
+        addCenteredText(panelY + 434.0f,
             "R この階をやり直す", 2.5f, pale);
-        addCenteredText(panelY + 436.0f,
+        addCenteredText(panelY + 476.0f,
             "T タイトルへ戻る", 2.5f, pale);
-        addCenteredText(panelY + 478.0f,
+        addCenteredText(panelY + 518.0f,
             "Q ゲーム終了", 2.5f, pale);
     }
 

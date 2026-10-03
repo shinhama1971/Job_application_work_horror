@@ -5,11 +5,14 @@
 // ============================================================================
 
 #include <chrono>
+#include <algorithm>
 #include <thread>
 #include "Application.h"
 #include "Game.h"
 #include "DebugUI.h"
 #include "CaptureMode.h"
+#include "GameSettings.h"
+#include "Renderer.h"
 #include <objbase.h>
 
 namespace
@@ -21,8 +24,12 @@ namespace
 
 HINSTANCE  Application::m_hInst;   // インスタンスハンドル
 HWND       Application::m_hWnd;    // ウィンドウハンドル
-uint32_t   Application::m_Width;   // ウィンドウの横幅
-uint32_t   Application::m_Height;  // ウィンドウの縦幅
+uint32_t   Application::m_Width;   // 描画解像度の横幅
+uint32_t   Application::m_Height;  // 描画解像度の縦幅
+uint32_t   Application::m_WindowWidth;
+uint32_t   Application::m_WindowHeight;
+int        Application::m_LaunchResolutionLevel = 0;
+float      Application::m_DpiScale = 1.0f;
 float      Application::m_DeltaTime = 1.0f / 60.0f;
 
 //-----------------------------------------------------------------------------
@@ -46,6 +53,9 @@ Application::~Application()
 //-----------------------------------------------------------------------------
 void Application::Run()
 {
+    // 画面の拡大率（125%など）で引き伸ばされず、モニター本来の解像度で描けるようにします。
+    EnableDpiAwareness();
+
     // 起動オプション --capture <出力フォルダ> があれば、自動撮影モードにします。
     Tools::CaptureMode::ConfigureFromCommandLine();
     if (Tools::CaptureMode::IsActive())
@@ -59,6 +69,69 @@ void Application::Run()
     if (okfg) { MainLoop(); }
 
     UninitApp(); // 終了処理
+}
+
+//-----------------------------------------------------------------------------
+// 拡大率への対応
+//-----------------------------------------------------------------------------
+void Application::EnableDpiAwareness()
+{
+    // 対応していないと、拡大率125%の1920x1080画面では1536x864として扱われ、描いた画面が引き伸ばされてぼやけます。
+    // SetProcessDpiAwarenessContextはWindows 10（1703）以降にしか無いため、無ければ古い関数を使います。
+    using SetDpiAwarenessContext = BOOL(WINAPI*)(DPI_AWARENESS_CONTEXT);
+    const HMODULE user32 = GetModuleHandleW(L"user32.dll");
+    const auto setContext = user32 == nullptr
+        ? nullptr
+        : reinterpret_cast<SetDpiAwarenessContext>(
+            GetProcAddress(user32, "SetProcessDpiAwarenessContext"));
+    if (setContext == nullptr ||
+        !setContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
+    {
+        SetProcessDPIAware();
+    }
+
+    // 拡大率を記録します（マウスの移動量が実際の画素単位になるため、視点の速さをそろえるのに使います）。
+    if (const HDC screen = GetDC(nullptr))
+    {
+        m_DpiScale = static_cast<float>(GetDeviceCaps(screen, LOGPIXELSX)) / 96.0f;
+        ReleaseDC(nullptr, screen);
+    }
+}
+
+//-----------------------------------------------------------------------------
+// 描画解像度を決める
+//-----------------------------------------------------------------------------
+void Application::DecideRenderSize()
+{
+    m_Width = m_WindowWidth;
+    m_Height = m_WindowHeight;
+    // 自動撮影モードは、ウィンドウも描画も動画の大きさ（720p）です。
+    if (Tools::CaptureMode::IsActive() && !Tools::CaptureMode::IsBenchmark())
+    {
+        return;
+    }
+
+    // 描画用のテクスチャはGameの初期化で作るため、設定はここで先に読みます。
+    Core::GameSettings settings;
+    settings.Load();
+    m_LaunchResolutionLevel = settings.GetResolutionLevel();
+    float scale = settings.GetRenderScale();
+    if (scale <= 0.0f)
+    {
+        // 自動: 内蔵GPUは画素数を減らして軽くし、単体GPUはそのままの解像度で描きます。
+        scale = Renderer::IsHighPerformanceAdapterIntegrated() ? 0.67f : 1.0f;
+    }
+
+    // HUDは画素単位で配置しているため、縦720より小さくはしません（ポーズ画面などが収まる大きさ）。
+    constexpr float MinimumRenderHeight = 720.0f;
+    const float windowHeight = static_cast<float>(m_WindowHeight);
+    if (windowHeight * scale < MinimumRenderHeight)
+    {
+        scale = (std::min)(1.0f, MinimumRenderHeight / windowHeight);
+    }
+    // 幅と高さは偶数にそろえます（縮小用のテクスチャで端の1画素がずれないように）。
+    m_Width = (static_cast<uint32_t>(static_cast<float>(m_WindowWidth) * scale) + 1u) & ~1u;
+    m_Height = (static_cast<uint32_t>(windowHeight * scale) + 1u) & ~1u;
 }
 
 //-----------------------------------------------------------------------------
@@ -96,27 +169,29 @@ bool Application::InitApp()
 
     // Direct3Dと画面効果用テクスチャを作る前にデスクトップ解像度を取得します。
     // 全画面時も全レンダーターゲットを同じ大きさに保つためです。
-    m_Width = static_cast<uint32_t>(GetSystemMetrics(SM_CXSCREEN));
-    m_Height = static_cast<uint32_t>(GetSystemMetrics(SM_CYSCREEN));
-    // 自動撮影モードは、動画の大きさ（720p）で描きます。計測モードは実際に遊ぶときと同じモニターの解像度のままです。
+    m_WindowWidth = static_cast<uint32_t>(GetSystemMetrics(SM_CXSCREEN));
+    m_WindowHeight = static_cast<uint32_t>(GetSystemMetrics(SM_CYSCREEN));
+    // 自動撮影モードは、動画の大きさ（720p）のウィンドウにします。計測モードは実際に遊ぶときと同じ大きさのままです。
     const bool capturing = Tools::CaptureMode::IsActive();
     if (capturing && !Tools::CaptureMode::IsBenchmark())
     {
-        m_Width = Tools::CaptureMode::Width;
-        m_Height = Tools::CaptureMode::Height;
+        m_WindowWidth = Tools::CaptureMode::Width;
+        m_WindowHeight = Tools::CaptureMode::Height;
     }
+    // 描画解像度は、設定（自動ならGPUの種類）に応じてウィンドウより小さくすることがあります。
+    DecideRenderSize();
 
     // ウィンドウのサイズを設定
     RECT rc = {};
-    rc.right = static_cast<LONG>(m_Width);
-    rc.bottom = static_cast<LONG>(m_Height);
+    rc.right = static_cast<LONG>(m_WindowWidth);
+    rc.bottom = static_cast<LONG>(m_WindowHeight);
 
     // ウィンドウサイズを調整
     auto style = WS_POPUP | WS_MINIMIZEBOX;
 
     // 自動撮影モードは、作業の邪魔にならないよう画面の外（全モニターの左端よりさらに左）に置きます。
     const int windowX = capturing
-        ? GetSystemMetrics(SM_XVIRTUALSCREEN) - static_cast<int>(m_Width) - 64
+        ? GetSystemMetrics(SM_XVIRTUALSCREEN) - static_cast<int>(m_WindowWidth) - 64
         : 0;
 
     // ウィンドウを生成

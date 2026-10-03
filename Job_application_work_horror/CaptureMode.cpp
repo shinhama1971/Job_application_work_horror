@@ -6,6 +6,7 @@
 
 #include "CaptureMode.h"
 
+#include "Application.h"
 #include "Camera.h"
 #include "Game.h"
 #include "GpuTimer.h"
@@ -457,7 +458,8 @@ namespace
         std::ostringstream text;
         text << std::fixed << std::setprecision(2);
         text << "処理の重さの計測結果（1面・ライトOFFとONの比較）\n";
-        text << "解像度: " << GetSystemMetrics(SM_CXSCREEN) << "x" << GetSystemMetrics(SM_CYSCREEN)
+        text << "画面: " << Application::GetWindowWidth() << "x" << Application::GetWindowHeight()
+             << "  描画解像度: " << Application::GetWidth() << "x" << Application::GetHeight()
              << "  垂直同期: なし  エフェクト設定: " << game->GetEffectLevel()
              << "  GPU: " << g_AdapterName << "\n";
         text << "各条件 " << BenchmarkMeasureFrames << " フレームの平均（ms）。"

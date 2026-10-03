@@ -221,6 +221,7 @@ void Stage2Scene::Draw(Camera* camera)
             game->GetLookSensitivityLevel(),
             game->GetVolumeLevel(),
             game->IsGuideEnabled(),
+            game->GetResolutionLevel(),
             game->GetPauseSettingIndex(),
             2,
             game->GetRunTimeSeconds(),

@@ -47,6 +47,19 @@ namespace
 	}
 }
 
+bool Renderer::IsHighPerformanceAdapterIntegrated()
+{
+	const Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter = FindHighPerformanceAdapter();
+	DXGI_ADAPTER_DESC1 description{};
+	if (adapter == nullptr || FAILED(adapter->GetDesc1(&description)))
+	{
+		return false;
+	}
+	// 内蔵GPUはメインメモリを共有するため、専用のビデオメモリは128MB程度しかありません（単体GPUは数GB）。
+	constexpr SIZE_T IntegratedVideoMemoryLimit = 512ull * 1024ull * 1024ull;
+	return description.DedicatedVideoMemory < IntegratedVideoMemoryLimit;
+}
+
 //Direct3Dのバージョン
 D3D_FEATURE_LEVEL Renderer::m_FeatureLevel = D3D_FEATURE_LEVEL_11_0;
 
@@ -497,35 +510,21 @@ HRESULT Renderer::ResizeWindow(int width, int height)
 	// 既存のデプスステンシルビューを解放
 	m_pDepthStencilView.Reset();
 
-	// スワップチェインのバッファサイズを新しいウィンドウサイズに合わせて変更
+	// バッファは描画解像度のままにします。画面効果やHUDのテクスチャも同じ大きさで作っているため、
+	// ウィンドウの大きさに合わせると大きさが食い違います。ウィンドウへの引き伸ばしは表示のときに行われます。
+	(void)width;
+	(void)height;
 	HRESULT hr = m_pSwapChain->ResizeBuffers(
-		0, width, height, DXGI_FORMAT_UNKNOWN, 0);
+		0, Application::GetWidth(), Application::GetHeight(), DXGI_FORMAT_UNKNOWN, 0);
 	if (FAILED(hr)) return hr;
 
 	// レンダーターゲットビュー・デプスステンシルバッファ・デプスステンシルビュー作成
 	hr = CreateRenderAndDepthResources();
 	if (FAILED(hr)) return hr;
 
-	// ウィンドウとターゲットのアスペクト比を比較してビューポートを調整
-	float windowAspect = (float)width / (float)height;
-	float targetAspect = (float)Application::GetWidth() / (float)Application::GetHeight();
-
 	D3D11_VIEWPORT vi = {};
-
-	if (windowAspect > targetAspect) {
-		// ウィンドウが横長の場合は高さに合わせて幅を調整
-		vi.Height = (float)height;
-		vi.Width = height * targetAspect;
-		vi.TopLeftX = (width - vi.Width) / 2.0f;
-		vi.TopLeftY = 0.0f;
-	}
-	else {
-		// ウィンドウが縦長の場合は幅に合わせて高さを調整
-		vi.Width = (float)width;
-		vi.Height = width / targetAspect;
-		vi.TopLeftX = 0.0f;
-		vi.TopLeftY = (height - vi.Height) / 2.0f;
-	}
+	vi.Width = static_cast<float>(Application::GetWidth());
+	vi.Height = static_cast<float>(Application::GetHeight());
 	vi.MinDepth = 0.0f;
 	vi.MaxDepth = 1.0f;
 

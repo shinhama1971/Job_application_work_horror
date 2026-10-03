@@ -136,12 +136,16 @@ public:
 
 	static HRESULT Init();
 	static void Uninit();
+	// 描画に使う高性能なGPUが内蔵GPU（専用のビデオメモリをほとんど持たないもの）ならtrueです。
+	// 描画解像度の「自動」を決めるため、Initより前（ウィンドウを作る前）に呼べます。
+	static bool IsHighPerformanceAdapterIntegrated();
 	// バックバッファと深度バッファをクリアし、本描画の描画先にします。
 	static void DrawStart();
 	// 描いた画面を表示します（垂直同期あり）。
 	static void DrawEnd();
 
-	// ウィンドウの大きさに合わせてバックバッファと深度バッファを作り直します。
+	// ウィンドウの大きさが変わったときにバックバッファと深度バッファを作り直します。
+	// バッファは描画解像度のままにし、ウィンドウへの引き伸ばしは表示（Present）に任せます。
 	static HRESULT ResizeWindow(int width, int height);
 
 	// falseでも深度テストは続け、深度の書き込みだけを止めます（半透明・加算合成の描画用）。
@@ -149,6 +153,8 @@ public:
 
 	// HUDなどの2D描画用に、左上原点・ピクセル単位の行列を設定します。
 	static void SetWorldViewProjection2D();
+	// 幅width・高さheightの座標系を画面全体に対応させます（HUDのキャンバス用）。
+	static void SetWorldViewProjection2D(float width, float height);
 	// 行列はシェーダーの mul(v, M) に合わせて、転置してからGPUへ送ります。
 	static void SetWorldMatrix(DirectX::SimpleMath::Matrix* WorldMatrix);
 	static void SetViewMatrix(DirectX::SimpleMath::Matrix* ViewMatrix);

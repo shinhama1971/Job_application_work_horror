@@ -52,6 +52,12 @@ namespace Core
         {
             m_GuideLevel = guideLevel;
         }
+        int resolutionLevel = 0;
+        if (settingsFile >> resolutionLevel &&
+            resolutionLevel >= 0 && resolutionLevel <= MaxResolutionLevel)
+        {
+            m_ResolutionLevel = resolutionLevel;
+        }
     }
 
     void GameSettings::Save() const
@@ -74,6 +80,7 @@ namespace Core
             << m_EffectLevel << ' '
             << m_LookSensitivityLevel << ' '
             << m_VolumeLevel << ' '
-            << m_GuideLevel << '\n';
+            << m_GuideLevel << ' '
+            << m_ResolutionLevel << '\n';
     }
 }

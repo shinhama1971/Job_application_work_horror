@@ -21,6 +21,7 @@ namespace Core
             LookSensitivity,
             Volume,
             Guide,       // 目的表示・目的地ガイドの表示あり/なし
+            Resolution,  // 描画解像度（次回起動から反映）
             Count
         };
 

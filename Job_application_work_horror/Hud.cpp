@@ -38,6 +38,21 @@ namespace
     }
 }
 
+float Hud::GetCanvasScale()
+{
+    return (std::max)(static_cast<float>(Application::GetHeight()), 1.0f) / ReferenceHeight;
+}
+
+float Hud::GetCanvasWidth()
+{
+    return static_cast<float>(Application::GetWidth()) / GetCanvasScale();
+}
+
+float Hud::GetCanvasHeight()
+{
+    return ReferenceHeight;
+}
+
 void Hud::Init()
 {
     m_Shader.Create("shader/hudVS.hlsl", "shader/hudPS.hlsl");
@@ -79,7 +94,8 @@ void Hud::DrawTextureRectangle(
     m_Vertices.push_back(makeVertex(right, bottom, 1.0f, 1.0f));
     m_VertexBuffer.Modify(m_Vertices);
 
-    Renderer::SetWorldViewProjection2D();
+    // 座標はHUDのキャンバス単位なので、キャンバス全体が画面全体になる行列にします。
+    Renderer::SetWorldViewProjection2D(GetCanvasWidth(), GetCanvasHeight());
     Renderer::SetDepthEnable(false);
     Renderer::SetBlendState(BS_NONE);
     Renderer::SetUV(0.0f, 0.0f, 1.0f, 1.0f);
@@ -122,8 +138,8 @@ void Hud::Draw(
             ? Color(0.62f, 0.92f, 0.70f, 0.98f)
             : white);
 
-    const float screenWidth = static_cast<float>(Application::GetWidth());
-    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
 
     if (!objectiveText.empty())
     {
@@ -317,8 +333,8 @@ void Hud::DrawBlink(float opacity)
     AddRectangle(
         0.0f,
         0.0f,
-        static_cast<float>(Application::GetWidth()),
-        static_cast<float>(Application::GetHeight()),
+        GetCanvasWidth(),
+        GetCanvasHeight(),
         Color(0.0f, 0.0f, 0.0f, blinkOpacity));
     Flush();
 }
@@ -356,8 +372,8 @@ void Hud::AddRectangle(float x, float y, float width, float height, const Color&
         return;
     }
 
-    const float screenWidth = static_cast<float>(Application::GetWidth());
-    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
 
     const float left = x / screenWidth * 2.0f - 1.0f;
     const float right = (x + width) / screenWidth * 2.0f - 1.0f;

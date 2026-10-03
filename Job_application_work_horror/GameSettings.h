@@ -16,6 +16,8 @@ namespace Core
         static constexpr int MaxLookSensitivityLevel = 4;
         static constexpr int MaxVolumeLevel = 4;
         static constexpr int MaxGuideLevel = 1;
+        // 描画解像度。0=自動（単体GPUは100%、内蔵GPUは67%）、1=100%、2=75%、3=67%。
+        static constexpr int MaxResolutionLevel = 3;
 
     private:
         int m_BrightnessLevel = 2;
@@ -24,6 +26,8 @@ namespace Core
         int m_VolumeLevel = 3;
         // 1で目的表示・目的地ガイドを出し、0で何も説明しないP.T.寄りの遊び方にします。
         int m_GuideLevel = 1;
+        // 描画用のテクスチャは起動時に作るため、変更は次回起動から反映されます。
+        int m_ResolutionLevel = 0;
 
         static bool TrySetLevel(int& current, int level, int maxLevel)
         {
@@ -67,12 +71,28 @@ namespace Core
             return TrySetLevel(m_GuideLevel, level, MaxGuideLevel);
         }
 
+        bool SetResolutionLevel(int level)
+        {
+            return TrySetLevel(m_ResolutionLevel, level, MaxResolutionLevel);
+        }
+
         int GetBrightnessLevel() const { return m_BrightnessLevel; }
         int GetEffectLevel() const { return m_EffectLevel; }
         int GetLookSensitivityLevel() const { return m_LookSensitivityLevel; }
         int GetVolumeLevel() const { return m_VolumeLevel; }
         int GetGuideLevel() const { return m_GuideLevel; }
         bool IsGuideEnabled() const { return m_GuideLevel > 0; }
+        int GetResolutionLevel() const { return m_ResolutionLevel; }
+
+        // 描画解像度の倍率です（画面の大きさに掛けます）。自動のときは0を返し、GPUに応じて決めてもらいます。
+        float GetRenderScale() const
+        {
+            constexpr float renderScales[MaxResolutionLevel + 1] =
+            {
+                0.0f, 1.0f, 0.75f, 0.67f
+            };
+            return renderScales[m_ResolutionLevel];
+        }
 
         // 段階値を各システムへ渡す倍率へ変換します。変換式はここだけに置きます。
         // 明るさは中央(2)を0とし、1段階ごとに露出を0.055ずらします。

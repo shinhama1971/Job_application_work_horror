@@ -84,6 +84,7 @@ public:
         int lookSensitivityLevel,
         int volumeLevel,
         bool guideEnabled,
+        int resolutionLevel,
         int selectedSetting,
         int floorNumber,
         float runTimeSeconds,
@@ -93,6 +94,13 @@ public:
 
 private:
     static constexpr size_t MaxVertices = 32768;
+
+    // HUDの座標は「縦864の画面」を基準に画素単位で決めてあります。実際の描画解像度との比で
+    // キャンバスの大きさを決め、画面の大きさが変わってもHUDが画面に対して同じ大きさに見えるようにします。
+    static constexpr float ReferenceHeight = 864.0f;
+    static float GetCanvasScale();
+    static float GetCanvasWidth();
+    static float GetCanvasHeight();
 
     void AddRectangle(float x, float y, float width, float height, const DirectX::SimpleMath::Color& color);
     void AddLetterE(float x, float y, float size, const DirectX::SimpleMath::Color& color);

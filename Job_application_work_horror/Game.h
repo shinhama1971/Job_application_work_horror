@@ -258,6 +258,11 @@ namespace Core
             return m_Settings.GetVolumeLevel();
         }
 
+        int GetResolutionLevel() const
+        {
+            return m_Settings.GetResolutionLevel();
+        }
+
         // falseのとき、Sceneは目的表示と目的地ガイドを出しません。
         bool IsGuideEnabled() const
         {

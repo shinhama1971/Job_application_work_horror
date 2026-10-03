@@ -95,6 +95,16 @@ void Renderer::SetDepthEnable(bool Enable)
 //--------------------------------------------------------------------------------------
 void Renderer::SetWorldViewProjection2D()
 {
+	SetWorldViewProjection2D(
+		static_cast<float>(Application::GetWidth()),
+		static_cast<float>(Application::GetHeight()));
+}
+
+//--------------------------------------------------------------------------------------
+// 2D描画用の行列を、指定した大きさの座標系（左上原点）で設定します
+//--------------------------------------------------------------------------------------
+void Renderer::SetWorldViewProjection2D(float width, float height)
+{
 	Matrix world = Matrix::Identity;			// 単位行列にする
 	world = world.Transpose();			// 転置
 	m_pDeviceContext->UpdateSubresource(
@@ -108,8 +118,8 @@ void Renderer::SetWorldViewProjection2D()
 	// 2D描画を左上原点にする
 	Matrix projection = DirectX::XMMatrixOrthographicOffCenterLH(
 		0.0f,
-		static_cast<float>(Application::GetWidth()),	// ビューボリュームの最小Ｘ
-		static_cast<float>(Application::GetHeight()),	// ビューボリュームの最小Ｙ
+		width,											// ビューボリュームの最大Ｘ
+		height,											// ビューボリュームの最小Ｙ
 		0.0f,											// ビューボリュームの最大Ｙ
 		0.0f,
 		1.0f);
