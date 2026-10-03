@@ -93,7 +93,7 @@ public:
     void Uninit();
 
 private:
-    static constexpr size_t MaxVertices = 32768;
+    static constexpr size_t MaxVertices = 65536;
 
     // HUDの座標は「縦864の画面」を基準に画素単位で決めてあります。実際の描画解像度との比で
     // キャンバスの大きさを決め、画面の大きさが変わってもHUDが画面に対して同じ大きさに見えるようにします。
