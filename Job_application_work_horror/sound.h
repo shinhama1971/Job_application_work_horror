@@ -26,6 +26,8 @@ typedef enum
 	SOUND_CUE_WATER_STEP,   // 水たまりを踏んだときの水音
 	SOUND_CUE_FLASHLIGHT,   // 懐中電灯スイッチのクリック音
 	SOUND_CUE_PIPE_KNOCK,   // 配管を叩いたような金属音（tools/generate-pipe-knock.ps1で合成）
+	SOUND_CUE_HEARTBEAT,    // 自分の心拍「ドクン」1回分（tools/generate-heartbeat-breath.ps1で合成）
+	SOUND_CUE_BREATH,       // 自分の呼吸「吐いて吸う」1回分（同上）
 
 	SOUND_LABEL_MAX,
 } SOUND_LABEL;
@@ -59,6 +61,8 @@ private:
 		{"assets/Audio/water_step.wav", false, 0.52f},
 		{"assets/Audio/flashlight_click.wav", false, 0.54f},
 		{"assets/Audio/pipe_knock.wav", false, 0.50f},
+		{"assets/Audio/heartbeat.wav", false, 0.70f},
+		{"assets/Audio/breath.wav", false, 0.32f},
 	};
 
 	// XAudio2本体はCOMのためComPtrで管理します。ボイスはCOMではなくDestroyVoiceで解放します。
@@ -122,8 +126,8 @@ public:
 	// ゲームループ終了後に呼び出すサウンドの解放処理
 	void Uninit(void);
 
-	// 引数で指定したサウンドを再生する
-	void Play(SOUND_LABEL label, float pitch = 1.0f);
+	// 引数で指定したサウンドを再生する。volume は素材ごとの音量に掛ける倍率です。
+	void Play(SOUND_LABEL label, float pitch = 1.0f, float volume = 1.0f);
 
 	// 引数で指定したサウンドを停止する
 	void Stop(SOUND_LABEL label);

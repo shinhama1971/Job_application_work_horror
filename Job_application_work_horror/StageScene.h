@@ -15,6 +15,7 @@
 #include "Stage1Layout.h"
 #include "Stage1Objective.h"
 #include "Stage1AmbientSounds.h"
+#include "TensionPulse.h"
 
 #include <array>
 #include <cstddef>
@@ -44,6 +45,10 @@ private:
     void UpdateAmbientSounds();
     // 懐中電灯で照らすと浮かぶ壁の文字。書き換わった文字を読んだら物音の演出を起こします。
     void UpdateWallWritings(class Player& player);
+    // 今の危険度（0〜1）。いちばん近くに出ている影までの距離と、隠し部屋に閉じ込められているかから求めます。
+    float ComputeThreatRate(const class Player& player) const;
+    // 危険度に合わせて、自分の心拍音と呼吸音を鳴らします。
+    void UpdateTensionPulse(const class Player& player, float deltaTime);
 
     StageObjects m_Objects;
 
@@ -78,6 +83,8 @@ private:
     ScareLightSequence m_ScareLightSequence;
     StagePowerSequence m_PowerSequence;
     ExitOmenSequence m_ExitOmenSequence;
+    // 自分の心拍と呼吸をいつ鳴らすか。
+    TensionPulse m_TensionPulse;
 
     // 0以上のtimerは演出実行中、-1は未実行または終了を表します。
     int m_CorridorLoopCount = 0;

@@ -248,7 +248,7 @@ void Sound::Uninit(void)
 //=============================================================================
 // 再生
 //=============================================================================
-void Sound::Play(SOUND_LABEL label, float pitch)
+void Sound::Play(SOUND_LABEL label, float pitch, float volume)
 {
 	if (!IsValidLabel(label))
 	{
@@ -288,7 +288,7 @@ void Sound::Play(SOUND_LABEL label, float pitch)
 	}
 
 	// WAVごとの音圧差を吸収し、環境音が効果音を覆わないようにします。
-	pSV->SetVolume(m_param[(int)label].volume);
+	pSV->SetVolume(m_param[(int)label].volume * (std::max)(volume, 0.0f));
 	pSV->SetFrequencyRatio((std::clamp)(pitch, 0.70f, 1.35f));
 
 	// 再生
