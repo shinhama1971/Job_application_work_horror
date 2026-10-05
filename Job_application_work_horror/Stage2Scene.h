@@ -23,6 +23,7 @@
 #include "PuzzleFeedback.h"
 #include "BehindPresence.h"
 #include "Stage2AnomalyPlan.h"
+#include "TensionPulse.h"
 
 #include "Stage2SceneConstants.h"
 #include "Stage2Layout.h"
@@ -85,6 +86,11 @@ private:
     bool IsBehindPresenceAllowed() const;
     // ロッカーに隠れている間の足音の影の振る舞い。trueを返したらUpdateNoiseThreatを終えます。
     bool UpdateHiddenFromStalker(Player& player, float deltaTime);
+    // 今の危険度（0〜1）。足音の危険度・最後の追跡の影・足音の影までの距離から求めます。
+    // includeMistakes が true のときは、1・2周目の観察ミスの回数も含めます（画面の危険ゲージ用）。
+    float ComputeThreatRate(const Player& player, bool includeMistakes) const;
+    // 危険度に合わせて、自分の心拍音と呼吸音を鳴らします（Stage2SceneHorror.cpp）。
+    void UpdateTensionPulse(const Player& player, float deltaTime);
 
     Stage2Objects m_Objects;
 
@@ -105,6 +111,8 @@ private:
     LightZoneProgress m_LightZoneProgress;
     PuzzleFeedback m_PuzzleFeedback;
     BehindPresence m_BehindPresence;
+    // 自分の心拍と呼吸をいつ鳴らすか。
+    TensionPulse m_TensionPulse;
     // 1周目・2周目にどの異変を探させるか。プレイごとにランダムに決めます。
     Stage2AnomalyPlan m_AnomalyPlan;
     std::mt19937 m_PresenceRandom{ std::random_device{}() };

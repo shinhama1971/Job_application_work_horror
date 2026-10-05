@@ -14,6 +14,7 @@
 #include "Input.h"
 #include "Player.h"
 #include "ShadowMan.h"
+#include "TensionPulseFeedback.h"
 #include "Wall.h"
 
 #include <SimpleMath.h>
@@ -898,4 +899,45 @@ void Stage2Scene::UpdateBehindPresence(Player& player, float deltaTime)
         presence->SetActive(false);
         break;
     }
+}
+
+float Stage2Scene::ComputeThreatRate(const Player& player, bool includeMistakes) const
+{
+    float threatRate = m_NoiseThreatSystem.GetThreat() * 0.78f;
+    if (includeMistakes && (m_LoopCount == 1 || m_LoopCount == 2))
+    {
+        const float observationDanger =
+            static_cast<float>(m_PuzzleFeedback.GetMistakeCount()) / 3.0f;
+        threatRate = (std::max)(threatRate, observationDanger * 0.72f);
+    }
+    if (m_FinalSequence.IsPursuitActive())
+    {
+        const ShadowMan* shadow = m_Objects.shadow;
+        if (shadow != nullptr)
+        {
+            Vector3 toShadow = shadow->GetPosition() - player.GetPosition();
+            toShadow.y = 0.0f;
+            const float distance = toShadow.Length();
+            threatRate = 1.0f - (std::clamp)(
+                (distance - 18.0f) / 92.0f, 0.0f, 1.0f);
+        }
+    }
+    const ShadowMan* noiseShadow = m_Objects.noiseShadow;
+    if (noiseShadow != nullptr && noiseShadow->IsActive())
+    {
+        Vector3 toShadow = noiseShadow->GetPosition() - player.GetPosition();
+        toShadow.y = 0.0f;
+        const float distance = toShadow.Length();
+        const float noiseShadowDanger = 1.0f - (std::clamp)(
+            (distance - 14.0f) / 72.0f, 0.0f, 1.0f);
+        threatRate = (std::max)(threatRate, noiseShadowDanger);
+    }
+    return threatRate;
+}
+
+void Stage2Scene::UpdateTensionPulse(const Player& player, float deltaTime)
+{
+    // 観察ミスの回数は含めません（一度ミスすると心拍が鳴りやまなくなるため）。今まさに迫っている危険だけを使います。
+    PlayTensionPulse(m_TensionPulse.Update(
+        deltaTime, ComputeThreatRate(player, false), player.IsHiding()));
 }

@@ -107,6 +107,7 @@ Application
 - `Stage2AnomalyPlan`: 1周目・2周目に見つける必要がある異変を、偽ドア・時計・肖像画・ノックから毎回ランダムに2つ選ぶ（入力や描画に依存しない純粋な状態クラス）
 - `Locker`: 隠れられるロッカーの扉と「隠れる」操作。隠れている間の移動・視点の制限は`Player`、影の振る舞い（見失う・見られて捕まる）は`Stage2Scene::UpdateHiddenFromStalker`が担当
 - `KnockingAnomaly`: 壁の向こうのノック異変（音の出どころの選択、ノックの間隔、出どころの壁の前で耳を澄ませた時間）
+- `TensionPulse`: 自分の心拍音と呼吸音をいつ・どれくらいの大きさで鳴らすかを、危険度と「隠れているか」から決める（入力や描画に依存しない状態クラス）。危険度は2面では危険ゲージと同じ`Stage2Scene::ComputeThreatRate`、1面では近くの影までの距離（`StageScene::ComputeThreatRate`）から渡す。鳴らす処理は1面・2面共通の`TensionPulseFeedback.h`
 - `ScratchAnomaly`: 引っかき傷メッセージ
 - `ObservedScareSequence`: 注視時の照明演出
 - `CaughtSequence`: 捕獲後の暗転と復帰

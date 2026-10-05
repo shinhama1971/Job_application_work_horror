@@ -64,37 +64,7 @@ void Stage2Scene::Draw(Camera* camera)
     }
     m_Hud.Draw(*player, -1, m_InteractionSystem.GetPrompt(),
         game->IsGuideEnabled() ? objective : std::string_view{});
-    float threatRate = 0.0f;
-    threatRate = (std::max)(
-        threatRate, m_NoiseThreatSystem.GetThreat() * 0.78f);
-    if (m_LoopCount == 1 || m_LoopCount == 2)
-    {
-        const float observationDanger =
-            static_cast<float>(m_PuzzleFeedback.GetMistakeCount()) / 3.0f;
-        threatRate = (std::max)(threatRate, observationDanger * 0.72f);
-    }
-    if (m_FinalSequence.IsPursuitActive())
-    {
-        ShadowMan* shadow = m_Objects.shadow;
-        if (shadow != nullptr)
-        {
-            Vector3 toShadow = shadow->GetPosition() - player->GetPosition();
-            toShadow.y = 0.0f;
-            const float distance = toShadow.Length();
-            threatRate = 1.0f - (std::clamp)(
-                (distance - 18.0f) / 92.0f, 0.0f, 1.0f);
-        }
-    }
-    ShadowMan* noiseShadow = m_Objects.noiseShadow;
-    if (noiseShadow != nullptr && noiseShadow->IsActive())
-    {
-        Vector3 toShadow = noiseShadow->GetPosition() - player->GetPosition();
-        toShadow.y = 0.0f;
-        const float distance = toShadow.Length();
-        const float noiseShadowDanger = 1.0f - (std::clamp)(
-            (distance - 14.0f) / 72.0f, 0.0f, 1.0f);
-        threatRate = (std::max)(threatRate, noiseShadowDanger);
-    }
+    const float threatRate = ComputeThreatRate(*player, true);
     if (game->IsGuideEnabled() &&
         m_VisualTimer >= 4.20f &&
         !m_CaughtSequence.IsActive() &&

@@ -105,6 +105,7 @@ void Stage2Scene::Init()
     m_AnomalyPlan.Randomize(m_PresenceRandom);
     m_PuzzleFeedback.Reset();
     m_NoiseThreatSystem.Reset();
+    m_TensionPulse.Reset();
     // 最初の気配は周回に慣れた頃に出します。
     m_BehindPresence.Reset(BehindPresence::MaxInterval);
     m_LoopBlinkTimer = 0.0f;
@@ -252,6 +253,7 @@ void Stage2Scene::Update()
     m_ClockAnomaly.UpdateNoticeTimer(deltaTime);
     m_PuzzleFeedback.Update(deltaTime);
     m_NoiseThreatSystem.UpdateTimers(deltaTime);
+    UpdateTensionPulse(*player, deltaTime);
 
     const Vector3 playerPosition = player->GetPosition();
     const bool onWetSurface =

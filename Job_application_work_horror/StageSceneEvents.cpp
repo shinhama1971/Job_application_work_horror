@@ -20,6 +20,7 @@
 #include "ScreenDustOverlay.h"
 #include "ScareTrigger.h"
 #include "ShadowMan.h"
+#include "TensionPulseFeedback.h"
 #include <SimpleMath.h>
 #include <algorithm>
 #include <cmath>
@@ -775,4 +776,42 @@ void StageScene::UpdateWallWritings(Player& player)
         game->IsPowerRestored(), camera->GetPosition(), camera->GetForward());
     game->GetPostProcess()->TriggerHorrorPulse(0.22f, 0.36f);
     Input::SetVibration(5, 0.16f);
+}
+
+float StageScene::ComputeThreatRate(const Player& player) const
+{
+    // 出ている影のうち、いちばん近いものほど危険とします（2面の足音の影と同じ距離の感じ方）。
+    const ShadowMan* shadows[] =
+    {
+        m_Objects.fuseWatcher,
+        m_Objects.storageShadow,
+        m_Objects.evidenceShadow,
+        m_Objects.exitOmen,
+        m_Objects.hiddenRoom.shadow,
+    };
+    float threatRate = 0.0f;
+    for (const ShadowMan* shadow : shadows)
+    {
+        if (shadow == nullptr || !shadow->IsActive())
+        {
+            continue;
+        }
+        Vector3 toShadow = shadow->GetPosition() - player.GetPosition();
+        toShadow.y = 0.0f;
+        const float danger = 1.0f - (std::clamp)(
+            (toShadow.Length() - 14.0f) / 72.0f, 0.0f, 1.0f);
+        threatRate = (std::max)(threatRate, danger);
+    }
+    // 隠し部屋に閉じ込められている間は、影が出ていなくても小さく心拍が聞こえるようにします（息は荒くしません）。
+    if (m_HiddenRoom.IsTrapped())
+    {
+        threatRate = (std::max)(threatRate, 0.30f);
+    }
+    return threatRate;
+}
+
+void StageScene::UpdateTensionPulse(const Player& player, float deltaTime)
+{
+    // 1面には隠れる場所がないため、隠れている扱いにはしません。
+    PlayTensionPulse(m_TensionPulse.Update(deltaTime, ComputeThreatRate(player), false));
 }
