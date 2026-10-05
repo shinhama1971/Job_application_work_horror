@@ -11,6 +11,8 @@
 #include "Stage1WallWritings.h"
 #include "StageSurveillanceCameras.h"
 
+#include <SimpleMath.h>
+
 #include <array>
 #include <cstddef>
 #include <string>
@@ -37,6 +39,8 @@ struct StageObjects
     static constexpr int CeilingLightCount = 8;
 
     Player* player = nullptr;
+    // 建物の壁を上から見た長方形（x,y = 中心のx・z、z,w = 幅と奥行きの半分）。部屋の角の暗がりの計算に使います。
+    std::vector<DirectX::SimpleMath::Vector4> wallFootprints;
     ShadowMan* fuseWatcher = nullptr;
     ShadowMan* storageShadow = nullptr;
     ShadowMan* evidenceShadow = nullptr;

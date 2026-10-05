@@ -68,10 +68,27 @@ struct DEBUG_VIEW_BUFFER
 {
     int Mode;
     float WallDampStrength;
-    float Padding[2];
+    // 壁の古さ（0〜1）。パネルの継ぎ目・穴・ひび・水の垂れた跡・床際の水位線・カビの濃さです。
+    // 面ごとに雰囲気を変えるため、各SceneのInitで設定します（1面は1、2面は0で従来どおり）。
+    float WallWeathering;
+    float Padding;
 };
 
 static_assert(sizeof(DEBUG_VIEW_BUFFER) == 16, "Debug view buffer must be 16 bytes");
+
+// 部屋の角の暗がり（shader/roomOcclusion.hlsli の RoomOcclusionBuffer、b11）と同じ並びです。
+struct ROOM_OCCLUSION_BUFFER
+{
+    static constexpr unsigned int MaxBoxes = 32;
+    // 壁を上から見た長方形。x,y = 中心のx・z、z,w = 幅と奥行きの半分。
+    DirectX::SimpleMath::Vector4 Boxes[MaxBoxes];
+    unsigned int BoxCount;  // 0なら暗がりを付けません
+    float FloorY;
+    float CeilingY;
+    float Strength;
+};
+
+static_assert(sizeof(ROOM_OCCLUSION_BUFFER) == 16 * 33, "Room occlusion buffer must match HLSL layout");
 
 //サブセット
 struct SUBSET{
@@ -92,7 +109,10 @@ struct MATERIAL
 	DirectX::SimpleMath::Color Emission;
 	float Shininess;
 	BOOL TextureEnable;
-	BOOL Dummy[2];
+	// 建物の壁（構造の壁）ならTRUE。壁の古さ（パネルの継ぎ目・ひびなど）はこの面だけに描きます。
+	// 棚や配管などの小物に継ぎ目が出ないようにするための印です。
+	BOOL WeatheringSurface;
+	BOOL Dummy;
 
 
 };
@@ -118,6 +138,10 @@ private:
 
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pLightBuffer;
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pDebugViewBuffer;
+	// デバッグ表示と壁の古さは同じ定数バッファにあるため、片方だけ変えるときのために中身を保持します。
+	static DEBUG_VIEW_BUFFER m_DebugView;
+	static void UploadDebugViewBuffer();
+	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pRoomOcclusionBuffer;
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pMaterialBuffer;
 	static LIGHT m_Light;
 	static bool m_LightEnable;
@@ -187,6 +211,12 @@ public:
 	// デバッグ用のシェーダー表示（法線・光源タイルなど）を切り替えます。0で通常表示です。
 	static void SetDebugViewMode(
 		int mode, float wallDampStrength = 1.0f);
+	// 壁の古さ（0〜1）を設定します。0なら従来の見た目のままです。
+	static void SetWallWeathering(float weathering);
+	// 部屋の角の暗がりに使う壁の形と、床・天井の高さを設定します。boxCount が0なら暗がりを付けません。
+	static void SetRoomOcclusion(
+		const DirectX::SimpleMath::Vector4* boxes, unsigned int boxCount,
+		float floorY, float ceilingY, float strength);
 	static void SetLightEnable(bool Enable);
 	static bool GetLightEnable();
 	static void SetMaterial(MATERIAL Material);

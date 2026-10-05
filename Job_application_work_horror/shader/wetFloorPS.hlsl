@@ -53,8 +53,82 @@ float ValueNoise(float2 value)
 
 #include "fastNoise.hlsli"
 #include "flashlightLighting.hlsli"
+#include "roomOcclusion.hlsli"
+#include "surfaceDetail.hlsli"
 
 
+// ----------------------------------------------------------------------------
+// 床の古さ（1面）。壁の古さと同じ WallWeathering で有効になり、2面（0）では何もしません。
+// コンクリートの床版の目地・ひびを凹凸として、油や水の染み・物を引きずった跡・壁際の埃を色として描きます。
+// ----------------------------------------------------------------------------
+struct FloorAgeing
+{
+    float height;   // 凹凸に足す高さ（へこみは負）
+    float3 tint;    // 元の色に掛ける色（1なら変化なし）
+};
+
+FloorAgeing ComputeFloorAgeing(float2 position, float amount)
+{
+    FloorAgeing ageing;
+    // 1画素がワールドで何単位か。遠くで細かい模様がちらつかないよう、これで薄めます。
+    const float footprint = max(length(fwidth(position)), 0.0001f);
+
+    // --- 床版の目地（56四方。細く浅くして、タイル張りに見えないようにします）。床版ごとに色がわずかに違います
+    const float slabSize = 56.0f;
+    const float2 slabUV = position / slabSize;
+    const float2 edgeDistance = (0.5f - abs(frac(slabUV) - 0.5f)) * slabSize;
+    const float joint = 1.0f - smoothstep(0.05f, 0.20f + footprint, min(edgeDistance.x, edgeDistance.y));
+    const float slabShade = FastHash21(floor(slabUV) + 11.0f);
+
+    // --- ひび（遠くでは1画素より細くなるため計算を省きます）
+    float crack = 0.0f;
+    [branch]
+    if (footprint < 0.5f)
+    {
+        const float crackLine = 1.0f - smoothstep(0.0f, 0.014f + footprint * 0.04f,
+            abs(FastValueNoise(position * 0.06f + 17.0f) - 0.5f));
+        crack = crackLine * smoothstep(0.60f, 0.78f, FastValueNoise(position * 0.015f + 4.0f)) *
+            saturate(1.0f - footprint / 0.35f);
+    }
+
+    // --- 油や水の染み（大きな黒ずみ）
+    const float stain = smoothstep(0.50f, 0.82f, FastValueNoise(position * 0.03f + 31.0f)) *
+        (0.6f + 0.4f * FastValueNoise(position * 0.2f + 7.0f));
+
+    // --- 物を引きずった跡（一方向に伸びた細い筋。出る場所を別のノイズで絞ります）
+    const float scuffLine = smoothstep(0.72f, 0.90f,
+        FastValueNoise(float2(position.x * 0.04f, position.y * 0.9f) + 53.0f));
+    const float scuff = scuffLine * smoothstep(0.50f, 0.70f, FastValueNoise(position * 0.012f + 2.0f)) *
+        saturate(1.0f - footprint / 0.6f);
+
+    // --- 壁際に溜まった埃（部屋の角の暗がりと同じ壁の形から、壁までの距離を求めます）
+    const float dust = exp(-GetNearestWallDistance(position) / 4.5f);
+
+    ageing.height = -(joint * 0.5f + crack * 0.4f) * amount;
+
+    float3 tint = (0.93f + 0.12f * slabShade).xxx;
+    tint *= 1.0f - joint * 0.22f;
+    tint *= 1.0f - crack * 0.50f;
+    tint = lerp(tint, tint * float3(0.55f, 0.52f, 0.48f), stain * 0.75f);
+    tint = lerp(tint, tint * 1.18f, scuff * 0.50f);
+    tint = lerp(tint, float3(1.30f, 1.25f, 1.15f), dust * 0.55f);
+    ageing.tint = lerp(1.0f.xxx, tint, amount);
+    return ageing;
+}
+
+FloorAgeing GetFloorAgeing(float3 worldPosition, float amount)
+{
+    FloorAgeing ageing;
+    ageing.height = 0.0f;
+    ageing.tint = 1.0f.xxx;
+    // amount は面ごとに一定なので、この分岐は画素ごとにばらつきません。
+    [branch]
+    if (amount > 0.0f)
+    {
+        ageing = ComputeFloorAgeing(worldPosition.xz, amount);
+    }
+    return ageing;
+}
 
 float3 ApplyFilmicHorrorGrade(float3 color)
 {
@@ -176,6 +250,8 @@ float GetPuddleMask(
 float4 main(in LIT_PS_IN input) : SV_Target
 {
     float4 color = input.col;
+    // 床の古さ（目地・ひび）の凹凸を入れた法線。古さのない面ではそのままの法線です。
+    float3 agedWorldNormal = normalize(input.worldNormal);
 
     if (Material.TextureEnable)
     {
@@ -185,9 +261,13 @@ float4 main(in LIT_PS_IN input) : SV_Target
             g_SamplerState,
             input.tex,
             1.15f).rgb;
-        const float floorLuminance = dot(
-            sampledFloor,
-            float3(0.2126f, 0.7152f, 0.0722f));
+        // 1面（床の古さあり）は、素材の明るさを平均（field.jpgで約0.40）へ寄せて砂利のようなざらつきを抑え、
+        // 床の模様は目地・染み・引きずった跡（GetFloorAgeing）で作ります。
+        // 素材にMipマップがないため、Mipバイアスではぼかせません。
+        const float floorLuminance = lerp(
+            dot(sampledFloor, float3(0.2126f, 0.7152f, 0.0722f)),
+            0.40f,
+            0.65f * WallWeathering);
         float3 concreteFloor = lerp(
             floorLuminance.xxx,
             sampledFloor,
@@ -197,6 +277,13 @@ float4 main(in LIT_PS_IN input) : SV_Target
         concreteFloor *= float3(0.72f, 0.75f, 0.73f) *
             lerp(0.88f, 1.04f, broadVariation);
         color.rgb *= concreteFloor;
+
+        // 床の古さ（1面だけ）。色を掛け、目地とひびの凹凸で法線を作ります。
+        // TextureEnable は描画単位で一定なので、この中で画面上の偏微分を使っても問題ありません。
+        const FloorAgeing floorAgeing = GetFloorAgeing(input.worldPos, WallWeathering);
+        color.rgb *= floorAgeing.tint;
+        agedWorldNormal = ApplyHeightToNormal(
+            input.worldPos, agedWorldNormal, floorAgeing.height, 0.9f);
     }
     else
     {
@@ -218,7 +305,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     shore *= smoothstep(0.55f, 0.92f, saturate(input.worldNormal.y));
 
     float dripRing = 0.0f;
-    float3 detailWorldNormal = normalize(input.worldNormal);
+    float3 detailWorldNormal = agedWorldNormal;
     // 動的な法線再構築は水たまりと狭い水際だけに適用します。
     // 乾いた床では三回のフラクタルノイズ計算を省きます。
     [branch]
@@ -237,8 +324,11 @@ float4 main(in LIT_PS_IN input) : SV_Target
         const float rippleZ = FastValueNoise(
             input.worldPos.xz * 0.095f + animatedNoiseOffset +
             float2(0.0f, 0.035f));
+        // 水たまりの中は目地やひびが水で埋まるため、平らな面から波の凹凸を作ります。
+        const float3 puddleBaseNormal = normalize(lerp(
+            agedWorldNormal, normalize(input.worldNormal), saturate(puddle * 1.5f)));
         detailWorldNormal = normalize(
-            input.worldNormal +
+            puddleBaseNormal +
             float3(ripple - rippleX, 0.0f, ripple - rippleZ) *
             (0.72f + abs(ripplePattern) * 0.55f) * puddle * RippleStrength);
     }
@@ -324,6 +414,11 @@ float4 main(in LIT_PS_IN input) : SV_Target
             * reflectedFixture * puddle * 0.38f;
     }
 
+    // 部屋の角の暗がり。環境光と天井灯には全部、懐中電灯には一部だけ掛けます（照らせば角も見えるように）。
+    const float roomOcclusion = GetRoomOcclusion(input.worldPos, normalize(input.worldNormal));
+    lighting *= roomOcclusion;
+    const float flashlightOcclusion = lerp(1.0f, roomOcclusion, 0.4f);
+
     if (Light.Enable && Light.FlashlightEnabled && distanceFromCamera > 0.001f)
     {
         const float3 pixelDirection = input.viewPos / distanceFromCamera;
@@ -343,14 +438,17 @@ float4 main(in LIT_PS_IN input) : SV_Target
             const float naturalAttenuation = attenuation *
                 lerp(1.0f, physicalFalloff, 0.32f);
 
-            const float3 normal = normalize(input.viewNormal);
+            // 1面は目地・ひび・水の波の凹凸を懐中電灯にも反映します（2面は従来どおり平らな面で計算）。
+            const float3 normal = WallWeathering > 0.0f
+                ? normalize(mul(float4(detailWorldNormal, 0.0f), View).xyz)
+                : normalize(input.viewNormal);
             const float3 directionToLight = -pixelDirection;
             const float lambert = saturate(dot(normal, directionToLight));
             const float softenedLambert = 0.25f + lambert * 0.75f;
 
             const float shadow = GetFlashlightShadow(input.shadowPos);
             const float flashlightAmount = Light.Intensity
-                * beamProfile * naturalAttenuation * lensPattern * shadow;
+                * beamProfile * naturalAttenuation * lensPattern * shadow * flashlightOcclusion;
 
             lighting += Light.Diffuse.rgb
                 * flashlightAmount

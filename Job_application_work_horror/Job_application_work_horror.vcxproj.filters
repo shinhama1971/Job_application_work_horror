@@ -308,6 +308,12 @@
     <ClInclude Include="shader\flashlightLighting.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="shader\roomOcclusion.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\surfaceDetail.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="ScareTrigger.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>

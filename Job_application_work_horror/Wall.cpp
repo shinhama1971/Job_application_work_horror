@@ -311,6 +311,15 @@ void Wall::SetAppearance(
     }
 }
 
+void Wall::SetWeatheringSurface(bool enabled)
+{
+    m_SurfaceMaterial.WeatheringSurface = enabled ? TRUE : FALSE;
+    if (m_Material != nullptr)
+    {
+        m_Material->SetMaterial(m_SurfaceMaterial);
+    }
+}
+
 // 発光色をそのまま光の色にし、明るさは発光の強さに比例させます。
 void Wall::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const
 {

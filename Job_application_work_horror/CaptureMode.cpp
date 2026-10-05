@@ -73,6 +73,7 @@ namespace
         { 8.0f, Vector3(0.0f, FloorY, -90.0f), 0.0f, 0.0f, nullptr, false },
         { 13.0f, Vector3(0.0f, FloorY, -10.0f), YawToward(0.0f, -10.0f, -180.0f, 35.0f), 0.0f, nullptr, false },
         { 15.5f, Vector3(-10.0f, FloorY, 0.0f), YawToward(-10.0f, 0.0f, -180.0f, 35.0f), -0.05f, L"02_1面_中央ホールと配電盤", false },
+        { 17.5f, Vector3(-10.0f, FloorY, 0.0f), YawToward(-10.0f, 0.0f, -180.0f, 35.0f) + 0.6f, 0.95f, L"02b_1面_中央ホールの天井", false },
         { 19.5f, Vector3(-60.0f, FloorY, -88.0f), YawToward(-60.0f, -88.0f, -150.0f, -140.0f), 0.0f, nullptr, false },
         { 24.0f, Vector3(-150.0f, FloorY, -110.0f), 0.0f, -0.26f, L"03_1面_左の倉庫の壁の文字", false },
         { 28.0f, Vector3(-60.0f, FloorY, -30.0f), YawToward(-60.0f, -30.0f, 0.0f, 40.0f), 0.0f, nullptr, false },

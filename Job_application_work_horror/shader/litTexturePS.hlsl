@@ -12,6 +12,8 @@ SamplerState g_SamplerState : register(s0);
 
 #include "fastNoise.hlsli"
 #include "flashlightLighting.hlsli"
+#include "roomOcclusion.hlsli"
+#include "surfaceDetail.hlsli"
 
 struct LIT_PS_IN
 {
@@ -78,26 +80,206 @@ float GetProceduralSurfaceHeight(float3 worldPosition, float3 worldNormal)
     return broad * 0.52f + plaster * 0.33f + fine * 0.15f;
 }
 
-float3 GetBumpedWorldNormal(float3 worldPosition, float3 worldNormal)
+// ----------------------------------------------------------------------------
+// 壁の古さ（1面）。WallWeathering（面ごと）と Material.WeatheringSurface（建物の壁だけ）で有効になります。
+// コンクリートパネルの継ぎ目・小さな穴・ひびを凹凸として、水の垂れた跡・床際の水位線・カビを色として描きます。
+// 画像素材は使わず、ワールド座標から計算するため、壁の長さが違っても模様の大きさはそろいます。
+// ----------------------------------------------------------------------------
+struct WallAgeing
+{
+    float height;   // 凹凸に足す高さ（へこみは負）
+    float cavity;   // 継ぎ目・穴・ひびの奥の暗さ（0〜1）
+    float3 tint;    // 染みの色（元の色に掛けます。1なら変化なし）
+    float damp;     // 湿り（0〜1）。浅い角度のぬれた光沢に使います
+};
+
+// 1面の床の高さ（y=-100）と、壁の上端までの高さ（天井の下面 y≒-48.5）です。
+static const float WallFloorY = -100.0f;
+static const float WallHeight = 51.0f;
+
+// normal はワールド法線の絶対値、weight は古さの濃さ（0より大きい）です。GetWallAgeing から呼びます。
+WallAgeing ComputeWallAgeing(float3 worldPosition, float3 normal, float weight)
+{
+    WallAgeing ageing;
+
+    // 壁に沿った横方向と高さの2次元座標です（GetProceduralGrimeと同じ選び方）。
+    const float2 uv = float2(
+        normal.x > normal.z ? worldPosition.z : worldPosition.x,
+        worldPosition.y);
+    const float heightFromFloor = worldPosition.y - WallFloorY;
+    // 1画素がワールドで何単位か。遠くで細かい模様がちらつかないよう、これで薄めます。
+    const float footprint = max(length(fwidth(uv)), 0.0001f);
+
+    // --- 打ちっぱなしコンクリートの継ぎ目（幅60・高さ17のパネル。壁の文字の高さ y=-70 は横の継ぎ目を避けます）
+    // 縦の継ぎ目はくっきり、横の継ぎ目（型枠の跡）は細く浅くして、タイル張りに見えないようにします。
+    const float2 panelSize = float2(60.0f, WallHeight / 3.0f);
+    const float2 panelUV = float2(uv.x, heightFromFloor) / panelSize;
+    const float2 edgeDistance = (0.5f - abs(frac(panelUV) - 0.5f)) * panelSize;
+    const float verticalJoint = 1.0f - smoothstep(0.06f, 0.26f + footprint, edgeDistance.x);
+    const float formLine = (1.0f - smoothstep(0.03f, 0.12f + footprint, edgeDistance.y)) * 0.45f;
+    const float seam = max(verticalJoint, formLine);
+    // パネルごとに、打った日の違いで色がわずかに違います。
+    const float panelShade = FastHash21(floor(panelUV) + 71.0f);
+
+    // 気泡の穴とひびは、遠くて1画素より小さくなる場所では見えないため計算を省きます。
+    float pit = 0.0f;
+    float crack = 0.0f;
+    [branch]
+    if (footprint < 0.5f)
+    {
+        // --- 小さな気泡の穴（セルの中で位置と大きさをばらつかせ、格子状に並ばないようにします）
+        const float pitCellSize = 1.6f;
+        const float2 pitCell = floor(uv / pitCellSize);
+        const float pitSeed = FastHash21(pitCell + 17.3f);
+        const float2 pitOffset = float2(
+            FastHash21(pitCell + 3.9f), FastHash21(pitCell + 8.6f)) * 0.5f - 0.25f;
+        const float pitSize = 0.05f + 0.12f * FastHash21(pitCell + 29.4f);
+        const float pitRadius = length(frac(uv / pitCellSize) - 0.5f - pitOffset) * pitCellSize;
+        pit = step(0.92f, pitSeed) *
+            (1.0f - smoothstep(pitSize * 0.4f, pitSize + footprint, pitRadius)) *
+            saturate(1.0f - footprint / 0.5f);
+
+        // --- ひび（ノイズの等高線を細い線として使い、別のノイズで出る場所を絞ります）
+        const float crackLine = 1.0f - smoothstep(0.0f, 0.012f + footprint * 0.04f,
+            abs(FastValueNoise(uv * 0.085f + 61.0f) - 0.5f));
+        const float crackMask = smoothstep(0.62f, 0.78f, FastValueNoise(uv * 0.021f + 9.0f));
+        crack = crackLine * crackMask * saturate(1.0f - footprint / 0.35f);
+    }
+
+    // --- 床際の水位線（水が溜まっていた跡）。高さは場所によって6〜12で揺らぎます
+    const float waterLine = 6.0f + 6.0f * FastValueNoise(float2(uv.x * 0.04f, 3.1f));
+    const float belowWater = 1.0f - smoothstep(waterLine - 1.5f, waterLine + 0.3f, heightFromFloor);
+    const float tideMark = exp(-abs(heightFromFloor - waterLine) * 1.6f);
+
+    // --- 上から垂れた錆と水の跡（幅2.4ごとの縦の帯のうち、2割ほどに出します）
+    const float streakWidth = 2.4f;
+    const float column = floor(uv.x / streakWidth);
+    const float streakSeed = FastHash21(float2(column, 41.7f));
+    const float streakX = abs(frac(uv.x / streakWidth) - 0.5f);
+    const float streakHalfWidth = 0.10f + 0.22f * FastHash21(float2(column, 7.7f));
+    const float streakLength = 14.0f + 26.0f * FastHash21(float2(column, 13.1f));
+    const float fromTop = WallHeight - heightFromFloor;
+    const float streak = step(0.80f, streakSeed) *
+        (1.0f - smoothstep(streakHalfWidth * 0.35f, streakHalfWidth + footprint, streakX)) *
+        (1.0f - smoothstep(streakLength * 0.45f, streakLength, fromTop)) *
+        (0.55f + 0.45f * FastValueNoise(float2(column * 3.1f, heightFromFloor * 0.35f)));
+
+    // --- カビ（床際に多く、壁の途中にも固まって生えます）。細かい斑点はなめらかなノイズで丸くにじませます
+    // 値ノイズは格子に沿った四角い形が出やすいため、座標を回転させ、大きさの違う2つを混ぜて格子を崩します。
+    const float moldCluster = smoothstep(0.58f, 0.82f, FastValueNoise(uv * 0.055f + 23.0f));
+    const float2 rotatedUV = float2(
+        uv.x * 0.866f - uv.y * 0.5f,
+        uv.x * 0.5f + uv.y * 0.866f);
+    const float moldGrain =
+        FastValueNoise(rotatedUV * 1.1f + 5.0f) * 0.6f +
+        FastValueNoise(uv * 2.7f - 13.0f) * 0.4f;
+    // 斑点は「ある・なし」で切らず、カビの塊の中の濃淡として使います。
+    const float moldSpeckle = lerp(0.45f, 1.0f, smoothstep(0.30f, 0.75f, moldGrain));
+    const float mold = moldCluster * lerp(1.0f, moldSpeckle, saturate(1.0f - footprint / 0.6f)) *
+        saturate(exp(-heightFromFloor * 0.05f) + 0.30f);
+
+    ageing.height = -(seam * 0.7f + pit * 0.5f + crack * 0.35f) * weight;
+    ageing.cavity = saturate(seam * 0.32f + pit * 0.40f + crack * 0.42f) * weight;
+
+    // 色は元の色に掛けます（茶色＝錆、くすんだ緑＝カビ、少し暗い灰緑＝水に浸かっていた部分）。
+    const float3 rust = float3(0.66f, 0.50f, 0.38f);
+    const float3 moldColor = float3(0.26f, 0.32f, 0.24f);
+    const float3 soakedColor = float3(0.72f, 0.76f, 0.70f);
+    float3 tint = (0.94f + 0.10f * panelShade).xxx;
+    tint = lerp(tint, soakedColor, belowWater * 0.60f);
+    tint = lerp(tint, rust * 0.85f, tideMark * 0.50f);
+    tint = lerp(tint, rust, streak * 0.65f);
+    tint = lerp(tint, moldColor, mold * 0.75f);
+    ageing.tint = lerp(1.0f.xxx, tint, weight);
+    ageing.damp = saturate(belowWater * 0.6f + streak * 0.4f) * weight;
+    return ageing;
+}
+
+// 天井の古さ。金属の枠に並んだ天井板（12四方。この世界では約60cm）、外れ落ちた板の穴、雨漏りの染みを描きます。
+// 天井の元の色はほぼ黒（0.055）なので、板の部分は色を掛けて暗い灰色まで明るくします（ホラーらしく、見上げても暗く沈む程度）。
+WallAgeing ComputeCeilingAgeing(float2 position, float weight)
+{
+    WallAgeing ageing;
+    const float footprint = max(length(fwidth(position)), 0.0001f);
+
+    // --- 天井板と金属の枠
+    const float tileSize = 12.0f;
+    const float2 tileUV = position / tileSize;
+    const float2 tileId = floor(tileUV);
+    const float2 local = frac(tileUV);
+    const float2 edgeDistance = (0.5f - abs(local - 0.5f)) * tileSize;
+    const float frame = 1.0f - smoothstep(0.15f, 0.35f + footprint, min(edgeDistance.x, edgeDistance.y));
+    const float tileSeed = FastHash21(tileId + 5.0f);
+
+    // --- 外れ落ちた板（7%ほど）。枠だけ残り、奥の暗い空間が見えます
+    const float missing = step(0.93f, tileSeed) * (1.0f - frame);
+
+    // --- 雨漏りの染み（板の25%ほど）。茶色いにじみと、縁の濃い輪
+    const float stainSeed = FastHash21(tileId + 19.0f);
+    const float2 stainCenter = 0.3f + 0.4f * float2(
+        FastHash21(tileId + 31.0f), FastHash21(tileId + 47.0f));
+    const float stainRadius = 2.0f + 3.0f * FastHash21(tileId + 61.0f);
+    const float stainDistance = length(local - stainCenter) * tileSize *
+        (0.85f + 0.3f * FastValueNoise(position * 0.4f + 3.0f));
+    const float stainOn = step(0.75f, stainSeed) * (1.0f - missing) * (1.0f - frame);
+    const float stainFill = (1.0f - smoothstep(stainRadius * 0.55f, stainRadius, stainDistance)) * stainOn;
+    const float stainRing = exp(-abs(stainDistance - stainRadius) * 3.0f) * stainOn;
+
+    // 枠は板より少し下に出ていて、外れた板の穴は奥へへこんでいます。
+    ageing.height = (frame * 0.4f - missing * 1.5f) * weight;
+    ageing.cavity = missing * 0.9f * weight;
+
+    const float3 tileColor = (2.3f + 0.4f * tileSeed).xxx;
+    const float3 frameColor = float3(1.6f, 1.6f, 1.55f);
+    float3 tint = lerp(tileColor, frameColor, frame);
+    tint = lerp(tint, tint * float3(0.78f, 0.62f, 0.44f), stainFill * 0.65f);
+    tint = lerp(tint, tint * float3(0.50f, 0.40f, 0.30f), stainRing * 0.55f);
+    tint = lerp(tint, 0.20f.xxx, missing);
+    ageing.tint = lerp(1.0f.xxx, tint, weight);
+    ageing.damp = stainFill * 0.3f * weight;
+    return ageing;
+}
+
+WallAgeing GetWallAgeing(float3 worldPosition, float3 worldNormal, float amount)
+{
+    WallAgeing ageing;
+    ageing.height = 0.0f;
+    ageing.cavity = 0.0f;
+    ageing.tint = 1.0f.xxx;
+    ageing.damp = 0.0f;
+
+    // 古さを描かない面（小物・2面）は何も計算しません。
+    // amount は描画単位で一定（定数バッファと材質）なので、この分岐は画素ごとにばらつかず安く済みます。
+    // 建物の面のうち、縦の面は壁の古さ、下を向いた面（天井）は天井の古さを描きます。
+    const float3 signedNormal = normalize(worldNormal);
+    const float3 normal = abs(signedNormal);
+    const float verticalSurface = saturate(1.0f - normal.y * normal.y);
+    const float weight = amount * smoothstep(0.5f, 0.9f, verticalSurface);
+    const float ceilingWeight = amount * smoothstep(0.7f, 0.95f, -signedNormal.y);
+    [branch]
+    if (weight > 0.0f)
+    {
+        ageing = ComputeWallAgeing(worldPosition, normal, weight);
+    }
+    else if (ceilingWeight > 0.0f)
+    {
+        ageing = ComputeCeilingAgeing(worldPosition.xz, ceilingWeight);
+    }
+    return ageing;
+}
+
+// extraHeight は GetProceduralSurfaceHeight に足す高さ（壁の古さの継ぎ目など）、strength は凹凸の強さです。
+float3 GetBumpedWorldNormal(
+    float3 worldPosition,
+    float3 worldNormal,
+    float extraHeight,
+    float strength)
 {
     const float3 normal = normalize(worldNormal);
     const float height = GetProceduralSurfaceHeight(
         worldPosition,
-        worldNormal);
-    const float heightDx = ddx(height);
-    const float heightDy = ddy(height);
-    const float3 positionDx = ddx(worldPosition);
-    const float3 positionDy = ddy(worldPosition);
-    const float3 gradientX = cross(positionDy, normal);
-    const float3 gradientY = cross(normal, positionDx);
-    const float determinant = dot(positionDx, gradientX);
-    const float inverseDeterminant =
-        (determinant < 0.0f ? -1.0f : 1.0f) /
-        max(abs(determinant), 0.0001f);
-    const float3 surfaceGradient =
-        (gradientX * heightDx + gradientY * heightDy) *
-        inverseDeterminant;
-    return normalize(normal - surfaceGradient * 0.72f);
+        worldNormal) + extraHeight;
+    return ApplyHeightToNormal(worldPosition, normal, height, strength);
 }
 
 float3 ApplyFilmicHorrorGrade(float3 color)
@@ -155,6 +337,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         float3(0.3333f, 0.3333f, 0.3333f));
     float3 detailWorldNormal = normalize(input.worldNormal);
     float grime = 0.0f;
+    float wetness = 0.0f;
     if (!Material.TextureEnable && emissionEnergy < 0.001f)
     {
         grime = GetProceduralGrime(
@@ -165,9 +348,20 @@ float4 main(in LIT_PS_IN input) : SV_Target
             color.rgb,
             color.rgb * float3(0.72f, 0.80f, 0.69f),
             grime * 0.20f);
+
+        // 壁の古さ（1面の建物の壁だけ）。0のときは従来の見た目と同じです。
+        const float weathering = Material.WeatheringSurface ? WallWeathering : 0.0f;
+        const WallAgeing ageing = GetWallAgeing(
+            input.worldPos, input.worldNormal, weathering);
+        color.rgb *= ageing.tint;
+        color.rgb *= 1.0f - ageing.cavity * 0.55f;
+        wetness = saturate(grime + ageing.damp * 0.8f);
+
         detailWorldNormal = GetBumpedWorldNormal(
             input.worldPos,
-            input.worldNormal);
+            input.worldNormal,
+            ageing.height,
+            0.72f * (1.0f + 0.8f * weathering));
     }
     const float3 detailViewNormal = normalize(mul(
         float4(detailWorldNormal, 0.0f),
@@ -219,6 +413,11 @@ float4 main(in LIT_PS_IN input) : SV_Target
             * fixtureDistribution;
     }
 
+    // 部屋の角の暗がり。環境光と天井灯には全部、懐中電灯には一部だけ掛けます（照らせば角も見えるように）。
+    const float roomOcclusion = GetRoomOcclusion(input.worldPos, normalize(input.worldNormal));
+    lighting *= roomOcclusion;
+    const float flashlightOcclusion = lerp(1.0f, roomOcclusion, 0.4f);
+
     if (Light.Enable && Light.FlashlightEnabled && distanceFromCamera > 0.001f)
     {
         const float3 pixelDirection = input.viewPos / distanceFromCamera;
@@ -249,7 +448,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
                 * naturalAttenuation
                 * lensPattern
                 * softenedLambert
-                * GetFlashlightShadow(input.shadowPos);
+                * GetFlashlightShadow(input.shadowPos)
+                * flashlightOcclusion;
         }
     }
 
@@ -261,7 +461,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     const float dampFresnel = pow(
         1.0f - saturate(dot(detailViewNormal, viewDirection)),
         4.0f);
-    color.rgb += float3(0.055f, 0.070f, 0.076f) * grime *
+    color.rgb += float3(0.055f, 0.070f, 0.076f) * wetness *
         (0.045f + dampFresnel * 0.42f);
 
     color.rgb += Material.Emission.rgb;

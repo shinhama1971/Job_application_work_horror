@@ -391,6 +391,8 @@
     <ClInclude Include="shader\fastNoise.hlsli" />
     <ClInclude Include="shader\flashlightShadow.hlsli" />
     <ClInclude Include="shader\flashlightLighting.hlsli" />
+    <ClInclude Include="shader\roomOcclusion.hlsli" />
+    <ClInclude Include="shader\surfaceDetail.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="shader\wetFloorPS.hlsl">

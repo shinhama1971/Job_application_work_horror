@@ -53,7 +53,9 @@ cbuffer DebugViewBuffer : register(b7)
 {
     int DebugViewMode;
     float WallDampStrength;
-    float2 DebugViewPadding;
+    // 壁の古さ（0〜1）。1面は1、2面は0（Renderer::SetWallWeathering）。
+    float WallWeathering;
+    float DebugViewPadding;
 };
 
 cbuffer LightBuffer : register(b3)
@@ -69,7 +71,8 @@ struct MATERIAL
     float4 Emission;
     float Shiness;
     bool TextureEnable;
-    bool2 Dummy;
+    bool WeatheringSurface;   // 建物の壁ならtrue（壁の古さを描く面）
+    bool Dummy;
 };
 // ----------------------------------------------------------------------------
 // タイルベースライティング
