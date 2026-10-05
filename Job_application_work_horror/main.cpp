@@ -6,6 +6,14 @@
 #include    "main.h"
 #include    "Application.h"
 
+// 内蔵GPUと単体GPUを持つノートPCで、GPUドライバーに単体GPU（高性能側）を使うよう伝えます。
+// Renderer::Initでも高性能なGPUを選びますが、古いドライバーではこちらの印が使われます。
+extern "C"
+{
+	__declspec(dllexport) unsigned long NvOptimusEnablement = 1;
+	__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+
 //=======================================
 //エントリーポイント
 //=======================================

@@ -46,8 +46,8 @@ void Hud::DrawTitle(
 {
     m_Vertices.clear();
 
-    const float screenWidth = static_cast<float>(Application::GetWidth());
-    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
     const Color background(0.002f, 0.004f, 0.004f, 1.0f);
     const Color dimGreen(0.08f, 0.20f, 0.14f, 0.50f);
     const Color titleGreen(0.48f, 0.90f, 0.58f, 0.96f);
@@ -192,14 +192,17 @@ void Hud::DrawResult(
     int puzzleMistakes,
     int chargersUsed,
     int evidenceCollected,
+    int wallWritingsRead,
+    bool hiddenRoomEscaped,
+    std::string_view stage2Anomalies,
     bool newBestTime,
     bool newBestCaught)
 {
     m_Vertices.clear();
 
     const float reveal = (std::clamp)(revealAmount, 0.0f, 1.0f);
-    const float screenWidth = static_cast<float>(Application::GetWidth());
-    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
     const Color background(0.004f, 0.007f, 0.006f, 1.0f);
     const Color panel(0.018f, 0.028f, 0.025f, 0.94f * reveal);
     const Color green(0.48f, 0.90f, 0.56f, 0.96f * reveal);
@@ -218,7 +221,8 @@ void Hud::DrawResult(
     }
 
     const float panelWidth = (std::min)(screenWidth * 0.72f, 860.0f);
-    const float panelHeight = 560.0f;
+    // 下段に「今回の発見」（壁の文字・隠し部屋・今回の異変）を並べるため、縦に広げています。
+    const float panelHeight = 680.0f;
     const float panelX = (screenWidth - panelWidth) * 0.5f;
     const float panelY = (screenHeight - panelHeight) * 0.5f;
     AddRectangle(panelX, panelY, panelWidth, panelHeight, panel);
@@ -256,7 +260,10 @@ void Hud::DrawResult(
     const int safeAnomaliesHandled = (std::max)(anomaliesHandled, 0);
     const int safePuzzleMistakes = (std::max)(puzzleMistakes, 0);
     const int safeChargersUsed = (std::max)(chargersUsed, 0);
-    const int safeEvidenceCollected = (std::clamp)(evidenceCollected, 0, 3);
+    constexpr int totalEvidence = Core::GameState::TotalEvidenceCount;
+    constexpr int totalWritings = Core::GameState::TotalWallWritingCount;
+    const int safeEvidenceCollected = (std::clamp)(evidenceCollected, 0, totalEvidence);
+    const int safeWritingsRead = (std::clamp)(wallWritingsRead, 0, totalWritings);
     const int timePenalty = (std::min)(
         (std::max)(clearSeconds - 360, 0) / 15, 40);
     const int caughtPenalty = (std::min)(safeCaughtCount * 15, 45);
@@ -303,7 +310,8 @@ void Hud::DrawResult(
     const std::string chargerText =
         "充電器の使用 " + std::to_string(safeChargersUsed) + "回";
     const std::string evidenceText =
-        "残された記録 " + std::to_string(safeEvidenceCollected) + " / 3";
+        "残された記録 " + std::to_string(safeEvidenceCollected) + " / " +
+        std::to_string(totalEvidence);
     constexpr float statPixelSize = 2.5f;
     const float timeWidth =
         static_cast<float>(CountDisplayedCharacters(timeText)) * statPixelSize * 6.0f;
@@ -352,13 +360,38 @@ void Hud::DrawResult(
         panelY + 402.0f,
         evidenceText,
         statPixelSize,
-        safeEvidenceCollected >= 3
+        safeEvidenceCollected >= totalEvidence
             ? Color(0.92f, 0.78f, 0.34f, 0.96f * reveal)
             : pale);
 
+    // 今回の発見。プレイごとに変わる要素と任意の探索を並べ、もう一度遊ぶ理由にします。
+    const Color gold(0.92f, 0.78f, 0.34f, 0.96f * reveal);
+    const Color dim(0.50f, 0.58f, 0.52f, 0.80f * reveal);
+    const auto addCenteredStat = [this, screenWidth](
+        float y, std::string_view text, float pixelSize, const Color& color)
+    {
+        const float width =
+            static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * 6.0f;
+        AddText((screenWidth - width) * 0.5f, y, text, pixelSize, color);
+    };
+    AddRectangle(panelX + 60.0f, panelY + 446.0f, panelWidth - 120.0f, 1.0f, dim);
+    addCenteredStat(panelY + 458.0f, "今回の発見", 2.2f, dim);
+    const std::string writingText =
+        "壁の文字 " + std::to_string(safeWritingsRead) + " / " + std::to_string(totalWritings);
+    addCenteredStat(panelY + 490.0f, writingText, statPixelSize,
+        safeWritingsRead >= totalWritings ? gold : pale);
+    addCenteredStat(panelY + 524.0f,
+        hiddenRoomEscaped ? "隠し部屋 脱出した" : "隠し部屋 見つけていない", statPixelSize,
+        hiddenRoomEscaped ? gold : pale);
+    if (!stage2Anomalies.empty())
+    {
+        addCenteredStat(panelY + 558.0f,
+            "2階の異変 " + std::string(stage2Anomalies), statPixelSize, pale);
+    }
+
     std::string_view achievement = "";
-    if (safeEvidenceCollected >= 3 && safeCaughtCount == 0 &&
-        safePuzzleMistakes == 0)
+    if (safeEvidenceCollected >= totalEvidence && safeWritingsRead >= totalWritings &&
+        hiddenRoomEscaped && safeCaughtCount == 0 && safePuzzleMistakes == 0)
     {
         achievement = "完全探索で脱出";
     }
@@ -386,7 +419,7 @@ void Hud::DrawResult(
             achievementPixelSize * 6.0f;
         AddText(
             (screenWidth - achievementWidth) * 0.5f,
-            panelY + 448.0f,
+            panelY + 598.0f,
             achievement,
             achievementPixelSize,
             Color(0.92f, 0.78f, 0.34f, 0.96f * reveal));
@@ -401,7 +434,7 @@ void Hud::DrawResult(
         promptPixelSize * 6.0f;
     AddText(
         (screenWidth - promptWidth) * 0.5f,
-        panelY + 508.0f,
+        panelY + 638.0f,
         prompt,
         promptPixelSize,
         pale);
@@ -425,8 +458,8 @@ void Hud::DrawSurveillanceFeed(
     bool reportReady,
     bool wrongReportVisible)
 {
-    const float screenWidth = static_cast<float>(Application::GetWidth());
-    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
     const float availableHeight = (std::max)(screenHeight - 156.0f, 300.0f);
     const float feedWidth = (std::min)({
         screenWidth * 0.90f,
@@ -568,8 +601,8 @@ void Hud::DrawChapterCard(
     }
 
     m_Vertices.clear();
-    const float screenWidth = static_cast<float>(Application::GetWidth());
-    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
     const float panelWidth = (std::min)(screenWidth * 0.72f, 760.0f);
     const float panelHeight = 142.0f;
     const float panelX = (screenWidth - panelWidth) * 0.5f;
@@ -665,7 +698,7 @@ void Hud::DrawStage2Status(
 {
     m_Vertices.clear();
 
-    const float screenWidth = static_cast<float>(Application::GetWidth());
+    const float screenWidth = GetCanvasWidth();
     constexpr float panelWidth = 214.0f;
     constexpr float panelHeight = 58.0f;
     const float panelX = screenWidth - panelWidth - 34.0f;
@@ -747,8 +780,8 @@ void Hud::DrawKeypad(
     int mistakes)
 {
     m_Vertices.clear();
-    const float screenWidth = static_cast<float>(Application::GetWidth());
-    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
     constexpr float panelWidth = 440.0f;
     constexpr float panelHeight = 300.0f;
     const float panelX = (screenWidth - panelWidth) * 0.5f;
@@ -826,10 +859,52 @@ void Hud::DrawKeypad(
     Flush();
 }
 
+void Hud::DrawHidingView(float elapsedSeconds, float dangerRate)
+{
+    m_Vertices.clear();
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
+    const float danger = (std::clamp)(dangerRate, 0.0f, 1.0f);
+    const Color dark(0.0f, 0.0f, 0.0f, 0.94f);
+    const Color edge(0.10f + danger * 0.35f, 0.02f, 0.02f, 0.55f);
+
+    // 画面の中央付近に4本の横長の隙間を残し、それ以外を扉の内側の暗さで覆います。
+    // 呼吸に合わせて、隙間がわずかに上下します。
+    constexpr int SlitCount = 4;
+    const float slitHeight = screenHeight * 0.055f;
+    const float slitGap = screenHeight * 0.035f;
+    const float breath = std::sin(elapsedSeconds * 1.6f) * screenHeight * 0.004f;
+    const float firstSlitY = screenHeight * 0.36f + breath;
+    const float slitInset = screenWidth * 0.12f;
+
+    float coveredY = 0.0f;
+    for (int index = 0; index < SlitCount; ++index)
+    {
+        const float slitY = firstSlitY + static_cast<float>(index) * (slitHeight + slitGap);
+        AddRectangle(0.0f, coveredY, screenWidth, slitY - coveredY, dark);
+        AddRectangle(0.0f, slitY, slitInset, slitHeight, dark);
+        AddRectangle(screenWidth - slitInset, slitY, slitInset, slitHeight, dark);
+        AddRectangle(slitInset, slitY, screenWidth - slitInset * 2.0f, 2.0f, edge);
+        AddRectangle(slitInset, slitY + slitHeight - 2.0f, screenWidth - slitInset * 2.0f, 2.0f, edge);
+        coveredY = slitY + slitHeight;
+    }
+    AddRectangle(0.0f, coveredY, screenWidth, screenHeight - coveredY, dark);
+
+    const std::string_view prompt = Input::IsControllerConnected()
+        ? "A 外に出る"
+        : "E 外に出る";
+    constexpr float promptPixelSize = 2.2f;
+    const float promptWidth =
+        static_cast<float>(CountDisplayedCharacters(prompt)) * promptPixelSize * 6.0f;
+    AddText((screenWidth - promptWidth) * 0.5f, screenHeight - 90.0f,
+        prompt, promptPixelSize, Color(0.62f, 0.70f, 0.66f, 0.80f));
+    Flush();
+}
+
 void Hud::DrawQuietRecovery(float progressRate, float cooldown, bool success, bool tooClose)
 {
     m_Vertices.clear();
-    const float x = (std::max)(12.0f, static_cast<float>(Application::GetWidth()) - 330.0f);
+    const float x = (std::max)(12.0f, GetCanvasWidth() - 330.0f);
     constexpr float y = 150.0f;
     const Color color = tooClose ? Color(0.96f, 0.38f, 0.25f, 1.0f)
         : Color(0.64f, 0.84f, 0.78f, 1.0f);
@@ -853,6 +928,7 @@ void Hud::DrawPause(
     int lookSensitivityLevel,
     int volumeLevel,
     bool guideEnabled,
+    int resolutionLevel,
     int selectedSetting,
     int floorNumber,
     float runTimeSeconds,
@@ -860,10 +936,10 @@ void Hud::DrawPause(
 {
     m_Vertices.clear();
 
-    const float screenWidth = static_cast<float>(Application::GetWidth());
-    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
     const float panelWidth = 660.0f;
-    const float panelHeight = 560.0f;
+    const float panelHeight = 600.0f;
     const float panelX = (screenWidth - panelWidth) * 0.5f;
     const float panelY = (screenHeight - panelHeight) * 0.5f;
     const Color shade(0.0f, 0.004f, 0.004f, 0.78f);
@@ -904,7 +980,7 @@ void Hud::DrawPause(
         (std::clamp)(lookSensitivityLevel, 0, 4);
     const int safeVolumeLevel = (std::clamp)(volumeLevel, 0, 4);
     const int safeSelectedSetting =
-        (std::clamp)(selectedSetting, 0, 4);
+        (std::clamp)(selectedSetting, 0, 5);
     const std::string brightnessText =
         "明るさ " + std::to_string(safeBrightnessLevel + 1) +
         " OF 5";
@@ -936,30 +1012,42 @@ void Hud::DrawPause(
     addCenteredText(panelY + 268.0f,
         guideEnabled ? "目的表示 あり" : "目的表示 なし", 2.5f,
         safeSelectedSetting == 4 ? green : pale);
+    // 描画解像度は次回起動から反映されるため、起動時と違う段階を選んでいるときはそのことを表示します。
+    constexpr std::string_view resolutionNames[] = { "自動", "100%", "75%", "67%" };
+    const int safeResolutionLevel = (std::clamp)(resolutionLevel, 0, 3);
+    const std::string resolutionText =
+        "描画解像度 " + std::string(resolutionNames[safeResolutionLevel]) +
+        (safeResolutionLevel == Application::GetLaunchResolutionLevel()
+            ? "  " + std::to_string(Application::GetWidth()) + "x" +
+                std::to_string(Application::GetHeight())
+            : std::string("  次回起動から"));
+    addCenteredText(panelY + 308.0f,
+        resolutionText, 2.5f,
+        safeSelectedSetting == 5 ? green : pale);
     if (Input::IsControllerConnected())
     {
-        addCenteredText(panelY + 310.0f,
+        addCenteredText(panelY + 350.0f,
             "十字キーで選択と調整", 2.0f, pale);
-        addCenteredText(panelY + 352.0f,
+        addCenteredText(panelY + 392.0f,
             "START ゲームに戻る", 2.5f, pale);
-        addCenteredText(panelY + 394.0f,
+        addCenteredText(panelY + 434.0f,
             "Y この階をやり直す", 2.5f, pale);
-        addCenteredText(panelY + 436.0f,
+        addCenteredText(panelY + 476.0f,
             "B タイトルへ戻る", 2.5f, pale);
-        addCenteredText(panelY + 478.0f,
+        addCenteredText(panelY + 518.0f,
             "BACK ゲーム終了", 2.5f, pale);
     }
     else
     {
-        addCenteredText(panelY + 310.0f,
+        addCenteredText(panelY + 350.0f,
             "矢印キーで選択と調整", 2.0f, pale);
-        addCenteredText(panelY + 352.0f,
+        addCenteredText(panelY + 392.0f,
             "ESC または P ゲームに戻る", 2.5f, pale);
-        addCenteredText(panelY + 394.0f,
+        addCenteredText(panelY + 434.0f,
             "R この階をやり直す", 2.5f, pale);
-        addCenteredText(panelY + 436.0f,
+        addCenteredText(panelY + 476.0f,
             "T タイトルへ戻る", 2.5f, pale);
-        addCenteredText(panelY + 478.0f,
+        addCenteredText(panelY + 518.0f,
             "Q ゲーム終了", 2.5f, pale);
     }
 

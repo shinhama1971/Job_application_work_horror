@@ -49,6 +49,19 @@ void Stage2Scene::Draw(Camera* camera)
         SelectStage2Objective(MakeObjectiveInput(confirmationPending));
 
     // 目的表示なしの設定では、何をすべきかを説明しない静かな画面にします。
+    // ロッカーの中では、扉の隙間以外を暗くします（目的表示はその上に重ねて読めるようにします）。
+    if (player->IsHiding())
+    {
+        float hidingDanger = 0.0f;
+        ShadowMan* stalker = m_Objects.noiseShadow;
+        if (stalker != nullptr && stalker->IsActive())
+        {
+            Vector3 toStalker = stalker->GetPosition() - player->GetPosition();
+            toStalker.y = 0.0f;
+            hidingDanger = 1.0f - (std::clamp)((toStalker.Length() - 20.0f) / 80.0f, 0.0f, 1.0f);
+        }
+        m_Hud.DrawHidingView(m_VisualTimer, hidingDanger);
+    }
     m_Hud.Draw(*player, -1, m_InteractionSystem.GetPrompt(),
         game->IsGuideEnabled() ? objective : std::string_view{});
     float threatRate = 0.0f;
@@ -208,6 +221,7 @@ void Stage2Scene::Draw(Camera* camera)
             game->GetLookSensitivityLevel(),
             game->GetVolumeLevel(),
             game->IsGuideEnabled(),
+            game->GetResolutionLevel(),
             game->GetPauseSettingIndex(),
             2,
             game->GetRunTimeSeconds(),
@@ -233,6 +247,8 @@ Stage2ObjectiveInput Stage2Scene::MakeObjectiveInput(bool confirmationPending) c
     input.requiredAnomalyFound = IsRequiredAnomalyFound();
     input.falseDoorObserved = m_FalseDoorAnomaly.WasObserved();
     input.portraitStaring = m_PortraitAnomaly.IsStaring();
+    input.hiding = m_Objects.player != nullptr && m_Objects.player->IsHiding();
+    input.hidingNotice = m_Notices.hiding > 0.0f;
     input.knockListening = m_KnockingAnomaly.IsListening();
 
     input.signalPuzzleComplete = m_SignalPuzzle.IsComplete();

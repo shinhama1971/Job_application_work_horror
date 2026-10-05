@@ -38,6 +38,21 @@ namespace
     }
 }
 
+float Hud::GetCanvasScale()
+{
+    return (std::max)(static_cast<float>(Application::GetHeight()), 1.0f) / ReferenceHeight;
+}
+
+float Hud::GetCanvasWidth()
+{
+    return static_cast<float>(Application::GetWidth()) / GetCanvasScale();
+}
+
+float Hud::GetCanvasHeight()
+{
+    return ReferenceHeight;
+}
+
 void Hud::Init()
 {
     m_Shader.Create("shader/hudVS.hlsl", "shader/hudPS.hlsl");
@@ -79,7 +94,8 @@ void Hud::DrawTextureRectangle(
     m_Vertices.push_back(makeVertex(right, bottom, 1.0f, 1.0f));
     m_VertexBuffer.Modify(m_Vertices);
 
-    Renderer::SetWorldViewProjection2D();
+    // 座標はHUDのキャンバス単位なので、キャンバス全体が画面全体になる行列にします。
+    Renderer::SetWorldViewProjection2D(GetCanvasWidth(), GetCanvasHeight());
     Renderer::SetDepthEnable(false);
     Renderer::SetBlendState(BS_NONE);
     Renderer::SetUV(0.0f, 0.0f, 1.0f, 1.0f);
@@ -122,8 +138,8 @@ void Hud::Draw(
             ? Color(0.62f, 0.92f, 0.70f, 0.98f)
             : white);
 
-    const float screenWidth = static_cast<float>(Application::GetWidth());
-    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
 
     if (!objectiveText.empty())
     {
@@ -150,16 +166,17 @@ void Hud::Draw(
     // リザルトで加点される探索要素も、クリア前から理解できる表示にします。
     Core::Game* game = Core::Game::GetInstance();
     const int evidenceCount = game != nullptr
-        ? (std::clamp)(game->GetEvidenceCollected(), 0, 3)
+        ? (std::clamp)(game->GetEvidenceCollected(), 0, Core::GameState::TotalEvidenceCount)
         : 0;
     const std::string evidenceText =
-        "記録 " + std::to_string(evidenceCount) + " / 3";
+        "記録 " + std::to_string(evidenceCount) + " / " +
+        std::to_string(Core::GameState::TotalEvidenceCount);
     constexpr float evidencePixelSize = 2.0f;
     const float evidenceWidth =
         static_cast<float>(CountDisplayedCharacters(evidenceText)) *
         evidencePixelSize * 6.0f;
     const float evidenceX = screenWidth - evidenceWidth - 52.0f;
-    const Color evidenceColor = evidenceCount >= 3
+    const Color evidenceColor = evidenceCount >= Core::GameState::TotalEvidenceCount
         ? Color(0.92f, 0.78f, 0.34f, 0.96f)
         : Color(0.62f, 0.78f, 0.70f, 0.88f);
     AddRectangle(evidenceX - 14.0f, 74.0f,
@@ -317,8 +334,8 @@ void Hud::DrawBlink(float opacity)
     AddRectangle(
         0.0f,
         0.0f,
-        static_cast<float>(Application::GetWidth()),
-        static_cast<float>(Application::GetHeight()),
+        GetCanvasWidth(),
+        GetCanvasHeight(),
         Color(0.0f, 0.0f, 0.0f, blinkOpacity));
     Flush();
 }
@@ -356,8 +373,8 @@ void Hud::AddRectangle(float x, float y, float width, float height, const Color&
         return;
     }
 
-    const float screenWidth = static_cast<float>(Application::GetWidth());
-    const float screenHeight = static_cast<float>(Application::GetHeight());
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
 
     const float left = x / screenWidth * 2.0f - 1.0f;
     const float right = (x + width) / screenWidth * 2.0f - 1.0f;
@@ -410,24 +427,19 @@ void Hud::AddText(
         unsigned int width = 0;
         unsigned int height = 0;
         int advance = 0;
+        int offsetX = 0;    // 文字の位置から画像の左上までのずれ（画素）
+        int offsetY = 0;
         std::vector<unsigned char> bitmap;
     };
 
+    // 日本語の文字は、画面に出る大きさ（画素の高さ）のフォントで白黒の画像にし、1ドット＝1画素で描きます。
+    // 小さいフォントの画像を縮めて描くと1ドットが1画素より細くなり、線が消えたり太ったりして字が崩れるためです。
     class JapaneseGlyphCache
     {
     public:
         JapaneseGlyphCache()
         {
             m_DC = CreateCompatibleDC(nullptr);
-            m_Font = CreateFontW(
-                -18, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
-                SHIFTJIS_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
-                NONANTIALIASED_QUALITY, FIXED_PITCH | FF_MODERN,
-                L"Yu Gothic UI");
-            if (m_DC != nullptr && m_Font != nullptr)
-            {
-                m_OldFont = SelectObject(m_DC, m_Font);
-            }
         }
 
         ~JapaneseGlyphCache()
@@ -436,9 +448,9 @@ void Hud::AddText(
             {
                 SelectObject(m_DC, m_OldFont);
             }
-            if (m_Font != nullptr)
+            for (const auto& [height, font] : m_Fonts)
             {
-                DeleteObject(m_Font);
+                DeleteObject(font);
             }
             if (m_DC != nullptr)
             {
@@ -446,18 +458,21 @@ void Hud::AddText(
             }
         }
 
-        const RasterGlyph& Get(wchar_t character)
+        // fontHeightは文字の高さ（画素）。大きさと文字の組み合わせごとに一度だけ画像を作ります。
+        const RasterGlyph& Get(wchar_t character, int fontHeight)
         {
-            const auto found = m_Glyphs.find(character);
+            const std::uint64_t key =
+                (static_cast<std::uint64_t>(fontHeight) << 32u) | static_cast<std::uint64_t>(character);
+            const auto found = m_Glyphs.find(key);
             if (found != m_Glyphs.end())
             {
                 return found->second;
             }
 
             RasterGlyph glyph;
-            if (m_DC == nullptr || m_Font == nullptr)
+            if (m_DC == nullptr || !SelectFont(fontHeight))
             {
-                return m_Glyphs.emplace(character, std::move(glyph)).first->second;
+                return m_Glyphs.emplace(key, std::move(glyph)).first->second;
             }
 
             MAT2 transform{};
@@ -469,11 +484,15 @@ void Hud::AddText(
                 0, nullptr, &transform);
             glyph.advance = metrics.gmCellIncX > 0
                 ? metrics.gmCellIncX
-                : 18;
+                : fontHeight;
             if (size != GDI_ERROR && size > 0)
             {
                 glyph.width = metrics.gmBlackBoxX;
                 glyph.height = metrics.gmBlackBoxY;
+                // 画像は字の形を囲む最小の四角なので、基準線からの位置で上下左右をずらします。
+                // ずらさないと「ュ」「ー」のような小さい字や横線が上端に寄って描かれます。
+                glyph.offsetX = metrics.gmptGlyphOrigin.x;
+                glyph.offsetY = m_Ascent - metrics.gmptGlyphOrigin.y - m_TopInset;
                 const unsigned int pitch = ((glyph.width + 31u) / 32u) * 4u;
                 std::vector<unsigned char> packed(size);
                 if (GetGlyphOutlineW(
@@ -492,14 +511,66 @@ void Hud::AddText(
                     }
                 }
             }
-            return m_Glyphs.emplace(character, std::move(glyph)).first->second;
+            return m_Glyphs.emplace(key, std::move(glyph)).first->second;
         }
 
     private:
         HDC m_DC = nullptr;
-        HFONT m_Font = nullptr;
         HGDIOBJ m_OldFont = nullptr;
-        std::unordered_map<wchar_t, RasterGlyph> m_Glyphs;
+        int m_SelectedHeight = 0;
+        int m_Ascent = 0;       // 基準線から文字の枠の上端までの高さ
+        int m_TopInset = 0;     // 文字の枠の上端から、漢字の上端までのすき間
+        std::unordered_map<int, HFONT> m_Fonts;
+        std::unordered_map<std::uint64_t, RasterGlyph> m_Glyphs;
+
+        // 指定した高さのフォントを使える状態にします（初めての高さなら作ります）。
+        bool SelectFont(int fontHeight)
+        {
+            if (m_SelectedHeight == fontHeight)
+            {
+                return true;
+            }
+            HFONT font = nullptr;
+            const auto found = m_Fonts.find(fontHeight);
+            if (found != m_Fonts.end())
+            {
+                font = found->second;
+            }
+            else
+            {
+                font = CreateFontW(
+                    -fontHeight, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+                    SHIFTJIS_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
+                    NONANTIALIASED_QUALITY, FIXED_PITCH | FF_MODERN,
+                    L"Yu Gothic UI");
+                if (font == nullptr)
+                {
+                    return false;
+                }
+                m_Fonts.emplace(fontHeight, font);
+            }
+
+            const HGDIOBJ previous = SelectObject(m_DC, font);
+            if (m_OldFont == nullptr)
+            {
+                m_OldFont = previous;
+            }
+            m_SelectedHeight = fontHeight;
+
+            TEXTMETRICW textMetrics{};
+            GetTextMetricsW(m_DC, &textMetrics);
+            m_Ascent = textMetrics.tmAscent;
+            // 漢字の上端を文字の位置（y）にそろえ、以前と同じ高さに並ぶようにします。
+            MAT2 transform{};
+            transform.eM11.value = 1;
+            transform.eM22.value = 1;
+            GLYPHMETRICS reference{};
+            m_TopInset = GetGlyphOutlineW(
+                m_DC, L'国', GGO_METRICS, &reference, 0, nullptr, &transform) != GDI_ERROR
+                ? m_Ascent - reference.gmptGlyphOrigin.y
+                : 0;
+            return true;
+        }
     };
 
     const auto getRows = [](char character)
@@ -589,11 +660,20 @@ void Hud::AddText(
             }
             textIndex += static_cast<size_t>(sequenceLength);
 
-            const RasterGlyph& glyph = japaneseGlyphs.Get(
-                static_cast<wchar_t>(codePoint));
-            // 5x7英字フォントの見た目の高さと送り幅に合わせます。
+            // 5x7英字フォントの見た目の高さと送り幅に合わせ、18pxのフォントを pixelSize*0.34 倍した大きさにします。
             // 日本語とASCIIが混在しても既存HUDパネル内へ収めるためです。
-            const float glyphPixelSize = pixelSize * 0.34f;
+            // その大きさを実際の画素に直したフォントで画像を作り、1ドットを1画素（キャンバス単位では1/scale）で描きます。
+            const float canvasScale = GetCanvasScale();
+            const int fontHeight = (std::max)(6,
+                static_cast<int>(std::lround(18.0f * pixelSize * 0.34f * canvasScale)));
+            const RasterGlyph& glyph = japaneseGlyphs.Get(
+                static_cast<wchar_t>(codePoint), fontHeight);
+            const float glyphPixelSize = 1.0f / canvasScale;
+            // 文字の位置を画素の境目にそろえ、ドットが2画素にまたがってにじまないようにします。
+            const float glyphX = std::round(cursorX * canvasScale) / canvasScale +
+                static_cast<float>(glyph.offsetX) * glyphPixelSize;
+            const float glyphY = std::round(y * canvasScale) / canvasScale +
+                static_cast<float>(glyph.offsetY) * glyphPixelSize;
             for (unsigned int row = 0; row < glyph.height; ++row)
             {
                 unsigned int column = 0;
@@ -613,8 +693,8 @@ void Hud::AddText(
                     if (column > runStart)
                     {
                         AddRectangle(
-                            cursorX + static_cast<float>(runStart) * glyphPixelSize,
-                            y + static_cast<float>(row) * glyphPixelSize,
+                            glyphX + static_cast<float>(runStart) * glyphPixelSize,
+                            glyphY + static_cast<float>(row) * glyphPixelSize,
                             static_cast<float>(column - runStart) * glyphPixelSize,
                             glyphPixelSize,
                             color);

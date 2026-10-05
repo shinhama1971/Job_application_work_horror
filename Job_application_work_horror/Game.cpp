@@ -15,6 +15,7 @@
 #include "ModelCache.h"
 #include "DebugUI.h"
 #include "Application.h"
+#include "CaptureMode.h"
 #include "Wall.h"
 #include "Door.h"
 
@@ -140,6 +141,8 @@ namespace Core
         m_Instance->m_Camera.Update();
         m_Instance->m_PostProcess.Update();
 
+        // 自動撮影モード（--capture）のときだけ、プレイヤーと視点を決めた道順で動かします。
+        Tools::CaptureMode::UpdateBeforeObjects();
 
         m_Instance->m_ObjectManager.UpdateAll();
         m_Instance->m_ObjectManager.RemoveDestroyed();
@@ -172,6 +175,8 @@ namespace Core
     void Game::Uninit()
     {
         if (m_Instance == nullptr) return;
+
+        Tools::CaptureMode::Shutdown();
 
         m_Instance->m_Camera.Uninit();
 

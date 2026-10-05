@@ -26,6 +26,75 @@ using namespace DirectX::SimpleMath;
 #include "Stage2SceneConstants.h"
 
 
+// ----------------------------------------------------------------------------
+// ロッカーに隠れている間
+// 足音の影が離れているうちに隠れれば、影は見失って立ち止まり、しばらくして去ります。
+// 影がすぐ近くまで来てから隠れても、入るところを見られていて捕まります。
+// 隠れている間は足音の危険度が下がり、新しい影も出ません。
+// ----------------------------------------------------------------------------
+namespace
+{
+    constexpr float HidingSeenDistance = 30.0f;     // これより近くで隠れると見られている
+    constexpr float HiddenStalkerLingerSeconds = 3.2f;
+}
+
+bool Stage2Scene::UpdateHiddenFromStalker(Player& player, float deltaTime)
+{
+    if (!player.IsHiding())
+    {
+        m_HiddenStalkerTimer = -1.0f;
+        return false;
+    }
+
+    m_QuietRecovery.Reset();
+    m_NoiseThreatSystem.SetThreat((std::max)(
+        0.0f, m_NoiseThreatSystem.GetThreat() - deltaTime * 0.30f));
+
+    ShadowMan* noiseShadow = m_Objects.noiseShadow;
+    if (noiseShadow == nullptr || !noiseShadow->IsActive())
+    {
+        m_HiddenStalkerTimer = -1.0f;
+        return true;
+    }
+
+    Core::Game* game = Core::Game::GetInstance();
+    if (m_HiddenStalkerTimer < 0.0f)
+    {
+        // 隠れた瞬間に影がどれだけ近かったかで、見られていたかを決めます。
+        Vector3 toShadow = noiseShadow->GetPosition() - player.GetPosition();
+        toShadow.y = 0.0f;
+        if (toShadow.Length() <= HidingSeenDistance)
+        {
+            StartCaughtSequence(player, CaughtSequence::Reason::NoiseStalker);
+            return true;
+        }
+        // 見失った影はその場で立ち止まり、辺りを探すように留まります。
+        noiseShadow->EnableChase(0.0f, 12.0f);
+        m_HiddenStalkerTimer = HiddenStalkerLingerSeconds;
+        game->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, noiseShadow->GetPosition(), 0.70f, 1.4f);
+        return true;
+    }
+
+    m_HiddenStalkerTimer -= deltaTime;
+    if (m_HiddenStalkerTimer > 0.0f)
+    {
+        return true;
+    }
+
+    // 影は諦めて去ります。危険度を下げ、しばらく次の影を出しません。
+    noiseShadow->SetActive(false);
+    m_HiddenStalkerTimer = -1.0f;
+    m_NoiseThreatSystem.SetThreat((std::max)(
+        0.0f, m_NoiseThreatSystem.GetThreat() - 0.40f));
+    m_NoiseThreatSystem.SetStalkerCooldown((std::max)(
+        m_NoiseThreatSystem.GetStalkerCooldown(), 9.0f));
+    m_NoiseThreatSystem.SetWarningTimer(0.0f);
+    m_Notices.hiding = 2.8f;
+    game->GetPostProcess()->TriggerBloomPulse(0.16f, 0.16f);
+    Input::SetVibration(2, 0.06f);
+    return true;
+}
+
 void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
 {
     if (m_FinalSequence.IsSequenceActive() ||
@@ -53,6 +122,11 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         {
             noiseShadow->SetActive(false);
         }
+        return;
+    }
+
+    if (UpdateHiddenFromStalker(player, deltaTime))
+    {
         return;
     }
 

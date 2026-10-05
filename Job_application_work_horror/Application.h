@@ -20,14 +20,33 @@ public:
     ~Application();
     void Run();
 
-    // 幅を取得
+    // 描画解像度の幅を取得（バックバッファ・画面効果・HUDはこの大きさで描きます）
     static uint32_t GetWidth() {
         return m_Width;
     }
 
-    // 高さを取得
+    // 描画解像度の高さを取得
     static uint32_t GetHeight() {
         return m_Height;
+    }
+
+    // ウィンドウ（画面）の大きさです。描画解像度が小さいときは、表示の際に引き伸ばされます。
+    static uint32_t GetWindowWidth() {
+        return m_WindowWidth;
+    }
+
+    static uint32_t GetWindowHeight() {
+        return m_WindowHeight;
+    }
+
+    // 画面の拡大率（100%なら1.0、125%なら1.25）です。
+    static float GetDpiScale() {
+        return m_DpiScale;
+    }
+
+    // 起動時に使った描画解像度の設定段階です（ポーズ画面で「次回起動から」を表示するために使います）。
+    static int GetLaunchResolutionLevel() {
+        return m_LaunchResolutionLevel;
     }
 
     // ウインドウハンドルを返す
@@ -43,10 +62,16 @@ public:
 private:
     static HINSTANCE   m_hInst;        // インスタンスハンドル
     static HWND        m_hWnd;         // ウィンドウハンドル
-    static uint32_t    m_Width;        // ウィンドウの横幅
-    static uint32_t    m_Height;       // ウィンドウの縦幅
+    static uint32_t    m_Width;        // 描画解像度の横幅
+    static uint32_t    m_Height;       // 描画解像度の縦幅
+    static uint32_t    m_WindowWidth;  // ウィンドウの横幅
+    static uint32_t    m_WindowHeight; // ウィンドウの縦幅
+    static int         m_LaunchResolutionLevel;
+    static float       m_DpiScale;     // 画面の拡大率
     static float       m_DeltaTime;    // 前回更新からの経過秒
 
+    static void EnableDpiAwareness();
+    static void DecideRenderSize();
     static bool InitApp(); //初期化
     static void UninitApp(); //終了処理
     static void MainLoop(); //メインループ

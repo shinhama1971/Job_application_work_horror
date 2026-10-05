@@ -16,6 +16,7 @@
 #include "Player.h"
 #include "ShadowMan.h"
 #include "Wall.h"
+#include "Locker.h"
 
 #include <SimpleMath.h>
 #include <iterator>
@@ -457,6 +458,27 @@ namespace Stage2Layout
         objects.evidenceTerminals = { evidenceTerminal1, evidenceTerminal2 };
         objects.evidenceMarkers = { evidenceMarker1, evidenceMarker2 };
         objects.portraitEyes = { portraitEyeLeft, portraitEyeRight };
+
+        // 隠れられるロッカー。本体は当たり判定のある箱（Wall）、扉と「隠れる」操作はLockerが担当します。
+        // 時計・偽ドア・肖像画・端末・信号盤・電池と重ならない位置に、左右1つずつ置きます。
+        const Color lockerColor(0.16f, 0.19f, 0.17f, 1.0f);
+        const auto createLocker = [&builder, &createWall, &lockerColor](
+            const char* name,
+            const char* bodyName,
+            float wallSideX,
+            float z)
+        {
+            // wallSideXは壁側の符号（左の壁は-1、右の壁は+1）。扉は廊下の中央を向きます。
+            createWall(bodyName, Vector3(wallSideX * 35.0f, -77.0f, z),
+                Vector3(10.0f, 44.0f, 16.0f), lockerColor, true);
+            Locker* locker = builder.Create<Locker>(name);
+            locker->Place(Vector3(wallSideX * 29.95f, -77.0f, z),
+                wallSideX < 0.0f ? DirectX::XM_PIDIV2 : -DirectX::XM_PIDIV2);
+            return locker;
+        };
+        objects.lockers = {
+            createLocker("Stage2LockerLeft", "Stage2LockerLeftBody", -1.0f, -62.0f),
+            createLocker("Stage2LockerRight", "Stage2LockerRightBody", 1.0f, 40.0f) };
         return objects;
     }
 }

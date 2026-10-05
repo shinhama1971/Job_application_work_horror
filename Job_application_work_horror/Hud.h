@@ -37,6 +37,9 @@ public:
         int puzzleMistakes,
         int chargersUsed,
         int evidenceCollected,
+        int wallWritingsRead,
+        bool hiddenRoomEscaped,
+        std::string_view stage2Anomalies,
         bool newBestTime,
         bool newBestCaught);
     void DrawChapterCard(
@@ -74,6 +77,9 @@ public:
         int cursor,
         float wrongRate,
         int mistakes);
+    // ロッカーに隠れている間の視界。扉の横長の隙間以外を暗くし、出る操作を表示します。
+    // dangerRateは影の近さ（0〜1）で、近いほど隙間の縁が赤くにじみます。
+    void DrawHidingView(float elapsedSeconds, float dangerRate);
     void DrawQuietRecovery(float progressRate, float cooldown, bool success, bool tooClose);
     void DrawPause(
         int brightnessLevel,
@@ -81,6 +87,7 @@ public:
         int lookSensitivityLevel,
         int volumeLevel,
         bool guideEnabled,
+        int resolutionLevel,
         int selectedSetting,
         int floorNumber,
         float runTimeSeconds,
@@ -89,7 +96,14 @@ public:
     void Uninit();
 
 private:
-    static constexpr size_t MaxVertices = 32768;
+    static constexpr size_t MaxVertices = 65536;
+
+    // HUDの座標は「縦864の画面」を基準に画素単位で決めてあります。実際の描画解像度との比で
+    // キャンバスの大きさを決め、画面の大きさが変わってもHUDが画面に対して同じ大きさに見えるようにします。
+    static constexpr float ReferenceHeight = 864.0f;
+    static float GetCanvasScale();
+    static float GetCanvasWidth();
+    static float GetCanvasHeight();
 
     void AddRectangle(float x, float y, float width, float height, const DirectX::SimpleMath::Color& color);
     void AddLetterE(float x, float y, float size, const DirectX::SimpleMath::Color& color);

@@ -14,6 +14,9 @@
 #include "CeilingLight.h"
 #include "Ground.h"
 
+#include <algorithm>
+#include <cmath>
+
 using namespace DirectX::SimpleMath;
 
 // 描画資源とプレイヤー状態を初期化します。配置座標はScene側がInit後に設定します。
@@ -86,6 +89,16 @@ void Player::Update()
     m_AmbienceTimer += deltaTime;
     m_Flashlight.TickNotice(deltaTime);
 
+    // ロッカーに隠れている間は、見回せる向きを制限し、出る操作を受け付けます。
+    if (m_IsHiding)
+    {
+        UpdateHiding(*cam, deltaTime);
+    }
+    else
+    {
+        m_HidingInputTimer = (std::max)(0.0f, m_HidingInputTimer - deltaTime);
+    }
+
     float yaw = cam->GetCameraDirection();
 
     Vector3 forward(sinf(yaw), 0.0f, cosf(yaw));
@@ -102,7 +115,11 @@ void Player::Update()
     moveDir += right * leftStick.x;
     moveDir += forward * leftStick.y;
 
-    const bool wantsToSprint = m_SprintAllowed &&
+    if (m_IsHiding)
+    {
+        moveDir = Vector3::Zero;
+    }
+    const bool wantsToSprint = !m_IsHiding && m_SprintAllowed &&
         (Input::GetKeyPress(VK_SHIFT) ||
             Input::GetButtonPress(XINPUT_LEFT_THUMB));
     if (m_Movement.Update(moveDir, wantsToSprint, deltaTime))
@@ -135,6 +152,12 @@ void Player::Update()
         {
             door->ResolveCollision(m_Position, m_Radius);
         }
+    }
+
+    // 隠れている間はロッカーの中に固定します（ロッカーの本体は壁なので、衝突補正で押し出されないよう後から戻します）。
+    if (m_IsHiding)
+    {
+        m_Position = m_HidePosition;
     }
 
     // 衝突補正後に実際に移動できた距離を使うため、壁へ押し続けても足音は鳴りません。
@@ -186,8 +209,8 @@ void Player::Update()
 #endif
 
     //ライトのオンオフ
-    if (Input::GetKeyTrigger(VK_F) ||
-        Input::GetButtonTrigger(XINPUT_Y))
+    if (!m_IsHiding && (Input::GetKeyTrigger(VK_F) ||
+        Input::GetButtonTrigger(XINPUT_Y)))
     {
        
         if (m_Flashlight.Toggle())
@@ -443,4 +466,50 @@ DirectX::SimpleMath::Vector3 Player::GetForward() const
         0.0f,
         cosf(yaw)
     );
+}
+
+// ロッカーに入ります。懐中電灯は消し、視点を扉の正面へ向けます。
+void Player::EnterHiding(const Vector3& hidePosition, const Vector3& exitPosition, float facing)
+{
+    if (m_IsHiding)
+    {
+        return;
+    }
+    m_IsHiding = true;
+    m_HidePosition = hidePosition;
+    m_HideExitPosition = exitPosition;
+    m_HideFacing = facing;
+    m_HidingInputTimer = HidingInputDelay;
+    m_Position = hidePosition;
+    m_Movement.ResetVelocity();
+    if (m_Flashlight.IsOn() && m_Flashlight.Toggle())
+    {
+        Core::Game::GetInstance()->PlayAudioCue(SOUND_CUE_FLASHLIGHT, 0.94f);
+    }
+    Core::Game::GetInstance()->GetCamera()->SetCameraDirection(facing);
+}
+
+// 隠れている間の処理です。扉の隙間から見える範囲だけ見回せるよう向きを制限し、
+// 調べるボタンで外へ出ます。
+void Player::UpdateHiding(Camera& camera, float deltaTime)
+{
+    m_HidingInputTimer = (std::max)(0.0f, m_HidingInputTimer - deltaTime);
+
+    constexpr float TwoPi = 6.28318530718f;
+    float offset = std::fmod(camera.GetCameraDirection() - m_HideFacing, TwoPi);
+    if (offset > TwoPi * 0.5f) offset -= TwoPi;
+    if (offset < -TwoPi * 0.5f) offset += TwoPi;
+    offset = (std::clamp)(offset, -HidingLookRange, HidingLookRange);
+    camera.SetCameraDirection(m_HideFacing + offset);
+
+    if (m_HidingInputTimer > 0.0f ||
+        !(Input::GetKeyTrigger(VK_E) || Input::GetButtonTrigger(XINPUT_A)))
+    {
+        return;
+    }
+    m_IsHiding = false;
+    m_HidingInputTimer = HidingInputDelay;
+    m_Position = m_HideExitPosition;
+    m_Movement.ResetVelocity();
+    Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_DOOR, m_HidePosition, 1.35f, 0.55f);
 }

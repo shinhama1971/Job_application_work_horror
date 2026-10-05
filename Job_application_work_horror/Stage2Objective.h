@@ -17,6 +17,7 @@ struct Stage2Notices
     float charger = 0.0f;    // 非常用充電器を使った通知
     float evidence = 0.0f;   // 記録を回収した通知
     float signal = 0.0f;     // 信号盤パズルの進行・失敗の通知
+    float hiding = 0.0f;     // ロッカーに隠れてやり過ごした通知
 
     void Tick(float deltaTime)
     {
@@ -28,6 +29,7 @@ struct Stage2Notices
         tick(charger);
         tick(evidence);
         tick(signal);
+        tick(hiding);
     }
 
     void Reset()
@@ -66,6 +68,8 @@ struct Stage2ObjectiveInput
 
     // 危険と最終イベント
     bool caught = false;
+    bool hiding = false;                // ロッカーに隠れている
+    bool hidingNotice = false;          // 隠れて影をやり過ごした直後
     bool presenceTooClose = false;
     bool quietRecoverySucceeded = false;
     bool quietRecoveryInProgress = false;

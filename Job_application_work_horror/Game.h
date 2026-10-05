@@ -111,6 +111,7 @@ namespace Core
         // シーン切り替えを予約します。実際の切り替えはUpdateの最後に行うため、
         // Objectの更新中に呼んでも安全です。同じフレームの2回目以降の予約は無視します。
         void RequestSceneChange(SceneName sName);
+        SceneName GetCurrentSceneName() const { return m_CurrentScene; }
 
         // 音声初期化に失敗したPCでもゲームを続行できる安全な再生窓口です。
         void PlayAudioCue(SOUND_LABEL label, float pitch = 1.0f)
@@ -257,6 +258,11 @@ namespace Core
             return m_Settings.GetVolumeLevel();
         }
 
+        int GetResolutionLevel() const
+        {
+            return m_Settings.GetResolutionLevel();
+        }
+
         // falseのとき、Sceneは目的表示と目的地ガイドを出しません。
         bool IsGuideEnabled() const
         {
@@ -323,6 +329,13 @@ namespace Core
         int GetChargersUsed() const { return m_State.GetChargersUsed(); }
         void RegisterEvidenceCollected() { m_State.RegisterEvidenceCollected(); }
         int GetEvidenceCollected() const { return m_State.GetEvidenceCollected(); }
+        void SetWallWritingsRead(int count) { m_State.SetWallWritingsRead(count); }
+        int GetWallWritingsRead() const { return m_State.GetWallWritingsRead(); }
+        void RegisterHiddenRoomEscaped() { m_State.RegisterHiddenRoomEscaped(); }
+        bool IsHiddenRoomEscaped() const { return m_State.IsHiddenRoomEscaped(); }
+        void SetStage2Anomalies(int first, int second) { m_State.SetStage2Anomalies(first, second); }
+        int GetStage2FirstAnomaly() const { return m_State.GetStage2FirstAnomaly(); }
+        int GetStage2SecondAnomaly() const { return m_State.GetStage2SecondAnomaly(); }
 
         // --- 描画システムへのアクセス。所有権はGameにあり、返すポインタは非所有です ---
         Camera* GetCamera()

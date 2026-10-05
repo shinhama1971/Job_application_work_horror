@@ -30,12 +30,18 @@
 | 2面の周回中は歩くだけにする変更と、目的表示なしの設定 | `Stage2Scene*.cpp`, `GameSettings.*`, `PauseMenu.*`, `Hud*.cpp` | 実装 | |
 | 2面の「背後の気配」 | `BehindPresence.h`, `Stage2SceneHorror.cpp` | 実装 | |
 | 2面の1周目・2周目の異変を毎回ランダムな組み合わせにする（肖像画を「見つめ続ける」異変に変更、立体音響で出どころを探す「壁の向こうのノック」異変を追加） | `Stage2AnomalyPlan.h`, `PortraitAnomaly.h`, `ClockAnomaly.h`, `Stage2Scene*.cpp`, `Stage2Objective.*` | 実装 | 方針の選択（ランダム化） |
+| 2面の隠れられるロッカー（隠れている間の視界・操作、影が見失って去る／見られて捕まる） | `Locker.*`, `Player.*`, `Camera.h`, `Stage2ScenePuzzles.cpp`, `HudScreens.cpp` | 実装 | 方針の選択（隠れる場所） |
+| 作業報告用の自動撮影モード（自動で見て回り、動画とスクリーンショットを保存） | `CaptureMode.*`, `tools/capture-daily.ps1`, `Application.cpp`, `Renderer.cpp` | 実装 | 方針の選択（作業報告の素材を自動で集める） |
+| 処理の重さの計測モード（ライトON/OFFのGPU時間の比較）と、高性能なGPUを選んで描画する修正 | `CaptureMode.*`, `Renderer.cpp`, `main.cpp` | 計測・原因の特定・実装 | 不具合の報告（ライトを点けるとFPSが下がり、カメラがかくかくする） |
+| HUDの日本語の文字の不具合修正（小さい字「ュ」や「ー」が上に寄る、細い線が消えて字が崩れる） | `Hud.*`（`AddText`） | 原因の特定・修正 | |
+| 描画解像度の設定（内蔵GPUでは自動で縮小）と、画面の拡大率への対応（HUDを画面の大きさに合わせて拡大縮小） | `Application.*`, `Renderer.*`, `RendererState.cpp`, `GameSettings.*`, `PauseMenu.*`, `Hud.*`, `HudScreens.cpp`, `Camera.cpp` | 実装 | 方針の選択 |
 | Compute Shaderによるタイルベースライティング | `TiledLighting.*`, `shader/tiledLightCullingCS.hlsl`, `shader/common.hlsl` | 実装（授業資料の内容を元に、作者の依頼で組み込み） | 授業資料の提供 |
 | X3DAudioによる立体音響（壁越しの音をこもらせる処理を含む） | `sound.*`, `Game.cpp` | 実装 | |
 | 1面の姿の見えない物音（天井裏の足音・配管の音・遠くの扉） | `Stage1AmbientSounds.*` | 実装 | 1面の演出を増やしたいという発案 |
 | 1面の懐中電灯で照らすと浮かぶ壁の文字（目を離すと書き換わる文字を含む） | `FlashlightWriting.*`, `Stage1WallWritings.*`, `shader/flashlightRevealPS.hlsl` | 実装 | |
 | 1面の暗証番号の扉（番号はプレイごとにランダム） | `KeypadLock.h`, `Stage1KeypadDoor.*`, `HudScreens.cpp`（`DrawKeypad`） | 実装 | |
 | 1面の隠し部屋の閉じ込めイベント（鍵探し・記録端末・ライトで追い払う影） | `Stage1HiddenRoomEvent.*`, `KeyItem.*`, `Stage1Layout.cpp` | 実装 | 方針の選択（隠し部屋を充実させる） |
+| リザルト画面の「今回の発見」（壁の文字・隠し部屋・2階の異変）、残された記録の総数を4へ修正 | `GameState.h`, `HudScreens.cpp`, `Hud.cpp`, `ResultScene.*` | 実装 | |
 | 1面のヒューズの置き場所をプレイごとに部屋の中の候補からランダムに選ぶ | `Stage1Layout.cpp`, `StageSceneDraw.cpp` | 実装 | |
 
 ### 設計の整理・品質改善

@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "Game.h"
+#include "CaptureMode.h"
 
 #include <filesystem>
 #include <fstream>
@@ -20,8 +21,10 @@ namespace Core
         }
 
         const float pauseScale = paused ? 0.42f : 1.0f;
+        // 自動撮影モードは裏で動かすため、音を出しません。
+        const float captureScale = Tools::CaptureMode::IsActive() ? 0.0f : 1.0f;
         m_Sound.SetMasterVolume(
-            m_Settings.GetVolumeScale() * pauseScale);
+            m_Settings.GetVolumeScale() * pauseScale * captureScale);
     }
 
     void Game::LoadBestRecord()

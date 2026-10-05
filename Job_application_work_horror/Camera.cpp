@@ -62,8 +62,11 @@ void Camera::Update()
             float dx = (float)(mousePos.x - m_LastMousePos.x);
             float dy = (float)(mousePos.y - m_LastMousePos.y);
 
+            // カーソルの移動量は実際の画素単位です。拡大率が大きい画面では同じ手の動きでも値が大きくなるため、
+            // 拡大率で割って、拡大率に関係なく同じ視点の速さにします。
             const float sensitivity =
-                0.003f * m_LookSensitivityScale;
+                0.003f * m_LookSensitivityScale /
+                (std::max)(Application::GetDpiScale(), 1.0f);
 
             m_CameraDirection += dx * sensitivity;
             m_CameraPitch += dy * sensitivity;
@@ -75,9 +78,9 @@ void Camera::Update()
             if (m_CameraPitch < minPitch) m_CameraPitch = minPitch;
         }
 
-        // マウスカーソルをウィンドウ中央へ戻す
-        int screenWidth = Application::GetWidth();
-        int screenHeight = Application::GetHeight();
+        // マウスカーソルをウィンドウ中央へ戻す（カーソルはウィンドウの座標なので、描画解像度ではなくウィンドウの大きさを使います）
+        const int screenWidth = static_cast<int>(Application::GetWindowWidth());
+        const int screenHeight = static_cast<int>(Application::GetWindowHeight());
 
         POINT screenCenter =
         {

@@ -92,6 +92,9 @@ namespace Core
         case Item::Guide:
             return settings.SetGuideLevel(
                 settings.GetGuideLevel() + delta);
+        case Item::Resolution:
+            return settings.SetResolutionLevel(
+                settings.GetResolutionLevel() + delta);
         default:
             return false;
         }
