@@ -37,6 +37,9 @@ public:
         int puzzleMistakes,
         int chargersUsed,
         int evidenceCollected,
+        int wallWritingsRead,
+        bool hiddenRoomEscaped,
+        std::string_view stage2Anomalies,
         bool newBestTime,
         bool newBestCaught);
     void DrawChapterCard(

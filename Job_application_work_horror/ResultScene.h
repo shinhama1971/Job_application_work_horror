@@ -8,6 +8,8 @@
 #include "Object.h"
 #include"sound.h"
 #include "Hud.h"
+
+#include <string>
 // ResultSceneクラス
 class ResultScene : public Scene
 {
@@ -19,6 +21,8 @@ private:
 	Sound m_Sound;//サウンド
 	Hud m_Hud;
 	float m_ResultTimer = 0.0f;
+	// 2階で今回出た異変の名前（「時計・壁のノック」など）。開始時に一度だけ作ります。
+	std::string m_Stage2AnomalyText;
 
 public:
 	ResultScene(); // コンストラクタ

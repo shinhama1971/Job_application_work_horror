@@ -8,6 +8,7 @@
 
 #include "Game.h"
 #include "Input.h"
+#include "Stage2AnomalyPlan.h"
 
 ResultScene::ResultScene()
 {
@@ -23,6 +24,16 @@ void ResultScene::Init()
 {
     m_ResultTimer = 0.0f;
     m_Hud.Init();
+
+    Core::Game* game = Core::Game::GetInstance();
+    const auto first = static_cast<Stage2Anomaly>(game->GetStage2FirstAnomaly());
+    const auto second = static_cast<Stage2Anomaly>(game->GetStage2SecondAnomaly());
+    m_Stage2AnomalyText.clear();
+    if (first != Stage2Anomaly::None && second != Stage2Anomaly::None)
+    {
+        m_Stage2AnomalyText = std::string(Stage2AnomalyPlan::GetDisplayName(first)) +
+            "・" + Stage2AnomalyPlan::GetDisplayName(second);
+    }
 
     Effect::PostProcess* postProcess =
         Core::Game::GetInstance()->GetPostProcess();
@@ -74,6 +85,9 @@ void ResultScene::Draw(Camera* camera)
         game->GetPuzzleMistakes(),
         game->GetChargersUsed(),
         game->GetEvidenceCollected(),
+        game->GetWallWritingsRead(),
+        game->IsHiddenRoomEscaped(),
+        m_Stage2AnomalyText,
         game->IsLastRunBestTime(),
         game->IsLastRunBestCaught());
 }
