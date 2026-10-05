@@ -152,6 +152,19 @@ namespace Stage1Layout
         loopWall4->SetPosition(77.5f, -74.0f, 275.0f);
         loopWall4->SetScale(245.0f, 50.0f, 4.0f);
 
+        // 建物の壁だけに、パネルの継ぎ目・ひび・水の跡・カビを描きます（棚や配管などの小物には描きません）。
+        for (Wall* structuralWall : {
+            wall1, wall2, wall3, wall4, wall5, wall6, wall7, wall8, wall9, wall10,
+            wall11, wall12, wall13, wall13North, wall14, wall15,
+            loopWall1, loopWall2, loopWall3, loopWall4 })
+        {
+            structuralWall->SetWeatheringSurface(true);
+            const Vector3 position = structuralWall->GetPosition();
+            const Vector3 scale = structuralWall->GetScale();
+            objects.wallFootprints.emplace_back(
+                position.x, position.z, scale.x * 0.5f, scale.z * 0.5f);
+        }
+
 
         // 配管や設備で区画ごとのシルエットを区別し、現在地を把握しやすくします。
         // 縁と天井配管は装飾のみ、床設備には当たり判定を持たせます。
@@ -181,6 +194,8 @@ namespace Stage1Layout
             Vector3(0.0f, -47.0f, 80.0f), Vector3(436.0f, 3.0f, 516.0f),
             Color(0.055f, 0.06f, 0.058f, 1.0f), noEmission, 4.0f, false);
         ceiling->SetCastsShadow(false);
+        // 天井も建物の面として、天井板・外れた板の穴・雨漏りの染みを描きます（litTexturePS）。
+        ceiling->SetWeatheringSurface(true);
 
         createStageProp("PropPipeLeft", Vector3(-205.0f, -55.0f, 60.0f),
             Vector3(3.0f, 3.0f, 450.0f), darkMetal, noEmission, 22.0f, false);

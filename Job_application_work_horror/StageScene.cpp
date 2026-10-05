@@ -7,6 +7,7 @@
 #include "Application.h"
 #include "Game.h"
 #include "Input.h"
+#include "Renderer.h"
 
 #include "Player.h"
 #include "Wall.h"
@@ -37,6 +38,8 @@ StageScene::~StageScene()
 void StageScene::Init()
 {
     Core::Game* game = Core::Game::GetInstance();
+    // 1面は長く放置された施設なので、壁にパネルの継ぎ目・ひび・水の垂れた跡・カビを出します。
+    Renderer::SetWallWeathering(1.0f);
     game->GetPostProcess()->SetVolumetricLight(true);
     game->GetPostProcess()->SetLensDistortionStrength(0.20f);
     game->GetPostProcess()->SetFilmGradeStrength(0.52f);
@@ -69,6 +72,11 @@ void StageScene::Init()
     m_WallWritings.Init(m_Objects.writings);
     m_KeypadDoor.Init(m_Objects.keypad);
     m_HiddenRoom.Init(m_Objects.hiddenRoom);
+    // 部屋の角の暗がり。床（y=-100）と天井の下面（y≒-48.5）の高さと、建物の壁の形を渡します。
+    Renderer::SetRoomOcclusion(
+        m_Objects.wallFootprints.data(),
+        static_cast<unsigned int>(m_Objects.wallFootprints.size()),
+        -100.0f, -48.5f, 0.55f);
 
     // シーン変更後の初回描画前にカメラとライトを更新します。
     // ImGuiでゲームを停止した場合も、面全体が黒くなることを防ぎます。
@@ -326,6 +334,9 @@ void StageScene::Update()
 
 void StageScene::Uninit()
 {
+    // 他の面の壁は従来の見た目に戻します（Sceneの切り替えは古いSceneの破棄が先です）。
+    Renderer::SetWallWeathering(0.0f);
+    Renderer::SetRoomOcclusion(nullptr, 0, 0.0f, 0.0f, 0.0f);
     Core::Game::GetInstance()->GetPostProcess()->SetAtmosphere(0.18f, 0.55f);
     Core::Game::GetInstance()->GetPostProcess()->SetExposure(1.0f);
     Core::Game::GetInstance()->GetPostProcess()->SetCorridorTension(0.0f);

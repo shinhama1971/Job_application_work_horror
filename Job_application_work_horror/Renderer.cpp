@@ -80,6 +80,8 @@ Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pProjectionBuffer;
 
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pLightBuffer;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pDebugViewBuffer;
+DEBUG_VIEW_BUFFER Renderer::m_DebugView{ 0, 1.0f, 0.0f, 0.0f };
+Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pRoomOcclusionBuffer;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pMaterialBuffer;
 LIGHT Renderer::m_Light{};
 bool Renderer::m_LightEnable = true;
@@ -310,6 +312,13 @@ HRESULT Renderer::Init()
 	m_pDeviceContext->PSSetConstantBuffers(
 		7, 1, m_pDebugViewBuffer.GetAddressOf());
 	SetDebugViewMode(0);
+
+	// 部屋の角の暗がり。最初は壁がない（暗がりなし）状態にしておきます。
+	bufferDesc.ByteWidth = sizeof(ROOM_OCCLUSION_BUFFER);
+	hr = m_pDevice->CreateBuffer(
+		&bufferDesc, NULL, m_pRoomOcclusionBuffer.ReleaseAndGetAddressOf());
+	if (FAILED(hr)) return hr;
+	SetRoomOcclusion(nullptr, 0, 0.0f, 0.0f, 0.0f);
 
 	bufferDesc.ByteWidth = sizeof(MATERIAL);
 	hr = m_pDevice->CreateBuffer(

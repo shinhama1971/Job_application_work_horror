@@ -55,6 +55,10 @@ public:
         const DirectX::SimpleMath::Color& emission,
         float shininess);
 
+    // 建物の壁として、壁の古さ（パネルの継ぎ目・ひび・水の跡・カビ）を描くかどうかです。
+    // 古さの濃さは面ごとに Renderer::SetWallWeathering で決めます。小物（棚・配管・標識）には使いません。
+    void SetWeatheringSurface(bool enabled);
+
     void SetSignalSurface(bool enabled)
     {
         m_Shader.Create(

@@ -20,11 +20,49 @@ void Renderer::SetLight(LIGHT Light)
 
 void Renderer::SetDebugViewMode(int mode, float wallDampStrength)
 {
-	DEBUG_VIEW_BUFFER buffer{};
-	buffer.Mode = mode;
-	buffer.WallDampStrength = wallDampStrength;
+	m_DebugView.Mode = mode;
+	m_DebugView.WallDampStrength = wallDampStrength;
+	UploadDebugViewBuffer();
+}
+
+void Renderer::SetWallWeathering(float weathering)
+{
+	m_DebugView.WallWeathering = weathering < 0.0f ? 0.0f : (weathering > 1.0f ? 1.0f : weathering);
+	UploadDebugViewBuffer();
+}
+
+void Renderer::SetRoomOcclusion(
+	const Vector4* boxes, unsigned int boxCount,
+	float floorY, float ceilingY, float strength)
+{
+	if (!m_pRoomOcclusionBuffer)
+	{
+		return;
+	}
+	ROOM_OCCLUSION_BUFFER buffer{};
+	buffer.BoxCount = boxes == nullptr ? 0u
+		: (boxCount < ROOM_OCCLUSION_BUFFER::MaxBoxes ? boxCount : ROOM_OCCLUSION_BUFFER::MaxBoxes);
+	for (unsigned int i = 0; i < buffer.BoxCount; ++i)
+	{
+		buffer.Boxes[i] = boxes[i];
+	}
+	buffer.FloorY = floorY;
+	buffer.CeilingY = ceilingY;
+	buffer.Strength = strength;
 	m_pDeviceContext->UpdateSubresource(
-		m_pDebugViewBuffer.Get(), 0, NULL, &buffer, 0, 0);
+		m_pRoomOcclusionBuffer.Get(), 0, NULL, &buffer, 0, 0);
+	m_pDeviceContext->PSSetConstantBuffers(
+		11, 1, m_pRoomOcclusionBuffer.GetAddressOf());
+}
+
+void Renderer::UploadDebugViewBuffer()
+{
+	if (!m_pDebugViewBuffer)
+	{
+		return;
+	}
+	m_pDeviceContext->UpdateSubresource(
+		m_pDebugViewBuffer.Get(), 0, NULL, &m_DebugView, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
 		7, 1, m_pDebugViewBuffer.GetAddressOf());
 }
