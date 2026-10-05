@@ -179,9 +179,9 @@ void Hud::Draw(
     const Color evidenceColor = evidenceCount >= Core::GameState::TotalEvidenceCount
         ? Color(0.92f, 0.78f, 0.34f, 0.96f)
         : Color(0.62f, 0.78f, 0.70f, 0.88f);
-    AddRectangle(evidenceX - 14.0f, 74.0f,
+    AddRectangle(evidenceX - 14.0f, 74.0f + m_TopRightOffset,
         evidenceWidth + 28.0f, 34.0f, dark);
-    AddText(evidenceX, 82.0f,
+    AddText(evidenceX, 82.0f + m_TopRightOffset,
         evidenceText, evidencePixelSize, evidenceColor);
 
     // 視線位置だけを伝える小さな中央レティクルを描画します。
@@ -312,9 +312,9 @@ void Hud::Draw(
             static_cast<float>(CountDisplayedCharacters(batteryNotice)) *
             noticePixelSize * 6.0f;
         const float noticeX = screenWidth - noticeWidth - 52.0f;
-        AddRectangle(noticeX - 14.0f, 28.0f,
+        AddRectangle(noticeX - 14.0f, 28.0f + m_TopRightOffset,
             noticeWidth + 28.0f, 34.0f, dark);
-        AddText(noticeX, 36.0f,
+        AddText(noticeX, 36.0f + m_TopRightOffset,
             batteryNotice, noticePixelSize, batteryNoticeColor);
     }
 

@@ -95,6 +95,13 @@ public:
     void DrawBlink(float opacity);
     void Uninit();
 
+    // 右上の電池の通知と「記録」を、この高さだけ下げて描きます。
+    // 2面の状態パネル（DrawStage2Status）が右上にあるとき、重ならないように使います。
+    void SetTopRightOffset(float offset) { m_TopRightOffset = offset; }
+    // 2面の右上に縦に並ぶ「状態パネル（高さ58）」と「危険ゲージ（高さ40）」に、すき間（8ずつ）を足した高さです。
+    // 危険ゲージは出たり消えたりするため、出ていないときも場所を空けておき、下の表示が上下に動かないようにします。
+    static constexpr float Stage2StatusReservedHeight = 58.0f + 8.0f + 40.0f + 8.0f;
+
 private:
     static constexpr size_t MaxVertices = 65536;
 
@@ -126,4 +133,5 @@ private:
     Shader m_Shader;
     VertexBuffer<VERTEX_3D> m_VertexBuffer;
     std::vector<VERTEX_3D> m_Vertices;
+    float m_TopRightOffset = 0.0f;
 };
