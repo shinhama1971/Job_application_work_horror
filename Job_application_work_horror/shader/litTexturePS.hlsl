@@ -325,6 +325,11 @@ float4 main(in LIT_PS_IN input) : SV_Target
         color *= Material.Diffuse;
     }
 
+    if (DebugViewMode == DEBUG_VIEW_FULLBRIGHT)
+    {
+        return GetFullbrightColor(color.rgb, input.viewNormal, input.viewPos);
+    }
+
     // プロシージャル汚れは、不透明でテクスチャのない建材だけへ適用します。
     // 発光パネルは汚さず、ブルームと天井光の明るさを保ちます。
     const float emissionEnergy = dot(

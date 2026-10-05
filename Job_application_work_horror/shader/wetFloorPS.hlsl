@@ -290,6 +290,11 @@ float4 main(in LIT_PS_IN input) : SV_Target
         color *= Material.Diffuse;
     }
 
+    if (DebugViewMode == DEBUG_VIEW_FULLBRIGHT)
+    {
+        return GetFullbrightColor(color.rgb, input.viewNormal, input.viewPos);
+    }
+
     float shore = 0.0f;
     float ripplePattern = 0.0f;
     float puddle = GetPuddleMask(

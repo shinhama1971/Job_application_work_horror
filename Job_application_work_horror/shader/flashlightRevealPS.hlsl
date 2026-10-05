@@ -44,6 +44,12 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
     const float presence = input.col.a;
     const float distanceFromCamera = length(input.viewPos);
+    // フルブライト表示（デバッグ）では、ライトが当たっていなくても文字をそのまま見せ、配置を確認できるようにします。
+    if (DebugViewMode == DEBUG_VIEW_FULLBRIGHT)
+    {
+        clip(presence - 0.001f);
+        return float4(Material.Diffuse.rgb * 2.2f, saturate(shape * presence));
+    }
     if (!Light.Enable || !Light.FlashlightEnabled ||
         presence <= 0.001f || distanceFromCamera <= 0.001f)
     {
