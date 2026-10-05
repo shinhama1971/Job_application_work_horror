@@ -905,7 +905,8 @@ void Hud::DrawQuietRecovery(float progressRate, float cooldown, bool success, bo
 {
     m_Vertices.clear();
     const float x = (std::max)(12.0f, GetCanvasWidth() - 330.0f);
-    constexpr float y = 150.0f;
+    // 右上の「記録」（Hud::Drawで描く。下端は108＋m_TopRightOffset）のすぐ下に置きます。
+    const float y = 116.0f + m_TopRightOffset;
     const Color color = tooClose ? Color(0.96f, 0.38f, 0.25f, 1.0f)
         : Color(0.64f, 0.84f, 0.78f, 1.0f);
     AddRectangle(x, y, 296.0f, 76.0f, Color(0.005f, 0.012f, 0.015f, 0.85f));

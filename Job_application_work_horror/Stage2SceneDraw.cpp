@@ -48,6 +48,14 @@ void Stage2Scene::Draw(Camera* camera)
     const std::string_view objective =
         SelectStage2Objective(MakeObjectiveInput(confirmationPending));
 
+    // 右上の状態パネルを出すときは、電池の通知と「記録」をその下へずらして重ならないようにします。
+    const bool showStatusPanel =
+        game->IsGuideEnabled() &&
+        m_VisualTimer >= 4.20f &&
+        !m_CaughtSequence.IsActive() &&
+        (exit == nullptr || !exit->IsEscaping());
+    m_Hud.SetTopRightOffset(showStatusPanel ? Hud::Stage2StatusReservedHeight : 0.0f);
+
     // 目的表示なしの設定では、何をすべきかを説明しない静かな画面にします。
     // ロッカーの中では、扉の隙間以外を暗くします（目的表示はその上に重ねて読めるようにします）。
     if (player->IsHiding())
@@ -65,10 +73,7 @@ void Stage2Scene::Draw(Camera* camera)
     m_Hud.Draw(*player, -1, m_InteractionSystem.GetPrompt(),
         game->IsGuideEnabled() ? objective : std::string_view{});
     const float threatRate = ComputeThreatRate(*player, true);
-    if (game->IsGuideEnabled() &&
-        m_VisualTimer >= 4.20f &&
-        !m_CaughtSequence.IsActive() &&
-        (exit == nullptr || !exit->IsEscaping()))
+    if (showStatusPanel)
     {
         m_Hud.DrawStage2Status(
             m_LoopCount, threatRate, m_FinalDoorReady,
