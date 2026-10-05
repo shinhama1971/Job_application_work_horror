@@ -65,6 +65,7 @@ void StageScene::Init()
     m_StageVisualTimer = 0.0f;
     m_ExitOmenSequence.Reset();
     m_AmbientSounds.Reset();
+    m_TensionPulse.Reset();
     m_ProgressHintTimer = 0.0f;
 
     // 壁・照明・ヒューズ・扉などの配置はStage1Layoutが担当し、使うObjectのポインタをまとめて返します。
@@ -200,6 +201,7 @@ void StageScene::Update()
     UpdateExitOmen(*player);
     UpdateWallWritings(*player);
     m_HiddenRoom.Update(*player, deltaTime, m_KeypadDoor.IsSolved());
+    UpdateTensionPulse(*player, deltaTime);
 
     Door* stageExitDoor = m_Objects.exitDoor;
     ExitTrigger* stageExit = m_Objects.exitTrigger;

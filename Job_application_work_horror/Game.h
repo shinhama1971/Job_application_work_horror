@@ -114,11 +114,11 @@ namespace Core
         SceneName GetCurrentSceneName() const { return m_CurrentScene; }
 
         // 音声初期化に失敗したPCでもゲームを続行できる安全な再生窓口です。
-        void PlayAudioCue(SOUND_LABEL label, float pitch = 1.0f)
+        void PlayAudioCue(SOUND_LABEL label, float pitch = 1.0f, float volume = 1.0f)
         {
             if (m_SoundReady)
             {
-                m_Sound.Play(label, pitch);
+                m_Sound.Play(label, pitch, volume);
             }
         }
 
