@@ -131,6 +131,7 @@ void Stage1HiddenRoomEvent::UpdateTrapped(Player& player, float deltaTime)
     if (m_Parts.key->IsCollected())
     {
         m_State = State::Escaped;
+        game->RegisterHiddenRoomEscaped();
         m_Parts.shadow->SetActive(false);
         Door* door = m_Parts.door;
         door->SetLocked(false);

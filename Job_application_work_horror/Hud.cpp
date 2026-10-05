@@ -166,16 +166,17 @@ void Hud::Draw(
     // リザルトで加点される探索要素も、クリア前から理解できる表示にします。
     Core::Game* game = Core::Game::GetInstance();
     const int evidenceCount = game != nullptr
-        ? (std::clamp)(game->GetEvidenceCollected(), 0, 3)
+        ? (std::clamp)(game->GetEvidenceCollected(), 0, Core::GameState::TotalEvidenceCount)
         : 0;
     const std::string evidenceText =
-        "記録 " + std::to_string(evidenceCount) + " / 3";
+        "記録 " + std::to_string(evidenceCount) + " / " +
+        std::to_string(Core::GameState::TotalEvidenceCount);
     constexpr float evidencePixelSize = 2.0f;
     const float evidenceWidth =
         static_cast<float>(CountDisplayedCharacters(evidenceText)) *
         evidencePixelSize * 6.0f;
     const float evidenceX = screenWidth - evidenceWidth - 52.0f;
-    const Color evidenceColor = evidenceCount >= 3
+    const Color evidenceColor = evidenceCount >= Core::GameState::TotalEvidenceCount
         ? Color(0.92f, 0.78f, 0.34f, 0.96f)
         : Color(0.62f, 0.78f, 0.70f, 0.88f);
     AddRectangle(evidenceX - 14.0f, 74.0f,

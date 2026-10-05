@@ -55,6 +55,20 @@ public:
         return anomaly != Stage2Anomaly::None && GetRequired(loopCount) == anomaly;
     }
 
+    // リザルト画面に出す名前です。
+    static const char* GetDisplayName(Stage2Anomaly anomaly) noexcept
+    {
+        switch (anomaly)
+        {
+        case Stage2Anomaly::FalseDoor: return "偽ドア";
+        case Stage2Anomaly::Clock: return "時計";
+        case Stage2Anomaly::Portrait: return "肖像画";
+        case Stage2Anomaly::Knocking: return "壁のノック";
+        case Stage2Anomaly::None: break;
+        }
+        return "なし";
+    }
+
     // デバッグ表示用の名前です。
     static const char* GetName(Stage2Anomaly anomaly) noexcept
     {

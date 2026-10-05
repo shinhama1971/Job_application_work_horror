@@ -767,6 +767,8 @@ void StageScene::UpdateWallWritings(Player& player)
         camera->GetForward(),
         player.IsFlashlightOn(),
         game->IsPowerRestored());
+    // 読んだ数はリザルト画面の「壁の文字」に出します。
+    game->SetWallWritingsRead(m_WallWritings.GetReadCount());
     if (!changedWritingRead)
     {
         return;
