@@ -1,6 +1,6 @@
 ﻿// ============================================================================
-// ファイルの役割: 1面の暗証番号の扉（入力画面の操作、正解・不正解の反応、手がかりの数字の配置）を管理します。
-// 主な技術: モーダル入力、純粋な状態クラス（KeypadLock）への委譲、ランダムな番号と手がかりの連動
+// ファイルの役割: 1面の暗証番号の扉（入力画面の操作、正解・不正解の反応、手がかりの数字の配置）を管理している。
+// 主な技術: 入力画面を開いている間だけ操作を受け取る仕組み、状態だけを持つクラス（KeypadLock）への委任、ランダムな番号と手がかりの連動
 // ============================================================================
 
 #include "Stage1KeypadDoor.h"
@@ -15,6 +15,7 @@
 
 #include <string>
 
+// 番号をランダムに決め、壁の手がかりの数字をその番号の画像にしている
 void Stage1KeypadDoor::Init(const Parts& parts)
 {
     m_Parts = parts;
@@ -22,7 +23,7 @@ void Stage1KeypadDoor::Init(const Parts& parts)
     m_InputDelayTimer = 0.0f;
     m_WrongTimer = 0.0f;
 
-    // 0は「まだ入力していない桁」と見分けにくいため、1〜9から選びます。
+    // 0は「まだ入力していない桁」と見分けにくいため、1〜9から選んでいる。
     std::uniform_int_distribution<int> digitDistribution(1, 9);
     KeypadLock::Digits code{};
     for (int& digit : code)
@@ -31,13 +32,14 @@ void Stage1KeypadDoor::Init(const Parts& parts)
     }
     m_Lock.SetCode(code);
 #ifdef _DEBUG
-    // 動作確認用に、Visual Studioの出力ウィンドウへ正解の番号を出します（Debug構成のみ）。
+    // 動作確認用に、Visual Studioの出力ウィンドウへ正解の番号を出している（Debug構成のみ）。
     const std::string message = "[Stage1KeypadDoor] code = " +
         std::to_string(code[0]) + std::to_string(code[1]) +
         std::to_string(code[2]) + std::to_string(code[3]) + "\n";
     OutputDebugStringA(message.c_str());
 #endif
 
+    // 各桁の手がかりの文字を、その数字の画像（writing_digit1〜9.png）に差し替えている
     for (int index = 0; index < KeypadLock::DigitCount; ++index)
     {
         FlashlightWriting* writing = m_Parts.digitWritings[static_cast<std::size_t>(index)];
@@ -49,6 +51,7 @@ void Stage1KeypadDoor::Init(const Parts& parts)
     }
 }
 
+// 入力盤を調べたら入力画面を開き、開いている間は入力を処理している
 void Stage1KeypadDoor::Update(Player& player, float deltaTime)
 {
     FuseBox* panel = m_Parts.panel;
@@ -59,7 +62,7 @@ void Stage1KeypadDoor::Update(Player& player, float deltaTime)
 
     if (!m_InputOpen)
     {
-        // 入力盤を調べると（FuseBoxが作動状態になると）入力画面を開きます。
+        // 入力盤を調べると（FuseBoxが作動した状態になると）入力画面を開いている。
         if (!m_Lock.IsSolved() && panel->IsActivated())
         {
             m_InputOpen = true;
@@ -79,6 +82,7 @@ void Stage1KeypadDoor::Update(Player& player, float deltaTime)
     }
 }
 
+// 入力を処理している：Q（B）で閉じ、左右で桁を選び、上下で数字を変え、E（A）で決定している
 void Stage1KeypadDoor::HandleInput(Player& player)
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -116,7 +120,7 @@ void Stage1KeypadDoor::HandleInput(Player& player)
     }
     else
     {
-        // キーボードでは数字キーで直接入力でき、入力すると次の桁へ進みます。
+        // キーボードでは数字キーで直接入力でき、入力すると次の桁へ進んでいる。
         for (int digit = 0; digit <= 9; ++digit)
         {
             if (Input::GetKeyTrigger(static_cast<BYTE>(VK_0 + digit)))
@@ -129,6 +133,7 @@ void Stage1KeypadDoor::HandleInput(Player& player)
             }
         }
     }
+    // 操作するたびに、小さな音と振動で手応えを返している
     if (changed)
     {
         game->PlayAudioCue(SOUND_CUE_FLASHLIGHT, 1.35f);
@@ -147,18 +152,19 @@ void Stage1KeypadDoor::HandleInput(Player& player)
         return;
     }
 
-    // 不正解: 入力をやり直させ、扉を向こう側から揺らされたように鳴らします。
+    // 不正解: 入力をやり直させ、扉を向こう側から揺らされたように鳴らしている。
     m_WrongTimer = WrongFeedbackSeconds;
     m_Lock.ResetEntry();
     m_Parts.door->Interact(player);
     if (m_Lock.GetMistakes() >= 3)
     {
-        // 何度も間違えると、扉の向こうの気配が強くなります。
+        // 何度も（3回以上）間違えると、扉の向こうの気配を強くしている。
         game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, m_Parts.door->GetPosition(), 0.82f, 1.3f);
         game->GetPostProcess()->TriggerHorrorPulse(0.20f, 0.30f);
     }
 }
 
+// 入力画面を閉じ、プレイヤーを動けるようにしている
 void Stage1KeypadDoor::Close(Player& player, bool solved)
 {
     m_InputOpen = false;
@@ -168,12 +174,12 @@ void Stage1KeypadDoor::Close(Player& player, bool solved)
     Door* door = m_Parts.door;
     if (!solved)
     {
-        // もう一度調べられるよう、入力盤を未操作に戻します。
+        // もう一度調べられるよう、入力盤を押していない状態に戻している。
         panel->ResetActivation();
         return;
     }
 
-    // 正解: 入力盤は作動したまま（緑の表示灯）にし、扉の鍵を外して開けます。
+    // 正解: 入力盤は作動したまま（緑のランプ）にし、扉の鍵を外して開けている。
     panel->SetManualInteractionAllowed(false);
     door->SetLocked(false);
     door->Interact(player);
@@ -183,6 +189,7 @@ void Stage1KeypadDoor::Close(Player& player, bool solved)
     Input::SetVibration(4, 0.12f);
 }
 
+// 入力画面を開いていれば、入力中の番号・選んでいる桁・不正解の点滅・間違えた回数を渡して描いている
 void Stage1KeypadDoor::Draw(Hud& hud) const
 {
     if (!m_InputOpen)

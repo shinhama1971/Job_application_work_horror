@@ -43,6 +43,7 @@
 | 1面の壁・床・天井の古さ（コンクリートの継ぎ目・気泡の穴・ひび・錆の垂れ跡・水位線・カビをシェーダーで計算）と部屋の角の暗がり（壁の形から計算する簡易AO）、面ごと・壁ごとに有効にする仕組み | `shader/litTexturePS.hlsl`, `shader/wetFloorPS.hlsl`, `shader/roomOcclusion.hlsli`, `shader/surfaceDetail.hlsli`, `shader/common.hlsl`, `Stage1Layout.*`, `Renderer.*`, `RendererState.cpp`, `Wall.*`, `Stage1Layout.cpp`, `StageScene.cpp` | 実装 | 方針の選択（壁の凹凸と汚れ） |
 | 1面の暗証番号の扉（番号はプレイごとにランダム） | `KeypadLock.h`, `Stage1KeypadDoor.*`, `HudScreens.cpp`（`DrawKeypad`） | 実装 | |
 | 1面の隠し部屋の閉じ込めイベント（鍵探し・記録端末・ライトで追い払う影） | `Stage1HiddenRoomEvent.*`, `KeyItem.*`, `Stage1Layout.cpp` | 実装 | 方針の選択（隠し部屋を充実させる） |
+| 1面の拡張：西棟（浸水した機械室・鍵で開く必須の区画・音だけの演出）、書類保管室の棚の迷路、崩れた資材置き場 | `Stage1WestWing.*`, `Stage1Layout.*`, `StageScene*.cpp`, `Stage1Objective.*`, `Ground.*`, `GroundWaterEffects.cpp`, `WaterEffectSystem.h`, `shader/wetFloorPS.hlsl` | 設計案（地図）・実装 | 方針の選択（区画の追加・西棟は必須・影は出さない） |
 | リザルト画面の「今回の発見」（壁の文字・隠し部屋・2階の異変）、残された記録の総数を4へ修正 | `GameState.h`, `HudScreens.cpp`, `Hud.cpp`, `ResultScene.*` | 実装 | |
 | 1面のヒューズの置き場所をプレイごとに部屋の中の候補からランダムに選ぶ | `Stage1Layout.cpp`, `StageSceneDraw.cpp` | 実装 | |
 

@@ -1,8 +1,9 @@
 // ============================================================================
-// シェーダーの役割: 露出と暗部の持ち上げを行い、暗所でも進行可能な明るさへ調整します。
-// 定数バッファのスロットと入出力構造はCPU側の定義と必ず一致させてください。
+// シェーダーの役割: 露出（目の慣れ）と暗い部分の持ち上げを計算し、暗い場所でも進める明るさにしている。
+// 定数バッファのスロットと入出力の形は、CPU側の定義と一致させている。
 // ============================================================================
 
+// 頂点シェーダー（unlitTextureVS）から受け取る値
 struct PS_IN
 {
     float4 pos : SV_POSITION;
@@ -10,6 +11,7 @@ struct PS_IN
     float2 uv : TEXCOORD0;
 };
 
+// 画面効果の値（FullScreenQuad.cppのTimeBufferと同じ並びの前半だけを使っている）
 cbuffer TimeBuffer : register(b0)
 {
     float time;
@@ -26,9 +28,11 @@ cbuffer TimeBuffer : register(b0)
     float exposurePadding;
 };
 
+// 描いた画面（t0）とサンプラー（s0）
 Texture2D sceneTexture : register(t0);
 SamplerState sceneSampler : register(s0);
 
+// 元の画面に「足す分の明るさ」だけを返している（加算合成で画面に足される）
 float4 main(PS_IN input) : SV_TARGET
 {
     const float3 scene =
@@ -39,8 +43,8 @@ float4 main(PS_IN input) : SV_TARGET
     sceneTexture.GetDimensions(sceneWidth, sceneHeight);
     const float2 texelSize = rcp(float2(sceneWidth, sceneHeight));
     const float2 localOffset = texelSize * 5.0f;
-    // 中心と対角2点で局所輝度を取ります。十字5点との差は暗部判定では
-    // 小さく、全画面パスのテクスチャ読取りを40%削減できます。
+    // 中心と斜めの2点で、周りの明るさを取っている。十字の5点との違いは、暗い所の判定では
+    // 小さく、全画面の描画のテクスチャの読み取りを40%減らせる。
     const float3 localAverage =
         (scene +
          sceneTexture.SampleLevel(
@@ -52,19 +56,20 @@ float4 main(PS_IN input) : SV_TARGET
             saturate(input.uv - localOffset),
             0.0f).rgb) * (1.0f / 3.0f);
 
-    // A power surge briefly blooms the image during event pulses. The clamp
-    // prevents eye adaptation from washing out UI drawn after this pass.
+    // 驚かせる演出の間は、画面を一瞬明るくしている。上限を設けて、
+    // 目の慣れでこの後に描くUIが白く飛ばないようにしている。
     const float eventExposure = horrorPulseStrength * 0.08f;
     const float exposureGain =
         max(exposure + eventExposure - 1.0f, 0.0f);
     const float3 adaptationLight = scene * exposureGain;
 
-    // Lift only a fraction of deep shadows as tension rises. This produces a
-    // cold, fog-like silhouette separation without flattening lit surfaces.
+    // 緊張が高まるほど、深い影の一部だけを持ち上げている。これで冷たい霧のように
+    // 輪郭が浮かび、光が当たっている面は平らにならない。
     const float luminance = dot(scene, float3(0.2126f, 0.7152f, 0.0722f));
     const float localLuminance = dot(
         localAverage,
         float3(0.2126f, 0.7152f, 0.0722f));
+    // 周りが暗く、明るい部分ではない所を、画面の中心ほど強く持ち上げている（露出を上げる設定のときだけ）
     const float localDarkness =
         1.0f - smoothstep(0.025f, 0.18f, localLuminance);
     const float highlightProtection =
@@ -78,12 +83,14 @@ float4 main(PS_IN input) : SV_TARGET
     const float localLiftStrength =
         adaptationRequest * localDarkness * highlightProtection *
         (0.0045f + centerPriority * 0.0095f);
+    // 持ち上げる光の色：緊張が高いほど青白くしている
     const float3 adaptationTint = lerp(
         float3(0.92f, 0.95f, 1.0f),
         float3(0.74f, 0.87f, 1.0f),
         corridorTension * 0.48f);
     const float3 localAdaptation =
         adaptationTint * localLiftStrength;
+    // 緊張が高いときは、暗い所に青みがかった霧を薄く足している
     const float shadowMask = 1.0f - smoothstep(0.025f, 0.22f, luminance);
     const float3 tensionHaze = float3(0.020f, 0.034f, 0.040f) *
         corridorTension * shadowMask;

@@ -1,7 +1,8 @@
 // ============================================================================
-// シェーダーの役割: 元のシーン色へブルーム画像を加算合成します。
+// シェーダーの役割: 元の画面の色へ、ブルームの画像（と横に伸びる光の筋・レンズの汚れ）を加算合成している。
 // ============================================================================
 
+// 頂点シェーダー（unlitTextureVS）から受け取る値
 struct PS_IN
 {
     float4 pos : SV_POSITION;
@@ -9,6 +10,7 @@ struct PS_IN
     float2 uv : TEXCOORD0;
 };
 
+// 画面効果の値（FullScreenQuad.cppのTimeBufferと同じ並び。ここではブルームの強さ・縦横比・レンズの汚れを使っている）
 cbuffer BloomCompositeBuffer : register(b0)
 {
     float time;
@@ -29,6 +31,7 @@ cbuffer BloomCompositeBuffer : register(b0)
     float postProcessPadding2;
 };
 
+// レンズの汚れのむらを、sinを重ねた模様で作っている（0〜1）
 float LensDirtWave(float2 uv)
 {
     const float first = sin(dot(uv, float2(23.17f, 17.83f)) + 1.73f);
@@ -39,6 +42,7 @@ float LensDirtWave(float2 uv)
     return saturate(first * 0.24f + second * 0.31f + broad * 0.45f + 0.50f);
 }
 
+// ぼかしたブルームの画像（t0）とサンプラー（s0）
 Texture2D bloomTexture : register(t0);
 SamplerState bloomSampler : register(s0);
 
@@ -54,8 +58,8 @@ float4 main(PS_IN input) : SV_TARGET
         uv,
         0.0f).rgb;
 
-    // ぼかし済みブルームを再利用して、控えめな横方向の光条を作ります。
-    // 広い間隔でサンプリングし、追加テクスチャなしで蛍光灯の横長形状を強調します。
+    // ぼかしたブルームを使い回して、控えめな横方向の光の筋を作っている。
+    // 広い間隔で読み取り、テクスチャを足さずに、蛍光灯の横長の形を強調している。
     float3 streak = 0.0f;
     streak += bloomTexture.SampleLevel(
         bloomSampler, saturate(uv + float2(texelSize.x * 7.0f, 0.0f)), 0.0f).rgb * 0.34f;
@@ -66,6 +70,7 @@ float4 main(PS_IN input) : SV_TARGET
     streak += bloomTexture.SampleLevel(
         bloomSampler, saturate(uv - float2(texelSize.x * 20.0f, 0.0f)), 0.0f).rgb * 0.16f;
 
+    // 筋は、明るくまとまった光（ブルームより筋が強い所）だけに出している
     const float streakLuminance = dot(
         streak,
         float3(0.2126f, 0.7152f, 0.0722f));
@@ -78,6 +83,7 @@ float4 main(PS_IN input) : SV_TARGET
         0.045f,
         0.32f,
         streakLuminance);
+    // イベントでブルームを強めたときは、筋も強くしている
     const float eventBoost = saturate(
         (bloomIntensity - 0.48f) * 0.85f);
     const float streakStrength =
@@ -85,8 +91,8 @@ float4 main(PS_IN input) : SV_TARGET
     const float3 streakColor =
         streak * float3(0.84f, 0.91f, 1.0f) * streakStrength;
 
-    // レンズ汚れはブルームが存在する場所だけへ表示します。
-    // 常時貼り付く汚れを避けながら、明るい照明へ光学的な反応を加えます。
+    // レンズの汚れは、ブルームがある場所だけに表示している。
+    // いつも張り付いた汚れを避けながら、明るい照明にレンズらしい反応を加えている。
     const float2 centered = (uv - 0.5f) * float2(screenAspect, 1.0f);
     const float edgeWeight = smoothstep(0.08f, 0.72f, length(centered));
     const float dirtWave = LensDirtWave(uv);
@@ -102,6 +108,7 @@ float4 main(PS_IN input) : SV_TARGET
     const float3 dirtGlow = bloom * float3(1.00f, 0.88f, 0.70f)
         * visibleDirt * 0.12f;
 
+    // ブルーム＋光の筋＋レンズの汚れの光を返している（加算合成で画面に足される）
     return float4(
         bloom * bloomIntensity + streakColor + dirtGlow,
         1.0f);

@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: 一度だけ発生する驚かせ演出の条件と進行を管理します。
-// 主な技術: AABBトリガー、イベント発火、再実行防止
+// ファイルの役割: プレイヤーが範囲に入ったとき、一度だけ起きる驚かせる演出の条件と実行を管理している。
+// 主な技術: 箱の範囲（AABB）に入ったかの判定、出来事の発生、二度起きないようにする仕組み
 // ============================================================================
 
 #include "Game.h"
@@ -12,10 +12,12 @@
 
 using namespace DirectX::SimpleMath;
 
+// 準備するものはない
 void ScareTrigger::Init()
 {
 }
 
+// まだ起きていなくて、条件を満たし、プレイヤーが範囲に入ったら演出を起こしている
 void ScareTrigger::Update()
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -27,6 +29,7 @@ void ScareTrigger::Update()
     }
 
     m_HasTriggered = true;
+    // 影を出している（更新の途中なので、追加は予約にしている）。電力が戻った後の影は、見つめると消える演出にしている
     const Vector3 shadowPosition = m_ShadowPosition;
     const bool makePersistentScare = m_RequiresPower;
     game->RequestAddObject<ShadowMan>(
@@ -43,6 +46,7 @@ void ScareTrigger::Update()
             }
         });
 
+    // 強い振動・驚かせる音・画面の乱れ・ブラウン管のようなノイズで驚かせている
     Input::SetVibration(14, 0.34f);
     game->PlayAudioCue(SOUND_CUE_SCARE);
     game->GetPostProcess()->TriggerHorrorPulse(1.0f, 0.65f);
@@ -57,15 +61,18 @@ void ScareTrigger::Update()
     }
 }
 
+// 見た目はないので何も描かない
 void ScareTrigger::Draw(Camera* camera)
 {
     (void)camera;
 }
 
+// 解放するものはない
 void ScareTrigger::Uninit()
 {
 }
 
+// プレイヤーの足元が、箱の範囲の中にあるかを調べている
 bool ScareTrigger::IsPlayerInside() const
 {
     const std::vector<Player*> players =

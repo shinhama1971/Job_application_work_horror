@@ -1,6 +1,6 @@
 ﻿// ============================================================================
-// ファイルの役割: 1面のHUD、目的表示、進行フィードバックの描画を管理します。
-// 主な技術: 描画パス分離、シャドウマップ、透明描画順
+// ファイルの役割: 1面のHUD（目的・目的地の方向・章のカード・暗転・暗証番号の入力・ポーズ）と、監視映像の描画を担当している。
+// 主な技術: 状態に応じたUIの重ね方、描く順番の制御、目的表示の選択を別の関数に任せる設計
 // ============================================================================
 
 #include "StageScene.h"
@@ -29,10 +29,11 @@ using namespace DirectX::SimpleMath;
 
 void StageScene::RenderOffscreen()
 {
-    // 監視映像を見ている間だけ、選んだカメラの視点を本描画の前に描きます。
+    // 監視映像を見ている間だけ、選んだカメラの視点を本描画の前に描いている。
     m_Surveillance.RenderFeeds();
 }
 
+// 1面のHUDを、下から順に重ねて描いている
 void StageScene::Draw(Camera* camera)
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -43,6 +44,7 @@ void StageScene::Draw(Camera* camera)
         return;
     }
 
+    // 監視映像を見ている間は、映像の画面（とポーズ）だけを描いている
     if (m_Surveillance.IsViewing())
     {
         m_Surveillance.DrawFeed(m_Hud);
@@ -69,16 +71,17 @@ void StageScene::Draw(Camera* camera)
 
     const int fuseCount = game->GetItemCount();
     ExitTrigger* exitTrigger = m_Objects.exitTrigger;
-    // どの目的・通知・ヒントを出すかの優先順位はSelectStage1Objectiveにまとめています。
+    // どの目的・知らせ・ヒントを出すかの優先順位は、SelectStage1Objectiveにまとめている。
     const std::string objectiveText = SelectStage1Objective(MakeObjectiveInput());
 
-    // 目的表示なしの設定では、何をすべきかを説明しない静かな画面にします。
+    // 目的表示なしの設定では、何をすべきかを説明しない静かな画面にしている。
     m_Hud.Draw(
         *player,
         fuseCount,
         m_InteractionSystem.GetPrompt(),
         game->IsGuideEnabled() ? std::string_view(objectiveText) : std::string_view{});
 
+    // 目的地の方向：始まりの4.2秒の後、進み具合に合わせて次に行く場所を指している（普段は出口）
     if (game->IsGuideEnabled() &&
         m_StageVisualTimer >= 4.20f &&
         (exitTrigger == nullptr || !exitTrigger->IsEscaping()))
@@ -86,9 +89,10 @@ void StageScene::Draw(Camera* camera)
         Vector3 guideTarget(0.0f, -99.0f, 315.0f);
         if (m_HiddenRoom.IsTrapped() && m_Objects.hiddenRoom.key != nullptr)
         {
-            // 隠し部屋に閉じ込められている間は、鍵の場所を指します。
+            // 隠し部屋に閉じ込められている間は、鍵の場所を指している。
             guideTarget = m_Objects.hiddenRoom.key->GetPosition();
         }
+        // 電力が戻った後は、出口の送電盤、次に出口の扉を指している
         else if (game->IsPowerRestored() && !exitPowerActivated)
         {
             guideTarget = Vector3(145.0f, -90.0f, 270.0f);
@@ -97,7 +101,7 @@ void StageScene::Draw(Camera* camera)
         {
             guideTarget = Vector3(202.0f, -74.0f, 307.5f);
         }
-        // ヒューズの位置はプレイごとに変わるため、配置したObjectから読みます。
+        // ヒューズの位置はプレイごとに変わるため、配置したObjectから読んでいる。
         else if (fuseCount <= 0 && m_Objects.firstFuse != nullptr)
         {
             guideTarget = m_Objects.firstFuse->GetPosition();
@@ -106,10 +110,12 @@ void StageScene::Draw(Camera* camera)
         {
             guideTarget = m_Objects.secondFuse->GetPosition();
         }
-        else if (fuseCount == 2 && m_CorridorLoopCount >= 2 && m_Objects.thirdFuse != nullptr)
+        else if (fuseCount == 2 && m_CorridorLoopCount >= 2)
         {
-            guideTarget = m_Objects.thirdFuse->GetPosition();
+            // 3本目は西棟の奥。鍵 → 西側の扉 → ヒューズの順に指している。
+            guideTarget = m_WestWing.GetGuideTarget();
         }
+        // ヒューズが3本そろったら、配電盤を指している
         else if (fuseCount >= 3)
         {
             guideTarget = Vector3(-180.0f, -90.0f, 35.0f);
@@ -120,6 +126,7 @@ void StageScene::Draw(Camera* camera)
             guideTarget);
     }
 
+    // 始まりの0.65秒は黒からだんだん明るくし、4.2秒までは章のカードを出している
     if (m_StageVisualTimer < 0.65f)
     {
         const float fade = 1.0f - m_StageVisualTimer / 0.65f;
@@ -130,12 +137,15 @@ void StageScene::Draw(Camera* camera)
         m_Hud.DrawChapterCard(
             "1階", "ヒューズを集めて電力を復旧する", m_StageVisualTimer);
     }
+    // 監視カメラの確認で捕まったときは、画面を暗くしている
     if (m_Surveillance.IsCaughtActive())
     {
         m_Hud.DrawBlink(m_Surveillance.GetCaughtFadeRate() * 0.96f);
     }
+    // 暗証番号の入力画面を開いていれば描いている
     m_KeypadDoor.Draw(m_Hud);
 
+    // ポーズ中はポーズメニューを重ねている（1階として表示）
     if (game->IsPaused())
     {
         m_Hud.DrawPause(
@@ -152,7 +162,7 @@ void StageScene::Draw(Camera* camera)
     }
 }
 
-// 目的表示の文章を選ぶための状態を、各仕組みから読み取って集めます。
+// 目的表示の文章を選ぶための状態を、各仕組みから読み取って集めている。
 Stage1ObjectiveInput StageScene::MakeObjectiveInput() const
 {
     const Core::Game* game = Core::Game::GetInstance();
@@ -188,5 +198,6 @@ Stage1ObjectiveInput StageScene::MakeObjectiveInput() const
     input.fuseWatcherNotice = m_FuseWatcherNoticeTimer > 0.0f;
     input.loopNotice = m_LoopNoticeTimer > 0.0f;
     input.hiddenRoomText = m_HiddenRoom.GetObjectiveText();
+    input.westWingStep = static_cast<int>(m_WestWing.GetStep());
     return input;
 }

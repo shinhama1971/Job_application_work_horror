@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: 過去フレームのGPU Queryだけを非同期取得し、msへ変換します。
-// 主な技術: TIMESTAMP、TIMESTAMP_DISJOINT、DONOTFLUSH、ComPtr
+// ファイルの役割: 過去のフレームのGPUのクエリだけを、待たずに読み取ってミリ秒に変換している。
+// 主な技術: TIMESTAMP、TIMESTAMP_DISJOINT、DONOTFLUSH（読むためにGPUの処理を急がせない）、ComPtr
 // ============================================================================
 
 #include "GpuTimer.h"
@@ -11,11 +11,13 @@
 
 namespace
 {
+    // 段階の列挙値を、配列の添字に変えている
     constexpr std::size_t ToIndex(GpuPass pass)
     {
         return static_cast<std::size_t>(pass);
     }
 
+    // 環境変数 GPU_TIMER_LOG_PATH があれば、測った結果をそのファイルへ書き出している（調査用）
     const std::string& GetDiagnosticLogPath()
     {
         static const std::string logPath = []
@@ -31,6 +33,7 @@ namespace
         return logPath;
     }
 
+    // 1フレーム分の結果を、カンマ区切りの1行として追記している
     void WriteDiagnosticSample(
         std::uint64_t frameNumber,
         const std::array<GpuTiming,
@@ -58,6 +61,7 @@ namespace
     }
 }
 
+// 4フレーム分のクエリ（時計の確認用と、各段階の始まり・終わりの時刻）を作っている
 bool GpuTimer::Init(ID3D11Device* device)
 {
     Uninit();
@@ -101,6 +105,7 @@ bool GpuTimer::Init(ID3D11Device* device)
     return true;
 }
 
+// クエリをすべて解放し、状態を最初に戻している
 void GpuTimer::Uninit()
 {
     m_CurrentFrame = nullptr;
@@ -126,6 +131,8 @@ void GpuTimer::Uninit()
     m_Initialized = false;
 }
 
+// GPUからそのフレームの結果が届いていれば読み取り、各段階の時間をミリ秒にしている。
+// まだ届いていなければ（S_FALSE）、待たずにfalseを返している
 bool GpuTimer::TryResolveFrame(
     ID3D11DeviceContext* context,
     QueryFrame& frame)
@@ -147,6 +154,7 @@ bool GpuTimer::TryResolveFrame(
     }
 
     std::array<GpuTiming, PassCount> resolvedTimings{};
+    // 測っている途中でGPUの時計が変わった（Disjoint）ときは、そのフレームの値は使えない
     if (FAILED(disjointResult) || disjointData.Disjoint ||
         disjointData.Frequency == 0)
     {
@@ -159,6 +167,7 @@ bool GpuTimer::TryResolveFrame(
     }
     else
     {
+        // 各段階の終わりの時刻から始まりの時刻を引き、GPUの時計の周波数で割ってミリ秒にしている
         for (std::size_t passIndex = 0; passIndex < PassCount; ++passIndex)
         {
             if (frame.Skipped[passIndex])
@@ -207,8 +216,8 @@ bool GpuTimer::TryResolveFrame(
                 GpuTimingStatus::Available &&
             resolvedTimings[bloomIndex].Status == GpuTimingStatus::Available)
         {
-            // PostProcess QueryはCopyResourceから最終FullScreen描画までを囲みます。
-            // 内側のBloom時間を除き、両項目を重複しない値として表示します。
+            // PostProcessのクエリは、画面の取り込み（CopyResource）から最後の全画面の描画までを囲んでいる。
+            // その中に含まれるブルームの時間を引き、2つの項目が重ならない値として表示している。
             resolvedTimings[postProcessIndex].Milliseconds = (std::max)(
                 0.0,
                 resolvedTimings[postProcessIndex].Milliseconds -
@@ -216,6 +225,7 @@ bool GpuTimer::TryResolveFrame(
         }
     }
 
+    // 届いた順番が前後しても、より新しいフレームの結果だけを残している
     if (!m_HasResolvedFrame || frame.FrameNumber > m_LatestResolvedFrame)
     {
         m_LatestTimings = resolvedTimings;
@@ -236,12 +246,13 @@ void GpuTimer::BeginFrame(ID3D11DeviceContext* context)
         return;
     }
 
-    // 完了済みの過去フレームだけを取得します。S_FALSEなら待たずに次へ進みます。
+    // 描き終わった過去のフレームの結果だけを読み取っている。S_FALSEなら待たずに次へ進んでいる。
     for (QueryFrame& frame : m_Frames)
     {
         TryResolveFrame(context, frame);
     }
 
+    // 結果を読み終えたクエリの組を探して、このフレームに使っている。全部使用中なら、このフレームは測らない
     QueryFrame* availableFrame = nullptr;
     for (std::size_t offset = 0; offset < QueryFrameCount; ++offset)
     {
@@ -260,6 +271,7 @@ void GpuTimer::BeginFrame(ID3D11DeviceContext* context)
         return;
     }
 
+    // このフレームの記録を始め、フレーム全体の始まりの時刻を記録している
     availableFrame->Issued.fill(false);
     availableFrame->Started.fill(false);
     availableFrame->Skipped.fill(false);
@@ -273,6 +285,7 @@ void GpuTimer::BeginFrame(ID3D11DeviceContext* context)
     m_CurrentFrame = availableFrame;
 }
 
+// フレーム全体の終わりの時刻を記録し、結果が届くのを待つ状態にしている
 void GpuTimer::EndFrame(ID3D11DeviceContext* context)
 {
     if (m_CurrentFrame == nullptr || context == nullptr)
@@ -288,6 +301,7 @@ void GpuTimer::EndFrame(ID3D11DeviceContext* context)
     m_CurrentFrame = nullptr;
 }
 
+// 段階の始まりの時刻を記録している（同じ段階を二重に始めないようにしている）
 void GpuTimer::BeginPass(GpuPass pass, ID3D11DeviceContext* context)
 {
     const std::size_t passIndex = ToIndex(pass);
@@ -302,6 +316,7 @@ void GpuTimer::BeginPass(GpuPass pass, ID3D11DeviceContext* context)
     m_CurrentFrame->Started[passIndex] = true;
 }
 
+// 段階の終わりの時刻を記録している
 void GpuTimer::EndPass(GpuPass pass, ID3D11DeviceContext* context)
 {
     const std::size_t passIndex = ToIndex(pass);
@@ -315,6 +330,7 @@ void GpuTimer::EndPass(GpuPass pass, ID3D11DeviceContext* context)
     m_CurrentFrame->Started[passIndex] = false;
 }
 
+// このフレームではその段階を描かなかったことを記録している（表示では「省いた」になる）
 void GpuTimer::SkipPass(GpuPass pass)
 {
     const std::size_t passIndex = ToIndex(pass);
@@ -325,6 +341,7 @@ void GpuTimer::SkipPass(GpuPass pass)
     }
 }
 
+// そのフレームで省いた段階は「省いた」、それ以外は最後に測れた結果を返している
 GpuTiming GpuTimer::GetTiming(GpuPass pass) const
 {
     const std::size_t passIndex = ToIndex(pass);

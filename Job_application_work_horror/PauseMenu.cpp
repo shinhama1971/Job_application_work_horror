@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: ポーズ画面の開閉、項目選択、設定値の変更、メニュー操作の入力を扱います。
-// 主な技術: 入力のエッジ検出、設定値の段階変更、コマンドの返却による責務分離
+// ファイルの役割: ポーズ画面の開け閉め、項目の選択、設定値の変更、メニュー操作の入力を扱っている。
+// 主な技術: 押した瞬間の判定、設定値を段階で変える操作、実行する命令を戻り値で返して役割を分ける設計
 // ============================================================================
 
 #include "PauseMenu.h"
@@ -12,12 +12,14 @@
 
 namespace Core
 {
+    // 開いたときは、いつも一番上の項目（明るさ）を選んだ状態にしている
     void PauseMenu::Open()
     {
         m_IsOpen = true;
         m_SelectedItem = Item::Brightness;
     }
 
+    // 上下で項目を選び、左右で設定を変え、変わったら小さく振動させている。最後に命令のボタンを読んでいる
     PauseMenu::Result PauseMenu::Update(GameSettings& settings)
     {
         UpdateSelection();
@@ -46,6 +48,7 @@ namespace Core
         return result;
     }
 
+    // 上下キー（十字キー）で選ぶ項目を動かしている（端で止まる）
     void PauseMenu::UpdateSelection()
     {
         int selectionDelta = 0;
@@ -74,7 +77,7 @@ namespace Core
     bool PauseMenu::ChangeSelectedSetting(
         GameSettings& settings, int delta) const
     {
-        // 範囲外はSet側で弾かれ、値が変わらない場合もfalseになります。
+        // 範囲外はSet側ではじかれ、値が変わらない場合もfalseになる。
         switch (m_SelectedItem)
         {
         case Item::Brightness:
@@ -100,6 +103,7 @@ namespace Core
         }
     }
 
+    // R（Y）でこの階をやり直す、T（B）でタイトルへ戻る、Q（BACK）でゲームを終える
     PauseMenu::Command PauseMenu::ReadCommand()
     {
         if (Input::GetKeyTrigger(VK_R) ||

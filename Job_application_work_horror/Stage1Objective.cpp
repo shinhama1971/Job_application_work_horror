@@ -1,12 +1,30 @@
 ﻿// ============================================================================
-// ファイルの役割: 1面の画面上部に出す目的・通知・ヒントの文章を、現在の状態から1つ選びます。
-// 主な技術: 描画・入力に依存しない純粋関数、優先順位付きの表示選択
+// ファイルの役割: 1面の画面の左上に出す目的・知らせ・ヒントの文章を、今の状態から1つ選んでいる。
+// 主な技術: 描画・入力に依存しない関数（同じ入力なら必ず同じ結果）、優先順位を付けた表示の選択
 // ============================================================================
 
 #include "Stage1Objective.h"
 
+namespace
+{
+    // 3本目のヒューズを探す段階（西棟）の文章。目的・ヒント（35秒・18秒）の3種類がある。
+    const char* SelectWestWingText(int westWingStep, int variant)
+    {
+        static const char* const Texts[3][3] =
+        {
+            { "右側の部屋で鍵を探す", "ヒント 右奥の部屋に鍵が落ちている", "ヒント 右側の部屋を確認する" },
+            { "西側の壁の扉を鍵で開ける", "ヒント 配電盤の近く、左の壁の扉", "ヒント 西側の壁沿いを探す" },
+            { "浸水した西棟の奥でヒューズを探す", "ヒント 水に浸かった通路の一番奥", "ヒント 西棟の奥へ進む" },
+        };
+        // 段階は1〜3の範囲に収めている
+        const int step = westWingStep < 1 ? 1 : (westWingStep > 3 ? 3 : westWingStep);
+        return Texts[step - 1][variant];
+    }
+}
+
 std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
 {
+    // まず、ヒューズの数とループ廊下の回数から、普段の目的を決めている
     std::string objectiveText;
     if (in.fuseCount <= 0)
     {
@@ -22,24 +40,25 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
     {
         objectiveText = in.corridorLoopCount < 2
             ? "もう一度廊下の奥まで進む"
-            : "右側の部屋でヒューズを探す";
+            : SelectWestWingText(in.westWingStep, 0);
     }
     else
     {
         objectiveText = "左の部屋にある配電盤を調べる";
     }
+    // ここから下は、上に書いたものほど優先して、普段の目的を上書きしている
     if (in.escaping)
     {
         objectiveText = "ドアの先へ移動中";
     }
     else if (!in.hiddenRoomText.empty())
     {
-        // 隠し部屋に閉じ込められている間は、その場の状況だけを伝えます。
+        // 隠し部屋に閉じ込められている間は、その場の状況だけを伝えている。
         objectiveText = std::string(in.hiddenRoomText);
     }
     else if (in.patrolDispatched)
     {
-        // 現地確認中の残り時間と除去の進み具合は毎フレーム変わるため、ここで文章を組み立てます。
+        // 現地確認の間の残り時間と、光で消した割合は毎フレーム変わるため、ここで文章を組み立てている。
         const std::string cameraLabel(in.patrolCameraLabel);
         const std::string anomalyLabel(in.patrolAnomalyLabel);
         if (!in.flashlightOn)
@@ -64,6 +83,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
     {
         objectiveText = in.patrolNoticeText;
     }
+    // 一時的な知らせ（充電・監視カメラ・倉庫の物音・ヒューズを拾った・影が消えた）
     else if (in.chargerNotice)
     {
         objectiveText = in.fuseWatcherState == 1
@@ -96,6 +116,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
             ? "影を正面から懐中電灯で照らす"
             : "影が光の中へ消えた";
     }
+    // 演出の最中の文章（出口の前兆・電力が戻った瞬間・送電中・照明の演出・ループ廊下）
     else if (in.exitOmenSeconds > 0.0f)
     {
         objectiveText = in.exitOmenSeconds > 1.75f
@@ -135,6 +156,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
             objectiveText = "後ろを振り返らない";
         }
     }
+    // 35秒止まっていたら、場所がはっきり分かるヒントを出している
     else if (in.progressHintSeconds >= 35.0f)
     {
         if (in.powerRestored && !in.exitPowerActivated)
@@ -163,13 +185,14 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         }
         else if (in.fuseCount == 2)
         {
-            objectiveText = "ヒント 右奥の部屋を探す";
+            objectiveText = SelectWestWingText(in.westWingStep, 1);
         }
         else
         {
             objectiveText = "ヒント 左の部屋の配電盤を調べる";
         }
     }
+    // 18秒止まっていたら、方向を示す軽いヒントを出している
     else if (in.progressHintSeconds >= 18.0f)
     {
         if (in.powerRestored && !in.exitPowerActivated)
@@ -198,13 +221,14 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         }
         else if (in.fuseCount == 2)
         {
-            objectiveText = "ヒント 右側の部屋を確認する";
+            objectiveText = SelectWestWingText(in.westWingStep, 2);
         }
         else
         {
             objectiveText = "ヒント 配電盤へ戻る";
         }
     }
+    // 電力が戻った後の普段の目的
     else if (in.powerRestored && !in.exitPowerActivated)
     {
         objectiveText = "出口手前の非常送電盤を操作する";

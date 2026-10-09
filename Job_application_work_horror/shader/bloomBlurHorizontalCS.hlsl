@@ -1,19 +1,22 @@
 // ============================================================================
-// シェーダーの役割: ブルーム画像を水平方向へガウシアンぼかしをす
+// シェーダーの役割: ブルームの画像を、横方向にガウシアンぼかしで、にじませている。
 // ============================================================================
 
+// 入力の画像（t0）と、書き込む先（u0）
 Texture2D<float4> InputTexture : register(t0);
 RWTexture2D<float4> OutputTexture : register(u0);
 
+// 1グループの画素の数（128）、ぼかしの半径（左右4画素）、共有メモリに置く画素の数（両端の分も含む）
 static const int GroupSize = 128;
 static const int Radius = 4;
 static const int SharedSize = GroupSize + Radius * 2 + 1;
 
-// スカラー配列を分け、隣接スレッドのアクセスを異なる共有メモリバンクへ分散します。
+// 色ごとに配列を分け、隣どうしのスレッドの読み書きが、別々の共有メモリのバンクへ散らばるようにしている。
 groupshared float SharedRed[SharedSize];
 groupshared float SharedGreen[SharedSize];
 groupshared float SharedBlue[SharedSize];
 
+// 共有メモリに色を書く・読む
 void StoreShared(int index, float3 color)
 {
     SharedRed[index] = color.r;
@@ -26,6 +29,7 @@ float3 LoadShared(int index)
     return float3(SharedRed[index], SharedGreen[index], SharedBlue[index]);
 }
 
+// 1スレッドが1画素を担当し、グループの128画素と両端4画素ずつを共有メモリへ読み込んでから、ぼかしている
 [numthreads(GroupSize, 1, 1)]
 void main(
     uint3 dispatchThreadId : SV_DispatchThreadID,
@@ -42,6 +46,7 @@ void main(
     const int centerX = clamp(groupStart + int(groupThreadId.x), 0, int(width) - 1);
     StoreShared(localIndex, InputTexture.Load(int3(centerX, y, 0)).rgb);
 
+    // グループの先頭の4スレッドが、両端からはみ出す分の画素も読み込んでいる
     if (int(groupThreadId.x) < Radius)
     {
         const int leftX = clamp(groupStart + int(groupThreadId.x) - Radius, 0, int(width) - 1);
@@ -50,6 +55,7 @@ void main(
         StoreShared(GroupSize + Radius + int(groupThreadId.x), InputTexture.Load(int3(rightX, y, 0)).rgb);
     }
 
+    // 全スレッドが読み込み終わるのを待っている
     GroupMemoryBarrierWithGroupSync();
 
     if (dispatchThreadId.x >= width || dispatchThreadId.y >= height)
@@ -57,6 +63,7 @@ void main(
         return;
     }
 
+    // 左右4画素ずつ、ガウス分布の重み（合計1）で足し合わせている
     float3 result = LoadShared(localIndex) * 0.22702703f;
     result += (LoadShared(localIndex - 1) + LoadShared(localIndex + 1)) * 0.19459459f;
     result += (LoadShared(localIndex - 2) + LoadShared(localIndex + 2)) * 0.12162162f;

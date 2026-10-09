@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: オフスクリーン描画用テクスチャ、RTV、SRV、深度を管理します。
-// 主な技術: Render Target View、Shader Resource View、Depth Stencil、解像度同期
+// ファイルの役割: 画面以外に描くためのテクスチャと、その描画先（RTV）・読み取り口（SRV）・書き込み口（UAV）・深度を管理している。
+// 主な技術: Render Target View、Shader Resource View、Unordered Access View、Depth Stencil
 // ============================================================================
 
 #include "RenderTexture.h"
@@ -18,6 +18,7 @@ namespace Graphics
         m_Width = width;
         m_Height = height;
 
+        // 描画先にもシェーダーの入力にもなるテクスチャを作っている（ミップマップなし、マルチサンプルなし）
         D3D11_TEXTURE2D_DESC texDesc{};
         texDesc.Width = width;
         texDesc.Height = height;
@@ -64,8 +65,8 @@ namespace Graphics
             );
         }
 
-        // レンダーターゲットと深度バッファは同じ寸法で作成します。
-        // コンピュート処理専用のブルーム画像には深度バッファを作りません。
+        // 描画先と深度バッファは同じ大きさで作っている。
+        // コンピュートシェーダー専用のブルームの画像には、深度バッファを作っていない。
         if (!enableUnorderedAccess)
         {
             D3D11_TEXTURE2D_DESC depthDesc{};
@@ -101,17 +102,19 @@ namespace Graphics
         m_Height = 0;
     }
 
+    // このテクスチャを描画先にし、ビューポートを大きさに合わせ、深度を消している
     void RenderTexture::SetRenderTarget()
     {
         ID3D11DeviceContext* context =
             Renderer::GetDeviceContext();
 
+        // このテクスチャ自身をシェーダーから読んだままだと描画先にできないため、t0・t1の読み取りを外している
         ID3D11ShaderResourceView* nullSRVs[2] = { nullptr, nullptr };
         context->PSSetShaderResources(0, 2, nullSRVs);
 
         ID3D11RenderTargetView* rtv = m_RTV.Get();
 
-        // まずは深度なしで確認
+        // このテクスチャと深度バッファを描画先にしている
         context->OMSetRenderTargets(
             1,
             &rtv,
@@ -132,6 +135,7 @@ namespace Graphics
         }
     }
 
+    // 指定した色で塗りつぶしている
     void RenderTexture::Clear(float r, float g, float b, float a)
     {
         float clearColor[4] = { r, g, b, a };

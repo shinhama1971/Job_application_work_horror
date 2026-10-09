@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: ヒューズアイテムの形状、浮遊演出、取得処理を管理します。
-// 主な技術: オブジェクト指向、発光パルス、AABB、時間ベースアニメーション
+// ファイルの役割: ヒューズ（1面で集めるアイテム）の形、浮かぶ動き、拾ったときの処理を管理している。
+// 主な技術: 箱を組み合わせた形をコードで生成、ゆっくり脈打つ大きさ、調べる操作、時間で回る・浮く動き
 // ============================================================================
 
 #include "Item.h"
@@ -15,11 +15,13 @@
 
 using namespace DirectX::SimpleMath;
 
+// ヒューズの形を箱の組み合わせで作っている
 void Item::BuildGeometry()
 {
     m_Vertices.clear();
     m_Indices.clear();
 
+    // 四角形の面を1枚追加している。表と裏の両方から見えるよう、三角形を両面分（12個のインデックス）入れている
     const auto addFace = [this](
         const std::array<Vector3, 4>& positions,
         const Vector3& normal,
@@ -51,6 +53,7 @@ void Item::BuildGeometry()
         m_Indices.insert(m_Indices.end(), indices, indices + 12);
     };
 
+    // 中心と半分の大きさを指定して、6面の箱を追加している
     const auto addBox = [&addFace](
         const Vector3& center,
         const Vector3& half,
@@ -83,6 +86,7 @@ void Item::BuildGeometry()
                 Vector3(0.0f, -1.0f, 0.0f), color);
     };
 
+    // 緑がかったガラスの筒、上下の金具、手前に見えるオレンジのフィラメント
     const Color glass(0.34f, 0.46f, 0.38f, 1.0f);
     const Color metal(0.62f, 0.58f, 0.42f, 1.0f);
     const Color filament(1.0f, 0.48f, 0.10f, 1.0f);
@@ -95,6 +99,7 @@ void Item::BuildGeometry()
         Vector3(0.045f, 0.34f, 0.035f), filament);
 }
 
+// 形とバッファ、シェーダー、マテリアルを作っている。わずかに自ら光らせ、暗い部屋でも見つけやすくしている
 void Item::Init()
 {
     m_Vertices.reserve(96);
@@ -123,13 +128,14 @@ void Item::Update()
 {
     if (!m_IsActive || m_IsCollected) return;
 
-    // ゆっくりした浮遊と明滅で、暗い部屋でも小さなヒューズを発見しやすくします。
+    // ゆっくり回りながら浮き沈みさせ、暗い部屋でも小さなヒューズを見つけやすくしている。
     const float deltaTime = Application::GetDeltaTime();
     m_AnimationTime += deltaTime;
     m_Rotation.y += 1.5f * deltaTime;
     m_Position.y = m_BaseY + std::sin(m_AnimationTime * 2.6f) * 0.75f;
 }
 
+// 拾ったときの処理：数を増やし、音・画面の光・振動で知らせている
 void Item::Interact(Player& player)
 {
     if (!m_IsActive || m_IsCollected)
@@ -144,6 +150,7 @@ void Item::Interact(Player& player)
         0.72f, 0.30f);
     Input::SetVibration(6, 0.14f);
 
+    // 1本目を拾った瞬間、プレイヤーから-Z方向に80離れた位置に影を出している（最初の驚かせる演出）
     if (Core::Game::GetInstance()->GetItemCount() == 1)
     {
         const Vector3 shadowPosition(
@@ -165,6 +172,7 @@ void Item::Interact(Player& player)
     }
 }
 
+// 回転と浮き沈みに加えて、大きさを少し脈打たせて描いている
 void Item::Draw(Camera* cam)
 {
     if (!m_IsActive || m_IsCollected) return;
@@ -200,6 +208,7 @@ void Item::Draw(Camera* cam)
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
 }
 
+// 頂点データとマテリアルを解放している
 void Item::Uninit()
 {
     m_Vertices.clear();

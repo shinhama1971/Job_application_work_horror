@@ -1,19 +1,23 @@
 // ============================================================================
-// 共通処理: 懐中電灯用シャドウマップ、定数バッファ、軽量PCFフィルター。
-// litTexturePS と wetFloorPS の影品質を同じ場所で調整できます。
+// 共通の処理: 懐中電灯のシャドウマップ、その定数バッファ、軽いPCF（周りの数か所を比べてぼかす）フィルター。
+// litTexturePS と wetFloorPS の影の品質を、同じ場所で調整できるようにしている。
 // ============================================================================
 
+// シャドウマップ（t5）と、深度を比べて読む比較サンプラー（s1）
 Texture2D<float> g_FlashlightShadowMap : register(t5);
 SamplerComparisonState g_ShadowSampler : register(s1);
 
+// ライトのビュー×射影の行列と、x=1テクセルの大きさ、y=比較のずれ、z=near、w=far（ShadowMap.cppと同じ並び）
 cbuffer ShadowBuffer : register(b8)
 {
     matrix ShadowViewProjection;
     float4 ShadowParameters;
 }
 
+// 影の明るさ（0=影、1=光が当たる）を返している
 float GetFlashlightShadow(float4 shadowPosition)
 {
+    // ライトの後ろや、シャドウマップの範囲の外は、影ではないことにしている
     if (shadowPosition.w <= 0.0f)
     {
         return 1.0f;
@@ -31,9 +35,9 @@ float GetFlashlightShadow(float4 shadowPosition)
         return 1.0f;
     }
 
-    // 5 taps retain a soft flashlight edge while avoiding the old 12 texture
-    // comparisons and per-pixel sin/cos rotation. The centre tap stabilises
-    // thin geometry and the asymmetric disk prevents a square-looking edge.
+    // 5か所を比べることで、懐中電灯の影の縁の柔らかさを保ちつつ、前の12回の比較と
+    // 画素ごとのsin/cosの回転をなくしている。中心の1か所で細い物の影を安定させ、
+    // 形をずらした円の配置で、影の縁が四角く見えないようにしている。
     static const float2 poissonDisk[4] =
     {
         float2(-0.72f, -0.31f), float2(0.39f, -0.78f),
@@ -41,7 +45,7 @@ float GetFlashlightShadow(float4 shadowPosition)
     };
     const float receiverDepth = saturate(
         (projected.z - 0.04f) / 0.86f);
-    // 遠距離でも影を広げすぎず、物体の輪郭を読み取れる柔らかさに留めます。
+    // 遠くでも影を広げすぎず、物の輪郭を読み取れる柔らかさにとどめている。
     const float filterRadius = ShadowParameters.x *
         lerp(0.85f, 2.25f, receiverDepth);
     const float receiverBias = ShadowParameters.y *

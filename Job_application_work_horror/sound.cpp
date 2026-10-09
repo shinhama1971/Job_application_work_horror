@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: XAudio2による効果音・環境音の読み込み、再生、解放を管理します。
-// 主な技術: XAudio2、X3DAudio（立体音響）、ローパスフィルター、RIFF/WAVE解析、Source Voice、RAII
+// ファイルの役割: XAudio2による効果音・環境音の読み込み、再生、解放を管理している。
+// 主な技術: XAudio2、X3DAudio（立体音響）、ローパスフィルター、RIFF/WAVEの解析、Source Voice、RAII
 // ============================================================================
 
 #include "sound.h"
@@ -8,27 +8,28 @@
 #include <algorithm>
 #include <cmath>
 
-// X3DAudioInitialize / X3DAudioCalculate は XAudio2 2.9 のライブラリに含まれます。
+// X3DAudioInitialize / X3DAudioCalculate は XAudio2 2.9 のライブラリに含まれている。
 #pragma comment(lib, "xaudio2.lib")
 
 using DirectX::SimpleMath::Vector3;
 
 namespace
 {
-	// 1ワールド単位はおよそ4cm（目の高さが40）。この距離までは減衰せず、以降は距離に反比例して小さくなります。
+	// 1ワールド単位はおよそ4cm（目の高さが40）。この距離までは小さくならず、その先は距離に反比例して小さくなる。
 	constexpr float SpatialCurveDistance = 30.0f;
-	// これより近い音は方向をはっきりさせず、耳元で広がるように聞かせます。
+	// これより近い音は方向をはっきりさせず、耳元で広がるように聞かせている。
 	constexpr float SpatialInnerRadius = 6.0f;
-	// 壁の向こうの音量と、こもり具合（ローパスフィルターの周波数）です。
+	// 壁の向こうの音の大きさと、こもり具合（ローパスフィルターの周波数）。
 	constexpr float OccludedVolume = 0.38f;
 	constexpr float OccludedCutoffHz = 650.0f;
-	// 遠くの音ほど高音が空気に吸われる様子を近似します。
+	// 遠くの音ほど、高い音が空気に吸われる様子を近似している。
 	constexpr float OpenAirCutoffHz = 16000.0f;
 	constexpr float DistantCutoffHz = 4500.0f;
 	constexpr float DistantCutoffRange = 600.0f;
-	// 壁の出入りで音がぷつっと変わらないよう、遮蔽量をこの速さで追従させます。
+	// 壁の出入りで音がぷつっと変わらないよう、さえぎる物の量をこの速さで追いかけさせている。
 	constexpr float OcclusionResponsePerSecond = 7.0f;
 
+	// SimpleMathのベクトルを、X3DAudioのベクトルに変換している
 	X3DAUDIO_VECTOR ToX3DAudio(const Vector3& value)
 	{
 		X3DAUDIO_VECTOR result{};
@@ -39,7 +40,7 @@ namespace
 	}
 }
 
-#ifdef _XBOX //Big-Endian
+#ifdef _XBOX // Xbox（ビッグエンディアン）用のチャンクの名前
 #define fourccRIFF 'RIFF'
 #define fourccDATA 'data'
 #define fourccFMT 'fmt '
@@ -48,11 +49,12 @@ namespace
 #define fourccDPDS 'dpds'
 #endif
 
+// 壊すときに解放している
 Sound::~Sound()
 {
 	Uninit();
 }
-#ifndef _XBOX //Little-Endian
+#ifndef _XBOX // Windows（リトルエンディアン）用のチャンクの名前。4文字を逆順に並べている
 #define fourccRIFF 'FFIR'
 #define fourccDATA 'atad'
 #define fourccFMT ' tmf'
@@ -62,7 +64,7 @@ Sound::~Sound()
 #endif
 
 //=============================================================================
-// 初期化
+// 初期化：COMとXAudio2を準備し、全部の素材のWAVを読み込んでいる
 //=============================================================================
 HRESULT Sound::Init()
 {
@@ -73,32 +75,32 @@ HRESULT Sound::Init()
 	DWORD  dwChunkPosition;
 	DWORD  filetype;
 
-	// COMの初期化
+	// COMを初期化している
 	hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
 	if (FAILED(hr)) {
 		return hr;
 	}
 	m_IsComInitialized = true;
 
-	/**** Create XAudio2 ****/
-	// 第2引数の動作フラグはWindowsでは使わないため0を渡します。
+	// XAudio2の本体を作っている
+	// 2番目の引数の動作の設定はWindowsでは使わないため、0を渡している。
 	hr = XAudio2Create(m_pXAudio2.ReleaseAndGetAddressOf(), 0);
 	if (FAILED(hr)) {
 		Uninit();
 		return hr;
 	}
 
-	/**** Create Mastering Voice ****/
-	// チャンネル数・サンプリング周波数は既定値にし、PCの出力設定（ステレオ・5.1chなど）に合わせます。
+	// 最終的に音を出すマスタリングボイスを作っている
+	// チャンネル数・サンプリング周波数は既定の値にし、PCの出力の設定（ステレオ・5.1chなど）に合わせている。
 	hr = m_pXAudio2->CreateMasteringVoice(&m_pMasteringVoice);
 	if (FAILED(hr)) {
 		Uninit();
 		return hr;
 	}
 
-	/**** Initialize X3DAudio ****/
-	// 出力先（ステレオ・5.1chなど）のスピーカー配置に合わせて、音の振り分けを計算させます。
-	// 立体音響だけが使えない環境でも、通常の再生は続けられるようにします。
+	// 立体音響（X3DAudio）を準備している
+	// 出力先（ステレオ・5.1chなど）のスピーカーの配置に合わせて、音の振り分けを計算させている。
+	// 立体音響だけが使えない環境でも、普通の再生は続けられるようにしている。
 	{
 		DWORD channelMask = 0;
 		if (FAILED(m_pMasteringVoice->GetChannelMask(&channelMask)) || channelMask == 0)
@@ -112,7 +114,7 @@ HRESULT Sound::Init()
 			X3DAudioInitialize(channelMask, X3DAUDIO_SPEED_OF_SOUND, m_X3DAudio));
 	}
 
-	/**** Initalize Sound ****/
+	// 全部の素材を、WAVファイルから読み込んでいる
 	for (int i = 0; i < SOUND_LABEL_MAX; i++)
 	{
 		memset(&m_wfx[i], 0, sizeof(WAVEFORMATEXTENSIBLE));
@@ -132,7 +134,7 @@ HRESULT Sound::Init()
 			return hr;
 		}
 
-		// ファイル形式がfourccWAVEまたはXWMAであることを確認します。
+		// ファイルの形式がWAVEであることを確かめている。
 		hr = FindChunk(hFile, fourccRIFF, dwChunkSize, dwChunkPosition);
 		if (FAILED(hr) || hr == S_FALSE)
 		{
@@ -153,6 +155,7 @@ HRESULT Sound::Init()
 			return E_FAIL;
 		}
 
+		// 音声の形式（fmtチャンク）を読み込んでいる
 		hr = FindChunk(hFile, fourccFMT, dwChunkSize, dwChunkPosition);
 		if (FAILED(hr) || hr == S_FALSE || dwChunkSize > sizeof(m_wfx[i]) ||
 			FAILED(ReadChunkData(hFile, &m_wfx[i], dwChunkSize, dwChunkPosition)))
@@ -162,7 +165,7 @@ HRESULT Sound::Init()
 			return FAILED(hr) ? hr : E_FAIL;
 		}
 
-		// fourccDATAチャンクの内容を再生用オーディオバッファへ設定します。
+		// 音声データ（dataチャンク）の中身を、再生用のバッファへ読み込んでいる。
 		hr = FindChunk(hFile, fourccDATA, dwChunkSize, dwChunkPosition);
 		if (FAILED(hr) || hr == S_FALSE || dwChunkSize == 0)
 		{
@@ -182,7 +185,7 @@ HRESULT Sound::Init()
 
 		CloseHandle(hFile);
 
-		// ソースボイスへ渡す再生用バッファ。ループ指定の素材（環境音）は無限に繰り返します。
+		// ソースボイスへ渡す再生用のバッファ。ループ指定の素材（環境音）は無限に繰り返している。
 		m_buffer[i].AudioBytes = dwChunkSize;
 		m_buffer[i].pAudioData = m_DataBuffer[i].get();
 		m_buffer[i].Flags = XAUDIO2_END_OF_STREAM;
@@ -191,6 +194,7 @@ HRESULT Sound::Init()
 		else
 			m_buffer[i].LoopCount = 0;
 
+		// 素材ごとのソースボイスを作っている
 		hr = m_pXAudio2->CreateSourceVoice(
 			&m_pSourceVoice[i],
 			&(m_wfx[i].Format)
@@ -205,11 +209,11 @@ HRESULT Sound::Init()
 }
 
 //=============================================================================
-// 開放処理
+// 解放処理
 //=============================================================================
 void Sound::Uninit(void)
 {
-	// 位置付きの音は音声データ（m_DataBuffer）を参照しているため、データより先に止めます。
+	// 位置付きの音は音声データ（m_DataBuffer）を参照しているため、データより先に止めている。
 	StopAllSpatial();
 	m_X3DAudioReady = false;
 
@@ -219,7 +223,7 @@ void Sound::Uninit(void)
 		{
 			m_pSourceVoice[i]->Stop(0);
 			m_pSourceVoice[i]->FlushSourceBuffers();
-			m_pSourceVoice[i]->DestroyVoice();			// オーディオグラフからソースボイスを削除
+			m_pSourceVoice[i]->DestroyVoice();			// ソースボイスを、音の流れから外して壊している
 			m_pSourceVoice[i] = nullptr;
 		}
 
@@ -237,7 +241,7 @@ void Sound::Uninit(void)
 		m_pXAudio2.Reset();
 	}
 
-	// COMの破棄
+	// COMを終了している
 	if (m_IsComInitialized)
 	{
 		CoUninitialize();
@@ -246,7 +250,7 @@ void Sound::Uninit(void)
 }
 
 //=============================================================================
-// 再生
+// 再生（位置なし）。同じ音を鳴らすと、前の再生を止めて最初から鳴らし直している
 //=============================================================================
 void Sound::Play(SOUND_LABEL label, float pitch, float volume)
 {
@@ -260,6 +264,7 @@ void Sound::Play(SOUND_LABEL label, float pitch, float volume)
 		return;
 	}
 
+	// 前のソースボイスを壊して、新しく作り直している
 	IXAudio2SourceVoice*& pSV = m_pSourceVoice[(int)label];
 
 	if (pSV != nullptr)
@@ -268,7 +273,7 @@ void Sound::Play(SOUND_LABEL label, float pitch, float volume)
 		pSV = nullptr;
 	}
 
-	// ソースボイス作成
+	// ソースボイスを作っている
 	HRESULT hr = m_pXAudio2->CreateSourceVoice(
 		&pSV,
 		&(m_wfx[(int)label].Format)
@@ -287,17 +292,18 @@ void Sound::Play(SOUND_LABEL label, float pitch, float volume)
 		return;
 	}
 
-	// WAVごとの音圧差を吸収し、環境音が効果音を覆わないようにします。
+	// WAVごとの音の大きさの差を吸収し、環境音が効果音を覆い隠さないようにしている。
 	pSV->SetVolume(m_param[(int)label].volume * (std::max)(volume, 0.0f));
+	// 音の高さ（再生速度）は0.70〜1.35倍に制限している
 	pSV->SetFrequencyRatio((std::clamp)(pitch, 0.70f, 1.35f));
 
-	// 再生
+	// 再生を始めている
 	pSV->Start(0);
 
 }
 
 //=============================================================================
-// 停止
+// 停止（音声データが残っていれば止めている）
 //=============================================================================
 void Sound::Stop(SOUND_LABEL label)
 {
@@ -317,7 +323,7 @@ void Sound::Stop(SOUND_LABEL label)
 }
 
 //=============================================================================
-// 再開（Stopで止めた音を続きから鳴らす）
+// 再開（Stopで止めた音を続きから鳴らしている）
 //=============================================================================
 void Sound::Resume(SOUND_LABEL label)
 {
@@ -333,6 +339,7 @@ void Sound::Resume(SOUND_LABEL label)
 	}
 }
 
+// 全体の音量を0〜1に制限して設定している
 void Sound::SetMasterVolume(float volume)
 {
 	if (m_pMasteringVoice == nullptr)
@@ -356,12 +363,12 @@ void Sound::PlayAt(
 	}
 	if (!m_X3DAudioReady)
 	{
-		// 立体音響が使えない環境では、位置を持たない通常の再生に切り替えます。
+		// 立体音響が使えない環境では、位置を持たない普通の再生に切り替えている。
 		Play(label, pitch);
 		return;
 	}
 
-	// 鳴り終わった枠を探します。全部使用中なら、いちばん古く鳴らした音を止めて使います。
+	// 鳴り終わった枠を探している。全部使っていれば、一番古く鳴らした音を止めて使っている。
 	SpatialVoice* slot = nullptr;
 	for (SpatialVoice& spatial : m_SpatialVoices)
 	{
@@ -386,7 +393,7 @@ void Sound::PlayAt(
 		ReleaseSpatialVoice(*slot);
 	}
 
-	// こもらせるためのローパスフィルターを使えるボイスとして作ります。
+	// こもらせるためのローパスフィルターを使えるボイスとして作っている。
 	const int index = static_cast<int>(label);
 	HRESULT hr = m_pXAudio2->CreateSourceVoice(
 		&slot->Voice, &m_wfx[index].Format, XAUDIO2_VOICE_USEFILTER);
@@ -396,7 +403,7 @@ void Sound::PlayAt(
 		return;
 	}
 
-	// ループ指定の素材でも、位置付きの音は1回だけ鳴らします。
+	// ループ指定の素材でも、位置付きの音は1回だけ鳴らしている。
 	XAUDIO2_BUFFER buffer = m_buffer[index];
 	buffer.LoopBegin = 0;
 	buffer.LoopLength = 0;
@@ -409,15 +416,17 @@ void Sound::PlayAt(
 
 	slot->Label = label;
 	slot->Position = position;
-	// 鳴り始めから壁の向こうの音として聞こえるよう、最初の遮蔽量はその場で求めます。
+	// 鳴り始めから壁の向こうの音として聞こえるよう、最初のさえぎる物の量はその場で求めている。
 	slot->MinimumOcclusion = (std::clamp)(minimumOcclusion, 0.0f, 1.0f);
 	slot->Occlusion = (std::max)(QueryOcclusion(position), slot->MinimumOcclusion);
 	slot->Voice->SetVolume(m_param[index].volume * (std::max)(volume, 0.0f));
+	// 音の高さは0.50〜1.50倍に制限している（位置なしの再生より広い範囲にしている）
 	slot->Voice->SetFrequencyRatio((std::clamp)(pitch, 0.50f, 1.50f));
 	ApplySpatialMix(*slot);
 	slot->Voice->Start(0);
 }
 
+// 聞き手を更新し、鳴り終わった音を片付け、鳴っている音のさえぎる物の量と聞こえ方を更新している
 void Sound::UpdateListener(const SoundListener& listener, float deltaTime)
 {
 	m_Listener = listener;
@@ -441,7 +450,7 @@ void Sound::UpdateListener(const SoundListener& listener, float deltaTime)
 			continue;
 		}
 
-		// 振り向いたり歩いたりして位置関係が変わった分を、鳴っている途中の音にも反映します。
+		// 振り向いたり歩いたりして位置関係が変わった分を、鳴っている途中の音にも反映している。
 		const float targetOcclusion =
 			(std::max)(QueryOcclusion(spatial.Position), spatial.MinimumOcclusion);
 		spatial.Occlusion += (targetOcclusion - spatial.Occlusion) * response;
@@ -449,6 +458,7 @@ void Sound::UpdateListener(const SoundListener& listener, float deltaTime)
 	}
 }
 
+// さえぎる物の量を、登録された関数に問い合わせている（未登録なら0）
 float Sound::QueryOcclusion(const Vector3& emitter) const
 {
 	if (!m_OcclusionQuery)
@@ -458,13 +468,14 @@ float Sound::QueryOcclusion(const Vector3& emitter) const
 	return (std::clamp)(m_OcclusionQuery(m_Listener.Position, emitter), 0.0f, 1.0f);
 }
 
+// 聞き手と音源の位置から、左右の振り分け・距離による減衰・こもり具合を計算してボイスに設定している
 void Sound::ApplySpatialMix(SpatialVoice& spatial)
 {
 	const WAVEFORMATEX& format = m_wfx[static_cast<int>(spatial.Label)].Format;
 	const UINT32 sourceChannels = (std::clamp)(static_cast<UINT32>(format.nChannels), 1u, 8u);
 	const UINT32 outputChannels = (std::min)(m_OutputChannels, 8u);
 
-	// 聞き手の上方向は、前方向に直交するように作り直します（X3DAudioの要件）。
+	// 聞き手の上方向は、前方向に直交するように作り直している（X3DAudioの決まり）。
 	Vector3 forward = m_Listener.Forward;
 	if (forward.LengthSquared() < 0.0001f)
 	{
@@ -483,7 +494,7 @@ void Sound::ApplySpatialMix(SpatialVoice& spatial)
 	listener.OrientTop = ToX3DAudio(up);
 	listener.Position = ToX3DAudio(m_Listener.Position);
 
-	// ステレオ素材も、すべてのチャンネルを同じ1点から鳴らします。
+	// ステレオの素材も、すべてのチャンネルを同じ1点から鳴らしている。
 	float channelAzimuths[8] = {};
 	X3DAUDIO_EMITTER emitter{};
 	emitter.Position = ToX3DAudio(spatial.Position);
@@ -502,9 +513,10 @@ void Sound::ApplySpatialMix(SpatialVoice& spatial)
 	dsp.SrcChannelCount = sourceChannels;
 	dsp.DstChannelCount = outputChannels;
 	dsp.pMatrixCoefficients = matrix;
+	// X3DAudioで、出力の各チャンネルへの振り分けの行列を計算している
 	X3DAudioCalculate(m_X3DAudio, &listener, &emitter, X3DAUDIO_CALCULATE_MATRIX, &dsp);
 
-	// 壁の向こうの音は小さく、高音を削ってこもらせます。遠い音も少しだけ高音を落とします。
+	// 壁の向こうの音は小さく、高い音を削ってこもらせている。遠い音も少しだけ高い音を落としている。
 	const float occlusion = spatial.Occlusion;
 	const float occlusionGain = 1.0f + (OccludedVolume - 1.0f) * occlusion;
 	for (UINT32 i = 0; i < sourceChannels * outputChannels; ++i)
@@ -515,12 +527,12 @@ void Sound::ApplySpatialMix(SpatialVoice& spatial)
 
 	const float distanceAmount = (std::min)(dsp.EmitterToListenerDistance / DistantCutoffRange, 1.0f);
 	const float openCutoff = OpenAirCutoffHz + (DistantCutoffHz - OpenAirCutoffHz) * distanceAmount;
-	// 周波数は人の聞こえ方に合わせ、対数的に補間します。
+	// 周波数は人の聞こえ方に合わせ、対数で補間している。
 	const float cutoffHz = std::exp(
 		std::log(openCutoff) + (std::log(OccludedCutoffHz) - std::log(openCutoff)) * occlusion);
 	XAUDIO2_FILTER_PARAMETERS filter{};
 	filter.Type = LowPassFilter;
-	// XAudio2のフィルター周波数は 2 * sin(π * 周波数 / サンプリング周波数) で表します
+	// XAudio2のフィルターの周波数は 2 * sin(π * 周波数 / サンプリング周波数) で表している
 	// （xaudio2.h の XAudio2CutoffFrequencyToRadians と同じ式）。
 	constexpr float Pi = 3.14159265f;
 	const float sampleRate = static_cast<float>((std::max)(format.nSamplesPerSec, 1ul));
@@ -530,6 +542,7 @@ void Sound::ApplySpatialMix(SpatialVoice& spatial)
 	spatial.Voice->SetFilterParameters(&filter);
 }
 
+// 位置付きのボイスを止めて壊し、枠を空にしている
 void Sound::ReleaseSpatialVoice(SpatialVoice& spatial)
 {
 	if (spatial.Voice != nullptr)
@@ -543,6 +556,7 @@ void Sound::ReleaseSpatialVoice(SpatialVoice& spatial)
 	spatial.MinimumOcclusion = 0.0f;
 }
 
+// 位置付きの音を全部止めている
 void Sound::StopAllSpatial()
 {
 	for (SpatialVoice& spatial : m_SpatialVoices)
@@ -552,6 +566,7 @@ void Sound::StopAllSpatial()
 	m_NextSpatialVoice = 0;
 }
 
+// 今鳴っている位置付きの音の数を数えている
 size_t Sound::GetActiveSpatialVoiceCount() const
 {
 	size_t count = 0;
@@ -568,8 +583,9 @@ size_t Sound::GetActiveSpatialVoiceCount() const
 
 
 //=============================================================================
-// ユーティリティ関数群
+// WAVファイルを読むための補助関数
 //=============================================================================
+// RIFFの中のチャンクを先頭から順に見ていき、指定した種類（fourcc）のチャンクの大きさと位置を探している
 HRESULT Sound::FindChunk(HANDLE hFile, DWORD fourcc, DWORD& dwChunkSize, DWORD& dwChunkDataPosition)
 {
 	HRESULT hr = S_OK;
@@ -613,6 +629,7 @@ HRESULT Sound::FindChunk(HANDLE hFile, DWORD fourcc, DWORD& dwChunkSize, DWORD& 
 	return S_OK;
 }
 
+// 指定した位置から、指定した大きさだけデータを読み込んでいる
 HRESULT Sound::ReadChunkData(HANDLE hFile, void* buffer, DWORD buffersize, DWORD bufferoffset)
 {
 	HRESULT hr = S_OK;

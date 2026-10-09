@@ -1,8 +1,8 @@
 ﻿// ============================================================================
-// ファイルの役割: 1面の監視カメラ巡回（映像の確認・報告・現地での対処・捕獲）を進めます。
-// 主な技術: 有限状態機械、RenderTextureによる別視点描画、入力と演出の同期
-// 端末で監視映像を確認して異常のあるカメラを報告し、現地で懐中電灯を当てて対処します。
-// 誤った報告や時間切れが続くと捕獲され、端末の前へ戻されます。
+// ファイルの役割: 1面の監視カメラの巡回（映像の確認・報告・現地での対処・捕まる）を進めている。
+// 主な技術: 有限状態機械、RenderTextureによる別の視点の描画、入力と演出のタイミング合わせ
+// 端末で監視映像を確かめて異常のあるカメラを報告し、現地で懐中電灯を当てて対処する。
+// 間違った報告や時間切れが続くと捕まり、端末の前へ戻される。
 // ============================================================================
 
 #include "StageSurveillanceController.h"
@@ -27,20 +27,23 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
-    // 映像を開いてから操作を受け付けるまでの秒数です（開いた直後の誤入力を防ぎます）。
+    // 映像を開いてから操作を受け付けるまでの秒数（開いた直後の押し間違いを防いでいる）。
     constexpr float PatrolInputDelay = 0.65f;
+    // 判定を間違えたときの表示の秒数、警告を始める残り秒数、照らしたと判定する距離と内積
     constexpr float PatrolWrongFeedbackSeconds = 1.35f;
     constexpr float PatrolWarningTime = 12.0f;
     constexpr float PatrolLookDistance = 110.0f;
     constexpr float PatrolLookAlignment = 0.90f;
-    // 異常なしの回の割合です。常に異常がある状態では報告が作業になってしまうためです。
+    // 異常なしの回の割合。いつも異常がある状態では、報告がただの作業になってしまうためである。
     constexpr float PatrolNoAnomalyChance = 0.25f;
 
+    // float[3]をVector3にしている
     Vector3 ToVector3(const float (&value)[3])
     {
         return Vector3(value[0], value[1], value[2]);
     }
 
+    // 目的表示に出す異常の名前を返している
     const char* GetAnomalyLabel(SurveillancePatrol::AnomalyType type)
     {
         switch (type)
@@ -58,6 +61,7 @@ namespace
     }
 }
 
+// 状態を最初に戻し、映像を描く960x540のテクスチャ（ライブ映像用と、各カメラの基準映像用）を作っている
 void StageSurveillanceController::Init(const StageObjects& objects)
 {
     m_Objects = &objects;
@@ -77,7 +81,7 @@ void StageSurveillanceController::Init(const StageObjects& objects)
     m_Shader.Create(
         "shader/unlitTextureVS.hlsl",
         "shader/surveillanceFeedPS.hlsl");
-    // 大きく表示しても異常の輪郭が潰れない解像度を確保します。
+    // 大きく表示しても、異常の輪郭が潰れない解像度を確保している。
     m_Feed.Init(960, 540);
     for (Graphics::RenderTexture& reference : m_References)
     {
@@ -85,6 +89,7 @@ void StageSurveillanceController::Init(const StageObjects& objects)
     }
 }
 
+// 映像用のテクスチャを解放している
 void StageSurveillanceController::Uninit()
 {
     m_Feed.Uninit();
@@ -94,6 +99,7 @@ void StageSurveillanceController::Uninit()
     }
 }
 
+// 巡回を1フレーム進め、このフレームで巡回をすべて終えたかを返している
 bool StageSurveillanceController::Update(Player& player, float deltaTime)
 {
     m_CompletedThisFrame = false;
@@ -101,6 +107,7 @@ bool StageSurveillanceController::Update(Player& player, float deltaTime)
     return m_CompletedThisFrame;
 }
 
+// 監視映像の画面（ライブか基準映像か・カメラの名前・巡回の進み具合・間違いの数など）をHUDで描いている
 void StageSurveillanceController::DrawFeed(Hud& hud)
 {
     const int selectedCamera = m_Patrol.GetSelectedCamera();
@@ -123,6 +130,7 @@ void StageSurveillanceController::DrawFeed(Hud& hud)
         m_WrongTimer > 0.0f);
 }
 
+// 現地確認の間は、向かう先のカメラ・異常の名前・残り秒数・照らした割合を目的表示に渡している
 void StageSurveillanceController::FillObjectiveInput(
     Stage1ObjectiveInput& input, const Player& player) const
 {
@@ -143,6 +151,7 @@ void StageSurveillanceController::FillObjectiveInput(
     input.patrolNoticeText = m_NoticeText;
 }
 
+// 状態ごとの処理を呼んでいる（捕まった演出の最中はそれだけ）
 void StageSurveillanceController::UpdateState(Player& player, float deltaTime)
 {
     m_NoticeTimer = (std::max)(0.0f, m_NoticeTimer - deltaTime);
@@ -163,7 +172,7 @@ void StageSurveillanceController::UpdateState(Player& player, float deltaTime)
             return;
         }
 
-        // 基準映像を記録してから異常を出すため、ここでは種類だけ確定します。
+        // 基準映像を記録してから異常を出すため、ここでは種類だけを決めている。
         const SurveillancePatrol::Anomaly anomaly = ChooseAnomaly();
         m_Patrol.BeginViewing(anomaly);
         m_ViewTimer = 0.0f;
@@ -191,6 +200,7 @@ void StageSurveillanceController::UpdateState(Player& player, float deltaTime)
     }
 }
 
+// 映像の操作：左右でカメラを切り替え、C（Y）で基準映像、Z（X）で拡大、E（A）で異常あり、Q（B）で異常なしを報告している
 void StageSurveillanceController::UpdateViewing(Player& player)
 {
     m_WrongTimer = (std::max)(
@@ -219,12 +229,12 @@ void StageSurveillanceController::UpdateViewing(Player& player)
     if (Input::GetKeyTrigger(VK_C) || Input::GetButtonTrigger(XINPUT_Y))
     {
         m_ShowReference = !m_ShowReference;
-        // 記録映像は標準画角なので、切替時にライブも同じ画角へ戻します。
+        // 記録した映像は標準の画角なので、切り替えるときにライブも同じ画角へ戻している。
         m_Zoomed = false;
         Input::SetVibration(1, 0.03f);
     }
 
-    // 広い画角で場所を把握し、必要なときだけ中央を拡大して小さな変化を調べます。
+    // 広い画角で場所を把握し、必要なときだけ中央を拡大して小さな変化を調べられるようにしている。
     if (!m_ShowReference &&
         (Input::GetKeyTrigger(VK_Z) || Input::GetButtonTrigger(XINPUT_X)))
     {
@@ -232,7 +242,7 @@ void StageSurveillanceController::UpdateViewing(Player& player)
         Input::SetVibration(1, 0.03f);
     }
 
-    // 基準映像からの誤報告を防ぐため、報告はライブ画面でのみ受け付けます。
+    // 基準映像を見ながら間違えて報告しないよう、報告はライブの画面でだけ受け付けている。
     if (m_ShowReference)
     {
         return;
@@ -284,6 +294,7 @@ void StageSurveillanceController::UpdateViewing(Player& player)
     }
 }
 
+// 現地確認：照らし続けたら対処、時間切れなら間違い、間違いが上限なら捕まる
 void StageSurveillanceController::UpdateDispatch(Player& player, float deltaTime)
 {
     const SurveillancePatrol::Anomaly anomaly = m_Patrol.GetAnomaly();
@@ -294,7 +305,7 @@ void StageSurveillanceController::UpdateDispatch(Player& player, float deltaTime
     switch (result)
     {
     case SurveillancePatrol::DispatchResult::None:
-        // 残り時間が少ないほど、端末から離れている不安を画面と振動で強めます。
+        // 残り時間が少ないほど、端末から離れている不安を画面と振動で強めている。
         m_WarningCooldown -= deltaTime;
         if (m_Patrol.GetRemainingTime() <= PatrolWarningTime &&
             m_WarningCooldown <= 0.0f)
@@ -341,6 +352,7 @@ void StageSurveillanceController::UpdateDispatch(Player& player, float deltaTime
     }
 }
 
+// 異常をランダムに選んでいる（25%は異常なし）
 SurveillancePatrol::Anomaly StageSurveillanceController::ChooseAnomaly()
 {
     std::uniform_real_distribution<float> chance(0.0f, 1.0f);
@@ -354,7 +366,7 @@ SurveillancePatrol::Anomaly StageSurveillanceController::ChooseAnomaly()
     SurveillancePatrol::Anomaly anomaly;
     anomaly.camera = cameraDistribution(m_Random);
 
-    // カメラごとに、その場所で起こせる異常だけを候補にします。
+    // カメラごとに、その場所で起こせる異常だけを候補にしている。
     const StageSurveillanceCamera& camera =
         StageSurveillanceCameras[anomaly.camera];
     SurveillancePatrol::AnomalyType candidates[3] =
@@ -365,8 +377,8 @@ SurveillancePatrol::Anomaly StageSurveillanceController::ChooseAnomaly()
     CeilingLight* anomalyLight = camera.LightNumber > 0
         ? m_Objects->CeilingLightAt(camera.LightNumber)
         : nullptr;
-    // 停電中に元から消えている通常照明を選ぶと映像に差が出ないため、
-    // 通電前は点灯している非常灯だけを消灯異常の候補にします。
+    // 停電中にもともと消えている普通の照明を選ぶと映像に差が出ないため、
+    // 電力が戻る前は、点いている非常灯だけを消灯の異常の候補にしている。
     if (anomalyLight != nullptr &&
         (Core::Game::GetInstance()->IsPowerRestored() ||
          anomalyLight->IsEmergencyLight()))
@@ -382,6 +394,7 @@ SurveillancePatrol::Anomaly StageSurveillanceController::ChooseAnomaly()
     return anomaly;
 }
 
+// 異常の見た目を出したり消したりしている（人影を立たせる・照明を消す・開かずの扉を開ける）
 void StageSurveillanceController::SetAnomalyVisible(
     const SurveillancePatrol::Anomaly& anomaly, bool visible)
 {
@@ -403,7 +416,7 @@ void StageSurveillanceController::SetAnomalyVisible(
                 const Vector3 position = ToVector3(camera.FigurePosition);
                 figure->SetPosition(position.x, position.y, position.z);
                 figure->SetActive(true);
-                // 現地確認の制限時間より長く残し、見つける前に消えないようにします。
+                // 現地確認の制限時間より長く残し、見つける前に消えないようにしている。
                 figure->EnableGazeScare(
                     SurveillancePatrol::DispatchTimeLimit + 60.0f);
             }
@@ -435,9 +448,10 @@ void StageSurveillanceController::SetAnomalyVisible(
     }
 }
 
+// ライトを点けて、異常の場所を110以内から視線の中心（内積0.9超）で照らしているかを返している
 bool StageSurveillanceController::IsIlluminatingAnomaly(const Player& player) const
 {
-    // ライトを点けて自分で異常を探す操作を必須にし、現地到着だけでは完了させません。
+    // ライトを点けて自分で異常を探す操作を必須にし、現地に着くだけでは完了させていない。
     if (!player.IsFlashlightOn())
     {
         return false;
@@ -466,7 +480,7 @@ bool StageSurveillanceController::IsIlluminatingAnomaly(const Player& player) co
         return false;
     }
 
-    // 光が届く距離まで近づき、ライトの中心で照らしている場合だけ対処を進めます。
+    // 光が届く距離まで近づき、ライトの中心で照らしている場合だけ対処を進めている。
     Camera* viewCamera = Core::Game::GetInstance()->GetCamera();
     Vector3 toTarget = target - viewCamera->GetPosition();
     const float distance = toTarget.Length();
@@ -478,18 +492,20 @@ bool StageSurveillanceController::IsIlluminatingAnomaly(const Player& player) co
     return viewCamera->GetForward().Dot(toTarget) > PatrolLookAlignment;
 }
 
+// 映像を閉じ、プレイヤーを動けるようにしている
 void StageSurveillanceController::EndViewing(Player& player)
 {
     player.SetCanControl(true);
     if (FuseBox* terminal = m_Objects->evidenceTerminal)
     {
         terminal->ResetActivation();
-        // 現地確認中は端末を操作できないようにし、確認後に戻ってから次の映像を見せます。
+        // 現地確認の間は端末を操作できないようにし、確かめて戻ってから次の映像を見せている。
         terminal->SetManualInteractionAllowed(
             m_Patrol.GetState() == SurveillancePatrol::State::Idle);
     }
 }
 
+// 捕まる演出を始めている（異常の見た目を消し、驚かせて暗転させる）
 void StageSurveillanceController::StartCaught(Player& player)
 {
     SetAnomalyVisible(m_Patrol.GetAnomaly(), false);
@@ -514,7 +530,7 @@ void StageSurveillanceController::UpdateCaught(Player& player, float deltaTime)
         return;
     }
 
-    // 暗転中に端末の前へ戻し、巡回はやり直せる状態にします（対処済みの回数は保持）。
+    // 暗転の間に端末の前へ戻し、巡回をやり直せる状態にしている（対処した回数はそのまま残している）。
     m_Caught.Complete();
     player.SetPosition(Vector3(190.0f, -99.0f, -42.0f));
     player.SetCanControl(true);
@@ -532,8 +548,9 @@ void StageSurveillanceController::UpdateCaught(Player& player, float deltaTime)
 
 void StageSurveillanceController::Complete(Player& player)
 {
-    // 記録端末の通知はSceneが出すため、完了したことだけを伝えます。
+    // 記録端末の知らせはSceneが出すため、ここでは完了したことだけを伝えている。
     m_CompletedThisFrame = true;
+    // ごほうびに電池を少し回復し、端末の目印を緑に変えて、記録を回収したことにしている
     player.AddBattery(8.0f);
 
     if (FuseBox* terminal = m_Objects->evidenceTerminal)
@@ -560,11 +577,13 @@ void StageSurveillanceController::Complete(Player& player)
     Input::SetVibration(9, 0.19f);
 }
 
+// 知らせの文章と、表示する秒数を決めている
 void StageSurveillanceController::ShowNotice(const char* text, float seconds)
 {
     m_NoticeText = text;
     m_NoticeTimer = seconds;
 }
+// 映像を見ている間だけ、監視カメラの視点で世界を描いている（本描画の前に呼ばれている）
 void StageSurveillanceController::RenderFeeds()
 {
     if (m_Patrol.GetState() != SurveillancePatrol::State::Viewing)
@@ -579,10 +598,12 @@ void StageSurveillanceController::RenderFeeds()
         return;
     }
 
+    // 本編のライトと点光源を覚えておき、描き終えたら元に戻している
     const LIGHT previousLight = Renderer::GetLight();
     Effect::TiledLighting* tiledLighting = game->GetTiledLighting();
     const std::vector<ENVIRONMENT_POINT_LIGHT> previousPointLights =
         tiledLighting->GetLights();
+    // 1台のカメラの視点で描いている（拡大なら画角32度、普段は56度）
     const auto drawCamera = [&](int index, bool zoomed,
         Graphics::RenderTexture& output)
     {
@@ -601,14 +622,14 @@ void StageSurveillanceController::RenderFeeds()
         output.Clear(0.018f, 0.028f, 0.022f, 1.0f);
         camera->SetOverrideMatrices(view, projection);
 
-        // 本編の照明を変更せず、監視映像だけに補助環境光を使います。
+        // 本編の照明は変えず、監視映像だけに補助の環境光を使っている（懐中電灯の光は映さない）。
         LIGHT surveillanceLight = previousLight;
         surveillanceLight.Enable = TRUE;
         surveillanceLight.FlashlightEnabled = FALSE;
         surveillanceLight.Ambient = Color(0.16f, 0.19f, 0.17f, 1.0f);
         Renderer::SetLight(surveillanceLight);
 
-        // 光源数の上限が大きくなったため、既存の照明を押し出さずに補助光を足せます。
+        // 光源の数の上限が大きくなったため、今の照明を押し出さずに補助の光を足せる。
         std::vector<ENVIRONMENT_POINT_LIGHT> surveillanceLights = previousPointLights;
         ENVIRONMENT_POINT_LIGHT helper{};
         helper.PositionRange = Vector4(
@@ -622,7 +643,7 @@ void StageSurveillanceController::RenderFeeds()
 
     if (m_ReferenceCapturePending)
     {
-        // 1フレームに1台ずつ記録し、端末を開いた瞬間の描画負荷を分散します。
+        // 1フレームに1台ずつ記録し、端末を開いた瞬間の描画の負荷を分散している。全部記録したら異常の見た目を出している。
         drawCamera(m_ReferenceCaptureIndex, false,
             m_References[m_ReferenceCaptureIndex]);
         ++m_ReferenceCaptureIndex;
@@ -633,6 +654,7 @@ void StageSurveillanceController::RenderFeeds()
         }
     }
 
+    // 選んでいるカメラのライブ映像を描いている
     drawCamera(m_Patrol.GetSelectedCamera(), m_Zoomed,
         m_Feed);
     Renderer::SetLight(previousLight);

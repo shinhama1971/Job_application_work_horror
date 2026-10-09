@@ -1,7 +1,7 @@
 ﻿// ============================================================================
-// ファイルの役割: キーボード、マウス、XInputコントローラーの入力状態を収集します。
-// 主な技術: Win32入力、XInput、エッジ検出、ゲームパッド振動
-// マウス振動もこのプログラムの中に入っている
+// ファイルの役割: キーボードとXInputコントローラーの入力の状態を集め、押した瞬間・離した瞬間を判定している。
+// 主な技術: Win32のキー入力（GetKeyboardState）、XInput、前フレームとの比較による押した瞬間の判定、コントローラーの振動
+// マウスの視点操作はCameraがカーソルの位置から直接読んでいる
 // ============================================================================
 
 #include "input.h"
@@ -12,6 +12,7 @@
 
 namespace
 {
+	// スティックの値を-1〜1にし、中心付近の遊び（デッドゾーン）を0、その外側を0〜1に広げ直している
 	float NormalizeStickAxis(SHORT value, SHORT deadZone)
 	{
 		const float normalized = value < 0
@@ -32,6 +33,7 @@ namespace
 
 std::unique_ptr<Input> Input::m_Instance;
 
+// インスタンスを作り、全部の状態を0で初期化している
 void Input::Create()
 {
 	if (m_Instance)return;
@@ -48,17 +50,18 @@ void Input::Create()
 
 void Input::Update()
 {
-	//1フレーム前の入力を記録しておく
+	// 前のフレームの入力を覚えておいている（押した瞬間・離した瞬間の判定に使う）
 	for (int i = 0; i < 256; i++) { m_Instance->keyState_old[i] = m_Instance->keyState[i]; }
 	m_Instance->controllerState_old = m_Instance->controllerState;
 
-	//キー入力を更新
+	// キーの状態を読み直している
 	GetKeyboardState(m_Instance->keyState);
 
-	//コントローラー入力を更新(XInput)
+	// コントローラーの状態を読み直している（XInput）
 	XINPUT_STATE nextControllerState{};
 	DWORD connectedIndex = XUSER_MAX_COUNT;
 
+	// 前につながっていたコントローラーを優先し、外れていたら0〜3番から最初に見つかったものを使っている
 	if (m_Instance->controllerIndex < XUSER_MAX_COUNT &&
 		XInputGetState(
 			m_Instance->controllerIndex,
@@ -90,10 +93,10 @@ void Input::Update()
 		ZeroMemory(&m_Instance->controllerState, sizeof(XINPUT_STATE));
 	}
 
-	//振動継続時間をカウント
+	// 振動を続ける残り時間を減らしている
 	if (m_Instance->VibrationTimeSeconds > 0.0f) {
 		m_Instance->VibrationTimeSeconds -= Application::GetDeltaTime();
-		if (m_Instance->VibrationTimeSeconds <= 0.0f) { //振動継続時間が経った時に振動を止める
+		if (m_Instance->VibrationTimeSeconds <= 0.0f) { // 時間が過ぎたら振動を止めている
 			XINPUT_VIBRATION vibration;
 			ZeroMemory(&vibration, sizeof(XINPUT_VIBRATION));
 			vibration.wLeftMotorSpeed = 0;
@@ -113,7 +116,7 @@ bool Input::IsControllerConnected()
 
 void Input::Release()
 {
-	//振動を終了させる
+	// 全部のコントローラーの振動を止めている
 	XINPUT_VIBRATION vibration;
 	ZeroMemory(&vibration, sizeof(XINPUT_VIBRATION));
 	vibration.wLeftMotorSpeed = 0;
@@ -122,25 +125,25 @@ void Input::Release()
 	{
 		XInputSetState(index, &vibration);
 	}
-	//解放
+	// インスタンスを解放している
 	m_Instance.reset();
 }
 
-//キー入力
-bool Input::GetKeyPress(int key) //プレス
+// キー入力（最上位ビットが1なら押されている）
+bool Input::GetKeyPress(int key) // 押している間ずっとtrue
 {
 	return m_Instance->keyState[key] & 0x80;
 }
-bool Input::GetKeyTrigger(int key) //トリガー
+bool Input::GetKeyTrigger(int key) // 押した瞬間だけtrue
 {
 	return (m_Instance->keyState[key] & 0x80) && !(m_Instance->keyState_old[key] & 0x80);
 }
-bool Input::GetKeyRelease(int key) //リリース
+bool Input::GetKeyRelease(int key) // 離した瞬間だけtrue
 {
 	return !(m_Instance->keyState[key] & 0x80) && (m_Instance->keyState_old[key] & 0x80);
 }
 
-//左アナログスティック
+// 左スティック
 DirectX::XMFLOAT2 Input::GetLeftAnalogStick(void)
 {
 	return DirectX::XMFLOAT2(
@@ -152,7 +155,7 @@ DirectX::XMFLOAT2 Input::GetLeftAnalogStick(void)
 			XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)
 	);
 }
-//右アナログスティック
+// 右スティック
 DirectX::XMFLOAT2 Input::GetRightAnalogStick(void)
 {
 	return DirectX::XMFLOAT2(
@@ -165,41 +168,41 @@ DirectX::XMFLOAT2 Input::GetRightAnalogStick(void)
 	);
 }
 
-//左トリガー
+// 左トリガー
 float Input::GetLeftTrigger(void)
 {
-	BYTE t = m_Instance->controllerState.Gamepad.bLeftTrigger; // 0～255
+	BYTE t = m_Instance->controllerState.Gamepad.bLeftTrigger; // 0〜255
 	return t / 255.0f;
 }
-//右トリガー
+// 右トリガー
 float Input::GetRightTrigger(void)
 {
-	BYTE t = m_Instance->controllerState.Gamepad.bRightTrigger; // 0～255
+	BYTE t = m_Instance->controllerState.Gamepad.bRightTrigger; // 0〜255
 	return t / 255.0f;
 }
 
-//ボタン入力
-bool Input::GetButtonPress(WORD btn) //プレス
+// ボタン入力
+bool Input::GetButtonPress(WORD btn) // 押している間ずっとtrue
 {
 	return (m_Instance->controllerState.Gamepad.wButtons & btn) != 0;
 }
-bool Input::GetButtonTrigger(WORD btn) //トリガー
+bool Input::GetButtonTrigger(WORD btn) // 押した瞬間だけtrue
 {
 	return (m_Instance->controllerState.Gamepad.wButtons & btn) != 0 && (m_Instance->controllerState_old.Gamepad.wButtons & btn) == 0;
 }
-bool Input::GetButtonRelease(WORD btn) //リリース
+bool Input::GetButtonRelease(WORD btn) // 離した瞬間だけtrue
 {
 	return (m_Instance->controllerState.Gamepad.wButtons & btn) == 0 && (m_Instance->controllerState_old.Gamepad.wButtons & btn) != 0;
 }
 
-//振動
+// 振動を始めている
 void Input::SetVibration(int frame, float powor)
 {
-	// XINPUT_VIBRATION構造体のインスタンスを作成
+	// 振動の設定
 	XINPUT_VIBRATION vibration;
 	ZeroMemory(&vibration, sizeof(XINPUT_VIBRATION));
 
-	// モーターの強度を設定（0～65535）
+	// 左右のモーターの強さを設定している（0〜65535）
 	vibration.wLeftMotorSpeed = (WORD)(powor * 65535.0f);
 	vibration.wRightMotorSpeed = (WORD)(powor * 65535.0f);
 	if (m_Instance->controllerConnected)
@@ -207,7 +210,7 @@ void Input::SetVibration(int frame, float powor)
 		XInputSetState(m_Instance->controllerIndex, &vibration);
 	}
 
-	//振動継続時間を代入
+	// 振動を続ける秒数を入れている（frameを60fpsのフレーム数として秒に直している）
 	m_Instance->VibrationTimeSeconds = static_cast<float>(frame) / 60.0f;
 }
 

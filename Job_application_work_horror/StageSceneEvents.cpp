@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: 1面の入口演出、廊下ループ、電力復旧、出口イベントを管理します。
-// 主な技術: イベント駆動、有限状態機械、カメラ・照明・音の同期
+// ファイルの役割: 1面の演出（入口・左の倉庫・ループ廊下・照明の連鎖・ヒューズの後の影・電力の復旧・出口・物音・壁の文字・心拍）を担当している。
+// 主な技術: 出来事をきっかけにした処理、有限状態機械、照明・音・画面効果のタイミング合わせ
 // ============================================================================
 
 #include "StageScene.h"
@@ -28,6 +28,7 @@
 
 using namespace DirectX::SimpleMath;
 
+// 入口の演出：中央の扉の先へ初めて入ったとき、前と後ろの照明を順に明滅させている（電力が戻るまで）
 void StageScene::UpdateEntranceThresholdEvent(Player& player)
 {
     const float deltaTime = Application::GetDeltaTime();
@@ -45,8 +46,8 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
             return;
         }
 
-        // 強制カメラ演出の代わりに、空間内の照明変化で出来事を見せます。
-        // 操作を奪わず、プレイヤー自身が異変へ気付ける演出にします。
+        // カメラを無理に動かす演出の代わりに、空間の中の照明の変化で出来事を見せている。
+        // 操作を奪わず、プレイヤー自身が異変に気づける演出にしている。
         m_EntranceEventTriggered = true;
         m_EntranceEventTimer = 0.0f;
         m_EntranceEventPhase = 0;
@@ -74,6 +75,7 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
         return;
     }
 
+    // 0.38秒で前の照明、1.12秒で後ろの照明を明滅させて終えている
     m_EntranceEventTimer += deltaTime;
     if (m_EntranceEventPhase == 0 && m_EntranceEventTimer >= 0.38f)
     {
@@ -103,6 +105,7 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
     }
 }
 
+// 左の倉庫の演出：2本目のヒューズを探しに入ると、物音の後に背後へ影を出している
 void StageScene::UpdateStorageScare(Player& player)
 {
     if (m_StorageScarePhase >= 2)
@@ -120,7 +123,7 @@ void StageScene::UpdateStorageScare(Player& player)
 
     if (m_StorageScarePhase == 0)
     {
-        // 二周目の左倉庫へ踏み込んだとき、先に物音と照明で背後を意識させます。
+        // 2回目に左の倉庫へ踏み込んだとき、先に物音と照明で背後を意識させている。
         if (m_CorridorLoopCount < 1 || game->GetItemCount() != 1 ||
             position.x > -110.0f || position.z > -108.0f)
         {
@@ -146,7 +149,7 @@ void StageScene::UpdateStorageScare(Player& player)
     }
     m_StorageScarePhase = 2;
 
-    // 倉庫から離れた場合は出現させず、視界の外に突然残る人影を防ぎます。
+    // 倉庫から離れた場合は出さず、視界の外に人影が突然残るのを防いでいる。
     if (position.x > -100.0f || position.z > -90.0f)
     {
         m_StorageScarePhase = 3;
@@ -163,6 +166,7 @@ void StageScene::UpdateStorageScare(Player& player)
     shadow->SetActive(true);
     shadow->EnableGazeScare(5.0f);
     m_StorageScareNoticeTimer = 2.0f;
+    // 影を見たら、異変に対処した数を増やして、照明と音で反応している
     shadow->SetOnObserved([this]()
     {
         Core::Game* currentGame = Core::Game::GetInstance();
@@ -181,6 +185,7 @@ void StageScene::UpdateStorageScare(Player& player)
     });
 }
 
+// ループ廊下：電力が戻る前に、廊下の出口（右の奥）へ入ったら開始地点へ戻している
 void StageScene::UpdateCorridorLoop(Player& player)
 {
     const float deltaTime = Application::GetDeltaTime();
@@ -209,13 +214,14 @@ void StageScene::UpdateCorridorLoop(Player& player)
     }
 }
 
+// ループ廊下を1周進めている：開始地点へ戻し、周回の数に応じて印・扉・照明・ヒューズ・影を変えている
 void StageScene::AdvanceCorridorLoop(Player& player)
 {
     Core::Game* game = Core::Game::GetInstance();
     ++m_CorridorLoopCount;
 
-    // 同じフレーム後半でPlayerがカメラを更新するため、再配置の瞬間を隠しつつ
-    // プレイヤーが見ていた方向を維持できます。
+    // 同じフレームの後半でPlayerがカメラを更新するため、場所を移した瞬間を隠しつつ、
+    // プレイヤーが見ていた方向をそのまま保てる。
     player.SetPosition(Vector3(0.0f, -99.0f, -150.0f));
     m_LoopCooldown = 1.0f;
     m_ProgressHintTimer = 0.0f;
@@ -225,6 +231,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
         ? m_CorridorLoopCount
         : 3;
 
+    // 周回の数だけ、壁の赤い印を出している
     for (int markerIndex = 1; markerIndex <= 3; ++markerIndex)
     {
         Wall* marker = m_Objects.loopMarkers[static_cast<std::size_t>(markerIndex - 1)];
@@ -244,8 +251,8 @@ void StageScene::AdvanceCorridorLoop(Player& player)
         0.42f + static_cast<float>(loopPhase) * 0.10f);
     Input::SetVibration(7 + loopPhase * 3, 0.18f + loopPhase * 0.04f);
 
-    // 入口へ戻すときに廊下の扉も復元します。同じ境界を再び開けさせることで、
-    // 各周回が意図的な反復として感じられるようにします。
+    // 開始地点へ戻すときに、廊下の扉も閉じた状態に戻している。同じ境目をもう一度開けさせることで、
+    // 各周回が意図された繰り返しとして感じられるようにしている。
     Door* loopDoor = m_Objects.loopDoor;
     if (loopDoor != nullptr)
     {
@@ -259,6 +266,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     CeilingLight* cornerLight =
         m_Objects.CeilingLightAt(8);
 
+    // 1周目：左の倉庫に2本目のヒューズを出している
     if (loopPhase == 1)
     {
         Item* secondFuse = m_Objects.secondFuse;
@@ -274,11 +282,13 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     }
     else if (loopPhase == 2)
     {
+        // 2周目：3本目のヒューズは西棟の奥にある。右の倉庫に西棟の鍵を出し、鍵で西棟の扉を開けさせている。
         Item* thirdFuse = m_Objects.thirdFuse;
         if (thirdFuse != nullptr && !thirdFuse->IsCollected())
         {
             thirdFuse->SetActive(true);
         }
+        m_WestWing.Activate();
 
         if (middleLight != nullptr)
         {
@@ -289,12 +299,14 @@ void StageScene::AdvanceCorridorLoop(Player& player)
             cornerLight->SetEmergencyLight(true, 1.1f);
         }
 
+        // 中央の廊下に影を出している
         game->RequestAddObject<ShadowMan>(
             [](ShadowMan& shadow)
             {
                 shadow.SetPosition(0.0f, -99.0f, -25.0f);
             });
     }
+    // 3周目以降：照明の配置を変えている
     else
     {
         if (entranceLight != nullptr)
@@ -310,7 +322,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
             cornerLight->SetEmergencyLight(false, 4.3f);
         }
 
-        // 警告文どおり、プレイヤーの背後に一度だけ人影を出現させます。
+        // 3周目だけ、壁の文字の警告どおり、プレイヤーの背後に一度だけ人影を出している（見ると照明の連鎖が始まる）。
         if (m_CorridorLoopCount == 3)
         {
             game->RequestAddObject<ShadowMan>(
@@ -328,6 +340,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     }
 }
 
+// 照明が次々に明滅する演出を始めている（電力が戻った後は起こさない）
 void StageScene::StartScareLightSequence()
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -371,6 +384,7 @@ void StageScene::StartScareLightSequence()
     }
 }
 
+// 照明の演出を進めている：赤い非常灯を、入口から廊下の出口へ向かって1つずつ移している
 void StageScene::UpdateScareLightSequence()
 {
     const float deltaTime = Application::GetDeltaTime();
@@ -451,6 +465,7 @@ void StageScene::UpdateScareLightSequence()
         game->GetPostProcess()->TriggerHorrorPulse(0.19f, 0.22f);
         Input::SetVibration(8, 0.19f);
         break;
+    // 最後の段階で、廊下の照明を赤い非常灯に戻している
     case 4:
         if (middle != nullptr)
         {
@@ -471,6 +486,7 @@ void StageScene::UpdateScareLightSequence()
     }
 }
 
+// ヒューズを拾った後の影：2本目なら中央のホール、3本目なら細い廊下に出している（見つめると消える）
 void StageScene::StartFuseWatcher(int fuseCount)
 {
     if (fuseCount < 2 || Core::Game::GetInstance()->IsPowerRestored())
@@ -524,6 +540,7 @@ void StageScene::StartFuseWatcher(int fuseCount)
         0.30f);
 }
 
+// 電力が戻る演出：戻った瞬間に照明の演出と周回の印を消し、0.38・1.15・2.25秒に画面の光と振動を出している
 void StageScene::UpdatePowerRestoreSequence()
 {
     const float deltaTime = Application::GetDeltaTime();
@@ -534,7 +551,7 @@ void StageScene::UpdatePowerRestoreSequence()
     {
         m_ProgressHintTimer = 0.0f;
 
-        // ここから先の画面・照明・音の演出は通電シーケンス側で一括管理します。
+        // ここから先の画面・照明・音の演出は、電力が戻る演出の側でまとめて管理している。
         m_ScareLightSequence.Cancel();
         m_ScareLightSequence.ClearNotice();
 
@@ -570,6 +587,7 @@ void StageScene::UpdatePowerRestoreSequence()
     }
 }
 
+// 出口へ送電する演出：送電盤を操作したら出口側の照明を消し、時間をずらして順に点け直している
 void StageScene::UpdateExitPowerSequence()
 {
     const float deltaTime = Application::GetDeltaTime();
@@ -635,6 +653,7 @@ void StageScene::UpdateExitPowerSequence()
     }
 }
 
+// 出口の前兆：送電が終わった後、出口の近く（z>215・x>28）まで来たら、背後の照明を消して影を出している
 void StageScene::UpdateExitOmen(Player& player)
 {
     const float deltaTime = Application::GetDeltaTime();
@@ -709,8 +728,8 @@ void StageScene::UpdateExitOmen(Player& player)
 
 // ----------------------------------------------------------------------------
 // 姿の見えない物音
-// 台本の演出（照明連鎖・倉庫の気配・出口の前兆など）の最中や、監視映像を見ている間は鳴らしません。
-// 演出の驚きを物音で打ち消さず、何も起きていない静かな時間にだけ不安を足すためです。
+// 台本の演出（照明の連鎖・倉庫の気配・出口の前兆など）の最中や、監視映像を見ている間は鳴らしていない。
+// 演出の驚きを物音で打ち消さず、何も起きていない静かな時間にだけ不安を足すためである。
 // ----------------------------------------------------------------------------
 bool StageScene::IsAmbientSoundAllowed() const
 {
@@ -732,6 +751,7 @@ bool StageScene::IsAmbientSoundAllowed() const
         (exit == nullptr || !exit->IsEscaping());
 }
 
+// 物音の予定を進め、鳴らす時間が来た音を立体音響で鳴らしている
 void StageScene::UpdateAmbientSounds()
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -754,8 +774,8 @@ void StageScene::UpdateAmbientSounds()
 
 // ----------------------------------------------------------------------------
 // 懐中電灯で照らすと浮かぶ壁の文字
-// ループ廊下の「ふりかえるな」は、目を離した隙に「ふりかえったな」へ書き換わります。
-// それを読んだ瞬間、背後の天井裏を何かが歩いていき、振り返らせる流れを作ります。
+// ループ廊下の「ふりかえるな」は、目を離した隙に「ふりかえったな」へ書き換わる。
+// それを読んだ瞬間、背後の天井裏を何かが歩いていき、振り返らせる流れを作っている。
 // ----------------------------------------------------------------------------
 void StageScene::UpdateWallWritings(Player& player)
 {
@@ -767,7 +787,7 @@ void StageScene::UpdateWallWritings(Player& player)
         camera->GetForward(),
         player.IsFlashlightOn(),
         game->IsPowerRestored());
-    // 読んだ数はリザルト画面の「壁の文字」に出します。
+    // 読んだ数は、リザルト画面の「壁の文字」に出している。
     game->SetWallWritingsRead(m_WallWritings.GetReadCount());
     if (!changedWritingRead)
     {
@@ -780,9 +800,10 @@ void StageScene::UpdateWallWritings(Player& player)
     Input::SetVibration(5, 0.16f);
 }
 
+// 今の危険度（0〜1）を求めている
 float StageScene::ComputeThreatRate(const Player& player) const
 {
-    // 出ている影のうち、いちばん近いものほど危険とします（2面の足音の影と同じ距離の感じ方）。
+    // 出ている影のうち、一番近いものほど危険としている（2面の足音の影と同じ距離の感じ方）。
     const ShadowMan* shadows[] =
     {
         m_Objects.fuseWatcher,
@@ -804,7 +825,7 @@ float StageScene::ComputeThreatRate(const Player& player) const
             (toShadow.Length() - 14.0f) / 72.0f, 0.0f, 1.0f);
         threatRate = (std::max)(threatRate, danger);
     }
-    // 隠し部屋に閉じ込められている間は、影が出ていなくても小さく心拍が聞こえるようにします（息は荒くしません）。
+    // 隠し部屋に閉じ込められている間は、影が出ていなくても小さく心拍が聞こえるようにしている（息は荒くしない）。
     if (m_HiddenRoom.IsTrapped())
     {
         threatRate = (std::max)(threatRate, 0.30f);
@@ -814,6 +835,6 @@ float StageScene::ComputeThreatRate(const Player& player) const
 
 void StageScene::UpdateTensionPulse(const Player& player, float deltaTime)
 {
-    // 1面には隠れる場所がないため、隠れている扱いにはしません。
+    // 1面には隠れる場所がないため、隠れている扱いにはしていない。
     PlayTensionPulse(m_TensionPulse.Update(deltaTime, ComputeThreatRate(player), false));
 }

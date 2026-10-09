@@ -1,6 +1,6 @@
 ﻿// ============================================================================
-// ファイルの役割: 文字列変換など複数機能から使う小さな補助関数を提供します。
-// 主な技術: std::filesystem、UTF文字列、再利用可能な純粋関数
+// ファイルの役割: 文字コードの変換や保存先の取得など、いろいろな所から使う小さな補助関数を提供している。
+// 主な技術: std::filesystem、UTF-8・UTF-16・Shift-JISの変換、Known Folder（%LOCALAPPDATA%）の取得
 // ============================================================================
 
 #include	"utility.h"
@@ -12,24 +12,10 @@
 #include	<ShlObj.h>
 
 namespace utility {
-    // std::string 用のディレクトリ取得関数
-    std::filesystem::path get_directory(const std::string& path) {
-        return std::filesystem::path(path).parent_path();
-    }
-
-    // std::u8string 用のディレクトリ取得関数
-    std::filesystem::path get_directory(const std::u8string& path) {
-        return std::filesystem::path(path).parent_path();
-    }
-
-    // std::wstring 用のディレクトリ取得関数
-    std::filesystem::path get_directory(const std::wstring& path) {
-        return std::filesystem::path(path).parent_path();
-    }
-
-	// ワイド文字(utf16)をｓ－ｊｉｓに
+	// ワイド文字（UTF-16）を、Windowsの既定の文字コード（日本語環境ではShift-JIS）にしている
 	std::string wide_to_multi_winapi(std::wstring const& src)
 	{
+		// 1回目で必要な長さを求め、2回目で実際に変換している
 		auto const dest_size = ::WideCharToMultiByte(
 			CP_ACP,
 			0U,
@@ -56,11 +42,11 @@ namespace utility {
 		return std::string(dest.begin(), dest.end());
 	}
 
-	// utf-8をワイド文字(utf-16)に
+	// UTF-8をワイド文字（UTF-16）にしている
 	std::wstring utf8_to_wide_winapi(std::string const& src)
 	{
 		auto const dest_size = ::MultiByteToWideChar(
-			CP_UTF8,			 // ソース側がUTF-8
+			CP_UTF8,			 // 元の文字列はUTF-8
 			0U,
 			src.data(),
 			-1,
@@ -75,13 +61,14 @@ namespace utility {
 		return std::wstring(dest.begin(), dest.end());
 	}
 
-	// utf8をS-JISに
+	// UTF-8を、Windowsの既定の文字コード（Shift-JIS）にしている
 	std::string utf8_to_multi_winapi(std::string const& src)
 	{
 		auto const wide = utf8_to_wide_winapi(src);
 		return wide_to_multi_winapi(wide);
 	}
 
+    // %LOCALAPPDATA%\SignalLost を返している
     std::filesystem::path GetSaveDirectory()
     {
         std::filesystem::path directory;
@@ -93,7 +80,7 @@ namespace utility {
         }
         ::CoTaskMemFree(localAppData);
 
-        // 取得できない環境では、従来どおり作業フォルダ直下を使います。
+        // 取得できない環境では、前と同じく作業フォルダの下の save を使っている。
         if (directory.empty())
         {
             directory = L"save";
@@ -101,11 +88,13 @@ namespace utility {
         return directory;
     }
 
+    // 前の版の保存先（作業フォルダの下の save）のパスを返している
     std::filesystem::path GetLegacySavePath(std::string const& fileName)
     {
         return std::filesystem::path(L"save") / fileName;
     }
 
+    // 新しい保存先にファイルがあればそれを、無ければ前の保存先のパスを返している
     std::filesystem::path ResolveSaveFileForRead(std::string const& fileName)
     {
         const std::filesystem::path current = GetSaveDirectory() / fileName;
@@ -117,6 +106,7 @@ namespace utility {
         return GetLegacySavePath(fileName);
     }
 
+    // 出力ウィンドウとダイアログにエラーを出し、すぐにプロセスを終えている
     void ReportFatalError(std::string const& utf8Message)
     {
         ::OutputDebugStringA((utf8Message + "\n").c_str());
@@ -133,7 +123,7 @@ namespace utility {
         ::MessageBoxW(
             ::GetActiveWindow(), message.c_str(), L"起動エラー", MB_OK | MB_ICONERROR);
 
-        // 読み込み途中のSceneやObjectは不完全な状態のため、デストラクタを走らせず終了します。
+        // 読み込みの途中のSceneやObjectは不完全な状態のため、デストラクタを呼ばずに終了している。
         ::ExitProcess(EXIT_FAILURE);
     }
 }

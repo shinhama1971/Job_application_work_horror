@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: タイトル、結果、目的ガイド、ポーズなどの画面別UIを描画します。
-// 主な技術: 画面状態機械、レスポンシブ配置、入力フォーカス
+// ファイルの役割: タイトル・リザルト・監視映像・章のカード・目的地の方向・暗証番号・隠れている間の視界・ポーズなど、画面ごとのUIを描いている。
+// 主な技術: 画面ごとの描画関数、画面の大きさに合わせた中央・端の配置、選んでいる項目の強調表示
 // ============================================================================
 
 #include "Hud.h"
@@ -24,6 +24,7 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // UTF-8の文字列で、画面に出る文字の数を数えている（中央に置くための幅の計算に使っている）
     size_t CountDisplayedCharacters(std::string_view text)
     {
         size_t count = 0;
@@ -38,6 +39,7 @@ namespace
     }
 }
 
+// タイトル画面：題名・操作の説明・ベスト記録・開始と終了の操作を、中央のパネルに並べている
 void Hud::DrawTitle(
     float time,
     bool hasClearRecord,
@@ -51,6 +53,7 @@ void Hud::DrawTitle(
     const Color background(0.002f, 0.004f, 0.004f, 1.0f);
     const Color dimGreen(0.08f, 0.20f, 0.14f, 0.50f);
     const Color titleGreen(0.48f, 0.90f, 0.58f, 0.96f);
+    // 「開始」の文字を、ゆっくり明滅させている
     const float pulse = std::sin(time * 2.1f) * 0.5f + 0.5f;
     const Color promptColor(
         0.58f + pulse * 0.16f,
@@ -58,6 +61,7 @@ void Hud::DrawTitle(
         0.62f + pulse * 0.14f,
         0.62f + pulse * 0.34f);
 
+    // 背景を塗り、7画素ごとに薄い横線（走査線）を引いて、古いモニターのような見た目にしている
     AddRectangle(0.0f, 0.0f, screenWidth, screenHeight, background);
 
     for (float y = 0.0f; y < screenHeight; y += 7.0f)
@@ -70,6 +74,7 @@ void Hud::DrawTitle(
             Color(0.08f, 0.16f, 0.11f, 0.075f));
     }
 
+    // 中央のパネル（左端に緑の線、上下に細い線）
     const float panelWidth = (std::min)(screenWidth * 0.76f, 980.0f);
     const float panelHeight = 430.0f;
     const float panelX = (screenWidth - panelWidth) * 0.5f;
@@ -102,6 +107,7 @@ void Hud::DrawTitle(
         panelY + 148.0f, subtitle, subtitlePixelSize,
         Color(0.42f, 0.58f, 0.48f, 0.74f));
 
+    // 操作の説明。コントローラーがつながっていれば、コントローラーのボタン名で表示している
     const bool controller = Input::IsControllerConnected();
     const std::string_view controls1 = controller
         ? "左スティック 移動  右スティック 視点  A 調べる"
@@ -130,6 +136,7 @@ void Hud::DrawTitle(
     AddText((screenWidth - controls3Width) * 0.5f,
         panelY + 250.0f, controls3, controlsPixelSize, controlsColor);
 
+    // クリアの記録があれば、最短タイムと最少の捕まった回数を出している
     if (hasClearRecord)
     {
         const int bestSeconds = (std::max)(
@@ -184,6 +191,7 @@ void Hud::DrawTitle(
     Flush();
 }
 
+// リザルト画面：評価・成績・今回の発見・達成の一言・次の操作を並べている。revealAmountで全体をフェードインさせている
 void Hud::DrawResult(
     float revealAmount,
     float clearTimeSeconds,
@@ -221,7 +229,7 @@ void Hud::DrawResult(
     }
 
     const float panelWidth = (std::min)(screenWidth * 0.72f, 860.0f);
-    // 下段に「今回の発見」（壁の文字・隠し部屋・今回の異変）を並べるため、縦に広げています。
+    // 下段に「今回の発見」（壁の文字・隠し部屋・今回の異変）を並べるため、縦に広げている。
     const float panelHeight = 680.0f;
     const float panelX = (screenWidth - panelWidth) * 0.5f;
     const float panelY = (screenHeight - panelHeight) * 0.5f;
@@ -252,6 +260,8 @@ void Hud::DrawResult(
         floorPixelSize,
         pale);
 
+    // 評価の点数：100点から、6分を超えた時間（15秒ごとに1点、最大40点）・捕まった回数（1回15点、最大45点）・
+    // 観察の失敗（1回5点、最大25点）を引き、異変への対処（1回2点、最大8点）と残された記録（1つ3点）を足している
     const int clearSeconds = (std::max)(
         0, static_cast<int>(clearTimeSeconds + 0.5f));
     const int minutes = clearSeconds / 60;
@@ -275,6 +285,7 @@ void Hud::DrawResult(
             anomalyBonus + evidenceBonus,
         0,
         100);
+    // 90点以上でS、75点以上でA、55点以上でB、それ未満はC
     const char rank = performanceScore >= 90
         ? 'S'
         : (performanceScore >= 75
@@ -298,6 +309,7 @@ void Hud::DrawResult(
         rankPixelSize,
         rankColor);
 
+    // 成績の各行（タイム・捕まった回数・異変への対処・観察の失敗・充電器・残された記録）
     const std::string timeText =
         "クリア時間 " + std::to_string(minutes) + "分 " +
         std::to_string(seconds) + "秒";
@@ -364,7 +376,7 @@ void Hud::DrawResult(
             ? Color(0.92f, 0.78f, 0.34f, 0.96f * reveal)
             : pale);
 
-    // 今回の発見。プレイごとに変わる要素と任意の探索を並べ、もう一度遊ぶ理由にします。
+    // 今回の発見。プレイごとに変わる要素と任意の探索を並べ、もう一度遊ぶ理由にしている。
     const Color gold(0.92f, 0.78f, 0.34f, 0.96f * reveal);
     const Color dim(0.50f, 0.58f, 0.52f, 0.80f * reveal);
     const auto addCenteredStat = [this, screenWidth](
@@ -389,6 +401,7 @@ void Hud::DrawResult(
             "2階の異変 " + std::string(stage2Anomalies), statPixelSize, pale);
     }
 
+    // 達成の一言：全部見つけて一度も失敗しない「完全探索」を最優先にし、次に記録の更新、捕まらなかったことの順で選んでいる
     std::string_view achievement = "";
     if (safeEvidenceCollected >= totalEvidence && safeWritingsRead >= totalWritings &&
         hiddenRoomEscaped && safeCaughtCount == 0 && safePuzzleMistakes == 0)
@@ -442,6 +455,7 @@ void Hud::DrawResult(
     Flush();
 }
 
+// 監視カメラの映像を見ている画面：暗くした背景に映像を貼り、枠・カメラの名前・巡回の進み具合・操作を重ねている
 void Hud::DrawSurveillanceFeed(
     ID3D11ShaderResourceView* feed,
     Shader& textureShader,
@@ -458,6 +472,7 @@ void Hud::DrawSurveillanceFeed(
     bool reportReady,
     bool wrongReportVisible)
 {
+    // 映像は16:9で、画面の90%・幅1280・上下の文字が入る高さのうち、最も小さい大きさにしている
     const float screenWidth = GetCanvasWidth();
     const float screenHeight = GetCanvasHeight();
     const float availableHeight = (std::max)(screenHeight - 156.0f, 300.0f);
@@ -469,6 +484,7 @@ void Hud::DrawSurveillanceFeed(
     const float feedX = (screenWidth - feedWidth) * 0.5f;
     const float feedY = (screenHeight - feedHeight) * 0.5f + 8.0f;
 
+    // 背景を暗くし、映像のテクスチャを貼っている（映像はHUDの頂点とは別に描いている）
     m_Vertices.clear();
     AddRectangle(0.0f, 0.0f, screenWidth, screenHeight,
         Color(0.0f, 0.004f, 0.003f, 0.94f));
@@ -477,6 +493,7 @@ void Hud::DrawSurveillanceFeed(
     DrawTextureRectangle(
         feed, textureShader, feedX, feedY, feedWidth, feedHeight);
 
+    // 映像の上に重ねる枠と、カメラの名前・操作の説明
     m_Vertices.clear();
     const Color green(0.38f, 0.94f, 0.55f, 0.96f);
     const Color pale(0.76f, 0.88f, 0.80f, 0.94f);
@@ -500,7 +517,7 @@ void Hud::DrawSurveillanceFeed(
                 : "暗視補正 ON   C / Y 基準映像   Z / X 拡大"),
         1.9f, Color(0.66f, 0.85f, 0.71f, 0.95f));
 
-    // 右上に巡回の進み具合と、捕獲までの残り猶予を表示します。
+    // 右上に巡回の進み具合と、捕まるまでに許される失敗の回数（使った分は赤）を表示している。
     const std::string status =
         "巡回 " + std::to_string(roundsCleared) + " / " +
         std::to_string(requiredRounds);
@@ -525,7 +542,7 @@ void Hud::DrawSurveillanceFeed(
                 : Color(0.20f, 0.34f, 0.26f, 0.80f));
     }
 
-    // 下端にカメラの並びを表示し、切り替えられることを伝えます。
+    // 下端にカメラの並びを表示し、切り替えられることを伝えている。
     const float indicatorWidth = 28.0f;
     const float indicatorGap = 8.0f;
     const float indicatorsWidth =
@@ -540,6 +557,7 @@ void Hud::DrawSurveillanceFeed(
             camera == cameraIndex ? green : Color(0.20f, 0.34f, 0.26f, 0.70f));
     }
 
+    // 映像の上を流れる薄い横線（監視カメラのノイズらしさ）
     for (int line = 0; line < 8; ++line)
     {
         const float offset = std::fmod(
@@ -550,6 +568,7 @@ void Hud::DrawSurveillanceFeed(
             Color(0.38f, 0.85f, 0.52f, 0.10f));
     }
 
+    // 下の操作の説明：基準映像・判定の間違い・判定できる状態・受信中で切り替えている
     const std::string_view prompt = showingReference
         ? (Input::IsControllerConnected()
             ? "記録映像   Y ライブ映像へ戻る"
@@ -575,6 +594,7 @@ void Hud::DrawSurveillanceFeed(
     Flush();
 }
 
+// 章の始まりのカード：0.45秒で現れ、3.15秒から薄れ始め、4.2秒で消えている
 void Hud::DrawChapterCard(
     std::string_view chapter,
     std::string_view subtitle,
@@ -617,6 +637,7 @@ void Hud::DrawChapterCard(
     AddRectangle(panelX, panelY, 5.0f, panelHeight, accent);
     AddRectangle(panelX, panelY, panelWidth, 2.0f, accent);
 
+    // 章の名前は英字の想定なので、文字数（バイト数）から幅を出して中央に置いている
     constexpr float chapterPixelSize = 4.0f;
     constexpr float subtitlePixelSize = 2.5f;
     const float chapterWidth =
@@ -630,11 +651,13 @@ void Hud::DrawChapterCard(
     Flush();
 }
 
+// 目的地の方向を、左上の小さなパネルに「前方・右・左・後方・近く」の言葉で出している
 void Hud::DrawObjectiveGuide(
     const Camera& camera,
     const Vector3& origin,
     const Vector3& target)
 {
+    // 水平面だけで、プレイヤーの向きと目的地への向きを比べている
     Vector3 toTarget = target - origin;
     toTarget.y = 0.0f;
     const float distance = toTarget.Length();
@@ -653,6 +676,7 @@ void Hud::DrawObjectiveGuide(
     }
     forward /= forwardLength;
 
+    // 内積で前か後ろか、外積のy成分で右か左かを決めている（28より近ければ「近く」）
     std::string_view direction = "前方";
     const float facing = forward.Dot(toTarget);
     const float side = forward.z * toTarget.x - forward.x * toTarget.z;
@@ -689,6 +713,7 @@ void Hud::DrawObjectiveGuide(
     Flush();
 }
 
+// 2面の右上の状態パネル：周回の進み具合（信号盤の段階に入ったら青・黄・赤）と、足音の危険度のゲージ
 void Hud::DrawStage2Status(
     int completedLoops,
     float threatRate,
@@ -716,6 +741,7 @@ void Hud::DrawStage2Status(
             (signalActive ? "信号復旧 青 黄 赤" : "廊下の繰り返し"),
         1.8f, active);
 
+    // 3つの区画：周回の数、信号盤の段階なら終えた色まで点け、次に押す色は暗くして示している
     const int safeCompletedLoops = (std::clamp)(completedLoops, 0, 3);
     constexpr float segmentWidth = 52.0f;
     constexpr float segmentGap = 7.0f;
@@ -750,6 +776,7 @@ void Hud::DrawStage2Status(
             segmentColor);
     }
 
+    // 危険度がある間だけ、その下に危険のゲージを出している
     const float safeThreatRate = (std::clamp)(threatRate, 0.0f, 1.0f);
     if (safeThreatRate > 0.0f)
     {
@@ -772,7 +799,7 @@ void Hud::DrawStage2Status(
     Flush();
 }
 
-// 画面中央に4桁の入力盤を出します。選択中の桁は緑の枠で示し、上下の三角で増減できることを伝えます。
+// 画面の中央に4桁の入力盤を出している。選んでいる桁は緑の枠で示し、上下の三角で増減できることを伝えている。
 void Hud::DrawKeypad(
     const std::array<int, 4>& entered,
     int cursor,
@@ -791,7 +818,7 @@ void Hud::DrawKeypad(
     const Color pale(0.72f, 0.82f, 0.74f, 0.92f);
     const Color dim(0.30f, 0.38f, 0.33f, 0.90f);
     const Color red(0.96f, 0.22f, 0.14f, 0.96f);
-    // 不正解の直後は枠を赤く点滅させます。
+    // 不正解の直後は、枠を赤く点滅させている。
     const bool wrongFlash = wrongRate > 0.0f &&
         static_cast<int>(wrongRate * 7.0f) % 2 == 0;
     const Color frame = wrongFlash ? red : green;
@@ -817,6 +844,7 @@ void Hud::DrawKeypad(
     const float rowWidth = boxWidth * 4.0f + boxGap * 3.0f;
     const float rowX = (screenWidth - rowWidth) * 0.5f;
     const float boxY = panelY + 88.0f;
+    // 4つの桁の箱と数字を描いている（選んでいる桁は枠を太くしている）
     for (int index = 0; index < 4; ++index)
     {
         const float boxX = rowX + static_cast<float>(index) * (boxWidth + boxGap);
@@ -837,7 +865,7 @@ void Hud::DrawKeypad(
 
         if (selected)
         {
-            // 上下の三角（増減できる合図）を、横幅の違う長方形を重ねて描きます。
+            // 上下の三角（増減できる合図）を、横幅の違う長方形を重ねて描いている。
             const float centerX = boxX + boxWidth * 0.5f;
             for (int step = 0; step < 4; ++step)
             {
@@ -850,6 +878,7 @@ void Hud::DrawKeypad(
         }
     }
 
+    // 下のメッセージ：間違えた直後は「番号が違う」、3回以上間違えると扉の向こうの気配を知らせている
     const std::string_view message = wrongRate > 0.0f
         ? (mistakes >= 3 ? "扉の向こうで何かが動いた" : "番号が違う")
         : "壁の数字を懐中電灯で探す";
@@ -868,8 +897,8 @@ void Hud::DrawHidingView(float elapsedSeconds, float dangerRate)
     const Color dark(0.0f, 0.0f, 0.0f, 0.94f);
     const Color edge(0.10f + danger * 0.35f, 0.02f, 0.02f, 0.55f);
 
-    // 画面の中央付近に4本の横長の隙間を残し、それ以外を扉の内側の暗さで覆います。
-    // 呼吸に合わせて、隙間がわずかに上下します。
+    // 画面の中央付近に4本の横長のすき間を残し、それ以外を扉の内側の暗さで覆っている。
+    // 呼吸に合わせて、すき間がわずかに上下している。
     constexpr int SlitCount = 4;
     const float slitHeight = screenHeight * 0.055f;
     const float slitGap = screenHeight * 0.035f;
@@ -877,6 +906,7 @@ void Hud::DrawHidingView(float elapsedSeconds, float dangerRate)
     const float firstSlitY = screenHeight * 0.36f + breath;
     const float slitInset = screenWidth * 0.12f;
 
+    // すき間とすき間の間を上から順に暗く塗り、すき間の左右の端も塗っている。影が近いほど、すき間の縁を赤くしている
     float coveredY = 0.0f;
     for (int index = 0; index < SlitCount; ++index)
     {
@@ -901,11 +931,12 @@ void Hud::DrawHidingView(float elapsedSeconds, float dangerRate)
     Flush();
 }
 
+// 息を殺して影をやり過ごす操作の進み具合（成功・影が近すぎる・呼吸を整えている間・止まっている時間）を出している
 void Hud::DrawQuietRecovery(float progressRate, float cooldown, bool success, bool tooClose)
 {
     m_Vertices.clear();
     const float x = (std::max)(12.0f, GetCanvasWidth() - 330.0f);
-    // 右上の「記録」（Hud::Drawで描く。下端は108＋m_TopRightOffset）のすぐ下に置きます。
+    // 右上の「記録」（Hud::Drawで描いている。下端は108＋m_TopRightOffset）のすぐ下に置いている。
     const float y = 116.0f + m_TopRightOffset;
     const Color color = tooClose ? Color(0.96f, 0.38f, 0.25f, 1.0f)
         : Color(0.64f, 0.84f, 0.78f, 1.0f);
@@ -917,12 +948,14 @@ void Hud::DrawQuietRecovery(float progressRate, float cooldown, bool success, bo
     AddText(x + 10.0f, y + 31.0f,
         success ? "静かに歩いて探索を続ける" : "移動や点灯で静止の計測はやり直し", 1.4f, color);
     AddRectangle(x + 10.0f, y + 58.0f, 276.0f, 6.0f, Color(0.09f, 0.14f, 0.14f, 1.0f));
+    // ゲージ：成功なら満タン、呼吸を整えている間は10秒で回復、それ以外は止まっている時間の進み具合
     const float fill = success ? 1.0f : (cooldown > 0.0f ?
         1.0f - cooldown / 10.0f : progressRate);
     AddRectangle(x + 10.0f, y + 58.0f, 276.0f * (std::clamp)(fill, 0.0f, 1.0f), 6.0f, color);
     Flush();
 }
 
+// ポーズメニュー：今の階・経過時間・捕まった回数と、6つの設定（選んでいる項目は緑）、操作の説明を並べている
 void Hud::DrawPause(
     int brightnessLevel,
     int effectLevel,
@@ -1013,7 +1046,7 @@ void Hud::DrawPause(
     addCenteredText(panelY + 268.0f,
         guideEnabled ? "目的表示 あり" : "目的表示 なし", 2.5f,
         safeSelectedSetting == 4 ? green : pale);
-    // 描画解像度は次回起動から反映されるため、起動時と違う段階を選んでいるときはそのことを表示します。
+    // 描画解像度は次回の起動から反映されるため、起動時と違う段階を選んでいるときは、そのことを表示している。
     constexpr std::string_view resolutionNames[] = { "自動", "100%", "75%", "67%" };
     const int safeResolutionLevel = (std::clamp)(resolutionLevel, 0, 3);
     const std::string resolutionText =
@@ -1025,6 +1058,7 @@ void Hud::DrawPause(
     addCenteredText(panelY + 308.0f,
         resolutionText, 2.5f,
         safeSelectedSetting == 5 ? green : pale);
+    // 操作の説明は、コントローラーがつながっているかで切り替えている
     if (Input::IsControllerConnected())
     {
         addCenteredText(panelY + 350.0f,

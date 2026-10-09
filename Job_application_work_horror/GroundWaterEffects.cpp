@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: 水たまり位置、落下水滴、着水・足音波紋の生成と描画を管理します。
-// 主な技術: オブジェクトプール、距離ソート、アルファ合成、時間減衰
+// ファイルの役割: 水たまりの位置、天井から落ちる水滴、着水と足音の波紋の作成と描画を管理している。
+// 主な技術: 決まった数の使い回し（オブジェクトプール）、距離順の並べ替え、アルファ合成・加算合成、時間で薄れる表現
 // ============================================================================
 
 #include "Ground.h"
@@ -13,6 +13,7 @@
 
 using namespace DirectX::SimpleMath;
 
+// 水滴と波紋の形・マテリアルを作り、シェーダーと同じ計算で水たまりの位置を求め、水滴を落とす場所を決めている
 void WaterEffectSystem::Init()
 {
 	m_FallingDrops.clear();
@@ -23,11 +24,12 @@ void WaterEffectSystem::Init()
 	m_PuddleCenters.reserve(40);
 	m_FootstepRipples.reserve(8);
 
-	// 先細りの線を十字に組み、どの角度から見ても小さな水滴に見える形状にします。
+	// 先が細い板を十字に組み、どの角度から見ても小さな水滴に見える形にしている。
 	const Color dropColor(0.62f, 0.76f, 0.80f, 0.80f);
 	const float tailWidth = 0.025f;
 	const float headWidth = 0.14f;
 	const float halfHeight = 0.58f;
+	// 4頂点で四角形（三角形2つ）を追加している
 	const auto addQuad = [this, &dropColor](
 		const Vector3& a, const Vector3& b,
 		const Vector3& c, const Vector3& d,
@@ -60,6 +62,7 @@ void WaterEffectSystem::Init()
 	m_DropVertexBuffer.Create(m_DropVertices);
 	m_DropShader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
+	// 水滴のマテリアル：薄い青の半透明で、光沢を強くしている
 	MATERIAL material{};
 	material.Diffuse = Color(0.64f, 0.78f, 0.82f, 0.82f);
 	material.Ambient = Color(0.32f, 0.42f, 0.46f, 0.82f);
@@ -70,6 +73,7 @@ void WaterEffectSystem::Init()
 	m_DropMaterial = std::make_unique<Material>();
 	m_DropMaterial->Create(material);
 
+	// 波紋の形：内側の半径0.76・外側の半径1の細い輪を32分割で作っている（表と裏の両面）
 	const Color rippleColor(0.62f, 0.78f, 0.82f, 0.72f);
 	constexpr int rippleSegments = 32;
 	constexpr float innerRadius = 0.76f;
@@ -100,6 +104,7 @@ void WaterEffectSystem::Init()
 		}
 	}
 	m_RippleVertexBuffer.Create(m_RippleVertices);
+	// 波紋のマテリアル（色の濃さは描くときに薄れ具合で毎回変えている）
 	MATERIAL rippleMaterial{};
 	rippleMaterial.Diffuse = Color(0.34f, 0.48f, 0.52f, 0.70f);
 	rippleMaterial.Emission = Color(0.035f, 0.065f, 0.075f, 0.0f);
@@ -109,6 +114,7 @@ void WaterEffectSystem::Init()
 	m_RippleMaterial = std::make_unique<Material>();
 	m_RippleMaterial->Create(rippleMaterial);
 
+	// 0〜1の疑似乱数。wetFloorPS.hlslの水たまりと同じ式を使い、見た目と判定の位置をそろえている
 	const auto fraction = [](float value)
 	{
 		return value - std::floor(value);
@@ -124,6 +130,7 @@ void WaterEffectSystem::Init()
 			hash21(x + 93.1f, y + 11.8f));
 	};
 
+	// 水滴を落とす場所の候補（水たまりがあるマス）
 	struct DropCandidate
 	{
 		int CellX;
@@ -133,6 +140,7 @@ void WaterEffectSystem::Init()
 		float DistanceSquared;
 	};
 
+	// 床を82x82のマスに分け、乱数がしきい値を超えたマスにだけ水たまりを置いている（シェーダーと同じ判定）
 	constexpr float cellSize = 82.0f;
 	std::vector<DropCandidate> candidates;
 	for (int cellZ = -4; cellZ <= 4; ++cellZ)
@@ -155,8 +163,8 @@ void WaterEffectSystem::Init()
 				 Vector2(0.5f, 0.5f) +
 				 (randomValue - Vector2(0.5f, 0.5f)) * 0.22f) * cellSize;
 			m_PuddleCenters.push_back(puddleCenter);
-			// プレイ領域はZ正方向へ少し寄っているため、候補を距離順に並べます。
-			// 限られたプールがマップ端のセルだけで埋まることを防ぎます。
+			// 遊ぶ範囲はZの正の方へ少し寄っているため、候補をその中心からの距離順に並べている。
+			// 限られた数の水滴が、マップの端のマスだけで埋まらないようにしている。
 			const Vector2 fromGameplayCenter =
 				puddleCenter - Vector2(0.0f, 70.0f);
 			candidates.push_back({
@@ -177,6 +185,7 @@ void WaterEffectSystem::Init()
 			return left.DistanceSquared < right.DistanceSquared;
 		});
 
+	// 近い順に最大24個の水滴を、水たまりの真上から落としている（落ちる速さと待ち時間はマスごとに変えている）
 	const size_t dropCount = (std::min)(candidates.size(), size_t(24));
 	for (size_t candidateIndex = 0; candidateIndex < dropCount; ++candidateIndex)
 	{
@@ -199,6 +208,7 @@ void WaterEffectSystem::Init()
 	}
 }
 
+// 水滴を落とし、床に着いたら着水の時間を始め、少し待ってからまた上から落としている
 void WaterEffectSystem::UpdateFallingDrops(float deltaTime)
 {
 	for (FallingDrop& drop : m_FallingDrops)
@@ -227,12 +237,18 @@ void WaterEffectSystem::UpdateFallingDrops(float deltaTime)
 	}
 }
 
+// その位置が水たまり（楕円）か、水に浸かった範囲の中かを返している
 bool WaterEffectSystem::IsInsidePuddle(const Vector3& position) const
 {
+	if (IsInsideFloodRegion(position))
+	{
+		return true;
+	}
 	for (const Vector2& center : m_PuddleCenters)
 	{
 		const float offsetX = position.x - center.x;
 		const float offsetZ = position.z - center.y;
+		// 水たまりは横24・縦17の楕円として判定している
 		if ((offsetX * offsetX) / (24.0f * 24.0f) +
 			(offsetZ * offsetZ) / (17.0f * 17.0f) <= 1.0f)
 		{
@@ -244,9 +260,32 @@ bool WaterEffectSystem::IsInsidePuddle(const Vector3& position) const
 
 bool WaterEffectSystem::IsAnyPuddleVisible(const Camera& camera) const
 {
+	if (m_HasFloodRegion)
+	{
+		// 水に浸かった範囲を長い方向に4つへ分け、それぞれを囲む球で判定している。
+		// 範囲全体を1つの大きな球で囲むと、ほかの場所を見ているときも反射の描画が動いてしまうためである。
+		constexpr int SegmentCount = 4;
+		const Vector2 size = m_FloodMax - m_FloodMin;
+		const bool alongZ = size.y >= size.x;
+		const Vector2 segmentSize = alongZ
+			? Vector2(size.x, size.y / SegmentCount)
+			: Vector2(size.x / SegmentCount, size.y);
+		const float radius = segmentSize.Length() * 0.5f;
+		for (int index = 0; index < SegmentCount; ++index)
+		{
+			const float offset = (static_cast<float>(index) + 0.5f) / SegmentCount;
+			const Vector2 center = alongZ
+				? Vector2(m_FloodMin.x + size.x * 0.5f, m_FloodMin.y + size.y * offset)
+				: Vector2(m_FloodMin.x + size.x * offset, m_FloodMin.y + size.y * 0.5f);
+			if (camera.IsSphereVisible(Vector3(center.x, -99.35f, center.y), radius))
+			{
+				return true;
+			}
+		}
+	}
 	for (const Vector2& center : m_PuddleCenters)
 	{
-		// 水たまりは最大およそ48x34。余白込みの境界球で画面端の欠けを防ぎます。
+		// 水たまりは最大でおよそ48x34。余白を含めた境界球で、画面の端で欠けるのを防いでいる。
 		if (camera.IsSphereVisible(
 			Vector3(center.x, -99.35f, center.y),
 			31.0f))
@@ -257,6 +296,7 @@ bool WaterEffectSystem::IsAnyPuddleVisible(const Camera& camera) const
 	return false;
 }
 
+// 足音の波紋を古くし、消える時間を過ぎたものを取り除いている
 void WaterEffectSystem::UpdateFootstepRipples(float deltaTime)
 {
 	m_FootstepRippleCooldown = (std::max)(
@@ -272,10 +312,12 @@ void WaterEffectSystem::UpdateFootstepRipples(float deltaTime)
 		return ripple.Age >= ripple.Duration;
 	});
 
-	// 波紋の発生自体はPlayerの足音イベントから呼び出します。
-	// これにより、壁へ向かって歩いた場合やフレーム落ち時にも音と波紋がずれません。
+	// 波紋を作るのは、Playerの足音のタイミングから呼んでいる。
+	// これにより、壁へ向かって歩いた場合やフレームが落ちたときも、音と波紋がずれない。
 }
 
+// 足元が水の中なら波紋を1つ作り、たまにレンズに水しぶきが付いた効果を出している。
+// 間隔を空けるために作らなかったときも、水の中ならtrueを返している（足音を水音にするため）
 bool WaterEffectSystem::TriggerFootstepRipple(
 	const Vector3& playerPosition,
 	bool sprinting)
@@ -290,12 +332,14 @@ bool WaterEffectSystem::TriggerFootstepRipple(
 	ripple.Duration = sprinting ? 0.82f : 0.68f;
 	ripple.MaxRadius = sprinting ? 4.4f : 3.2f;
 	m_FootstepRipples.push_back(ripple);
+	// 足音の波紋は最大8個まで（古いものから消している）
 	if (m_FootstepRipples.size() > 8)
 	{
 		m_FootstepRipples.erase(m_FootstepRipples.begin());
 	}
 	m_FootstepRippleCooldown = sprinting ? 0.22f : 0.36f;
 
+	// 走っているほど強く長く、レンズの曇りを出している（続けて出しすぎないよう間隔を空けている）
 	if (m_LensSplashCooldown <= 0.0f)
 	{
 		const float moistureStrength = sprinting ? 0.92f : 0.58f;
@@ -308,6 +352,7 @@ bool WaterEffectSystem::TriggerFootstepRipple(
 	return true;
 }
 
+// 落ちている水滴を、半透明で描いている（画面に映っているものだけ）
 void WaterEffectSystem::DrawFallingDrops(Camera* camera)
 {
 	if (m_DropVertices.empty() || m_DropMaterial == nullptr)
@@ -339,6 +384,7 @@ void WaterEffectSystem::DrawFallingDrops(Camera* camera)
 	Renderer::SetBlendState(BS_NONE);
 }
 
+// 着水したところの、小さなしぶきと広がる波紋を描いている
 void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 {
 	if (m_RippleVertices.empty() || m_RippleMaterial == nullptr ||
@@ -355,6 +401,7 @@ void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 	Renderer::SetBlendState(BS_ALPHABLEND);
 	m_DropVertexBuffer.SetGPU();
 	m_DropMaterial->SetGPU();
+	// 着水から0.2秒の間、4方向へ小さなしぶきを飛ばしている（水滴の形を小さくして使い回している）
 	for (const FallingDrop& drop : m_FallingDrops)
 	{
 		const float impactAge = 0.55f - drop.ImpactTimer;
@@ -385,8 +432,10 @@ void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 		}
 	}
 
+	// 波紋は加算合成で、光が当たったように明るく重ねている
 	Renderer::SetBlendState(BS_ADDITIVE);
 	m_RippleVertexBuffer.SetGPU();
+	// 1つの波紋を、広がり具合（progress）に合わせて大きく・薄くして描いている
 	const auto drawRipple = [this, context](
 		const Vector3& position,
 		float progress,
@@ -412,6 +461,7 @@ void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 		context->Draw(static_cast<UINT>(m_RippleVertices.size()), 0);
 	};
 
+	// 水滴が着水したところの波紋
 	for (const FallingDrop& drop : m_FallingDrops)
 	{
 		if (drop.ImpactTimer <= 0.0f ||
@@ -427,6 +477,7 @@ void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 			0.82f);
 	}
 
+	// 足音の波紋
 	for (const WaterRipple& ripple : m_FootstepRipples)
 	{
 		if (!camera->IsSphereVisible(ripple.Position, ripple.MaxRadius + 1.0f))
@@ -444,18 +495,21 @@ void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 	Renderer::SetBlendState(BS_NONE);
 }
 
+// 水滴と足音の波紋を更新している
 void WaterEffectSystem::Update(float deltaTime)
 {
 	UpdateFallingDrops(deltaTime);
 	UpdateFootstepRipples(deltaTime);
 }
 
+// 水滴と波紋を描いている
 void WaterEffectSystem::Draw(Camera* camera)
 {
 	DrawFallingDrops(camera);
 	DrawWaterRipples(camera);
 }
 
+// 作ったものをすべて解放している
 void WaterEffectSystem::Uninit()
 {
 	m_FallingDrops.clear();
@@ -467,6 +521,7 @@ void WaterEffectSystem::Uninit()
 	m_RippleMaterial.reset();
 }
 
+// Groundの関数は、水の効果の処理をそのまま呼んでいる
 bool Ground::TriggerFootstepRipple(
 	const Vector3& position,
 	bool sprinting)

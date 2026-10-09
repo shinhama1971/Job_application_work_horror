@@ -248,7 +248,6 @@
     <ClCompile Include="ShadowMan.cpp" />
     <ClCompile Include="ShadowMap.cpp" />
     <ClCompile Include="sound.cpp" />
-    <ClCompile Include="SpriteRenderer.cpp" />
     <ClCompile Include="StageScene.cpp" />
     <ClCompile Include="Stage1Layout.cpp" />
     <ClCompile Include="Stage1Objective.cpp" />
@@ -258,6 +257,7 @@
     <ClCompile Include="FlashlightWriting.cpp" />
     <ClCompile Include="Stage1KeypadDoor.cpp" />
     <ClCompile Include="Stage1HiddenRoomEvent.cpp" />
+    <ClCompile Include="Stage1WestWing.cpp" />
     <ClCompile Include="KeyItem.cpp" />
     <ClCompile Include="Locker.cpp" />
     <ClCompile Include="CaptureMode.cpp" />
@@ -273,7 +273,6 @@
     <ClCompile Include="ModelCache.cpp" />
     <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="Texture.cpp" />
-    <ClCompile Include="Texture2D.cpp" />
     <ClCompile Include="TiledLighting.cpp" />
     <ClCompile Include="PipeProp.cpp" />
     <ClCompile Include="TitleScene.cpp" />
@@ -351,7 +350,6 @@
     <ClInclude Include="ShadowMan.h" />
     <ClInclude Include="ShadowMap.h" />
     <ClInclude Include="sound.h" />
-    <ClInclude Include="SpriteRenderer.h" />
     <ClInclude Include="StageScene.h" />
     <ClInclude Include="Stage1Layout.h" />
     <ClInclude Include="Stage1Objective.h" />
@@ -361,6 +359,7 @@
     <ClInclude Include="FlashlightWriting.h" />
     <ClInclude Include="Stage1KeypadDoor.h" />
     <ClInclude Include="Stage1HiddenRoomEvent.h" />
+    <ClInclude Include="Stage1WestWing.h" />
     <ClInclude Include="KeyItem.h" />
     <ClInclude Include="Locker.h" />
     <ClInclude Include="CaptureMode.h" />
@@ -381,7 +380,6 @@
     <ClInclude Include="StaticMesh.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Texture.h" />
-    <ClInclude Include="Texture2D.h" />
     <ClInclude Include="TiledLighting.h" />
     <ClInclude Include="PipeProp.h" />
     <ClInclude Include="TitleScene.h" />

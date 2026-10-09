@@ -1,6 +1,6 @@
 ﻿// ============================================================================
-// ファイルの役割: シェーダー、GPUバッファ、バックバッファ操作を管理します。
-// 主な技術: COM、Constant Buffer、Shader Resource View、RAII
+// ファイルの役割: シェーダー・GPUのバッファの作成と、バックバッファの操作を担当している。
+// 主な技術: COM、定数バッファ、頂点・インデックスバッファ、シェーダーのコンパイル
 // ============================================================================
 
 #include "Renderer.h"
@@ -10,7 +10,7 @@
 
 using namespace DirectX::SimpleMath;
 
-// シェーダーをファイル拡張子に合わせてコンパイルします。
+// シェーダーを読み込んでいる。コンパイル済みの.csoがあればそれを使い、無ければ.hlslをコンパイルしている。
 HRESULT Renderer::CompileShader(
 	const char* szFileName,
 	LPCSTR szEntryPoint,
@@ -18,17 +18,17 @@ HRESULT Renderer::CompileShader(
 	std::vector<unsigned char>& shaderObject)
 {
 	shaderObject.clear();
-	// 拡張子をcsoに置き換えたファイル名を作成します。
-	// 固定長バッファを使わないため、長いパスでもあふれません。
+	// 拡張子をcsoに置き換えたファイル名を作っている。
+	// 固定長のバッファを使わないため、長いパスでもあふれない。
 	std::filesystem::path csoPath(szFileName);
 	csoPath.replace_extension(".cso");
 
-	//csoファイルがあれば開く
+	// csoファイルがあれば開いている
 	FILE* fp;
 	int ret = fopen_s(&fp, csoPath.string().c_str(), "rb");
 	if (ret == 0)
 	{
-		// ファイルサイズを取得
+		// ファイルの大きさを取得している
 		fseek(fp, 0, SEEK_END);
 		int size = ftell(fp);
 		fseek(fp, 0, SEEK_SET);
@@ -50,7 +50,7 @@ HRESULT Renderer::CompileShader(
 			return E_FAIL;
 		}
 	}
-	//csoファイルがなければhlslファイルをコンパイルする
+	// csoファイルが無ければ、hlslファイルをコンパイルしている
 	else
 	{
 		HRESULT hr = S_OK;
@@ -58,33 +58,33 @@ HRESULT Renderer::CompileShader(
 		size_t 	wLen = 0;
 		int err = 0;
 
-		// 文字コードを Shift-JIS → UTF-16 に変換
-		setlocale(LC_ALL, "japanese");  // ロケールを設定（Windows特有）
+		// 文字コードを Shift-JIS → UTF-16 に変換している
+		setlocale(LC_ALL, "japanese");  // ロケールを日本語にしている（Windowsの日本語のパスを正しく変換するため）
 		err = mbstowcs_s(&wLen, filename, 512, szFileName, _TRUNCATE);
 
-		// シェーダーコンパイルオプションを設定
+		// シェーダーのコンパイルの設定（古い書き方を許さない）
 		DWORD dwShaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
 #if defined( DEBUG ) || defined( _DEBUG )
-		dwShaderFlags |= D3DCOMPILE_DEBUG; // デバッグビルドの場合はデバッグ情報も含める
+		dwShaderFlags |= D3DCOMPILE_DEBUG; // Debug構成では、シェーダーのデバッグ情報も含めている
 #endif
 
-		// コンパイル結果およびエラー情報格納用のBlob
+		// コンパイルの結果と、エラーの情報を受け取る入れ物
 		Microsoft::WRL::ComPtr<ID3DBlob> pErrorBlob;
 		Microsoft::WRL::ComPtr<ID3DBlob> pBlob;
 
-		// HLSLファイルをコンパイル
+		// HLSLファイルをコンパイルしている
 		hr = D3DCompileFromFile(
 			filename,							// ファイル名
-			nullptr,							// マクロ定義なし 
-			D3D_COMPILE_STANDARD_FILE_INCLUDE,	// #include 対応 
-			szEntryPoint,						// エントリーポイント名
+			nullptr,							// マクロの定義はなし
+			D3D_COMPILE_STANDARD_FILE_INCLUDE,	// #include を使えるようにしている
+			szEntryPoint,						// 入口の関数の名前
 			szShaderModel,						// シェーダーモデル
-			dwShaderFlags,						// コンパイルフラグ
-			0,									// エフェクトフラグ
-			pBlob.GetAddressOf(),				// 成功時のコンパイル結果
-			pErrorBlob.GetAddressOf());			// コンパイルエラー出力
+			dwShaderFlags,						// コンパイルの設定
+			0,									// エフェクトの設定（使わない）
+			pBlob.GetAddressOf(),				// 成功したときのコンパイル結果
+			pErrorBlob.GetAddressOf());			// コンパイルエラーの出力
 
-		// コンパイル失敗時のエラーメッセージを表示
+		// コンパイルに失敗したら、エラーの内容を表示している
 		if (FAILED(hr))
 		{
 			if (pErrorBlob != nullptr) {
@@ -93,7 +93,7 @@ HRESULT Renderer::CompileShader(
 			return E_FAIL;
 		}
 
-		// コンパイル成功時のバイナリデータコピーして呼び出し元に渡す
+		// コンパイルに成功したら、バイナリを呼び出し元へ渡している
 		shaderObject.resize(pBlob->GetBufferSize());
 		memcpy(
 			shaderObject.data(),
@@ -105,18 +105,18 @@ HRESULT Renderer::CompileShader(
 }
 
 //--------------------------------------------------------------------------------------
-// 頂点シェーダーオブジェクトを生成する
+// 頂点シェーダーと、入力レイアウト（頂点の並び方）を作っている
 //--------------------------------------------------------------------------------------
 HRESULT Renderer::CreateVertexShader(ID3D11VertexShader** ppVertexShader, ID3D11InputLayout** ppVertexLayout, D3D11_INPUT_ELEMENT_DESC* pLayout, unsigned int numElements, const char* szFileName)
 {
 	std::vector<unsigned char> shaderObject;
 
-	// ファイルの拡張子に合わせてコンパイル
+	// vs_5_0としてコンパイルしている（入口はmain関数）
 	HRESULT hr = CompileShader(
 		szFileName, "main", "vs_5_0", shaderObject);
 	if (FAILED(hr)) return hr;
 
-	// デバイスを使って頂点シェーダーを作成
+	// 頂点シェーダーを作っている
 	hr = m_pDevice->CreateVertexShader(
 		shaderObject.data(), shaderObject.size(), NULL, ppVertexShader);
 
@@ -124,7 +124,7 @@ HRESULT Renderer::CreateVertexShader(ID3D11VertexShader** ppVertexShader, ID3D11
 	{
 		return hr;
 	}
-	// デバイスを使って頂点レイアウトを作成
+	// 頂点の並び方（入力レイアウト）を、シェーダーの入力と照らし合わせて作っている
 	hr = m_pDevice->CreateInputLayout(
 		pLayout,
 		numElements,
@@ -141,18 +141,18 @@ HRESULT Renderer::CreateVertexShader(ID3D11VertexShader** ppVertexShader, ID3D11
 }
 
 //--------------------------------------------------------------------------------------
-// ピクセルシェーダーオブジェクトを生成する
+// ピクセルシェーダーを作っている
 //--------------------------------------------------------------------------------------
 HRESULT Renderer::CreatePixelShader(ID3D11PixelShader** ppPixelShader, const char* szFileName)
 {
 	std::vector<unsigned char> shaderObject;
 
-	// ファイルの拡張子に合わせてコンパイル
+	// ps_5_0としてコンパイルしている（入口はmain関数）
 	HRESULT hr = CompileShader(
 		szFileName, "main", "ps_5_0", shaderObject);
 	if (FAILED(hr)) return hr;
 
-	// ピクセルシェーダーを生成
+	// ピクセルシェーダーを作っている
 	hr = m_pDevice->CreatePixelShader(
 		shaderObject.data(), shaderObject.size(), nullptr, ppPixelShader);
 	if (FAILED(hr))
@@ -163,22 +163,22 @@ HRESULT Renderer::CreatePixelShader(ID3D11PixelShader** ppPixelShader, const cha
 }
 
 //--------------------------------------------------------------------------------------
-//インデックスバッファを作成
+// インデックスバッファを作っている（中身は後から書き換えない）
 //--------------------------------------------------------------------------------------
 bool Renderer::CreateIndexBuffer(
-	unsigned int indexnum,						// インデックス数
-	void* indexdata,							// インデックスデータ格納メモリ先頭アドレス
-	ID3D11Buffer** pIndexBuffer) {				// インデックスバッファ
+	unsigned int indexnum,						// インデックスの数
+	void* indexdata,							// インデックスデータの先頭アドレス
+	ID3D11Buffer** pIndexBuffer) {				// 作ったバッファを受け取る場所
 
-	// インデックスバッファ生成
+	// インデックスバッファの設定
 	D3D11_BUFFER_DESC bd;
 	D3D11_SUBRESOURCE_DATA InitData;
 
 	ZeroMemory(&bd, sizeof(bd));
-	bd.Usage = D3D11_USAGE_DEFAULT;								// バッファ使用方
-	bd.ByteWidth = sizeof(unsigned int) * indexnum;				// バッファの大き
-	bd.BindFlags = D3D11_BIND_INDEX_BUFFER;						// インデックスバッファ
-	bd.CPUAccessFlags = 0;										// CPUアクセス不要
+	bd.Usage = D3D11_USAGE_DEFAULT;								// GPUだけで読み書きする
+	bd.ByteWidth = sizeof(unsigned int) * indexnum;				// バッファの大きさ
+	bd.BindFlags = D3D11_BIND_INDEX_BUFFER;						// インデックスバッファとして使う
+	bd.CPUAccessFlags = 0;										// CPUからは書き換えない
 
 	ZeroMemory(&InitData, sizeof(InitData));
 	InitData.pSysMem = indexdata;
@@ -193,29 +193,29 @@ bool Renderer::CreateIndexBuffer(
 }
 
 //--------------------------------------------------------------------------------------
-//頂点バッファを作成
+// 頂点バッファを作っている（中身は後から書き換えない）
 //--------------------------------------------------------------------------------------
 bool Renderer::CreateVertexBuffer(
-	unsigned int stride,				// １頂点当たりバイト数
-	unsigned int vertexnum,				// 頂点数
-	void* vertexdata,					// 頂点データ格納メモリ先頭アドレス
-	ID3D11Buffer** pVertexBuffer) {		// 頂点バッファ
+	unsigned int stride,				// 1頂点あたりのバイト数
+	unsigned int vertexnum,				// 頂点の数
+	void* vertexdata,					// 頂点データの先頭アドレス
+	ID3D11Buffer** pVertexBuffer) {		// 作ったバッファを受け取る場所
 
 	HRESULT hr;
 
-	// 頂点バッファ生成
+	// 頂点バッファの設定
 	D3D11_BUFFER_DESC bd;
 	ZeroMemory(&bd, sizeof(bd));
-	bd.Usage = D3D11_USAGE_DEFAULT;				// バッファ使用方法
+	bd.Usage = D3D11_USAGE_DEFAULT;				// GPUだけで読み書きする
 	bd.ByteWidth = stride * vertexnum;			// バッファの大きさ
-	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;	// 頂点バッファ
-	bd.CPUAccessFlags = 0;						// CPUアクセス不要
+	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;	// 頂点バッファとして使う
+	bd.CPUAccessFlags = 0;						// CPUからは書き換えない
 
 	D3D11_SUBRESOURCE_DATA InitData;
 	ZeroMemory(&InitData, sizeof(InitData));
-	InitData.pSysMem = vertexdata;				// バッファの初期値
+	InitData.pSysMem = vertexdata;				// バッファの最初の中身
 
-	hr = m_pDevice->CreateBuffer(&bd, &InitData, pVertexBuffer);		// バッファ生成
+	hr = m_pDevice->CreateBuffer(&bd, &InitData, pVertexBuffer);		// バッファを作っている
 	if (FAILED(hr)) {
 		MessageBox(nullptr, "CreateBuffer(vertex buffer) error", "Error", MB_OK);
 		return false;
@@ -225,29 +225,29 @@ bool Renderer::CreateVertexBuffer(
 }
 
 //--------------------------------------------------------------------------------------
-//頂点バッファを作成(CPU書き込み可能)
+// 頂点バッファを作っている（CPUからMapで書き換えられる）
 //--------------------------------------------------------------------------------------
 bool Renderer::CreateVertexBufferWrite(
-	unsigned int stride,				// １頂点当たりバイト数
-	unsigned int vertexnum,				// 頂点数
-	void* vertexdata,					// 頂点データ格納メモリ先頭アドレス
-	ID3D11Buffer** pVertexBuffer) {		// 頂点バッファ
+	unsigned int stride,				// 1頂点あたりのバイト数
+	unsigned int vertexnum,				// 頂点の数
+	void* vertexdata,					// 頂点データの先頭アドレス
+	ID3D11Buffer** pVertexBuffer) {		// 作ったバッファを受け取る場所
 
 	HRESULT hr;
 
-	// 頂点バッファ生成
+	// 頂点バッファの設定
 	D3D11_BUFFER_DESC bd;
 	ZeroMemory(&bd, sizeof(bd));
-	bd.Usage = D3D11_USAGE_DYNAMIC;							// バッファ使用方法
+	bd.Usage = D3D11_USAGE_DYNAMIC;							// CPUから毎フレーム書き換える
 	bd.ByteWidth = stride * vertexnum;						// バッファの大きさ
-	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;				// 頂点バッファ
-	bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;				// CPUアクセス可能
+	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;				// 頂点バッファとして使う
+	bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;				// CPUから書き込める
 
 	D3D11_SUBRESOURCE_DATA InitData;
 	ZeroMemory(&InitData, sizeof(InitData));
-	InitData.pSysMem = vertexdata;							// バッファの初期値
+	InitData.pSysMem = vertexdata;							// バッファの最初の中身
 
-	hr = m_pDevice->CreateBuffer(&bd, &InitData, pVertexBuffer);		// バッファ生成
+	hr = m_pDevice->CreateBuffer(&bd, &InitData, pVertexBuffer);		// バッファを作っている
 	if (FAILED(hr)) {
 		MessageBox(nullptr, "CreateBuffer(vertex buffer) error", "Error", MB_OK);
 		return false;
@@ -257,20 +257,20 @@ bool Renderer::CreateVertexBufferWrite(
 }
 
 //--------------------------------------------------------------------------------------
-//コンスタントバッファを作成
+// 定数バッファを作っている（UpdateSubresourceで書き換える）
 //--------------------------------------------------------------------------------------
 bool Renderer::CreateConstantBuffer(
-	unsigned int bytesize,					// コンスタントバッファサイズ
-	ID3D11Buffer** pConstantBuffer) {			// コンスタントバッファ
+	unsigned int bytesize,					// 定数バッファの大きさ（16バイトの倍数）
+	ID3D11Buffer** pConstantBuffer) {			// 作ったバッファを受け取る場所
 
-	// コンスタントバッファ生成
+	// 定数バッファの設定
 	D3D11_BUFFER_DESC bd;
 
 	ZeroMemory(&bd, sizeof(bd));
-	bd.Usage = D3D11_USAGE_DEFAULT;								// バッファ使用方法
-	bd.ByteWidth = bytesize;									// バッファの大き
-	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;					// コンスタントバッファ
-	bd.CPUAccessFlags = 0;										// CPUアクセス不要
+	bd.Usage = D3D11_USAGE_DEFAULT;								// GPUが読み、CPUからはUpdateSubresourceで書き換える
+	bd.ByteWidth = bytesize;									// バッファの大きさ
+	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;					// 定数バッファとして使う
+	bd.CPUAccessFlags = 0;										// CPUから直接は書き込まない
 
 	HRESULT hr = m_pDevice->CreateBuffer(&bd, nullptr, pConstantBuffer);
 	if (FAILED(hr)) {
@@ -281,6 +281,7 @@ bool Renderer::CreateConstantBuffer(
 	return true;
 }
 
+// 描画先をバックバッファに戻し、ビューポートを描画解像度の全体にしている
 void Renderer::SetBackBufferRenderTarget()
 {
 	m_pDeviceContext->OMSetRenderTargets(
@@ -297,6 +298,7 @@ void Renderer::SetBackBufferRenderTarget()
     m_pDeviceContext->RSSetViewports(1, &viewport);
 }
 
+// バックバッファを指定の色で消している
 void Renderer::ClearBackBuffer(float r, float g, float b, float a)
 {
 	float clearColor[4] = { r, g, b, a };
@@ -307,6 +309,7 @@ void Renderer::ClearBackBuffer(float r, float g, float b, float a)
 	);
 }
 
+// 深度バッファを一番奥（1.0）で消している
 void Renderer::ClearDepth()
 {
 	m_pDeviceContext->ClearDepthStencilView(
@@ -318,20 +321,20 @@ void Renderer::ClearDepth()
 }
 
 //--------------------------------------------------------------------------------------
-//コンスタントバッファを作成(CPU書き込み可能)
+// 定数バッファを作っている（CPUからMapで書き換えられる）
 //--------------------------------------------------------------------------------------
 bool Renderer::CreateConstantBufferWrite(
-	unsigned int bytesize,					// コンスタントバッファサイズ
-	ID3D11Buffer** pConstantBuffer) {			// コンスタントバッファ
+	unsigned int bytesize,					// 定数バッファの大きさ（16バイトの倍数）
+	ID3D11Buffer** pConstantBuffer) {			// 作ったバッファを受け取る場所
 
-	// コンスタントバッファ生成
+	// 定数バッファの設定
 	D3D11_BUFFER_DESC bd;
 
 	ZeroMemory(&bd, sizeof(bd));
-	bd.Usage = D3D11_USAGE_DYNAMIC;							// バッファ使用方法
-	bd.ByteWidth = bytesize;									// バッファの大き
-	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;					// コンスタントバッファ
-	bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;					// CPUアクセス可能
+	bd.Usage = D3D11_USAGE_DYNAMIC;							// CPUから毎フレーム書き換える
+	bd.ByteWidth = bytesize;									// バッファの大きさ
+	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;					// 定数バッファとして使う
+	bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;					// CPUから書き込める
 
 	HRESULT hr = m_pDevice->CreateBuffer(&bd, nullptr, pConstantBuffer);
 	if (FAILED(hr)) {

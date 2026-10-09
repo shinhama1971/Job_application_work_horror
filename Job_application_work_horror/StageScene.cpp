@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: 1面のステージ配置、ヒューズ探索、電力復旧、出口までの進行を管理します。
-// 主な技術: シーン構成、オブジェクト配置、進行状態、環境ストーリーテリング
+// ファイルの役割: 1面のシーンの初期化と、毎フレームの進行の中心（各演出・仕組みの更新を順に呼ぶ）を担当している。
+// 主な技術: Sceneの処理を複数のファイルに分ける構成、進行の状態の管理、周りの物で物語を伝える演出
 // ============================================================================
 
 #include "StageScene.h"
@@ -24,26 +24,29 @@
 
 using namespace DirectX::SimpleMath;
 
+// 作るときに初期化している
 StageScene::StageScene()
 {
     Init();
 }
 
+// 壊すときに後片付けをしている
 StageScene::~StageScene()
 {
     Uninit();
 }
 
-// 1面で必要な床、壁、照明、アイテム、進行用Triggerをまとめて配置します。
+// 1面で必要な床・壁・照明・アイテム・進行用のObjectをまとめて配置し、各仕組みを準備している。
 void StageScene::Init()
 {
     Core::Game* game = Core::Game::GetInstance();
-    // 1面は長く放置された施設なので、壁にパネルの継ぎ目・ひび・水の垂れた跡・カビを出します。
+    // 1面は長く放置された施設なので、壁にパネルの継ぎ目・ひび・水の垂れた跡・カビを出している。
     Renderer::SetWallWeathering(1.0f);
     game->GetPostProcess()->SetVolumetricLight(true);
     game->GetPostProcess()->SetLensDistortionStrength(0.20f);
     game->GetPostProcess()->SetFilmGradeStrength(0.52f);
     game->GetPostProcess()->SetLensDirtStrength(0.10f);
+    // 進行の状態をすべて最初に戻している
     m_CorridorLoopCount = 0;
     m_LastFuseCount = game->GetItemCount();
     m_FuseNoticeTimer = 0.0f;
@@ -68,29 +71,31 @@ void StageScene::Init()
     m_TensionPulse.Reset();
     m_ProgressHintTimer = 0.0f;
 
-    // 壁・照明・ヒューズ・扉などの配置はStage1Layoutが担当し、使うObjectのポインタをまとめて返します。
+    // 壁・照明・ヒューズ・扉などの配置はStage1Layoutが担当し、使うObjectのポインタをまとめて返している。
     m_Objects = Stage1Layout::Build(*game);
+    // 壁の文字・暗証番号の扉・隠し部屋・西棟の仕組みに、配置したObjectを渡している
     m_WallWritings.Init(m_Objects.writings);
     m_KeypadDoor.Init(m_Objects.keypad);
     m_HiddenRoom.Init(m_Objects.hiddenRoom);
-    // 部屋の角の暗がり。床（y=-100）と天井の下面（y≒-48.5）の高さと、建物の壁の形を渡します。
+    m_WestWing.Init(m_Objects.westWing);
+    // 部屋の角の暗がり。床（y=-100）と天井の下面（y≒-48.5）の高さと、建物の壁の形を渡している。
     Renderer::SetRoomOcclusion(
         m_Objects.wallFootprints.data(),
         static_cast<unsigned int>(m_Objects.wallFootprints.size()),
         -100.0f, -48.5f, 0.55f);
 
-    // シーン変更後の初回描画前にカメラとライトを更新します。
-    // ImGuiでゲームを停止した場合も、面全体が黒くなることを防ぎます。
+    // シーンを変えた後の最初の描画の前に、カメラとライトを更新している。
+    // ImGuiでゲームを止めた場合も、面全体が黒くなるのを防いでいる。
     m_Objects.player->Update();
 
     m_Hud.Init();
-    // 監視カメラ巡回は配置済みのObjectを使うため、配置の後に準備します。
+    // 監視カメラの巡回は配置したObjectを使うため、配置の後に準備している。
     m_Surveillance.Init(m_Objects);
     SetupPracticalLights();
 }
 
-// 看板や表示灯が自分の発光色で周囲の床と壁を照らすようにします。
-// 天井照明だけだった頃は光源数の上限(8個)で足せなかった小さな光です。
+// 看板やランプが、自分の光る色で周りの床と壁を照らすようにしている。
+// 天井照明だけだった頃は、光源の数の上限（8個）のせいで足せなかった小さな光。
 void StageScene::SetupPracticalLights()
 {
     m_Objects.exitSign->SetGlowLight(60.0f, 2.2f);
@@ -102,7 +107,7 @@ void StageScene::SetupPracticalLights()
     }
 }
 
-// ヒューズ数と電力状態を基準に目的表示とイベント段階を更新します。
+// ヒューズの数と電力の状態をもとに、目的表示と演出の段階を更新している。
 void StageScene::Update()
 {
     Player* player =
@@ -113,15 +118,15 @@ void StageScene::Update()
         return;
     }
 
-    // 映像確認中と捕獲中は操作不能なので、操作可否の判定より前に更新します。
+    // 映像の確認中と捕まっている間は操作できないので、操作できるかの判定より前に更新している。
     if (m_Surveillance.Update(*player, Application::GetDeltaTime()))
     {
-        // 巡回をすべて終えたら、記録端末の完了通知を出します。
+        // 巡回をすべて終えたら、記録端末の完了の知らせを出している。
         m_EvidenceNoticeTimer = 3.2f;
     }
-    // 暗証番号の入力画面も操作不能の間に入力を受け取るため、操作可否の判定より前に更新します。
+    // 暗証番号の入力画面も、操作できない間に入力を受け取るため、操作できるかの判定より前に更新している。
     m_KeypadDoor.Update(*player, Application::GetDeltaTime());
-    // 操作できない間（映像確認・捕獲中）も呼び、途中の物音を打ち切れるようにします。
+    // 操作できない間（映像の確認・捕まっている間）も呼び、途中の物音を打ち切れるようにしている。
     UpdateAmbientSounds();
     if (!player->CanControl())
     {
@@ -130,6 +135,7 @@ void StageScene::Update()
 
     Core::Game* game = Core::Game::GetInstance();
     const float deltaTime = Application::GetDeltaTime();
+    // 経過時間と、進行が止まっている時間を数えている。H（LB）が押されたら、すぐに強いヒントを出している
     m_StageVisualTimer += deltaTime;
     m_ProgressHintTimer += deltaTime;
     if (Input::GetKeyTrigger(VK_H) ||
@@ -139,6 +145,7 @@ void StageScene::Update()
         Input::SetVibration(2, 0.04f);
     }
 
+    // 各知らせの残り時間を減らしている
     m_FuseNoticeTimer = (std::max)(
         0.0f, m_FuseNoticeTimer - deltaTime);
     m_FuseWatcherNoticeTimer = (std::max)(
@@ -149,6 +156,7 @@ void StageScene::Update()
         0.0f, m_EvidenceNoticeTimer - deltaTime);
     m_StorageScareNoticeTimer = (std::max)(
         0.0f, m_StorageScareNoticeTimer - deltaTime);
+    // ヒューズを拾った瞬間、知らせを出し、画面の光と振動で伝え、廊下に影を出している
     const int currentFuseCount = game->GetItemCount();
     if (currentFuseCount > m_LastFuseCount)
     {
@@ -164,6 +172,7 @@ void StageScene::Update()
         StartFuseWatcher(currentFuseCount);
     }
 
+    // 電力が戻ったら、ヒューズの後に出る影を消している
     if (game->IsPowerRestored())
     {
         ShadowMan* watcher = m_Objects.fuseWatcher;
@@ -171,6 +180,7 @@ void StageScene::Update()
         m_FuseWatcherState = 0;
     }
 
+    // 非常用充電器を使ったら、電池を回復する代わりに、音で廊下に影を呼んでいる
     FuseBox* emergencyCharger =
         m_Objects.emergencyCharger;
     if (!m_ChargerHandled && emergencyCharger != nullptr &&
@@ -192,6 +202,7 @@ void StageScene::Update()
         Input::SetVibration(6, 0.14f);
     }
 
+    // 各演出と仕組みを順に更新している
     UpdateCorridorLoop(*player);
     UpdateEntranceThresholdEvent(*player);
     UpdateStorageScare(*player);
@@ -201,8 +212,17 @@ void StageScene::Update()
     UpdateExitOmen(*player);
     UpdateWallWritings(*player);
     m_HiddenRoom.Update(*player, deltaTime, m_KeypadDoor.IsSolved());
+    // 西棟の進行と、水の滴る音・背後で水の中を歩く音などの物音。
+    m_WestWingCues.clear();
+    m_WestWing.Update(*player, deltaTime, game->GetCamera()->GetForward(), m_WestWingCues);
+    for (const AmbientSoundCue& cue : m_WestWingCues)
+    {
+        game->PlayAudioCueAt(
+            cue.Label, cue.Position, cue.Pitch, cue.Volume, cue.MinimumOcclusion);
+    }
     UpdateTensionPulse(*player, deltaTime);
 
+    // 出口の扉：送電が終わるまで鍵をかけ、開いた扉を通り抜けたら脱出を始めている
     Door* stageExitDoor = m_Objects.exitDoor;
     ExitTrigger* stageExit = m_Objects.exitTrigger;
     const bool exitPowerReady = m_PowerSequence.IsExitComplete();
@@ -220,6 +240,7 @@ void StageScene::Update()
         }
     }
 
+    // 出口の表示：送電が終わるまで赤く、終わったら緑で脈打たせている
     Wall* stageExitSign = m_Objects.exitSign;
     if (stageExitSign != nullptr)
     {
@@ -242,6 +263,7 @@ void StageScene::Update()
         }
     }
 
+    // 扉のランプ：出口の前兆の間は速く点滅させている
     Wall* exitIndicator = m_Objects.doorIndicator;
     if (exitIndicator != nullptr)
     {
@@ -269,6 +291,7 @@ void StageScene::Update()
         }
     }
 
+    // 画面効果：電池の少なさ・走っているか・ループ廊下の奥への近さで、ノイズと周辺減光を強めている
     float lowBattery = (25.0f - player->GetBattery()) / 25.0f;
     if (lowBattery < 0.0f) lowBattery = 0.0f;
     if (lowBattery > 1.0f) lowBattery = 1.0f;
@@ -281,8 +304,8 @@ void StageScene::Update()
     const float sprintStress = player->IsSprinting() ? 1.0f : 0.0f;
     const Vector3 playerPosition = player->GetPosition();
 
-    // ループ廊下の奥ほど圧迫感を強め、周回数に応じて基準値も上げます。
-    // 通電後は効果を解除し、状況が変わったことを伝えます。
+    // ループ廊下の奥ほど圧迫感を強め、周回の数に応じて基準の値も上げている。
+    // 電力が戻った後は効果を外し、状況が変わったことを伝えている。
     const float corridorDepth = (std::clamp)(
         (playerPosition.z - 90.0f) / 190.0f,
         0.0f,
@@ -306,8 +329,8 @@ void StageScene::Update()
             1.0f);
     game->GetPostProcess()->SetCorridorTension(corridorTension);
 
-    // ホラーらしい暗さを保ちつつ、懐中電灯なしでも時間経過で目が慣れ、
-    // 最低限移動できる明るさへ調整します。
+    // ホラーらしい暗さを保ちつつ、懐中電灯なしでも時間とともに目が慣れ、
+    // 最低限動ける明るさにしている。
     const float targetExposure = game->IsPowerRestored()
         ? 1.12f + (1.01f - 1.12f) * powerBlend
         : (player->IsFlashlightOn() ? 1.04f : 1.15f);
@@ -329,14 +352,16 @@ void StageScene::Update()
     game->GetPostProcess()->SetLensDirtStrength(
         0.10f + corridorTension * 0.12f);
 
+    // 調べる対象を選び、Eキー（A）で調べている
     m_InteractionSystem.Update(*player);
 }
 
 
 
+// 描画の設定と画面効果を普段の値に戻し、配置で作ったObjectを破棄している
 void StageScene::Uninit()
 {
-    // 他の面の壁は従来の見た目に戻します（Sceneの切り替えは古いSceneの破棄が先です）。
+    // ほかの面の壁は前の見た目に戻している（シーンを切り替えるときは、古いSceneの破棄が先に行われる）。
     Renderer::SetWallWeathering(0.0f);
     Renderer::SetRoomOcclusion(nullptr, 0, 0.0f, 0.0f, 0.0f);
     Core::Game::GetInstance()->GetPostProcess()->SetAtmosphere(0.18f, 0.55f);
@@ -351,7 +376,7 @@ void StageScene::Uninit()
 
     Core::Game* game = Core::Game::GetInstance();
 
-    // Stage1Layoutが生成時に記録した名前の一覧で破棄します（名前を書く場所を1か所にするため）。
+    // Stage1Layoutが作るときに記録した名前の一覧で破棄している（名前を書く場所を1か所にするため）。
     for (const std::string& name : m_Objects.objectNames)
     {
         game->DestroyObj(name);

@@ -1,7 +1,8 @@
 // ============================================================================
-// シェーダーの役割: 懐中電灯の光芒と霧による散乱を画面上へ合成します。
+// シェーダーの役割: 懐中電灯の光の筋（空気中の霧やちりで光が見える散乱）を、画面に重ねている。
 // ============================================================================
 
+// 頂点シェーダーから受け取る値
 struct PS_IN
 {
     float4 pos : SV_POSITION;
@@ -9,6 +10,7 @@ struct PS_IN
     float2 uv : TEXCOORD0;
 };
 
+// 画面効果の値（FullScreenQuad.cppのTimeBufferと同じ並びの前半）
 cbuffer PostProcessBuffer : register(b0)
 {
     float time;
@@ -25,6 +27,7 @@ cbuffer PostProcessBuffer : register(b0)
     float exposurePadding;
 };
 
+// 懐中電灯（common.hlslのLIGHTと同じ並び。b3）
 struct LIGHT
 {
     bool Enable;
@@ -42,15 +45,18 @@ cbuffer LightBuffer : register(b3)
     LIGHT Light;
 };
 
+// シャドウマップの行列とパラメーター（b8。z=near、w=farを使っている）
 cbuffer ShadowBuffer : register(b8)
 {
     matrix ShadowViewProjection;
     float4 ShadowParameters;
 };
 
+// 懐中電灯から見た深度（シャドウマップ、t5）とサンプラー
 Texture2D<float> FlashlightDepth : register(t5);
 SamplerState LinearSampler : register(s0);
 
+// 0〜1の疑似乱数と、それをなめらかにつないだノイズ
 float Hash(float2 value)
 {
     float3 value3 = frac(float3(value.x, value.y, value.x) * 0.1031f);
@@ -75,6 +81,7 @@ float ValueNoise(float2 value)
     return lerp(bottom, top, local.y);
 }
 
+// シャドウマップの深度（0〜1）を、実際の距離に戻している
 float LinearizeDepth(float depth, float nearPlane, float farPlane)
 {
     return nearPlane * farPlane /
@@ -83,12 +90,13 @@ float LinearizeDepth(float depth, float nearPlane, float farPlane)
 
 float4 main(PS_IN input) : SV_Target
 {
+    // ライトが消えているときや、効果が0のときは何も足さない
     if (!Light.Enable || !Light.FlashlightEnabled || volumeIntensity <= 0.0f)
     {
         return 0.0f;
     }
 
-    // カメラレイを復元し、正方形のスポットライト深度マップへ投影します。
+    // カメラからの光線を求め、正方形のスポットライトの深度マップへ投影している（懐中電灯はカメラと同じ位置・向き）。
     const float2 screenNdc = float2(
         input.uv.x * 2.0f - 1.0f,
         1.0f - input.uv.y * 2.0f);
@@ -106,6 +114,7 @@ float4 main(PS_IN input) : SV_Target
         return 0.0f;
     }
 
+    // その方向で、光が何かに当たるまでの距離を求めている
     const float depth = FlashlightDepth.SampleLevel(
         LinearSampler,
         shadowUV,
@@ -115,19 +124,21 @@ float4 main(PS_IN input) : SV_Target
         ShadowParameters.z,
         ShadowParameters.w);
 
+    // 光の円錐の中心ほど濃くしている
     const float radial = saturate(1.0f - length(shadowNdc));
     const float softBeam = radial * radial * (3.0f - 2.0f * radial);
-    // 平方根応答で壁近くの短い光線も見せつつ、長い廊下では散乱光を多く蓄積します。
+    // 平方根で変化させ、壁の近くの短い光線も見せつつ、長い廊下では散乱した光を多くためている。
     const float visibleLength = sqrt(saturate(
         (occluderDistance - 2.0f) / 120.0f));
+    // 画面の下の方（床）では薄くしている
     const float floorFade = 1.0f - smoothstep(0.62f, 0.98f, input.uv.y);
 
-    // 連続したスクリーン空間の流れを使い、毎フレーム乱数を変えるテレビノイズ状のちらつきを避けます。
-    // 速度の異なる二層で、光円錐内の異なる奥行きに漂う粒子を表現します。
+    // 連続した画面の流れを使い、毎フレーム乱数を変えるテレビのノイズのようなちらつきを避けている。
+    // 速さの違う2つの層で、光の円錐の中の違う奥行きに漂う粒を表している。
     const float2 dustFlow = float2(time * 0.42f, -time * 0.24f);
     const float nearDustNoise = ValueNoise(
         input.pos.xy * 0.045f + dustFlow);
-    // 遠い粒は補間不要のセルノイズで十分なため、4回のハッシュを1回にします。
+    // 遠くの粒は補間しないセルのノイズで十分なため、4回の乱数の計算を1回にしている。
     const float farDustNoise = Hash(floor(
         input.pos.xy * 0.019f - dustFlow * 0.57f + 19.7f));
     const float nearDust =
@@ -138,16 +149,19 @@ float4 main(PS_IN input) : SV_Target
     const float slowVariation =
         sin(input.uv.y * 38.0f - time * 1.7f) * 0.5f + 0.5f;
 
+    // 光の筋の濃さ：驚かせる演出や緊張が高いほど濃くしている
     float density =
         (0.032f + slowVariation * 0.012f + driftingDust) *
         softBeam * visibleLength * floorFade * volumeIntensity;
     density *= 1.0f + horrorPulseStrength * 0.32f;
     density *= 1.0f + corridorTension * 0.48f;
+    // 光の筋の色：普段は暖かい色、緊張が高いと青白くしている
     const float3 beamColor = lerp(
         float3(1.0f, 0.78f, 0.50f),
         float3(0.76f, 0.84f, 0.88f),
         corridorTension * 0.34f) *
         saturate(Light.Intensity / 1.35f);
 
+    // 色と濃さを返している（アルファブレンドではなく加算合成で重ねている）
     return float4(beamColor, saturate(density));
 }

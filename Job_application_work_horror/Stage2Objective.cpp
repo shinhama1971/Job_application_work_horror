@@ -1,6 +1,6 @@
 ﻿// ============================================================================
-// ファイルの役割: 2面の画面上部に出す目的・通知・ヒントの文章を、現在の状態から1つ選びます。
-// 主な技術: 描画・入力に依存しない純粋関数、優先順位付きの表示選択
+// ファイルの役割: 2面の画面の左上に出す目的・知らせ・ヒントの文章を、今の状態から1つ選んでいる。
+// 主な技術: 描画・入力に依存しない関数（同じ入力なら必ず同じ結果）、優先順位を付けた表示の選択
 // ============================================================================
 
 #include "Stage2Objective.h"
@@ -9,13 +9,13 @@
 
 namespace
 {
-    // この周回で探す異変が、まだ見つかっていないか。
+    // この周回で探す異変が、まだ見つかっていないかを返している。
     bool IsSearchingAnomaly(const Stage2ObjectiveInput& in)
     {
         return in.requiredAnomaly != Stage2Anomaly::None && !in.requiredAnomalyFound;
     }
 
-    // 15秒止まったときのヒント。どの異変を探す周回かは毎回変わるため、ここで初めて場所と方法を伝えます。
+    // 15秒止まったときのヒント。どの異変を探す周回かは毎回変わるため、ここで初めて場所と方法を伝えている。
     std::string_view GetAnomalyHint(const Stage2ObjectiveInput& in)
     {
         switch (in.requiredAnomaly)
@@ -36,7 +36,7 @@ namespace
         return "ヒント 廊下の変化を探す";
     }
 
-    // 30秒止まったときのヒント。解き方をそのまま伝えます。
+    // 30秒止まったときのヒント。解き方をそのまま伝えている。
     std::string_view GetAnomalyStrongHint(const Stage2ObjectiveInput& in)
     {
         switch (in.requiredAnomaly)
@@ -58,6 +58,7 @@ namespace
 
 std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
 {
+    // 周回ごとの普段の目的（扉が閉まっているとき・開いたとき）
     constexpr std::string_view closedLoopObjectives[] =
     {
         "奥のドアを開ける 1回目",
@@ -81,8 +82,8 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
     }
     if (IsSearchingAnomaly(in))
     {
-        // どの異変が出るかは毎回変わるため、普段の目的では答えを言わず、探させます。
-        // 解き方の途中まで進んでいるときだけ、次の一手を伝えます。
+        // どの異変が出るかは毎回変わるため、普段の目的では答えを言わず、探させている。
+        // 解き方の途中まで進んでいるときだけ、次の一手を伝えている。
         if (in.requiredAnomaly == Stage2Anomaly::FalseDoor && in.falseDoorObserved)
         {
             objective = "偽物のドアから視線を外す";
@@ -104,6 +105,7 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
     {
         objective = "奥の異常確認スイッチを押す";
     }
+    // 3周目以降：信号盤を青・黄・赤の順に操作する。2回以上間違えたら、助けが入っていることを伝えている
     else if (in.loopCount >= 3 && !in.signalPuzzleComplete)
     {
         if (in.signalPuzzleStep == 0)
@@ -121,6 +123,7 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
             objective = "信号復旧 赤へ戻る 背後の影はライトで追い払う";
         }
     }
+    // ここから下は、上に書いたものほど優先して、普段の目的を上書きしている
     if (in.escaping)
     {
         objective = "脱出中";
@@ -208,6 +211,7 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
     {
         objective = "足音が響いている 歩いて静める";
     }
+    // パズルの間違いの知らせ（種類によって、どう直せばよいかを伝えている）
     else if (in.puzzleFeedbackVisible)
     {
         if (in.puzzleFeedbackType == 5)
@@ -242,6 +246,7 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
             }
         }
     }
+    // 最後のイベント（影を見た罰・走って逃げる・出口が開いた）
     else if (in.finalGazePenalty)
     {
         objective = "それを見てはいけない";
@@ -264,6 +269,7 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
             ? "奥のドアを開ける"
             : "開いた出口を通り抜ける";
     }
+    // 異変を見つけたときの知らせ
     else if (in.scratchNotice)
     {
         objective = "止まらず奥のドアへ進む";
@@ -286,6 +292,7 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
     {
         objective = "音の出どころを見つけた 奥のスイッチへ進む";
     }
+    // 周回が変わったときの知らせ
     else if (in.loopNotice)
     {
         if (in.loopCount == 0) objective = "1回目 奥のドアを開ける";
@@ -303,6 +310,7 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
             ? "信号が復旧した 廊下の中央へ進む"
             : "奥の青い信号盤から復旧する";
     }
+    // 30秒止まっていたら、場所と方法がはっきり分かるヒントを出している
     else if (in.progressHintSeconds >= 30.0f)
     {
         if (IsSearchingAnomaly(in))
@@ -340,6 +348,7 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
             objective = "ヒント まっすぐ進み奥のドアを開ける";
         }
     }
+    // 15秒止まっていたら、方向を示す軽いヒントを出している
     else if (in.progressHintSeconds >= 15.0f)
     {
         if (IsSearchingAnomaly(in))

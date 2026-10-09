@@ -1,8 +1,8 @@
 ﻿// ============================================================================
 // ファイルの役割: 画面をタイルに分け、タイルごとに影響する点光源だけを
-//                 Compute Shaderで絞り込む「タイルベースライティング」を管理します。
-// 主な技術: Compute Shader、StructuredBuffer(SRV/UAV)、Group Shared Memory、
-//           InterlockedAdd、タイル視錐台と球の交差判定
+//                 Compute Shaderで絞り込む「タイルベースライティング」を管理している。
+// 主な技術: Compute Shader、StructuredBuffer(SRV/UAV)、グループ共有メモリ、
+//           InterlockedAdd、タイルの視錐台と球の交差判定
 // ============================================================================
 
 #include "TiledLighting.h"
@@ -18,12 +18,13 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
-    // ピクセルシェーダーが参照するスロット。既存のテクスチャ(t0〜t6)と重ならない番号です。
+    // ピクセルシェーダーが参照するスロット。今あるテクスチャ(t0〜t6)と重ならない番号にしている。
     constexpr UINT PointLightSlot = 10;
     constexpr UINT TileIndexSlot = 11;
     constexpr UINT TileCountSlot = 12;
     constexpr UINT ShadingParamsSlot = 6;
 
+    // StructuredBuffer（構造体の配列のバッファ）を作っている
     bool CreateStructuredBuffer(
         UINT stride,
         UINT count,
@@ -36,13 +37,13 @@ namespace
         desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
         if (writableByGpu)
         {
-            // Compute Shaderが書き込み(UAV)、ピクセルシェーダーが読み取る(SRV)バッファです。
+            // Compute Shaderが書き込み(UAV)、ピクセルシェーダーが読み取る(SRV)バッファ。
             desc.Usage = D3D11_USAGE_DEFAULT;
             desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
         }
         else
         {
-            // 毎フレームCPUから書き換えるライト一覧は、読み取り専用のSRVにします。
+            // 毎フレームCPUから書き換えるライトの一覧は、読み取り専用のSRVにしている。
             desc.Usage = D3D11_USAGE_DYNAMIC;
             desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
             desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -50,6 +51,7 @@ namespace
         return SUCCEEDED(Renderer::GetDevice()->CreateBuffer(&desc, nullptr, buffer));
     }
 
+    // バッファの読み取り口（SRV）を作っている
     bool CreateBufferSRV(ID3D11Buffer* buffer, UINT count,
         ID3D11ShaderResourceView** srv)
     {
@@ -62,6 +64,7 @@ namespace
             Renderer::GetDevice()->CreateShaderResourceView(buffer, &desc, srv));
     }
 
+    // バッファの書き込み口（UAV）を作っている
     bool CreateBufferUAV(ID3D11Buffer* buffer, UINT count,
         ID3D11UnorderedAccessView** uav)
     {
@@ -74,6 +77,7 @@ namespace
             Renderer::GetDevice()->CreateUnorderedAccessView(buffer, &desc, uav));
     }
 
+    // 定数バッファを作っている
     bool CreateConstantBuffer(UINT size, ID3D11Buffer** buffer)
     {
         D3D11_BUFFER_DESC desc{};
@@ -88,13 +92,14 @@ namespace Effect
 {
     void TiledLighting::Init()
     {
-        // タイル数は描画先（全画面のバックバッファ）の大きさで確保します。
+        // タイルの数は、描画先（全画面のバックバッファ）の大きさで確保している。
         const uint32_t width = (std::max)(Application::GetWidth(), 1u);
         const uint32_t height = (std::max)(Application::GetHeight(), 1u);
         m_MaxTiles = ((width + TileSize - 1) / TileSize) *
             ((height + TileSize - 1) / TileSize);
         const UINT indexCount = m_MaxTiles * MaxLightsPerTile;
 
+        // シェーダーとバッファをまとめて作り、1つでも失敗したら理由を表示して終了している
         const bool created =
             m_CullingShader.Create("shader/tiledLightCullingCS.hlsl") &&
             CreateStructuredBuffer(sizeof(ENVIRONMENT_POINT_LIGHT), MaxLights, false,
@@ -125,6 +130,7 @@ namespace Effect
         SetLights({});
     }
 
+    // ピクセルシェーダーから外してから、全部のバッファを解放している
     void TiledLighting::Uninit()
     {
         ID3D11ShaderResourceView* nullViews[3] = {};
@@ -146,6 +152,7 @@ namespace Effect
         m_UploadedLightCount = 0;
     }
 
+    // ライトの一覧を覚え、上限までをGPUのバッファへ書き込んでいる。最初は全ライトを使う設定にしている
     void TiledLighting::SetLights(const std::vector<ENVIRONMENT_POINT_LIGHT>& lights)
     {
         m_Lights = lights;
@@ -167,17 +174,19 @@ namespace Effect
         BindAllLights();
     }
 
+    // 全ライトを順に計算する設定にしている
     void TiledLighting::BindAllLights()
     {
         UpdateShadingParams(false);
         BindForShading();
     }
 
+    // 本描画の直前に、プレイヤー視点でタイルごとのライトリストを作っている
     void TiledLighting::BuildTiles(const Camera& camera)
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
 
-        // 本描画のビューポートに合わせてタイルを敷きます（左右の黒帯は含めません）。
+        // 本描画のビューポートに合わせてタイルを敷いている（左右の黒帯は含めない）。
         UINT viewportCount = 1;
         D3D11_VIEWPORT viewport{};
         context->RSGetViewports(&viewportCount, &viewport);
@@ -191,6 +200,7 @@ namespace Effect
             --m_TilesY;
         }
 
+        // プレイヤー視点の行列の逆行列を渡し、Compute Shaderがタイルの四隅の向きを求められるようにしている
         Matrix view;
         Matrix projection;
         camera.GetMainMatrices(view, projection);
@@ -206,7 +216,7 @@ namespace Effect
         params.ViewportOffset = m_ViewportOffset;
         context->UpdateSubresource(m_CullingParamsBuffer.Get(), 0, nullptr, &params, 0, 0);
 
-        // 同じバッファをSRVとUAVへ同時に結び付けられないため、先に描画側から外します。
+        // 同じバッファをSRVとUAVに同時に設定できないため、先に描画側から外している。
         ID3D11ShaderResourceView* nullViews[3] = {};
         context->PSSetShaderResources(PointLightSlot, 3, nullViews);
 
@@ -219,9 +229,10 @@ namespace Effect
             m_TileIndexUAV.Get(), m_TileCountUAV.Get() };
         context->CSSetUnorderedAccessViews(0, 2, uavs, nullptr);
 
-        // 1タイル = 1スレッドグループ。グループ内の64スレッドでライトを分担して判定します。
+        // 1タイル = 1スレッドグループ。グループ内の64スレッドで、ライトを分担して判定している。
         context->Dispatch(m_TilesX, m_TilesY, 1);
 
+        // Compute Shaderからバッファを外し、ピクセルシェーダーがタイルのリストを使う設定にしている
         ID3D11UnorderedAccessView* nullUAVs[2] = {};
         context->CSSetUnorderedAccessViews(0, 2, nullUAVs, nullptr);
         ID3D11ShaderResourceView* nullSRV = nullptr;
@@ -232,6 +243,7 @@ namespace Effect
         BindForShading();
     }
 
+    // ピクセルシェーダーへ渡す値（ライトの数・タイルのリストを使うか・タイルの数・描く範囲）を更新している
     void TiledLighting::UpdateShadingParams(bool tiled)
     {
         ShadingParams params{};
@@ -244,6 +256,7 @@ namespace Effect
             m_ShadingParamsBuffer.Get(), 0, nullptr, &params, 0, 0);
     }
 
+    // b6に定数バッファを、t10〜t12にライトの一覧・タイルのリスト・タイルごとの数を設定している
     void TiledLighting::BindForShading()
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();

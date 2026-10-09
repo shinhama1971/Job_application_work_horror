@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: 露出、ブルーム、CRT、霧など画面全体のシェーダー演出を統括します。
-// 主な技術: Render To Texture、Compute Shader、Ping-Pong Blur、トーン調整
+// ファイルの役割: 露出・ブルーム・ブラウン管風の効果・光の筋など、画面全体に掛けるシェーダーの演出をまとめて管理している。
+// 主な技術: Render To Texture、Compute Shader、横と縦に分けたぼかし（2枚のテクスチャを交互に使う）、明るさと色の調整
 // ============================================================================
 
 #include "PostProcess.h"
@@ -13,7 +13,7 @@
 
 namespace Effect
 {
-    // 中間RenderTextureと各シェーダーを一度だけ生成します。
+    // 作業用のRenderTextureと各シェーダーを一度だけ作っている。
     void PostProcess::Init()
     {
         m_EnableNoise = true;
@@ -45,10 +45,11 @@ namespace Effect
             Application::GetHeight()
         );
 
-        // ブルームは4分の1解像度で処理します。元画面は拡大しないため、
-        // 物体の輪郭自体は鮮明なまま発光部分だけが外側へ滲みます。
+        // ブルームは縦横1/4の解像度で処理している。元の画面は拡大しないため、
+        // 物の輪郭そのものははっきりしたまま、光っている部分だけが外側へにじむ。
         const int bloomWidth = (Application::GetWidth() + 3) / 4;
         const int bloomHeight = (Application::GetHeight() + 3) / 4;
+        // 明るさが1を超える値も残せるよう、16ビットの浮動小数点のテクスチャにしている（コンピュートシェーダーから書けるようUAV付き）
         constexpr DXGI_FORMAT bloomFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
         m_BloomExtractTexture.Init(bloomWidth, bloomHeight, bloomFormat, true);
@@ -62,6 +63,7 @@ namespace Effect
         m_FullScreenQuad.Init();
     }
 
+    // 作った物を解放している
     void PostProcess::Uninit()
     {
         m_BloomVerticalShader.Uninit();
@@ -74,10 +76,11 @@ namespace Effect
         m_RenderTexture.Uninit();
     }
 
-    // target値へ緩やかに補間し、場面転換時の露出やノイズの急変を防ぎます。
+    // 目標値へゆっくり近づけ、場面が変わったときの露出やノイズの急な変化を防いでいる。
     void PostProcess::Update()
     {
         const float deltaTime = Application::GetDeltaTime();
+        // 60fpsで1フレームあたりの近づく割合を、フレームレートが違っても同じ速さになるよう補正している
         const auto response = [deltaTime](float responseAt60Fps)
         {
             return 1.0f - std::pow(
@@ -85,14 +88,14 @@ namespace Effect
         };
         m_Time += deltaTime;
 
-        // 走行や電池警告の強度を平滑化し、画面効果が瞬間的に切り替わらないようにします。
+        // 走ったときや電池の警告の強さをなめらかにし、画面効果が一瞬で切り替わらないようにしている。
         m_NoiseAmount +=
             (m_TargetNoiseAmount - m_NoiseAmount) * response(0.075f);
         m_VignetteStrength +=
             (m_TargetVignetteStrength - m_VignetteStrength) * response(0.075f);
 
-        // 暗所へ入った後はゆっくり目を順応させ、懐中電灯や照明が戻ったときは
-        // 素早く通常露出へ戻すことで、人の視覚変化に近づけます。
+        // 暗い所へ入った後はゆっくり目を慣らし、懐中電灯や照明が戻ったときは
+        // 素早く普段の露出へ戻すことで、人の目の慣れ方に近づけている。
         const float exposureResponse = response(
             m_TargetExposure > m_Exposure ? 0.012f : 0.065f);
         m_Exposure +=
@@ -104,6 +107,7 @@ namespace Effect
         m_SignalInterference +=
             (m_TargetSignalInterference - m_SignalInterference) * response(0.085f);
 
+        // ブルームの一時的な強まり：残り時間の2乗で弱めている（始めは急に、終わりはゆっくり戻る）
         if (m_BloomPulseTimer > 0.0f && m_BloomPulseDuration > 0.0f)
         {
             m_BloomPulseTimer =
@@ -119,6 +123,7 @@ namespace Effect
                 (m_BloomBaseIntensity - m_BloomIntensity) * response(0.12f);
         }
 
+        // 驚かせる演出の強さ：同じく残り時間の2乗で弱めている
         if (m_HorrorPulseTimer > 0.0f && m_HorrorPulseDuration > 0.0f)
         {
             m_HorrorPulseTimer =
@@ -134,6 +139,7 @@ namespace Effect
                 (0.0f - m_HorrorPulseStrength) * response(0.18f);
         }
 
+        // レンズの曇り：なめらかな曲線（smoothstep）で消している
         if (m_LensMoistureTimer > 0.0f && m_LensMoistureDuration > 0.0f)
         {
             m_LensMoistureTimer = (std::max)(
@@ -150,6 +156,7 @@ namespace Effect
         }
     }
 
+    // ブルームを一時的に強めている（peakIntensityは普段の強さを含めた最大値）
     void PostProcess::TriggerBloomPulse(float peakIntensity, float duration)
     {
         m_BloomPulseDuration = (std::max)(duration, 0.01f);
@@ -159,6 +166,7 @@ namespace Effect
         m_BloomIntensity = m_BloomBaseIntensity + m_BloomPulseStrength;
     }
 
+    // 驚かせる演出を始めている
     void PostProcess::TriggerHorrorPulse(float strength, float duration)
     {
         m_HorrorPulseDuration = (std::max)(duration, 0.01f);
@@ -167,6 +175,7 @@ namespace Effect
         m_HorrorPulseStrength = m_HorrorPulsePeak;
     }
 
+    // レンズの曇りを始めている（すでに曇っていれば、強い方を残している）
     void PostProcess::TriggerLensMoisture(float strength, float duration)
     {
         const float clampedStrength = (std::clamp)(strength, 0.0f, 1.0f);
@@ -176,13 +185,13 @@ namespace Effect
         m_LensMoisture = m_LensMoisturePeak;
     }
 
-    // 現行構成では3DシーンをBackBufferへ描くため、画面効果の入力として
-    // 同じ寸法・形式の中間テクスチャへ複製します。
+    // 今の作りでは3DのシーンをBackBufferへ描いているため、画面効果の入力として
+    // 同じ大きさ・形式の作業用テクスチャへ写している。
     void PostProcess::CaptureBackBuffer()
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
 
-        // 出力先に設定中のリソースは安全にコピーできないため、描画先から解除します。
+        // 描画先に設定している資源は安全に写せないため、描画先から外している。
         context->OMSetRenderTargets(0, nullptr, nullptr);
 
         Microsoft::WRL::ComPtr<ID3D11Resource> backBufferResource;
@@ -192,7 +201,7 @@ namespace Effect
         Renderer::SetBackBufferRenderTarget();
     }
 
-    // UAV/SRVの同時バインドを避けながら、抽出と2方向ぼかしを順番に実行します。
+    // UAVとSRVを同時に設定しないようにしながら、明るい部分の抽出と、2方向のぼかしを順番に実行している。
     void PostProcess::RunBloom()
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
@@ -202,6 +211,7 @@ namespace Effect
         const UINT bloomWidth = static_cast<UINT>(m_BloomExtractTexture.GetWidth());
         const UINT bloomHeight = static_cast<UINT>(m_BloomExtractTexture.GetHeight());
 
+        // 1つの段階を実行している：入力をSRV、出力をUAVに設定してDispatchし、終わったら両方を外している
         const auto dispatchPass = [context](
             const ComputeShader& shader,
             ID3D11ShaderResourceView* input,
@@ -220,6 +230,7 @@ namespace Effect
             context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
         };
 
+        // 明るい部分の抽出（8x8の画素を1グループとして処理している）
         dispatchPass(
             m_BloomExtractShader,
             m_RenderTexture.GetSRV(),
@@ -227,6 +238,7 @@ namespace Effect
             (bloomWidth + 7) / 8,
             (bloomHeight + 7) / 8);
 
+        // 横のぼかし（1行を128画素ずつのグループで処理している）
         dispatchPass(
             m_BloomHorizontalShader,
             m_BloomExtractTexture.GetSRV(),
@@ -234,6 +246,7 @@ namespace Effect
             (bloomWidth + 127) / 128,
             bloomHeight);
 
+        // 縦のぼかし（1列を128画素ずつのグループで処理している）
         dispatchPass(
             m_BloomVerticalShader,
             m_BloomHorizontalTexture.GetSRV(),
@@ -245,7 +258,7 @@ namespace Effect
         Renderer::SetBackBufferRenderTarget();
     }
 
-    // ブルーム結果と元画像を合成し、最後にCRT・色調・霧・レンズ汚れを適用します。
+    // ブルームの結果と元の画像を合成し、最後にブラウン管風の効果・色調・光の筋・レンズの汚れを重ねている。
     void PostProcess::Draw(GpuTimer* gpuTimer)
     {
         if (m_EnableBloom)
@@ -266,6 +279,7 @@ namespace Effect
         {
             gpuTimer->SkipPass(GpuPass::Bloom);
         }
+        // ポーズメニューの「演出の強さ」を、各効果の強さに掛けている
         const float effectScale = m_UserEffectScale;
         const float adjustedBloom = (std::clamp)(
             m_BloomIntensity * (0.72f + effectScale * 0.28f),
@@ -273,8 +287,8 @@ namespace Effect
         const float adjustedVignette = (std::clamp)(
             0.45f + (m_VignetteStrength - 0.45f) * effectScale,
             0.0f, 1.0f);
-        // 軽量設定では全画面の光芒パスを止めます。ブルームと懐中電灯本体は
-        // 残るため視認性は変えず、古いGPUで最も重い追加パスだけを省けます。
+        // 軽い設定では、全画面の光の筋の描画を止めている。ブルームと懐中電灯そのものは
+        // 残るため見やすさは変わらず、古いGPUで最も重い追加の描画だけを省ける。
         const float volumeQuality = (std::clamp)(
             (effectScale - 0.75f) / 0.25f, 0.0f, 1.0f);
         m_FullScreenQuad.Draw(

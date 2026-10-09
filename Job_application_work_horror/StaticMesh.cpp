@@ -1,6 +1,6 @@
 ﻿// ============================================================================
-// ファイルの役割: OBJなどの静的モデルを読み込み、描画用データとして保持します。
-// 主な技術: Assimp、GPUバッファ、マテリアル、インデックス描画
+// ファイルの役割: OBJ・FBXなどの動かないモデルを読み込み、描画用のデータ（頂点・インデックス・マテリアル・テクスチャ）として持っている。
+// 主な技術: Assimp、GPUのバッファへ渡す形への変換、マテリアル、インデックスを使った描画
 // ============================================================================
 
 #include	"StaticMesh.h"
@@ -9,28 +9,29 @@
 #include <algorithm>
 #include <cfloat>
 
+// Assimpで読み込んだ結果を、ゲームで使う形（VERTEX_3D・SUBSET・MATERIAL）に変換している
 void StaticMesh::Load(std::string filename, std::string texturedirectory)
 {
-	std::vector<AssimpPerse::SUBSET> subsets{};					// サブセット情報
+	std::vector<AssimpPerse::SUBSET> subsets{};					// サブセットの情報
 	std::vector<std::vector<AssimpPerse::VERTEX>> vertices{};	// 頂点データ（メッシュ単位）
 	std::vector<std::vector<unsigned int>> indices{};			// インデックスデータ（メッシュ単位）
 	std::vector<AssimpPerse::MATERIAL> materials{};				// マテリアル
-	std::vector<std::unique_ptr<Texture>> embededtextures{};	// 内蔵テクスチャ群
+	std::vector<std::unique_ptr<Texture>> embededtextures{};	// 内蔵テクスチャ（今は使っていない）
 
-	// assimpを使用してモデルデータを取得
+	// Assimpを使ってモデルのデータを読み込んでいる
 	AssimpPerse::GetModelData(filename, texturedirectory);
 
-	subsets = AssimpPerse::GetSubsets();		// サブセット情報取得
+	subsets = AssimpPerse::GetSubsets();		// サブセットの情報を取得している
 	vertices = AssimpPerse::GetVertices();		// 頂点データ（メッシュ単位）
 	indices = AssimpPerse::GetIndices();		// インデックスデータ（メッシュ単位）
-	materials = AssimpPerse::GetMaterials();	// マテリアル情報取得
+	materials = AssimpPerse::GetMaterials();	// マテリアルの情報を取得している
 
-	m_textures = AssimpPerse::GetTextures();	// テクスチャ情報取得	
+	m_textures = AssimpPerse::GetTextures();	// テクスチャを受け取っている（所有権もここへ移る）
 	m_modelBounds = {};
 	DirectX::SimpleMath::Vector3 boundsMin(FLT_MAX, FLT_MAX, FLT_MAX);
 	DirectX::SimpleMath::Vector3 boundsMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
-	// 頂点データ作成
+	// 頂点データを作り、ついでに全頂点を囲む箱（最小と最大）を求めている
 	for (const auto& mv : vertices)
 	{
 		for (auto& v : mv)
@@ -52,6 +53,7 @@ void StaticMesh::Load(std::string filename, std::string texturedirectory)
 		}
 	}
 
+	// 全頂点を囲む箱から、中心・半分の大きさ・境界球の半径を求めている
 	if (!m_vertices.empty())
 	{
 		m_modelBounds.Center = (boundsMin + boundsMax) * 0.5f;
@@ -60,7 +62,7 @@ void StaticMesh::Load(std::string filename, std::string texturedirectory)
 		m_modelBounds.IsValid = true;
 	}
 
-	// インデックスデータ作成
+	// インデックスデータを1つの配列につなげている（サブセットの開始位置で区別している）
 	for (const auto& mi : indices)
 	{
 		for (auto& index : mi)
@@ -69,20 +71,20 @@ void StaticMesh::Load(std::string filename, std::string texturedirectory)
 		}
 	}
 
-	// サブセットデータ作成
+	// サブセットのデータを作っている
 	for (const auto& sub : subsets)
 	{
 		SUBSET subset{};
 		subset.VertexBase = sub.VertexBase; // 頂点の開始位置
-		subset.VertexNum = sub.VertexNum; // サブセット内の頂点数
+		subset.VertexNum = sub.VertexNum; // サブセットの中の頂点の数
 		subset.IndexBase = sub.IndexBase;  // インデックスの開始位置
-		subset.IndexNum = sub.IndexNum; // サブセット内のインデックス数
-		subset.MtrlName = sub.mtrlname; // マテリアル名
-		subset.MaterialIdx = sub.materialindex; // マテリアル配列のインデックス
+		subset.IndexNum = sub.IndexNum; // サブセットの中のインデックスの数
+		subset.MtrlName = sub.mtrlname; // マテリアルの名前
+		subset.MaterialIdx = sub.materialindex; // マテリアルの配列の番号
 		m_subsets.emplace_back(subset);
 	}
 
-	// マテリアルデータ作成
+	// マテリアルのデータを作っている（テクスチャの名前があれば、テクスチャを使う設定にしている）
 	for (const auto& m : materials)
 	{
 		MATERIAL material{};

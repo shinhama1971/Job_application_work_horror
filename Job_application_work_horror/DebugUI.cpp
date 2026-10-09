@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: ImGuiによるデバッグ表示と、ライティング・演出値の実行時調整を提供します。
-// 主な技術: Dear ImGui、リアルタイムパラメータ編集、デバッグ可視化
+// ファイルの役割: ImGuiによるデバッグ画面と、ライティング・演出の値をゲーム中に調整する機能を提供している。
+// 主な技術: Dear ImGui、ゲーム中のパラメータ編集、デバッグ用の表示切り替え
 // ============================================================================
 
 #include "DebugUI.h"
@@ -11,6 +11,7 @@
 #include "Renderer.h"
 #include "Scene.h"
 
+// ENABLE_IMGUIはDebug構成でだけ定義している。Releaseでは下の関数はほとんど何もしない
 #if defined(ENABLE_IMGUI)
 #include "imgui.h"
 #include "imgui_impl_dx11.h"
@@ -24,6 +25,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(
 
 namespace
 {
+    // カリングの結果（本描画・影・反射それぞれで描いた数と省いた数）。Releaseでも受け取るだけ受け取っている
     unsigned int g_MainDrawn = 0;
     unsigned int g_MainCulled = 0;
     unsigned int g_ShadowDrawn = 0;
@@ -32,9 +34,11 @@ namespace
     unsigned int g_ReflectionCulled = 0;
     bool g_ReflectionSkipped = false;
 #if defined(ENABLE_IMGUI)
+    // 初期化済みか、画面を開いているか、調整中にゲームを止めるか
     bool g_Initialized = false;
     bool g_Visible = false;
     bool g_PauseGameplay = false;
+    // 画面効果の値をデバッグ画面の値で上書きするか、と上書きする値
     bool g_OverridePostProcess = false;
     bool g_EnableBloom = true;
     bool g_EnableNoise = true;
@@ -49,16 +53,22 @@ namespace
     float g_FilmGradeStrength = 0.55f;
     float g_LensDirtStrength = 0.16f;
     float g_SignalInterference = 0.0f;
+    // 壁の湿り気の強さ（シェーダーへ渡している）
     float g_WallDampStrength = 1.0f;
+    // 直近120フレームのフレーム時間（グラフ表示用）と、次に書く位置
     float g_FrameTimes[120]{};
     int g_FrameTimeOffset = 0;
+    // シェーダーのデバッグ表示の番号（0は通常の画面）
     int g_DebugViewMode = 0;
+    // 反射の更新頻度を自動で調整するか、選んだ頻度、今使っている間隔、FPSが低い・回復した状態の継続秒数
     bool g_AdaptiveReflectionQuality = true;
     int g_ReflectionPresetIndex = 0;
     int g_ActiveReflectionInterval = 1;
     float g_LowFpsTimer = 0.0f;
     float g_RecoveryFpsTimer = 0.0f;
 
+    // FPSに合わせて水面の反射を描き直す間隔を自動で変えている。
+    // 52fps未満が1.5秒続いたら間隔を1つ広げ（最大4フレームに1回）、58fps以上が4秒続いたら1つ戻している。
     void UpdateAdaptiveReflectionQuality()
     {
         const int requestedInterval = g_ReflectionPresetIndex + 1;
@@ -98,6 +108,7 @@ namespace
 #endif
 }
 
+// ImGuiを作り、Win32とDirect3D 11の描画の仕組みにつないでいる
 bool Debug::UI::Init(HWND window)
 {
 #if defined(ENABLE_IMGUI)
@@ -109,6 +120,7 @@ bool Debug::UI::Init(HWND window)
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
+    // キーボードで項目を選べるようにし、窓の配置は imgui_debug_layout.ini に保存している
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.IniFilename = "imgui_debug_layout.ini";
 
@@ -139,6 +151,7 @@ bool Debug::UI::Init(HWND window)
     return true;
 }
 
+// ImGuiを終了している
 void Debug::UI::Uninit()
 {
 #if defined(ENABLE_IMGUI)
@@ -155,6 +168,7 @@ void Debug::UI::Uninit()
 #endif
 }
 
+// F1が押されていたら画面の表示を切り替え、ImGuiの新しいフレームを始めている
 void Debug::UI::BeginFrame()
 {
 #if defined(ENABLE_IMGUI)
@@ -171,10 +185,13 @@ void Debug::UI::BeginFrame()
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
+    // デバッグ画面を開いている間だけ、ImGuiがマウスカーソルを描いている
     ImGui::GetIO().MouseDrawCursor = g_Visible;
 #endif
 }
 
+// デバッグ画面で決めた値を反映している。シェーダーのデバッグ表示はいつも反映し、
+// 画面効果の値は「Override post process」をオンにしたときだけ上書きしている
 void Debug::UI::ApplyTuning(Effect::PostProcess& postProcess)
 {
 #if defined(ENABLE_IMGUI)
@@ -204,6 +221,7 @@ void Debug::UI::ApplyTuning(Effect::PostProcess& postProcess)
 #endif
 }
 
+// デバッグ画面の中身を作って描いている（性能・カリング・2面の進行・表示の切り替え・画面効果の調整）
 void Debug::UI::Draw(Effect::PostProcess& postProcess)
 {
 #if defined(ENABLE_IMGUI)
@@ -220,6 +238,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         ImGui::Checkbox(
             "Pause gameplay while tuning", &g_PauseGameplay);
 
+        // FPSとフレーム時間。60fps近くは緑、45fps以上は黄、それ未満は赤で表示している
         const float currentFps = ImGui::GetIO().Framerate;
         const float currentFrameMs = 1000.0f * ImGui::GetIO().DeltaTime;
         g_FrameTimes[g_FrameTimeOffset] = currentFrameMs;
@@ -238,10 +257,12 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             g_FrameTimeOffset, "Frame time (16.67 ms = 60 FPS)",
             0.0f, 33.33f, ImVec2(-1.0f, 72.0f));
         Core::Game* game = Core::Game::GetInstance();
+        // 描画の段階ごとのGPU時間（タイムスタンプのクエリで測っている）
         if (ImGui::CollapsingHeader(
             "GPU Performance", ImGuiTreeNodeFlags_DefaultOpen))
         {
             ImGui::Text("CPU frame       %.2f ms", currentFrameMs);
+            // 測れた時間・省いた・測れない・待っている、のどれかを表示する関数
             const auto drawGpuTiming = [](const char* label, GpuTiming timing)
             {
                 switch (timing.Status)
@@ -276,13 +297,14 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
                 ImGui::TextDisabled("4-frame query ring / no GPU wait");
             }
         }
+        // カリングの結果（描いた数と省いた数）
         ImGui::Text("Main objects: %u drawn / %u culled",
             g_MainDrawn, g_MainCulled);
         ImGui::Text("Shadow casters: %u drawn / %u culled",
             g_ShadowDrawn, g_ShadowCulled);
         if (Core::Game* currentGame = Core::Game::GetInstance())
         {
-            // タイルベースライティング: 光源数と、Compute Shaderで判定したタイル数です。
+            // タイルベースライティング: 光源の数と、Compute Shaderで判定したタイルの数を表示している。
             const Effect::TiledLighting* tiledLighting = currentGame->GetTiledLighting();
             ImGui::Text("Point lights: %u / %u   Light tiles: %u (16x16)",
                 tiledLighting->GetLightCount(),
@@ -292,6 +314,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
                 currentGame->GetActiveSpatialVoiceCount(),
                 Sound::MaxSpatialVoices);
         }
+        // モデルの読み込みを使い回せた回数（同じモデルを2回読まないようにしている効果の確認用）
         const ModelCacheStats modelCacheStats = ModelCache::GetStats();
         ImGui::Text("Model cache: %zu loaded / %llu hit / %llu miss",
             modelCacheStats.LoadedModels,
@@ -299,6 +322,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             static_cast<unsigned long long>(modelCacheStats.CacheMisses));
         ImGui::Text("Assimp loads through cache: %llu",
             static_cast<unsigned long long>(modelCacheStats.AssimpLoads));
+        // 水面の反射：画面に水たまりが無ければ描くのを省いている
         if (g_ReflectionSkipped)
         {
             ImGui::TextColored(
@@ -312,6 +336,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         }
         ImGui::Separator();
 
+        // 2面の進行の確認と、イベントをすぐ再生するボタン（2面の間だけ表示している）
         Scene* scene = game == nullptr ? nullptr : game->GetScene();
         SceneDebugInfo sceneDebugInfo{};
         if (scene != nullptr && scene->TryGetDebugInfo(sceneDebugInfo) &&
@@ -330,6 +355,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             ImGui::Text("最終イベント: %s  出口: %s",
                 sceneDebugInfo.finalSequenceArmed ? "準備済み" : "待機中",
                 sceneDebugInfo.exitReady ? "解錠" : "施錠");
+            // ボタンの操作はすぐ実行せず、次のゲームの更新の始めに実行している（描画中に状態を変えないため）
             if (ImGui::Button("ループを1回進める"))
             {
                 scene->RequestDebugAction(
@@ -351,10 +377,11 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             ImGui::Separator();
         }
 
-        // 番号はシェーダーのDebugViewModeと対応します（8のフルブライトはcommon.hlslのDEBUG_VIEW_FULLBRIGHT）。
+        // 番号はシェーダーのDebugViewModeと対応している（8のフルブライトはcommon.hlslのDEBUG_VIEW_FULLBRIGHT）。
         const char* debugViews[] = { "Final", "World normals", "Flashlight shadow", "Lighting only", "Puddle mask", "Planar reflection", "Wall damp mask", "Light tiles (lights per 16x16 tile)", "Fullbright (照明・影・霧なしで全体を明るく)" };
         ImGui::Combo("Shader debug view", &g_DebugViewMode,
             debugViews, IM_ARRAYSIZE(debugViews));
+        // 水面の反射を描き直す頻度（何フレームに1回か）
         const char* reflectionRates[] =
         {
             "60 Hz - every frame",
@@ -370,6 +397,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             60 / g_ActiveReflectionInterval, g_ActiveReflectionInterval,
             g_ActiveReflectionInterval == 1 ? "" : "s");
 
+        // 画面効果の値をまとめて切り替えるプリセット：見やすさ重視・雰囲気重視・怖さ重視・軽さ重視
         ImGui::TextUnformatted("Visual presets");
         if (ImGui::Button("Readable gameplay", ImVec2(196.0f, 0.0f)))
         {
@@ -451,6 +479,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         }
         ImGui::Separator();
 
+        // 画面効果の値を1つずつ調整するスライダー（上書きをオンにしたときだけ操作できる）
         ImGui::Checkbox("Override post process", &g_OverridePostProcess);
         ImGui::BeginDisabled(!g_OverridePostProcess);
         ImGui::Checkbox("Bloom compute", &g_EnableBloom);
@@ -469,6 +498,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         ImGui::SliderFloat("Signal interference", &g_SignalInterference, 0.0f, 1.0f, "%.2f");
         ImGui::SliderFloat("Wall dampness", &g_WallDampStrength, 0.0f, 2.0f, "%.2f");
 
+        // 画面効果の演出を試しに再生するボタン
         if (ImGui::Button("Bloom pulse"))
         {
             postProcess.TriggerBloomPulse(1.65f, 0.65f);
@@ -487,6 +517,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         ImGui::End();
     }
 
+    // ImGuiの描画データを作り、バックバッファへ直接描いている（画面効果の後なので、ぼかしなどが掛からない）
     ImGui::Render();
     Renderer::SetBackBufferRenderTarget();
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
@@ -495,6 +526,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
 #endif
 }
 
+// WindowsのメッセージをImGuiへ渡している。デバッグ画面を開いていて、ImGuiがそのメッセージを使ったときだけtrueを返している
 bool Debug::UI::HandleWindowMessage(
     HWND window,
     UINT message,
@@ -516,6 +548,7 @@ bool Debug::UI::HandleWindowMessage(
     return false;
 }
 
+// デバッグ画面を開いているかを返している
 bool Debug::UI::IsVisible()
 {
 #if defined(ENABLE_IMGUI)
@@ -525,6 +558,7 @@ bool Debug::UI::IsVisible()
 #endif
 }
 
+// デバッグ画面を開いていて、ゲームを止める設定のときだけtrueを返している
 bool Debug::UI::ShouldPauseGameplay()
 {
 #if defined(ENABLE_IMGUI)
@@ -534,17 +568,19 @@ bool Debug::UI::ShouldPauseGameplay()
 #endif
 }
 
+// 水面の反射を何フレームに1回描き直すかを返している
 unsigned int Debug::UI::GetReflectionUpdateInterval()
 {
 #if defined(ENABLE_IMGUI)
     return static_cast<unsigned int>(g_ActiveReflectionInterval);
 #else
-    // 1/6解像度と反射専用カリングにより、移動中は滑らかな60Hzを優先します。
-    // 静止中の間引きはGameRendering側で行います。
+    // Releaseは毎フレーム描き直す。反射は縦横半分の解像度で描き、反射に映る物だけに絞っているので、移動中は滑らかさを優先している。
+    // 止まっているときに描き直す回数を減らす処理はGameRendering側で行っている。
     return 1u;
 #endif
 }
 
+// カリングの結果を受け取り、デバッグ画面で表示できるように覚えている
 void Debug::UI::SetCullingStats(
     unsigned int mainDrawn,
     unsigned int mainCulled,

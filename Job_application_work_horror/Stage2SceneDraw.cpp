@@ -1,6 +1,6 @@
 ﻿// ============================================================================
-// ファイルの役割: 2面の目的、ヒント、異変フィードバックの描画を管理します。
-// 主な技術: マルチパス描画、描画順制御、シャドウマップ
+// ファイルの役割: 2面のHUD（目的・ヒント・状態パネル・目的地の方向・章のカード・暗転・ポーズ）を描いている。
+// 主な技術: 状態に応じたUIの重ね方、描く順番の制御、目的表示の選択を別の関数に任せる設計
 // ============================================================================
 
 #include "Stage2Scene.h"
@@ -26,6 +26,7 @@ using namespace DirectX::SimpleMath;
 #include "Stage2SceneConstants.h"
 
 
+// 2面のHUDを、下から順に重ねて描いている（隠れている間の視界 → 普段のHUD → 状態パネル → 方向 → カード → 暗転 → ポーズ）
 void Stage2Scene::Draw(Camera* camera)
 {
     (void)camera;
@@ -44,11 +45,11 @@ void Stage2Scene::Draw(Camera* camera)
         confirmationPanel != nullptr &&
         !confirmationPanel->IsActivated() &&
         IsRequiredAnomalyFound();
-    // どの目的・通知・ヒントを出すかの優先順位はSelectStage2Objectiveにまとめています。
+    // どの目的・知らせ・ヒントを出すかの優先順位は、SelectStage2Objectiveにまとめている。
     const std::string_view objective =
         SelectStage2Objective(MakeObjectiveInput(confirmationPending));
 
-    // 右上の状態パネルを出すときは、電池の通知と「記録」をその下へずらして重ならないようにします。
+    // 右上の状態パネルを出すときは、電池の知らせと「記録」をその下へずらして重ならないようにしている。
     const bool showStatusPanel =
         game->IsGuideEnabled() &&
         m_VisualTimer >= 4.20f &&
@@ -56,8 +57,8 @@ void Stage2Scene::Draw(Camera* camera)
         (exit == nullptr || !exit->IsEscaping());
     m_Hud.SetTopRightOffset(showStatusPanel ? Hud::Stage2StatusReservedHeight : 0.0f);
 
-    // 目的表示なしの設定では、何をすべきかを説明しない静かな画面にします。
-    // ロッカーの中では、扉の隙間以外を暗くします（目的表示はその上に重ねて読めるようにします）。
+    // 目的表示なしの設定では、何をすべきかを説明しない静かな画面にしている。
+    // ロッカーの中では、扉のすき間以外を暗くしている（目的表示はその上に重ねて読めるようにしている）。
     if (player->IsHiding())
     {
         float hidingDanger = 0.0f;
@@ -66,10 +67,12 @@ void Stage2Scene::Draw(Camera* camera)
         {
             Vector3 toStalker = stalker->GetPosition() - player->GetPosition();
             toStalker.y = 0.0f;
+            // 足音の影が近いほど、すき間の縁を赤くしている（20〜100の距離で変化）
             hidingDanger = 1.0f - (std::clamp)((toStalker.Length() - 20.0f) / 80.0f, 0.0f, 1.0f);
         }
         m_Hud.DrawHidingView(m_VisualTimer, hidingDanger);
     }
+    // 普段のHUD（2面はヒューズがないので-1を渡している）
     m_Hud.Draw(*player, -1, m_InteractionSystem.GetPrompt(),
         game->IsGuideEnabled() ? objective : std::string_view{});
     const float threatRate = ComputeThreatRate(*player, true);
@@ -79,6 +82,7 @@ void Stage2Scene::Draw(Camera* camera)
             m_LoopCount, threatRate, m_FinalDoorReady,
             m_SignalPuzzle.GetStep(),
             m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete());
+        // 危険度があるとき・息を潜めている間だけ、その進み具合を出している
         if (m_LoopCount < 3 && !m_ObservedScareSequence.IsActive() &&
             !m_FinalSequence.IsPursuitActive() &&
             !m_FinalSequence.IsSequenceActive() &&
@@ -93,6 +97,7 @@ void Stage2Scene::Draw(Camera* camera)
                 m_QuietRecovery.tooClose);
         }
     }
+    // 目的地の方向：普段は奥の扉、異変を探す間はその場所、確認のスイッチや信号盤の段階ではその位置
     if (m_VisualTimer >= 4.20f &&
         !m_CaughtSequence.IsActive() &&
         (exit == nullptr || !exit->IsEscaping()))
@@ -103,7 +108,7 @@ void Stage2Scene::Draw(Camera* camera)
         const Stage2Anomaly requiredAnomaly = m_AnomalyPlan.GetRequired(m_LoopCount);
         if (requiredAnomaly != Stage2Anomaly::None && !IsRequiredAnomalyFound())
         {
-            // 探すべき異変の場所を指します（偽ドア・時計・肖像画・ノックの出どころ）。
+            // 探すべき異変の場所を指している（偽の扉・時計・肖像画・ノックの出どころ）。
             guideTarget =
                 requiredAnomaly == Stage2Anomaly::FalseDoor ? Vector3(-38.3f, -72.0f, 70.0f) :
                 requiredAnomaly == Stage2Anomaly::Clock ? Vector3(-38.0f, -70.0f, -25.0f) :
@@ -132,11 +137,13 @@ void Stage2Scene::Draw(Camera* camera)
         m_Hud.DrawObjectiveGuide(
             *camera, player->GetPosition(), guideTarget);
     }
+    // 始まりの0.65秒は、黒からだんだん明るくしている
     if (m_VisualTimer < 0.65f)
     {
         const float fade = 1.0f - m_VisualTimer / 0.65f;
         m_Hud.DrawBlink(fade * fade);
     }
+    // 始まりの4.2秒は章のカードを、周回が変わったときは周回のカードを出している
     if (m_VisualTimer < 4.20f)
     {
         m_Hud.DrawChapterCard(
@@ -165,6 +172,7 @@ void Stage2Scene::Draw(Camera* camera)
             cycleSubtitles[cycleIndex],
             m_LoopTransitionTimer);
     }
+    // 周回が変わった瞬間のまばたき
     if (m_LoopBlinkTimer > 0.0f)
     {
         const float blinkRate =
@@ -172,12 +180,14 @@ void Stage2Scene::Draw(Camera* camera)
         m_Hud.DrawBlink(blinkRate * blinkRate * 0.90f);
     }
 
+    // 捕まったときは画面を暗くしている
     if (m_CaughtSequence.IsActive())
     {
         const float caughtFade = m_CaughtSequence.GetFadeRate();
         m_Hud.DrawBlink(caughtFade * 0.96f);
     }
 
+    // 脱出の演出の後半で、画面をなめらかに暗くしている
     if (exit != nullptr && exit->IsEscaping())
     {
         const float fadeRate = (std::clamp)(
@@ -188,6 +198,7 @@ void Stage2Scene::Draw(Camera* camera)
         m_Hud.DrawBlink(smoothFade * 0.90f);
     }
 
+    // ポーズ中はポーズメニューを重ねている（2階として表示）
     if (game->IsPaused())
     {
         m_Hud.DrawPause(
@@ -204,7 +215,7 @@ void Stage2Scene::Draw(Camera* camera)
     }
 }
 
-// 目的表示の文章を選ぶための状態を、各仕組みから読み取って集めます。
+// 目的表示の文章を選ぶための状態を、各仕組みから読み取って集めている。
 Stage2ObjectiveInput Stage2Scene::MakeObjectiveInput(bool confirmationPending) const
 {
     Stage2ObjectiveInput input;

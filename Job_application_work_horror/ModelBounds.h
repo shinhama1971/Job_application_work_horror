@@ -1,12 +1,13 @@
 // ============================================================================
-// ファイルの役割: モデル頂点から得たローカル境界と描画判定用の境界球を定義します。
-// 主な技術: Local AABB、Bounding Sphere、SRT変換
+// ファイルの役割: モデルの頂点から求めた、ローカル座標の境界（箱と球）と、描画の判定に使うワールド座標の境界球を定義している。
+// 主な技術: ローカル座標のAABB、境界球、拡大・回転・移動の変換
 // ============================================================================
 
 #pragma once
 
 #include <SimpleMath.h>
 
+// モデルの頂点から求めた、ローカル座標の境界（中心・各軸の半分の大きさ・境界球の半径・求められたか）
 struct ModelBounds
 {
     DirectX::SimpleMath::Vector3 Center =
@@ -17,6 +18,7 @@ struct ModelBounds
     bool IsValid = false;
 };
 
+// ワールド座標に変換した境界球（カリングに使っている）
 struct WorldBoundingSphere
 {
     DirectX::SimpleMath::Vector3 Center =

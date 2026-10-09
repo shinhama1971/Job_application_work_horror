@@ -1,23 +1,29 @@
 // ============================================================================
-// シェーダーの役割: 濡れた床の反射、フレネル、波紋、粗さを計算します。
+// シェーダーの役割: 濡れた床を描いている（床の古さ、水たまりと浸水した範囲、波紋、水面の反射、フレネル、懐中電灯と天井灯の照明、霧）。
 // ============================================================================
 
 #include "common.hlsl"
 
+// 床のテクスチャ（t0）とサンプラー（s0）
 Texture2D g_Texture : register(t0);
 SamplerState g_SamplerState : register(s0);
 #include "flashlightShadow.hlsli"
 
+// 水面の反射の画像（PlanarReflectionが描いたもの、t6）
 Texture2D g_PlanarReflection : register(t6);
 
+// Ground.cppのWetFloorBufferと同じ並び（b10）。経過時間、波紋の強さ、反射の強さ、詰め物
 cbuffer WetFloorBuffer : register(b10)
 {
     float WetTime;
     float RippleStrength;
     float ReflectionStrength;
     float WetPadding;
+    // 床一面が水に浸かった範囲（xy = x・zの最小、zw = x・zの最大）。範囲がないときは、最小が最大より大きい値にしている。
+    float4 FloodRect;
 }
 
+// 頂点シェーダー（litTextureVS）から受け取る値（影と反射の座標も使っている）
 struct LIT_PS_IN
 {
     float4 pos : SV_POSITION;
@@ -33,11 +39,13 @@ struct LIT_PS_IN
 };
 
 
+// 2次元の値から0〜1の疑似乱数を作っている（GroundWaterEffects.cppの水たまりの位置と同じ式）
 float Hash21(float2 value)
 {
     return frac(sin(dot(value, float2(127.1f, 311.7f))) * 43758.5453f);
 }
 
+// 格子の4隅の乱数を、なめらかに補間した値のノイズ
 float ValueNoise(float2 value)
 {
     const float2 cell = floor(value);
@@ -58,8 +66,8 @@ float ValueNoise(float2 value)
 
 
 // ----------------------------------------------------------------------------
-// 床の古さ（1面）。壁の古さと同じ WallWeathering で有効になり、2面（0）では何もしません。
-// コンクリートの床版の目地・ひびを凹凸として、油や水の染み・物を引きずった跡・壁際の埃を色として描きます。
+// 床の古さ（1面）。壁の古さと同じ WallWeathering で有効になり、2面（0）では何もしない。
+// コンクリートの床版の目地・ひびを凹凸として、油や水の染み・物を引きずった跡・壁際の埃を色として描いている。
 // ----------------------------------------------------------------------------
 struct FloorAgeing
 {
@@ -67,20 +75,21 @@ struct FloorAgeing
     float3 tint;    // 元の色に掛ける色（1なら変化なし）
 };
 
+// 床の古さを計算している（amountは古さの濃さ）
 FloorAgeing ComputeFloorAgeing(float2 position, float amount)
 {
     FloorAgeing ageing;
-    // 1画素がワールドで何単位か。遠くで細かい模様がちらつかないよう、これで薄めます。
+    // 1画素がワールドで何単位か。遠くで細かい模様がちらつかないよう、これで薄めている。
     const float footprint = max(length(fwidth(position)), 0.0001f);
 
-    // --- 床版の目地（56四方。細く浅くして、タイル張りに見えないようにします）。床版ごとに色がわずかに違います
+    // --- 床版の目地（56四方。細く浅くして、タイル張りに見えないようにしている）。床版ごとに色をわずかに変えている
     const float slabSize = 56.0f;
     const float2 slabUV = position / slabSize;
     const float2 edgeDistance = (0.5f - abs(frac(slabUV) - 0.5f)) * slabSize;
     const float joint = 1.0f - smoothstep(0.05f, 0.20f + footprint, min(edgeDistance.x, edgeDistance.y));
     const float slabShade = FastHash21(floor(slabUV) + 11.0f);
 
-    // --- ひび（遠くでは1画素より細くなるため計算を省きます）
+    // --- ひび（遠くでは1画素より細くなるため、計算を省いている）
     float crack = 0.0f;
     [branch]
     if (footprint < 0.5f)
@@ -95,17 +104,19 @@ FloorAgeing ComputeFloorAgeing(float2 position, float amount)
     const float stain = smoothstep(0.50f, 0.82f, FastValueNoise(position * 0.03f + 31.0f)) *
         (0.6f + 0.4f * FastValueNoise(position * 0.2f + 7.0f));
 
-    // --- 物を引きずった跡（一方向に伸びた細い筋。出る場所を別のノイズで絞ります）
+    // --- 物を引きずった跡（一方向に伸びた細い筋。出る場所を別のノイズで絞っている）
     const float scuffLine = smoothstep(0.72f, 0.90f,
         FastValueNoise(float2(position.x * 0.04f, position.y * 0.9f) + 53.0f));
     const float scuff = scuffLine * smoothstep(0.50f, 0.70f, FastValueNoise(position * 0.012f + 2.0f)) *
         saturate(1.0f - footprint / 0.6f);
 
-    // --- 壁際に溜まった埃（部屋の角の暗がりと同じ壁の形から、壁までの距離を求めます）
+    // --- 壁際にたまった埃（部屋の角の暗がりと同じ壁の形から、壁までの距離を求めている）
     const float dust = exp(-GetNearestWallDistance(position) / 4.5f);
 
+    // 目地とひびを、へこみの高さにしている
     ageing.height = -(joint * 0.5f + crack * 0.4f) * amount;
 
+    // 床版ごとの色、目地・ひびの暗さ、染み、引きずった跡、埃を順に重ねている
     float3 tint = (0.93f + 0.12f * slabShade).xxx;
     tint *= 1.0f - joint * 0.22f;
     tint *= 1.0f - crack * 0.50f;
@@ -116,12 +127,13 @@ FloorAgeing ComputeFloorAgeing(float2 position, float amount)
     return ageing;
 }
 
+// 床の古さを返している（古さが0なら何も計算しない）
 FloorAgeing GetFloorAgeing(float3 worldPosition, float amount)
 {
     FloorAgeing ageing;
     ageing.height = 0.0f;
     ageing.tint = 1.0f.xxx;
-    // amount は面ごとに一定なので、この分岐は画素ごとにばらつきません。
+    // amount は面ごとに一定なので、この分岐は画素ごとにばらつかない。
     [branch]
     if (amount > 0.0f)
     {
@@ -130,6 +142,7 @@ FloorAgeing GetFloorAgeing(float3 worldPosition, float amount)
     return ageing;
 }
 
+// 映画のような色調にしている（litTexturePSと同じ処理）
 float3 ApplyFilmicHorrorGrade(float3 color)
 {
     color = max(color, 0.0f);
@@ -157,6 +170,7 @@ float3 ApplyFilmicHorrorGrade(float3 color)
     return saturate(color);
 }
 
+// 2次元の値から、0〜1の乱数を2つ作っている
 float2 Hash22(float2 value)
 {
     const float first = Hash21(value + float2(17.3f, 41.7f));
@@ -164,9 +178,10 @@ float2 Hash22(float2 value)
     return float2(first, second);
 }
 
+// 水たまりに落ちる水滴の、広がる輪を計算している（0〜1）
 float GetDripRing(float2 worldPosition)
 {
-    // 水滴を疎に発生させ、雨に見せず水たまりへ小さな動きを加えます。
+    // 水滴はまばらに起こし、雨には見せずに、水たまりへ小さな動きを加えている。
     const float cellSize = 15.0f;
     const float2 cell = floor(worldPosition / cellSize);
     const float2 localPosition = frac(worldPosition / cellSize);
@@ -183,6 +198,7 @@ float GetDripRing(float2 worldPosition)
     return ring * activeDrop * (1.0f - phase);
 }
 
+// その位置の水たまりの濃さ（0〜1）を返し、岸の線と波の模様も返している
 float GetPuddleMask(
     float2 worldPosition,
     out float shore,
@@ -190,8 +206,8 @@ float GetPuddleMask(
 {
     shore = 0.0f;
     ripplePattern = 0.0f;
-    // 大きなワールド空間セルごとに、不規則に回転した水たまりを一つ配置します。
-    // 半径をセル境界より小さくし、床全体を均一に濡らさず独立した水たまりにします。
+    // 大きなワールド空間のマス目ごとに、不規則に回した水たまりを1つ置いている。
+    // 半径をマス目の境目より小さくし、床全体を一様に濡らさず、独立した水たまりにしている。
     const float cellSize = 82.0f;
     const float2 gridPosition = worldPosition / cellSize;
     const float2 cell = floor(gridPosition);
@@ -200,8 +216,8 @@ float GetPuddleMask(
     const float hasPuddle = step(
         0.62f,
         Hash21(cell + float2(53.4f, 27.9f)));
-    // 大半の床セルは乾いているため、対象外では回転・輪郭ノイズ・波計算を省略します。
-    // in those cells; the branch is coherent over a large world-space tile.
+    // 大半の床のマス目は乾いているため、対象外のマス目では、回転・輪郭のノイズ・波の計算を省いている。
+    // （この分岐はワールド空間の大きなマス目の単位でそろうので、画素ごとにばらつかない）
     if (hasPuddle < 0.5f)
     {
         shore = 0.0f;
@@ -209,6 +225,7 @@ float GetPuddleMask(
         return 0.0f;
     }
 
+    // 水たまりの中心をずらし、ランダムに回した楕円にしている
     const float2 randomValue = Hash22(cell);
     localPosition -= (randomValue - 0.5f) * 0.22f;
 
@@ -222,6 +239,7 @@ float GetPuddleMask(
         0.72f + randomValue.x * 0.25f,
         0.43f + randomValue.y * 0.20f);
 
+    // 縁をノイズと波形でゆがませ、自然な形の水たまりにしている
     const float radialDistance = length(rotated / axes);
     const float polarAngle = atan2(rotated.y, rotated.x);
     const float organicLobes =
@@ -232,6 +250,7 @@ float GetPuddleMask(
         organicLobes;
     const float irregularDistance = radialDistance + edgeWarp;
 
+    // 水たまりの濃さ、岸の細い線、ゆっくり広がる波と交差する波の模様
     const float puddle =
         (1.0f - smoothstep(0.34f, 0.40f, irregularDistance)) * hasPuddle;
     shore = (1.0f - smoothstep(
@@ -247,23 +266,24 @@ float GetPuddleMask(
     return puddle;
 }
 
+// 床の画素の色を計算している：床の色と古さ → 水たまり → 照明 → 光沢 → 反射 → 霧 → 色調
 float4 main(in LIT_PS_IN input) : SV_Target
 {
     float4 color = input.col;
-    // 床の古さ（目地・ひび）の凹凸を入れた法線。古さのない面ではそのままの法線です。
+    // 床の古さ（目地・ひび）の凹凸を入れた法線。古さのない面では元の法線のまま。
     float3 agedWorldNormal = normalize(input.worldNormal);
 
     if (Material.TextureEnable)
     {
-        // 元画像の草らしい高周波模様を正のMipバイアスで弱めます。
-        // 色域を抑えて湿った汚いコンクリートへ見せ、追加素材を不要にします。
+        // 元の画像の草のような細かい模様を、正のMipバイアスで弱めようとしている。
+        // 色の幅を抑えて、湿った汚いコンクリートに見せ、素材を足さずに済ませている。
         const float3 sampledFloor = g_Texture.SampleBias(
             g_SamplerState,
             input.tex,
             1.15f).rgb;
         // 1面（床の古さあり）は、素材の明るさを平均（field.jpgで約0.40）へ寄せて砂利のようなざらつきを抑え、
-        // 床の模様は目地・染み・引きずった跡（GetFloorAgeing）で作ります。
-        // 素材にMipマップがないため、Mipバイアスではぼかせません。
+        // 床の模様は目地・染み・引きずった跡（GetFloorAgeing）で作っている。
+        // 素材にMipマップがないため、Mipバイアスではぼかせない。
         const float floorLuminance = lerp(
             dot(sampledFloor, float3(0.2126f, 0.7152f, 0.0722f)),
             0.40f,
@@ -272,14 +292,15 @@ float4 main(in LIT_PS_IN input) : SV_Target
             floorLuminance.xxx,
             sampledFloor,
             0.10f);
+        // 広い範囲の明るさのむらを付け、少し緑がかった灰色にしている
         const float broadVariation = saturate(FastValueNoise(
             input.worldPos.xz * 0.020f + 6.4f));
         concreteFloor *= float3(0.72f, 0.75f, 0.73f) *
             lerp(0.88f, 1.04f, broadVariation);
         color.rgb *= concreteFloor;
 
-        // 床の古さ（1面だけ）。色を掛け、目地とひびの凹凸で法線を作ります。
-        // TextureEnable は描画単位で一定なので、この中で画面上の偏微分を使っても問題ありません。
+        // 床の古さ（1面だけ）。色を掛け、目地とひびの凹凸で法線を作っている。
+        // TextureEnable は描画の単位で一定なので、この中で画面上の偏微分を使っても問題ない。
         const FloorAgeing floorAgeing = GetFloorAgeing(input.worldPos, WallWeathering);
         color.rgb *= floorAgeing.tint;
         agedWorldNormal = ApplyHeightToNormal(
@@ -295,19 +316,32 @@ float4 main(in LIT_PS_IN input) : SV_Target
         return GetFullbrightColor(color.rgb, input.viewNormal, input.viewPos);
     }
 
+    // 水たまりの濃さ・岸の線・波の模様を求めている
     float shore = 0.0f;
     float ripplePattern = 0.0f;
     float puddle = GetPuddleMask(
         input.worldPos.xz,
         shore,
         ripplePattern);
+    // 床一面が水に浸かった範囲（1面の西棟）。範囲の内側は全面を水たまりと同じに扱い、ゆるい波を立てている。
+    {
+        const float2 fromMinimum = input.worldPos.xz - FloodRect.xy;
+        const float2 toMaximum = FloodRect.zw - input.worldPos.xz;
+        const float insideDistance = min(
+            min(fromMinimum.x, fromMinimum.y), min(toMaximum.x, toMaximum.y));
+        const float flood = smoothstep(-0.5f, 1.5f, insideDistance);
+        ripplePattern += sin(input.worldPos.x * 0.21f + input.worldPos.z * 0.13f + WetTime * 0.9f) *
+            0.35f * flood * (1.0f - puddle);
+        puddle = max(puddle, flood);
+    }
+    // 上を向いた面（床）だけを水たまりにしている
     puddle *= smoothstep(0.55f, 0.92f, saturate(input.worldNormal.y));
     shore *= smoothstep(0.55f, 0.92f, saturate(input.worldNormal.y));
 
     float dripRing = 0.0f;
     float3 detailWorldNormal = agedWorldNormal;
-    // 動的な法線再構築は水たまりと狭い水際だけに適用します。
-    // 乾いた床では三回のフラクタルノイズ計算を省きます。
+    // 動く波の法線を作り直す処理は、水たまりと細い岸だけにしている。
+    // 乾いた床では、3回のノイズの計算を省いている。
     [branch]
     if (puddle > 0.001f || shore > 0.001f)
     {
@@ -316,6 +350,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         const float2 animatedNoiseOffset = float2(
             WetTime * 0.018f,
             -WetTime * 0.013f);
+        // 少しずつ流れるノイズの傾きから、波の凹凸の法線を作っている
         const float ripple = FastValueNoise(
             input.worldPos.xz * 0.095f + animatedNoiseOffset);
         const float rippleX = FastValueNoise(
@@ -324,7 +359,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         const float rippleZ = FastValueNoise(
             input.worldPos.xz * 0.095f + animatedNoiseOffset +
             float2(0.0f, 0.035f));
-        // 水たまりの中は目地やひびが水で埋まるため、平らな面から波の凹凸を作ります。
+        // 水たまりの中は、目地やひびが水で埋まるため、平らな面から波の凹凸を作っている。
         const float3 puddleBaseNormal = normalize(lerp(
             agedWorldNormal, normalize(input.worldNormal), saturate(puddle * 1.5f)));
         detailWorldNormal = normalize(
@@ -336,8 +371,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     const float baseLuminance = dot(
         color.rgb,
         float3(0.2126f, 0.7152f, 0.0722f));
-    // 浅い室内水は上から見たときに床面を透かします。
-    // 暗くしすぎて黒いデカールに見えることを防ぎます。
+    // 浅い室内の水は、上から見たときに床を透かして見せる。
+    // 暗くしすぎて、黒いシールのように見えるのを防いでいる。
     const float3 wetColor = lerp(
         color.rgb * 0.76f,
         color.rgb * 0.58f +
@@ -346,6 +381,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     color.rgb = lerp(color.rgb, wetColor, puddle * 0.84f);
     color.rgb *= 1.0f - shore * 0.035f;
 
+    // 上下で色を変えた環境光と、浅い角度ほど強い反射（フレネル）
     float3 lighting = GetHemisphereAmbient(detailWorldNormal);
     float3 specularLighting = 0.0f;
     const float distanceFromCamera = length(input.viewPos);
@@ -356,7 +392,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         1.0f - saturate(dot(normalize(input.viewNormal), viewDirection)),
         4.0f);
 
-    // 天井の点光源はパネルだけでなく、近くの床と壁も照らします。
+    // 天井の点光源は、パネルだけでなく、近くの床と壁も照らしている。
     uint pointLightListOffset;
     const uint pointLightCount =
         GetPixelLightCount(input.pos.xy, pointLightListOffset);
@@ -370,6 +406,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
             pointLight.PositionRange.xyz - input.worldPos;
         const float lightRange = max(pointLight.PositionRange.w, 0.001f);
         const float distanceSquaredToLight = dot(offsetToLight, offsetToLight);
+        // 光が届かない距離の光源は、計算を省いている
         [branch]
         if (distanceSquaredToLight >= lightRange * lightRange)
         {
@@ -384,8 +421,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
         const float pointLambert = saturate(dot(
             detailWorldNormal, directionToPointLight));
         const float softPointLambert = 0.20f + pointLambert * 0.80f;
-        // 天井パネルを裸の点電球ではなく、下向きに広がる面光源として近似します。
-        // 床へ光を集中させつつ、横方向にも少量の光を残します。
+        // 天井のパネルを裸の電球ではなく、下向きに広がる面の光源として近似している。
+        // 床へ光を集めつつ、横の方向にも少しだけ光を残している。
         const float downwardAmount = saturate(directionToPointLight.y);
         const float fixtureDistribution = lerp(
             0.22f,
@@ -398,13 +435,14 @@ float4 main(in LIT_PS_IN input) : SV_Target
             * softPointLambert
             * fixtureDistribution;
 
+        // 水たまりでは、点光源の鋭い光沢を足している
         specularLighting += pointLight.ColorIntensity.rgb
             * pointLight.ColorIntensity.a
             * pointAttenuation
             * pow(pointLambert, 12.0f)
             * puddle * 0.58f;
 
-        // 柔らかい光の範囲を作り、天井照明が水面へ映ることを分かりやすくします。
+        // 柔らかい光の範囲を作り、天井の照明が水面へ映っていることを分かりやすくしている。
         const float horizontalDistance = length(offsetToLight.xz);
         const float reflectedFixture = pow(saturate(
             1.0f - horizontalDistance / max(lightRange * 0.46f, 0.001f)),
@@ -414,7 +452,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
             * reflectedFixture * puddle * 0.38f;
     }
 
-    // 部屋の角の暗がり。環境光と天井灯には全部、懐中電灯には一部だけ掛けます（照らせば角も見えるように）。
+    // 部屋の角の暗がり。環境光と天井灯には全部、懐中電灯には一部だけ掛けている（照らせば角も見えるように）。
     const float roomOcclusion = GetRoomOcclusion(input.worldPos, normalize(input.worldNormal));
     lighting *= roomOcclusion;
     const float flashlightOcclusion = lerp(1.0f, roomOcclusion, 0.4f);
@@ -423,7 +461,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     {
         const float3 pixelDirection = input.viewPos / distanceFromCamera;
         const float beamProfile = GetFlashlightBeamProfile(pixelDirection);
-        // 円錐外の床はレンズ汚れ、影、鏡面反射の計算を行いません。
+        // 円錐の外の床では、レンズの汚れ・影・鏡面反射の計算を行っていない。
         [branch]
         if (beamProfile > 0.001f)
         {
@@ -438,7 +476,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
             const float naturalAttenuation = attenuation *
                 lerp(1.0f, physicalFalloff, 0.32f);
 
-            // 1面は目地・ひび・水の波の凹凸を懐中電灯にも反映します（2面は従来どおり平らな面で計算）。
+            // 1面は目地・ひび・水の波の凹凸を懐中電灯にも反映している（2面は前と同じく平らな面で計算）。
             const float3 normal = WallWeathering > 0.0f
                 ? normalize(mul(float4(detailWorldNormal, 0.0f), View).xyz)
                 : normalize(input.viewNormal);
@@ -454,6 +492,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
                 * flashlightAmount
                 * softenedLambert;
 
+            // 濡れた面の鏡面反射（水たまりほど鋭く強い）
             const float3 halfVector = normalize(directionToLight + viewDirection);
             const float wetSpecular = pow(
                 saturate(dot(normal, halfVector)),
@@ -463,8 +502,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
                 * wetSpecular
                 * lerp(0.025f, 1.15f, puddle);
 
-            // 完全な鏡面反射方向がカメラを外れても、浅い水は懐中電灯を弱く広く反射します。
-            // 水面が黒く落ちることを防ぎます。
+            // 完全な鏡面反射の方向がカメラを外れても、浅い水は懐中電灯を弱く広く反射する。
+            // 水面が黒く沈むのを防いでいる。
             specularLighting += Light.Diffuse.rgb
                 * flashlightAmount
                 * puddle
@@ -473,6 +512,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     }
 
     color.rgb *= lighting;
+    // 水面の空の映り込み・波の光・水滴の輪・岸の光を足している
     specularLighting += float3(0.19f, 0.25f, 0.28f)
         * puddle * (0.15f + fresnel * 0.76f);
     const float rippleHighlight = pow(
@@ -486,8 +526,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     color.rgb += specularLighting;
     color.rgb += Material.Emission.rgb;
 
-    // ワールド座標を反転カメラ画像へ投影し、平面反射の参照位置を求めます。
-    // real scene reflection; the normal only adds a small water distortion.
+    // ワールド座標を反転したカメラの画像へ投影し、平面反射の参照する位置を求めている。
+    // （反射は実際の景色を映し、法線は水の小さな揺らぎだけを足している）
     const float reflectionW = max(input.reflectionPos.w, 0.0001f);
     const float3 reflectionNdc =
         input.reflectionPos.xyz / reflectionW;
@@ -503,16 +543,17 @@ float4 main(in LIT_PS_IN input) : SV_Target
         step(reflectionNdc.z, 1.0f) *
         step(0.0001f, input.reflectionPos.w);
 
+    // 波の法線で、反射を参照する位置を少しずらしている
     const float2 waterDistortion =
         detailWorldNormal.xz *
         (0.0045f + abs(ripplePattern) * 0.0022f) *
         puddle * RippleStrength;
     reflectionUV = saturate(reflectionUV + waterDistortion);
 
-    // フレネル効果により、真上からは主に水面下の床を見せます。
-    // water; grazing angles strongly show the mirrored room and fixtures.
-    // 平方根で再マッピングして中間角度の反射を見やすくします。
-    // 最小値を低く保ち、水たまりが黒い板に戻ることを防ぎます。
+    // フレネル効果により、真上からは主に水面の下の床を見せている。
+    // 浅い角度から見ると、鏡に映った部屋と照明がはっきり見える。
+    // 平方根で変換して、中くらいの角度の反射を見やすくしている。
+    // 最小値を低く保ち、水たまりが黒い板に戻るのを防いでいる。
     const float viewAngleReflection = sqrt(saturate(fresnel));
     const float reflectionStrength = saturate(
         puddle * reflectionInside *
@@ -530,8 +571,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
         reflectedScene * reflectionGain + float3(0.023f, 0.032f, 0.037f),
         reflectionStrength);
 
-    // 高さの異なる霧を重ね、近距離の移動視認性を保ちながら遠景の輪郭を分離します。
-    // 部屋全体を一様に白くせず、床付近へ霧を集めます。
+    // 高さの違う霧を重ね、近くの見やすさを保ちながら、遠くの輪郭を分けている。
+    // 部屋全体を一様に白くせず、床の近くに霧を集めている。
     const float distanceFog =
         smoothstep(110.0f, 390.0f, distanceFromCamera) * 0.72f;
     const float heightFromFloor = max(input.worldPos.y + 100.0f, 0.0f);
@@ -549,6 +590,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     color.rgb = lerp(color.rgb, fogColor, fogFactor);
     color.rgb = ApplyFilmicHorrorGrade(color.rgb);
 
+    // デバッグ表示：1=法線、2=懐中電灯の影、3=照明だけ、4=水たまりの濃さ、5=反射の画像、7=タイルごとの光源の数（6は壁用なので黒）
     if (DebugViewMode == 1)
     {
         return float4(detailWorldNormal * 0.5f + 0.5f, 1.0f);
