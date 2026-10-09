@@ -6,7 +6,6 @@
 #include "Game.h"
 #include "Scene.h"
 #include "Renderer.h"
-#include "Texture2D.h"
 #include "ScreenDustOverlay.h"
 #include "Player.h"
 #include "DebugUI.h"

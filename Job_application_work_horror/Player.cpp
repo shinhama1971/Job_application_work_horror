@@ -427,11 +427,13 @@ void Player::Update()
     }
 
 
-	// 電池を回復するデバッグ用のキー入力（Bキー。今はRelease版でも有効になっている）
+    // 電池を回復するデバッグ用のキー入力（Bキー）。Release版では遊びに影響しないよう無効にしている
+#ifdef _DEBUG
     if (Input::GetKeyTrigger(VK_B))
     {
         AddBattery(50.0f);
     }
+#endif
 }
 
 // 一人称のときは体を見せず、デバッグ用の三人称のときだけメッシュを描いている。

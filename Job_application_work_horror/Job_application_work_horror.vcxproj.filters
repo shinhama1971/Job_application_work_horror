@@ -141,9 +141,6 @@
     <ClCompile Include="sound.cpp">
       <Filter>ソース ファイル\Audio</Filter>
     </ClCompile>
-    <ClCompile Include="Texture2D.cpp">
-      <Filter>ソース ファイル\Asset</Filter>
-    </ClCompile>
     <ClCompile Include="GamePersistence.cpp">
       <Filter>ソース ファイル\Core</Filter>
     </ClCompile>
@@ -283,9 +280,6 @@
       <Filter>ソース ファイル\Gameplay</Filter>
     </ClCompile>
     <ClCompile Include="ScareTrigger.cpp">
-      <Filter>ソース ファイル\Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="SpriteRenderer.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
     <ClCompile Include="StaticMesh.cpp">
@@ -488,9 +482,6 @@
     <ClInclude Include="Mesh.h">
       <Filter>ソース ファイル\Asset</Filter>
     </ClInclude>
-    <ClInclude Include="Texture2D.h">
-      <Filter>ソース ファイル\Asset</Filter>
-    </ClInclude>
     <ClInclude Include="IndexBuffer.h">
       <Filter>ソース ファイル\Core</Filter>
     </ClInclude>
@@ -628,9 +619,6 @@
     </ClInclude>
     <ClInclude Include="Item.h">
       <Filter>ソース ファイル\Gameplay</Filter>
-    </ClInclude>
-    <ClInclude Include="SpriteRenderer.h">
-      <Filter>ソース ファイル\Rendering</Filter>
     </ClInclude>
     <ClInclude Include="StaticMesh.h">
       <Filter>ソース ファイル\Warld</Filter>

@@ -12,21 +12,6 @@
 #include	<ShlObj.h>
 
 namespace utility {
-    // std::string のパスから、フォルダの部分を取り出している（今はどこからも使っていない）
-    std::filesystem::path get_directory(const std::string& path) {
-        return std::filesystem::path(path).parent_path();
-    }
-
-    // std::u8string のパスから、フォルダの部分を取り出している（今はどこからも使っていない）
-    std::filesystem::path get_directory(const std::u8string& path) {
-        return std::filesystem::path(path).parent_path();
-    }
-
-    // std::wstring のパスから、フォルダの部分を取り出している（今はどこからも使っていない）
-    std::filesystem::path get_directory(const std::wstring& path) {
-        return std::filesystem::path(path).parent_path();
-    }
-
 	// ワイド文字（UTF-16）を、Windowsの既定の文字コード（日本語環境ではShift-JIS）にしている
 	std::string wide_to_multi_winapi(std::wstring const& src)
 	{
