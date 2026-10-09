@@ -661,6 +661,7 @@
     <FxCompile Include="shader\bloomBlurHorizontalCS.hlsl" />
     <FxCompile Include="shader\bloomBlurVerticalCS.hlsl" />
     <FxCompile Include="shader\bloomExtractCS.hlsl" />
+    <FxCompile Include="shader\autoExposureCS.hlsl" />
     <FxCompile Include="shader\hudPS.hlsl" />
     <FxCompile Include="shader\hudVS.hlsl" />
   </ItemGroup>

@@ -172,7 +172,7 @@ Game::Draw
   2. 必要な場合のみPlanarReflection更新
   3. 監視映像などSceneの補助カメラ描画
   4. 深度プリパス（不透明な壁・床・扉の深度だけ）→ タイル別ライトリスト作成（Compute Shader）→ ワールドObject描画
-  5. PostProcess
+  5. PostProcess（ブルーム → 自動露出の測光 → 露出・画面効果の合成）
   6. SceneのHUD・画面演出
   7. Debug UI
 ```
@@ -251,6 +251,7 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 | 壁・床・天井の古さ、凹凸、部屋の角の暗がり | GPU（PS） | `GetWallAgeing`、`GetFloorAgeing`、`surfaceDetail.hlsli`、`roomOcclusion.hlsli` | 画像素材を読まずにワールド座標から計算する（メモリ帯域の代わりに計算量を使う） |
 | 水たまりの反射 | GPU | `PlanarReflection`（縦横半分の解像度） | 上下を反転したカメラで別に描画 |
 | ブルーム | GPU（CS） | `bloomExtractCS` → `bloomBlurHorizontalCS` → `bloomBlurVerticalCS` | ぼかしに使う画素を `groupshared` に一度読み込み、グループ内で使い回してテクスチャの読み込みを減らす |
+| 自動露出の測光と目の慣れ | GPU（CS） | `autoExposureCS.hlsl` | 4096点の明るさを1グループ256スレッドで合計する。結果はGPUのバッファに置いたまま露出のシェーダーが読み、CPUへ読み戻さない |
 | 画面効果（露出・光の筋・CRT風） | GPU（PS） | `FullScreenQuad` | 画面全体の画素ごとの処理 |
 
 処理の重さは `--benchmark` で、フレーム時間・CPU時間・描画パスごとのGPU時間（`GpuTimer`）を分けて計測します。
@@ -270,7 +271,7 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 | 遮蔽 | 部屋の形から解析的に求める角の暗がり（SSAOではない） | `roomOcclusion.hlsli` |
 | 懐中電灯 | 内側・外側の円錐による配光、レンズのむら、シャドウマップ。距離減衰は届く範囲の端で0になる減衰に、距離の2乗に反比例する物理的な減衰を3割ほど混ぜたもの | `flashlightLighting.hlsli`、`flashlightShadow.hlsli` |
 | 色空間 | テクスチャ・バックバッファとも `R8G8B8A8_UNORM` で、ガンマ空間のまま計算 | `Texture.cpp`、`Renderer.cpp` |
-| 露出 | シーンが決めた目標の露出（0.85〜1.20）へなめらかに近づける（画面の輝度は測っていない） | `PostProcess` |
+| 露出 | シーンが決めた目標の露出（演出の意図）に、Compute Shaderで測った画面の明るさの対数平均（中央を重く）から求めた目の慣れの倍率（0.95〜1.08）を掛ける。暗い所へは約3秒、明るい所へは約0.4秒で慣れる | `PostProcess`、`autoExposureCS.hlsl`、`exposurePS.hlsl` |
 
 ### PBRにしていない理由
 
@@ -284,7 +285,7 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 3. `Material` に roughness・metallic を追加する。
 4. 鏡面反射を Cook-Torrance（GGXの法線分布、Schlickのフレネル、Smithの幾何減衰）に、拡散光を `(1 - F)(1 - metallic) * albedo / π` にして、エネルギー保存を守る。
 5. 半球環境光を、キューブマップによるIBL（拡散の照度と、粗さごとの鏡面反射）に置き換える。
-6. 露出を、Compute Shaderで画面の平均輝度を求める自動露出にする。
+6. 自動露出（実装済み）を、HDRの値の平均輝度から露出を決める本来の形にし、倍率の範囲を広げる（今はガンマ空間の明るさを測り、ホラーの暗さを保つため倍率を小さい範囲に抑えている）。
 
 ### タイルベースライティングの既知の制限
 
