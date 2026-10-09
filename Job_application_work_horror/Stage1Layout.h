@@ -9,6 +9,7 @@
 #include "Stage1HiddenRoomEvent.h"
 #include "Stage1KeypadDoor.h"
 #include "Stage1WallWritings.h"
+#include "Stage1WestWing.h"
 #include "StageSurveillanceCameras.h"
 
 #include <SimpleMath.h>
@@ -67,6 +68,8 @@ struct StageObjects
     Stage1KeypadDoor::Parts keypad;
     // 暗証番号の扉の先の部屋の閉じ込めイベント（鍵・記録端末・影。扉はkeypad.doorと同じ）
     Stage1HiddenRoomEvent::Parts hiddenRoom;
+    // 西棟（浸水した機械室）の扉・鍵・3本目のヒューズ。西棟に入らないと先へ進めません。
+    Stage1WestWing::Parts westWing;
 
     // 生成したすべてのObjectの名前。Sceneの終了時にこの一覧で破棄します。
     // 名前での破棄は、すでに破棄されたObjectに対しても安全です。将来、途中で破棄されるObjectを

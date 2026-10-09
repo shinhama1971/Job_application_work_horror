@@ -229,6 +229,10 @@ void WaterEffectSystem::UpdateFallingDrops(float deltaTime)
 
 bool WaterEffectSystem::IsInsidePuddle(const Vector3& position) const
 {
+	if (IsInsideFloodRegion(position))
+	{
+		return true;
+	}
 	for (const Vector2& center : m_PuddleCenters)
 	{
 		const float offsetX = position.x - center.x;
@@ -244,6 +248,29 @@ bool WaterEffectSystem::IsInsidePuddle(const Vector3& position) const
 
 bool WaterEffectSystem::IsAnyPuddleVisible(const Camera& camera) const
 {
+	if (m_HasFloodRegion)
+	{
+		// 水に浸かった範囲を長い方向に4つへ分け、それぞれを囲む球で判定します。
+		// 範囲全体を1つの大きな球で囲むと、ほかの場所を見ているときも反射の描画が動いてしまうためです。
+		constexpr int SegmentCount = 4;
+		const Vector2 size = m_FloodMax - m_FloodMin;
+		const bool alongZ = size.y >= size.x;
+		const Vector2 segmentSize = alongZ
+			? Vector2(size.x, size.y / SegmentCount)
+			: Vector2(size.x / SegmentCount, size.y);
+		const float radius = segmentSize.Length() * 0.5f;
+		for (int index = 0; index < SegmentCount; ++index)
+		{
+			const float offset = (static_cast<float>(index) + 0.5f) / SegmentCount;
+			const Vector2 center = alongZ
+				? Vector2(m_FloodMin.x + size.x * 0.5f, m_FloodMin.y + size.y * offset)
+				: Vector2(m_FloodMin.x + size.x * offset, m_FloodMin.y + size.y * 0.5f);
+			if (camera.IsSphereVisible(Vector3(center.x, -99.35f, center.y), radius))
+			{
+				return true;
+			}
+		}
+	}
 	for (const Vector2& center : m_PuddleCenters)
 	{
 		// 水たまりは最大およそ48x34。余白込みの境界球で画面端の欠けを防ぎます。

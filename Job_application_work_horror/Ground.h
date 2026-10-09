@@ -26,6 +26,8 @@ class Ground :public Object
 		float RippleStrength;
 		float ReflectionStrength;
 		float Padding;
+		// 床一面が水に浸かった範囲（x・zの最小と最大）。範囲がないときは最小が最大より大きい値にします。
+		DirectX::SimpleMath::Vector4 FloodRect;
 	};
 	
 	// 頂点データ
@@ -65,6 +67,13 @@ public:
 		const DirectX::SimpleMath::Vector3& position) const;
 	// 反射面が画面外なら高コストな平面反射パスを丸ごと省略できます。
 	bool IsAnyPuddleVisible(const Camera& camera) const;
+	// x・z の範囲を、床一面が水に浸かった場所にします（1面の西棟）。描画・足音・波紋のすべてに反映されます。
+	void SetFloodRegion(
+		const DirectX::SimpleMath::Vector2& minimum,
+		const DirectX::SimpleMath::Vector2& maximum)
+	{
+		m_WaterEffects.SetFloodRegion(minimum, maximum);
+	}
 	bool IsPlanarReflectionSurfaceVisible(const Camera& camera) const override
 	{
 		return IsAnyPuddleVisible(camera);

@@ -258,6 +258,7 @@
     <ClCompile Include="FlashlightWriting.cpp" />
     <ClCompile Include="Stage1KeypadDoor.cpp" />
     <ClCompile Include="Stage1HiddenRoomEvent.cpp" />
+    <ClCompile Include="Stage1WestWing.cpp" />
     <ClCompile Include="KeyItem.cpp" />
     <ClCompile Include="Locker.cpp" />
     <ClCompile Include="CaptureMode.cpp" />
@@ -361,6 +362,7 @@
     <ClInclude Include="FlashlightWriting.h" />
     <ClInclude Include="Stage1KeypadDoor.h" />
     <ClInclude Include="Stage1HiddenRoomEvent.h" />
+    <ClInclude Include="Stage1WestWing.h" />
     <ClInclude Include="KeyItem.h" />
     <ClInclude Include="Locker.h" />
     <ClInclude Include="CaptureMode.h" />

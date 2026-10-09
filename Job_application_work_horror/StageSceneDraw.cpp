@@ -106,9 +106,10 @@ void StageScene::Draw(Camera* camera)
         {
             guideTarget = m_Objects.secondFuse->GetPosition();
         }
-        else if (fuseCount == 2 && m_CorridorLoopCount >= 2 && m_Objects.thirdFuse != nullptr)
+        else if (fuseCount == 2 && m_CorridorLoopCount >= 2)
         {
-            guideTarget = m_Objects.thirdFuse->GetPosition();
+            // 3本目は西棟の奥。鍵 → 西側の扉 → ヒューズの順に指します。
+            guideTarget = m_WestWing.GetGuideTarget();
         }
         else if (fuseCount >= 3)
         {
@@ -188,5 +189,6 @@ Stage1ObjectiveInput StageScene::MakeObjectiveInput() const
     input.fuseWatcherNotice = m_FuseWatcherNoticeTimer > 0.0f;
     input.loopNotice = m_LoopNoticeTimer > 0.0f;
     input.hiddenRoomText = m_HiddenRoom.GetObjectiveText();
+    input.westWingStep = static_cast<int>(m_WestWing.GetStep());
     return input;
 }

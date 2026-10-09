@@ -73,6 +73,7 @@ void StageScene::Init()
     m_WallWritings.Init(m_Objects.writings);
     m_KeypadDoor.Init(m_Objects.keypad);
     m_HiddenRoom.Init(m_Objects.hiddenRoom);
+    m_WestWing.Init(m_Objects.westWing);
     // 部屋の角の暗がり。床（y=-100）と天井の下面（y≒-48.5）の高さと、建物の壁の形を渡します。
     Renderer::SetRoomOcclusion(
         m_Objects.wallFootprints.data(),
@@ -201,6 +202,14 @@ void StageScene::Update()
     UpdateExitOmen(*player);
     UpdateWallWritings(*player);
     m_HiddenRoom.Update(*player, deltaTime, m_KeypadDoor.IsSolved());
+    // 西棟の進行と、水の滴る音・背後で水の中を歩く音などの物音です。
+    m_WestWingCues.clear();
+    m_WestWing.Update(*player, deltaTime, game->GetCamera()->GetForward(), m_WestWingCues);
+    for (const AmbientSoundCue& cue : m_WestWingCues)
+    {
+        game->PlayAudioCueAt(
+            cue.Label, cue.Position, cue.Pitch, cue.Volume, cue.MinimumOcclusion);
+    }
     UpdateTensionPulse(*player, deltaTime);
 
     Door* stageExitDoor = m_Objects.exitDoor;

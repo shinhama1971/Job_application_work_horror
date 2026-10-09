@@ -60,6 +60,10 @@ namespace Stage1Layout
         Ground* ground = builder.Create<Ground>("Ground");
         ground->SetPosition(0.0f, -100.0f, 0.0f);
         ground->SetScale(20.0f, 1.0f, 20.0f);
+        // 西棟は床一面が水に浸かっています（水たまりと同じ反射・波紋を、範囲全体に出します）。
+        ground->SetFloodRegion(
+            Vector2(Stage1WestWing::MinX, Stage1WestWing::MinZ),
+            Vector2(Stage1WestWing::MaxX, Stage1WestWing::MaxZ));
 
         // 壁
         Wall* wall1 = builder.Create<Wall>("Wall1");
@@ -74,9 +78,30 @@ namespace Stage1Layout
         wall3->SetPosition(0.0f, -74.0f, -180.0f);
         wall3->SetScale(440.0f, 50.0f, 4.0f);
 
+        // 西側の外壁は、西棟の扉（z=-35〜-5）の分だけ開けて2枚に分けます。
         Wall* wall4 = builder.Create<Wall>("Wall4");
-        wall4->SetPosition(-220.0f, -74.0f, 80.0f);
-        wall4->SetScale(4.0f, 50.0f, 520.0f);
+        wall4->SetPosition(-220.0f, -74.0f, -107.5f);
+        wall4->SetScale(4.0f, 50.0f, 145.0f);
+
+        Wall* wall4North = builder.Create<Wall>("Wall4North");
+        wall4North->SetPosition(-220.0f, -74.0f, 167.5f);
+        wall4North->SetScale(4.0f, 50.0f, 345.0f);
+
+        // 西棟（浸水した機械室）。西側の扉から入り、折り返しの多い通路を奥のポンプ室まで進みます。
+        // 仕切りの壁は東・西・東と交互に開けて、見通しの悪い蛇行通路にします。
+        const auto createWestWingWall = [&builder](const char* name, const Vector3& position, const Vector3& scale)
+        {
+            Wall* wall = builder.Create<Wall>(name);
+            wall->SetPosition(position.x, position.y, position.z);
+            wall->SetScale(scale.x, scale.y, scale.z);
+            return wall;
+        };
+        Wall* westWingOuter = createWestWingWall("WestWingOuter", Vector3(-380.0f, -74.0f, 80.0f), Vector3(4.0f, 50.0f, 364.0f));
+        Wall* westWingSouth = createWestWingWall("WestWingSouth", Vector3(-300.0f, -74.0f, -100.0f), Vector3(164.0f, 50.0f, 4.0f));
+        Wall* westWingNorth = createWestWingWall("WestWingNorth", Vector3(-300.0f, -74.0f, 260.0f), Vector3(164.0f, 50.0f, 4.0f));
+        Wall* westWingInner1 = createWestWingWall("WestWingInner1", Vector3(-320.0f, -74.0f, 0.0f), Vector3(120.0f, 50.0f, 4.0f));
+        Wall* westWingInner2 = createWestWingWall("WestWingInner2", Vector3(-280.0f, -74.0f, 80.0f), Vector3(120.0f, 50.0f, 4.0f));
+        Wall* westWingInner3 = createWestWingWall("WestWingInner3", Vector3(-320.0f, -74.0f, 160.0f), Vector3(120.0f, 50.0f, 4.0f));
 
         Wall* wall5 = builder.Create<Wall>("Wall5");
         wall5->SetPosition(-117.5f, -74.0f, 40.0f);
@@ -154,9 +179,10 @@ namespace Stage1Layout
 
         // 建物の壁だけに、パネルの継ぎ目・ひび・水の跡・カビを描きます（棚や配管などの小物には描きません）。
         for (Wall* structuralWall : {
-            wall1, wall2, wall3, wall4, wall5, wall6, wall7, wall8, wall9, wall10,
+            wall1, wall2, wall3, wall4, wall4North, wall5, wall6, wall7, wall8, wall9, wall10,
             wall11, wall12, wall13, wall13North, wall14, wall15,
-            loopWall1, loopWall2, loopWall3, loopWall4 })
+            loopWall1, loopWall2, loopWall3, loopWall4,
+            westWingOuter, westWingSouth, westWingNorth, westWingInner1, westWingInner2, westWingInner3 })
         {
             structuralWall->SetWeatheringSurface(true);
             const Vector3 position = structuralWall->GetPosition();
@@ -196,6 +222,12 @@ namespace Stage1Layout
         ceiling->SetCastsShadow(false);
         // 天井も建物の面として、天井板・外れた板の穴・雨漏りの染みを描きます（litTexturePS）。
         ceiling->SetWeatheringSurface(true);
+        // 西棟の天井（照明はなく、懐中電灯だけが頼りです）。
+        Wall* westWingCeiling = createStageProp("PropCeilingWestWing",
+            Vector3(-300.0f, -47.0f, 80.0f), Vector3(164.0f, 3.0f, 364.0f),
+            Color(0.055f, 0.06f, 0.058f, 1.0f), noEmission, 4.0f, false);
+        westWingCeiling->SetCastsShadow(false);
+        westWingCeiling->SetWeatheringSurface(true);
 
         createStageProp("PropPipeLeft", Vector3(-205.0f, -55.0f, 60.0f),
             Vector3(3.0f, 3.0f, 450.0f), darkMetal, noEmission, 22.0f, false);
@@ -210,8 +242,11 @@ namespace Stage1Layout
         createStageProp("PropPipeCrossHallRight", Vector3(132.5f, -52.5f, 177.0f),
             Vector3(175.0f, 2.5f, 2.5f), darkMetal, noEmission, 22.0f, false);
 
-        createStageProp("PropBaseboardLeft", Vector3(-217.2f, -96.5f, 80.0f),
-            Vector3(1.5f, 6.0f, 510.0f), trimColor, noEmission, 5.0f, false);
+        // 西側の幅木は、西棟の扉（z=-35〜-5）の前で途切れさせます。
+        createStageProp("PropBaseboardLeft", Vector3(-217.2f, -96.5f, -105.0f),
+            Vector3(1.5f, 6.0f, 140.0f), trimColor, noEmission, 5.0f, false);
+        createStageProp("PropBaseboardLeftNorth", Vector3(-217.2f, -96.5f, 165.0f),
+            Vector3(1.5f, 6.0f, 340.0f), trimColor, noEmission, 5.0f, false);
         createStageProp("PropBaseboardRight", Vector3(217.2f, -96.5f, 80.0f),
             Vector3(1.5f, 6.0f, 510.0f), trimColor, noEmission, 5.0f, false);
 
@@ -223,6 +258,39 @@ namespace Stage1Layout
             Vector3(36.0f, 22.0f, 14.0f), cabinetMetal, noEmission, 14.0f, true);
         createStageProp("PropServiceBox", Vector3(205.0f, -82.0f, 118.0f),
             Vector3(10.0f, 30.0f, 24.0f), cabinetMetal, noEmission, 12.0f, true);
+
+        // 書類保管室（廊下の西側の部屋）。目線より高い書類棚を互い違いに並べ、見通しの悪い迷路にします。
+        // 入口は x=-45 の壁の z=110〜130 です。
+        const Color shelfColor(0.13f, 0.12f, 0.10f, 1.0f);
+        createStageProp("PropArchiveShelf1", Vector3(-160.0f, -77.0f, 70.0f),
+            Vector3(80.0f, 44.0f, 6.0f), shelfColor, noEmission, 10.0f, true);
+        createStageProp("PropArchiveShelf2", Vector3(-105.0f, -77.0f, 100.0f),
+            Vector3(90.0f, 44.0f, 6.0f), shelfColor, noEmission, 10.0f, true);
+        createStageProp("PropArchiveShelf3", Vector3(-155.0f, -77.0f, 130.0f),
+            Vector3(90.0f, 44.0f, 6.0f), shelfColor, noEmission, 10.0f, true);
+        createStageProp("PropArchiveShelf4", Vector3(-110.0f, -77.0f, 158.0f),
+            Vector3(100.0f, 44.0f, 6.0f), shelfColor, noEmission, 10.0f, true);
+        createStageProp("PropArchiveDesk", Vector3(-200.0f, -89.0f, 160.0f),
+            Vector3(26.0f, 20.0f, 14.0f), cabinetMetal, noEmission, 12.0f, true);
+
+        // 崩れた資材置き場（北西の部屋）。崩れた資材と機材で視界を遮ります。
+        const Color debrisColor(0.12f, 0.11f, 0.095f, 1.0f);
+        createStageProp("PropDebris1", Vector3(-150.0f, -84.0f, 230.0f),
+            Vector3(40.0f, 30.0f, 30.0f), debrisColor, noEmission, 6.0f, true);
+        createStageProp("PropDebris2", Vector3(-95.0f, -88.0f, 285.0f),
+            Vector3(50.0f, 22.0f, 24.0f), debrisColor, noEmission, 6.0f, true);
+        createStageProp("PropDebris3", Vector3(-190.0f, -80.0f, 300.0f),
+            Vector3(30.0f, 38.0f, 40.0f), cabinetMetal, noEmission, 10.0f, true);
+        createStageProp("PropDebrisBeam", Vector3(-120.0f, -93.0f, 250.0f),
+            Vector3(60.0f, 6.0f, 6.0f), darkMetal, noEmission, 18.0f, true);
+
+        // 西棟の中の機材（ポンプと配管）。水の中に沈んだ機械室らしさを出します。
+        createStageProp("PropWestWingPump", Vector3(-345.0f, -86.0f, 235.0f),
+            Vector3(30.0f, 26.0f, 26.0f), darkMetal, noEmission, 20.0f, true);
+        createStageProp("PropWestWingTank", Vector3(-250.0f, -82.0f, 120.0f),
+            Vector3(20.0f, 34.0f, 30.0f), cabinetMetal, noEmission, 14.0f, true);
+        createStageProp("PropWestWingPipe", Vector3(-375.0f, -55.0f, 80.0f),
+            Vector3(3.0f, 3.0f, 350.0f), darkMetal, noEmission, 22.0f, false);
 
         createStageProp("PropExitColumnLeft", Vector3(-52.0f, -80.0f, 179.0f),
             Vector3(10.0f, 38.0f, 10.0f), darkMetal, noEmission, 8.0f, true);
@@ -314,12 +382,13 @@ namespace Stage1Layout
             Vector3(-196.0f, -95.0f, -160.0f),
             Vector3(-128.0f, -95.0f, -166.0f)
         };
-        // 3本目: 右の倉庫（棚の陰・奥の角・入口寄り）
+        // 3本目: 西棟の一番奥のポンプ室（ポンプの陰・奥の角・タンク寄り）。
+        // 右の倉庫で西棟の鍵を拾い、西側の扉を開けて浸水した通路を抜けないと取れません。
         const std::array<Vector3, 3> thirdFuseSpots =
         {
-            Vector3(150.0f, -95.0f, -140.0f),
-            Vector3(196.0f, -95.0f, -164.0f),
-            Vector3(122.0f, -95.0f, -98.0f)
+            Vector3(-345.0f, -95.0f, 210.0f),
+            Vector3(-365.0f, -95.0f, 250.0f),
+            Vector3(-245.0f, -95.0f, 240.0f)
         };
 
         Item* item1 = builder.Create<Item>("Item1");
@@ -332,6 +401,37 @@ namespace Stage1Layout
         Item* item3 = builder.Create<Item>("Item3");
         placeFuse(item3, thirdFuseSpots);
         item3->SetActive(false);
+
+        // 西棟の鍵。右の倉庫（もとは3本目のヒューズがあった部屋）のどこかに、2周目のループの後に現れます。
+        const std::array<Vector3, 3> westWingKeySpots =
+        {
+            Vector3(150.0f, -95.0f, -140.0f),
+            Vector3(196.0f, -95.0f, -164.0f),
+            Vector3(122.0f, -95.0f, -98.0f)
+        };
+        KeyItem* westWingKey = builder.Create<KeyItem>("Stage1WestWingKey");
+        {
+            std::uniform_int_distribution<std::size_t> pick(0, westWingKeySpots.size() - 1);
+            const Vector3& spot = westWingKeySpots[pick(fuseRandom)];
+            westWingKey->SetPosition(spot.x, spot.y, spot.z);
+        }
+        westWingKey->SetActive(false);
+
+        // 西棟の扉（西側の外壁の z=-35〜-5）。鍵を拾うまで開きません。
+        Door* westWingDoor = builder.Create<Door>("Stage1WestWingDoor");
+        westWingDoor->SetPosition(-220.0f, -74.0f, -20.0f);
+        westWingDoor->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
+        westWingDoor->SetLocked(true);
+
+        objects.westWing.door = westWingDoor;
+        objects.westWing.key = westWingKey;
+        objects.westWing.fuse = item3;
+
+        // 寄り道の報酬の電池（西棟の通路・崩れた資材置き場）。
+        BatteryItem* westWingBattery = builder.Create<BatteryItem>("Stage1WestWingBattery");
+        westWingBattery->SetPosition(-355.0f, -95.0f, 40.0f);
+        BatteryItem* debrisBattery = builder.Create<BatteryItem>("Stage1DebrisRoomBattery");
+        debrisBattery->SetPosition(-120.0f, -95.0f, 300.0f);
 
         // ドア
         Door* door = builder.Create<Door>("Door");

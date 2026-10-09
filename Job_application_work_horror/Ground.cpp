@@ -212,6 +212,11 @@ void Ground::Draw(Camera* cam)
 		0.92f + m_PowerReflectionBlend * 0.10f + surgeWave * 0.18f;
 	wetFloor.ReflectionStrength =
 		0.96f + m_PowerReflectionBlend * 0.22f + surgeWave * 0.12f;
+	wetFloor.FloodRect = m_WaterEffects.HasFloodRegion()
+		? DirectX::SimpleMath::Vector4(
+			m_WaterEffects.GetFloodMin().x, m_WaterEffects.GetFloodMin().y,
+			m_WaterEffects.GetFloodMax().x, m_WaterEffects.GetFloodMax().y)
+		: DirectX::SimpleMath::Vector4(1.0f, 1.0f, 0.0f, 0.0f);
 	devicecontext->UpdateSubresource(
 		m_WetFloorBuffer.Get(), 0, nullptr, &wetFloor, 0, 0);
 	ID3D11Buffer* wetFloorBuffer = m_WetFloorBuffer.Get();

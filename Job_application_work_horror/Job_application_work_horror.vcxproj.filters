@@ -252,6 +252,9 @@
     <ClCompile Include="Stage1HiddenRoomEvent.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="Stage1WestWing.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="KeyItem.cpp">
       <Filter>ソース ファイル\Gameplay</Filter>
     </ClCompile>
@@ -585,6 +588,9 @@
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="Stage1HiddenRoomEvent.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Stage1WestWing.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="KeyItem.h">

@@ -5,6 +5,22 @@
 
 #include "Stage1Objective.h"
 
+namespace
+{
+    // 3本目のヒューズを探す段階（西棟）の文章です。目的・ヒント（35秒・18秒）の3種類があります。
+    const char* SelectWestWingText(int westWingStep, int variant)
+    {
+        static const char* const Texts[3][3] =
+        {
+            { "右側の部屋で鍵を探す", "ヒント 右奥の部屋に鍵が落ちている", "ヒント 右側の部屋を確認する" },
+            { "西側の壁の扉を鍵で開ける", "ヒント 配電盤の近く、左の壁の扉", "ヒント 西側の壁沿いを探す" },
+            { "浸水した西棟の奥でヒューズを探す", "ヒント 水に浸かった通路の一番奥", "ヒント 西棟の奥へ進む" },
+        };
+        const int step = westWingStep < 1 ? 1 : (westWingStep > 3 ? 3 : westWingStep);
+        return Texts[step - 1][variant];
+    }
+}
+
 std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
 {
     std::string objectiveText;
@@ -22,7 +38,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
     {
         objectiveText = in.corridorLoopCount < 2
             ? "もう一度廊下の奥まで進む"
-            : "右側の部屋でヒューズを探す";
+            : SelectWestWingText(in.westWingStep, 0);
     }
     else
     {
@@ -163,7 +179,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         }
         else if (in.fuseCount == 2)
         {
-            objectiveText = "ヒント 右奥の部屋を探す";
+            objectiveText = SelectWestWingText(in.westWingStep, 1);
         }
         else
         {
@@ -198,7 +214,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         }
         else if (in.fuseCount == 2)
         {
-            objectiveText = "ヒント 右側の部屋を確認する";
+            objectiveText = SelectWestWingText(in.westWingStep, 2);
         }
         else
         {

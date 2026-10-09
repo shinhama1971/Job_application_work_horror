@@ -82,6 +82,19 @@ namespace
         { 41.0f, Vector3(0.0f, FloorY, 185.0f), 0.0f, 0.0f, nullptr, false },
         { 46.5f, Vector3(0.0f, FloorY, 240.0f), 0.0f, -0.10f, L"05_1面_ループ廊下の突き当たり", false },
         { 50.0f, Vector3(0.0f, FloorY, 245.0f), 0.0f, -0.10f, nullptr, false },
+        // 西棟（浸水した機械室）。入口の内側へ場面を切り替え、仕切りの切れ目を通って奥のポンプ室まで進みます。
+        { 50.05f, Vector3(-235.0f, FloorY, -85.0f), YawToward(-235.0f, -85.0f, -370.0f, -20.0f), -0.28f, nullptr, false },
+        { 52.5f, Vector3(-237.0f, FloorY, -82.0f), YawToward(-237.0f, -82.0f, -370.0f, -20.0f), -0.28f, L"05b_1面_西棟の浸水した通路", false },
+        { 54.0f, Vector3(-240.0f, FloorY, 25.0f), 0.0f, -0.10f, nullptr, false },
+        { 56.5f, Vector3(-245.0f, FloorY, 40.0f), -Pi * 0.5f, -0.10f, nullptr, false },
+        { 60.0f, Vector3(-355.0f, FloorY, 40.0f), -Pi * 0.5f, -0.05f, nullptr, false },
+        { 62.0f, Vector3(-360.0f, FloorY, 60.0f), 0.0f, -0.05f, nullptr, false },
+        { 64.5f, Vector3(-360.0f, FloorY, 115.0f), Pi * 0.5f, -0.05f, nullptr, false },
+        { 68.0f, Vector3(-250.0f, FloorY, 120.0f), Pi * 0.5f, -0.05f, nullptr, false },
+        { 70.0f, Vector3(-240.0f, FloorY, 140.0f), 0.0f, -0.05f, nullptr, false },
+        { 72.5f, Vector3(-240.0f, FloorY, 195.0f), -Pi * 0.4f, -0.10f, nullptr, false },
+        { 75.0f, Vector3(-280.0f, FloorY, 210.0f), YawToward(-280.0f, 210.0f, -345.0f, 235.0f), -0.15f, L"05c_1面_西棟のポンプ室", false },
+        { 77.0f, Vector3(-285.0f, FloorY, 212.0f), YawToward(-285.0f, 212.0f, -345.0f, 235.0f), -0.15f, nullptr, false },
     };
 
     // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉
@@ -364,6 +377,8 @@ namespace
         { "左の倉庫", Vector3(-150.0f, FloorY, -110.0f), 0.0f, -0.26f },
         { "暗証番号の扉", Vector3(12.0f, FloorY, 112.0f), Pi * 0.5f, -0.05f },
         { "ループ廊下", Vector3(0.0f, FloorY, 185.0f), 0.0f, 0.0f },
+        // 床一面が水に浸かった西棟。水面の反射（平面反射）が画面の広い範囲に出る場所です。
+        { "西棟（浸水した通路）", Vector3(-237.0f, FloorY, -82.0f), YawToward(-237.0f, -82.0f, -370.0f, -20.0f), -0.28f },
     };
 
     // 各段階のフレーム数。切り替え直後はGPU時間の結果が数フレーム遅れて届くため、捨てる区間を置きます。

@@ -140,10 +140,15 @@ WallAgeing ComputeWallAgeing(float3 worldPosition, float3 normal, float weight)
             saturate(1.0f - footprint / 0.5f);
 
         // --- ひび（ノイズの等高線を細い線として使い、別のノイズで出る場所を絞ります）
+        // 等高線だけだと大きな輪のような滑らかな曲線になるため、細かいノイズで線をギザギザに揺らし、
+        // さらに別のノイズで途切れ途切れにして、割れたひびらしくします。
+        const float2 crackWarp = float2(
+            FastValueNoise(uv * 0.9f + 3.0f), FastValueNoise(uv * 0.9f + 17.0f)) - 0.5f;
         const float crackLine = 1.0f - smoothstep(0.0f, 0.012f + footprint * 0.04f,
-            abs(FastValueNoise(uv * 0.085f + 61.0f) - 0.5f));
+            abs(FastValueNoise(uv * 0.085f + 61.0f + crackWarp * 0.22f) - 0.5f));
         const float crackMask = smoothstep(0.62f, 0.78f, FastValueNoise(uv * 0.021f + 9.0f));
-        crack = crackLine * crackMask * saturate(1.0f - footprint / 0.35f);
+        const float crackPieces = smoothstep(0.42f, 0.58f, FastValueNoise(uv * 0.32f + 41.0f));
+        crack = crackLine * crackMask * crackPieces * saturate(1.0f - footprint / 0.35f);
     }
 
     // --- 床際の水位線（水が溜まっていた跡）。高さは場所によって6〜12で揺らぎます

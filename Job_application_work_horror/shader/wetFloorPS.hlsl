@@ -16,6 +16,8 @@ cbuffer WetFloorBuffer : register(b10)
     float RippleStrength;
     float ReflectionStrength;
     float WetPadding;
+    // 床一面が水に浸かった範囲（xy = x・zの最小、zw = x・zの最大）。範囲がないときは最小が最大より大きい値です。
+    float4 FloodRect;
 }
 
 struct LIT_PS_IN
@@ -301,6 +303,17 @@ float4 main(in LIT_PS_IN input) : SV_Target
         input.worldPos.xz,
         shore,
         ripplePattern);
+    // 床一面が水に浸かった範囲（1面の西棟）。範囲の内側は全面を水たまりと同じに扱い、ゆるい波を立てます。
+    {
+        const float2 fromMinimum = input.worldPos.xz - FloodRect.xy;
+        const float2 toMaximum = FloodRect.zw - input.worldPos.xz;
+        const float insideDistance = min(
+            min(fromMinimum.x, fromMinimum.y), min(toMaximum.x, toMaximum.y));
+        const float flood = smoothstep(-0.5f, 1.5f, insideDistance);
+        ripplePattern += sin(input.worldPos.x * 0.21f + input.worldPos.z * 0.13f + WetTime * 0.9f) *
+            0.35f * flood * (1.0f - puddle);
+        puddle = max(puddle, flood);
+    }
     puddle *= smoothstep(0.55f, 0.92f, saturate(input.worldNormal.y));
     shore *= smoothstep(0.55f, 0.92f, saturate(input.worldNormal.y));
 

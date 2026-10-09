@@ -47,6 +47,10 @@ private:
     std::vector<WaterRipple> m_FootstepRipples;
     float m_FootstepRippleCooldown = 0.0f;
     float m_LensSplashCooldown = 0.0f;
+    // 床一面が水に浸かった範囲（1面の西棟）。水たまりと同じく足音が水音になり、波紋が立ちます。
+    bool m_HasFloodRegion = false;
+    DirectX::SimpleMath::Vector2 m_FloodMin;
+    DirectX::SimpleMath::Vector2 m_FloodMax;
 
     void UpdateFallingDrops(float deltaTime);
     void DrawFallingDrops(Camera* camera);
@@ -65,4 +69,22 @@ public:
     bool IsInsidePuddle(
         const DirectX::SimpleMath::Vector3& position) const;
     bool IsAnyPuddleVisible(const Camera& camera) const;
+    // x・z の範囲（minimum〜maximum）を、床一面が水に浸かった場所にします。
+    void SetFloodRegion(
+        const DirectX::SimpleMath::Vector2& minimum,
+        const DirectX::SimpleMath::Vector2& maximum)
+    {
+        m_HasFloodRegion = true;
+        m_FloodMin = minimum;
+        m_FloodMax = maximum;
+    }
+    bool IsInsideFloodRegion(const DirectX::SimpleMath::Vector3& position) const
+    {
+        return m_HasFloodRegion &&
+            position.x > m_FloodMin.x && position.x < m_FloodMax.x &&
+            position.z > m_FloodMin.y && position.z < m_FloodMax.y;
+    }
+    bool HasFloodRegion() const { return m_HasFloodRegion; }
+    DirectX::SimpleMath::Vector2 GetFloodMin() const { return m_FloodMin; }
+    DirectX::SimpleMath::Vector2 GetFloodMax() const { return m_FloodMax; }
 };
