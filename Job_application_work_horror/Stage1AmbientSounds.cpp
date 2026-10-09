@@ -1,7 +1,7 @@
 ﻿// ============================================================================
 // ファイルの役割: 1面で、姿の見えない物音（天井裏の足音・配管を叩く音・遠くの扉）を
-//                 ランダムな間隔と場所で起こします。
-// 主な技術: 立体音響と組み合わせた環境演出、乱数による出現制御、時間差で鳴らす音の予約
+//                 ランダムな間隔と場所で起こしている。
+// 主な技術: 立体音響と組み合わせた環境の演出、乱数による出現の制御、時間をずらして鳴らす音の予定
 // ============================================================================
 
 #include "Stage1AmbientSounds.h"
@@ -17,7 +17,7 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
-    // 1面の施設の広さ（壁の内側）。この外で鳴る音は選びません。
+    // 1面の施設の広さ（壁の内側。西棟は含めていない）。この外で鳴る音は選ばない。
     constexpr float StageMinX = -205.0f;
     constexpr float StageMaxX = 205.0f;
     constexpr float StageMinZ = -170.0f;
@@ -25,11 +25,11 @@ namespace
     constexpr float CeilingVoidY = -44.0f;  // 天井板（y=-47付近）のすぐ上
     constexpr float Pi = 3.14159265f;
 
-    // 見ていない方向（背後・横）から鳴らすと、振り向いても何もいない怖さが出ます。
-    // 視線との内積がこの値以下の場所だけを選びます（0で真横、負で背後寄り）。
+    // 見ていない方向（背後・横）から鳴らすと、振り向いても何もいない怖さが出る。
+    // 視線との内積がこの値以下の場所だけを選んでいる（0で真横、負で背後寄り）。
     constexpr float MaxFacingDot = 0.35f;
 
-    // 壁際の配管。Stage1Layoutの配管（PropPipe...）に沿った線分です。
+    // 壁際の配管。Stage1Layoutの配管（PropPipe...）に沿った線分。
     struct PipeSegment
     {
         Vector3 Start;
@@ -45,7 +45,7 @@ namespace
         { Vector3(45.0f, -52.5f, 177.0f), Vector3(205.0f, -52.5f, 177.0f) }
     }};
 
-    // 聞き手から見て、距離が範囲内で、しかも視線の外にある場所かどうか。
+    // 聞き手から見て、距離が範囲内で、しかも視線の外にある場所かどうかを返している。
     bool IsUnseenSpot(
         const Vector3& spot,
         const Vector3& listenerPosition,
@@ -69,6 +69,7 @@ namespace
         return forward.Dot(toSpot / distance) <= MaxFacingDot;
     }
 
+    // 施設の広さの中にあるか
     bool IsInsideStage(const Vector3& position)
     {
         return position.x >= StageMinX && position.x <= StageMaxX &&
@@ -76,6 +77,7 @@ namespace
     }
 }
 
+// 予定をすべて消し、最初の物音までの時間に戻している
 void Stage1AmbientSounds::Reset()
 {
     m_Scheduled.clear();
@@ -93,7 +95,7 @@ void Stage1AmbientSounds::Update(
 {
     if (!allowed)
     {
-        // 台本の演出と重ならないよう、鳴っている途中の物音も打ち切り、待ち時間も止めます。
+        // 台本の演出と重ならないよう、鳴っている途中の物音も打ち切り、待ち時間も止めている。
         m_Scheduled.clear();
         return;
     }
@@ -103,13 +105,14 @@ void Stage1AmbientSounds::Update(
         m_WaitTimer -= deltaTime;
         if (m_WaitTimer <= 0.0f)
         {
-            // 条件に合う場所が見つからないときは、少し待ってから選び直します。
+            // 条件に合う場所が見つからないときは、少し待ってから（4秒後に）選び直している。
             m_WaitTimer = TryStartEvent(powerRestored, listenerPosition, listenerForward)
                 ? NextInterval(powerRestored)
                 : 4.0f;
         }
     }
 
+    // 予定の時間が来た音を、このフレームに鳴らす音として渡している
     for (ScheduledCue& scheduled : m_Scheduled)
     {
         scheduled.Delay -= deltaTime;
@@ -124,6 +127,7 @@ void Stage1AmbientSounds::Update(
     });
 }
 
+// 台本の演出から、天井裏の足音をすぐに始めている
 bool Stage1AmbientSounds::StartCeilingStepsNow(
     bool powerRestored,
     const Vector3& listenerPosition,
@@ -143,8 +147,8 @@ bool Stage1AmbientSounds::TryStartEvent(
     const Vector3& listenerPosition,
     const Vector3& listenerForward)
 {
-    // 同じ種類が続かないよう、前回と違う種類から順に試します。
-    // 扉の音は目立つので、足音・配管より出にくくします。
+    // 同じ種類が続かないよう、前回と違う種類から順に試している。
+    // 扉の音は目立つので、足音・配管より出にくくしている。
     std::array<Kind, 3> order = { Kind::CeilingSteps, Kind::PipeKnocks, Kind::DistantDoor };
     std::shuffle(order.begin(), order.end(), m_Random);
     if (RandomRange(0.0f, 1.0f) < 0.6f && order[0] == Kind::DistantDoor)
@@ -168,7 +172,7 @@ bool Stage1AmbientSounds::TryStartEvent(
             scheduled = SchedulePipeKnocks(listenerPosition, listenerForward);
             break;
         case Kind::DistantDoor:
-            // 電力が戻る前の施設は静まり返っているため、扉が動くのは電力復旧後だけにします。
+            // 電力が戻る前の施設は静まり返っているため、扉が動くのは電力が戻った後だけにしている。
             scheduled = powerRestored &&
                 ScheduleDistantDoor(listenerPosition, listenerForward);
             break;
@@ -182,7 +186,7 @@ bool Stage1AmbientSounds::TryStartEvent(
     return false;
 }
 
-// 背後の少し離れた天井裏から、プレイヤーの近くを通り過ぎるように足音が歩いていきます。
+// 背後の少し離れた天井裏から、プレイヤーの近くを通り過ぎるように足音が歩いていく。
 bool Stage1AmbientSounds::ScheduleCeilingSteps(
     const Vector3& listenerPosition,
     const Vector3& listenerForward)
@@ -197,7 +201,7 @@ bool Stage1AmbientSounds::ScheduleCeilingSteps(
 
     for (int attempt = 0; attempt < 10; ++attempt)
     {
-        // 真後ろから左右100度の範囲で、少し離れた場所から歩き始めます。
+        // 真後ろから左右100度の範囲で、少し離れた場所（85〜125）から歩き始めている。
         const float angle = RandomRange(-100.0f, 100.0f) * Pi / 180.0f;
         const float distance = RandomRange(85.0f, 125.0f);
         Vector3 start = listenerPosition +
@@ -208,7 +212,7 @@ bool Stage1AmbientSounds::ScheduleCeilingSteps(
             continue;
         }
 
-        // プレイヤーの真上を少し外れた場所へ向かって歩きます。
+        // プレイヤーの真上を少し外れた場所へ向かって歩いている。
         Vector3 target = listenerPosition + right * RandomRange(-28.0f, 28.0f);
         target.y = CeilingVoidY;
         Vector3 direction = target - start;
@@ -218,6 +222,7 @@ bool Stage1AmbientSounds::ScheduleCeilingSteps(
         }
         direction.Normalize();
 
+        // 歩幅18で5〜7歩、0.54〜0.66秒おきに鳴らしている（施設の外に出たらそこで止める）
         constexpr float Stride = 18.0f;
         const int stepCount = 5 + static_cast<int>(RandomRange(0.0f, 2.99f));
         const float stepInterval = RandomRange(0.54f, 0.66f);
@@ -233,12 +238,13 @@ bool Stage1AmbientSounds::ScheduleCeilingSteps(
             scheduled.Delay = stepInterval * static_cast<float>(step);
             scheduled.Cue.Label = SOUND_CUE_FOOTSTEP;
             scheduled.Cue.Position = position;
-            // 人より重く低い足音にし、左右の足でわずかに高さを変えます。
+            // 人より重く低い足音にし、左右の足でわずかに音の高さを変えている。
             scheduled.Cue.Pitch = (step % 2 == 0) ? 0.60f : 0.66f;
             scheduled.Cue.Volume = 1.9f;
             scheduled.Cue.MinimumOcclusion = 0.72f;
             m_Scheduled.push_back(scheduled);
         }
+        // 3歩以上鳴らせる道筋が見つかったら決定している
         if (m_Scheduled.size() >= 3)
         {
             return true;
@@ -248,13 +254,14 @@ bool Stage1AmbientSounds::ScheduleCeilingSteps(
     return false;
 }
 
-// 壁際の配管を、見えない何かが2〜4回叩きます。
+// 壁際の配管を、見えない何かが2〜4回叩いている。
 bool Stage1AmbientSounds::SchedulePipeKnocks(
     const Vector3& listenerPosition,
     const Vector3& listenerForward)
 {
     std::uniform_int_distribution<int> segmentDistribution(
         0, static_cast<int>(PipeSegments.size()) - 1);
+    // 配管の線分の上から、視線の外で60〜200離れた場所を探している
     for (int attempt = 0; attempt < 16; ++attempt)
     {
         const PipeSegment& segment = PipeSegments[
@@ -278,7 +285,7 @@ bool Stage1AmbientSounds::SchedulePipeKnocks(
             scheduled.Cue.Pitch = RandomRange(0.88f, 1.08f);
             scheduled.Cue.Volume = 1.2f;
             m_Scheduled.push_back(scheduled);
-            // 一定の間隔にせず、ためらうような間を空けます。
+            // 一定の間隔にせず、ためらうような間を空けている。
             delay += RandomRange(0.42f, 0.90f);
         }
         return true;
@@ -286,7 +293,7 @@ bool Stage1AmbientSounds::SchedulePipeKnocks(
     return false;
 }
 
-// 離れた扉が、誰もいないのにきしみます。
+// 離れた扉が、誰もいないのにきしんでいる。
 bool Stage1AmbientSounds::ScheduleDistantDoor(
     const Vector3& listenerPosition,
     const Vector3& listenerForward)
@@ -296,12 +303,14 @@ bool Stage1AmbientSounds::ScheduleDistantDoor(
         Vector3(0.0f, -74.0f, 40.0f),       // 中央の廊下の扉
         Vector3(202.0f, -74.0f, 307.5f)     // 出口の扉
     };
+    // 監視カメラで見られる閉ざされた扉も候補に加えている
     for (const StageSealedDoor& sealed : StageSealedDoors)
     {
         doors.emplace_back(sealed.Position[0], sealed.Position[1], sealed.Position[2]);
     }
     std::shuffle(doors.begin(), doors.end(), m_Random);
 
+    // 視線の外で90〜260離れた扉を1つ選んでいる
     for (const Vector3& door : doors)
     {
         if (!IsUnseenSpot(door, listenerPosition, listenerForward, 90.0f, 260.0f))
@@ -320,12 +329,14 @@ bool Stage1AmbientSounds::ScheduleDistantDoor(
     return false;
 }
 
+// minimum〜maximumの一様な乱数を返している
 float Stage1AmbientSounds::RandomRange(float minimum, float maximum)
 {
     std::uniform_real_distribution<float> distribution(minimum, maximum);
     return distribution(m_Random);
 }
 
+// 次の物音までの間隔を決めている（電力が戻っていれば0.72倍）
 float Stage1AmbientSounds::NextInterval(bool powerRestored)
 {
     const float interval = RandomRange(MinInterval, MaxInterval);

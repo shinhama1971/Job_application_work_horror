@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: カリング、影、水面反射、本描画の順序を管理します。
-// 主な技術: マルチパス描画、シャドウマップ、視錐台カリング、ポストプロセス
+// ファイルの役割: 1フレームの描画の順番（影 → 水面の反射 → 監視映像 → 本描画 → 画面効果 → HUD）と、描かない物の省き方を管理している。
+// 主な技術: 何段階にも分けた描画、シャドウマップ、視錐台カリング、ポストプロセス、描き直す頻度の調整
 // ============================================================================
 
 #include "Game.h"
@@ -16,12 +16,13 @@
 
 namespace
 {
+    // カリングに使う境界球を、見える側に寄せて大きめに作っている
     WorldBoundingSphere GetConservativeCullingBounds(const Object& object)
     {
         if (object.HasModelBounds())
         {
             WorldBoundingSphere bounds = object.GetWorldBoundingSphere();
-            // 既存の画面端余白を維持し、実モデルBoundsでも急な消失を防ぎます。
+            // 画面端の余白を残し、実際のモデルの大きさを使った境界球でも急に消えないようにしている。
             bounds.Radius += 3.0f;
             return bounds;
         }
@@ -29,12 +30,13 @@ namespace
         const DirectX::SimpleMath::Vector3 scale = object.GetScale();
         WorldBoundingSphere bounds;
         bounds.Center = object.GetPosition();
-        // コード生成メッシュは従来どおりScaleの半対角と余白を使います。
+        // コードで頂点を作ったメッシュは、大きさ（Scale）の対角線の半分に余白を足した半径にしている。
         bounds.Radius = 0.5f * std::sqrt(
             scale.x * scale.x + scale.y * scale.y + scale.z * scale.z) + 3.0f;
         return bounds;
     }
 
+    // カメラに映るかを判定している（カリングしない設定のObjectは常に描いている）
     bool IsVisibleToCamera(
         const Object& object,
         const Camera& camera,
@@ -51,6 +53,7 @@ namespace
             bounds.Center, bounds.Radius, testVertical);
     }
 
+    // 影を落とす可能性があるかを判定している（影の届く距離の中にあり、視野の近くにある物だけ）
     bool IsRelevantToShadowMap(const Object& object, const Camera& camera)
     {
         const WorldBoundingSphere bounds =
@@ -58,8 +61,8 @@ namespace
         const float radius = bounds.Radius;
         const DirectX::SimpleMath::Vector3 offset =
             bounds.Center - camera.GetPosition();
-        // 投影far=280の境界に大きな物体の一部が掛かる場合を残すため、
-        // 中心距離の判定には半径と固定余白を加えます。
+        // 影の投影のfar=280の境目に大きな物の一部が掛かる場合も残すため、
+        // 中心までの距離の判定には半径と固定の余白を足している。
         const float shadowRange = 292.0f + radius;
         const float distanceSquared =
             offset.x * offset.x + offset.y * offset.y + offset.z * offset.z;
@@ -67,6 +70,7 @@ namespace
             camera.IsSphereVisible(bounds.Center, radius + 18.0f, false);
     }
 
+    // 水面の反射に映す価値があるかを、距離で判定している
     bool IsNearEnoughForReflection(const Object& object, const Camera& camera)
     {
         const WorldBoundingSphere bounds =
@@ -74,8 +78,8 @@ namespace
         const float radius = bounds.Radius;
         const DirectX::SimpleMath::Vector3 offset =
             bounds.Center - camera.GetPosition();
-        // 1/6解像度では判別できない遠景を省きます。大型物だけはradius分を
-        // 判定距離へ加え、背景になる壁が欠けないようにします。
+        // 縦横半分の解像度の反射では見分けにくい遠くの物は省いている。大きな物だけは半径の分を
+        // 判定の距離に足し、背景になる壁が欠けないようにしている。
         const float reflectionRange = 230.0f + radius;
         return offset.x * offset.x + offset.y * offset.y + offset.z * offset.z <=
             reflectionRange * reflectionRange;
@@ -85,6 +89,7 @@ namespace
 
 namespace Core
 {
+    // 監視カメラなどの補助カメラの視点で、補助の映像に映してよいObjectだけを描いている
     void Game::DrawWorldForAuxiliaryCamera(Camera& camera)
     {
         for (auto& object : m_ObjectManager.GetAllObjects())
@@ -97,17 +102,17 @@ namespace Core
         }
     }
 
-    // 影・反射などの事前パスを必要なフレームだけ更新し、
-    // 本描画をPostProcessへ取り込んでからHUDとデバッグUIを重ねます。
-    //
+    // 影・反射などの事前の描画は必要なフレームだけ更新し、
+    // 本描画を画面効果に取り込んでから、HUDとデバッグ画面を重ねている。
+    // GPU時間は描画の段階ごとにGpuTimerで測っている。
     void Game::Draw()
     {
         Debug::UI::BeginFrame();
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
         m_Instance->m_GpuTimer.BeginFrame(context);
 
-        // 光を放つObjectから、このフレームの点光源を集めてGPUへ送ります。
-        // 以降の反射・監視映像パスでは全光源を、本描画ではタイル別リストを使います。
+        // 光を放つObjectから、このフレームの点光源を集めてGPUへ送っている。
+        // この後の反射・監視映像の描画では全部の光源を、本描画ではタイルごとのリストを使っている。
         m_Instance->m_FramePointLights.clear();
         for (const auto& object : m_Instance->m_ObjectManager.GetAllObjects())
         {
@@ -125,12 +130,14 @@ namespace Core
         unsigned int reflectionDrawn = 0;
         unsigned int reflectionCulled = 0;
         bool reflectionSkipped = false;
+        // 影を描き直す間隔：エフェクト設定が高なら毎フレーム、中なら2フレーム、低なら3フレームに1回
         const unsigned int shadowInterval =
             m_Instance->m_Settings.GetEffectLevel() >= 2
                 ? 1u
                 : (m_Instance->m_Settings.GetEffectLevel() == 1 ? 2u : 3u);
         const bool updateShadow =
             (m_Instance->m_ShadowFrameIndex++ % shadowInterval) == 0u;
+        // 影：影を落とす物だけを、ライトから見た深度としてシャドウマップへ描いている
         if (updateShadow)
         {
             m_Instance->m_GpuTimer.BeginPass(GpuPass::Shadow, context);
@@ -154,12 +161,14 @@ namespace Core
             m_Instance->m_ShadowMap.End();
             m_Instance->m_GpuTimer.EndPass(GpuPass::Shadow, context);
         }
+        // 描き直さないフレームは、前に描いたシャドウマップをそのまま使っている
         else
         {
             m_Instance->m_GpuTimer.SkipPass(GpuPass::Shadow);
             m_Instance->m_ShadowMap.Bind();
         }
 
+        // 水面の反射は1面だけ。水たまりが画面に映っているかを先に調べている
         if (m_Instance->m_CurrentScene == SceneName::Stage)
         {
             bool reflectionVisible = false;
@@ -175,8 +184,8 @@ namespace Core
                 }
             }
 
-            // 移動中は反射カメラも動くため毎フレーム更新します。静止中は反射像を
-            // 再利用し、ドアや照明の変化を拾うためだけに低頻度で更新します。
+            // 移動中は反射カメラも動くため毎フレーム描き直している。止まっている間は反射像を
+            // 使い回し、扉や照明の変化を拾うためだけに、間隔をあけて描き直している。
             const DirectX::SimpleMath::Vector3 reflectionCameraPosition =
                 m_Instance->m_Camera.GetPosition();
             const DirectX::SimpleMath::Vector3 reflectionCameraForward =
@@ -201,7 +210,7 @@ namespace Core
             const unsigned int reflectionInterval = reflectionCameraMoved
                 ? movingReflectionInterval
                 : (std::max)(movingReflectionInterval, idleReflectionInterval);
-            // 水面が画面へ入った最初のフレームは直ちに更新し、古い反射を見せません。
+            // 水面が画面に入った最初のフレームはすぐに描き直し、古い反射を見せないようにしている。
             const bool updateReflection = reflectionVisible &&
                 (!m_Instance->m_WasReflectionVisible ||
                     (m_Instance->m_ReflectionFrameIndex++ %
@@ -210,6 +219,7 @@ namespace Core
             {
                 m_Instance->m_GpuTimer.BeginPass(
                     GpuPass::Reflection, context);
+                // 床の高さ（-99.5）を鏡の面にして、上下を反転したカメラで描いている
                 m_Instance->m_PlanarReflection.Begin(
                     m_Instance->m_Camera,
                     -99.5f);
@@ -222,8 +232,8 @@ namespace Core
                         continue;
                     }
 
-                    // 反射カメラは上下が反転するため、左右・前後・距離だけを判定します。
-                    // これにより縦方向の誤判定を避けつつ廊下後方を大きく削減できます。
+                    // 反射カメラは上下が反転するため、左右・前後・距離だけを判定している。
+                    // これで上下方向の判定ミスを避けつつ、廊下の後ろ側の物を大きく減らしている。
                     if (!IsVisibleToCamera(*o, m_Instance->m_Camera, false) ||
                         !IsNearEnoughForReflection(*o, m_Instance->m_Camera))
                     {
@@ -245,6 +255,7 @@ namespace Core
                     reflectionCameraForward;
                 m_Instance->m_HasReflectionCameraPose = true;
             }
+            // 描き直さないフレームは、前の反射像を使っている（水面が見えていなければ省いたことを記録している）
             else
             {
                 m_Instance->m_GpuTimer.SkipPass(GpuPass::Reflection);
@@ -260,15 +271,16 @@ namespace Core
             m_Instance->m_HasReflectionCameraPose = false;
         }
 
-        // 監視映像などSceneが持つ補助カメラは、本描画の前に描いておきます。
+        // 監視映像など、Sceneが持つ補助カメラの映像は、本描画の前に描いておいている。
         if (m_Instance->m_Scene)
         {
             m_Instance->m_Scene->RenderOffscreen();
         }
 
+        // 本描画：レンダーターゲットを消してから、カメラに映る物だけを描いている
         m_Instance->m_GpuTimer.BeginPass(GpuPass::MainScene, context);
         Renderer::DrawStart();
-        // プレイヤー視点のタイル別ライトリストをCompute Shaderで作ってから描きます。
+        // プレイヤー視点のタイルごとのライトリストを、Compute Shaderで作ってから描いている。
         m_Instance->m_TiledLighting.BuildTiles(m_Instance->m_Camera);
 
         for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
@@ -287,6 +299,7 @@ namespace Core
         }
         m_Instance->m_GpuTimer.EndPass(GpuPass::MainScene, context);
 
+        // デバッグ画面に表示する、描いた数と省いた数を渡している
         Debug::UI::SetCullingStats(
             mainDrawn,
             mainCulled,
@@ -296,18 +309,20 @@ namespace Core
             reflectionCulled,
             reflectionSkipped);
 
+        // 描き終えた画面を取り込み、露出・ブルーム・光の筋・ノイズなどの画面効果を重ねている
         m_Instance->m_GpuTimer.BeginPass(GpuPass::PostProcess, context);
         m_Instance->m_PostProcess.CaptureBackBuffer();
         m_Instance->m_PostProcess.Draw(&m_Instance->m_GpuTimer);
         m_Instance->m_GpuTimer.EndPass(GpuPass::PostProcess, context);
 
-        // ブルーム後にHUDと画面表示を描き、文字の輪郭がぼけないようにします。
+        // ブルームの後にHUDと画面の文字を描き、文字の輪郭がぼけないようにしている。
         if (m_Instance->m_Scene)
         {
             m_Instance->m_Scene->Draw(&m_Instance->m_Camera);
         }
         Debug::UI::Draw(m_Instance->m_PostProcess);
 
+        // GPU時間の計測を締めくくり、画面に表示している（Present）
         m_Instance->m_GpuTimer.EndFrame(context);
         Renderer::DrawEnd();
     }

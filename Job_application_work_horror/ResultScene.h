@@ -1,6 +1,6 @@
 ﻿// ============================================================================
-// ファイルの役割: ゲーム終了後の評価とリザルト画面を管理します。
-// 主な技術: Scene継承、記録集計、2D UI、入力遷移
+// ファイルの役割: クリアした後の評価を表示するリザルト画面を管理している。
+// 主な技術: Sceneの継承、成績の集計、2DのUI、入力によるシーンの切り替え
 // ============================================================================
 
 #pragma once
@@ -10,28 +10,30 @@
 #include "Hud.h"
 
 #include <string>
-// ResultSceneクラス
+// ResultSceneクラス：クリアタイム・捕まった回数・今回の発見などを表示し、タイトルへ戻るかもう一度遊ぶかを選ばせている
 class ResultScene : public Scene
 {
 private:
-	std::vector<Object*> m_MySceneObjects; // このシーンのオブジェクト
+	std::vector<Object*> m_MySceneObjects; // このシーンのObject（今は使っていない）
 
-	void Init(); // 初期化
-	void Uninit(); // 終了処理
-	Sound m_Sound;//サウンド
+	void Init(); // HUDを準備し、画面効果をリザルト用の落ち着いた設定にしている
+	void Uninit(); // 画面効果の設定を普段の値に戻している
+	Sound m_Sound; // 音（今は使っていない。音はGameのSoundで鳴らしている）
+	// リザルト画面を描くHUD、画面を開いてからの経過秒
 	Hud m_Hud;
 	float m_ResultTimer = 0.0f;
-	// 2階で今回出た異変の名前（「時計・壁のノック」など）。開始時に一度だけ作ります。
+	// 2階で今回出た異変の名前（「時計・壁のノック」など）。始めるときに一度だけ作っている。
 	std::string m_Stage2AnomalyText;
 
 public:
-	ResultScene(); // コンストラクタ
-	~ResultScene(); // デストラクタ
+	ResultScene(); // コンストラクタ（Initを呼んでいる）
+	~ResultScene(); // デストラクタ（Uninitを呼んでいる）
 
-	void Update(); // 更新
+	void Update(); // 少し待ってから、もう一度遊ぶ・タイトルへ戻る入力を受け付けている
+	// 成績をHUDで描いている
 	void Draw(Camera* camera) override;
-	void SetScore(int c); // スコア設定
-	static int s_Score;      // スコア保存用
-	static int s_NextScene;  // 次のシーンID保存用 (SCENE_ID を int で扱います)
+	void SetScore(int c); // （宣言だけで、どこからも使っていない）
+	static int s_Score;      // （宣言だけで、どこからも使っていない）
+	static int s_NextScene;  // （宣言だけで、どこからも使っていない）
 };
 

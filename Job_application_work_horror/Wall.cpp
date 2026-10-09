@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: 壁の形状、材質、衝突範囲、影の有無を管理します。
-// 主な技術: プロシージャルメッシュ、AABB、最近傍面への押し戻し、SRT行列
+// ファイルの役割: 箱の形をした壁（と、同じ形を使う棚・配管・目印などの小物）の形・色・当たり判定・影の有無を管理している。
+// 主な技術: コードで作る箱のメッシュ、AABBの当たり判定、一番近い面への押し戻し、拡大・回転・移動の行列
 // ============================================================================
 
 #include "Wall.h"
@@ -14,6 +14,7 @@
 
 using namespace DirectX::SimpleMath;
 
+// 原点を中心にした1x1x1の箱（6面）を作り、灰色のコンクリートのマテリアルを用意している
 void Wall::Init()
 {
     m_Vertices.clear();
@@ -23,6 +24,7 @@ void Wall::Init()
 
     const Color vertexColor(1.0f, 1.0f, 1.0f, 1.0f);
 
+    // 四角形の面を1枚追加している
     const auto addFace = [this, &vertexColor](
         const std::array<Vector3, 4>& positions,
         const Vector3& normal)
@@ -46,8 +48,8 @@ void Wall::Init()
             m_Vertices.push_back(vertex);
         }
 
-        // 表裏両方の頂点順を持たせ、どちら側からでも壁を表示します。
-        // 部屋配置を調整中でも裏面欠けを起こさないためです。
+        // 表と裏の両方の頂点の順番を持たせ、どちら側からでも壁が見えるようにしている。
+        // 部屋の配置を調整している途中でも、裏の面が欠けないようにするためである。
         const unsigned int faceIndices[] =
         {
             base + 0, base + 1, base + 2,
@@ -62,6 +64,7 @@ void Wall::Init()
         );
     };
 
+    // 前・後ろ・右・左・上・下の6面
     addFace(
         { Vector3(-0.5f, -0.5f, 0.5f), Vector3(-0.5f, 0.5f, 0.5f),
           Vector3(0.5f, -0.5f, 0.5f), Vector3(0.5f, 0.5f, 0.5f) },
@@ -98,6 +101,7 @@ void Wall::Init()
     m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
     m_Material = std::make_unique<Material>();
+    // 普段の色：くすんだ灰色、光沢は弱い
     m_SurfaceMaterial.Diffuse = Color(0.34f, 0.36f, 0.33f, 1.0f);
     m_SurfaceMaterial.Ambient = Color(0.03f, 0.035f, 0.03f, 1.0f);
     m_SurfaceMaterial.Specular = Color(0.04f, 0.04f, 0.04f, 1.0f);
@@ -107,10 +111,12 @@ void Wall::Init()
     m_Material->Create(m_SurfaceMaterial);
 }
 
+// 動かないので、毎フレームの処理はない
 void Wall::Update()
 {
 }
 
+// 箱を描いている（非表示なら何もしない）
 void Wall::Draw(Camera* cam)
 {
     if (!m_Visible)
@@ -141,6 +147,7 @@ void Wall::Draw(Camera* cam)
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
 }
 
+// 影を作るための描画（深度だけ）
 void Wall::DrawShadow()
 {
     if (!m_Visible || !m_CastsShadow)
@@ -164,6 +171,7 @@ void Wall::DrawShadow()
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
 }
 
+// プレイヤーの円が箱にめり込んでいたら押し出している。回転は考えず、上から見た長方形として扱っている
 void Wall::ResolveCollision(Vector3& position, float radius) const
 {
     if (!m_Visible || !m_CollisionEnabled)
@@ -179,6 +187,7 @@ void Wall::ResolveCollision(Vector3& position, float radius) const
     const float minZ = m_Position.z - halfZ;
     const float maxZ = m_Position.z + halfZ;
 
+    // 長方形の中で、プレイヤーに最も近い点を求め、中心が外にあれば半径の分だけ離している
     const float closestX = std::clamp(position.x, minX, maxX);
     const float closestZ = std::clamp(position.z, minZ, maxZ);
 
@@ -202,8 +211,8 @@ void Wall::ResolveCollision(Vector3& position, float radius) const
         return;
     }
 
-    // プレイヤー中心が壁内部にある場合は、最も近い面の外へ押し出します。
-    // 壁内スポーンや大きなフレーム移動が起きても安全に復帰できます。
+    // プレイヤーの中心が壁の中にある場合は、最も近い面の外へ押し出している。
+    // 壁の中に現れたり、1フレームで大きく動いたりしても、安全に戻れるようにしている。
     const float distanceToLeft = position.x - minX;
     const float distanceToRight = maxX - position.x;
     const float distanceToNear = position.z - minZ;
@@ -232,6 +241,7 @@ void Wall::ResolveCollision(Vector3& position, float radius) const
     }
 }
 
+// 線分が箱に当たるかを、3つの軸それぞれで線分が箱の幅の中にある区間を絞り込んで調べている（スラブ法）
 bool Wall::IntersectsInteractionSegment(
     const Vector3& start,
     const Vector3& end,
@@ -282,17 +292,20 @@ bool Wall::IntersectsInteractionSegment(
         return false;
     }
 
+    // 当たった位置（線分の始点からの距離）を返している
     const float segmentLength = direction.Length();
     hitDistance = segmentLength * (std::clamp)(minimumTime, 0.0f, 1.0f);
     return true;
 }
 
+// 頂点データを解放している
 void Wall::Uninit()
 {
     m_Vertices.clear();
     m_Indices.clear();
 }
 
+// 色・自己発光の色・光沢を変えている（環境光と鏡面反射の色は小物用の値にそろえている）
 void Wall::SetAppearance(
     const Color& diffuse,
     const Color& emission,
@@ -311,6 +324,7 @@ void Wall::SetAppearance(
     }
 }
 
+// 壁の古さを描く面かどうかを、マテリアルの印として変えている
 void Wall::SetWeatheringSurface(bool enabled)
 {
     m_SurfaceMaterial.WeatheringSurface = enabled ? TRUE : FALSE;
@@ -320,7 +334,7 @@ void Wall::SetWeatheringSurface(bool enabled)
     }
 }
 
-// 発光色をそのまま光の色にし、明るさは発光の強さに比例させます。
+// 光る色をそのまま光の色にし、明るさは光る強さに比例させている。
 void Wall::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const
 {
     if (!m_Visible || m_GlowRange <= 0.0f || m_GlowStrength <= 0.0f)
@@ -329,6 +343,7 @@ void Wall::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) cons
     }
 
     const Color& emission = m_SurfaceMaterial.Emission;
+    // 光る色の一番強い成分で割って色だけを取り出し、強さは別に渡している
     const float peak = (std::max)(emission.R(), (std::max)(emission.G(), emission.B()));
     if (peak <= 0.01f)
     {

@@ -1,6 +1,6 @@
 ﻿// ============================================================================
-// ファイルの役割: 2面のループ廊下に置くObject（壁・照明・端末・異変用の小物）を生成して配置します。
-// 主な技術: 配置データの分離、生成時のポインタ受け渡し、名前一覧の一元管理
+// ファイルの役割: 2面のループ廊下に置くObject（壁・照明・端末・異変用の小物）を作って配置している。
+// 主な技術: 配置のデータを進行から分ける設計、作るときにポインタを受け取る仕組み、名前の一覧の一元管理
 // ============================================================================
 
 #include "Stage2Layout.h"
@@ -25,31 +25,35 @@ using namespace DirectX::SimpleMath;
 
 namespace Stage2Layout
 {
+    // 2面の廊下（幅84・長さ300のまっすぐな廊下）を組み立て、進行で使うObjectのポインタを入れて返している
     Stage2Objects Build(Core::Game& game, float clockHourAngle, float clockMinuteAngle)
     {
         Stage2Objects objects;
         SceneLayoutBuilder builder(game, objects.objectNames);
 
+        // プレイヤー（廊下の入口側。2面は最後の追跡まで走れない）
         Player* player = builder.Create<Player>("Player");
         player->SetPosition(Vector3(0.0f, -99.0f, -125.0f));
         player->SetSprintAllowed(false);
 
+        // 謎解きと最後の追跡で使う影（最初は隠している）
         ShadowMan* stageShadow = builder.Create<ShadowMan>("Stage2Shadow");
         stageShadow->SetPosition(0.0f, -99.0f, 62.0f);
         stageShadow->SetDeactivateOnExpire(true);
         stageShadow->SetActive(false);
 
-        // 謎解き用の影と分け、足音だけに反応する追跡者を独立して管理します。
+        // 謎解き用の影と分け、足音だけに反応する追跡者を別に管理している。
         ShadowMan* noiseShadow = builder.Create<ShadowMan>("Stage2NoiseShadow");
         noiseShadow->SetPosition(0.0f, -99.0f, -145.0f);
         noiseShadow->SetDeactivateOnExpire(true);
         noiseShadow->SetActive(false);
 
-        // 2周目以降、視界の外から静かに近づく「背後の気配」です。
+        // 2周目以降、視界の外から静かに近づく「背後の気配」。
         ShadowMan* presence = builder.Create<ShadowMan>("Stage2Presence");
         presence->SetDeactivateOnExpire(true);
         presence->SetActive(false);
 
+        // 異常確認のスイッチ（出口の扉の横。異変を見つけた後に押せるようになる）
         FuseBox* confirmationPanel =
             builder.Create<FuseBox>("Stage2ConfirmationPanel");
         confirmationPanel->SetManualControl("異常確認スイッチを押す");
@@ -57,6 +61,7 @@ namespace Stage2Layout
         confirmationPanel->SetPosition(35.5f, -90.0f, 112.0f);
         confirmationPanel->SetRotation(Vector3(0.0f, -DirectX::XM_PIDIV2, 0.0f));
 
+        // 非常用充電器（入口側の左の壁）
         FuseBox* emergencyCharger =
             builder.Create<FuseBox>("Stage2EmergencyCharger");
         emergencyCharger->SetManualControl("非常用充電器を使う");
@@ -64,6 +69,7 @@ namespace Stage2Layout
         emergencyCharger->SetPosition(-35.5f, -90.0f, -106.0f);
         emergencyCharger->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
 
+        // 残された記録の端末（2台）
         FuseBox* evidenceTerminal1 =
             builder.Create<FuseBox>("Stage2EvidenceTerminal1");
         evidenceTerminal1->SetManualControl("残された記録を回収する");
@@ -78,6 +84,7 @@ namespace Stage2Layout
         evidenceTerminal2->SetPosition(-35.5f, -90.0f, 108.0f);
         evidenceTerminal2->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
 
+        // 信号盤（青・黄・赤）。3周目に、この順番で操作する
         constexpr const char* signalTerminalNames[] =
         {
             "Stage2SignalTerminalBlue",
@@ -113,6 +120,7 @@ namespace Stage2Layout
             objects.signalTerminals[signalIndex] = signalTerminal;
         }
 
+        // Wallを、色と当たり判定の有無を指定して作る関数
         const auto createWall = [&builder](
             const char* name,
             const Vector3& position,
@@ -128,10 +136,12 @@ namespace Stage2Layout
             return wall;
         };
 
+        // 壁・縁取り・床の色
         const Color wallColor(0.17f, 0.16f, 0.145f, 1.0f);
         const Color trimColor(0.075f, 0.068f, 0.06f, 1.0f);
         const Color floorColor(0.105f, 0.085f, 0.065f, 1.0f);
 
+        // 廊下の左右の壁と、奥の壁、出口の扉の左右の壁
         createWall("Stage2WallLeft", Vector3(-42.0f, -74.0f, -10.0f),
             Vector3(4.0f, 50.0f, 300.0f), wallColor, true);
         createWall("Stage2WallRight", Vector3(42.0f, -74.0f, -10.0f),
@@ -143,11 +153,12 @@ namespace Stage2Layout
         createWall("Stage2WallFrontRight", Vector3(28.5f, -74.0f, 140.0f),
             Vector3(27.0f, 50.0f, 4.0f), wallColor, true);
 
+        // 床（Groundの濡れた床ではなく、色を付けた板を敷いている）
         Wall* floor = createWall("Stage2Floor", Vector3(0.0f, -100.5f, -10.0f),
             Vector3(84.0f, 2.0f, 300.0f), floorColor, false);
         floor->SetCastsShadow(false);
 
-        // 水たまりは安全な近道と静かな迂回路の間に置き、走り抜けるほど敵へ音が伝わります。
+        // 水たまりは安全な近道と静かな回り道の間に置き、上を通るほど（走るほど）敵へ音が伝わるようにしている。
         struct CorridorPuddle { const char* Name; float X; float Z; float Width; float Depth; };
         const CorridorPuddle corridorPuddles[] =
         {
@@ -169,6 +180,7 @@ namespace Stage2Layout
             surface->SetCastsShadow(false);
             objects.puddles[puddleIndex] = surface;
         }
+        // 天井、床際の縁取り、天井近くの配管
         Wall* ceiling = createWall("Stage2Ceiling", Vector3(0.0f, -47.0f, -10.0f),
             Vector3(84.0f, 3.0f, 300.0f), trimColor, false);
         ceiling->SetCastsShadow(false);
@@ -185,6 +197,7 @@ namespace Stage2Layout
             Vector3(3.0f, 3.0f, 282.0f), trimColor, false);
         pipeRight->SetCastsShadow(false);
 
+        // 残された記録の端末の上に付けた、緑に光る目印
         Wall* evidenceMarker1 = createWall(
             "Stage2EvidenceMarker1", Vector3(39.4f, -65.0f, -76.0f),
             Vector3(1.0f, 5.0f, 18.0f),
@@ -202,6 +215,7 @@ namespace Stage2Layout
             Color(0.02f, 0.24f, 0.16f, 1.0f), 36.0f);
         evidenceMarker2->SetCastsShadow(false);
 
+        // 信号盤の上の、色付きで光る目印（信号の面として、シェーダーで模様を描いている）
         const char* signalMarkerNames[] =
         {
             "Stage2SignalMarkerBlue",
@@ -236,6 +250,7 @@ namespace Stage2Layout
             objects.signalMarkers[signalIndex] = marker;
         }
 
+        // 肖像画と、目が開いたときに出す赤い目（最初は隠している）
         Wall* portrait = createWall("Stage2Portrait", Vector3(39.4f, -70.0f, -25.0f),
             Vector3(1.0f, 22.0f, 16.0f), Color(0.055f, 0.042f, 0.034f, 1.0f), false);
         portrait->SetCastsShadow(false);
@@ -256,6 +271,7 @@ namespace Stage2Layout
         portraitEyeRight->SetCastsShadow(false);
         portraitEyeRight->SetVisible(false);
 
+        // 時計（文字盤・枠・時針・分針）。針はx軸の回転で動かしている
         Wall* clockFace = createWall(
             "Stage2ClockFace", Vector3(-39.3f, -70.0f, -25.0f),
             Vector3(1.0f, 20.0f, 20.0f),
@@ -294,11 +310,13 @@ namespace Stage2Layout
         clockMinuteHand->SetRotation(Vector3(
             clockMinuteAngle, 0.0f, 0.0f));
 
+        // 周回によって現れる赤い印（最初は隠している）
         Wall* loopMark = createWall("Stage2LoopMark", Vector3(-39.4f, -68.0f, 52.0f),
             Vector3(1.0f, 18.0f, 12.0f), Color(0.22f, 0.01f, 0.006f, 1.0f), false);
         loopMark->SetCastsShadow(false);
         loopMark->SetVisible(false);
 
+        // 入口側の右の壁に、周回の数だけ現れる3本の傷の印
         const char* cycleMarkNames[] =
         {
             "Stage2CycleMark1",
@@ -327,6 +345,7 @@ namespace Stage2Layout
             objects.cycleMarks[markIndex] = cycleMark;
         }
 
+        // 出口の扉の上のランプ（開くまでは赤）
         Wall* doorIndicator = createWall("Stage2DoorIndicator",
             Vector3(22.0f, -67.0f, 137.4f), Vector3(10.0f, 5.0f, 1.0f),
             Color(0.24f, 0.012f, 0.008f, 1.0f), false);
@@ -335,6 +354,7 @@ namespace Stage2Layout
             Color(0.24f, 0.012f, 0.008f, 1.0f),
             Color(0.18f, 0.001f, 0.0f, 1.0f), 24.0f);
 
+        // 偽の扉（板・枠・取っ手）。異変の周回だけ表示している
         Wall* falseDoorPanel = createWall(
             "Stage2FalseDoorPanel", Vector3(-39.3f, -76.0f, 70.0f),
             Vector3(1.2f, 40.0f, 22.0f),
@@ -363,6 +383,7 @@ namespace Stage2Layout
             piece->SetVisible(false);
         }
 
+        // 壁の引っかき傷（周回が進むほど増えていく）
         struct ScratchPiece
         {
             Vector3 Position;
@@ -397,6 +418,7 @@ namespace Stage2Layout
             objects.scratches[index] = scratch;
         }
 
+        // 棚と、その上の電池（進行に合わせて出している）
         Wall* batteryShelf = createWall(
             "Stage2BatteryShelf",
             Vector3(35.8f, -87.0f, -45.0f),
@@ -408,6 +430,7 @@ namespace Stage2Layout
         battery->SetPosition(35.0f, -82.5f, -45.0f);
         battery->SetActive(false);
 
+        // 天井照明（4つ。出口の扉の上の照明は1面と同じ名前"CeilingLight4"にしている）
         CeilingLight* light1 = builder.Create<CeilingLight>("Stage2Light1");
         light1->SetPosition(0.0f, -50.5f, -112.0f);
         light1->SetScale(18.0f, 2.0f, 8.0f);
@@ -425,6 +448,7 @@ namespace Stage2Layout
         light4->SetScale(18.0f, 2.0f, 8.0f);
         light4->SetEmergencyLight(false, 4.1f);
 
+        // 出口の扉と、その先の出口（調べるとリザルト画面へ）
         Door* door = builder.Create<Door>("Stage2Door");
         door->SetPosition(0.0f, -74.0f, 140.0f);
         door->ResetClosed(0);
@@ -459,8 +483,8 @@ namespace Stage2Layout
         objects.evidenceMarkers = { evidenceMarker1, evidenceMarker2 };
         objects.portraitEyes = { portraitEyeLeft, portraitEyeRight };
 
-        // 隠れられるロッカー。本体は当たり判定のある箱（Wall）、扉と「隠れる」操作はLockerが担当します。
-        // 時計・偽ドア・肖像画・端末・信号盤・電池と重ならない位置に、左右1つずつ置きます。
+        // 隠れられるロッカー。本体は当たり判定のある箱（Wall）、扉と「隠れる」操作はLockerが担当している。
+        // 時計・偽の扉・肖像画・端末・信号盤・電池と重ならない位置に、左右1つずつ置いている。
         const Color lockerColor(0.16f, 0.19f, 0.17f, 1.0f);
         const auto createLocker = [&builder, &createWall, &lockerColor](
             const char* name,
@@ -468,7 +492,7 @@ namespace Stage2Layout
             float wallSideX,
             float z)
         {
-            // wallSideXは壁側の符号（左の壁は-1、右の壁は+1）。扉は廊下の中央を向きます。
+            // wallSideXは壁側の符号（左の壁は-1、右の壁は+1）。扉は廊下の中央を向いている。
             createWall(bodyName, Vector3(wallSideX * 35.0f, -77.0f, z),
                 Vector3(10.0f, 44.0f, 16.0f), lockerColor, true);
             Locker* locker = builder.Create<Locker>(name);

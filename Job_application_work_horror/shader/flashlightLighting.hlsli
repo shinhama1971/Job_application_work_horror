@@ -1,10 +1,11 @@
 // ============================================================================
-// 共通処理: 床と壁が共有する懐中電灯の配光（円錐・レンズ模様）と半球環境光。
-// common.hlslとfastNoise.hlsliの後に読み込みます。
+// 共通の処理: 床と壁が共有する、懐中電灯の光の形（円錐・レンズの模様）と、上下で色を変えた環境光。
+// common.hlslとfastNoise.hlsliの後に読み込んでいる。
 // ============================================================================
 #ifndef FLASHLIGHT_LIGHTING_INCLUDED
 #define FLASHLIGHT_LIGHTING_INCLUDED
 
+// 上を向いた面はわずかに青白く、下を向いた面はわずかに暖かい色にした環境光を返している
 float3 GetHemisphereAmbient(float3 worldNormal)
 {
     const float skyAmount = saturate(normalize(worldNormal).y * 0.5f + 0.5f);
@@ -13,6 +14,7 @@ float3 GetHemisphereAmbient(float3 worldNormal)
     return Light.Ambient.rgb * tint * lerp(0.90f, 1.06f, skyAmount);
 }
 
+// 懐中電灯の円錐の中での明るさ（内側の円錐で最大、外側の円錐で0）を返している
 float GetFlashlightBeamProfile(float3 pixelDirection)
 {
     const float coneDot = dot(pixelDirection, normalize(Light.Direction.xyz));
@@ -21,17 +23,19 @@ float GetFlashlightBeamProfile(float3 pixelDirection)
     return shapedCone * lerp(0.82f, 1.08f, smoothstep(0.38f, 1.0f, cone));
 }
 
+// 懐中電灯のレンズの模様：中心を明るくし、レンズの汚れのような細かいむらを付けている
 float GetFlashlightLensPattern(float3 pixelDirection)
 {
     const float outerCosine = max(Light.SpotParams.y, 0.05f);
     const float outerTangent =
         sqrt(saturate(1.0f - outerCosine * outerCosine)) / outerCosine;
-    // 揺れるライトの方向を基準にし、ホットスポットと外周を一致させます。
+    // 揺れるライトの向きを基準にし、明るい中心と外周を一致させている。
     const float3 forward = normalize(Light.Direction.xyz);
     const float3 referenceUp = abs(forward.y) < 0.99f
         ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f);
     const float3 right = normalize(cross(referenceUp, forward));
     const float3 up = cross(forward, right);
+    // 画素の方向を、ライトの円錐の中の2次元の座標（外周が半径1）にしている
     const float2 lensUV = float2(dot(pixelDirection, right), dot(pixelDirection, up)) /
         max(dot(pixelDirection, forward) * outerTangent, 0.001f);
     const float radius = length(lensUV);
@@ -46,7 +50,7 @@ float GetFlashlightLensPattern(float3 pixelDirection)
         ((largeDust - 0.5f) * 0.030f +
          (fineDust - 0.5f) * 0.012f) * patternFade;
 
-    // 外周は少し暗く、中心は明るい実物の懐中電灯に近い配光です。
+    // 外周は少し暗く、中心は明るい、本物の懐中電灯に近い光の形にしている。
     return saturate(
         0.90f + centerHotspot * 0.16f + lensDirt);
 }

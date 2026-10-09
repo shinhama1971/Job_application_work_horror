@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: Pipe90.fbxを読み込み、通常・影・反射パスへ描画します。
-// 主な技術: Assimp、静的メッシュ、Diffuse Texture、Shadow Map
+// ファイルの役割: Pipe90.fbxを読み込み、本描画・影・反射の各描画で描いている。
+// 主な技術: Assimp（ModelCache経由）、静的メッシュ、ディフューズテクスチャ、シャドウマップ
 // ============================================================================
 
 #include "PipeProp.h"
@@ -10,6 +10,7 @@
 
 using namespace DirectX::SimpleMath;
 
+// モデルをキャッシュから読み込み、色のテクスチャ（Albedo）を貼るマテリアルを作っている
 void PipeProp::Init()
 {
     const std::string modelDirectory = "assets/model/pipe";
@@ -21,7 +22,7 @@ void PipeProp::Init()
     SetModelBounds(m_ModelData->LocalBounds);
     m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
-    // FBX内の高度な材質は現行Rendererの対象外なので、Albedoだけを明示的に使います。
+    // FBXの中の高度なマテリアルは今のRendererでは扱えないので、Albedo（色）のテクスチャだけをはっきり指定して使っている。
     const bool albedoLoaded = m_ModelData->AlbedoOverride != nullptr;
 
     std::vector<MATERIAL> importedMaterials = m_ModelData->Materials;
@@ -32,7 +33,7 @@ void PipeProp::Init()
 
     for (MATERIAL& materialData : importedMaterials)
     {
-        // Albedoの色をそのまま見せつつ、既存ライトのDiffuse/Specularを受けます。
+        // Albedoの色をそのまま見せつつ、今のライトの拡散反射・鏡面反射を受けるようにしている。
         materialData.Ambient = Color(0.12f, 0.12f, 0.12f, 1.0f);
         materialData.Diffuse = Color(1.0f, 1.0f, 1.0f, 1.0f);
         materialData.Specular = Color(0.18f, 0.18f, 0.18f, 1.0f);
@@ -60,6 +61,7 @@ Matrix PipeProp::GetWorldMatrix() const
     return scale * rotation * translation;
 }
 
+// サブセットごとに、対応するマテリアルを設定して描いている
 void PipeProp::Draw(Camera* camera)
 {
     camera->SetCamera();
@@ -83,6 +85,7 @@ void PipeProp::Draw(Camera* camera)
     }
 }
 
+// 影：ライトから見た深度だけを描くので、マテリアルは使わず全サブセットを描いている
 void PipeProp::DrawShadow()
 {
     Matrix world = GetWorldMatrix();
@@ -99,6 +102,7 @@ void PipeProp::DrawShadow()
     }
 }
 
+// マテリアルを解放し、共有しているモデルの参照を手放している
 void PipeProp::Uninit()
 {
     m_Materials.clear();

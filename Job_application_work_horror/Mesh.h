@@ -1,23 +1,24 @@
 ﻿// ============================================================================
-// ファイルの役割: 汎用メッシュの頂点・インデックス・材質情報を保持します。
-// 主な技術: インデックス付き描画、頂点レイアウト、サブメッシュ
+// ファイルの役割: メッシュの頂点とインデックスの配列を持つ基本のクラス。
+// 主な技術: インデックスを使った描画のためのデータ、継承して形を作るクラスの土台
 // ============================================================================
 
 #pragma once
 #include	<vector>
 #include	"renderer.h"
 
+// 頂点とインデックスの配列を持ち、MeshRendererへ渡している（StaticMeshがモデルから中身を作っている）
 class Mesh {
 protected:
-	std::vector<VERTEX_3D>		m_vertices;		// 頂点座標群
-	std::vector<unsigned int>	m_indices;		// インデックスデータ群
+	std::vector<VERTEX_3D>		m_vertices;		// 頂点の配列
+	std::vector<unsigned int>	m_indices;		// インデックスの配列
 public:
-	// 頂点データ取得
+	// 頂点データを返している
 	const std::vector<VERTEX_3D>& GetVertices() {
 		return m_vertices;
 	}
 
-	// インデックスデータ取得
+	// インデックスデータを返している
 	const std::vector<unsigned int>& GetIndices() {
 		return m_indices;
 	}

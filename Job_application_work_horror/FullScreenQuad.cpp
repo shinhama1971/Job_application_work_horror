@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: ポストプロセス用の画面全体ポリゴンとレンダーターゲットを管理します。
-// 主な技術: フルスクリーンクアッド、加算合成、ブルーム、露出補正、CRT、ボリュームライト
+// ファイルの役割: 画面全体を覆う四角形で、画面効果（露出・ブルーム・光の筋・ブラウン管風の効果）を重ねて描いている。
+// 主な技術: フルスクリーンクアッド、加算合成、ブルーム、露出補正、CRT風の効果、ボリュームライト（光の筋）
 // ============================================================================
 
 #include "FullScreenQuad.h"
@@ -10,6 +10,7 @@ using namespace DirectX::SimpleMath;
 
 namespace Graphics
 {
+    // 画面と同じ大きさの四角形（左上が原点の画素単位）と、4種類の画面効果のシェーダー、定数バッファを作っている
     void FullScreenQuad::Init()
     {
         m_Vertices.resize(4);
@@ -34,6 +35,7 @@ namespace Graphics
 
         m_VertexBuffer.Create(m_Vertices);
 
+        // 三角形ストリップで描くので、インデックスは0〜3の4つだけ
         m_Indices.clear();
         m_Indices.push_back(0);
         m_Indices.push_back(1);
@@ -42,21 +44,25 @@ namespace Graphics
 
         m_IndexBuffer.Create(m_Indices);
 
+        // ブルーム（明るい部分のにじみ）を足すシェーダー
         m_BloomShader.Create(
             "shader/unlitTextureVS.hlsl",
             "shader/bloomCompositePS.hlsl"
         );
 
+        // 懐中電灯の光の筋（空気中のちりで光が見える効果）を足すシェーダー
         m_VolumeShader.Create(
             "shader/unlitTextureVS.hlsl",
             "shader/volumetricFlashlightPS.hlsl"
         );
 
+        // ノイズ・周辺減光・画面の乱れなどを重ねるシェーダー
         m_OverlayShader.Create(
             "shader/unlitTextureVS.hlsl",
             "shader/crtOverlayPS.hlsl"
         );
 
+        // 目が暗さ・明るさに慣れる効果（露出の補正）を足すシェーダー
         m_ExposureShader.Create(
             "shader/unlitTextureVS.hlsl",
             "shader/exposurePS.hlsl"
@@ -70,17 +76,20 @@ namespace Graphics
 
         m_Material->Create(mtrl);
 
+        // 画面効果の値を渡す定数バッファ
         Renderer::CreateConstantBuffer(
             sizeof(TimeBuffer),
             m_TimeBuffer.ReleaseAndGetAddressOf()
         );
     }
 
+    // 定数バッファを解放している
     void FullScreenQuad::Uninit()
     {
         m_TimeBuffer.Reset();
     }
 
+    // 画面効果の値を定数バッファへ入れ、描画済みの画面の上に効果を順に重ねて描いている
     void FullScreenQuad::Draw(
         ID3D11ShaderResourceView* sceneSRV,
         ID3D11ShaderResourceView* bloomSRV,
@@ -101,10 +110,12 @@ namespace Graphics
         ID3D11DeviceContext* context =
             Renderer::GetDeviceContext();
 
+        // 2D用の行列にし、深度は使わずに描いている
         Renderer::SetWorldViewProjection2D();
         Renderer::SetDepthEnable(false);
         Renderer::SetUV(0.0f, 0.0f, 1.0f, 1.0f);
 
+        // シェーダーへ渡す画面効果の値（画面の縦横比も一緒に渡している）
         TimeBuffer tb{};
         tb.time = time;
         tb.bloomIntensity = bloomIntensity;
@@ -144,15 +155,15 @@ namespace Graphics
 
         ID3D11ShaderResourceView* nullResource = nullptr;
 
-        // 目の順応による明るさの差分だけを加算します。
-        // 取得用SRVが使えない場合も元のバックバッファを見える状態に保ちます。
+        // 目の順応による明るさの差だけを加算している。
+        // 読み取り用のSRVが使えない場合も、元のバックバッファがそのまま見える状態を保っている。
         m_ExposureShader.SetGPU();
         Renderer::SetBlendState(BS_ADDITIVE);
         context->PSSetShaderResources(0, 1, &sceneSRV);
         context->DrawIndexed(4, 0, 0);
         context->PSSetShaderResources(0, 1, &nullResource);
 
-        // 露出補正の後にブルームを加算し、明るい照明のにじみを残します。
+        // 露出の補正の後にブルームを加算し、明るい照明のにじみを残している。
         if (bloomSRV != nullptr && bloomIntensity > 0.001f)
         {
             m_BloomShader.SetGPU();
@@ -161,10 +172,11 @@ namespace Graphics
             context->DrawIndexed(4, 0, 0);
         }
 
+        // 次の描画で同じテクスチャへ書き込めるよう、読み取りの設定を外している
         context->PSSetShaderResources(0, 1, &nullResource);
 
-        // 懐中電灯の光線上で短い区間の大気散乱を積算します。
-        // シャドウ深度を参照し、壁の位置で光の筋を止めます。
+        // 懐中電灯の光線の上で、短い区間の大気の散乱を積み重ねている。
+        // シャドウマップの深度を参照し、壁の位置で光の筋を止めている。
         if (volumeIntensity > 0.0f)
         {
             m_VolumeShader.SetGPU();
@@ -172,7 +184,7 @@ namespace Graphics
             context->DrawIndexed(4, 0, 0);
         }
 
-        // CRT効果は透過オーバーレイとして合成し、シーン全体を黒で上書きしないようにします。
+        // CRT風の効果は半透明の重ね描きとして合成し、画面全体を黒で塗りつぶさないようにしている。
         if (noiseAmount > 0.0f || horrorPulseStrength > 0.001f ||
             lensMoisture > 0.001f || filmGradeStrength > 0.001f ||
             signalInterference > 0.001f)
@@ -184,6 +196,7 @@ namespace Graphics
             context->PSSetShaderResources(0, 1, &nullResource);
         }
 
+        // ブレンドと深度の設定を元に戻している
         Renderer::SetBlendState(BS_NONE);
         Renderer::SetDepthEnable(true);
     }

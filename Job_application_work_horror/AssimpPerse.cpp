@@ -1,6 +1,6 @@
 ﻿// ============================================================================
-// ファイルの役割: aiSceneから頂点・Index・Material・Textureを一時キャッシュへ展開します。
-// 主な技術: Assimp、左手座標変換、三角形化、Texture所有権移譲
+// ファイルの役割: Assimpで読んだaiSceneから、頂点・インデックス・マテリアル・テクスチャを一時的な作業領域へ展開している。
+// 主な技術: Assimp、左手座標系への変換、三角形化、unique_ptrによるTextureの所有権の受け渡し
 // ============================================================================
 
 #include	<vector>
@@ -11,7 +11,7 @@
 #include	"AssimpPerse.h"
 #include	"utility.h"
 
-// Assimp側のCRT構成と一致させ、Release版がデバッグランタイムへ依存するのを防ぎます。
+// Assimp側のCRT構成（静的CRT）と一致させ、Release版がデバッグランタイムに依存しないようにしている。
 #if defined(_DEBUG)
 #pragma comment(lib, "assimp-vc143-mtd.lib")
 #else
@@ -20,112 +20,112 @@
 
 namespace AssimpPerse
 {
-	// g_*は1回のLoadだけに使う作業領域で、GetModelDataの先頭で初期化します。
-	// Textureだけはunique_ptrなのでGetTexturesで呼び出し元へ所有権を移します。
-	std::vector<std::vector<VERTEX>> g_vertices{};		// 頂点データ
-	std::vector<std::vector<unsigned int>> g_indices{};	// インデックスデータ
-	std::vector<SUBSET> g_subsets{};					// サブセット情報
-	std::vector<MATERIAL> g_materials{};				// マテリアル
-	std::vector<std::unique_ptr<Texture>> g_textures;	// ディフューズテクスチャ群
+	// g_*は1回の読み込みだけに使う作業領域で、GetModelDataの先頭で毎回空にしている。
+	// Textureだけはunique_ptrなので、GetTexturesで呼び出し元へ所有権を移している（移した後は空になる）。
+	std::vector<std::vector<VERTEX>> g_vertices{};		// 頂点データ（メッシュごとの配列）
+	std::vector<std::vector<unsigned int>> g_indices{};	// インデックスデータ（メッシュごとの配列）
+	std::vector<SUBSET> g_subsets{};					// サブセット情報（メッシュごとの描画範囲とマテリアル）
+	std::vector<MATERIAL> g_materials{};				// マテリアル（色と使うテクスチャ名）
+	std::vector<std::unique_ptr<Texture>> g_textures;	// ディフューズテクスチャ（マテリアルと同じ添字で並べている）
 
-	// unique_ptrをコピーできないため、Texture群はまとめて呼び出し元へ移します。
+	// unique_ptrはコピーできないため、Texture群はまとめてmoveで呼び出し元へ渡している。
 	std::vector<std::unique_ptr<Texture>> GetTextures()
 	{
 		return std::move(g_textures);
 	}
 
-	// MaterialIndexと同じ添字で参照できるよう、Texture領域をMaterial数に合わせます。
+	// マテリアルの色とテクスチャを集めている。MaterialIndexと同じ添字で引けるよう、テクスチャの配列をマテリアル数に合わせている。
 	void GetMaterialData(const aiScene* pScene, std::string texturedirectory)
 	{
-		// TextureがないMaterialも添字を維持するため、先に全要素を確保します。
+		// テクスチャのないマテリアルも添字がずれないよう、先に全要素を確保している。
 		g_textures.resize(pScene->mNumMaterials);
 
-		// Materialごとに色とDiffuse Textureを同じ添字へ収集します。
+		// マテリアルごとに、色とディフューズテクスチャを同じ添字の場所へ集めている。
 		for (unsigned int m = 0; m < pScene->mNumMaterials; m++)
 		{
 			aiMaterial* material = pScene->mMaterials[m];
 
-			// マテリアル名取得
+			// マテリアル名を取得し、確認用にコンソールへ出している
 			std::string mtrlname = std::string(material->GetName().C_Str());
 			std::cout << mtrlname << std::endl;
 
-			// マテリアル情報
+			// マテリアルの各色と光沢の強さ
 			aiColor4D ambient;
 			aiColor4D diffuse;
 			aiColor4D specular;
 			aiColor4D emission;
 			float shininess;
 
-			// アンビエント
+			// アンビエント（環境光の色）。無ければ黒にしている
 			if (AI_SUCCESS == aiGetMaterialColor(material, AI_MATKEY_COLOR_AMBIENT, &ambient)) {
 			}
 			else {
 				ambient = aiColor4D(0.0f, 0.0f, 0.0f, 0.0f);
 			}
 
-			// ディフューズ
+			// ディフューズ（拡散反射の色）。無ければ白にして、テクスチャの色がそのまま出るようにしている
 			if (AI_SUCCESS == aiGetMaterialColor(material, AI_MATKEY_COLOR_DIFFUSE, &diffuse)) {
 			}
 			else {
 				diffuse = aiColor4D(1.0f, 1.0f, 1.0f, 1.0f);
 			}
 
-			// スペキュラ
+			// スペキュラ（鏡面反射の色）。無ければ黒にしている
 			if (AI_SUCCESS == aiGetMaterialColor(material, AI_MATKEY_COLOR_SPECULAR, &specular)) {
 			}
 			else {
 				specular = aiColor4D(0.0f, 0.0f, 0.0f, 0.0f);
 			}
 
-			// エミッション
+			// エミッション（自己発光の色）。無ければ黒にしている
 			if (AI_SUCCESS == aiGetMaterialColor(material, AI_MATKEY_COLOR_EMISSIVE, &emission)) {
 			}
 			else {
 				emission = aiColor4D(0.0f, 0.0f, 0.0f, 0.0f);
 			}
 
-			// シャイネス
+			// シャイネス（鏡面反射の鋭さ）。無ければ0にしている
 			if (AI_SUCCESS == aiGetMaterialFloat(material, AI_MATKEY_SHININESS, &shininess)) {
 			}
 			else {
 				shininess = 0.0f;
 			}
 
-			// このマテリアルに紐づいているディフューズテクスチャ数分ループ
+			// このマテリアルに付いているディフューズテクスチャの数だけ繰り返している
 			std::vector<std::string> texpaths{};
 
 			for (unsigned int t = 0; t < material->GetTextureCount(aiTextureType_DIFFUSE); t++)
 			{
 				aiString path{};
 
-				// t番目のテクスチャパス取得
+				// t番目のテクスチャのパスを取得している
 				if (AI_SUCCESS == material->Get(AI_MATKEY_TEXTURE(aiTextureType_DIFFUSE, t), path))
 				{
-					// テクスチャパス取得
+					// テクスチャのパスを文字列にし、確認用にコンソールへ出している
 					std::string texpath = std::string(path.C_Str());
 					std::cout << texpath << std::endl;
 
-					// テクスチャパスに「:」が含まれていれば絶対パスなのでパスを加工する
+					// パスに「:」が含まれていれば絶対パス（作った人のPCのパス）なので、ファイル名だけを取り出している
 					if (texpath.find(':') != std::string::npos) {
-						// スラッシュまたはバックスラッシュが最後に現れる位置を探す
+						// スラッシュまたはバックスラッシュが最後に現れる位置を探している
 						size_t pos = texpath.find_last_of("/\\");
 						if (pos != std::string::npos)
 						{
-							// 最後のスラッシュまたはバックスラッシュの次から文字列を返す
+							// 最後の区切り文字の次から後ろ（ファイル名）だけを残している
 							texpath = texpath.substr(pos + 1);
 						}
 					}
 					texpaths.push_back(texpath);
 
-					// 内蔵テクスチャかどうかを判断する
+					// FBXなどに埋め込まれた内蔵テクスチャかどうかを調べている
 					if (auto tex = pScene->GetEmbeddedTexture(path.C_Str())) {
 
 						std::unique_ptr<Texture> texture = std::make_unique<Texture>();
 
-						// 内蔵テクスチャの場合
+						// 内蔵テクスチャは、ファイルではなくメモリ上の画像データから読み込んでいる
 						bool sts = texture->LoadFromMemory(
-							(unsigned char*)tex->pcData,			// 先頭アドレス
-							tex->mWidth);			// テクスチャサイズ（メモリにある場合幅がサイズ）	
+							(unsigned char*)tex->pcData,			// 画像データの先頭アドレス
+							tex->mWidth);			// 圧縮画像の場合、mWidthに画像データのバイト数が入っている
 						if (sts) {
 							g_textures[m] = std::move(texture);
 						}
@@ -133,7 +133,7 @@ namespace AssimpPerse
 
 					}
 					else {
-						// 外部テクスチャファイルの場合
+						// 外部のテクスチャファイルは、モデルと同じフォルダ（texturedirectory）から読み込んでいる
 						std::unique_ptr<Texture> texture;
 						texture = std::make_unique<Texture>();
 
@@ -147,17 +147,17 @@ namespace AssimpPerse
 						std::cout << "other Embedded" << std::endl;
 					}
 				}
-				// ディフューズテクスチャがなかった場合
+				// テクスチャのパスを取得できなかった場合
 				else
 				{
-					// 外部テクスチャファイルの場合
+					// 空のTextureを入れて、添字の対応だけは保っている
 					std::unique_ptr<Texture> texture;
 					texture = std::make_unique<Texture>();
 					g_textures[m] = std::move(texture);
 				}
 			}
 
-			// マテリアル情報を保存
+			// マテリアル情報を保存している（最初のディフューズテクスチャの名前も一緒に記録している）
 			AssimpPerse::MATERIAL mtrl{};
 			mtrl.mtrlname = mtrlname;
 			mtrl.Ambient = ambient;
@@ -177,25 +177,27 @@ namespace AssimpPerse
 		}
 	}
 
+	// モデルファイルを読み込み、頂点・インデックス・サブセット・マテリアルを作業領域へ展開している。
+	// texturedirectoryは、モデルが参照するテクスチャを探すフォルダ。
 	void GetModelData(std::string filename, std::string texturedirectory)
 	{
-		//データを一度クリア
+		// 前回の読み込み結果が残らないよう、作業領域を空にしている
 		g_vertices.clear();		// 頂点データ
 		g_indices.clear();		// インデックスデータ
 		g_subsets.clear();		// サブセット情報
 		g_materials.clear();	// マテリアル
-		g_textures.clear(); 	// ディフューズテクスチャ群
+		g_textures.clear(); 	// ディフューズテクスチャ
 
-		// シーン情報構築
+		// 読み込み用のImporter（読み込んだaiSceneの寿命もImporterが持っている）
 		Assimp::Importer importer;
 
-		// シーン情報を構築
+		// ファイルを読み込み、シーン情報を作っている
 		const aiScene* pScene = importer.ReadFile(
 			filename.c_str(),
-			aiProcess_ConvertToLeftHanded |	// 左手座標系に変換する
-			aiProcess_Triangulate);			// 三角形化する
+			aiProcess_ConvertToLeftHanded |	// DirectXに合わせて左手座標系に変換している
+			aiProcess_Triangulate);			// 四角形以上の面を三角形に分割している
 
-        // assertはReleaseで消えるため、欠落時はファイル名を示して終了します。
+        // assertはReleaseで消えるため、読み込めないときはファイル名と理由を表示して終了している。
 		if (pScene == nullptr)
 		{
             utility::ReportFatalError(
@@ -203,36 +205,36 @@ namespace AssimpPerse
                 importer.GetErrorString());
 		}
 
-		// マテリアル情報取得
+		// マテリアル情報を集めている（頂点がマテリアル名を参照するため、先に読んでいる）
 		GetMaterialData(pScene, texturedirectory);
 
-		// aiMeshは一つのMaterialIndexを持つため、メッシュ単位で頂点配列を作ります。
+		// aiMeshはマテリアルを1つだけ持つため、メッシュ単位で頂点配列を作っている。
 		g_vertices.resize(pScene->mNumMeshes);
 
 		for (unsigned int m = 0; m < pScene->mNumMeshes; m++)
 		{
 			aiMesh* mesh = pScene->mMeshes[m];
 
-			// メッシュ名取得
+			// メッシュ名を取得している
 			std::string meshname = std::string(mesh->mName.C_Str());
 
-			//　頂点数分ループ
+			// 頂点の数だけ繰り返している
 			for (unsigned int vidx = 0; vidx < mesh->mNumVertices; vidx++)
 			{
-				// 頂点データ
+				// 1頂点分のデータを作っている
 				VERTEX	v{};
-				v.meshname = meshname;		// メッシュ名セット
+				v.meshname = meshname;		// どのメッシュの頂点かを覚えている
 
-				// 座標		
+				// 位置
 				v.pos = mesh->mVertices[vidx];
 
-				// この頂点が使用しているマテリアルのインデックス番号（メッシュ内の）
-				// を使用してマテリアル名をセット
+				// この頂点が属するメッシュのマテリアル番号を覚え、
+				// その番号からマテリアル名も入れている
 				v.materialindex = mesh->mMaterialIndex;
 
 				v.mtrlname = g_materials[mesh->mMaterialIndex].mtrlname;
 
-				// 法線あり？
+				// 法線があれば使い、無ければ0にしている
 				if (mesh->HasNormals()) {
 					v.normal = mesh->mNormals[vidx];
 				}
@@ -241,7 +243,7 @@ namespace AssimpPerse
 					v.normal = aiVector3D(0.0f, 0.0f, 0.0f);
 				}
 
-				// 頂点カラー？（０番目）
+				// 頂点カラー（0番目の組）があれば使い、無ければ白にしている
 				if (mesh->HasVertexColors(0)) {
 					v.color = mesh->mColors[0][vidx];
 				}
@@ -250,7 +252,7 @@ namespace AssimpPerse
 					v.color = aiColor4D(1.0f, 1.0f, 1.0f, 1.0f);
 				}
 
-				// テクスチャあり？（０番目）
+				// テクスチャ座標（0番目の組）があれば使い、無ければ0にしている
 				if (mesh->HasTextureCoords(0)) {
 					v.texcoord = mesh->mTextureCoords[0][vidx];
 				}
@@ -259,28 +261,28 @@ namespace AssimpPerse
 					v.texcoord = aiVector3D(0.0f, 0.0f, 0.0f);
 				}
 
-				// 頂点データを追加
+				// メッシュの頂点配列へ追加している
 				g_vertices[m].push_back(v);
 			}
 		}
 
-		// Triangulate済みのFaceをメッシュ単位のIndex配列へ連結します。
+		// 三角形化済みの面を、メッシュ単位のインデックス配列へつなげている。
 		g_indices.resize(pScene->mNumMeshes);
 		for (unsigned int m = 0; m < pScene->mNumMeshes; m++)
 		{
 			aiMesh* mesh = pScene->mMeshes[m];
 
-			// メッシュ名取得
+			// メッシュ名を取得している
 			std::string meshname = std::string(mesh->mName.C_Str());
 
-			// インデックス数分ループ
+			// 面の数だけ繰り返している
 			for (unsigned int fidx = 0; fidx < mesh->mNumFaces; fidx++)
 			{
 				aiFace face = mesh->mFaces[fidx];
 
-				assert(face.mNumIndices == 3);	// 三角形のみ対応
+				assert(face.mNumIndices == 3);	// aiProcess_Triangulateで三角形にしているため、頂点は必ず3つ
 
-				// インデックスデータを追加
+				// 面の3頂点のインデックスを追加している
 				for (unsigned int i = 0; i < face.mNumIndices; i++)
 				{
 					g_indices[m].push_back(face.mIndices[i]);
@@ -288,7 +290,7 @@ namespace AssimpPerse
 			}
 		}
 
-		// サブセット情報を生成
+		// サブセット情報を作っている（メッシュごとの頂点数・インデックス数・マテリアル）
 		g_subsets.resize(pScene->mNumMeshes);
 		for (unsigned int m = 0; m < g_subsets.size(); m++)
 		{
@@ -301,16 +303,16 @@ namespace AssimpPerse
 			g_subsets[m].materialindex = g_vertices[m][0].materialindex;
 		}
 
-		// サブセット情報を相対的なものにする	
+		// 全メッシュを1つの頂点・インデックスバッファにまとめるため、各サブセットの開始位置を計算している
 		for (int m = 0; m < g_subsets.size(); m++)
 		{
-			// 頂点バッファのベースを計算
+			// 頂点バッファの開始位置＝それより前のメッシュの頂点数の合計
 			g_subsets[m].VertexBase = 0;
 			for (int i = m - 1; i >= 0; i--) {
 				g_subsets[m].VertexBase += g_subsets[i].VertexNum;
 			}
 
-			// インデックスバッファのベースを計算
+			// インデックスバッファの開始位置＝それより前のメッシュのインデックス数の合計
 			g_subsets[m].IndexBase = 0;
 			for (int i = m - 1; i >= 0; i--) {
 				g_subsets[m].IndexBase += g_subsets[i].IndexNum;
@@ -318,22 +320,25 @@ namespace AssimpPerse
 		}
 	}
 
-	// サブセット情報
+	// サブセット情報を返している（コピーを返すので、作業領域はそのまま残る）
 	std::vector<SUBSET> GetSubsets()
 	{
 		return g_subsets;
 	}
 
+	// 頂点データ（メッシュ単位）を返している
 	std::vector<std::vector<VERTEX>> GetVertices()
 	{
 		return g_vertices; // 頂点データ（メッシュ単位）
 	}
 
+	// インデックスデータ（メッシュ単位）を返している
 	std::vector<std::vector<unsigned int>> GetIndices()
 	{
 		return g_indices; // インデックスデータ（メッシュ単位）
 	}
 
+	// マテリアルを返している
 	std::vector<MATERIAL> GetMaterials()
 	{
 		return g_materials; // マテリアル

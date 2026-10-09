@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: モデルパスごとにAssimp読込結果を保持し、再利用します。
-// 主な技術: パス正規化、unordered_map、shared_ptr、GPUバッファ共有
+// ファイルの役割: モデルのパスごとにAssimpで読み込んだ結果を持ち、使い回している。
+// 主な技術: パスの正規化、unordered_map、shared_ptr、GPUのバッファの共有
 // ============================================================================
 
 #include "ModelCache.h"
@@ -15,11 +15,13 @@
 
 namespace
 {
+    // キャッシュ本体（キー→モデル）と、デバッグ画面に出す数
     std::unordered_map<std::string, std::shared_ptr<ModelData>> g_ModelCache;
     std::uint64_t g_CacheHits = 0;
     std::uint64_t g_CacheMisses = 0;
     std::uint64_t g_AssimpLoads = 0;
 
+    // 書き方が違っても同じファイルを同じキーにするため、絶対パスにして「.」「..」を整理し、小文字にそろえている
     std::string NormalizePath(const std::string& path)
     {
         if (path.empty())
@@ -47,6 +49,7 @@ namespace
         return normalized;
     }
 
+    // モデル・テクスチャのフォルダ・差し替えテクスチャの3つを「|」でつないだ文字列をキーにしている
     std::string MakeCacheKey(
         const std::string& modelPath,
         const std::string& textureDirectory,
@@ -58,6 +61,7 @@ namespace
     }
 }
 
+// キャッシュにあればそれを返し、無ければAssimpで読み込んで、GPUのバッファ・マテリアル・テクスチャを作ってから登録している
 std::shared_ptr<ModelData> ModelCache::Load(
     const std::string& modelPath,
     const std::string& textureDirectory,
@@ -87,8 +91,8 @@ std::shared_ptr<ModelData> ModelCache::Load(
     modelData->LocalBounds =
         std::make_shared<ModelBounds>(staticMesh.GetModelBounds());
 
-    // StaticMeshが受け取ったunique_ptrはここで一度だけshared_ptrへ移します。
-    // 以後、同じモデルを使うObjectは同じTexture SRVを参照します。
+    // StaticMeshが受け取ったunique_ptrは、ここで一度だけshared_ptrへ移している。
+    // この後、同じモデルを使うObjectは同じテクスチャ（SRV）を参照している。
     auto importedTextures = staticMesh.GetTextures();
     modelData->Textures.reserve(importedTextures.size());
     for (auto& texture : importedTextures)
@@ -96,6 +100,7 @@ std::shared_ptr<ModelData> ModelCache::Load(
         modelData->Textures.emplace_back(std::move(texture));
     }
 
+    // 色の差し替え用テクスチャが指定されていれば読み込んでいる（モデルの色をテクスチャで置き換えるのに使っている）
     if (!albedoOverridePath.empty())
     {
         auto albedo = std::make_shared<Texture>();
@@ -109,11 +114,13 @@ std::shared_ptr<ModelData> ModelCache::Load(
     return modelData;
 }
 
+// キャッシュを空にし、GPUの資源を解放している
 void ModelCache::Clear()
 {
     g_ModelCache.clear();
 }
 
+// デバッグ画面に出す数を返している
 ModelCacheStats ModelCache::GetStats()
 {
     ModelCacheStats stats;

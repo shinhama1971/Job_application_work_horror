@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: ドアの描画、開閉アニメーション、施錠条件、当たり判定を管理します。
-// 主な技術: 有限状態機械、SRT行列、蝶番回転、AABB、インタラクション
+// ファイルの役割: 扉の形と描画、開くときの動き、鍵がかかっているときの反応、プレイヤーとの当たり判定を管理している。
+// 主な技術: 有限状態機械、拡大・回転・移動の行列、蝶番を軸にした回転、回転を打ち消した空間での当たり判定、調べる操作
 // ============================================================================
 
 #include "Door.h"
@@ -17,6 +17,7 @@
 
 using namespace DirectX::SimpleMath;
 
+// 扉の形（扉板・上下の飾り板・取っ手・足元の漏れ光）を箱の組み合わせで作り、マテリアルを用意している。
 void Door::Init()
 {
     m_Vertices.clear();
@@ -24,6 +25,7 @@ void Door::Init()
     m_Vertices.reserve(96);
     m_Indices.reserve(288);
 
+    // 四角形の面を1枚追加している。表と裏の両方から見えるよう、三角形を両面分（12個のインデックス）入れている
     const auto addFace = [this](
         const std::array<Vector3, 4>& positions,
         const Vector3& normal,
@@ -56,6 +58,7 @@ void Door::Init()
         m_Indices.insert(m_Indices.end(), faceIndices, faceIndices + 12);
     };
 
+    // 中心と半分の大きさを指定して、6面の箱を追加している
     const auto addBox = [&addFace](
         const Vector3& center,
         const Vector3& half,
@@ -88,18 +91,21 @@ void Door::Init()
                 Vector3(0.0f, -1.0f, 0.0f), color);
     };
 
+    // 扉板（茶色）
     addBox(Vector3::Zero, Vector3(0.5f, 0.5f, 0.5f),
            Color(0.30f, 0.13f, 0.07f, 1.0f));
+    // 扉板の手前側に付けた、上下2枚の飾り板（濃い茶色）
     addBox(Vector3(0.0f, 0.22f, -0.54f), Vector3(0.35f, 0.17f, 0.035f),
            Color(0.16f, 0.055f, 0.025f, 1.0f));
     addBox(Vector3(0.0f, -0.22f, -0.54f), Vector3(0.35f, 0.17f, 0.035f),
            Color(0.16f, 0.055f, 0.025f, 1.0f));
-    // 蝶番をローカル左端に置くため、取っ手は扉板の反対側へ配置します。
+    // 蝶番をローカル座標の左端に置くため、取っ手は扉板の反対側（右端寄り）に付けている。
     addBox(Vector3(0.28f, 0.0f, -0.64f), Vector3(0.055f, 0.075f, 0.11f),
            Color(0.72f, 0.48f, 0.12f, 1.0f));
 
+    // ここまでが扉本体。足元の漏れ光は別のマテリアルで描くので、インデックス数を区切っている
     m_DoorIndexCount = m_Indices.size();
-    // 影を落とさない別メッシュで、扉の隙間から漏れる奥の部屋の光を表現します。
+    // 影を落とさない別のメッシュで、扉の下の隙間から漏れる奥の部屋の光を表している。
     addBox(Vector3(0.0f, -0.505f, -0.61f),
            Vector3(0.48f, 0.018f, 0.045f),
            Color(1.0f, 0.72f, 0.42f, 1.0f));
@@ -108,6 +114,7 @@ void Door::Init()
     m_IndexBuffer.Create(m_Indices);
     m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
+    // 扉本体のマテリアル。色は頂点の色を使い、光沢は弱くしている
     m_Material = std::make_unique<Material>();
     MATERIAL material{};
     material.Diffuse = Color(1.0f, 1.0f, 1.0f, 1.0f);
@@ -116,6 +123,7 @@ void Door::Init()
     material.TextureEnable = FALSE;
     m_Material->Create(material);
 
+    // 漏れ光のマテリアル（光る色はDrawで毎回決め直している）
     m_LeakMaterial = std::make_unique<Material>();
     MATERIAL leakMaterial{};
     leakMaterial.Diffuse = Color(0.05f, 0.035f, 0.02f, 1.0f);
@@ -123,11 +131,14 @@ void Door::Init()
     leakMaterial.TextureEnable = FALSE;
     m_LeakMaterial->Create(leakMaterial);
 
+    // 扉の大きさ（幅30・高さ50・厚さ4）
     m_Scale = Vector3(30.0f, 50.0f, 4.0f);
 }
+// 1フレーム分、扉の動きを進めている：鍵がかかっていれば小刻みに揺らし、開け始めたら少しためてから回転させている
 void Door::Update()
 {
     const float deltaTime = Application::GetDeltaTime();
+    // 鍵がかかった扉を調べた直後：0.28秒だけ小さくガタガタ揺らしている
     if (m_LockedRattleTimer > 0.0f)
     {
         constexpr float rattleDuration = 0.28f;
@@ -149,6 +160,7 @@ void Door::Update()
         return;
     }
 
+    // 開く前のため：ループ廊下の周回が進むほど強く・速く揺れ、なかなか開かない感じを出している
     if (m_OpenDelayTimer > 0.0f)
     {
         m_OpenDelayTimer = (std::max)(
@@ -170,6 +182,7 @@ void Door::Update()
         return;
     }
 
+    // 1.5ラジアン（約86度）まで、周回ごとの速さで開いている
     constexpr float targetAngle = 1.50f;
     m_OpenAngle = (std::min)(
         m_OpenAngle + m_OpenSpeedPerSecond * deltaTime,
@@ -182,6 +195,7 @@ void Door::Update()
     }
 }
 
+// 調べるときに表示する文章（鍵がかかっていれば「開かない」）
 const char* Door::GetInteractionPrompt() const
 {
     return m_IsLocked
@@ -189,10 +203,12 @@ const char* Door::GetInteractionPrompt() const
         : "ドアを開ける";
 }
 
+// 扉を調べたときの処理
 void Door::Interact(Player& player)
 {
     (void)player;
 
+    // 鍵がかかっている：ガタッという音と小さな揺れ・画面の脈動・振動で、開かないことを伝えている
     if (m_IsLocked)
     {
         Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_DOOR, m_Position);
@@ -204,10 +220,11 @@ void Door::Interact(Player& player)
         return;
     }
 
-    // この扉はループ廊下へ続くため、通電前でも操作可能にします。
-    // 最終出口だけは別の条件で通電ロックを維持します。
+    // この扉はループ廊下へ続くため、電力が戻る前でも開けられるようにしている。
+    // 最後の出口だけは、別の条件で電力が戻るまで開かないようにしている。
     if (!m_IsOpen && !m_IsOpening)
     {
+        // 開ける音を鳴らし、ためる時間を始めている。周回が進むほど画面の演出と振動を強くしている
         Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_DOOR, m_Position);
         m_IsOpening = true;
         m_OpenDelayTimer = m_OpenDelayDuration;
@@ -221,6 +238,7 @@ void Door::Interact(Player& player)
             0.82f + static_cast<float>(m_LoopPhase) * 0.10f,
             0.20f + static_cast<float>(m_LoopPhase) * 0.10f);
 
+        // 扉の近くの天井照明を一瞬明滅させている
         CeilingLight* doorLight =
             Core::Game::GetInstance()->GetObj<CeilingLight>("CeilingLight4");
         if (doorLight != nullptr)
@@ -236,6 +254,7 @@ void Door::Interact(Player& player)
     }
 }
 
+// 扉を閉じた状態に戻している（鍵は外れた状態になる）。loopPhaseはループ廊下の周回（0〜3）
 void Door::ResetClosed(int loopPhase)
 {
     m_Position = m_StartPosition;
@@ -247,8 +266,8 @@ void Door::ResetClosed(int loopPhase)
     m_OpenDelayTimer = 0.0f;
     m_LoopPhase = (std::clamp)(loopPhase, 0, 3);
 
-    // 同じ扉でも周回ごとに開き方を変えます。2周目は重く、最終周は一度ためてから
-    // 不自然な速さで開き、見慣れた空間の違和感を強めます。
+    // 同じ扉でも周回ごとに開き方を変えている。2周目は重く、最終周は一度ためてから
+    // 不自然な速さで開き、見慣れた空間の違和感を強めている。
     if (m_LoopPhase == 0)
     {
         m_OpenSpeedPerSecond = 1.92f;
@@ -271,6 +290,7 @@ void Door::ResetClosed(int loopPhase)
     }
 }
 
+// 2点を結ぶ線分を、閉じた扉板がさえぎるかを判定している（開いている・開き始めていれば何もさえぎらない）
 bool Door::BlocksSoundSegment(const Vector3& start, const Vector3& end) const
 {
     if (m_IsOpen || m_IsOpening)
@@ -278,8 +298,8 @@ bool Door::BlocksSoundSegment(const Vector3& start, const Vector3& end) const
         return false;
     }
 
-    // 扉の回転を打ち消した空間で、扉板の長方形（床に投影したもの）と線分を判定します。
-    // 高さは当たり判定と同じく考えず、扉の前後で鳴る音を遮るものとして扱います。
+    // 扉の回転を打ち消した空間で、扉板の長方形（床に投影したもの）と線分を判定している。
+    // 高さは当たり判定と同じく考えず、扉の前後で鳴る音をさえぎるものとして扱っている。
     const Matrix inverseRotation = Matrix::CreateFromYawPitchRoll(
         m_Rotation.y, m_Rotation.x, m_Rotation.z).Invert();
     const Vector3 localStart = Vector3::Transform(start - m_Position, inverseRotation);
@@ -288,6 +308,8 @@ bool Door::BlocksSoundSegment(const Vector3& start, const Vector3& end) const
 
     float minimumTime = 0.0f;
     float maximumTime = 1.0f;
+    // 1つの軸について、線分が扉板の幅の中にある区間（始点からの割合）を絞り込んでいる（スラブ法）。
+    // x軸とz軸の両方で区間が残れば、線分は扉板を通っている
     const auto clipAxis = [&](float origin, float direction, float halfExtent)
     {
         constexpr float epsilon = 0.000001f;
@@ -309,15 +331,17 @@ bool Door::BlocksSoundSegment(const Vector3& start, const Vector3& end) const
         clipAxis(localStart.z, delta.z, std::abs(m_Scale.z) * 0.5f);
 }
 
+// プレイヤー（半径radiusの円）が閉じた扉板にめり込んでいたら、外へ押し出している
 void Door::ResolveCollision(Vector3& position, float radius) const
 {
-    // 取っ手を操作した後は、扉板の回転中でも通行を許可します。
-    // 回転するメッシュがプレイヤーを壁へ押し込むことを防ぎます。
+    // 取っ手を操作した後は、扉板が回転している途中でも通れるようにしている。
+    // 回転するメッシュがプレイヤーを壁へ押し込むのを防いでいる。
     if (m_IsOpen || m_IsOpening)
     {
         return;
     }
 
+    // 扉の回転を打ち消したローカル空間で、扉板を長方形として扱っている
     const float halfX = std::abs(m_Scale.x) * 0.5f;
     const float halfZ = std::abs(m_Scale.z) * 0.5f;
     const Matrix baseRotation = Matrix::CreateFromYawPitchRoll(
@@ -331,6 +355,7 @@ void Door::ResolveCollision(Vector3& position, float radius) const
     const float minZ = -halfZ;
     const float maxZ = halfZ;
 
+    // 長方形の中で、プレイヤーに最も近い点を求めている
     const float closestX = std::clamp(localPosition.x, minX, maxX);
     const float closestZ = std::clamp(localPosition.z, minZ, maxZ);
     const float deltaX = localPosition.x - closestX;
@@ -342,6 +367,7 @@ void Door::ResolveCollision(Vector3& position, float radius) const
         return;
     }
 
+    // 中心が長方形の外にあるなら、最も近い点から半径の分だけ離している
     constexpr float epsilon = 0.000001f;
     if (distanceSquared > epsilon)
     {
@@ -355,6 +381,7 @@ void Door::ResolveCollision(Vector3& position, float radius) const
         return;
     }
 
+    // 中心が長方形の中にまで入っているなら、一番近い辺の外側へ出している
     const float distanceToLeft = localPosition.x - minX;
     const float distanceToRight = maxX - localPosition.x;
     const float distanceToNear = localPosition.z - minZ;
@@ -380,6 +407,7 @@ void Door::ResolveCollision(Vector3& position, float radius) const
     {
         localPosition.z = maxZ + radius;
     }
+    // ローカル空間からワールド座標へ戻している
     position = m_Position + Vector3::Transform(
         localPosition,
         baseRotation);
@@ -387,8 +415,8 @@ void Door::ResolveCollision(Vector3& position, float radius) const
 
 Matrix Door::GetDoorWorldMatrix() const
 {
-    // 中心原点で生成したメッシュを左端が原点になるよう移動し、蝶番を中心に回転してから
-    // ワールド座標へ戻すことで、自然な扉の開閉行列を作ります。
+    // 原点を中心にして作ったメッシュを、左端が原点になるよう移動し、蝶番を軸に回転してから
+    // ワールド座標へ戻すことで、端を軸に開く扉の行列を作っている。
     const float halfWidth = std::abs(m_Scale.x) * 0.5f;
     const Matrix baseRotation = Matrix::CreateFromYawPitchRoll(
         m_Rotation.y,
@@ -411,6 +439,7 @@ Matrix Door::GetDoorWorldMatrix() const
         Matrix::CreateTranslation(hingePosition);
 }
 
+// 扉本体を描き、続けて足元の漏れ光を開き具合に合わせた明るさで描いている
 void Door::Draw(Camera* camera)
 {
     camera->SetCamera();
@@ -427,9 +456,11 @@ void Door::Draw(Camera* camera)
     m_Material->SetGPU();
     context->DrawIndexed(static_cast<UINT>(m_DoorIndexCount), 0, 0);
 
+    // 開き具合（0〜1）をなめらかな曲線（smoothstep）に変えている
     const float normalizedOpen = (std::clamp)(m_OpenAngle / 1.20f, 0.0f, 1.0f);
     const float openAmount = normalizedOpen * normalizedOpen *
         (3.0f - 2.0f * normalizedOpen);
+    // 開く前のためで揺れている間は、漏れ光もちらつかせている
     float rattleGlow = 0.0f;
     if (m_OpenDelayTimer > 0.0f)
     {
@@ -440,6 +471,7 @@ void Door::Draw(Camera* camera)
             (std::sin(elapsed * 45.0f) * 0.5f + 0.5f) * remaining;
     }
 
+    // 漏れ光の明るさ：周回が進むほど、開くほど、明るくしている
     const bool powerRestored =
         Core::Game::GetInstance()->IsPowerRestored();
     const float leakIntensity =
@@ -447,6 +479,7 @@ void Door::Draw(Camera* camera)
         openAmount * (powerRestored ? 0.62f : 0.30f) +
         rattleGlow * 0.22f;
 
+    // 漏れ光の色：電力が戻っていれば青白、停電中は赤
     MATERIAL leakMaterial{};
     leakMaterial.Diffuse = Color(0.04f, 0.03f, 0.02f, 1.0f);
     leakMaterial.Emission = powerRestored
@@ -464,7 +497,7 @@ void Door::Draw(Camera* camera)
     m_LeakMaterial->SetMaterial(leakMaterial);
     m_LeakMaterial->SetGPU();
 
-    // 漏れ光は開口部側の表現なので、扉板が蝶番で回転しても固定位置に残します。
+    // 漏れ光は戸口の側の表現なので、扉板が蝶番で回転しても元の位置に残している。
     const Matrix baseRotation = Matrix::CreateFromYawPitchRoll(
         m_Rotation.y, m_Rotation.x, m_Rotation.z);
     Matrix leakWorld = Matrix::CreateScale(m_Scale) * baseRotation *
@@ -476,6 +509,7 @@ void Door::Draw(Camera* camera)
         0);
 }
 
+// 影を作るための描画（漏れ光は影を落とさないので、扉本体だけを描いている）
 void Door::DrawShadow()
 {
     Matrix world = GetDoorWorldMatrix();
@@ -489,6 +523,7 @@ void Door::DrawShadow()
     context->DrawIndexed(static_cast<UINT>(m_DoorIndexCount), 0, 0);
 }
 
+// 頂点データを解放している
 void Door::Uninit()
 {
     m_Vertices.clear();

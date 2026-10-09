@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: 画面の埃、レンズ汚れ、湿り表現のオーバーレイを管理します。
-// 主な技術: スクリーンスペース表現、粒子、アルファブレンド、時間アニメーション
+// ファイルの役割: 驚かせる瞬間などに、画面の上へ漂う埃の粒と細かい走査線を短い時間だけ重ねている（Object名は "CRTNoise"）。
+// 主な技術: 画面全体に重ねる表現、シェーダーで作る粒の模様、アルファブレンド、時間で動く表現
 // ============================================================================
 
 #include "ScreenDustOverlay.h"
@@ -9,6 +9,7 @@
 
 using namespace DirectX::SimpleMath;
 
+// 画面と同じ大きさの四角形と、埃を描くシェーダー（PS_HorrorDust）、定数バッファを作っている
 void ScreenDustOverlay::Init()
 {
     float w = (float)Application::GetWidth();
@@ -55,6 +56,7 @@ void ScreenDustOverlay::Init()
     );
 }
 
+// 表示している間だけ時間を進め、残り秒数が尽きたら消している
 void ScreenDustOverlay::Update()
 {
     if (!m_IsActive) return;
@@ -73,6 +75,7 @@ void ScreenDustOverlay::Update()
     }
 }
 
+// 2D用の行列で、画面全体に半透明で重ねて描いている（深度は使わない）
 void ScreenDustOverlay::Draw(Camera* /*camera*/)
 {
     if (!m_IsActive) return;
@@ -115,6 +118,7 @@ void ScreenDustOverlay::Draw(Camera* /*camera*/)
     Renderer::SetDepthEnable(true);
 }
 
+// 定数バッファを解放している
 void ScreenDustOverlay::Uninit()
 {
     m_TimeBuffer.Reset();

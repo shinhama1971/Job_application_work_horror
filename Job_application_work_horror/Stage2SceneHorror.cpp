@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: 2面の偽ドア異変、視線演出、停電、追跡、捕獲イベントを管理します。
-// 主な技術: 有限状態機械、動的照明、距離判定、時間演出
+// ファイルの役割: 2面の怖い演出（偽の扉・影を見たときの照明・最後の停電と追跡・捕まったとき・傷・肖像画・ノック・背後の気配・心拍）を担当している。
+// 主な技術: 有限状態機械、照明の演出、距離と視線の判定、時間で進む演出
 // ============================================================================
 
 #include "Stage2Scene.h"
@@ -27,9 +27,10 @@ using namespace DirectX::SimpleMath;
 #include "Stage2SceneConstants.h"
 
 
+// 偽の扉の異変：ライトで照らして見た後、目を離した隙に反対側（右）の壁へ移している
 void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
 {
-    // 偽ドアを見つける周回（Stage2AnomalyPlanが決める）だけ判定します。
+    // 偽の扉を見つける周回（Stage2AnomalyPlanが決める）だけ判定している。
     if (!m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::FalseDoor) ||
         m_FalseDoorAnomaly.HasMoved())
     {
@@ -45,6 +46,7 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
         cameraToDoor /= distance;
     }
 
+    // 近く（105未満）で正面（内積0.88超）から見たとき、ライトが点いていれば「見た」、消えていれば間違いとして数えている
     const float facing = game->GetCamera()->GetForward().Dot(cameraToDoor);
     if (distance < 105.0f && facing > 0.88f)
     {
@@ -58,6 +60,7 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
         return;
     }
 
+    // 見た後で、目をそらす（内積0.30以下）か離れたら、右の壁へ移して照明と画面で知らせている
     if (!m_FalseDoorAnomaly.WasObserved() ||
         (facing > 0.30f && distance < 118.0f))
     {
@@ -87,6 +90,7 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
     Input::SetVibration(8, 0.20f);
 }
 
+// 影を見てしまったときの演出を始めている（驚かせる音・画面・振動）
 void Stage2Scene::StartObservedScare()
 {
     if (!m_ObservedScareSequence.Start())
@@ -100,6 +104,7 @@ void Stage2Scene::StartObservedScare()
     Input::SetVibration(15, 0.34f);
 }
 
+// 影を見たときの演出を進めている：奥の扉の照明から入口の照明へ、順に明滅させている
 void Stage2Scene::UpdateObservedScare(float deltaTime)
 {
     if (!m_ObservedScareSequence.IsActive())
@@ -154,6 +159,7 @@ void Stage2Scene::UpdateObservedScare(float deltaTime)
     }
 }
 
+// 最後の停電の演出を始めている：足音の影を消し、スタミナを満タンにして、背後72に追ってくる影を出している
 void Stage2Scene::StartFinalSequence()
 {
     m_FinalSequence.Start();
@@ -182,10 +188,12 @@ void Stage2Scene::StartFinalSequence()
             playerPosition.z - 72.0f);
         shadow->SetActive(false);
         shadow->SetActive(true);
+        // 捕まった回数が多いほど影を遅くしている（1回1.5ずつ、最大2回分）
         const float retryAssist = static_cast<float>((std::min)(
             game->GetCaughtCount(), 2)) * 1.5f;
         shadow->EnableChase(18.0f - retryAssist, 30.0f);
         shadow->EnableGazeScare(8.0f);
+        // 追跡中に影を見てしまうと、照明が一斉に明滅する罰を出している（続けては出さない）
         shadow->SetOnObserved(
             [this]()
             {
@@ -208,11 +216,13 @@ void Stage2Scene::StartFinalSequence()
                 Input::SetVibration(16, 0.45f);
             });
     }
+    // 壁の傷を全部見せ、強く驚かせている
     RevealScratchPieces(0, Stage2ScratchCount, 0.34f);
     game->GetPostProcess()->TriggerHorrorPulse(0.82f, 0.72f);
     Input::SetVibration(18, 0.42f);
 }
 
+// 最後の停電の演出を進め、終わったら出口の扉の鍵を外している
 void Stage2Scene::UpdateFinalSequence(float deltaTime)
 {
     if (!m_FinalSequence.IsSequenceActive() || m_FinalDoorReady)
@@ -226,7 +236,7 @@ void Stage2Scene::UpdateFinalSequence(float deltaTime)
     int pendingBeat = m_FinalSequence.ConsumePendingBeat();
     while (pendingBeat >= 0)
     {
-        // 最終演出の拍は入口側から出口扉の上へ順に非常灯を点けます。
+        // 最後の演出の拍ごとに、入口側から出口の扉の上へ順に非常灯（赤）を点けている。
         CeilingLight* light = m_Objects.lights[static_cast<std::size_t>(pendingBeat)];
         if (light != nullptr)
         {
@@ -239,6 +249,7 @@ void Stage2Scene::UpdateFinalSequence(float deltaTime)
         pendingBeat = m_FinalSequence.ConsumePendingBeat();
     }
 
+    // 最初の1.65秒は、画面を強く明滅させている
     if (m_FinalSequence.GetSequenceTimer() < 1.65f)
     {
         const float pulse =
@@ -253,6 +264,7 @@ void Stage2Scene::UpdateFinalSequence(float deltaTime)
         return;
     }
 
+    // 演出が終わったら、出口の扉の鍵を外し、出口を調べられるようにし、扉のランプを緑にしている
     m_FinalDoorReady = true;
     m_FinalSequenceArmed = false;
     m_Notices.loop = 3.0f;
@@ -281,6 +293,7 @@ void Stage2Scene::UpdateFinalSequence(float deltaTime)
     Input::SetVibration(9, 0.24f);
 }
 
+// 最後の追跡：影に追いつかれたら捕まり、近いほど画面を乱し、振動を強くしている
 void Stage2Scene::UpdateFinalPursuit(float deltaTime)
 {
     if (!m_FinalSequence.IsPursuitActive())
@@ -306,12 +319,14 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
     const Vector3 offset = player->GetPosition() - shadow->GetPosition();
     const float horizontalDistance =
         std::sqrt(offset.x * offset.x + offset.z * offset.z);
+    // 31.5以内まで追いつかれたら捕まっている
     if (horizontalDistance <= 31.5f)
     {
         StartCaughtSequence(*player, CaughtSequence::Reason::FinalPursuit);
         return;
     }
 
+    // 近さ（0〜1）：30〜102の距離で、近いほど1に近づく
     const float proximity = 1.0f - (std::clamp)(
         (horizontalDistance - 30.0f) / 72.0f,
         0.0f,
@@ -341,6 +356,7 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
             dangerPulse * proximity * 0.025f);
     }
 
+    // 影を見てしまった罰の間は、画面を暗く乱している
     if (m_FinalSequence.HasGazePenalty())
     {
         const float penalty = m_FinalSequence.GetGazePenaltyRate();
@@ -353,6 +369,7 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
         game->GetPostProcess()->SetExposure(0.91f + (1.0f - penalty) * 0.06f);
     }
 
+    // 近いほど短い間隔で、振動と画面の脈動を出している
     if (!m_FinalSequence.AdvancePursuitPulse(deltaTime))
     {
         return;
@@ -372,6 +389,7 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
     m_FinalSequence.SchedulePursuitPulse(proximity);
 }
 
+// 捕まった演出を始めている（追跡・息を潜める操作・隠れている状態を止め、影を消している）
 void Stage2Scene::StartCaughtSequence(
     Player& player,
     CaughtSequence::Reason reason)
@@ -383,7 +401,7 @@ void Stage2Scene::StartCaughtSequence(
 
     m_QuietRecovery.Reset();
     m_FinalSequence.StopForCaught();
-    // ロッカーの中で捕まった場合も、外へ出た扱いにしてからチェックポイントへ戻します。
+    // ロッカーの中で捕まった場合も、外へ出た扱いにしてから入口へ戻している。
     player.ForceExitHiding();
     m_HiddenStalkerTimer = -1.0f;
     player.SetCanControl(false);
@@ -401,7 +419,7 @@ void Stage2Scene::StartCaughtSequence(
     {
         noiseShadow->SetActive(false);
     }
-    // 捕獲中はUpdateBehindPresenceが呼ばれないため、ここで背後の気配も消します。
+    // 捕まっている間はUpdateBehindPresenceが呼ばれないため、ここで背後の気配も消している。
     m_Objects.presence->SetActive(false);
     m_BehindPresence.Postpone(BehindPresence::MaxInterval);
 
@@ -410,6 +428,7 @@ void Stage2Scene::StartCaughtSequence(
     Input::SetVibration(24, 0.72f);
 }
 
+// 捕まった演出を進め、暗転した後に入口へ戻している
 void Stage2Scene::UpdateCaughtSequence(Player& player, float deltaTime)
 {
     m_CaughtSequence.Advance(deltaTime);
@@ -428,12 +447,13 @@ void Stage2Scene::UpdateCaughtSequence(Player& player, float deltaTime)
         return;
     }
 
-    // 騒音追跡で捕まった場合は現在の周回を保持し、入口へ戻して再挑戦させます。
+    // 足音の影に捕まった場合は今の周回を残し、入口へ戻して再挑戦させている。
     player.SetPosition(Vector3(0.0f, -99.0f, -125.0f));
     player.RestoreStamina();
     player.SetCanControl(true);
     const bool wasNoiseCatch = m_CaughtSequence.WasNoiseStalker();
     m_CaughtSequence.Complete();
+    // 最後の追跡で捕まった場合は、停電の演出をもう一度最初からにして、扉を閉め直している
     if (!wasNoiseCatch)
     {
         m_FinalSequence.ResetSequenceForRetry();
@@ -474,6 +494,7 @@ void Stage2Scene::UpdateCaughtSequence(Player& player, float deltaTime)
     Input::SetVibration(8, 0.18f);
 }
 
+// 指定の範囲の傷を表示し、少しずつ色を変えて赤く光らせている
 void Stage2Scene::RevealScratchPieces(int first, int last, float emission)
 {
     first = (std::clamp)(first, 0, Stage2ScratchCount);
@@ -496,6 +517,7 @@ void Stage2Scene::RevealScratchPieces(int first, int last, float emission)
     }
 }
 
+// 照明の区画：廊下を進むと照明を明滅させ、2周目以降は通り過ぎた照明を消している
 void Stage2Scene::UpdateLightZones(const Player& player)
 {
     if (m_LoopCount >= 3 || m_FinalSequence.IsSequenceActive())
@@ -537,8 +559,8 @@ void Stage2Scene::UpdateLightZones(const Player& player)
             light->TriggerEventFlicker(0.48f + loopStrength, strength);
         }
 
-        // 2周目以降はプレイヤーの背後から照明を消し、暗闇が迫るように見せます。
-        // 次の周回開始時に照明を戻し、同じ廊下を再利用できる状態にします。
+        // 2周目以降はプレイヤーの背後から照明を消し、暗闇が迫るように見せている。
+        // 次の周回の始まりに照明を戻し、同じ廊下を使い直せる状態にしている。
         if (m_LoopCount > 0 && index > 0)
         {
             CeilingLight* lightBehind = m_Objects.Light(zones[index - 1].Light);
@@ -561,6 +583,7 @@ void Stage2Scene::UpdateLightZones(const Player& player)
     }
 }
 
+// 壁の傷：周回が進むほど増え、ライトで照らすと心臓の鼓動のように赤く脈打っている
 void Stage2Scene::UpdateScratchMessage(
     const Player& player,
     float deltaTime)
@@ -585,6 +608,7 @@ void Stage2Scene::UpdateScratchMessage(
         cameraToMessage /= distance;
     }
 
+    // 見ている度合い（正面ほど1）と近さ（24〜119）から、照らしている強さを求めている
     const float facing = (std::max)(
         game->GetCamera()->GetForward().Dot(cameraToMessage),
         0.0f);
@@ -608,6 +632,7 @@ void Stage2Scene::UpdateScratchMessage(
         0.07f + static_cast<float>(m_LoopCount) * 0.035f +
         flashlightResponse * (0.10f + heartbeat * 0.16f) + finalBoost;
 
+    // 周回に合わせた数の傷を見せ、2周目以降に近くで正面から照らしたら一度だけ驚かせている
     const int visibleCount = m_ScratchAnomaly.GetVisiblePieceCount(
         m_LoopCount, Stage2ScratchCount);
     RevealScratchPieces(0, visibleCount, emission);
@@ -623,9 +648,9 @@ void Stage2Scene::UpdateScratchMessage(
     }
 }
 
-// 肖像画を見つける周回（Stage2AnomalyPlanが決める）だけ判定します。
-// 懐中電灯で照らしたまま見つめ続けると、閉じていた目がゆっくり浮かび、やがて開きます。
-// 途中で目を離すと、目は消えて最初からやり直しです。
+// 肖像画を見つける周回（Stage2AnomalyPlanが決める）だけ判定している。
+// 懐中電灯で照らしたまま見つめ続けると、閉じていた目がゆっくり浮かび、やがて開く。
+// 途中で目を離すと、目は消えて最初からやり直しにしている。
 void Stage2Scene::UpdatePortraitAnomaly(const Player& player, float deltaTime)
 {
     if (!m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Portrait) ||
@@ -646,12 +671,13 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player, float deltaTime)
 
     const float facing =
         game->GetCamera()->GetForward().Dot(cameraToPortrait);
+    // ライトが点いていて、近く（105未満）で正面（内積0.91超）から見ているか
     const bool lookingAtPortrait =
         player.IsFlashlightOn() && distance < 105.0f && facing > 0.91f;
     const bool wasStaring = m_PortraitAnomaly.IsStaring();
     if (!m_PortraitAnomaly.UpdateStare(lookingAtPortrait, deltaTime))
     {
-        // 見つめている間は目がかすかに浮かび、目を離すと消えます。
+        // 見つめている間は目がかすかに浮かび、目を離すと消える。
         const float stareRate = m_PortraitAnomaly.GetStareRate();
         if (m_PortraitAnomaly.IsStaring() || wasStaring)
         {
@@ -670,7 +696,7 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player, float deltaTime)
         return;
     }
 
-    // 見つめ続けた: 目が開き、奥の確認スイッチが押せるようになります。
+    // 見つめ続けた: 目が開き、奥の確認スイッチが押せるようになる。
     m_Notices.loop = 2.8f;
     constexpr float emission = 0.28f;
     for (Wall* eye : m_Objects.portraitEyes)
@@ -694,7 +720,7 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player, float deltaTime)
             12.0f);
     }
 
-    // 肖像画は時計の向かい（z=-25）にあるため、近くの照明と奥の扉の照明を揺らします。
+    // 肖像画は時計の向かい（z=-25）にあるため、近くの照明と奥の扉の照明を揺らしている。
     CeilingLight* nearbyLight = m_Objects.Light(Stage2Light::Light2);
     if (nearbyLight != nullptr)
     {
@@ -711,14 +737,15 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player, float deltaTime)
 
 // ----------------------------------------------------------------------------
 // 壁の向こうのノック
-// ノックを見つける周回（Stage2AnomalyPlanが決める）だけ、壁の裏から叩く音を立体音響で鳴らします。
-// 出どころの壁の前で立ち止まり、壁の方を向いて耳を澄ますと見つけたことになります。
+// ノックを見つける周回（Stage2AnomalyPlanが決める）だけ、壁の裏から叩く音を立体音響で鳴らしている。
+// 出どころの壁の前で立ち止まり、壁の方を向いて耳を澄ますと見つけたことになる。
 // ----------------------------------------------------------------------------
 namespace
 {
     constexpr float KnockListenDistance = 24.0f;    // 出どころの壁の前とみなす距離
     constexpr float KnockListenFacing = 0.60f;      // 壁の方を向いているとみなす内積
 
+    // 音の出どころの番号から位置を作っている
     Vector3 GetKnockSpot(int index)
     {
         const float* spot = Stage2KnockSpots[index];
@@ -726,13 +753,14 @@ namespace
     }
 }
 
-// 音の出どころの壁の手前（廊下の内側）の位置です。耳を澄ます場所と、案内の矢印の先に使います。
+// 音の出どころの壁の手前（廊下の内側）の位置を返している。耳を澄ます場所と、案内の矢印の先に使っている。
 Vector3 Stage2Scene::GetKnockListenPoint() const
 {
     const Vector3 spot = GetKnockSpot(m_KnockingAnomaly.GetSpot());
     return Vector3(spot.x > 0.0f ? 38.0f : -38.0f, spot.y, spot.z);
 }
 
+// ノックの異変：決まったリズムで壁の裏から叩く音を鳴らし、聞き当てたかを判定している
 void Stage2Scene::UpdateKnockingAnomaly(const Player& player, float deltaTime)
 {
     if (!m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Knocking) ||
@@ -745,12 +773,12 @@ void Stage2Scene::UpdateKnockingAnomaly(const Player& player, float deltaTime)
     const Vector3 spot = GetKnockSpot(m_KnockingAnomaly.GetSpot());
     if (m_KnockingAnomaly.UpdateKnock(deltaTime))
     {
-        // 配管の音より低くし、木の扉を拳で叩くような鈍い音にします。
+        // 配管の音より低くし、木の扉を拳で叩くような鈍い音にしている。
         std::uniform_real_distribution<float> pitch(0.58f, 0.68f);
         game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, spot, pitch(m_PresenceRandom), 1.6f);
     }
 
-    // 壁の手前（廊下の内側）の位置と、プレイヤーとの距離・向きで「耳を澄ませているか」を判定します。
+    // 壁の手前（廊下の内側）の位置と、プレイヤーとの距離・向きで「耳を澄ませているか」を判定している（立ち止まっていることも条件）。
     const Vector3 listenPoint = GetKnockListenPoint();
     const Camera* camera = game->GetCamera();
     Vector3 toSpot = listenPoint - camera->GetPosition();
@@ -767,7 +795,7 @@ void Stage2Scene::UpdateKnockingAnomaly(const Player& player, float deltaTime)
         return;
     }
 
-    // 聞き当てた: 壁のすぐ向こうで一度だけ強く叩き、音が止まります。
+    // 聞き当てた: 壁のすぐ向こうで一度だけ強く叩き、音が止まる。
     game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, spot, 0.52f, 2.2f);
     m_Notices.loop = 2.8f;
     CeilingLight* nearbyLight = m_Objects.Light(Stage2NearestLight(spot.z));
@@ -786,17 +814,18 @@ void Stage2Scene::UpdateKnockingAnomaly(const Player& player, float deltaTime)
 
 // ----------------------------------------------------------------------------
 // 背後の気配
-// 視界の外に人影を出し、見ていない間だけ近づけます。振り向けば消え、
-// 気づかずに背後まで近づかれると足音の危険度が一気に上がります。
+// 視界の外に人影を出し、見ていない間だけ近づけている。振り向けば消え、
+// 気づかずに背後まで近づかれると、足音の危険度が一気に上がる。
 // ----------------------------------------------------------------------------
 namespace
 {
+    // 出す距離（背後58）、近づく速さ、見たと判定する距離と内積、追いつかれたときに上がる危険度
     constexpr float PresenceSpawnDistance = 58.0f;
-    constexpr float PresenceCreepSpeed = 17.0f;     // 歩く速さ(30)より遅く、止まれば迫る速さ
+    constexpr float PresenceCreepSpeed = 17.0f;     // 歩く速さ（30）より遅く、止まれば迫ってくる速さ
     constexpr float PresenceLookDistance = 170.0f;
     constexpr float PresenceLookAlignment = 0.88f;
     constexpr float PresenceReachThreat = 0.35f;
-    // 廊下の内側に収め、壁の中に出現しないようにします。
+    // 廊下の内側に収め、壁の中に出ないようにしている。
     constexpr float CorridorHalfWidth = 30.0f;
     constexpr float CorridorMinZ = -150.0f;
     constexpr float CorridorMaxZ = 130.0f;
@@ -804,7 +833,7 @@ namespace
 
 bool Stage2Scene::IsBehindPresenceAllowed() const
 {
-    // 他の人影や大きな演出と重ねず、周回そのものの静けさの中でだけ出します。
+    // ほかの人影や大きな演出と重ねず、周回そのものの静けさの中でだけ出している。
     const bool otherFigureActive =
         (m_Objects.shadow != nullptr && m_Objects.shadow->IsActive()) ||
         (m_Objects.noiseShadow != nullptr && m_Objects.noiseShadow->IsActive());
@@ -819,6 +848,7 @@ bool Stage2Scene::IsBehindPresenceAllowed() const
         !m_CaughtSequence.IsActive();
 }
 
+// 背後の気配：見ているかと距離を調べ、BehindPresenceが返す出来事ごとに、影を出す・消す・驚かせる
 void Stage2Scene::UpdateBehindPresence(Player& player, float deltaTime)
 {
     ShadowMan* presence = m_Objects.presence;
@@ -854,7 +884,7 @@ void Stage2Scene::UpdateBehindPresence(Player& player, float deltaTime)
         break;
     case BehindPresence::Event::Spawn:
     {
-        // カメラの真後ろへ置きます。廊下の外に出る場合は、次の機会に回します。
+        // カメラの真後ろへ置いている。廊下の外に出る場合は、次の機会（3秒後）に回している。
         Vector3 backward = -camera->GetForward();
         backward.y = 0.0f;
         if (backward.LengthSquared() < 0.001f)
@@ -878,11 +908,12 @@ void Stage2Scene::UpdateBehindPresence(Player& player, float deltaTime)
         break;
     }
     case BehindPresence::Event::Seen:
-        // 振り向いた瞬間に消し、見間違いだったのかと思わせる程度の反応にとどめます。
+        // 振り向いた瞬間に消し、見間違いだったのかと思わせる程度の反応にとどめている。
         presence->SetActive(false);
         game->GetPostProcess()->TriggerHorrorPulse(0.14f, 0.18f);
         Input::SetVibration(2, 0.05f);
         break;
+    // 気づかずに追いつかれた：照明が一斉に明滅し、危険度が上がる
     case BehindPresence::Event::Reached:
         presence->SetActive(false);
         for (CeilingLight* light : m_Objects.lights)
@@ -901,6 +932,7 @@ void Stage2Scene::UpdateBehindPresence(Player& player, float deltaTime)
     }
 }
 
+// 今の危険度（0〜1）を求めている。足音の危険度、観察の間違い（必要なとき）、最後の追跡の影、足音の影のうち、一番高いものを使っている
 float Stage2Scene::ComputeThreatRate(const Player& player, bool includeMistakes) const
 {
     float threatRate = m_NoiseThreatSystem.GetThreat() * 0.78f;
@@ -937,7 +969,7 @@ float Stage2Scene::ComputeThreatRate(const Player& player, bool includeMistakes)
 
 void Stage2Scene::UpdateTensionPulse(const Player& player, float deltaTime)
 {
-    // 観察ミスの回数は含めません（一度ミスすると心拍が鳴りやまなくなるため）。今まさに迫っている危険だけを使います。
+    // 観察の間違いの回数は含めていない（一度間違えると心拍が鳴りやまなくなるため）。今まさに迫っている危険だけを使っている。
     PlayTensionPulse(m_TensionPulse.Update(
         deltaTime, ComputeThreatRate(player, false), player.IsHiding()));
 }

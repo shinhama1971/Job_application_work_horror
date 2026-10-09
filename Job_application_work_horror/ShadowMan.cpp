@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: 遠景の人影、出現時間、消失・ディゾルブ演出を管理します。
-// 主な技術: ゲームAI状態機械、追跡補間、シャドウ表現、ディゾルブ
+// ファイルの役割: 人影の出現時間、プレイヤーを追う動き、見られたときに崩れて消える演出を管理している。
+// 主な技術: 簡単な敵の状態管理、プレイヤーへ近づく動き、黒い人影の表現、ディゾルブ（崩れて消える表現）
 // ============================================================================
 
 #include "Game.h"
@@ -15,6 +15,7 @@
 
 using namespace DirectX::SimpleMath;
 
+// 状態を初期化し、箱を組み合わせて人の形（両足・胴・両腕・頭）を作っている
 void ShadowMan::Init()
 {
 	m_Age = 0.0f;
@@ -33,8 +34,10 @@ void ShadowMan::Init()
     m_Vertices.reserve(144);
     m_Indices.reserve(432);
 
+    // ほとんど黒に近い色
     const Color shadowColor(0.025f, 0.03f, 0.027f, 1.0f);
 
+    // 四角形の面を1枚追加している。表と裏の両方から見えるよう、三角形を両面分（12個のインデックス）入れている
     const auto addFace = [this, &shadowColor](
         const std::array<Vector3, 4>& positions,
         const Vector3& normal)
@@ -66,6 +69,7 @@ void ShadowMan::Init()
         m_Indices.insert(m_Indices.end(), indices, indices + 12);
     };
 
+    // 中心と半分の大きさを指定して、6面の箱を追加している
     const auto addBox = [&addFace](const Vector3& center, const Vector3& half)
     {
         const float left = center.x - half.x;
@@ -95,6 +99,7 @@ void ShadowMan::Init()
                 Vector3(0.0f, -1.0f, 0.0f));
     };
 
+    // 両足・胴・両腕・頭
     addBox(Vector3(-0.18f, 0.45f, 0.0f), Vector3(0.12f, 0.45f, 0.12f));
     addBox(Vector3(0.18f, 0.45f, 0.0f), Vector3(0.12f, 0.45f, 0.12f));
     addBox(Vector3(0.0f, 1.25f, 0.0f), Vector3(0.36f, 0.42f, 0.16f));
@@ -104,6 +109,7 @@ void ShadowMan::Init()
 
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
+    // 崩れて消える表現のピクセルシェーダーを使っている
     m_Shader.Create(
         "shader/litTextureVS.hlsl",
         "shader/shadowDissolvePS.hlsl");
@@ -120,9 +126,11 @@ void ShadowMan::Init()
     m_Material = std::make_unique<Material>();
     m_Material->Create(material);
 
+    // 人の背丈くらいの大きさ（高さ16倍で約30）
     m_Scale = Vector3(8.0f, 16.0f, 8.0f);
 }
 
+// 表示時間を減らし、追ってくる・プレイヤーの方を向く・見られたかの判定をしている
 void ShadowMan::Update()
 {
     if (!m_IsActive)
@@ -133,6 +141,7 @@ void ShadowMan::Update()
     const float deltaTime = Application::GetDeltaTime();
     m_Age += deltaTime;
     m_LifeTime -= deltaTime;
+    // 時間切れになったら、非表示にするか破棄している
     if (m_LifeTime <= 0.0f)
     {
         if (m_DeactivateOnExpire)
@@ -158,6 +167,7 @@ void ShadowMan::Update()
     }
 
     Vector3 toPlayer = player->GetPosition() - m_Position;
+    // 追ってくる設定なら、水平方向にプレイヤーへ近づいている（止まる距離より近づかない）
     if (m_ChaseEnabled)
     {
         Vector3 horizontalDirection(toPlayer.x, 0.0f, toPlayer.z);
@@ -172,15 +182,15 @@ void ShadowMan::Update()
             m_Position += horizontalDirection * travel;
             toPlayer = player->GetPosition() - m_Position;
 
-            // 一定の歩幅ごとに、この人影の足元から足音を鳴らします。
-            // 立体音響で、見えていなくても背後のどこから近づいてくるかが分かります。
+            // 一定の歩幅ごとに、この人影の足元から足音を鳴らしている。
+            // 立体音響で、見えていなくても背後のどこから近づいてくるかが分かる。
             constexpr float ChaseStrideLength = 22.0f;
             m_ChaseStepDistance += travel;
             if (m_ChaseStepDistance >= ChaseStrideLength)
             {
                 m_ChaseStepDistance -= ChaseStrideLength;
                 m_ChaseStepLeft = !m_ChaseStepLeft;
-                // プレイヤーより低く重い足音にし、左右の足で少しだけ高さを変えます。
+                // プレイヤーより低く重い足音にし、左右の足で少しだけ音の高さを変えている。
                 game->PlayAudioCueAt(
                     SOUND_CUE_FOOTSTEP,
                     m_Position + Vector3(0.0f, 4.0f, 0.0f),
@@ -189,11 +199,13 @@ void ShadowMan::Update()
             }
         }
     }
+    // いつもプレイヤーの方を向いている
     if (toPlayer.LengthSquared() > 0.0001f)
     {
         m_Rotation.y = std::atan2(toPlayer.x, toPlayer.z);
     }
 
+	// 見られたか：ライトを点けていて、220より近く、視線の中心（内積0.955超）に影の胸のあたりがあるとき
 	const Vector3 shadowCenter = m_Position + Vector3(0.0f, 17.0f, 0.0f);
 	Vector3 cameraToShadow = shadowCenter - game->GetCamera()->GetPosition();
 	const float distanceToShadow = cameraToShadow.Length();
@@ -210,6 +222,7 @@ void ShadowMan::Update()
 		distanceToShadow < 220.0f &&
 		gazeAlignment > 0.955f;
 
+	// 見られている間は崩れていき、表示時間も早く減っている。最初に見られた瞬間に画面と振動で驚かせている
 	if (illuminatedByGaze)
 	{
 		m_ObservedAmount += 3.6f * deltaTime;
@@ -235,18 +248,21 @@ void ShadowMan::Update()
 			}
 		}
 	}
+	// 目を離すと、崩れ具合が少しずつ戻る
 	else
 	{
 		m_ObservedAmount -= 1.08f * deltaTime;
 	}
 
 	m_ObservedAmount = (std::clamp)(m_ObservedAmount, 0.0f, 1.0f);
+	// ほとんど崩れたら、0.4秒以内に消している
 	if (m_ObservedAmount > 0.82f)
 	{
 		m_LifeTime = (std::min)(m_LifeTime, 0.4f);
 	}
 }
 
+// 現れる・消える・見られて崩れる度合いを合わせて、崩れて消える表現で描いている
 void ShadowMan::Draw(Camera* camera)
 {
     if (!m_IsActive || m_LifeTime <= 0.0f)
@@ -270,6 +286,7 @@ void ShadowMan::Draw(Camera* camera)
     m_IndexBuffer.SetGPU();
     m_Material->SetGPU();
 
+    // 0.35秒かけて現れ、残り0.5秒で消えていく
     const float appear = (std::min)(m_Age / 0.35f, 1.0f);
     const float disappear = (std::min)(
         m_LifeTime / 0.5f,
@@ -290,8 +307,8 @@ void ShadowMan::Draw(Camera* camera)
         0,
         0);
     ID3D11Buffer* dissolveBuffer = m_DissolveBuffer.Get();
-    // b7は通常の材質シェーダーではデバッグ表示設定にも使います。
-    // 人影を描いた後に戻さないと、次のフレームの部屋全体が黒くなる場合があります。
+    // b7は普通のマテリアルのシェーダーでは、デバッグ表示の設定にも使っている。
+    // 人影を描いた後に戻さないと、次のフレームの部屋全体が黒くなる場合がある。
     Microsoft::WRL::ComPtr<ID3D11Buffer> previousBuffer;
     context->PSGetConstantBuffers(7, 1, previousBuffer.GetAddressOf());
     context->PSSetConstantBuffers(7, 1, &dissolveBuffer);
@@ -300,6 +317,7 @@ void ShadowMan::Draw(Camera* camera)
     context->PSSetConstantBuffers(7, 1, &restoredBuffer);
 }
 
+// 見られたときの処理と、定数バッファ・頂点データを解放している
 void ShadowMan::Uninit()
 {
 	m_OnObserved = nullptr;

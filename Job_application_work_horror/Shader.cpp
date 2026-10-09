@@ -1,6 +1,6 @@
 ﻿// ============================================================================
-// ファイルの役割: HLSLのコンパイル、頂点入力レイアウト、GPUへのシェーダー設定を管理します。
-// 主な技術: D3DCompileFromFile、Vertex/Pixel Shader、Input Layout、エラー出力
+// ファイルの役割: HLSLの読み込み、頂点の入力レイアウト、GPUへのシェーダーの設定を管理している。
+// 主な技術: D3DCompileFromFile（またはコンパイル済みの.cso）、頂点・ピクセルシェーダー、入力レイアウト、エラーの表示
 // ============================================================================
 
 #include	"Shader.h"
@@ -10,6 +10,7 @@
 
 namespace
 {
+	// 作ったシェーダーを、ファイル名の組み合わせごとに覚えておく入れ物（同じシェーダーを何度もコンパイルしないため）
 	struct ShaderCacheEntry
 	{
 		ComPtr<ID3D11VertexShader> VertexShader;
@@ -21,10 +22,11 @@ namespace
 }
 
 //=======================================
-//Shader作成
+// シェーダーを作っている
 //=======================================
 void Shader::Create(std::string vs, std::string ps)
 {
+	// 頂点シェーダーとピクセルシェーダーのファイル名を改行でつないだものをキーにしている
 	const std::string cacheKey = vs + '\n' + ps;
 	const auto cachedShader = g_ShaderCache.find(cacheKey);
 	if (cachedShader != g_ShaderCache.end())
@@ -35,7 +37,7 @@ void Shader::Create(std::string vs, std::string ps)
 		return;
 	}
 
-	// 頂点データの定義
+	// 頂点データの並び方（VERTEX_3Dと同じ：位置・法線・色・テクスチャ座標）
 	D3D11_INPUT_ELEMENT_DESC layout[] =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,		0,	D3D11_APPEND_ALIGNED_ELEMENT,	D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -46,10 +48,10 @@ void Shader::Create(std::string vs, std::string ps)
 
 	unsigned int numElements = ARRAYSIZE(layout);
 
-	// 頂点シェーダーオブジェクトを生成、同時に頂点レイアウトも生成
+	// 頂点シェーダーと、頂点レイアウトを一緒に作っている
 	HRESULT hr = Renderer::CreateVertexShader(
-		m_pVertexShader.ReleaseAndGetAddressOf(),		// 頂点シェーダーオブジェクト
-		m_pVertexLayout.ReleaseAndGetAddressOf(),			// 頂点レイアウトオブジェクト
+		m_pVertexShader.ReleaseAndGetAddressOf(),		// 頂点シェーダー
+		m_pVertexLayout.ReleaseAndGetAddressOf(),			// 頂点レイアウト
 		layout,
 		numElements,
 		vs.c_str()
@@ -59,9 +61,9 @@ void Shader::Create(std::string vs, std::string ps)
 		return;
 	}
 
-	// ピクセルシェーダーを生成
+	// ピクセルシェーダーを作っている
 
-	hr = Renderer::CreatePixelShader(			// ピクセルシェーダーオブジェクトを生成
+	hr = Renderer::CreatePixelShader(			// ピクセルシェーダーを作っている
 		m_pPixelShader.ReleaseAndGetAddressOf(),
 		ps.c_str()
 		);
@@ -70,6 +72,7 @@ void Shader::Create(std::string vs, std::string ps)
 		return;
 	}
 
+	// 作ったシェーダーを覚えておいている
 	g_ShaderCache.emplace(
 		cacheKey,
 		ShaderCacheEntry{
@@ -81,18 +84,19 @@ void Shader::Create(std::string vs, std::string ps)
 }
 
 //=======================================
-//GPUにデータを送る
+// シェーダーをGPUへ設定している
 //=======================================
 void Shader::SetGPU()
 {
 	ID3D11DeviceContext* devicecontext = Renderer::GetDeviceContext();
 
-	devicecontext->VSSetShader(m_pVertexShader.Get(), nullptr, 0);		// 頂点シェーダーをセット
-	devicecontext->PSSetShader(m_pPixelShader.Get(), nullptr, 0);		// ピクセルシェーダーをセット
-	devicecontext->IASetInputLayout(m_pVertexLayout.Get());				// 頂点レイアウトセット
+	devicecontext->VSSetShader(m_pVertexShader.Get(), nullptr, 0);		// 頂点シェーダーを設定している
+	devicecontext->PSSetShader(m_pPixelShader.Get(), nullptr, 0);		// ピクセルシェーダーを設定している
+	devicecontext->IASetInputLayout(m_pVertexLayout.Get());				// 頂点レイアウトを設定している
 	
 }
 
+// 覚えているシェーダーを全部手放している
 void Shader::ClearCache()
 {
 	g_ShaderCache.clear();

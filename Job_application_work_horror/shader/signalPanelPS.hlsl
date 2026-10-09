@@ -1,10 +1,11 @@
 // ============================================================================
-// シェーダーの役割: 2面の信号パネルを状態に応じた発光色で描きます。
-// 定数バッファのスロットと入出力構造はCPU側の定義と必ず一致させてください。
+// シェーダーの役割: 2面の信号盤の目印を、状態に応じた光る色と、電子パネルのような模様で描いている。
+// 定数バッファのスロットと入出力の形は、CPU側の定義と一致させている。
 // ============================================================================
 
 #include "common.hlsl"
 
+// 頂点シェーダー（litTextureVS）から受け取る値（反射の座標は使わないので省いている）
 struct SIGNAL_PS_IN
 {
     float4 pos : SV_POSITION;
@@ -18,6 +19,7 @@ struct SIGNAL_PS_IN
     float4 shadowPos : TEXCOORD6;
 };
 
+// 2次元の値から0〜1の疑似乱数を作っている
 float SignalHash(float2 value)
 {
     return frac(sin(dot(value, float2(41.73f, 289.19f))) * 43758.5453f);
@@ -25,12 +27,13 @@ float SignalHash(float2 value)
 
 float4 main(SIGNAL_PS_IN input) : SV_Target
 {
+    // パネルの縁の明るい枠
     const float2 uv = saturate(input.tex);
     const float2 edgeDistance = min(uv, 1.0f - uv);
     const float border = 1.0f - smoothstep(
         0.025f, 0.085f, min(edgeDistance.x, edgeDistance.y));
 
-    // プロシージャルな診断グリッドで、追加テクスチャなしに電子パネルらしい表面を作ります。
+    // 計算で作る格子と配線の模様で、テクスチャを足さずに電子パネルらしい表面にしている。
     const float2 gridCoordinate = abs(frac(uv * float2(12.0f, 7.0f)) - 0.5f);
     const float grid = 1.0f - smoothstep(
         0.455f, 0.495f, max(gridCoordinate.x, gridCoordinate.y));
@@ -39,9 +42,11 @@ float4 main(SIGNAL_PS_IN input) : SV_Target
     const float traceB = 1.0f - smoothstep(
         0.014f, 0.038f, abs(uv.y - (0.73f - uv.x * 0.22f)));
     const float circuit = saturate(traceA + traceB);
+    // ところどころの格子を消し、壊れかけた表示にしている
     const float cellNoise = SignalHash(floor(uv * float2(12.0f, 7.0f)));
     const float brokenCells = step(0.22f, cellNoise);
 
+    // 点光源の明かりを足している（タイルベースライティングのリストを使っている）
     float3 lighting = Light.Ambient.rgb + 0.12f;
     const float3 normal = normalize(input.worldNormal);
     uint pointLightListOffset;
@@ -66,6 +71,7 @@ float4 main(SIGNAL_PS_IN input) : SV_Target
             attenuation * lambert;
     }
 
+    // マテリアルの色に明かりを掛け、光る色を中心と模様ほど強く足している
     const float pattern = saturate(
         border * 0.82f + grid * brokenCells * 0.20f + circuit * 0.48f);
     const float centerGlow = 1.0f - smoothstep(
@@ -74,15 +80,16 @@ float4 main(SIGNAL_PS_IN input) : SV_Target
     color += Material.Emission.rgb *
         (0.42f + centerGlow * 0.38f + pattern * 0.62f);
 
-    // 細い水平蛍光体ラインは、通常の視距離で目立ちすぎない強度にします。
+    // 細い横の蛍光体の線は、普段の距離から見て目立ちすぎない強さにしている。
     const float phosphor = 0.965f +
         sin(input.pos.y * 3.1415926f) * 0.035f;
     color *= phosphor;
 
+    // デバッグ表示1：法線を色で表示している
     if (DebugViewMode == 1)
     {
         return float4(normal * 0.5f + 0.5f, 1.0f);
     }
-    // HDR値を1.0より高く保ち、既存のブルーム抽出で復旧パネルを柔らかな光源として見せます。
+    // HDRの値を1.0より高く残し、ブルームの抽出で、直ったパネルを柔らかな光源として見せている。
     return float4(max(color, 0.0f), 1.0f);
 }

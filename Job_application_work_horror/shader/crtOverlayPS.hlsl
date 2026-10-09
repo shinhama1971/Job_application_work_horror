@@ -1,8 +1,9 @@
 // ============================================================================
-// シェーダーの役割: 走査線、ノイズ、ビネットを重ねてブラウン管風の画面を作ります。
-// 定数バッファのスロットと入出力構造はCPU側の定義と必ず一致させてください。
+// シェーダーの役割: 走査線・ノイズ・周辺減光・画面の乱れ・レンズの水滴・色調を、半透明の層として画面に重ねている（ブラウン管風の効果）。
+// 定数バッファのスロットと入出力の形は、CPU側の定義（FullScreenQuad.cppのTimeBuffer）と一致させている。
 // ============================================================================
 
+// 頂点シェーダー（unlitTextureVS）から受け取る値
 struct PS_IN
 {
     float4 pos : SV_POSITION;
@@ -10,6 +11,7 @@ struct PS_IN
     float2 uv : TEXCOORD0;
 };
 
+// 画面効果の値（FullScreenQuad.cppのTimeBufferと同じ並び）
 cbuffer TimeBuffer : register(b0)
 {
     float time;
@@ -29,18 +31,21 @@ cbuffer TimeBuffer : register(b0)
     float2 postProcessPadding;
 };
 
+// 描いた画面（t0）とサンプラー（s0）
 Texture2D SceneTexture : register(t0);
 SamplerState LinearSampler : register(s0);
 
+// 2次元の値から0〜1の疑似乱数を作っている
 float Hash(float2 value)
 {
-    // Full-screen grain calls this several times per pixel. An algebraic hash
-    // keeps the unstable analogue pattern without the cost of repeated sin().
+    // 全画面の粒状のノイズは、1画素あたり何度もこれを呼ぶ。sin()を使わない計算式の乱数にして、
+    // 古いアナログ映像のような不安定な模様を保ちつつ、計算を軽くしている。
     float3 p3 = frac(float3(value.xyx) * 0.1031f);
     p3 += dot(p3, p3.yzx + 33.33f);
     return frac((p3.x + p3.y) * p3.z);
 }
 
+// 画面に付いた1粒の水滴の形を返している（x=縁、y=本体、z=光る所）
 float3 GetLensDrop(
     float2 uv,
     float2 center,
@@ -65,6 +70,7 @@ float3 GetLensDrop(
     return float3(rim, body, highlight);
 }
 
+// 水滴の縁で、後ろの景色が曲がって見える量（UVのずれ）を返している
 float2 GetLensDropRefraction(
     float2 uv,
     float2 center,
@@ -88,10 +94,12 @@ float2 GetLensDropRefraction(
         float2(1.0f / aspect, 1.0f);
 }
 
+// 重ねる層の色と透明度を返している（アルファブレンドで画面に重なる）
 float4 main(PS_IN input) : SV_TARGET
 {
     const float2 center = float2(0.5f, 0.5f);
     float2 centered = input.uv - center;
+    // ノイズと周辺減光の強さ：驚かせる演出・緊張・信号の乱れで強めている
     const float eventNoise = saturate(
         noiseAmount + horrorPulseStrength * 1.20f +
         corridorTension * 0.16f + signalInterference * 0.48f);
@@ -99,12 +107,12 @@ float4 main(PS_IN input) : SV_TARGET
         vignetteStrength + horrorPulseStrength * 0.52f +
         corridorTension * 0.18f;
 
-    // Soft edge darkening that does not hide gameplay information.
+    // 遊ぶのに必要な情報を隠さない程度の、柔らかい周辺減光。
     float edgeDistance = length(centered * float2(1.15f, 1.0f));
     const float2 radialDirection = centered /
         max(length(centered), 0.001f);
-    // 通常の緊張度だけでは元画像をずらしません。色ずれと歪みは、
-    // 恐怖イベント・信号異常・終盤の高緊張時だけに限定します。
+    // 普段の緊張感だけでは、元の画像をずらさない。色ずれと歪みは、
+    // 驚かせる演出・信号の異常・終盤の強い緊張のときだけにしている。
     const float highTension = smoothstep(0.62f, 0.92f, corridorTension);
     const float distortionEvent = saturate(
         horrorPulseStrength * 1.15f +
@@ -120,9 +128,8 @@ float4 main(PS_IN input) : SV_TARGET
     const float radialSquared = dot(aspectCentered, aspectCentered);
     const float radialWarp = lensDistortionStrength * distortionEvent *
         (0.0015f + highTension * 0.0040f);
-    // Signal restoration errors break the image into independently shifted
-    // horizontal blocks. The displacement is deliberately bounded so the
-    // player never loses navigation information.
+    // 信号の復旧に失敗すると、画面が横の帯ごとにばらばらにずれる。
+    // ずれる量にはわざと上限を付け、プレイヤーが進む方向を見失わないようにしている。
     const float signalBand = floor(input.uv.y * 54.0f);
     const float signalFrame = floor(time * 18.0f);
     const float signalSeed = Hash(float2(signalBand, signalFrame));
@@ -141,8 +148,8 @@ float4 main(PS_IN input) : SV_TARGET
         input.uv,
         0.0f).rgb;
     float3 distortedScene = sceneCenter;
-    // 通常時はdistortedUvとinput.uvが同一です。恐怖演出時だけ2回目を読み、
-    // 平常時の全画面テクスチャ参照を1回分減らします。
+    // 普段はdistortedUvとinput.uvが同じ。驚かせる演出のときだけ2回目を読み、
+    // 普段の全画面のテクスチャの読み取りを1回分減らしている。
     [branch]
     if (distortionEvent > 0.001f)
     {
@@ -152,8 +159,8 @@ float4 main(PS_IN input) : SV_TARGET
             0.0f).rgb;
     }
     float3 chromaticScene = distortedScene;
-    // Chromatic separation is an event effect. In normal play this uniform
-    // branch saves two full-resolution texture samples per screen pixel.
+    // 色ずれは演出のときだけの効果。普段は、この全体で同じ分岐によって、
+    // 1画素あたり、全解像度のテクスチャの読み取りを2回省いている。
     [branch]
     if (eventAberration > 0.001f)
     {
@@ -168,6 +175,7 @@ float4 main(PS_IN input) : SV_TARGET
                 saturate(distortedUv - radialDirection * chromaOffset),
                 0.0f).b);
     }
+    // ずれた画像・色ずれした画像は、元の画像との差がある所だけ、少し重ねている
     const float distortionDifference = length(
         abs(distortedScene - sceneCenter));
     const float distortionAlpha = saturate(
@@ -182,36 +190,37 @@ float4 main(PS_IN input) : SV_TARGET
     float vignette = smoothstep(0.30f, 0.72f, edgeDistance) *
         0.25f * eventVignette;
 
-    // Alternating CRT rows. SV_POSITION is used so the line width remains
-    // stable at different window resolutions.
+    // 1行おきの走査線。SV_POSITIONを使っているので、
+    // ウィンドウの解像度が違っても線の太さが変わらない。
     float scanWave = sin(input.pos.y * 3.14159265f) * 0.5f + 0.5f;
     float scanline = (1.0f - scanWave) * 0.018f * eventNoise;
 
+    // 1/30秒ごとに変わる粒状のノイズ（暗い粒）
     float frame = floor(time * 30.0f);
     float noise = Hash(floor(input.pos.xy) + frame * float2(17.0f, 31.0f));
     float darkGrain = smoothstep(0.68f, 1.0f, noise) *
         0.012f * eventNoise;
 
-    // A very faint rolling band gives the image analogue motion.
+    // ごく薄い、ゆっくり流れる帯で、アナログ映像らしい動きを出している。
     float rolling = sin(input.uv.y * 10.0f - time * 1.8f) * 0.5f + 0.5f;
     rolling = pow(rolling, 12.0f) * 0.012f * eventNoise;
 
-    // Rare dust pixels are bright but use very low opacity.
+    // まれに出る埃の画素は明るいが、透明度はとても低くしている。
     float dust = step(0.9985f, noise);
 
     float darkAlpha = saturate(vignette + scanline + darkGrain + rolling);
     float dustAlpha = dust * 0.030f * eventNoise;
 
-    // Moisture appears only after the player disturbs a puddle. Each drop
-    // slides at a different speed, keeping the pattern from looking stamped.
+    // レンズの水滴は、プレイヤーが水たまりを踏んだ後だけ出る。水滴ごとに
+    // 流れ落ちる速さを変え、模様がスタンプのように見えないようにしている。
     const float slide0 = frac(0.12f + time * 0.010f);
     const float slide1 = frac(0.48f + time * 0.006f);
     const float slide2 = frac(0.76f + time * 0.008f);
     float3 lensDrop = 0.0f;
     float2 lensRefraction = 0.0f;
     const float moisture = saturate(lensMoisture);
-    // Lens droplets are absent for most of a run. Keep all ten distance-field
-    // evaluations out of the normal full-screen path until a splash occurs.
+    // レンズの水滴は、ほとんどの時間は出ていない。水しぶきが起きるまで、
+    // 10回の距離の計算を、普段の全画面の処理から外している。
     [branch]
     if (moisture > 0.001f)
     {
@@ -245,12 +254,14 @@ float4 main(PS_IN input) : SV_TARGET
         lensRefraction += GetLensDropRefraction(
             input.uv, float2(0.91f, slide2 * 1.17f - 0.08f),
             0.011f, screenAspect);
+        // 水滴によるずれは、合計で一定の量までにしている
         const float refractionMagnitude = length(lensRefraction);
         if (refractionMagnitude > 0.008f)
         {
             lensRefraction *= 0.008f / refractionMagnitude;
         }
     }
+    // 水滴が付いている間だけ、ずらした位置の景色を読んでいる
     float3 refractedScene = sceneCenter;
     [branch]
     if (moisture > 0.001f)
@@ -266,8 +277,8 @@ float4 main(PS_IN input) : SV_TARGET
         (lensDrop.x * 0.13f + lensDrop.y * 0.025f +
          lensDrop.z * 0.09f) * moisture);
 
-    // Scare events add transparent synchronization tears. This pass never
-    // replaces the scene, so a missing texture can no longer make it black.
+    // 驚かせる演出では、半透明の同期の乱れ（横の裂け目）を加えている。この層は景色を置き換えないので、
+    // テクスチャが無くても画面が真っ黒になることはない。
     float bandId = floor(input.uv.y * 38.0f);
     float bandNoise = Hash(float2(bandId, floor(time * 24.0f)));
     float tear = step(0.86f, bandNoise) * horrorPulseStrength;
@@ -287,6 +298,7 @@ float4 main(PS_IN input) : SV_TARGET
             saturate(input.uv + float2(tearOffset, 0.0f)),
             0.0f).rgb;
     }
+    // 信号の乱れの横線
     float tearAlpha = tear * thinLine * 0.16f;
     const float signalLine = 1.0f - smoothstep(
         0.015f, 0.085f,
@@ -299,6 +311,7 @@ float4 main(PS_IN input) : SV_TARGET
         dropRefractionAlpha + chromaAlpha + distortionAlpha +
         signalAlpha);
 
+    // 重ねる層の色：埃・裂け目・信号の乱れ・歪み・色ずれ・水滴を、それぞれの強さで混ぜている
     float3 overlayColor = lerp(
         float3(0.0f, 0.0f, 0.0f),
         float3(0.70f, 0.74f, 0.70f),
@@ -339,8 +352,8 @@ float4 main(PS_IN input) : SV_TARGET
         refractedScene,
         saturate(dropRefractionAlpha * 9.0f));
 
-    // The far corridor slowly cools and desaturates. This remains subtle and
-    // transparent so navigation information is never hidden.
+    // 廊下の奥ほど、ゆっくり冷たい色で彩度を落としている。ごく控えめで半透明なので、
+    // 進むための情報は隠れない。
     const float lowerScreen = smoothstep(0.22f, 0.92f, input.uv.y);
     const float tensionVeil = corridorTension *
         (0.014f + lowerScreen * 0.010f);
@@ -351,9 +364,9 @@ float4 main(PS_IN input) : SV_TARGET
         saturate(tensionVeil * 12.0f));
     alpha = saturate(alpha + tensionVeil);
 
-    // Cinematic split toning keeps shadow detail cold and lets practical
-    // lights retain a restrained warm halo. It is composed as another
-    // transparent layer so the captured scene can never be replaced by black.
+    // 映画のような色分け：影の部分は冷たい色に、照明の部分は控えめな暖かいにじみを残している。
+    // これも半透明の層として重ねているので、
+    // 取り込んだ景色が黒で置き換わることはない。
     const float sceneLuminance = dot(
         sceneCenter,
         float3(0.2126f, 0.7152f, 0.0722f));
@@ -369,6 +382,7 @@ float4 main(PS_IN input) : SV_TARGET
         coldShadow,
         warmLight,
         saturate(highlightWeight * 1.35f));
+    // 2つの半透明の層を1つにまとめ、合わせた色と透明度を返している
     const float combinedAlpha = alpha + filmAlpha * (1.0f - alpha);
     overlayColor = (
         overlayColor * alpha +

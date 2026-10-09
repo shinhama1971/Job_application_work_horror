@@ -1,8 +1,9 @@
 // ============================================================================
-// 共通処理: 壁の汚れ、床の凹凸、霧に使う軽量なプロシージャルノイズ。
-// ゲーム進行と同期する乱数には使わず、見た目専用として使用します。
+// 共通の処理: 壁の汚れ、床の凹凸、霧に使う軽いプロシージャルノイズ（計算で作る模様）。
+// ゲームの進行と同期する乱数には使わず、見た目専用として使っている。
 // ============================================================================
 
+// 2次元の座標から、0〜1の疑似乱数を作っている
 float FastHash21(float2 value)
 {
     float3 p3 = frac(float3(value.xyx) * 0.1031f);
@@ -10,6 +11,7 @@ float FastHash21(float2 value)
     return frac((p3.x + p3.y) * p3.z);
 }
 
+// 格子の4隅の乱数を、なめらかに補間した値のノイズ（0〜1）
 float FastValueNoise(float2 value)
 {
     const float2 cell = floor(value);
@@ -22,6 +24,7 @@ float FastValueNoise(float2 value)
     return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
 }
 
+// 細かさの違うノイズを3段重ねた、自然な揺らぎのノイズ
 float FastFractalNoise3(float2 value)
 {
     float result = 0.0f;

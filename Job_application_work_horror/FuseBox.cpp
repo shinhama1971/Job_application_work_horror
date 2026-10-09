@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: ヒューズ挿入、電力復旧、操作フィードバックを管理します。
-// 主な技術: Interactable、有限状態機械、進行条件、照明・効果音連携
+// ファイルの役割: 配電盤（ヒューズを入れて電力を戻す）と、同じ形を使うスイッチ類の、調べたときの処理と見た目を管理している。
+// 主な技術: Interactableインターフェース、有限状態機械、進行の条件、照明・効果音・画面効果との連携
 // ============================================================================
 
 #include "Game.h"
@@ -13,11 +13,14 @@
 
 using namespace DirectX::SimpleMath;
 
+// 箱の形（本体・前面のふた・ヒューズ3本・状態を示すランプ・レバー）を頂点で組み立てている。
+// 電力が戻ったかどうかでヒューズとランプの色が変わるので、状態が変わるたびに作り直している。
 void FuseBox::BuildGeometry()
 {
     m_Vertices.clear();
     m_Indices.clear();
 
+    // 四角形の面を1枚追加している。表と裏の両方から見えるよう、三角形を両面分（12個のインデックス）入れている
     const auto addFace = [this](
         const std::array<Vector3, 4>& positions,
         const Vector3& normal,
@@ -50,6 +53,7 @@ void FuseBox::BuildGeometry()
         m_Indices.insert(m_Indices.end(), indices, indices + 12);
     };
 
+    // 中心と半分の大きさを指定して、6面の箱を追加している
     const auto addBox = [&addFace](
         const Vector3& center,
         const Vector3& half,
@@ -82,11 +86,13 @@ void FuseBox::BuildGeometry()
                 Vector3(0.0f, -1.0f, 0.0f), color);
     };
 
+    // 本体の箱と、前面のふた
     addBox(Vector3::Zero, Vector3(0.50f, 0.50f, 0.20f),
            Color(0.16f, 0.18f, 0.17f, 1.0f));
     addBox(Vector3(0.0f, 0.0f, -0.23f), Vector3(0.42f, 0.42f, 0.045f),
            Color(0.035f, 0.045f, 0.04f, 1.0f));
 
+    // ヒューズ3本：電力が戻ると明るい緑がかった色になる
     const Color fuseColor = m_IsPowered
         ? Color(0.68f, 0.82f, 0.64f, 1.0f)
         : Color(0.11f, 0.13f, 0.12f, 1.0f);
@@ -94,16 +100,19 @@ void FuseBox::BuildGeometry()
     addBox(Vector3(0.0f, -0.06f, -0.30f), Vector3(0.075f, 0.25f, 0.04f), fuseColor);
     addBox(Vector3(0.25f, -0.06f, -0.30f), Vector3(0.075f, 0.25f, 0.04f), fuseColor);
 
+    // ランプ：停電中は赤、電力が戻ると緑
     const Color indicatorColor = m_IsPowered
         ? Color(0.12f, 1.0f, 0.24f, 1.0f)
         : Color(0.85f, 0.04f, 0.025f, 1.0f);
     addBox(Vector3(0.0f, 0.33f, -0.31f), Vector3(0.12f, 0.055f, 0.045f),
            indicatorColor);
 
+    // 横のレバー（真鍮色）
     addBox(Vector3(0.46f, 0.0f, -0.30f), Vector3(0.025f, 0.16f, 0.04f),
            Color(0.52f, 0.39f, 0.12f, 1.0f));
 }
 
+// 形とバッファ、シェーダー、マテリアルを作っている。色は頂点の色を使っている
 void FuseBox::Init()
 {
     m_Vertices.reserve(168);
@@ -125,10 +134,12 @@ void FuseBox::Init()
     m_Scale = Vector3(12.0f, 18.0f, 4.0f);
 }
 
+// 毎フレームの処理はない（調べられたときだけ状態が変わる）
 void FuseBox::Update()
 {
 }
 
+// 調べるときに表示する文章。役割（スイッチ・出口の送電盤・主電源の配電盤）によって変えている
 const char* FuseBox::GetInteractionPrompt() const
 {
     if (m_IsManualControl)
@@ -148,11 +159,13 @@ const char* FuseBox::GetInteractionPrompt() const
         : "電力を復旧する";
 }
 
+// 調べたときの処理。役割ごとに、電力を入れて見た目を作り直し、音・画面の光・振動で知らせている
 void FuseBox::Interact(Player& player)
 {
     (void)player;
 
     Core::Game* game = Core::Game::GetInstance();
+    // スイッチとして使う場合（非常用充電器・監視カメラの端末・暗証番号の入力など）：押せる状態なら一度だけ反応している
     if (m_IsManualControl)
     {
         if (m_IsPowered || !m_ManualInteractionAllowed)
@@ -170,6 +183,7 @@ void FuseBox::Interact(Player& player)
         return;
     }
 
+    // 出口の送電盤：主電源が戻った後にだけ、出口へ電力を送っている
     if (m_IsExitControl)
     {
         if (m_IsPowered || !game->IsPowerRestored())
@@ -196,6 +210,7 @@ void FuseBox::Interact(Player& player)
         return;
     }
 
+    // 主電源の配電盤：ヒューズを3本持っていれば、施設の電力を戻している（照明が点き、出口の扉などが使えるようになる）
     if (m_IsPowered || game->GetItemCount() < 3)
     {
         return;
@@ -210,6 +225,7 @@ void FuseBox::Interact(Player& player)
     m_VertexBuffer.Modify(m_Vertices);
     Input::SetVibration(18, 0.28f);
 
+    // 画面にブラウン管のようなノイズを0.7秒出している
     ScreenDustOverlay* crt =
         game->GetObj<ScreenDustOverlay>("CRTNoise");
     if (crt != nullptr)
@@ -220,6 +236,7 @@ void FuseBox::Interact(Player& player)
     }
 }
 
+// 電力を入れていない状態に戻し、見た目も作り直している（やり直しや周回の切り替えで使っている）
 void FuseBox::ResetActivation()
 {
     m_IsPowered = false;
@@ -227,6 +244,7 @@ void FuseBox::ResetActivation()
     m_VertexBuffer.Modify(m_Vertices);
 }
 
+// 箱を描いている
 void FuseBox::Draw(Camera* camera)
 {
     camera->SetCamera();
@@ -248,6 +266,7 @@ void FuseBox::Draw(Camera* camera)
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
 }
 
+// 頂点データを解放している
 void FuseBox::Uninit()
 {
     m_Vertices.clear();

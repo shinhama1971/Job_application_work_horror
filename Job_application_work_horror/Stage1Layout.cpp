@@ -1,6 +1,6 @@
 ﻿// ============================================================================
-// ファイルの役割: 1面の施設（壁・照明・ヒューズ・端末・扉・演出用の人影）を生成して配置します。
-// 主な技術: 配置データの分離、生成時のポインタ受け渡し、名前一覧の一元管理
+// ファイルの役割: 1面の施設（壁・照明・ヒューズ・端末・扉・演出用の人影）を作って配置している。
+// 主な技術: 配置のデータを進行から分ける設計、作るときにポインタを受け取る仕組み、名前の一覧の一元管理
 // ============================================================================
 
 #include "Stage1Layout.h"
@@ -31,16 +31,17 @@ using namespace DirectX::SimpleMath;
 
 namespace Stage1Layout
 {
+    // 1面の施設をすべて作り、進行で使うObjectのポインタを入れて返している。座標の単位は全ステージ共通（床の高さはy=-100）
     StageObjects Build(Core::Game& game)
     {
         StageObjects objects;
         SceneLayoutBuilder builder(game, objects.objectNames);
 
-        // プレイヤー
+        // プレイヤー（開始地点は南の区画の中央）
         Player* player = builder.Create<Player>("Player");
         player->SetPosition(Vector3(0.0f, -99.0f, -120.0f));
 
-        // 外部FBXの配管モデル（背景装飾）。進行や当たり判定には参加させません。
+        // 外部のFBXの配管モデル（背景の飾り）。進行や当たり判定には参加させていない。
         PipeProp* pipe = builder.Create<PipeProp>("PipeProp");
         pipe->SetPosition(Vector3(22.0f, -87.54f, -105.0f));
         pipe->SetRotation(Vector3(0.0f, 0.45f, 0.0f));
@@ -56,16 +57,16 @@ namespace Stage1Layout
         pipe3->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
         pipe3->SetScale(Vector3(8.0f, 8.0f, 8.0f));
 
-        // 地面
+        // 床（建物全体を覆う1000x1000の濡れた床）
         Ground* ground = builder.Create<Ground>("Ground");
         ground->SetPosition(0.0f, -100.0f, 0.0f);
         ground->SetScale(20.0f, 1.0f, 20.0f);
-        // 西棟は床一面が水に浸かっています（水たまりと同じ反射・波紋を、範囲全体に出します）。
+        // 西棟は床一面が水に浸かっている（水たまりと同じ反射・波紋を、範囲全体に出している）。
         ground->SetFloodRegion(
             Vector2(Stage1WestWing::MinX, Stage1WestWing::MinZ),
             Vector2(Stage1WestWing::MaxX, Stage1WestWing::MaxZ));
 
-        // 壁
+        // 壁（外周の4面と、部屋を区切る壁）
         Wall* wall1 = builder.Create<Wall>("Wall1");
         wall1->SetPosition(0.0f, -74.0f, 340.0f);
         wall1->SetScale(440.0f, 50.0f, 4.0f);
@@ -78,7 +79,7 @@ namespace Stage1Layout
         wall3->SetPosition(0.0f, -74.0f, -180.0f);
         wall3->SetScale(440.0f, 50.0f, 4.0f);
 
-        // 西側の外壁は、西棟の扉（z=-35〜-5）の分だけ開けて2枚に分けます。
+        // 西側の外壁は、西棟の扉（z=-35〜-5）の分だけ開けて2枚に分けている。
         Wall* wall4 = builder.Create<Wall>("Wall4");
         wall4->SetPosition(-220.0f, -74.0f, -107.5f);
         wall4->SetScale(4.0f, 50.0f, 145.0f);
@@ -87,8 +88,8 @@ namespace Stage1Layout
         wall4North->SetPosition(-220.0f, -74.0f, 167.5f);
         wall4North->SetScale(4.0f, 50.0f, 345.0f);
 
-        // 西棟（浸水した機械室）。西側の扉から入り、折り返しの多い通路を奥のポンプ室まで進みます。
-        // 仕切りの壁は東・西・東と交互に開けて、見通しの悪い蛇行通路にします。
+        // 西棟（浸水した機械室）。西側の扉から入り、折り返しの多い通路を奥のポンプ室まで進む。
+        // 仕切りの壁は東・西・東と交互に開けて、見通しの悪い蛇行する通路にしている。
         const auto createWestWingWall = [&builder](const char* name, const Vector3& position, const Vector3& scale)
         {
             Wall* wall = builder.Create<Wall>(name);
@@ -111,7 +112,7 @@ namespace Stage1Layout
         wall6->SetPosition(117.5f, -74.0f, 40.0f);
         wall6->SetScale(205.0f, 50.0f, 4.0f);
 
-        // 倉庫区画を分けつつ、中央に広い通路を確保します。
+        // 倉庫の区画を分けつつ、中央に広い通路を残している。
         Wall* wall7 = builder.Create<Wall>("Wall7");
         wall7->SetPosition(-135.0f, -74.0f, -70.0f);
         wall7->SetScale(170.0f, 50.0f, 4.0f);
@@ -120,7 +121,7 @@ namespace Stage1Layout
         wall8->SetPosition(135.0f, -74.0f, -70.0f);
         wall8->SetScale(170.0f, 50.0f, 4.0f);
 
-        // 短い壁で奥の倉庫を三つの探索可能な部屋へ分割します。
+        // 短い壁で、奥の倉庫を探索できる3つの部屋に分けている。
         Wall* wall9 = builder.Create<Wall>("Wall9");
         wall9->SetPosition(-90.0f, -74.0f, -140.0f);
         wall9->SetScale(4.0f, 50.0f, 80.0f);
@@ -129,7 +130,7 @@ namespace Stage1Layout
         wall10->SetPosition(90.0f, -74.0f, -140.0f);
         wall10->SetScale(4.0f, 50.0f, 80.0f);
 
-        // 通電扉側は脇部屋を持つ細い廊下として構成します。
+        // 電力の扉の側は、脇の部屋を持つ細い廊下にしている。
         Wall* wall11 = builder.Create<Wall>("Wall11");
         wall11->SetPosition(-45.0f, -74.0f, 75.0f);
         wall11->SetScale(4.0f, 50.0f, 70.0f);
@@ -138,8 +139,8 @@ namespace Stage1Layout
         wall12->SetPosition(-45.0f, -74.0f, 155.0f);
         wall12->SetScale(4.0f, 50.0f, 50.0f);
 
-        // 東側の壁は、暗証番号の扉（z=95〜125）の分だけ開けて2枚に分けます。
-        // 扉の先は、それまで入れなかった東側の部屋です。
+        // 東側の壁は、暗証番号の扉（z=95〜125）の分だけ開けて2枚に分けている。
+        // 扉の先は、それまで入れなかった東側の部屋。
         Wall* wall13 = builder.Create<Wall>("Wall13");
         wall13->SetPosition(45.0f, -74.0f, 67.5f);
         wall13->SetScale(4.0f, 50.0f, 55.0f);
@@ -148,7 +149,7 @@ namespace Stage1Layout
         wall13North->SetPosition(45.0f, -74.0f, 152.5f);
         wall13North->SetScale(4.0f, 50.0f, 55.0f);
 
-        // 脱出ホールを区切り、中央の開口部を廊下へ接続します。
+        // 脱出のホールを区切り、中央の開口部を廊下へつないでいる。
         Wall* wall14 = builder.Create<Wall>("Wall14");
         wall14->SetPosition(-132.5f, -74.0f, 180.0f);
         wall14->SetScale(175.0f, 50.0f, 4.0f);
@@ -157,8 +158,8 @@ namespace Stage1Layout
         wall15->SetPosition(132.5f, -74.0f, 180.0f);
         wall15->SetScale(175.0f, 50.0f, 4.0f);
 
-        // 中央開口部から細いL字型のループ廊下を始めます。
-        // 最初は北へ進ませ、死角の先で右へ曲がる構成です。
+        // 中央の開口部から、細いL字型のループ廊下を始めている。
+        // 最初は北へ進ませ、死角の先で右へ曲がる作り。
         Wall* loopWall1 = builder.Create<Wall>("LoopWall1");
         loopWall1->SetPosition(-45.0f, -74.0f, 227.5f);
         loopWall1->SetScale(4.0f, 50.0f, 95.0f);
@@ -167,17 +168,17 @@ namespace Stage1Layout
         loopWall2->SetPosition(45.0f, -74.0f, 207.5f);
         loopWall2->SetScale(4.0f, 50.0f, 55.0f);
 
-        // 南側の壁は角から始め、直線区間の入口を開けておきます。
+        // 南側の壁は角から始め、まっすぐな区間の入口を開けている。
         Wall* loopWall3 = builder.Create<Wall>("LoopWall3");
         loopWall3->SetPosition(122.5f, -74.0f, 235.0f);
         loopWall3->SetScale(155.0f, 50.0f, 4.0f);
 
-        // 長い壁で前方視界を塞ぎ、右折を自然に誘導します。
+        // 長い壁で前の見通しをふさぎ、自然に右へ曲がるよう誘っている。
         Wall* loopWall4 = builder.Create<Wall>("LoopWall4");
         loopWall4->SetPosition(77.5f, -74.0f, 275.0f);
         loopWall4->SetScale(245.0f, 50.0f, 4.0f);
 
-        // 建物の壁だけに、パネルの継ぎ目・ひび・水の跡・カビを描きます（棚や配管などの小物には描きません）。
+        // 建物の壁だけに、パネルの継ぎ目・ひび・水の跡・カビを描いている（棚や配管などの小物には描かない）。
         for (Wall* structuralWall : {
             wall1, wall2, wall3, wall4, wall4North, wall5, wall6, wall7, wall8, wall9, wall10,
             wall11, wall12, wall13, wall13North, wall14, wall15,
@@ -185,6 +186,7 @@ namespace Stage1Layout
             westWingOuter, westWingSouth, westWingNorth, westWingInner1, westWingInner2, westWingInner3 })
         {
             structuralWall->SetWeatheringSurface(true);
+            // 部屋の角の暗がりの計算用に、壁を上から見た長方形を記録している
             const Vector3 position = structuralWall->GetPosition();
             const Vector3 scale = structuralWall->GetScale();
             objects.wallFootprints.emplace_back(
@@ -192,8 +194,9 @@ namespace Stage1Layout
         }
 
 
-        // 配管や設備で区画ごとのシルエットを区別し、現在地を把握しやすくします。
-        // 縁と天井配管は装飾のみ、床設備には当たり判定を持たせます。
+        // 配管や設備で区画ごとの見た目の形を変え、今いる場所を分かりやすくしている。
+        // 縁と天井の配管は飾りだけ、床の設備には当たり判定を持たせている。
+        // Wallを、色と当たり判定の有無を指定した小物として作る関数
         const auto createStageProp = [&builder](
             const char* name,
             const Vector3& position,
@@ -211,24 +214,27 @@ namespace Stage1Layout
             return prop;
         };
 
+        // 小物の色（暗い金属・棚の金属・縁取り）
         const Color darkMetal(0.10f, 0.115f, 0.11f, 1.0f);
         const Color cabinetMetal(0.16f, 0.18f, 0.17f, 1.0f);
         const Color trimColor(0.075f, 0.08f, 0.075f, 1.0f);
         const Color noEmission(0.0f, 0.0f, 0.0f, 1.0f);
 
+        // 天井（床から53の高さに、施設全体を覆う板を置いている。影は落とさない）
         Wall* ceiling = createStageProp("PropCeilingMain",
             Vector3(0.0f, -47.0f, 80.0f), Vector3(436.0f, 3.0f, 516.0f),
             Color(0.055f, 0.06f, 0.058f, 1.0f), noEmission, 4.0f, false);
         ceiling->SetCastsShadow(false);
-        // 天井も建物の面として、天井板・外れた板の穴・雨漏りの染みを描きます（litTexturePS）。
+        // 天井も建物の面として、天井板・外れた板の穴・雨漏りの染みを描いている（litTexturePS）。
         ceiling->SetWeatheringSurface(true);
-        // 西棟の天井（照明はなく、懐中電灯だけが頼りです）。
+        // 西棟の天井（照明はなく、懐中電灯だけが頼り）。
         Wall* westWingCeiling = createStageProp("PropCeilingWestWing",
             Vector3(-300.0f, -47.0f, 80.0f), Vector3(164.0f, 3.0f, 364.0f),
             Color(0.055f, 0.06f, 0.058f, 1.0f), noEmission, 4.0f, false);
         westWingCeiling->SetCastsShadow(false);
         westWingCeiling->SetWeatheringSurface(true);
 
+        // 壁際と天井近くを走る配管（Stage1AmbientSoundsが、この線に沿って配管の音を鳴らしている）
         createStageProp("PropPipeLeft", Vector3(-205.0f, -55.0f, 60.0f),
             Vector3(3.0f, 3.0f, 450.0f), darkMetal, noEmission, 22.0f, false);
         createStageProp("PropPipeRight", Vector3(205.0f, -55.0f, 60.0f),
@@ -242,7 +248,7 @@ namespace Stage1Layout
         createStageProp("PropPipeCrossHallRight", Vector3(132.5f, -52.5f, 177.0f),
             Vector3(175.0f, 2.5f, 2.5f), darkMetal, noEmission, 22.0f, false);
 
-        // 西側の幅木は、西棟の扉（z=-35〜-5）の前で途切れさせます。
+        // 西側の幅木は、西棟の扉（z=-35〜-5）の前で途切れさせている。
         createStageProp("PropBaseboardLeft", Vector3(-217.2f, -96.5f, -105.0f),
             Vector3(1.5f, 6.0f, 140.0f), trimColor, noEmission, 5.0f, false);
         createStageProp("PropBaseboardLeftNorth", Vector3(-217.2f, -96.5f, 165.0f),
@@ -250,6 +256,7 @@ namespace Stage1Layout
         createStageProp("PropBaseboardRight", Vector3(217.2f, -96.5f, 80.0f),
             Vector3(1.5f, 6.0f, 510.0f), trimColor, noEmission, 5.0f, false);
 
+        // 棚や設備（当たり判定あり）
         createStageProp("PropCabinetLeft", Vector3(-190.0f, -87.0f, -132.0f),
             Vector3(28.0f, 24.0f, 12.0f), cabinetMetal, noEmission, 14.0f, true);
         createStageProp("PropCabinetRight", Vector3(190.0f, -87.0f, -112.0f),
@@ -259,8 +266,8 @@ namespace Stage1Layout
         createStageProp("PropServiceBox", Vector3(205.0f, -82.0f, 118.0f),
             Vector3(10.0f, 30.0f, 24.0f), cabinetMetal, noEmission, 12.0f, true);
 
-        // 書類保管室（廊下の西側の部屋）。目線より高い書類棚を互い違いに並べ、見通しの悪い迷路にします。
-        // 入口は x=-45 の壁の z=110〜130 です。
+        // 書類保管室（廊下の西側の部屋）。目線より高い書類棚を互い違いに並べ、見通しの悪い迷路にしている。
+        // 入口は x=-45 の壁の z=110〜130。
         const Color shelfColor(0.13f, 0.12f, 0.10f, 1.0f);
         createStageProp("PropArchiveShelf1", Vector3(-160.0f, -77.0f, 70.0f),
             Vector3(80.0f, 44.0f, 6.0f), shelfColor, noEmission, 10.0f, true);
@@ -273,7 +280,7 @@ namespace Stage1Layout
         createStageProp("PropArchiveDesk", Vector3(-200.0f, -89.0f, 160.0f),
             Vector3(26.0f, 20.0f, 14.0f), cabinetMetal, noEmission, 12.0f, true);
 
-        // 崩れた資材置き場（北西の部屋）。崩れた資材と機材で視界を遮ります。
+        // 崩れた資材置き場（北西の部屋）。崩れた資材と機材で視界をさえぎっている。
         const Color debrisColor(0.12f, 0.11f, 0.095f, 1.0f);
         createStageProp("PropDebris1", Vector3(-150.0f, -84.0f, 230.0f),
             Vector3(40.0f, 30.0f, 30.0f), debrisColor, noEmission, 6.0f, true);
@@ -284,7 +291,7 @@ namespace Stage1Layout
         createStageProp("PropDebrisBeam", Vector3(-120.0f, -93.0f, 250.0f),
             Vector3(60.0f, 6.0f, 6.0f), darkMetal, noEmission, 18.0f, true);
 
-        // 西棟の中の機材（ポンプと配管）。水の中に沈んだ機械室らしさを出します。
+        // 西棟の中の機材（ポンプと配管）。水の中に沈んだ機械室らしさを出している。
         createStageProp("PropWestWingPump", Vector3(-345.0f, -86.0f, 235.0f),
             Vector3(30.0f, 26.0f, 26.0f), darkMetal, noEmission, 20.0f, true);
         createStageProp("PropWestWingTank", Vector3(-250.0f, -82.0f, 120.0f),
@@ -292,6 +299,7 @@ namespace Stage1Layout
         createStageProp("PropWestWingPipe", Vector3(-375.0f, -55.0f, 80.0f),
             Vector3(3.0f, 3.0f, 350.0f), darkMetal, noEmission, 22.0f, false);
 
+        // 脱出のホールの入口の柱と、扉の状態を示すランプ（停電中は赤）
         createStageProp("PropExitColumnLeft", Vector3(-52.0f, -80.0f, 179.0f),
             Vector3(10.0f, 38.0f, 10.0f), darkMetal, noEmission, 8.0f, true);
         createStageProp("PropExitColumnRight", Vector3(52.0f, -80.0f, 179.0f),
@@ -300,6 +308,7 @@ namespace Stage1Layout
             Vector3(10.0f, 5.0f, 1.0f), Color(0.26f, 0.025f, 0.018f, 1.0f),
             Color(0.30f, 0.005f, 0.002f, 1.0f), 28.0f, false);
 
+        // ループ廊下で、周回によって現れる赤い目印（最初は隠している）
         const auto createLoopMarker = [&createStageProp, &noEmission](
             const char* name,
             const Vector3& position)
@@ -316,7 +325,7 @@ namespace Stage1Layout
             createLoopMarker("PropLoopMarker1", Vector3(-82.0f, -67.0f, -177.4f)),
             createLoopMarker("PropLoopMarker2", Vector3(82.0f, -67.0f, -177.4f)),
             createLoopMarker("PropLoopMarker3", Vector3(36.0f, -67.0f, 37.4f)) };
-        // 天井照明の見た目で、施設の通電状態を直接伝えます。
+        // 天井照明の見た目で、施設に電気が来ているかを直接伝えている（非常灯は停電中も赤く光る）。
         CeilingLight* light1 = builder.Create<CeilingLight>("CeilingLight1");
         light1->SetPosition(0.0f, -50.5f, -140.0f);
         light1->SetScale(24.0f, 2.0f, 11.0f);
@@ -358,8 +367,8 @@ namespace Stage1Layout
         light8->SetEmergencyLight(true, 6.2f);
 
         // ヒューズ。どの部屋にあるかは固定し（目的表示と演出の流れを保つため）、
-        // 部屋の中のどこに落ちているかを、プレイごとに候補からランダムに選びます。
-        // 覚えた場所へ走るのではなく、毎回ライトで部屋を探させるためです。
+        // 部屋の中のどこに落ちているかを、プレイごとに候補からランダムに選んでいる。
+        // 覚えた場所へ走るのではなく、毎回ライトで部屋を探させるためである。
         std::mt19937 fuseRandom{ std::random_device{}() };
         const auto placeFuse = [&fuseRandom](Item* fuse, const std::array<Vector3, 3>& candidates)
         {
@@ -375,7 +384,7 @@ namespace Stage1Layout
             Vector3(64.0f, -95.0f, -160.0f)
         };
         // 2本目: 左の倉庫。倉庫の演出（StageScene::UpdateStorageScare）が始まる
-        // x<-110, z<-108 の範囲の中だけから選びます。
+        // x<-110, z<-108 の範囲の中だけから選んでいる。
         const std::array<Vector3, 3> secondFuseSpots =
         {
             Vector3(-150.0f, -95.0f, -140.0f),
@@ -383,7 +392,7 @@ namespace Stage1Layout
             Vector3(-128.0f, -95.0f, -166.0f)
         };
         // 3本目: 西棟の一番奥のポンプ室（ポンプの陰・奥の角・タンク寄り）。
-        // 右の倉庫で西棟の鍵を拾い、西側の扉を開けて浸水した通路を抜けないと取れません。
+        // 右の倉庫で西棟の鍵を拾い、西側の扉を開けて浸水した通路を抜けないと取れない。
         const std::array<Vector3, 3> thirdFuseSpots =
         {
             Vector3(-345.0f, -95.0f, 210.0f),
@@ -394,6 +403,7 @@ namespace Stage1Layout
         Item* item1 = builder.Create<Item>("Item1");
         placeFuse(item1, firstFuseSpots);
 
+        // 2本目と3本目は、進行に合わせて出すので最初は隠している
         Item* item2 = builder.Create<Item>("Item2");
         placeFuse(item2, secondFuseSpots);
         item2->SetActive(false);
@@ -402,7 +412,7 @@ namespace Stage1Layout
         placeFuse(item3, thirdFuseSpots);
         item3->SetActive(false);
 
-        // 西棟の鍵。右の倉庫（もとは3本目のヒューズがあった部屋）のどこかに、2周目のループの後に現れます。
+        // 西棟の鍵。右の倉庫（前は3本目のヒューズがあった部屋）のどこかに、2周目のループの後に現れる。
         const std::array<Vector3, 3> westWingKeySpots =
         {
             Vector3(150.0f, -95.0f, -140.0f),
@@ -417,7 +427,7 @@ namespace Stage1Layout
         }
         westWingKey->SetActive(false);
 
-        // 西棟の扉（西側の外壁の z=-35〜-5）。鍵を拾うまで開きません。
+        // 西棟の扉（西側の外壁の z=-35〜-5）。鍵を拾うまで開かない。
         Door* westWingDoor = builder.Create<Door>("Stage1WestWingDoor");
         westWingDoor->SetPosition(-220.0f, -74.0f, -20.0f);
         westWingDoor->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
@@ -427,23 +437,25 @@ namespace Stage1Layout
         objects.westWing.key = westWingKey;
         objects.westWing.fuse = item3;
 
-        // 寄り道の報酬の電池（西棟の通路・崩れた資材置き場）。
+        // 寄り道のごほうびの電池（西棟の通路・崩れた資材置き場）。
         BatteryItem* westWingBattery = builder.Create<BatteryItem>("Stage1WestWingBattery");
         westWingBattery->SetPosition(-355.0f, -95.0f, 40.0f);
         BatteryItem* debrisBattery = builder.Create<BatteryItem>("Stage1DebrisRoomBattery");
         debrisBattery->SetPosition(-120.0f, -95.0f, 300.0f);
 
-        // ドア
+        // 中央の扉（ループ廊下へ続く）と、主電源の配電盤
         Door* door = builder.Create<Door>("Door");
         door->SetPosition(0.0f, -74.0f, 40.0f);
         FuseBox* fuseBox = builder.Create<FuseBox>("FuseBox");
         fuseBox->SetPosition(-180.0f, -90.0f, 35.0f);
 
+        // 出口の送電盤（主電源が戻った後に操作する）
         FuseBox* exitPowerPanel =
             builder.Create<FuseBox>("ExitPowerPanel");
         exitPowerPanel->SetExitControl(true);
         exitPowerPanel->SetPosition(145.0f, -90.0f, 270.0f);
 
+        // 非常用充電器（懐中電灯の電池を回復できる）
         FuseBox* emergencyCharger =
             builder.Create<FuseBox>("Stage1EmergencyCharger");
         emergencyCharger->SetManualControl("非常用充電器を使う");
@@ -451,14 +463,15 @@ namespace Stage1Layout
         emergencyCharger->SetPosition(-205.0f, -90.0f, -112.0f);
         emergencyCharger->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
 
-        // 任意探索の報酬は最短経路から外して配置します。
-        // 素早い脱出と完全探索のどちらを選ぶか判断させるためです。
+        // 任意で探索するごほうびは、最短の道筋から外して置いている。
+        // 素早く脱出するか、全部探索するかを選ばせるためである。
         FuseBox* evidenceTerminal =
             builder.Create<FuseBox>("Stage1EvidenceTerminal");
         evidenceTerminal->SetManualControl("監視カメラを確認する");
         evidenceTerminal->SetManualInteractionAllowed(true);
         evidenceTerminal->SetPosition(205.0f, -90.0f, -42.0f);
         evidenceTerminal->SetRotation(Vector3(0.0f, -DirectX::XM_PIDIV2, 0.0f));
+        // 監視カメラの端末の上に付けた、緑に光る目印
         Wall* evidenceMarker = createStageProp(
             "Stage1EvidenceMarker",
             Vector3(217.2f, -65.0f, -42.0f),
@@ -470,15 +483,15 @@ namespace Stage1Layout
         evidenceMarker->SetCastsShadow(false);
 
 
-        // 1面の出口は、見える扉を操作して通過したときだけ成立させます。
-        // 廊下を歩きながら操作キーを押すだけで透明トリガーが反応する問題を防ぎます。
+        // 1面の出口は、見える扉を調べて通ったときだけ成り立つようにしている。
+        // 廊下を歩きながら操作キーを押すだけで、見えない出口が反応してしまう問題を防いでいる。
         Door* stageExitDoor = builder.Create<Door>("Stage1ExitDoor");
         stageExitDoor->SetPosition(202.0f, -74.0f, 307.5f);
         stageExitDoor->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
         stageExitDoor->SetScale(Vector3(60.0f, 50.0f, 4.0f));
         stageExitDoor->SetLocked(true);
 
-        // 監視カメラの異常用に、壁際へ開かずの扉を置きます。開いても先は壁です。
+        // 監視カメラの異常用に、壁際へ開かずの扉を置いている。開いても先は壁。
         for (int index = 0; index < StageSealedDoorCount; ++index)
         {
             const StageSealedDoor& sealed = StageSealedDoors[index];
@@ -490,6 +503,7 @@ namespace Stage1Layout
             objects.sealedDoors[static_cast<std::size_t>(index)] = sealedDoor;
         }
 
+        // 出口の上の赤い非常口の表示
         Wall* stageExitSign = createStageProp(
             "PropStage1ExitSign",
             Vector3(198.0f, -51.5f, 307.5f),
@@ -500,8 +514,8 @@ namespace Stage1Layout
             false);
         stageExitSign->SetCastsShadow(false);
 
-        // 懐中電灯で照らしたときだけ浮かぶ壁の文字。進む道筋に沿って、目的の手がかりと不安を置きます。
-        // 位置は壁の表面、向きは壁から通路側へ向かう法線です。画像は横長(4:1)です。
+        // 懐中電灯で照らしたときだけ浮かぶ壁の文字。進む道筋に沿って、目的の手がかりと不安を置いている。
+        // 位置は壁の表面、向きは壁から通路側へ向かう法線。画像は横長(4:1)。
         const auto createWriting = [&builder](
             const char* name,
             const char* texture,
@@ -524,13 +538,13 @@ namespace Stage1Layout
         objects.writings[Stage1WallWritings::Power] = createWriting(
             "Stage1WritingPower", "assets/texture/writing_power.png", "",
             Vector3(-128.0f, -69.0f, 38.0f), Vector3(0.0f, 0.0f, -1.0f), 64.0f);
-        // ループ廊下を北へ進むと正面に見える突き当たりの壁。右へ曲がると目を離すことになります。
+        // ループ廊下を北へ進むと正面に見える突き当たりの壁。右へ曲がると目を離すことになる（その間に書き換わる）。
         objects.writings[Stage1WallWritings::Turn] = createWriting(
             "Stage1WritingTurn", "assets/texture/writing_turn.png",
             "assets/texture/writing_turned.png",
             Vector3(0.0f, -70.0f, 273.0f), Vector3(0.0f, 0.0f, -1.0f), 60.0f);
 
-        // 暗証番号の扉（任意探索）。中央の扉の先の細い廊下の東の壁にあり、ループ廊下へ向かうたびに目に入ります。
+        // 暗証番号の扉（任意で探索）。中央の扉の先の細い廊下の東の壁にあり、ループ廊下へ向かうたびに目に入る。
         Door* keypadDoor = builder.Create<Door>("Stage1KeypadDoor");
         keypadDoor->SetPosition(45.0f, -74.0f, 110.0f);
         keypadDoor->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
@@ -542,8 +556,8 @@ namespace Stage1Layout
         keypadPanel->SetPosition(41.5f, -80.0f, 135.0f);
         keypadPanel->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
 
-        // 番号の手がかり。「ひとつめ」などの文字の右に、その桁の数字を書きます。
-        // 数字の画像は、番号を決めるStage1KeypadDoor::Initで差し替えます。
+        // 番号の手がかり。「ひとつめ」などの文字の右に、その桁の数字を書いている。
+        // 数字の画像は、番号を決めるStage1KeypadDoor::Initで差し替えている。
         const auto createDigitClue = [&builder](
             int order,
             const Vector3& surfaceCenter,
@@ -555,7 +569,7 @@ namespace Stage1Layout
             label->SetTextures("assets/texture/writing_order" + number + ".png");
             label->Place(surfaceCenter, outwardNormal, 40.0f, 10.0f);
 
-            // 文字を正面から見たときの右方向です。
+            // 文字を正面から見たときの右方向。
             const Vector3 right(-outwardNormal.z, 0.0f, outwardNormal.x);
             FlashlightWriting* digit = builder.Create<FlashlightWriting>(
                 "Stage1KeypadClueDigit" + number);
@@ -574,14 +588,14 @@ namespace Stage1Layout
             // 右の倉庫の東の壁
             createDigitClue(4, Vector3(218.0f, -70.0f, -135.0f), Vector3(-1.0f, 0.0f, 0.0f)) };
 
-        // 扉の先の部屋: 予備の電池と、入った者を迎える文字を置きます。
+        // 扉の先の部屋: 予備の電池と、入った者を迎える文字を置いている。
         BatteryItem* hiddenBattery = builder.Create<BatteryItem>("Stage1KeypadRoomBattery");
         hiddenBattery->SetPosition(140.0f, -95.0f, 110.0f);
         createWriting("Stage1KeypadRoomWriting", "assets/texture/writing_watched.png", "",
             Vector3(218.0f, -70.0f, 70.0f), Vector3(-1.0f, 0.0f, 0.0f), 64.0f);
 
         // 閉じ込めイベント（Stage1HiddenRoomEvent）で使う、鍵・記録端末・影。
-        // 鍵は閉じ込めた瞬間に、部屋の隅の候補からランダムな位置へ置きます。
+        // 鍵は閉じ込めた瞬間に、部屋の隅の候補からランダムな位置へ置いている。
         KeyItem* hiddenRoomKey = builder.Create<KeyItem>("Stage1HiddenRoomKey");
         hiddenRoomKey->SetPosition(140.0f, -95.0f, 60.0f);
         hiddenRoomKey->SetActive(false);
@@ -601,21 +615,24 @@ namespace Stage1Layout
         objects.hiddenRoom.record = hiddenRoomRecord;
         objects.hiddenRoom.shadow = hiddenRoomShadow;
 
+        // 出口（出口の扉の前。電力が戻るまでは調べられない）
         ExitTrigger* exit = builder.Create<ExitTrigger>("ExitTrigger");
         exit->SetPosition(207.0f, -80.0f, 307.5f);
         exit->SetNextScene(SceneName::Stage2);
         exit->SetInteractionEnabled(false);
 
-        // バッテリー
+        // 電池（書類保管室）
         BatteryItem* battery = builder.Create<BatteryItem>("BatteryItem");
         battery->SetPosition(-130.0f, -95.0f, 120.0f);
 
+        // 驚かせる瞬間に重ねる画面のノイズ
         ScreenDustOverlay* crt =
             builder.Create<ScreenDustOverlay>("CRTNoise");
 
         crt->SetPower(0.7f);
         crt->SetActive(false);
 
+        // 電力が戻った後、中央の廊下へ入ると、奥に影が現れる驚かせる演出
         ScareTrigger* corridorScare =
             builder.Create<ScareTrigger>("ScareTrigger_Corridor");
         corridorScare->SetPosition(Vector3(0.0f, -90.0f, 65.0f));
@@ -623,6 +640,7 @@ namespace Stage1Layout
         corridorScare->SetShadowPosition(Vector3(0.0f, -99.0f, 150.0f));
         corridorScare->SetRequiresPower(true);
 
+        // 演出用の人影。どれも最初は隠しておき、StageSceneの演出で出している（時間切れで破棄せずに隠す）
         ShadowMan* exitOmen =
             builder.Create<ShadowMan>("Stage1ExitOmen");
         exitOmen->SetPosition(92.0f, -99.0f, 278.0f);

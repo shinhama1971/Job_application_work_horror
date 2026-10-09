@@ -1,15 +1,17 @@
 ﻿// ============================================================================
-// ファイルの役割: 2面の信号パズルの入力順序と完了状態だけを管理します。
-// 主な技術: 有限状態機械、入力列照合、フィードバック、進行ロック
+// ファイルの役割: 2面の信号盤パズルで、入力の順番と、解けたかどうかだけを管理している。
+// 主な技術: 有限状態機械、入力の順番の照合、間違えたら最初からやり直す仕組み
 // ============================================================================
 
 #pragma once
 
 #include <array>
 
+// 青・黄・赤の3つの信号盤を、決まった順番（0→1→2）で操作するパズル。
 class SignalPuzzle final
 {
 public:
+    // 操作した結果（順番が違う・受け付けた・全部そろって解けた）
     enum class AcceptResult
     {
         WrongOrder,
@@ -18,11 +20,13 @@ public:
     };
 
 private:
+    // 各信号盤を受け付けたか、次に操作すべき番号、解けたか
     std::array<bool, 3> m_Accepted{ false, false, false };
     int m_Step = 0;
     bool m_Complete = false;
 
 public:
+    // 最初からやり直している
     void Reset()
     {
         m_Accepted.fill(false);
@@ -30,6 +34,7 @@ public:
         m_Complete = false;
     }
 
+    // デバッグ用などで、解けた状態にしている
     void ForceComplete()
     {
         m_Accepted.fill(true);
@@ -37,6 +42,7 @@ public:
         m_Complete = true;
     }
 
+    // 信号盤を操作している。順番どおりなら受け付け、違えば最初からやり直している
     AcceptResult Accept(int signalIndex)
     {
         if (signalIndex < 0 || signalIndex >= 3 || signalIndex != m_Step)
@@ -55,6 +61,7 @@ public:
         return AcceptResult::Accepted;
     }
 
+    // その信号盤を受け付けたか、次の番号、解けたかを返している
     bool IsAccepted(int signalIndex) const
     {
         return signalIndex >= 0 && signalIndex < 3 &&

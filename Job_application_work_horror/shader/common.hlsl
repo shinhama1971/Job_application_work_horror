@@ -1,8 +1,9 @@
 // ============================================================================
-// シェーダーの役割: CPU側と共有する行列、ライト、マテリアルの定数バッファを定義します。
-// 定数バッファのスロットと入出力構造はCPU側の定義と必ず一致させてください。
+// シェーダーの役割: CPU側と共有する行列・ライト・マテリアルの定数バッファや、点光源の一覧を定義している。
+// 定数バッファのスロットと入出力の形は、CPU側の定義（Renderer.hなど）と一致させている。
 // ============================================================================
 
+// ワールド・ビュー・射影の行列（b0〜b2。Renderer::SetWorldMatrixなどが転置して送っている）
 cbuffer WorldBuffer : register(b0)
 {
 	matrix World;
@@ -16,6 +17,7 @@ cbuffer ProjectionBuffer : register(b2)
 	matrix Projection;
 }
 
+// 頂点の入力（VERTEX_3Dと同じ並び。位置・法線・色・UV）
 struct VS_IN
 {
     float4 pos : POSITION0;
@@ -25,6 +27,7 @@ struct VS_IN
     
 };
 
+// 照明を使わない描画で、頂点シェーダーからピクセルシェーダーへ渡す値
 struct PS_IN
 {
 	float4 pos : SV_POSITION;
@@ -37,6 +40,7 @@ struct PS_IN
     float3 worldNormal : TEXCOORD5;
 };
 
+// 懐中電灯と環境光（Renderer.hのLIGHTと同じ並び）
 struct LIGHT
 {
     bool Enable;
@@ -49,6 +53,7 @@ struct LIGHT
     float4 SpotParams;
 };
 
+// デバッグ表示の番号、2面の壁の湿り気の強さ、壁の古さ（b7）
 cbuffer DebugViewBuffer : register(b7)
 {
     int DebugViewMode;
@@ -58,11 +63,13 @@ cbuffer DebugViewBuffer : register(b7)
     float DebugViewPadding;
 };
 
+// 懐中電灯と環境光の定数バッファ（b3）
 cbuffer LightBuffer : register(b3)
 {
     LIGHT Light;
 }
 
+// マテリアル（Renderer.hのMATERIALと同じ並び。Ambient・Shininessの綴りはシェーダー側だけ違っている）
 struct MATERIAL
 {
     float4 Ambuent;
@@ -72,38 +79,43 @@ struct MATERIAL
     float Shiness;
     bool TextureEnable;
     bool WeatheringSurface;   // 建物の壁ならtrue（壁の古さを描く面）
+    // 16バイトにそろえるための詰め物
     bool Dummy;
 };
 // ----------------------------------------------------------------------------
 // タイルベースライティング
-// 点光源はStructuredBufferで受け取り、本描画ではCompute Shaderが作った
-// 「そのピクセルのタイルに影響する光源の番号リスト」だけを計算します。
-// 反射・監視映像など別視点の描画では、全光源を順に計算します。
+// 点光源はStructuredBufferで受け取り、本描画では、Compute Shaderが作った
+// 「その画素のタイルに影響する光源の番号のリスト」だけを計算している。
+// 反射・監視映像など別の視点の描画では、全部の光源を順に計算している。
 // ----------------------------------------------------------------------------
 struct ENVIRONMENT_POINT_LIGHT
 {
-    float4 PositionRange;   // xyz = 位置, w = 影響半径（この距離で0になるよう減衰させる）
+    float4 PositionRange;   // xyz = 位置、w = 影響の半径（この距離で0になるよう弱めている）
+    // rgb = 色、a = 強さ
     float4 ColorIntensity;
 };
 
+// TiledLighting.cppのShadingParamsと同じ並び（b6）
 cbuffer TiledLightBuffer : register(b6)
 {
     uint PointLightCount;
-    uint TiledLightMode;        // 0: 全光源、1: タイル別リスト
+    uint TiledLightMode;        // 0: 全部の光源、1: タイルごとのリスト
     uint LightTilesX;
     uint LightTilesY;
     float2 LightViewportOffset;
     float2 TiledLightPadding;
 };
 
+// 点光源の一覧（t10）、タイルごとの光源の番号の並び（t11）、タイルごとの光源の数（t12）
 StructuredBuffer<ENVIRONMENT_POINT_LIGHT> g_PointLights : register(t10);
 StructuredBuffer<uint> g_TileLightIndices : register(t11);
 StructuredBuffer<uint> g_TileLightCounts : register(t12);
 
+// タイルの大きさと、1タイルに入れる光源の上限（TiledLighting.hと同じ値）
 static const uint LIGHT_TILE_SIZE = 16;
 static const uint MAX_LIGHTS_PER_TILE = 64;
 
-// このピクセルで計算する光源の数と、タイル別リストの先頭位置を返します。
+// この画素で計算する光源の数と、タイルごとのリストの先頭の位置を返している。
 uint GetPixelLightCount(float2 pixelPosition, out uint listOffset)
 {
     listOffset = 0;
@@ -121,8 +133,8 @@ uint GetPixelLightCount(float2 pixelPosition, out uint listOffset)
     return g_TileLightCounts[tileIndex];
 }
 
-// デバッグ表示: タイルごとの光源数を色で表します（0=暗い青、1=緑、2=黄、4以上=赤）。
-// タイルの境界線も重ね、画面がどう分割されているかを確認できるようにします。
+// デバッグ表示: タイルごとの光源の数を色で表している（0=暗い青、1=緑、2=黄、4以上=赤）。
+// タイルの境目の線も重ね、画面がどう分かれているかを確かめられるようにしている。
 float4 GetLightTileHeatmap(float2 pixelPosition, uint lightCount)
 {
     const float amount = saturate(float(lightCount) / 4.0f);
@@ -138,6 +150,7 @@ float4 GetLightTileHeatmap(float2 pixelPosition, uint lightCount)
     return float4(onEdge ? heat * 0.45f : heat, 1.0f);
 }
 
+// その画素で計算するlightNumber番目の光源を返している（タイルのリストを使うときは番号を読み替えている）
 ENVIRONMENT_POINT_LIGHT GetPixelLight(uint listOffset, uint lightNumber)
 {
     if (TiledLightMode == 0)
@@ -147,22 +160,23 @@ ENVIRONMENT_POINT_LIGHT GetPixelLight(uint listOffset, uint lightNumber)
     return g_PointLights[g_TileLightIndices[listOffset + lightNumber]];
 }
 
+// マテリアルの定数バッファ（b4）
 cbuffer MaterialBuffer : register(b4)
 {
   MATERIAL Material;
 }
 
-//UV座標移動行列
+// UV座標を動かす行列（b5）
 cbuffer TextureBuffer : register(b5)
 {
     matrix matrixTex;
 }
 
 // ----------------------------------------------------------------------------
-// デバッグ表示8: フルブライト（DebugUIの「Shader debug view」で選択）
-// 照明・影・霧を無視し、元の色に「面がカメラを向いているか」だけの陰影を付けて表示します。
-// 暗い場所の配置（アイテムが埋まっていないか、壁の文字の位置など）を確認するためのものです。
-// DebugUIはDebug構成だけなので、Release版の見た目には影響しません。
+// デバッグ表示8: フルブライト（DebugUIの「Shader debug view」で選んでいる）
+// 照明・影・霧を無視し、元の色に「面がカメラを向いているか」だけの陰影を付けて表示している。
+// 暗い場所の配置（アイテムが埋まっていないか、壁の文字の位置など）を確かめるためのもの。
+// DebugUIはDebug構成だけなので、Release版の見た目には影響しない。
 // ----------------------------------------------------------------------------
 static const int DEBUG_VIEW_FULLBRIGHT = 8;
 

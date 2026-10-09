@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: 2面の足音危険度、時計、信号パズル、偽ドア状態を管理します。
-// 主な技術: 入力列照合、状態機械、環境パズル、進行ゲート
+// ファイルの役割: 2面の足音の危険度、周回の進め方、時計、信号盤パズル、偽の扉の表示を担当している。
+// 主な技術: 入力の順番の照合、状態機械、環境を使ったパズル、条件を満たすまで先へ進めない仕組み
 // ============================================================================
 
 #include "Stage2Scene.h"
@@ -28,16 +28,18 @@ using namespace DirectX::SimpleMath;
 
 // ----------------------------------------------------------------------------
 // ロッカーに隠れている間
-// 足音の影が離れているうちに隠れれば、影は見失って立ち止まり、しばらくして去ります。
-// 影がすぐ近くまで来てから隠れても、入るところを見られていて捕まります。
-// 隠れている間は足音の危険度が下がり、新しい影も出ません。
+// 足音の影が離れているうちに隠れれば、影は見失って立ち止まり、しばらくして去っていく。
+// 影がすぐ近くまで来てから隠れても、入るところを見られていて捕まる。
+// 隠れている間は足音の危険度が下がり、新しい影も出ない。
 // ----------------------------------------------------------------------------
 namespace
 {
     constexpr float HidingSeenDistance = 30.0f;     // これより近くで隠れると見られている
+    // 見失った影がその場に留まる秒数
     constexpr float HiddenStalkerLingerSeconds = 3.2f;
 }
 
+// 隠れている間の処理。隠れていなければfalseを返している
 bool Stage2Scene::UpdateHiddenFromStalker(Player& player, float deltaTime)
 {
     if (!player.IsHiding())
@@ -60,7 +62,7 @@ bool Stage2Scene::UpdateHiddenFromStalker(Player& player, float deltaTime)
     Core::Game* game = Core::Game::GetInstance();
     if (m_HiddenStalkerTimer < 0.0f)
     {
-        // 隠れた瞬間に影がどれだけ近かったかで、見られていたかを決めます。
+        // 隠れた瞬間に影がどれだけ近かったかで、見られていたかを決めている。
         Vector3 toShadow = noiseShadow->GetPosition() - player.GetPosition();
         toShadow.y = 0.0f;
         if (toShadow.Length() <= HidingSeenDistance)
@@ -68,7 +70,7 @@ bool Stage2Scene::UpdateHiddenFromStalker(Player& player, float deltaTime)
             StartCaughtSequence(player, CaughtSequence::Reason::NoiseStalker);
             return true;
         }
-        // 見失った影はその場で立ち止まり、辺りを探すように留まります。
+        // 見失った影はその場で立ち止まり、辺りを探すように留まっている。
         noiseShadow->EnableChase(0.0f, 12.0f);
         m_HiddenStalkerTimer = HiddenStalkerLingerSeconds;
         game->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, noiseShadow->GetPosition(), 0.70f, 1.4f);
@@ -81,7 +83,7 @@ bool Stage2Scene::UpdateHiddenFromStalker(Player& player, float deltaTime)
         return true;
     }
 
-    // 影は諦めて去ります。危険度を下げ、しばらく次の影を出しません。
+    // 影はあきらめて去っていく。危険度を下げ、しばらく次の影を出さない。
     noiseShadow->SetActive(false);
     m_HiddenStalkerTimer = -1.0f;
     m_NoiseThreatSystem.SetThreat((std::max)(
@@ -95,8 +97,10 @@ bool Stage2Scene::UpdateHiddenFromStalker(Player& player, float deltaTime)
     return true;
 }
 
+// 足音の危険度を更新し、高くなったら足音を追う影を出している
 void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
 {
+    // 最後の演出と追跡の間は、危険度を下げて足音の影を消している
     if (m_FinalSequence.IsSequenceActive() ||
         m_FinalSequence.IsPursuitActive())
     {
@@ -111,6 +115,7 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         return;
     }
 
+    // 3周目で信号盤を直し終えた後も、同じように危険度を下げている
     const bool signalStealthActive =
         m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete();
     if (m_LoopCount >= 3 && !signalStealthActive)
@@ -130,6 +135,7 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         return;
     }
 
+    // 足音の大きさ（水たまりや走った音）で危険度を上げ、強い水音なら知らせを出している
     const float surfacePulse = player.GetSurfaceNoisePulse();
     if (surfacePulse > 0.0f)
     {
@@ -142,6 +148,7 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         }
     }
 
+    // 走ると上がり、歩くと下がる（信号盤パズルの間は上がりやすく下がりにくい）
     const float change = player.IsSprinting()
         ? deltaTime * (signalStealthActive ? 0.48f : 0.36f)
         : -deltaTime * (signalStealthActive ? 0.12f : 0.22f);
@@ -149,6 +156,7 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         m_NoiseThreatSystem.GetThreat() + change, 0.0f, 1.0f));
 
     Core::Game* game = Core::Game::GetInstance();
+    // 足音の影が出ていれば、近いほど危険度を上げ、15.5まで近づかれたら捕まっている
     ShadowMan* noiseShadow =
         m_Objects.noiseShadow;
     if (noiseShadow != nullptr && noiseShadow->IsActive())
@@ -169,8 +177,8 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         }
     }
 
-    // 初めの3周では、距離を取って消灯・静止すると足音の影を振り切れます。
-    // 信号パズルと最終追跡はそれぞれの対処法を維持します。
+    // 初めの3周では、距離を取って消灯・静止すると、足音の影を振り切れる。
+    // 信号盤パズルと最後の追跡は、それぞれの対処のしかたのままにしている。
     bool nearbyThreat = false;
     if (noiseShadow != nullptr && noiseShadow->IsActive())
     {
@@ -193,12 +201,13 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         m_NoiseThreatSystem.SetStalkerCooldown((std::max)(
             m_NoiseThreatSystem.GetStalkerCooldown(), 8.0f));
         m_NoiseThreatSystem.SetWarningTimer(0.0f);
-        // 成功時は強いフラッシュを避け、視界の落ち着きで成功を伝えます。
+        // 成功したときは強い光を避け、視界が落ち着くことで成功を伝えている。
         game->GetPostProcess()->TriggerHorrorPulse(0.08f, 0.16f);
         game->GetPostProcess()->TriggerBloomPulse(0.18f, 0.16f);
         Input::SetVibration(2, 0.06f);
     }
 
+    // 危険度が0.74以上になったら、背後68に足音の影を出し、追わせている（ライトで照らせば追い払える）
     const bool canSpawnNoiseStalker =
         m_NoiseThreatSystem.GetThreat() >= 0.74f &&
         m_NoiseThreatSystem.GetStalkerCooldown() <= 0.0f &&
@@ -241,6 +250,7 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         Input::SetVibration(8, 0.22f);
     }
 
+    // 信号盤パズルの間に危険度が最大になったら、パズルを最初からやり直させている
     if (signalStealthActive && m_NoiseThreatSystem.GetThreat() >= 0.98f)
     {
         ResetSignalPuzzle();
@@ -256,6 +266,7 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         Input::SetVibration(13, 0.30f);
         return;
     }
+    // 危険度が0.70以上になると、近くの照明を明滅させて警告している
     if (m_NoiseThreatSystem.GetThreat() < 0.70f ||
         m_NoiseThreatSystem.GetEventCooldown() > 0.0f)
     {
@@ -287,6 +298,7 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         0.08f + m_NoiseThreatSystem.GetThreat() * 0.08f);
 }
 
+// 周回を進めている：状態を戻し、プレイヤーを入口へ戻し、扉を閉め、その周回の異変を出している
 void Stage2Scene::AdvanceLoop(Player& player)
 {
     m_QuietRecovery.Reset();
@@ -329,11 +341,12 @@ void Stage2Scene::AdvanceLoop(Player& player)
     if (loopDoor != nullptr)
     {
         loopDoor->ResetClosed(m_LoopCount);
-        // 各周回には発見必須の変化を一つ設け、気付くまで同じ扉を開けません。
-        // 同じ廊下を直進するだけでなく、周囲を観察するゲームプレイにします。
+        // 各周回には見つけないと先へ進めない変化を1つ設け、気づくまで同じ扉を開けないようにしている。
+        // 同じ廊下をまっすぐ進むだけでなく、周りを観察する遊びにしている。
         loopDoor->SetLocked(m_LoopCount > 0);
     }
 
+    // 消していた照明を戻している
     for (CeilingLight* light : m_Objects.lights)
     {
         if (light != nullptr)
@@ -352,6 +365,7 @@ void Stage2Scene::AdvanceLoop(Player& player)
         0.26f);
     Input::SetVibration(6 + m_LoopCount * 3, 0.18f);
 
+    // 周回の数だけ、入口の右の壁に傷の印を出している
     for (int markIndex = 0; markIndex < 3; ++markIndex)
     {
         Wall* cycleMark = m_Objects.cycleMarks[static_cast<std::size_t>(markIndex)];
@@ -378,9 +392,10 @@ void Stage2Scene::AdvanceLoop(Player& player)
     CeilingLight* light2 = m_Objects.Light(Stage2Light::Light2);
     CeilingLight* light3 = m_Objects.Light(Stage2Light::Light3);
 
+    // 1周目：中央の照明を故障させ、傷を3本出し、電池と周回の印を出している
     if (m_LoopCount == 1)
     {
-        // 偽ドアは、偽ドアを見つける周回（Stage2AnomalyPlanが決める）だけ出します。
+        // 偽の扉は、偽の扉を見つける周回（Stage2AnomalyPlanが決める）だけ出している。
         SetFalseDoorState(
             m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::FalseDoor), false);
         CeilingLight* failingLight =
@@ -407,6 +422,7 @@ void Stage2Scene::AdvanceLoop(Player& player)
             light2->SetEmergencyLight(true, 5.2f);
         }
     }
+    // 2周目：入口と奥の照明も故障させ、傷を9本にし、肖像画を赤く変え、見つめると照明の演出が起きる影を出している
     else if (m_LoopCount == 2)
     {
         SetFalseDoorState(
@@ -450,8 +466,8 @@ void Stage2Scene::AdvanceLoop(Player& player)
     {
         SetFalseDoorState(false, false);
         RevealScratchPieces(9, Stage2ScratchCount, 0.24f);
-        // 最終周では三つの信号パネルを復旧する必要があります。
-        // 廊下を探索して表示された色順を正しく入力した後だけ追跡を開始します。
+        // 最後の周では、3つの信号盤を直す必要がある。
+        // 廊下を探して、表示された色の順番どおりに操作した後だけ、最後の停電と追跡を始めている。
         m_FinalSequenceArmed = false;
         CeilingLight* doorLight = m_Objects.Light(Stage2Light::DoorLight);
         if (doorLight != nullptr)
@@ -462,6 +478,7 @@ void Stage2Scene::AdvanceLoop(Player& player)
     }
 }
 
+// 周回に合わせて時計の針を決めている（3周目以降は文字盤を赤黒くしている）
 void Stage2Scene::ConfigureClockForLoop()
 {
     m_ClockAnomaly.ConfigureForLoop(
@@ -481,7 +498,7 @@ void Stage2Scene::ConfigureClockForLoop()
 
 void Stage2Scene::UpdateClock(float deltaTime)
 {
-    // 針の進み方と逆回転時の刻み表示は時計異変自身が管理します。
+    // 針の進み方と、逆回りするときのカクカクした表示は、時計の異変のクラス自身が管理している。
     const bool clockLoop = m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Clock);
     m_ClockAnomaly.Update(m_LoopCount, clockLoop, deltaTime);
     const float displayedHourAngle =
@@ -489,6 +506,7 @@ void Stage2Scene::UpdateClock(float deltaTime)
     const float displayedMinuteAngle =
         m_ClockAnomaly.GetDisplayedMinuteAngle(clockLoop);
 
+    // 針は、時計に向かって手前向きのx軸の回転で動かしている
     Wall* hourHand = m_Objects.clockHourHand;
     Wall* minuteHand = m_Objects.clockMinuteHand;
     if (hourHand != nullptr)
@@ -503,7 +521,7 @@ void Stage2Scene::UpdateClock(float deltaTime)
 
 void Stage2Scene::UpdateClockObservation()
 {
-    // 時計を見つける周回（Stage2AnomalyPlanが決める）だけ観察を受け付けます。
+    // 時計を見つける周回（Stage2AnomalyPlanが決める）だけ、観察を受け付けている。
     if (!m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Clock) ||
         m_ClockAnomaly.WasObservedThisLoop())
     {
@@ -520,6 +538,7 @@ void Stage2Scene::UpdateClockObservation()
         cameraToClock /= distance;
     }
 
+    // 近く（98以内）で正面（内積0.91以上）から見たとき、ライトが点いていれば間違い、消えていれば見つけたことにしている
     const float facing =
         game->GetCamera()->GetForward().Dot(cameraToClock);
     if (distance > 98.0f || facing < 0.91f)
@@ -555,6 +574,7 @@ void Stage2Scene::UpdateClockObservation()
     Input::SetVibration(6, 0.14f);
 }
 
+// パズルの間違いを記録し、間違えるほど強く照明と画面で知らせている（3回目で近くの照明を消している）
 void Stage2Scene::RegisterPuzzleMistake(int type)
 {
     if (!m_PuzzleFeedback.TryRegisterMistake(type))
@@ -590,6 +610,7 @@ void Stage2Scene::RegisterPuzzleMistake(int type)
         0.06f + mistakeRate * 0.12f);
 }
 
+// 信号盤パズルを最初からやり直している（3周目なら信号盤を押せる状態に戻している）
 void Stage2Scene::ResetSignalPuzzle()
 {
     m_SignalPuzzle.Reset();
@@ -614,6 +635,7 @@ void Stage2Scene::ResetSignalPuzzle()
     ApplySignalLightingState();
 }
 
+// 信号盤パズル：押された信号盤を順番どおりか判定し、目印の光り方を更新している
 void Stage2Scene::UpdateSignalPuzzle()
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -654,6 +676,7 @@ void Stage2Scene::UpdateSignalPuzzle()
 
             const SignalPuzzle::AcceptResult acceptResult =
                 m_SignalPuzzle.Accept(signalIndex);
+            // 順番が違えば、間違いを数えて危険度を大きく上げている
             if (acceptResult == SignalPuzzle::AcceptResult::WrongOrder)
             {
                 if (m_LoopCount >= 3)
@@ -668,6 +691,7 @@ void Stage2Scene::UpdateSignalPuzzle()
                 break;
             }
 
+            // 順番どおりなら、危険度を少し上げて、対応する照明を明滅させている
             m_PuzzleFeedback.SetType(0);
             const float retryAssist = static_cast<float>((std::min)(
                 m_PuzzleFeedback.GetMistakeCount(), 2));
@@ -690,6 +714,7 @@ void Stage2Scene::UpdateSignalPuzzle()
             }
             ApplySignalLightingState();
 
+            // 3つそろったら、最後の停電の準備をして、影を消している
             if (acceptResult == SignalPuzzle::AcceptResult::Completed)
             {
                 m_FinalSequenceArmed = true;
@@ -714,6 +739,7 @@ void Stage2Scene::UpdateSignalPuzzle()
             }
             else
             {
+                // 途中なら、背後に影を出して追わせている（間違えた回数が多いほど遠くに出し、遅くしている）
                 Player* player = m_Objects.player;
                 ShadowMan* signalShadow =
                     m_Objects.shadow;
@@ -768,6 +794,7 @@ void Stage2Scene::UpdateSignalPuzzle()
         }
     }
 
+    // 目印：受け付けた信号盤は緑に、次に押す信号盤は明るく脈打たせている
     const float pulse = std::sin(m_VisualTimer * 5.4f) * 0.5f + 0.5f;
     for (int signalIndex = 0; signalIndex < 3; ++signalIndex)
     {
@@ -798,6 +825,7 @@ void Stage2Scene::UpdateSignalPuzzle()
     }
 }
 
+// 信号盤の段階に合わせて、照明を戻している（直していない区画は赤い非常灯のまま）
 void Stage2Scene::ApplySignalLightingState()
 {
     if (m_LoopCount < 3)
@@ -844,6 +872,7 @@ void Stage2Scene::ApplySignalLightingState()
     }
 }
 
+// 信号盤パズルの間に背後から来る影：近いほど危険度を上げ、35まで近づかれたらパズルをやり直させている
 void Stage2Scene::UpdateSignalStalker()
 {
     if (m_LoopCount < 3 || m_SignalPuzzle.IsComplete() ||
@@ -884,6 +913,7 @@ void Stage2Scene::UpdateSignalStalker()
     Input::SetVibration(15, 0.34f);
 }
 
+// 偽の扉の表示と位置を切り替えている。右側に移るときは、入口寄り（z=-88）の右の壁に置いている
 void Stage2Scene::SetFalseDoorState(bool visible, bool rightSide)
 {
     m_FalseDoorAnomaly.SetVisualState(visible, rightSide);

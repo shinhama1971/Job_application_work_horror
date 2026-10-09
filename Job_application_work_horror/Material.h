@@ -1,6 +1,6 @@
 ﻿// ============================================================================
-// ファイルの役割: シェーダーへ渡す材質定数とテクスチャのGPU設定を管理します。
-// 主な技術: PBR向け材質パラメータ、定数バッファ、GPUリソース参照
+// ファイルの役割: シェーダーへ渡すマテリアル（色・光沢・テクスチャを使うか）の定数バッファと、その設定を管理している。
+// 主な技術: 定数バッファ（b4）、拡散・環境・鏡面・自己発光の色と光沢の強さ、GPUへの設定
 // ============================================================================
 
 #pragma once
@@ -15,43 +15,51 @@
 class Shader;
 class Texture;
 
+// マテリアル1つ分。値を定数バッファに入れ、描く直前に頂点シェーダーとピクセルシェーダーのb4へ設定している。
 class Material {
 
+	// 定数バッファに入れる形（MATERIALはRenderer.hで定義している）
 	struct ConstantBufferMaterial {
 		MATERIAL	Material;
 	};
 
+	// 今のマテリアルの値と、定数バッファ
 	MATERIAL	m_Material{};
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_pConstantBufferMaterial;
 
+	// 一緒に設定するシェーダーとテクスチャ（どちらも持ち主は別で、ここでは参照するだけ）
 	Shader* m_pShader;
 	Texture* m_pTexture;	
 
 public:
+	// 空のマテリアル（後でCreateを呼ぶ）
 	Material() :
 		m_pShader(nullptr),
 		m_pTexture(nullptr)
 	{}
 
+	// 値を指定して、すぐに定数バッファを作っている
 	Material(MATERIAL mtrl) :
 		m_pShader(nullptr),
 		m_pTexture(nullptr)
 	{
 		Create(mtrl);
 	}
+	// 定数バッファはComPtrなので、ここで解放する必要はない
 	~Material() {
 		Uninit();
 	}
 
+	// 定数バッファを作り、値を入れてGPUへ送っている
 	bool Create(MATERIAL mtrl) {
 
 		ID3D11Device* dev;
 		dev = Renderer::GetDevice();
 
-		// コンスタントバッファ作成
+		// 定数バッファを作っている
 		bool sts = Renderer::CreateConstantBuffer(
-			sizeof(ConstantBufferMaterial),		// サイズ
-			m_pConstantBufferMaterial.ReleaseAndGetAddressOf());		// コンスタントバッファ４
+			sizeof(ConstantBufferMaterial),		// 大きさ
+			m_pConstantBufferMaterial.ReleaseAndGetAddressOf());		// 作ったバッファを受け取る場所
 		if (!sts) {
 			MessageBox(NULL, "CreateBuffer(constant buffer Material) error", "Error", MB_OK);
 			return false;
@@ -69,6 +77,7 @@ public:
 		return true;
 	}
 
+	// 今の値を定数バッファへ送り、b4に設定している
 	void Update() {
 		ConstantBufferMaterial		cb{};
 
@@ -84,14 +93,15 @@ public:
 			&cb,
 			0, 0);
 
-		// コンスタントバッファ4をｂ4レジスタへセット（頂点シェーダー用）
+		// 定数バッファをb4レジスタへ設定している（頂点シェーダー用）
 		devcontext->VSSetConstantBuffers(4, 1, m_pConstantBufferMaterial.GetAddressOf());
 
-		// コンスタントバッファ4をｂ4レジスタへセット(ピクセルシェーダー用)
+		// 定数バッファをb4レジスタへ設定している（ピクセルシェーダー用）
 		devcontext->PSSetConstantBuffers(4, 1, m_pConstantBufferMaterial.GetAddressOf());
 
 	}
 
+	// 描く直前に呼び、シェーダー・テクスチャ（あれば）・定数バッファを設定している
 	void SetGPU() {
 		if (m_pShader)
 		{
@@ -107,13 +117,14 @@ public:
 		ID3D11DeviceContext* devcontext;
 		devcontext = Renderer::GetDeviceContext();
 
-		// コンスタントバッファ4をｂ4レジスタへセット（頂点シェーダー用）
+		// 定数バッファをb4レジスタへ設定している（頂点シェーダー用）
 		devcontext->VSSetConstantBuffers(4, 1, m_pConstantBufferMaterial.GetAddressOf());
 
-		// コンスタントバッファ4をｂ4レジスタへセット(ピクセルシェーダー用)
+		// 定数バッファをb4レジスタへ設定している（ピクセルシェーダー用）
 		devcontext->PSSetConstantBuffers(4, 1, m_pConstantBufferMaterial.GetAddressOf());
 	}
 
+	// 一時的な値を定数バッファへ送って設定している（m_Materialは変えない。明るさが毎フレーム変わる物で使っている）
 	void SetMaterial(const MATERIAL& mtrl) {
 		ConstantBufferMaterial		cb{};
 
@@ -129,17 +140,19 @@ public:
 			&cb,
 			0, 0);
 
-		// コンスタントバッファ4をｂ4レジスタへセット（頂点シェーダー用）
+		// 定数バッファをb4レジスタへ設定している（頂点シェーダー用）
 		devcontext->VSSetConstantBuffers(4, 1, m_pConstantBufferMaterial.GetAddressOf());
 
-		// コンスタントバッファ4をｂ4レジスタへセット(ピクセルシェーダー用)
+		// 定数バッファをb4レジスタへ設定している（ピクセルシェーダー用）
 		devcontext->PSSetConstantBuffers(4, 1, m_pConstantBufferMaterial.GetAddressOf());
 
 	}
 
+	// 解放するものはない
 	void Uninit() {
 	}
 
+	// 各値を書き換えている（GPUへ送るのは次のUpdateを呼んだとき）
 	void SetDiffuse(DirectX::XMFLOAT4 diffuse) {
 		m_Material.Diffuse = diffuse;
 	}
@@ -160,6 +173,7 @@ public:
 		m_Material.Shininess = shininess;
 	}
 
+	// 一緒に設定するシェーダーとテクスチャを決めている
 	void SetShader(Shader* shader) {
 		m_pShader = shader;
 	}
@@ -168,6 +182,7 @@ public:
 		m_pTexture = texture;
 	}
 
+	// テクスチャを使う設定か
 	bool isTextureEnable() {
 		return m_Material.TextureEnable == TRUE;
 	}

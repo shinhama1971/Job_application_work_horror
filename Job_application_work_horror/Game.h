@@ -1,6 +1,6 @@
 // ============================================================================
-// ファイルの役割: ゲーム全体のオブジェクト所有、更新・描画順、シーン遷移を統括します。
-// 主な技術: RAII、unique_ptr、遅延追加・削除、シングルトン、固定更新順
+// ファイルの役割: ゲーム全体のObjectの所有、更新と描画の順番、シーンの切り替えをまとめて管理している。
+// 主な技術: RAII、unique_ptr、Objectの追加・削除の後回し、シングルトン、決まった更新順
 // ============================================================================
 
 #pragma once
@@ -26,6 +26,7 @@
 #include "GpuTimer.h"
 #include "sound.h"
 #include "utility.h"
+// ゲームのシーン（タイトル・1面・2面・リザルト）
 enum class SceneName
 {
     Title,
@@ -38,50 +39,61 @@ class Scene;
 
 namespace Core
 {
-    // ゲームループの最上位クラス。
-    // SceneとObjectの所有権はGameがunique_ptrで保持し、外部へ返す生ポインタは
-    // 「参照専用」として扱います。シーン変更と追加・削除は更新ループ後に遅延実行し、
-    // vector走査中に所有コンテナが変化することを防いでいます。
+    // ゲームループの一番上にあるクラス。
+    // SceneとObjectの所有権はGameがunique_ptrで持ち、外へ返す生ポインタは
+    // 「参照するだけ」のものとして扱っている。シーンの切り替えとObjectの追加・削除は更新ループの後にまとめて行い、
+    // vectorを順に処理している途中で、持ち主の入れ物が変わらないようにしている。
     class Game
     {
     private:
-        // Game自身と現在のSceneは単一所有。明示的なdeleteは行いません。
+        // Game自身と今のSceneは、それぞれ1か所だけが所有している。明示的なdeleteはしていない。
         static std::unique_ptr<Game> m_Instance;
 
+        // 今のシーン、プレイヤーの視点のカメラ、画面効果、影、水面の反射、タイルベースライティング
         std::unique_ptr<Scene> m_Scene;
         Camera m_Camera;
         Effect::PostProcess m_PostProcess;
         Effect::ShadowMap m_ShadowMap;
         Effect::PlanarReflection m_PlanarReflection;
         Effect::TiledLighting m_TiledLighting;
-        // 毎フレームObjectから集める点光源。確保し直しを避けるため使い回します。
+        // 毎フレームObjectから集める点光源。確保し直しを避けるため、同じvectorを使い回している。
         std::vector<ENVIRONMENT_POINT_LIGHT> m_FramePointLights;
+        // 描画の段階ごとのGPU時間の計測、音、音の初期化に成功したか
         GpuTimer m_GpuTimer;
         Sound m_Sound;
         bool m_SoundReady = false;
 
+        // 全Objectの持ち主と、予約されたシーンの切り替え先
         ObjectManager m_ObjectManager;
         std::optional<SceneName> m_PendingScene;
 
+        // プレイの進行と成績、設定、今のシーン
         GameState m_State;
         GameSettings m_Settings;
         SceneName m_CurrentScene = SceneName::Title;
+        // 水面の反射と影を何フレーム目に描き直すかの数え方
         unsigned int m_ReflectionFrameIndex = 0;
         unsigned int m_ShadowFrameIndex = 0;
+		// 前フレームで水面が見えていたか、反射を最後に描いたときのカメラの位置と向き（止まっている間は描き直しを減らすため）
 		bool m_WasReflectionVisible = false;
         DirectX::SimpleMath::Vector3 m_LastReflectionCameraPosition{};
         DirectX::SimpleMath::Vector3 m_LastReflectionCameraForward{ 0.0f, 0.0f, 1.0f };
         bool m_HasReflectionCameraPose = false;
+        // ポーズメニュー
         PauseMenu m_PauseMenu;
 
+        // シーンを実際に切り替えている（前のシーンのObjectを全部解放してから、新しいシーンを作っている）
         void ChangeScene(SceneName sName);
+        // ベスト記録を読み込む・保存する
         void LoadBestRecord();
         void SaveBestRecord() const;
+        // 音量の設定を反映している（ポーズ中は小さくしている）
         void ApplyAudioVolume(bool paused);
-        // 明るさ・演出強度・視点感度をPostProcessとCameraへ反映します。
+        // 明るさ・演出の強さ・視点の感度を、PostProcessとCameraへ反映している。
         void ApplyVisualSettings();
+        // ポーズメニューの開閉と操作を処理している
         void UpdatePauseMenu();
-        // 聞き手と音源の間にある壁・閉じた扉の量（0〜1）を返します。
+        // 聞き手と音源の間にある壁・閉じた扉の量（0〜1）を返している。
         float ComputeSoundOcclusion(
             const DirectX::SimpleMath::Vector3& listener,
             const DirectX::SimpleMath::Vector3& emitter);
@@ -90,30 +102,34 @@ namespace Core
         Game();
         ~Game();
 
-        // 描画デバイスを初期化できなかった場合はfalseを返します。
+        // 描画デバイスを初期化できなかった場合はfalseを返している。
         static bool Init();
-        // 1フレーム分の入力・Scene・Objectの更新と、遅延していた追加・削除・シーン切り替えを行います。
+        // 1フレーム分の入力・Scene・Objectの更新と、後回しにしていた追加・削除・シーンの切り替えを行っている。
         static void Update();
-        // 影・反射などの事前パス、本描画、ポストプロセス、HUDの順に描画します（GameRendering.cpp）。
+        // 影・反射などの事前の描画、本描画、ポストプロセス、HUDの順に描いている（GameRendering.cpp）。
         static void Draw();
+        // 全Objectとシーン、描画・音の仕組みを解放している
         static void Uninit();
 
-        // Sceneが所有する補助カメラへ、現在の3D Objectだけを描画します。
+        // Sceneが持っている補助カメラ（監視カメラなど）の視点で、今の3D Objectだけを描いている。
         void DrawWorldForAuxiliaryCamera(Camera& camera);
 
+        // Gameのただ1つのインスタンスを返している
         static Game* GetInstance();
 
+        // 今のシーンを返している（所有権は渡さない）
         Scene* GetScene() const
         {
             return m_Scene.get();
         }
 
-        // シーン切り替えを予約します。実際の切り替えはUpdateの最後に行うため、
-        // Objectの更新中に呼んでも安全です。同じフレームの2回目以降の予約は無視します。
+        // シーンの切り替えを予約している。実際の切り替えはUpdateの最後に行うため、
+        // Objectの更新中に呼んでも安全。同じフレームの2回目以降の予約は無視している。
         void RequestSceneChange(SceneName sName);
         SceneName GetCurrentSceneName() const { return m_CurrentScene; }
 
-        // 音声初期化に失敗したPCでもゲームを続行できる安全な再生窓口です。
+        // 音の初期化に失敗したPCでも、ゲームを止めずに続けられる安全な再生の窓口。
+        // pitchは再生速度（1で元の高さ）、volumeは音量の倍率
         void PlayAudioCue(SOUND_LABEL label, float pitch = 1.0f, float volume = 1.0f)
         {
             if (m_SoundReady)
@@ -122,8 +138,8 @@ namespace Core
             }
         }
 
-        // ワールド上の位置から鳴らします。カメラとの位置関係で左右・距離・壁越しの聞こえ方が変わります。
-        // minimumOcclusion を指定すると、壁がなくても天井越しのようにこもって聞こえます。
+        // ワールド上の位置から鳴らしている。カメラとの位置関係で、左右・距離・壁越しの聞こえ方が変わる。
+        // minimumOcclusion を指定すると、壁がなくても天井越しのようにこもって聞こえる。
         void PlayAudioCueAt(
             SOUND_LABEL label,
             const DirectX::SimpleMath::Vector3& position,
@@ -137,13 +153,13 @@ namespace Core
             }
         }
 
-        // デバッグ表示用。いま鳴っている位置付きの音の数です。
+        // デバッグ表示用。今鳴っている位置付きの音の数を返している。
         size_t GetActiveSpatialVoiceCount() const
         {
             return m_SoundReady ? m_Sound.GetActiveSpatialVoiceCount() : 0;
         }
 
-        // 環境音のループなど、PlayAudioCueで鳴らした音を止めます。
+        // 環境音のループなど、PlayAudioCueで鳴らした音を止めている。
         void StopAudioCue(SOUND_LABEL label)
         {
             if (m_SoundReady)
@@ -152,22 +168,22 @@ namespace Core
             }
         }
 
-        // --- Objectの生成・破棄・検索（実体はObjectManagerが所有します） ---
-        // 破棄の予約です。実体はUpdateの破棄処理（RemoveDestroyed）で解放されます。
+        // --- Objectの生成・破棄・検索（実体はObjectManagerが所有している） ---
+        // 破棄の予約。実体はUpdateの破棄処理（RemoveDestroyed）で解放している。
         void DeleteObject(Object* pt);
-        // 名前で指定して破棄を予約します。
+        // 名前で指定して破棄を予約している。
         void DestroyObj(const std::string& name);
-        // 全Objectをその場で解放します。シーン切り替え時とGameの終了時だけ使います。
+        // 全Objectをその場で解放している。シーンの切り替え時とGameの終了時だけ使っている。
         void DeleteAllObject();
 
-        // その場で生成します。更新ループの外（SceneのInitなど）で使います。
+        // その場で生成している。更新ループの外（SceneのInitなど）で使っている。
         template<typename T>
         T* AddObject()
         {
             return m_ObjectManager.AddObject<T>();
         }
 
-        // 更新ループの中から生成したいときの予約です。setupは生成直後に呼ばれます。
+        // 更新ループの中から生成したいときの予約。setupは生成した直後に呼ばれる。
         template<typename T, typename Setup>
         void RequestAddObject(Setup&& setup)
         {
@@ -175,23 +191,23 @@ namespace Core
                 std::forward<Setup>(setup));
         }
 
-        // 名前付きで生成します。SceneのInitで配置し、RequireObjで取得し直して使います。
+        // 名前付きで生成している。SceneのInitで配置し、RequireObjで取得し直して使っている。
         template<typename T>
         T* CreateObj(const std::string& name)
         {
             return m_ObjectManager.CreateNamedObject<T>(name);
         }
 
-        // 見つからなくてもよい場合の名前検索です（無い場合はnullptr）。
-        // 必ず存在するはずのObjectにはRequireObjを使い、打ち間違いを起動時に検出します。
+        // 見つからなくてもよい場合の名前の検索（無い場合はnullptrを返している）。
+        // 必ずあるはずのObjectにはRequireObjを使い、名前の打ち間違いを起動時に見つけている。
         template<typename T>
         T* GetObj(const std::string& name)
         {
             return m_ObjectManager.FindNamedObject<T>(name);
         }
 
-        // Sceneの初期化時に、以後使い続けるObjectを取得します。
-        // 名前の打ち間違いや生成漏れは、その場でObject名を示して終了します。
+        // Sceneの初期化時に、その後使い続けるObjectを取得している。
+        // 名前の打ち間違いや生成し忘れがあれば、その場でObjectの名前を表示して終了している。
         template<typename T>
         T* RequireObj(const std::string& name)
         {
@@ -204,14 +220,15 @@ namespace Core
             return object;
         }
 
-        // 指定型のObjectをすべて返します。全Objectを走査するため、頻繁に使う場合は結果を保持します。
+        // 指定した型のObjectをすべて返している。全Objectを調べるため、何度も使う場合は結果を覚えておいて使っている。
         template<typename T>
         std::vector<T*> GetObjects()
         {
             return m_ObjectManager.FindObjects<T>();
         }
 
-        // --- プレイの進行と成績（GameStateへの委譲） ---
+        // --- プレイの進行と成績（GameStateに任せている） ---
+        // 拾ったヒューズの数を増やしている・返している
         void AddItemCount()
         {
             m_State.AddItem();
@@ -222,6 +239,7 @@ namespace Core
             return m_State.GetItemCount();
         }
 
+        // 電力が戻ったかを記録している・返している
         void SetPowerRestored(bool restored)
         {
             m_State.SetPowerRestored(restored);
@@ -232,12 +250,13 @@ namespace Core
             return m_State.IsPowerRestored();
         }
 
+        // ポーズメニューを開いているか
         bool IsPaused() const
         {
             return m_PauseMenu.IsOpen();
         }
 
-        // --- 設定値（GameSettingsへの委譲）。値はポーズメニューの段階番号です ---
+        // --- 設定値（GameSettingsに任せている）。値はポーズメニューの段階の番号 ---
         int GetBrightnessLevel() const
         {
             return m_Settings.GetBrightnessLevel();
@@ -263,19 +282,20 @@ namespace Core
             return m_Settings.GetResolutionLevel();
         }
 
-        // falseのとき、Sceneは目的表示と目的地ガイドを出しません。
+        // falseのとき、Sceneは目的の文章と目的地の矢印を出さない。
         bool IsGuideEnabled() const
         {
             return m_Settings.IsGuideEnabled();
         }
 
-        // ポーズメニューで選択中の項目番号です（HUDの強調表示に使います）。
+        // ポーズメニューで選んでいる項目の番号を返している（HUDで強調して表示するのに使っている）。
         int GetPauseSettingIndex() const
         {
             return m_PauseMenu.GetSelectedIndex();
         }
 
-        // --- 結果画面・ベスト記録用の成績 ---
+        // --- リザルト画面・ベスト記録用の成績 ---
+        // 前回クリアしたときのタイムと、今のプレイの経過時間
         float GetLastClearTimeSeconds() const
         {
             return m_State.GetLastClearTimeSeconds();
@@ -286,6 +306,7 @@ namespace Core
             return m_State.GetRunTimeSeconds();
         }
 
+        // クリアの記録があるか、ベストタイム、ベストの捕まった回数、今のプレイで捕まった回数
         bool HasClearRecord() const
         {
             return m_State.HasClearRecord();
@@ -306,6 +327,7 @@ namespace Core
             return m_State.GetCaughtCount();
         }
 
+        // 前回のプレイがベストタイム・ベストの捕まった回数を更新したか
         bool IsLastRunBestTime() const
         {
             return m_State.IsLastRunBestTime();
@@ -316,11 +338,14 @@ namespace Core
             return m_State.IsLastRunBestCaught();
         }
 
+        // 捕まった回数を増やしている
         void RegisterCaught()
         {
             m_State.RegisterCaught();
         }
 
+        // リザルト画面に出す成績と「今回の発見」の記録（異変を解いた数・パズルの失敗・充電器を使った回数・
+        // 残された記録・読んだ壁の文字・隠し部屋から脱出したか・2面で出た異変）
         void RegisterAnomalyHandled() { m_State.RegisterAnomalyHandled(); }
         void RegisterPuzzleMistake() { m_State.RegisterPuzzleMistake(); }
         void RegisterChargerUsed() { m_State.RegisterChargerUsed(); }
@@ -337,7 +362,7 @@ namespace Core
         int GetStage2FirstAnomaly() const { return m_State.GetStage2FirstAnomaly(); }
         int GetStage2SecondAnomaly() const { return m_State.GetStage2SecondAnomaly(); }
 
-        // --- 描画システムへのアクセス。所有権はGameにあり、返すポインタは非所有です ---
+        // --- 描画の仕組みへのアクセス。所有権はGameにあり、返すポインタは所有しない ---
         Camera* GetCamera()
         {
             return &m_Camera;
