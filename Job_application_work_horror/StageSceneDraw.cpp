@@ -198,6 +198,9 @@ Stage1ObjectiveInput StageScene::MakeObjectiveInput() const
     input.fuseWatcherNotice = m_FuseWatcherNoticeTimer > 0.0f;
     input.loopNotice = m_LoopNoticeTimer > 0.0f;
     input.hiddenRoomText = m_HiddenRoom.GetObjectiveText();
+    input.archiveStalkerText = m_ArchiveStalkerNoticeTimer > 0.0f
+        ? m_ArchiveStalkerNotice
+        : std::string_view{};
     input.westWingStep = static_cast<int>(m_WestWing.GetStep());
     return input;
 }

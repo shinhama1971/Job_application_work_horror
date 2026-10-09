@@ -49,6 +49,8 @@ struct StageObjects
     ShadowMan* storageShadow = nullptr;
     ShadowMan* evidenceShadow = nullptr;
     ShadowMan* exitOmen = nullptr;
+    // 書類保管室の「照らすと止まる影」（位置はStage1LightStalkerが決めている）
+    ShadowMan* archiveStalker = nullptr;
     // スイッチ類（非常用充電器・監視カメラの端末・出口の送電盤）
     FuseBox* emergencyCharger = nullptr;
     FuseBox* evidenceTerminal = nullptr;

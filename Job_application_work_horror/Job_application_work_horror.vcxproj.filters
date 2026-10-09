@@ -587,6 +587,9 @@
     <ClInclude Include="Stage1HiddenRoomEvent.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
+    <ClInclude Include="Stage1LightStalker.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
     <ClInclude Include="Stage1WestWing.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>

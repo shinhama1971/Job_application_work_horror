@@ -16,10 +16,13 @@
 #include "Stage1Objective.h"
 #include "Stage1AmbientSounds.h"
 #include "TensionPulse.h"
+#include "Stage1LightStalker.h"
 
 #include <array>
 #include <cstddef>
 #include <random>
+#include <string_view>
+#include <vector>
 
 class Player;
 class ShadowMan;
@@ -51,6 +54,10 @@ private:
     float ComputeThreatRate(const class Player& player) const;
     // 危険度に合わせて、自分の心拍音と呼吸音を鳴らしている。
     void UpdateTensionPulse(const class Player& player, float deltaTime);
+    // 書類保管室の「照らすと止まる影」を進め、表示・足音・触れられたときの電池の減少を行っている。
+    void UpdateArchiveStalker(class Player& player, float deltaTime);
+    // 点が懐中電灯で照らされているか（光の円の中にあり、間に壁や扉がないか）を返している。
+    bool IsLitByFlashlight(const class Player& player, const DirectX::SimpleMath::Vector3& target) const;
 
     // 配置で作った、進行で使うObject
     StageObjects m_Objects;
@@ -90,6 +97,14 @@ private:
     Stage1WestWing m_WestWing;
     // 西棟で鳴らす物音（使い回している）
     std::vector<AmbientSoundCue> m_WestWingCues;
+    // 書類保管室の「照らすと止まる影」。動きのルールはこのクラス、影の表示・音・電池はSceneが行っている。
+    Stage1LightStalker m_ArchiveStalker;
+    // 照らされているかの判定と、影を棚や壁から押し戻すのに使う壁と扉（Sceneの初期化時に一度だけ集めている）
+    std::vector<class Wall*> m_StalkerWalls;
+    std::vector<class Door*> m_StalkerDoors;
+    // 影についての知らせの文章と、その残り秒数
+    std::string_view m_ArchiveStalkerNotice;
+    float m_ArchiveStalkerNoticeTimer = 0.0f;
     // 照明の演出・電力の演出・出口の前兆の、時間と段階
     ScareLightSequence m_ScareLightSequence;
     StagePowerSequence m_PowerSequence;

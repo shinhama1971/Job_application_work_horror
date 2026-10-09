@@ -360,6 +360,7 @@
     <ClInclude Include="FlashlightRig.h" />
     <ClInclude Include="Stage1KeypadDoor.h" />
     <ClInclude Include="Stage1HiddenRoomEvent.h" />
+    <ClInclude Include="Stage1LightStalker.h" />
     <ClInclude Include="Stage1WestWing.h" />
     <ClInclude Include="KeyItem.h" />
     <ClInclude Include="Locker.h" />
