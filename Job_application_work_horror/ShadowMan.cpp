@@ -140,6 +140,25 @@ void ShadowMan::Update()
 
     const float deltaTime = Application::GetDeltaTime();
     m_Age += deltaTime;
+
+    // 位置を外から決めている影は、時間切れ・追う動き・見られて崩れる反応をせず、プレイヤーの方を向くだけにしている
+    if (m_ExternallyControlled)
+    {
+        if (m_Player == nullptr)
+        {
+            m_Player = Core::Game::GetInstance()->GetObj<Player>("Player");
+        }
+        if (m_Player != nullptr)
+        {
+            const Vector3 toPlayer = m_Player->GetPosition() - m_Position;
+            if (toPlayer.x * toPlayer.x + toPlayer.z * toPlayer.z > 0.0001f)
+            {
+                m_Rotation.y = std::atan2(toPlayer.x, toPlayer.z);
+            }
+        }
+        return;
+    }
+
     m_LifeTime -= deltaTime;
     // 時間切れになったら、非表示にするか破棄している
     if (m_LifeTime <= 0.0f)

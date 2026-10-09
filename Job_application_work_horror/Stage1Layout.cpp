@@ -615,6 +615,12 @@ namespace Stage1Layout
         objects.hiddenRoom.record = hiddenRoomRecord;
         objects.hiddenRoom.shadow = hiddenRoomShadow;
 
+        // 書類保管室の「照らすと止まる影」。最初は出さず、位置はStage1LightStalkerが毎フレーム決めている。
+        ShadowMan* archiveStalker = builder.Create<ShadowMan>("Stage1ArchiveStalker");
+        archiveStalker->SetExternallyControlled(true);
+        archiveStalker->SetActive(false);
+        objects.archiveStalker = archiveStalker;
+
         // 出口（出口の扉の前。電力が戻るまでは調べられない）
         ExitTrigger* exit = builder.Create<ExitTrigger>("ExitTrigger");
         exit->SetPosition(207.0f, -80.0f, 307.5f);

@@ -40,6 +40,13 @@ public:
 	// CastsShadowがtrueのObjectだけ、懐中電灯のシャドウマップへ深度を描いている。
 	virtual void DrawShadow() {}
 	virtual bool CastsShadow() const { return false; }
+	// trueのObjectだけ、本描画の前にプレイヤー視点の深度を本描画の深度バッファへ描いている（深度プリパス）。
+	// ・本描画では、奥に隠れた画素の重いピクセルシェーダーを、深度の判定で先に捨てられる（重なり描きを減らす）。
+	// ・タイルベースライティングでは、タイルごとの一番奥の深度より奥の光源を外している。
+	// 不透明で、clip・discardをせず、本描画と同じ頂点シェーダー・同じ行列で描ける物だけがtrueを返す。
+	// 同じシェーダー・同じ入力なら深度が完全に一致するため、本描画の深度の判定（LESS_EQUAL）を必ず通る。
+	virtual bool WritesDepthPrepass() const { return false; }
+	virtual void DrawDepthPrepass(Camera* cam) { (void)cam; }
 	// 描画への参加の可否は、型で判定するのではなく、各Object自身が宣言している。
 	// trueなら視錐台の外にあるとき描画を省いている（HUDや全画面の効果はfalseのまま）。
 	virtual bool UsesCameraCulling() const { return false; }

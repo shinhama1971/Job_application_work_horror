@@ -523,6 +523,23 @@ void Door::DrawShadow()
     context->DrawIndexed(static_cast<UINT>(m_DoorIndexCount), 0, 0);
 }
 
+// 深度プリパス：本描画と同じ頂点シェーダー・同じ行列で、扉の本体の深度だけを描いている
+void Door::DrawDepthPrepass(Camera* camera)
+{
+    camera->SetCamera();
+
+    Matrix world = GetDoorWorldMatrix();
+    Renderer::SetWorldMatrix(&world);
+
+    ID3D11DeviceContext* context = Renderer::GetDeviceContext();
+    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_Shader.SetGPU();
+    context->PSSetShader(nullptr, nullptr, 0);
+    m_VertexBuffer.SetGPU();
+    m_IndexBuffer.SetGPU();
+    context->DrawIndexed(static_cast<UINT>(m_DoorIndexCount), 0, 0);
+}
+
 // 頂点データを解放している
 void Door::Uninit()
 {

@@ -176,6 +176,19 @@ void Ground::Update()
 	// 水面の乱れは約2.4秒で収まる
 	m_PowerSurge = (std::max)(0.0f, m_PowerSurge - deltaTime * 0.42f);
 	m_WaterEffects.Update(deltaTime);
+
+	// 浸水した範囲があれば、水面で跳ね返った懐中電灯の光を壁や天井に揺らして映している（waterCaustics.hlsli）。
+	// 範囲がない面（2面など）は強さを0にし、壁のシェーダーで計算しないようにしている。
+	const bool hasFlood = m_WaterEffects.HasFloodRegion();
+	Renderer::SetWaterCaustics(
+		hasFlood
+			? DirectX::SimpleMath::Vector4(
+				m_WaterEffects.GetFloodMin().x, m_WaterEffects.GetFloodMin().y,
+				m_WaterEffects.GetFloodMax().x, m_WaterEffects.GetFloodMax().y)
+			: DirectX::SimpleMath::Vector4(1.0f, 1.0f, 0.0f, 0.0f),
+		m_Position.y,
+		m_WetTime,
+		hasFlood ? 1.0f : 0.0f);
 }
 
 //=======================================
@@ -186,14 +199,9 @@ void Ground::Draw(Camera* cam)
 	// プレイヤーの視点の行列を設定している
 	cam->SetCamera();
 
-	// 拡大・回転・移動の行列を作っている
-	Matrix r = Matrix::CreateFromYawPitchRoll(m_Rotation.x, m_Rotation.y, m_Rotation.z);
-	Matrix t = Matrix::CreateTranslation(m_Position.x, m_Position.y, m_Position.z);
-	Matrix s = Matrix::CreateScale(m_Scale.x, m_Scale.y, m_Scale.z);
-
-	Matrix worldmtx;
-	worldmtx = s * r * t;
-	Renderer::SetWorldMatrix(&worldmtx); // GPUへ設定している
+	// 拡大・回転・移動の行列を作り、GPUへ設定している
+	Matrix worldmtx = MakeWorldMatrix();
+	Renderer::SetWorldMatrix(&worldmtx);
 
 	// デバイスコンテキストを取得している
 	ID3D11DeviceContext* devicecontext;
@@ -240,10 +248,42 @@ void Ground::Draw(Camera* cam)
 }
 
 //=======================================
+// ワールド行列：拡大・回転・移動の順に掛けている
+//=======================================
+Matrix Ground::MakeWorldMatrix() const
+{
+	Matrix r = Matrix::CreateFromYawPitchRoll(m_Rotation.x, m_Rotation.y, m_Rotation.z);
+	Matrix t = Matrix::CreateTranslation(m_Position.x, m_Position.y, m_Position.z);
+	Matrix s = Matrix::CreateScale(m_Scale.x, m_Scale.y, m_Scale.z);
+	return s * r * t;
+}
+
+//=======================================
+// 深度プリパス：本描画と同じ頂点シェーダー・同じ行列で、床の面の深度だけを描いている
+//=======================================
+void Ground::DrawDepthPrepass(Camera* cam)
+{
+	cam->SetCamera();
+	Matrix worldmtx = MakeWorldMatrix();
+	Renderer::SetWorldMatrix(&worldmtx);
+
+	ID3D11DeviceContext* devicecontext = Renderer::GetDeviceContext();
+	devicecontext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	// ピクセルシェーダーを外し、深度だけを書いている
+	m_Shader.SetGPU();
+	devicecontext->PSSetShader(nullptr, nullptr, 0);
+	m_VertexBuffer.SetGPU();
+	m_IndexBuffer.SetGPU();
+	devicecontext->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
+}
+
+//=======================================
 // 終了処理：水の効果と定数バッファを解放している
 //=======================================
 void Ground::Uninit()
 {
+	// 次のシーンに水面の光の揺らぎが残らないよう、効果を消している
+	Renderer::SetWaterCaustics(DirectX::SimpleMath::Vector4(1.0f, 1.0f, 0.0f, 0.0f), 0.0f, 0.0f, 0.0f);
 	m_WaterEffects.Uninit();
 	m_WetFloorBuffer.Reset();
 }

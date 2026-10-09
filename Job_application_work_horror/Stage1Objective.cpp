@@ -56,6 +56,11 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         // 隠し部屋に閉じ込められている間は、その場の状況だけを伝えている。
         objectiveText = std::string(in.hiddenRoomText);
     }
+    else if (!in.archiveStalkerText.empty())
+    {
+        // 照らすと止まる影が現れた・触れられたときの知らせは、短い間だけ普段の目的より優先している。
+        objectiveText = std::string(in.archiveStalkerText);
+    }
     else if (in.patrolDispatched)
     {
         // 現地確認の間の残り時間と、光で消した割合は毎フレーム変わるため、ここで文章を組み立てている。

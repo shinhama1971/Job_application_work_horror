@@ -37,6 +37,10 @@
 | HUDの日本語の文字の不具合修正（小さい字「ュ」や「ー」が上に寄る、細い線が消えて字が崩れる） | `Hud.*`（`AddText`） | 原因の特定・修正 | |
 | 描画解像度の設定（内蔵GPUでは自動で縮小）と、画面の拡大率への対応（HUDを画面の大きさに合わせて拡大縮小） | `Application.*`, `Renderer.*`, `RendererState.cpp`, `GameSettings.*`, `PauseMenu.*`, `Hud.*`, `HudScreens.cpp`, `Camera.cpp` | 実装 | 方針の選択 |
 | Compute Shaderによるタイルベースライティング | `TiledLighting.*`, `shader/tiledLightCullingCS.hlsl`, `shader/common.hlsl` | 実装（授業資料の内容を元に、作者の依頼で組み込み） | 授業資料の提供 |
+| 深度プリパス（Zプリパス）と、タイルの一番奥の深度による光源の絞り込み。計測モードで地点ごとの画面を保存し、導入前後を画素単位で比較 | `Object.h`, `Wall.*`, `Ground.*`, `Door.*`, `GameRendering.cpp`, `TiledLighting.*`, `shader/tiledLightCullingCS.hlsl`, `Renderer.*`, `CaptureMode.cpp` | 計測・実装・見た目の比較 | 方針の選択（深度の範囲で光源を絞る） |
+| Compute Shaderによる自動露出（画面の明るさを測り、目が暗さ・明るさに慣れる） | `PostProcess.*`, `FullScreenQuad.*`, `shader/autoExposureCS.hlsl`, `shader/exposurePS.hlsl`, `DebugUI.*`, `Game.cpp` | 実装 | 方針の選択（自動露出） |
+| 懐中電灯の影を手元から作る変更と、PCSS（影の縁を距離で柔らかくする）、濡れた床の反射のむら、西棟の水面の光の揺らぎ（コースティクス）。撮影モードに書類保管室を追加 | `FlashlightRig.h`, `ShadowMap.cpp`, `shader/flashlightShadow.hlsli`, `shader/wetFloorPS.hlsl`, `shader/waterCaustics.hlsli`, `shader/litTexturePS.hlsl`, `Renderer.*`, `RendererState.cpp`, `Ground.cpp`, `CaptureMode.cpp` | 実装・見た目の比較 | 方針の選択（1面のグラフィックの追加） |
+| 1面の書類保管室の「照らすと止まる影」 | `Stage1LightStalker.h`, `ShadowMan.*`, `Stage1Layout.*`, `StageScene*.cpp`, `StageScene.h`, `Stage1Objective.*` | 実装 | 方針の選択（遊びの追加） |
 | X3DAudioによる立体音響（壁越しの音をこもらせる処理を含む） | `sound.*`, `Game.cpp` | 実装 | |
 | 1面の姿の見えない物音（天井裏の足音・配管の音・遠くの扉） | `Stage1AmbientSounds.*` | 実装 | 1面の演出を増やしたいという発案 |
 | 1面の懐中電灯で照らすと浮かぶ壁の文字（目を離すと書き換わる文字を含む） | `FlashlightWriting.*`, `Stage1WallWritings.*`, `shader/flashlightRevealPS.hlsl` | 実装 | |

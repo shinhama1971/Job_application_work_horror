@@ -68,7 +68,7 @@ namespace
         return std::atan2(toX - fromX, toZ - fromZ);
     }
 
-    // 1面: 開始地点 → 中央ホール → 左の倉庫 → 暗証番号の扉 → ループ廊下 → 西棟（浸水した機械室）
+    // 1面: 開始地点 → 中央ホール → 左の倉庫 → 暗証番号の扉 → ループ廊下 → 西棟（浸水した機械室） → 書類保管室
     const std::vector<Keyframe> Stage1Tour =
     {
         { 0.0f, Vector3(0.0f, FloorY, -120.0f), Pi, -0.12f, nullptr, false },
@@ -99,6 +99,14 @@ namespace
         { 72.5f, Vector3(-240.0f, FloorY, 195.0f), -Pi * 0.4f, -0.10f, nullptr, false },
         { 75.0f, Vector3(-280.0f, FloorY, 210.0f), YawToward(-280.0f, 210.0f, -345.0f, 235.0f), -0.15f, L"05c_1面_西棟のポンプ室", false },
         { 77.0f, Vector3(-285.0f, FloorY, 212.0f), YawToward(-285.0f, 212.0f, -345.0f, 235.0f), -0.15f, nullptr, false },
+        // 書類保管室（棚が並ぶ迷路）。棚の間から奥を向き、懐中電灯の影（手元から作る影と、距離で柔らかくなる縁）を写している。
+        { 77.05f, Vector3(-60.0f, FloorY, 115.0f), YawToward(-60.0f, 115.0f, -200.0f, 118.0f), -0.12f, nullptr, false },
+        { 79.5f, Vector3(-62.0f, FloorY, 115.0f), YawToward(-62.0f, 115.0f, -200.0f, 118.0f), -0.12f, L"05d_1面_書類保管室の棚と影", false },
+        // 入ってから4秒で「照らすと止まる影」が部屋の奥に現れ、光の外を回り込んで近づき、ライトの中に入ると止まる。
+        { 81.0f, Vector3(-62.0f, FloorY, 115.0f), YawToward(-62.0f, 115.0f, -200.0f, 118.0f), -0.12f, nullptr, false },
+        { 84.0f, Vector3(-62.0f, FloorY, 115.0f), YawToward(-62.0f, 115.0f, -200.0f, 118.0f), -0.12f, L"05e_1面_書類保管室の照らすと止まる影", false },
+        { 87.0f, Vector3(-62.0f, FloorY, 115.0f), YawToward(-62.0f, 115.0f, -200.0f, 118.0f), -0.12f, L"05f_1面_照らされて止まった影", false },
+        { 88.5f, Vector3(-62.0f, FloorY, 115.0f), YawToward(-62.0f, 115.0f, -200.0f, 118.0f), -0.12f, nullptr, false },
     };
 
     // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉
@@ -783,6 +791,8 @@ namespace Tools::CaptureMode
         {
             player->SetPosition(pose.Position);
         }
+        // 道順の途中で電池が切れて懐中電灯が消えないよう、電池を満タンに保っている（計測モードと同じ）
+        player->AddBattery(100.0f);
         player->SetFlashlightOn(true);
         camera->SetCameraDirection(pose.Yaw);
         camera->SetCameraPitch(pose.Pitch);
@@ -791,16 +801,28 @@ namespace Tools::CaptureMode
     // 描き終えた画面をGPUからCPUへ読み戻し、動画のフレームとスクリーンショットとして保存している
     void OnFrameRendered(ID3D11DeviceContext* context, ID3D11Texture2D* backBuffer)
     {
-        // 計測モードは画面を保存していない（読み戻しの時間が計測に混ざらないように）。
+        // 計測モードは、計測する区間では画面を保存していない（読み戻しの時間が計測に混ざらないように）。
         if (g_Benchmark)
         {
             if (g_AdapterName.empty() && context != nullptr)
             {
                 RecordAdapterName(context);
             }
-            // 最初の地点で1枚だけ画面を保存し、描画解像度とHUDの見え方を確認できるようにしている（捨てる区間の中なので計測には影響しない）。
-            if (g_BenchmarkSpot == 0 && g_BenchmarkFrame == BenchmarkWarmupFrames / 2 &&
-                context != nullptr && backBuffer != nullptr)
+            // 最初の地点のライトOFFと、各地点のライトONで1枚ずつ画面を保存している。描画解像度とHUDの見え方に加え、
+            // 描画の処理を変えたときに見た目が変わっていないかを、地点ごとに比べられるようにしている。
+            // どちらも捨てる区間の中なので、読み戻しの時間は計測に混ざらない。
+            const int phaseLength = BenchmarkWarmupFrames + BenchmarkMeasureFrames;
+            std::wstring screenName;
+            if (g_BenchmarkSpot == 0 && g_BenchmarkFrame == BenchmarkWarmupFrames / 2)
+            {
+                screenName = L"benchmark_screen.png";
+            }
+            else if (g_BenchmarkSpot < BenchmarkSpots.size() &&
+                g_BenchmarkFrame == phaseLength + BenchmarkWarmupFrames / 2)
+            {
+                screenName = L"benchmark_spot" + std::to_wstring(g_BenchmarkSpot) + L"_light_on.png";
+            }
+            if (!screenName.empty() && context != nullptr && backBuffer != nullptr)
             {
                 // CPUから読めるステージングテクスチャを作り、バックバッファをコピーして読み出している
                 D3D11_TEXTURE2D_DESC description{};
@@ -819,7 +841,7 @@ namespace Tools::CaptureMode
                     context->CopyResource(staging.Get(), backBuffer);
                     if (SUCCEEDED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped)))
                     {
-                        SavePng((g_OutputDirectory / L"benchmark_screen.png").wstring(),
+                        SavePng((g_OutputDirectory / screenName).wstring(),
                             static_cast<const BYTE*>(mapped.pData), mapped.RowPitch,
                             description.Width, description.Height);
                         context->Unmap(staging.Get(), 0);

@@ -357,8 +357,10 @@
     <ClInclude Include="Stage1AmbientSounds.h" />
     <ClInclude Include="Stage1WallWritings.h" />
     <ClInclude Include="FlashlightWriting.h" />
+    <ClInclude Include="FlashlightRig.h" />
     <ClInclude Include="Stage1KeypadDoor.h" />
     <ClInclude Include="Stage1HiddenRoomEvent.h" />
+    <ClInclude Include="Stage1LightStalker.h" />
     <ClInclude Include="Stage1WestWing.h" />
     <ClInclude Include="KeyItem.h" />
     <ClInclude Include="Locker.h" />
@@ -390,6 +392,7 @@
     <ClInclude Include="shader\flashlightShadow.hlsli" />
     <ClInclude Include="shader\flashlightLighting.hlsli" />
     <ClInclude Include="shader\roomOcclusion.hlsli" />
+    <ClInclude Include="shader\waterCaustics.hlsli" />
     <ClInclude Include="shader\surfaceDetail.hlsli" />
   </ItemGroup>
   <ItemGroup>
@@ -415,6 +418,9 @@
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\bloomExtractCS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\autoExposureCS.hlsl">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\hudPS.hlsl">

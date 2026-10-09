@@ -20,6 +20,7 @@
 #include "ScreenDustOverlay.h"
 #include "ScareTrigger.h"
 #include "ShadowMan.h"
+#include "Camera.h"
 #include "TensionPulseFeedback.h"
 #include <SimpleMath.h>
 #include <algorithm>
@@ -811,6 +812,7 @@ float StageScene::ComputeThreatRate(const Player& player) const
         m_Objects.evidenceShadow,
         m_Objects.exitOmen,
         m_Objects.hiddenRoom.shadow,
+        m_Objects.archiveStalker,
     };
     float threatRate = 0.0f;
     for (const ShadowMan* shadow : shadows)
@@ -837,4 +839,130 @@ void StageScene::UpdateTensionPulse(const Player& player, float deltaTime)
 {
     // 1面には隠れる場所がないため、隠れている扱いにはしていない。
     PlayTensionPulse(m_TensionPulse.Update(deltaTime, ComputeThreatRate(player), false));
+}
+
+// 点が懐中電灯で照らされているかを返している。
+// 光の円（外側29度）の縁は暗いため、視線の中心から22度以内を「照らしている」としている。
+bool StageScene::IsLitByFlashlight(const Player& player, const Vector3& target) const
+{
+    if (!player.IsFlashlightOn())
+    {
+        return false;
+    }
+
+    Camera* camera = Core::Game::GetInstance()->GetCamera();
+    const Vector3 eye = camera->GetPosition();
+    Vector3 toTarget = target - eye;
+    const float distance = toTarget.Length();
+    // 懐中電灯の光が届く距離（約275）より少し手前までにしている
+    if (distance < 0.001f || distance > 240.0f)
+    {
+        return false;
+    }
+    toTarget /= distance;
+    Vector3 forward = camera->GetForward();
+    forward.Normalize();
+    if (forward.Dot(toTarget) < 0.927f)
+    {
+        return false;
+    }
+
+    // 間に壁・棚・閉じた扉があれば、光は届いていない。
+    // 線分の終点は目標の少し手前にし、目標のすぐ近くの棚の面に当たって照らされない扱いになるのを防いでいる。
+    const Vector3 end = eye + toTarget * (distance - 4.0f);
+    float hitDistance = 0.0f;
+    for (const Wall* wall : m_StalkerWalls)
+    {
+        if (wall->IntersectsInteractionSegment(eye, end, hitDistance))
+        {
+            return false;
+        }
+    }
+    for (const Door* door : m_StalkerDoors)
+    {
+        if (door->BlocksSoundSegment(eye, end))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+// 書類保管室の「照らすと止まる影」を1フレーム進めている。
+// 動きのルールはStage1LightStalkerが決め、ここでは照らされているかの判定と、表示・音・電池の変化を行っている。
+void StageScene::UpdateArchiveStalker(Player& player, float deltaTime)
+{
+    ShadowMan* shadow = m_Objects.archiveStalker;
+    if (shadow == nullptr)
+    {
+        return;
+    }
+    Core::Game* game = Core::Game::GetInstance();
+    m_ArchiveStalkerNoticeTimer = (std::max)(0.0f, m_ArchiveStalkerNoticeTimer - deltaTime);
+
+    Stage1LightStalker::FrameInput input;
+    input.PlayerPosition = player.GetPosition();
+    // 電力が戻った後と、隠し部屋に閉じ込められている間は出さない
+    input.Enabled = !game->IsPowerRestored() && !m_HiddenRoom.IsTrapped();
+    // 照らされているかは、影の胸のあたり（足元から17）で判定している（ShadowManの「見られたか」と同じ高さ）
+    input.Lit = m_ArchiveStalker.IsActive() &&
+        IsLitByFlashlight(player, shadow->GetPosition() + Vector3(0.0f, 17.0f, 0.0f));
+    input.DeltaTime = deltaTime;
+
+    // 影は棚・壁・閉じた扉を通り抜けず、押し戻されて沿うように回り込む
+    const Stage1LightStalker::FrameResult result = m_ArchiveStalker.Update(
+        input,
+        [this](Vector3& position, float radius)
+        {
+            for (const Wall* wall : m_StalkerWalls)
+            {
+                wall->ResolveCollision(position, radius);
+            }
+            for (const Door* door : m_StalkerDoors)
+            {
+                door->ResolveCollision(position, radius);
+            }
+        });
+
+    // 影の位置と表示を、ルールの結果に合わせている
+    if (result.Visible)
+    {
+        shadow->SetPosition(result.Position.x, result.Position.y, result.Position.z);
+    }
+    if (shadow->IsActive() != result.Visible)
+    {
+        shadow->SetActive(result.Visible);
+    }
+
+    // 現れたとき：天井近くで低く配管の音を鳴らして気配を知らせ、初めてのときは遊び方を伝えている
+    if (result.Appeared)
+    {
+        game->PlayAudioCueAt(
+            SOUND_CUE_PIPE_KNOCK, result.Position + Vector3(0.0f, 20.0f, 0.0f), 0.55f, 1.4f);
+        m_ArchiveStalkerNotice = result.FirstAppearance
+            ? "棚の間に何かいる ライトで照らすと動かない"
+            : "また棚の間に何かいる";
+        m_ArchiveStalkerNoticeTimer = result.FirstAppearance ? 4.5f : 2.6f;
+    }
+
+    // 光が外れて近づいている間は、影の足元から重い足音を鳴らしている（立体音響で、見えなくても方向が分かる）
+    if (result.Step)
+    {
+        game->PlayAudioCueAt(
+            SOUND_CUE_FOOTSTEP, result.Position + Vector3(0.0f, 4.0f, 0.0f), 0.74f, 1.6f);
+    }
+
+    // 触れられたとき：懐中電灯の電池を奪っている（5%は残し、完全には空にしない）
+    if (result.Caught)
+    {
+        constexpr float BatteryPenalty = 30.0f;
+        const float taken = (std::min)(
+            BatteryPenalty, (std::max)(0.0f, player.GetBattery() - 5.0f));
+        player.AddBattery(-taken);
+        game->PlayAudioCue(SOUND_CUE_SCARE, 0.9f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.72f, 0.55f);
+        Input::SetVibration(14, 0.36f);
+        m_ArchiveStalkerNotice = "影に触れられた 電池を奪われた";
+        m_ArchiveStalkerNoticeTimer = 2.8f;
+    }
 }

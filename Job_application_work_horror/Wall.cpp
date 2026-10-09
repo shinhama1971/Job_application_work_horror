@@ -116,6 +116,19 @@ void Wall::Update()
 {
 }
 
+// 拡大・回転・移動の順に掛けたワールド行列を返している
+Matrix Wall::MakeWorldMatrix() const
+{
+    const Matrix rotation = Matrix::CreateFromYawPitchRoll(
+        m_Rotation.y,
+        m_Rotation.x,
+        m_Rotation.z
+    );
+    const Matrix scale = Matrix::CreateScale(m_Scale);
+    const Matrix translation = Matrix::CreateTranslation(m_Position);
+    return scale * rotation * translation;
+}
+
 // 箱を描いている（非表示なら何もしない）
 void Wall::Draw(Camera* cam)
 {
@@ -126,14 +139,7 @@ void Wall::Draw(Camera* cam)
 
     cam->SetCamera();
 
-    const Matrix rotation = Matrix::CreateFromYawPitchRoll(
-        m_Rotation.y,
-        m_Rotation.x,
-        m_Rotation.z
-    );
-    const Matrix scale = Matrix::CreateScale(m_Scale);
-    const Matrix translation = Matrix::CreateTranslation(m_Position);
-    Matrix world = scale * rotation * translation;
+    Matrix world = MakeWorldMatrix();
     Renderer::SetWorldMatrix(&world);
 
     ID3D11DeviceContext* context = Renderer::GetDeviceContext();
@@ -155,17 +161,34 @@ void Wall::DrawShadow()
         return;
     }
 
-    const Matrix rotation = Matrix::CreateFromYawPitchRoll(
-        m_Rotation.y,
-        m_Rotation.x,
-        m_Rotation.z);
-    Matrix world = Matrix::CreateScale(m_Scale) * rotation *
-        Matrix::CreateTranslation(m_Position);
+    Matrix world = MakeWorldMatrix();
     Renderer::SetWorldMatrix(&world);
 
     ID3D11DeviceContext* context = Renderer::GetDeviceContext();
     context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     Core::Game::GetInstance()->GetShadowMap()->SetShader();
+    m_VertexBuffer.SetGPU();
+    m_IndexBuffer.SetGPU();
+    context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
+}
+
+// 深度プリパス：本描画と同じ頂点シェーダー・同じ行列で、深度だけを描いている（ピクセルシェーダーは外している）
+void Wall::DrawDepthPrepass(Camera* cam)
+{
+    if (!WritesDepthPrepass())
+    {
+        return;
+    }
+
+    cam->SetCamera();
+
+    Matrix world = MakeWorldMatrix();
+    Renderer::SetWorldMatrix(&world);
+
+    ID3D11DeviceContext* context = Renderer::GetDeviceContext();
+    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_Shader.SetGPU();
+    context->PSSetShader(nullptr, nullptr, 0);
     m_VertexBuffer.SetGPU();
     m_IndexBuffer.SetGPU();
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);

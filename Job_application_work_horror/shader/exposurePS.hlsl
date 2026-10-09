@@ -1,5 +1,6 @@
 // ============================================================================
 // シェーダーの役割: 露出（目の慣れ）と暗い部分の持ち上げを計算し、暗い場所でも進める明るさにしている。
+// 露出は、シーンが決めた値に、自動露出（autoExposureCS.hlsl）が画面の明るさから求めた倍率を掛けて使っている。
 // 定数バッファのスロットと入出力の形は、CPU側の定義と一致させている。
 // ============================================================================
 
@@ -32,6 +33,9 @@ cbuffer TimeBuffer : register(b0)
 Texture2D sceneTexture : register(t0);
 SamplerState sceneSampler : register(s0);
 
+// 自動露出の結果（autoExposureCS.hlslが書いている）。[0]は慣れた明るさ、[1]は露出の倍率
+StructuredBuffer<float> AutoExposureState : register(t3);
+
 // 元の画面に「足す分の明るさ」だけを返している（加算合成で画面に足される）
 float4 main(PS_IN input) : SV_TARGET
 {
@@ -56,11 +60,14 @@ float4 main(PS_IN input) : SV_TARGET
             saturate(input.uv - localOffset),
             0.0f).rgb) * (1.0f / 3.0f);
 
+    // シーンが決めた露出（演出の意図）に、実際の画面の明るさから求めた目の慣れの倍率を掛けている。
+    const float adaptedExposure = exposure * AutoExposureState[1];
+
     // 驚かせる演出の間は、画面を一瞬明るくしている。上限を設けて、
     // 目の慣れでこの後に描くUIが白く飛ばないようにしている。
     const float eventExposure = horrorPulseStrength * 0.08f;
     const float exposureGain =
-        max(exposure + eventExposure - 1.0f, 0.0f);
+        max(adaptedExposure + eventExposure - 1.0f, 0.0f);
     const float3 adaptationLight = scene * exposureGain;
 
     // 緊張が高まるほど、深い影の一部だけを持ち上げている。これで冷たい霧のように
@@ -79,7 +86,7 @@ float4 main(PS_IN input) : SV_TARGET
     const float centerPriority =
         1.0f - smoothstep(0.18f, 0.76f, length(centered));
     const float adaptationRequest = saturate(
-        (exposure - 1.025f) / 0.125f);
+        (adaptedExposure - 1.025f) / 0.125f);
     const float localLiftStrength =
         adaptationRequest * localDarkness * highlightProtection *
         (0.0045f + centerPriority * 0.0095f);

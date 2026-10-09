@@ -36,6 +36,9 @@ private:
     float m_GlowRange = 0.0f;
     float m_GlowStrength = 0.0f;
 
+    // 本描画・影・深度プリパスで共通のワールド行列（同じ計算にし、深度プリパスと本描画の深度を一致させている）
+    DirectX::SimpleMath::Matrix MakeWorldMatrix() const;
+
 public:
     // 箱を作る／何もしない／描く／影を描く／解放する
     void Init() override;
@@ -43,6 +46,13 @@ public:
     void Draw(Camera* cam) override;
     void DrawShadow() override;
     bool CastsShadow() const override { return m_Visible && m_CastsShadow; }
+    // 天井や影を落とさない小物も含め、不透明な箱は深度プリパスに描いている。
+    // 半透明の色（2面の水たまりの面など）は後ろの物が透けて見えるため、描かない。
+    bool WritesDepthPrepass() const override
+    {
+        return m_Visible && m_SurfaceMaterial.Diffuse.w >= 0.999f;
+    }
+    void DrawDepthPrepass(Camera* cam) override;
     bool UsesCameraCulling() const override { return true; }
     bool ContributesToPlanarReflection() const override { return true; }
     void Uninit() override;

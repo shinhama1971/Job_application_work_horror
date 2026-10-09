@@ -341,6 +341,8 @@ namespace Core
         m_ShadowFrameIndex = 0;
 		m_WasReflectionVisible = false;
         m_HasReflectionCameraPose = false;
+        // 前の画面の明るさに慣れたままにならないよう、自動露出は新しいシーンの最初の画面にすぐ合わせている。
+        m_PostProcess.ResetAutoExposure();
         // 前の場所で鳴っていた位置付きの音（足音・扉など）を持ち越さないよう止めている。
         if (m_SoundReady)
         {

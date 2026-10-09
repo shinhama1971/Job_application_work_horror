@@ -110,6 +110,15 @@ namespace Core
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
         m_Instance->m_GpuTimer.BeginFrame(context);
 
+        // 水面の光の揺らぎ（壁のピクセルシェーダー）で使う、プレイヤーの視点のビュー行列を渡している。
+        // 懐中電灯はこの視点から照らしているため、反射を描くときも同じ行列を使う。
+        {
+            DirectX::SimpleMath::Matrix mainView;
+            DirectX::SimpleMath::Matrix mainProjection;
+            m_Instance->m_Camera.GetMainMatrices(mainView, mainProjection);
+            Renderer::SetWaterCausticsView(mainView);
+        }
+
         // 光を放つObjectから、このフレームの点光源を集めてGPUへ送っている。
         // この後の反射・監視映像の描画では全部の光源を、本描画ではタイルごとのリストを使っている。
         m_Instance->m_FramePointLights.clear();
@@ -279,8 +288,22 @@ namespace Core
         // 本描画：レンダーターゲットを消してから、カメラに映る物だけを描いている
         m_Instance->m_GpuTimer.BeginPass(GpuPass::MainScene, context);
         Renderer::DrawStart();
+        // 深度プリパス：不透明な壁・床・扉の深度だけを、本描画の深度バッファへ先に描いている。
+        // ・本描画では、奥に隠れた画素が深度の判定で先に捨てられ、重いピクセルシェーダーを動かさずに済む。
+        // ・タイルベースライティングでは、タイルごとの一番奥の深度より奥の光源を外せる。
+        // 本描画と同じカリングの判定を使い、本描画で描かない物の深度は書かないようにしている。
+        Renderer::SetDepthEnable(true);
+        for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
+        {
+            if (o->IsDestroy() || !o->WritesDepthPrepass() ||
+                !IsVisibleToCamera(*o, m_Instance->m_Camera, true))
+            {
+                continue;
+            }
+            o->DrawDepthPrepass(&m_Instance->m_Camera);
+        }
         // プレイヤー視点のタイルごとのライトリストを、Compute Shaderで作ってから描いている。
-        m_Instance->m_TiledLighting.BuildTiles(m_Instance->m_Camera);
+        m_Instance->m_TiledLighting.BuildTiles(m_Instance->m_Camera, true);
 
         for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
         {

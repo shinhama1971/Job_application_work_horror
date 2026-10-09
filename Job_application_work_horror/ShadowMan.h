@@ -45,6 +45,8 @@ private:
     bool m_ChaseEnabled = false;
     bool m_IsActive = true;
     bool m_DeactivateOnExpire = false;
+    // 位置を外から決めているか（SetExternallyControlled）
+    bool m_ExternallyControlled = false;
     // 見られたときに呼ぶ処理（Sceneが演出を足すのに使っている）
     std::function<void()> m_OnObserved;
     // 最初のUpdateで名前で探して、その後は覚えておいている。PlayerとShadowManは同じSceneで作られ、
@@ -120,6 +122,13 @@ public:
         m_ChaseEnabled = true;
         m_ChaseSpeed = (std::max)(speed, 0.0f);
         m_ChaseStopDistance = (std::max)(stopDistance, 8.0f);
+    }
+
+    // 位置を外（シーンの状態クラス）から決める使い方にしている。trueの間は、時間切れ・追ってくる動き・
+    // 見られて崩れる反応をせず、プレイヤーの方を向くだけにしている（照らすと止まる影で使っている）。
+    void SetExternallyControlled(bool controlled)
+    {
+        m_ExternallyControlled = controlled;
     }
 
     // 時間切れのとき、破棄せずに非表示にするか（何度も使い回す影で使っている）

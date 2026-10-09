@@ -308,6 +308,9 @@
     <ClInclude Include="shader\roomOcclusion.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="shader\waterCaustics.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="shader\surfaceDetail.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -575,10 +578,16 @@
     <ClInclude Include="FlashlightWriting.h">
       <Filter>ソース ファイル\Gameplay</Filter>
     </ClInclude>
+    <ClInclude Include="FlashlightRig.h">
+      <Filter>ソース ファイル\Gameplay</Filter>
+    </ClInclude>
     <ClInclude Include="Stage1KeypadDoor.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="Stage1HiddenRoomEvent.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Stage1LightStalker.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="Stage1WestWing.h">
@@ -661,6 +670,7 @@
     <FxCompile Include="shader\bloomBlurHorizontalCS.hlsl" />
     <FxCompile Include="shader\bloomBlurVerticalCS.hlsl" />
     <FxCompile Include="shader\bloomExtractCS.hlsl" />
+    <FxCompile Include="shader\autoExposureCS.hlsl" />
     <FxCompile Include="shader\hudPS.hlsl" />
     <FxCompile Include="shader\hudVS.hlsl" />
   </ItemGroup>

@@ -55,6 +55,10 @@ namespace
     float g_SignalInterference = 0.0f;
     // 壁の湿り気の強さ（シェーダーへ渡している）
     float g_WallDampStrength = 1.0f;
+    // タイルベースライティングで、タイルの一番奥の深度より奥の光源を外すか（外す前との比較用）
+    bool g_TileDepthBounds = true;
+    // 画面の明るさから目の慣れの倍率を求める自動露出を使うか（使わない場合との比較用）
+    bool g_AutoExposure = true;
     // 直近120フレームのフレーム時間（グラフ表示用）と、次に書く位置
     float g_FrameTimes[120]{};
     int g_FrameTimeOffset = 0;
@@ -198,6 +202,7 @@ void Debug::UI::ApplyTuning(Effect::PostProcess& postProcess)
     UpdateAdaptiveReflectionQuality();
     Renderer::SetDebugViewMode(
         g_DebugViewMode, g_WallDampStrength);
+    postProcess.SetAutoExposureEnabled(g_AutoExposure);
 
     if (!g_OverridePostProcess)
     {
@@ -310,6 +315,8 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
                 tiledLighting->GetLightCount(),
                 Effect::TiledLighting::MaxLights,
                 tiledLighting->GetTileCount());
+            // 深度プリパスの深度で、タイルの一番奥より奥の光源を外すか（Light tilesの表示で効果を比べられる）
+            ImGui::Checkbox("Tile depth bounds (cull lights behind walls)", &g_TileDepthBounds);
             ImGui::Text("Spatial voices: %zu / %zu (X3DAudio)",
                 currentGame->GetActiveSpatialVoiceCount(),
                 Sound::MaxSpatialVoices);
@@ -479,6 +486,8 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         }
         ImGui::Separator();
 
+        // 自動露出（画面の明るさを測って目の慣れを決める）は、上書きとは別にいつでも切り替えられる
+        ImGui::Checkbox("Auto exposure (measure scene luminance)", &g_AutoExposure);
         // 画面効果の値を1つずつ調整するスライダー（上書きをオンにしたときだけ操作できる）
         ImGui::Checkbox("Override post process", &g_OverridePostProcess);
         ImGui::BeginDisabled(!g_OverridePostProcess);
@@ -577,6 +586,16 @@ unsigned int Debug::UI::GetReflectionUpdateInterval()
     // Releaseは毎フレーム描き直す。反射は縦横半分の解像度で描き、反射に映る物だけに絞っているので、移動中は滑らかさを優先している。
     // 止まっているときに描き直す回数を減らす処理はGameRendering側で行っている。
     return 1u;
+#endif
+}
+
+// タイルの深度の範囲で光源を絞るかを返している（Releaseは常に絞る）
+bool Debug::UI::IsTileDepthBoundsEnabled()
+{
+#if defined(ENABLE_IMGUI)
+    return g_TileDepthBounds;
+#else
+    return true;
 #endif
 }
 

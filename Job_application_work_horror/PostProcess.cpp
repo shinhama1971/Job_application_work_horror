@@ -7,6 +7,7 @@
 #include "GpuTimer.h"
 #include "Renderer.h"
 #include "Application.h"
+#include "utility.h"
 
 #include <algorithm>
 #include <cmath>
@@ -60,12 +61,62 @@ namespace Effect
         m_BloomHorizontalShader.Create("shader/bloomBlurHorizontalCS.hlsl");
         m_BloomVerticalShader.Create("shader/bloomBlurVerticalCS.hlsl");
 
+        // 自動露出：慣れた明るさ（対数）と倍率の2つの値を、Compute Shaderが書き、露出のシェーダーが読むバッファに置いている
+        m_AutoExposureShader.Create("shader/autoExposureCS.hlsl");
+        {
+            ID3D11Device* device = Renderer::GetDevice();
+            D3D11_BUFFER_DESC stateDesc{};
+            stateDesc.ByteWidth = sizeof(float) * 2;
+            stateDesc.StructureByteStride = sizeof(float);
+            stateDesc.Usage = D3D11_USAGE_DEFAULT;
+            stateDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+            stateDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+            // 最初の値は「倍率1」にしている（最初のフレームは、すぐ今の明るさに慣れさせる）
+            const float initialState[2] = { 0.0f, 1.0f };
+            D3D11_SUBRESOURCE_DATA initialData{};
+            initialData.pSysMem = initialState;
+
+            D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+            uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+            uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+            uavDesc.Buffer.NumElements = 2;
+            D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+            srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+            srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+            srvDesc.Buffer.NumElements = 2;
+
+            D3D11_BUFFER_DESC paramsDesc{};
+            paramsDesc.ByteWidth = sizeof(AutoExposureParams);
+            paramsDesc.Usage = D3D11_USAGE_DEFAULT;
+            paramsDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+
+            const bool created =
+                SUCCEEDED(device->CreateBuffer(&stateDesc, &initialData,
+                    m_AutoExposureState.ReleaseAndGetAddressOf())) &&
+                SUCCEEDED(device->CreateUnorderedAccessView(m_AutoExposureState.Get(), &uavDesc,
+                    m_AutoExposureUAV.ReleaseAndGetAddressOf())) &&
+                SUCCEEDED(device->CreateShaderResourceView(m_AutoExposureState.Get(), &srvDesc,
+                    m_AutoExposureSRV.ReleaseAndGetAddressOf())) &&
+                SUCCEEDED(device->CreateBuffer(&paramsDesc, nullptr,
+                    m_AutoExposureParams.ReleaseAndGetAddressOf()));
+            if (!created)
+            {
+                utility::ReportFatalError("自動露出のバッファの作成に失敗しました。");
+            }
+        }
+        m_ResetAutoExposure = true;
+
         m_FullScreenQuad.Init();
     }
 
     // 作った物を解放している
     void PostProcess::Uninit()
     {
+        m_AutoExposureParams.Reset();
+        m_AutoExposureSRV.Reset();
+        m_AutoExposureUAV.Reset();
+        m_AutoExposureState.Reset();
+        m_AutoExposureShader.Uninit();
         m_BloomVerticalShader.Uninit();
         m_BloomHorizontalShader.Uninit();
         m_BloomExtractShader.Uninit();
@@ -258,6 +309,51 @@ namespace Effect
         Renderer::SetBackBufferRenderTarget();
     }
 
+    // 描いた画面（m_RenderTexture）の明るさを1グループ256スレッドで測り、目の慣れの倍率をバッファへ書いている。
+    // 結果はGPUに置いたまま、続く露出のシェーダーが読むため、CPUがGPUを待つことはない。
+    void PostProcess::RunAutoExposure()
+    {
+        ID3D11DeviceContext* context = Renderer::GetDeviceContext();
+
+        AutoExposureParams params{};
+        // ポーズ中なども時間は進めている。ただし長い停止の後に一気に慣れないよう、1フレームの時間に上限を付けている
+        params.DeltaTime = (std::min)(Application::GetDeltaTime(), 0.1f);
+        // 目標の明るさ。1面の懐中電灯を点けた廊下（画面の明るさの平均が0.06〜0.12）で、倍率がほぼ1になる値にしている
+        params.TargetLuminance = 0.075f;
+        // 倍率の範囲：暗い所では最大8%明るくし、懐中電灯で近くの壁を照らしているときは、シーン側の持ち上げを少し弱める
+        params.MinGain = 0.95f;
+        params.MaxGain = 1.08f;
+        // 暗い所へは約3秒かけてゆっくり、明るい所へは約0.4秒で素早く慣れる
+        params.DarkAdaptSpeed = 0.35f;
+        params.LightAdaptSpeed = 2.5f;
+        params.Enabled = m_EnableAutoExposure ? 1.0f : 0.0f;
+        params.ResetAdaptation = m_ResetAutoExposure ? 1.0f : 0.0f;
+        m_ResetAutoExposure = false;
+        context->UpdateSubresource(m_AutoExposureParams.Get(), 0, nullptr, &params, 0, 0);
+
+        // 画面のテクスチャを描画先から外したうえで、読み取りに使っている
+        ID3D11RenderTargetView* nullRenderTarget = nullptr;
+        context->OMSetRenderTargets(1, &nullRenderTarget, nullptr);
+
+        m_AutoExposureShader.SetGPU();
+        ID3D11Buffer* paramsBuffer = m_AutoExposureParams.Get();
+        context->CSSetConstantBuffers(0, 1, &paramsBuffer);
+        ID3D11ShaderResourceView* sceneSRV = m_RenderTexture.GetSRV();
+        context->CSSetShaderResources(0, 1, &sceneSRV);
+        ID3D11UnorderedAccessView* stateUAV = m_AutoExposureUAV.Get();
+        context->CSSetUnorderedAccessViews(0, 1, &stateUAV, nullptr);
+
+        // 1グループだけで画面全体を測っている（64x64点）
+        context->Dispatch(1, 1, 1);
+
+        ID3D11ShaderResourceView* nullSRV = nullptr;
+        ID3D11UnorderedAccessView* nullUAV = nullptr;
+        context->CSSetShaderResources(0, 1, &nullSRV);
+        context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
+        context->CSSetShader(nullptr, nullptr, 0);
+        Renderer::SetBackBufferRenderTarget();
+    }
+
     // ブルームの結果と元の画像を合成し、最後にブラウン管風の効果・色調・光の筋・レンズの汚れを重ねている。
     void PostProcess::Draw(GpuTimer* gpuTimer)
     {
@@ -279,6 +375,9 @@ namespace Effect
         {
             gpuTimer->SkipPass(GpuPass::Bloom);
         }
+        // 自動露出の倍率を、露出のシェーダーより先に更新している
+        RunAutoExposure();
+
         // ポーズメニューの「演出の強さ」を、各効果の強さに掛けている
         const float effectScale = m_UserEffectScale;
         const float adjustedBloom = (std::clamp)(
@@ -294,6 +393,7 @@ namespace Effect
         m_FullScreenQuad.Draw(
             m_RenderTexture.GetSRV(),
             m_EnableBloom ? m_BloomVerticalTexture.GetSRV() : nullptr,
+            m_AutoExposureSRV.Get(),
             m_Time,
             m_EnableBloom ? adjustedBloom : 0.0f,
             m_EnableNoise ? m_NoiseAmount * effectScale : 0.0f,

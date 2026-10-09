@@ -78,8 +78,35 @@ namespace Effect
         ComputeShader m_BloomHorizontalShader;
         ComputeShader m_BloomVerticalShader;
 
+        // 自動露出のCompute Shaderへ渡す値（b0）。autoExposureCS.hlslのAutoExposureBufferと同じ並び
+        struct AutoExposureParams
+        {
+            float DeltaTime;
+            float TargetLuminance;
+            float MinGain;
+            float MaxGain;
+            float DarkAdaptSpeed;
+            float LightAdaptSpeed;
+            float Enabled;
+            float ResetAdaptation;
+        };
+        static_assert(sizeof(AutoExposureParams) == 32,
+            "AutoExposureParams must match autoExposureCS.hlsl");
+
+        // 自動露出：画面の明るさを測るコンピュートシェーダーと、慣れた明るさ・倍率を置くバッファ（書き込みはUAV、読み取りはSRV）
+        ComputeShader m_AutoExposureShader;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> m_AutoExposureState;
+        Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_AutoExposureUAV;
+        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_AutoExposureSRV;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> m_AutoExposureParams;
+        // 自動露出を使うか、次のフレームで今の明るさにすぐ慣れさせるか（始めのフレーム）
+        bool m_EnableAutoExposure = true;
+        bool m_ResetAutoExposure = true;
+
         // 明るい部分の抽出 → 横のぼかし → 縦のぼかしの順で、ブルームの画像を作っている。
         void RunBloom();
+        // 描いた画面の明るさを測り、目の慣れの倍率をGPUのバッファへ書いている。
+        void RunAutoExposure();
 
     public:
         // 作業用テクスチャとシェーダーを作る／解放する／値を目標へ近づける
@@ -124,6 +151,18 @@ namespace Effect
         {
             m_TargetVolumetricIntensity =
                 (std::clamp)(intensity, 0.0f, 1.0f);
+        }
+
+        // 自動露出のON/OFF（OFFのときは倍率を1にし、シーンが決めた露出だけを使う）
+        void SetAutoExposureEnabled(bool enable)
+        {
+            m_EnableAutoExposure = enable;
+        }
+
+        // 次のフレームで、目の慣れを今の画面の明るさにすぐ合わせている（シーンを切り替えたとき）
+        void ResetAutoExposure()
+        {
+            m_ResetAutoExposure = true;
         }
 
         // ブルームとフィルムノイズのON/OFF

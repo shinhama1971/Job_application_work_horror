@@ -40,6 +40,8 @@ namespace Debug
         static bool ShouldPauseGameplay();
         // 水面の反射を何フレームに1回描き直すか
         static unsigned int GetReflectionUpdateInterval();
+        // タイルベースライティングで、タイルの一番奥の深度より奥の光源を外すか
+        static bool IsTileDepthBoundsEnabled();
         // 描いた物と省いた物の数を受け取っている（デバッグ画面に表示するため）
         static void SetCullingStats(
             unsigned int mainDrawn,

@@ -66,10 +66,12 @@ namespace Graphics
         void Init();
         void Uninit();
 
-        // sceneSRVは描画済みの画面、bloomSRVはぼかした明るい部分。値を定数バッファへ入れて、効果を順に重ねて描いている
+        // sceneSRVは描画済みの画面、bloomSRVはぼかした明るい部分、autoExposureSRVは自動露出の倍率（露出のシェーダーのt3）。
+        // 値を定数バッファへ入れて、効果を順に重ねて描いている
         void Draw(
             ID3D11ShaderResourceView* sceneSRV,
             ID3D11ShaderResourceView* bloomSRV,
+            ID3D11ShaderResourceView* autoExposureSRV,
             float time,
             float bloomIntensity,
             float noiseAmount,

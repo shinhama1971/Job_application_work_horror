@@ -93,6 +93,7 @@ namespace Graphics
     void FullScreenQuad::Draw(
         ID3D11ShaderResourceView* sceneSRV,
         ID3D11ShaderResourceView* bloomSRV,
+        ID3D11ShaderResourceView* autoExposureSRV,
         float time,
         float bloomIntensity,
         float noiseAmount,
@@ -160,8 +161,12 @@ namespace Graphics
         m_ExposureShader.SetGPU();
         Renderer::SetBlendState(BS_ADDITIVE);
         context->PSSetShaderResources(0, 1, &sceneSRV);
+        // 自動露出の倍率は、Compute Shaderが書いたバッファをそのまま読んでいる（CPUへは読み戻さない）
+        context->PSSetShaderResources(3, 1, &autoExposureSRV);
         context->DrawIndexed(4, 0, 0);
         context->PSSetShaderResources(0, 1, &nullResource);
+        // 次のフレームでCompute Shaderが書き込めるよう、読み取りを外している
+        context->PSSetShaderResources(3, 1, &nullResource);
 
         // 露出の補正の後にブルームを加算し、明るい照明のにじみを残している。
         if (bloomSRV != nullptr && bloomIntensity > 0.001f)

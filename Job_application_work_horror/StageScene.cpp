@@ -78,6 +78,11 @@ void StageScene::Init()
     m_KeypadDoor.Init(m_Objects.keypad);
     m_HiddenRoom.Init(m_Objects.hiddenRoom);
     m_WestWing.Init(m_Objects.westWing);
+    // 照らすと止まる影の判定と押し戻しに使う壁と扉を、一度だけ集めている（毎フレーム全Objectを調べないため）
+    m_ArchiveStalker = Stage1LightStalker{};
+    m_StalkerWalls = game->GetObjects<Wall>();
+    m_StalkerDoors = game->GetObjects<Door>();
+    m_ArchiveStalkerNoticeTimer = 0.0f;
     // 部屋の角の暗がり。床（y=-100）と天井の下面（y≒-48.5）の高さと、建物の壁の形を渡している。
     Renderer::SetRoomOcclusion(
         m_Objects.wallFootprints.data(),
@@ -212,6 +217,7 @@ void StageScene::Update()
     UpdateExitOmen(*player);
     UpdateWallWritings(*player);
     m_HiddenRoom.Update(*player, deltaTime, m_KeypadDoor.IsSolved());
+    UpdateArchiveStalker(*player, deltaTime);
     // 西棟の進行と、水の滴る音・背後で水の中を歩く音などの物音。
     m_WestWingCues.clear();
     m_WestWing.Update(*player, deltaTime, game->GetCamera()->GetForward(), m_WestWingCues);
