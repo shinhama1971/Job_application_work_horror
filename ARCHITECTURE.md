@@ -197,6 +197,67 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 描画パスへの参加可否は `Object` の仮想関数で問い合わせます。Rendererが具象型を列挙して
 `dynamic_cast` する構造にはしていません。
 
+## GPUとCPUの分担
+
+画素ごと・光源ごとの大量の並列計算はGPU、分岐が多くゲームの状態に依存する処理はCPUで行います。
+当たり判定のように結果をゲームの進行が使う処理は、GPUからの読み戻し（待ちが発生する）を避けるためCPUに置いています。
+
+| 処理 | 担当 | 実装 | CPU/GPUを選んだ理由 |
+|---|---|---|---|
+| ゲーム進行・状態機械・入力 | CPU | 各Scene、各Sequence、`PauseMenu` | 分岐が多く、フレームごとの処理量は小さい |
+| 当たり判定（線分・平面・三角形・球・AABB） | CPU | `Collision`、`Player` | 結果を移動や進行に即座に使うため |
+| 視錐台カリング | CPU | `GameRendering.cpp`（Objectごとの境界球） | Objectは数百以下のため、CPUで判定して描画コール自体を減らす方が効果が大きい。本描画・影・反射でパスごとに判定 |
+| 点光源の収集と転送 | CPU → GPU | `Object::CollectPointLights` → `TiledLighting::SetLights` | 毎フレーム `MAP_WRITE_DISCARD` で StructuredBuffer へ書き込み。収集用の `vector` は使い回して再確保しない |
+| 音の遮蔽判定 | CPU | `Game::ComputeSoundOcclusion` | 壁・扉との線分判定。結果を `Sound` へ数値で渡す |
+| 壁の文字を読めるかの判定 | CPU | `FlashlightWriting::IsBeingRead` | 距離・視線の角度・遮蔽で判定し、進行（既読）に使う |
+| 描画パスの間引き | CPU | `GameRendering.cpp` | 影は設定に応じて1〜3フレームに1回、反射は水面が見えるときだけ・静止中は間隔をあけて更新 |
+| 頂点変換・ライティング | GPU（VS/PS） | `litTextureVS/PS`、`wetFloorPS` | 画素ごとの計算 |
+| タイルごとの光源の絞り込み | GPU（CS） | `tiledLightCullingCS.hlsl` | タイル数×光源数の組み合わせが大きく、画面座標に依存する |
+| 影 | GPU | `ShadowMap`（1024x1024）、`flashlightShadow.hlsli`（比較サンプラーで5か所のPCF） | 深度の描画と比較は画素ごとの処理 |
+| 壁・床・天井の古さ、凹凸、部屋の角の暗がり | GPU（PS） | `GetWallAgeing`、`GetFloorAgeing`、`surfaceDetail.hlsli`、`roomOcclusion.hlsli` | 画像素材を読まずにワールド座標から計算する（メモリ帯域の代わりに計算量を使う） |
+| 水たまりの反射 | GPU | `PlanarReflection`（縦横半分の解像度） | 上下を反転したカメラで別に描画 |
+| ブルーム | GPU（CS） | `bloomExtractCS` → `bloomBlurHorizontalCS` → `bloomBlurVerticalCS` | ぼかしに使う画素を `groupshared` に一度読み込み、グループ内で使い回してテクスチャの読み込みを減らす |
+| 画面効果（露出・光の筋・CRT風） | GPU（PS） | `FullScreenQuad` | 画面全体の画素ごとの処理 |
+
+処理の重さは `--benchmark` で、フレーム時間・CPU時間・描画パスごとのGPU時間（`GpuTimer`）を分けて計測します。
+`GpuTimer` は `TIMESTAMP` / `TIMESTAMP_DISJOINT` クエリを4フレーム分順に使い回し、結果を待たずに取得するため、
+計測のためにCPUがGPUを待つことはありません。
+
+## ライティングモデル
+
+本作のライティングは物理ベース（PBR）ではなく、暗いホラーの絵作りを数値で直接調整する経験的なモデルです。
+
+| 要素 | 現在の実装 | 場所 |
+|---|---|---|
+| 拡散光 | Lambert（`N·L`）を、暗い面が真っ黒にならないよう底上げ（例：`0.25 + lambert * 0.75`） | `litTexturePS.hlsl`、`wetFloorPS.hlsl` |
+| 鏡面反射 | 濡れた床だけ Blinn-Phong（ハーフベクトル） | `wetFloorPS.hlsl` |
+| フレネル | `pow(1 - N·V, 4)` の近似（濡れた床の反射の強さ、湿った壁の光沢） | `wetFloorPS.hlsl`、`litTexturePS.hlsl` |
+| 環境光 | 上向きの面は青白く、下向きの面は暖かくする半球環境光 | `flashlightLighting.hlsli` |
+| 遮蔽 | 部屋の形から解析的に求める角の暗がり（SSAOではない） | `roomOcclusion.hlsli` |
+| 懐中電灯 | 内側・外側の円錐による配光、レンズのむら、シャドウマップ。距離減衰は届く範囲の端で0になる減衰に、距離の2乗に反比例する物理的な減衰を3割ほど混ぜたもの | `flashlightLighting.hlsli`、`flashlightShadow.hlsli` |
+| 色空間 | テクスチャ・バックバッファとも `R8G8B8A8_UNORM` で、ガンマ空間のまま計算 | `Texture.cpp`、`Renderer.cpp` |
+| 露出 | シーンが決めた目標の露出（0.85〜1.20）へなめらかに近づける（画面の輝度は測っていない） | `PostProcess` |
+
+### PBRにしていない理由
+
+- 光源は懐中電灯と少数の天井照明が中心で、「どこがどれだけ見えるか」をゲームの難しさとして直接調整したかったため。
+- 金属・光沢のある材質がほとんどなく、コンクリート・漆喰・濡れた床の表現は、底上げした拡散光とフレネル近似で足りていたため。
+
+### PBRへ移行する場合に必要な変更
+
+1. テクスチャを `_SRGB` 形式で読み込み、ライティングをリニア空間で計算する。
+2. 描画先を浮動小数点のHDRにし、トーンマッピングで表示用の範囲へ変換する（ブルームの中間バッファはすでにFP16）。
+3. `Material` に roughness・metallic を追加する。
+4. 鏡面反射を Cook-Torrance（GGXの法線分布、Schlickのフレネル、Smithの幾何減衰）に、拡散光を `(1 - F)(1 - metallic) * albedo / π` にして、エネルギー保存を守る。
+5. 半球環境光を、キューブマップによるIBL（拡散の照度と、粗さごとの鏡面反射）に置き換える。
+6. 露出を、Compute Shaderで画面の平均輝度を求める自動露出にする。
+
+### タイルベースライティングの既知の制限
+
+- タイルの奥行きの範囲（深度の最小・最大）で光源を絞っていないため、手前の壁しか映っていないタイルにも奥の光源が入ります。
+  深度の最小・最大による判定、または奥行き方向にも分けるClustered方式で改善できます。
+- 反射・監視映像など別視点の描画では、タイルがプレイヤー視点と一致しないため全光源を計算しています。
+
 ## 立体音響（`Sound` + X3DAudio）
 
 環境音やUIの音は従来どおり位置を持たずに鳴らし、ワールド上で起きる音だけを `Game::PlayAudioCueAt` で
