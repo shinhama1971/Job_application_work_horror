@@ -791,16 +791,28 @@ namespace Tools::CaptureMode
     // 描き終えた画面をGPUからCPUへ読み戻し、動画のフレームとスクリーンショットとして保存している
     void OnFrameRendered(ID3D11DeviceContext* context, ID3D11Texture2D* backBuffer)
     {
-        // 計測モードは画面を保存していない（読み戻しの時間が計測に混ざらないように）。
+        // 計測モードは、計測する区間では画面を保存していない（読み戻しの時間が計測に混ざらないように）。
         if (g_Benchmark)
         {
             if (g_AdapterName.empty() && context != nullptr)
             {
                 RecordAdapterName(context);
             }
-            // 最初の地点で1枚だけ画面を保存し、描画解像度とHUDの見え方を確認できるようにしている（捨てる区間の中なので計測には影響しない）。
-            if (g_BenchmarkSpot == 0 && g_BenchmarkFrame == BenchmarkWarmupFrames / 2 &&
-                context != nullptr && backBuffer != nullptr)
+            // 最初の地点のライトOFFと、各地点のライトONで1枚ずつ画面を保存している。描画解像度とHUDの見え方に加え、
+            // 描画の処理を変えたときに見た目が変わっていないかを、地点ごとに比べられるようにしている。
+            // どちらも捨てる区間の中なので、読み戻しの時間は計測に混ざらない。
+            const int phaseLength = BenchmarkWarmupFrames + BenchmarkMeasureFrames;
+            std::wstring screenName;
+            if (g_BenchmarkSpot == 0 && g_BenchmarkFrame == BenchmarkWarmupFrames / 2)
+            {
+                screenName = L"benchmark_screen.png";
+            }
+            else if (g_BenchmarkSpot < BenchmarkSpots.size() &&
+                g_BenchmarkFrame == phaseLength + BenchmarkWarmupFrames / 2)
+            {
+                screenName = L"benchmark_spot" + std::to_wstring(g_BenchmarkSpot) + L"_light_on.png";
+            }
+            if (!screenName.empty() && context != nullptr && backBuffer != nullptr)
             {
                 // CPUから読めるステージングテクスチャを作り、バックバッファをコピーして読み出している
                 D3D11_TEXTURE2D_DESC description{};
@@ -819,7 +831,7 @@ namespace Tools::CaptureMode
                     context->CopyResource(staging.Get(), backBuffer);
                     if (SUCCEEDED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped)))
                     {
-                        SavePng((g_OutputDirectory / L"benchmark_screen.png").wstring(),
+                        SavePng((g_OutputDirectory / screenName).wstring(),
                             static_cast<const BYTE*>(mapped.pData), mapped.RowPitch,
                             description.Width, description.Height);
                         context->Unmap(staging.Get(), 0);

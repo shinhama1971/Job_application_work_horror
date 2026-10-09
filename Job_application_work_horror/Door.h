@@ -49,6 +49,9 @@ public:
     void Draw(Camera* cam) override;
     void DrawShadow() override;
     bool CastsShadow() const override { return true; }
+    // 扉の本体は不透明なので、深度プリパスに本体だけを描いている（隙間の漏れ光は描かない）
+    bool WritesDepthPrepass() const override { return true; }
+    void DrawDepthPrepass(Camera* camera) override;
     bool UsesCameraCulling() const override { return true; }
     bool ContributesToPlanarReflection() const override { return true; }
     void Uninit() override;

@@ -54,6 +54,9 @@ class Ground :public Object
 	bool m_WasPowerRestored = false;
 	// 水たまりの位置、天井からの水滴、足元の波紋をまとめて管理している
 	WaterEffectSystem m_WaterEffects;
+
+	// 本描画と深度プリパスで共通のワールド行列（同じ計算にし、深度を一致させている）
+	DirectX::SimpleMath::Matrix MakeWorldMatrix() const;
 public:
 	
 
@@ -61,6 +64,9 @@ public:
 	void Init();
 	void Update();
 	void Draw(Camera* cam);
+	// 床は不透明なので、深度プリパスに床の面だけを描いている（水滴・波紋の半透明の板は描かない）
+	bool WritesDepthPrepass() const override { return true; }
+	void DrawDepthPrepass(Camera* cam) override;
 	void Uninit();
 	// 大きさと位置を設定している
 	void SetScale(float x, float y, float z) { m_Scale = DirectX::SimpleMath::Vector3(x, y, z); }

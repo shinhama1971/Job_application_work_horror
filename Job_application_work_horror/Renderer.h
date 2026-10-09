@@ -144,6 +144,7 @@ private:
 	static Microsoft::WRL::ComPtr<IDXGISwapChain> m_pSwapChain;
 	static Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_pRenderTargetView;
 	static Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_pDepthStencilView;
+	static Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_pDepthShaderResourceView;
 
 	// ワールド・ビュー・射影の行列の定数バッファ
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pWorldBuffer;
@@ -260,6 +261,12 @@ public:
 	static ID3D11DepthStencilView* GetDepthStencilView()
 	{
 		return m_pDepthStencilView.Get();
+	}
+
+	// 深度バッファを読み取るビュー（深度バッファとして設定している間は読めないため、外してから使う）
+	static ID3D11ShaderResourceView* GetDepthShaderResourceView()
+	{
+		return m_pDepthShaderResourceView.Get();
 	}
 
 	// 画面以外へ描いた後、描画先をバックバッファへ戻している。

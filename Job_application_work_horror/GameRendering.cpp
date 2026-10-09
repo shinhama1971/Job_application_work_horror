@@ -279,8 +279,22 @@ namespace Core
         // 本描画：レンダーターゲットを消してから、カメラに映る物だけを描いている
         m_Instance->m_GpuTimer.BeginPass(GpuPass::MainScene, context);
         Renderer::DrawStart();
+        // 深度プリパス：不透明な壁・床・扉の深度だけを、本描画の深度バッファへ先に描いている。
+        // ・本描画では、奥に隠れた画素が深度の判定で先に捨てられ、重いピクセルシェーダーを動かさずに済む。
+        // ・タイルベースライティングでは、タイルごとの一番奥の深度より奥の光源を外せる。
+        // 本描画と同じカリングの判定を使い、本描画で描かない物の深度は書かないようにしている。
+        Renderer::SetDepthEnable(true);
+        for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
+        {
+            if (o->IsDestroy() || !o->WritesDepthPrepass() ||
+                !IsVisibleToCamera(*o, m_Instance->m_Camera, true))
+            {
+                continue;
+            }
+            o->DrawDepthPrepass(&m_Instance->m_Camera);
+        }
         // プレイヤー視点のタイルごとのライトリストを、Compute Shaderで作ってから描いている。
-        m_Instance->m_TiledLighting.BuildTiles(m_Instance->m_Camera);
+        m_Instance->m_TiledLighting.BuildTiles(m_Instance->m_Camera, true);
 
         for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
         {

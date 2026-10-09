@@ -43,27 +43,31 @@ namespace Effect
         void BindAllLights();
 
         // 本描画の直前に呼び、プレイヤー視点のタイルごとのライトリストを作って使わせている。
-        void BuildTiles(const Camera& camera);
+        // hasDepthPrepassがtrueなら、本描画の深度バッファに描いた深度プリパスの深度から、タイルごとに
+        // 一番奥の深度を求め、それより奥の光源も外している。終わると描画先は本描画のものに戻っている。
+        void BuildTiles(const Camera& camera, bool hasDepthPrepass);
 
         // 送ったライトの数と、タイルの数を返している（デバッグ画面用）
         uint32_t GetLightCount() const { return m_UploadedLightCount; }
         uint32_t GetTileCount() const { return m_TilesX * m_TilesY; }
 
     private:
-        // Compute Shaderへ渡す値（b0）：画面の座標からワールド座標へ戻す行列、カメラの位置、ライトの数、タイルの数、描く範囲
+        // Compute Shaderへ渡す値（b0）：画面の座標からワールド座標へ戻す行列、カメラの位置と向き、
+        // ライトの数、タイルの数、深度の範囲で絞るか、描く範囲
         struct CullingParams
         {
             DirectX::SimpleMath::Matrix InverseViewProjection;
             DirectX::SimpleMath::Vector4 CameraPosition;
+            DirectX::SimpleMath::Vector4 CameraForward;
             uint32_t LightCount;
             uint32_t TilesX;
             uint32_t TilesY;
-            uint32_t Padding;
+            uint32_t UseDepthBounds;    // 0: 深度を使わない、1: タイルの一番奥の深度より奥の光源を外す
             DirectX::SimpleMath::Vector2 ViewportSize;
             DirectX::SimpleMath::Vector2 ViewportOffset;
         };
         // HLSLの定数バッファと同じ大きさかを、コンパイル時に確かめている
-        static_assert(sizeof(CullingParams) == 112,
+        static_assert(sizeof(CullingParams) == 128,
             "CullingParams must match tiledLightCullingCS.hlsl");
 
         // ピクセルシェーダーのb6。common.hlslのTiledLightBufferと同じ並びにしている。

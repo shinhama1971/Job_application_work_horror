@@ -75,6 +75,7 @@ Microsoft::WRL::ComPtr<IDXGISwapChain> Renderer::m_pSwapChain;
 Microsoft::WRL::ComPtr<ID3D11RenderTargetView> Renderer::m_pRenderTargetView;
 // 深度ステンシルビュー＝深度バッファ（奥行きで前後関係を判定する）
 Microsoft::WRL::ComPtr<ID3D11DepthStencilView> Renderer::m_pDepthStencilView;
+Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Renderer::m_pDepthShaderResourceView;
 
 // ワールド・ビュー・射影の行列の定数バッファ（b0〜b2）
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pWorldBuffer;
@@ -381,11 +382,11 @@ HRESULT Renderer::CreateRenderAndDepthResources()
 	textureDesc.Height = Application::GetHeight(); // バッファの高さを描画解像度に合わせている
 	textureDesc.MipLevels = 1;                            // ミップマップは使わない
 	textureDesc.ArraySize = 1;                            // 配列ではない1枚のテクスチャ
-	textureDesc.Format = DXGI_FORMAT_D16_UNORM;           // 16ビットの深度バッファを使っている
+	textureDesc.Format = DXGI_FORMAT_R32_TYPELESS;           // 32ビット。書き込みは深度（D32_FLOAT）、読み取りは浮動小数点（R32_FLOAT）として使うため型なしにしている
 	textureDesc.SampleDesc.Count = 1;                     // スワップチェーンと同じサンプルの設定
 	textureDesc.SampleDesc.Quality = 0;                   // 同上
 	textureDesc.Usage = D3D11_USAGE_DEFAULT;              // GPUだけで使う
-	textureDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;     // 深度ステンシルバッファとして使う
+	textureDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE; // 深度バッファとして使い、タイルベースライティングのCompute Shaderからも読んでいる
 	textureDesc.CPUAccessFlags = 0;                       // CPUからは読み書きしない
 	textureDesc.MiscFlags = 0;                            // その他のフラグはなし
     hr = m_pDevice->CreateTexture2D(
@@ -396,13 +397,24 @@ HRESULT Renderer::CreateRenderAndDepthResources()
 
 	// 深度ステンシルビューを作っている
 	D3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc{};
-	depthStencilViewDesc.Format = textureDesc.Format; // 深度ステンシルバッファと同じ形式
+	depthStencilViewDesc.Format = DXGI_FORMAT_D32_FLOAT; // 深度として書き込むときの形式
 	depthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D; // 2Dテクスチャ用のビューにしている
 	depthStencilViewDesc.Flags = 0; // 特別なフラグはなし
     hr = m_pDevice->CreateDepthStencilView(
         depthStencil.Get(),
         &depthStencilViewDesc,
 		m_pDepthStencilView.ReleaseAndGetAddressOf());
+    if (FAILED(hr)) return hr;
+
+	// 深度を読み取るビュー（タイルごとの一番奥の深度を求めるCompute Shaderが使う）
+	D3D11_SHADER_RESOURCE_VIEW_DESC depthResourceDesc{};
+	depthResourceDesc.Format = DXGI_FORMAT_R32_FLOAT;
+	depthResourceDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+	depthResourceDesc.Texture2D.MipLevels = 1;
+    hr = m_pDevice->CreateShaderResourceView(
+        depthStencil.Get(),
+        &depthResourceDesc,
+		m_pDepthShaderResourceView.ReleaseAndGetAddressOf());
     if (FAILED(hr)) return hr;
 
     return S_OK;
@@ -446,6 +458,7 @@ void Renderer::Uninit()
 		m_pBlendState[i].Reset();
 	}
 	m_pDepthStencilView.Reset();
+	m_pDepthShaderResourceView.Reset();
 	m_pRenderTargetView.Reset();
 	m_pSwapChain.Reset();
 
@@ -532,6 +545,7 @@ HRESULT Renderer::ResizeWindow(int width, int height)
 
 	// 今の深度ステンシルビューを解放している
 	m_pDepthStencilView.Reset();
+	m_pDepthShaderResourceView.Reset();
 
 	// バッファは描画解像度のままにしている。画面効果やHUDのテクスチャも同じ大きさで作っているため、
 	// ウィンドウの大きさに合わせると大きさが食い違う。ウィンドウへの引き伸ばしは表示のときに行われる。

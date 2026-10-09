@@ -9,6 +9,7 @@
 
 #include "Application.h"
 #include "Camera.h"
+#include "DebugUI.h"
 #include "utility.h"
 
 #include <algorithm>
@@ -182,7 +183,7 @@ namespace Effect
     }
 
     // 本描画の直前に、プレイヤー視点でタイルごとのライトリストを作っている
-    void TiledLighting::BuildTiles(const Camera& camera)
+    void TiledLighting::BuildTiles(const Camera& camera, bool hasDepthPrepass)
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
 
@@ -209,9 +210,14 @@ namespace Effect
         params.InverseViewProjection = (view * projection).Invert().Transpose();
         const Vector3 eye = camera.GetPosition();
         params.CameraPosition = Vector4(eye.x, eye.y, eye.z, 1.0f);
+        Vector3 forward = camera.GetForward();
+        forward.Normalize();
+        params.CameraForward = Vector4(forward.x, forward.y, forward.z, 0.0f);
         params.LightCount = m_UploadedLightCount;
         params.TilesX = m_TilesX;
         params.TilesY = m_TilesY;
+        params.UseDepthBounds =
+            (hasDepthPrepass && Debug::UI::IsTileDepthBoundsEnabled()) ? 1u : 0u;
         params.ViewportSize = Vector2(viewportWidth, viewportHeight);
         params.ViewportOffset = m_ViewportOffset;
         context->UpdateSubresource(m_CullingParamsBuffer.Get(), 0, nullptr, &params, 0, 0);
@@ -223,8 +229,14 @@ namespace Effect
         m_CullingShader.SetGPU();
         ID3D11Buffer* cullingParams = m_CullingParamsBuffer.Get();
         context->CSSetConstantBuffers(0, 1, &cullingParams);
-        ID3D11ShaderResourceView* lightSRV = m_LightSRV.Get();
-        context->CSSetShaderResources(0, 1, &lightSRV);
+        // 深度バッファは、描画先に設定したままでは読み取れないため、描画先から外している（色の描画先はそのまま）。
+        ID3D11RenderTargetView* backBuffer = Renderer::GetBackBufferRTV();
+        context->OMSetRenderTargets(1, &backBuffer, nullptr);
+
+        // t0にライトの一覧、t1に深度プリパスの深度を設定している
+        ID3D11ShaderResourceView* csViews[2] = {
+            m_LightSRV.Get(), Renderer::GetDepthShaderResourceView() };
+        context->CSSetShaderResources(0, 2, csViews);
         ID3D11UnorderedAccessView* uavs[2] = {
             m_TileIndexUAV.Get(), m_TileCountUAV.Get() };
         context->CSSetUnorderedAccessViews(0, 2, uavs, nullptr);
@@ -235,9 +247,11 @@ namespace Effect
         // Compute Shaderからバッファを外し、ピクセルシェーダーがタイルのリストを使う設定にしている
         ID3D11UnorderedAccessView* nullUAVs[2] = {};
         context->CSSetUnorderedAccessViews(0, 2, nullUAVs, nullptr);
-        ID3D11ShaderResourceView* nullSRV = nullptr;
-        context->CSSetShaderResources(0, 1, &nullSRV);
+        // 深度バッファの読み取りを外してから、本描画の描画先（色と深度）に戻している
+        ID3D11ShaderResourceView* nullSRVs[2] = {};
+        context->CSSetShaderResources(0, 2, nullSRVs);
         context->CSSetShader(nullptr, nullptr, 0);
+        context->OMSetRenderTargets(1, &backBuffer, Renderer::GetDepthStencilView());
 
         UpdateShadingParams(true);
         BindForShading();
