@@ -176,6 +176,19 @@ void Ground::Update()
 	// 水面の乱れは約2.4秒で収まる
 	m_PowerSurge = (std::max)(0.0f, m_PowerSurge - deltaTime * 0.42f);
 	m_WaterEffects.Update(deltaTime);
+
+	// 浸水した範囲があれば、水面で跳ね返った懐中電灯の光を壁や天井に揺らして映している（waterCaustics.hlsli）。
+	// 範囲がない面（2面など）は強さを0にし、壁のシェーダーで計算しないようにしている。
+	const bool hasFlood = m_WaterEffects.HasFloodRegion();
+	Renderer::SetWaterCaustics(
+		hasFlood
+			? DirectX::SimpleMath::Vector4(
+				m_WaterEffects.GetFloodMin().x, m_WaterEffects.GetFloodMin().y,
+				m_WaterEffects.GetFloodMax().x, m_WaterEffects.GetFloodMax().y)
+			: DirectX::SimpleMath::Vector4(1.0f, 1.0f, 0.0f, 0.0f),
+		m_Position.y,
+		m_WetTime,
+		hasFlood ? 1.0f : 0.0f);
 }
 
 //=======================================
@@ -269,6 +282,8 @@ void Ground::DrawDepthPrepass(Camera* cam)
 //=======================================
 void Ground::Uninit()
 {
+	// 次のシーンに水面の光の揺らぎが残らないよう、効果を消している
+	Renderer::SetWaterCaustics(DirectX::SimpleMath::Vector4(1.0f, 1.0f, 0.0f, 0.0f), 0.0f, 0.0f, 0.0f);
 	m_WaterEffects.Uninit();
 	m_WetFloorBuffer.Reset();
 }

@@ -68,7 +68,7 @@ namespace
         return std::atan2(toX - fromX, toZ - fromZ);
     }
 
-    // 1面: 開始地点 → 中央ホール → 左の倉庫 → 暗証番号の扉 → ループ廊下 → 西棟（浸水した機械室）
+    // 1面: 開始地点 → 中央ホール → 左の倉庫 → 暗証番号の扉 → ループ廊下 → 西棟（浸水した機械室） → 書類保管室
     const std::vector<Keyframe> Stage1Tour =
     {
         { 0.0f, Vector3(0.0f, FloorY, -120.0f), Pi, -0.12f, nullptr, false },
@@ -99,6 +99,10 @@ namespace
         { 72.5f, Vector3(-240.0f, FloorY, 195.0f), -Pi * 0.4f, -0.10f, nullptr, false },
         { 75.0f, Vector3(-280.0f, FloorY, 210.0f), YawToward(-280.0f, 210.0f, -345.0f, 235.0f), -0.15f, L"05c_1面_西棟のポンプ室", false },
         { 77.0f, Vector3(-285.0f, FloorY, 212.0f), YawToward(-285.0f, 212.0f, -345.0f, 235.0f), -0.15f, nullptr, false },
+        // 書類保管室（棚が並ぶ迷路）。棚の間から奥を向き、懐中電灯の影（手元から作る影と、距離で柔らかくなる縁）を写している。
+        { 77.05f, Vector3(-60.0f, FloorY, 115.0f), YawToward(-60.0f, 115.0f, -200.0f, 118.0f), -0.12f, nullptr, false },
+        { 79.5f, Vector3(-62.0f, FloorY, 115.0f), YawToward(-62.0f, 115.0f, -200.0f, 118.0f), -0.12f, L"05d_1面_書類保管室の棚と影", false },
+        { 81.0f, Vector3(-62.0f, FloorY, 115.0f), YawToward(-62.0f, 115.0f, -200.0f, 118.0f), -0.12f, nullptr, false },
     };
 
     // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉
@@ -783,6 +787,8 @@ namespace Tools::CaptureMode
         {
             player->SetPosition(pose.Position);
         }
+        // 道順の途中で電池が切れて懐中電灯が消えないよう、電池を満タンに保っている（計測モードと同じ）
+        player->AddBattery(100.0f);
         player->SetFlashlightOn(true);
         camera->SetCameraDirection(pose.Yaw);
         camera->SetCameraPitch(pose.Pitch);

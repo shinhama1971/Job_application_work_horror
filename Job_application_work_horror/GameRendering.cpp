@@ -110,6 +110,15 @@ namespace Core
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
         m_Instance->m_GpuTimer.BeginFrame(context);
 
+        // 水面の光の揺らぎ（壁のピクセルシェーダー）で使う、プレイヤーの視点のビュー行列を渡している。
+        // 懐中電灯はこの視点から照らしているため、反射を描くときも同じ行列を使う。
+        {
+            DirectX::SimpleMath::Matrix mainView;
+            DirectX::SimpleMath::Matrix mainProjection;
+            m_Instance->m_Camera.GetMainMatrices(mainView, mainProjection);
+            Renderer::SetWaterCausticsView(mainView);
+        }
+
         // 光を放つObjectから、このフレームの点光源を集めてGPUへ送っている。
         // この後の反射・監視映像の描画では全部の光源を、本描画ではタイルごとのリストを使っている。
         m_Instance->m_FramePointLights.clear();

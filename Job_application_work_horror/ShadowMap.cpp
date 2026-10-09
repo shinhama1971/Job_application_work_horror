@@ -6,6 +6,7 @@
 #include "ShadowMap.h"
 
 #include "Camera.h"
+#include "FlashlightRig.h"
 
 using namespace DirectX::SimpleMath;
 
@@ -132,9 +133,12 @@ namespace Effect
             1.0f,
             0);
 
-        // ライトの位置と向き＝カメラの位置と向き（懐中電灯は目の位置から照らしている）
-        const Vector3 lightPosition = camera.GetPosition();
-        const Vector3 lightForward = camera.GetForward();
+        // 影を作る位置と向き：目の位置から作ると影が物の真後ろに隠れて見えないため、
+        // 手元（目より少し右下）から、画面の中央の少し先へ向けて作っている（FlashlightRig.h）。
+        Vector3 lightPosition;
+        Vector3 lightForward;
+        FlashlightRig::GetShadowPose(
+            camera.GetPosition(), camera.GetForward(), lightPosition, lightForward);
         const Matrix lightView = Matrix::CreateLookAt(
             lightPosition,
             lightPosition + lightForward,

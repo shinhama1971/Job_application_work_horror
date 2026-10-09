@@ -99,6 +99,21 @@ struct ROOM_OCCLUSION_BUFFER
 
 static_assert(sizeof(ROOM_OCCLUSION_BUFFER) == 16 * 33, "Room occlusion buffer must match HLSL layout");
 
+// 水面の光の揺らぎ（コースティクス）の定数バッファ（shader/waterCaustics.hlsliのWaterCausticsBuffer、b12と同じ並び）
+struct WATER_CAUSTICS_BUFFER
+{
+    // プレイヤーの視点のビュー行列（転置済み）。懐中電灯はこの視点から照らしているため、反射を描くときもこの行列を使う
+    DirectX::SimpleMath::Matrix View;
+    // 床一面が水に浸かった範囲。x,y = x・zの最小、z,w = x・zの最大（範囲がないときは最小を最大より大きくしている）
+    DirectX::SimpleMath::Vector4 FloodRect;
+    float WaterY;    // 水面の高さ
+    float Time;      // 揺らぎを動かす時間（秒）
+    float Strength;  // 強さ（0なら計算しない）
+    float Padding;
+};
+
+static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 96, "Water caustics buffer must match HLSL layout");
+
 // サブセット（モデルの中で、同じマテリアルで描く部分）
 struct SUBSET{
 	// マテリアルの名前、インデックスの数、頂点の数、インデックスと頂点の開始位置、マテリアルの番号
@@ -160,6 +175,8 @@ private:
 	static void UploadDebugViewBuffer();
 	// 部屋の角の暗がりとマテリアルの定数バッファ、今のライト、ライトの計算をするか
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pRoomOcclusionBuffer;
+	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pWaterCausticsBuffer;
+	static WATER_CAUSTICS_BUFFER m_WaterCaustics;
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pMaterialBuffer;
 	static LIGHT m_Light;
 	static bool m_LightEnable;
@@ -244,6 +261,11 @@ public:
 	static void SetRoomOcclusion(
 		const DirectX::SimpleMath::Vector4* boxes, unsigned int boxCount,
 		float floorY, float ceilingY, float strength);
+	// 浸水した範囲の水面で跳ね返った懐中電灯の光が、壁や天井に揺らいで映る効果の値を設定している。strengthが0なら計算しない。
+	static void SetWaterCaustics(
+		const DirectX::SimpleMath::Vector4& floodRect, float waterY, float time, float strength);
+	// 水面の光の揺らぎで使う、プレイヤーの視点のビュー行列を設定している（毎フレーム、描画の最初に呼ぶ）
+	static void SetWaterCausticsView(const DirectX::SimpleMath::Matrix& view);
 	// ライトの計算をするかを切り替える・返している
 	static void SetLightEnable(bool Enable);
 	static bool GetLightEnable();

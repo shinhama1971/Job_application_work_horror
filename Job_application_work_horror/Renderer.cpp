@@ -87,6 +87,8 @@ Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pLightBuffer;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pDebugViewBuffer;
 DEBUG_VIEW_BUFFER Renderer::m_DebugView{ 0, 1.0f, 0.0f, 0.0f };
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pRoomOcclusionBuffer;
+Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pWaterCausticsBuffer;
+WATER_CAUSTICS_BUFFER Renderer::m_WaterCaustics{};
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pMaterialBuffer;
 LIGHT Renderer::m_Light{};
 bool Renderer::m_LightEnable = true;
@@ -331,6 +333,13 @@ HRESULT Renderer::Init()
 	if (FAILED(hr)) return hr;
 	SetRoomOcclusion(nullptr, 0, 0.0f, 0.0f, 0.0f);
 
+	// 水面の光の揺らぎ。最初は浸水した範囲がない（効果なし）状態にしている。
+	bufferDesc.ByteWidth = sizeof(WATER_CAUSTICS_BUFFER);
+	hr = m_pDevice->CreateBuffer(
+		&bufferDesc, NULL, m_pWaterCausticsBuffer.ReleaseAndGetAddressOf());
+	if (FAILED(hr)) return hr;
+	SetWaterCaustics(Vector4(1.0f, 1.0f, 0.0f, 0.0f), 0.0f, 0.0f, 0.0f);
+
 	// マテリアルの定数バッファを作り、頂点・ピクセルシェーダーのb4に設定している
 	bufferDesc.ByteWidth = sizeof(MATERIAL);
 	hr = m_pDevice->CreateBuffer(
@@ -444,6 +453,8 @@ void Renderer::Uninit()
 	// 定数バッファ・描画の状態・描画先・スワップチェーンを解放している
 	m_pLightBuffer.Reset();
 	m_pDebugViewBuffer.Reset();
+	m_pRoomOcclusionBuffer.Reset();
+	m_pWaterCausticsBuffer.Reset();
 	m_pMaterialBuffer.Reset();
 	m_pTextureBuffer.Reset();
 

@@ -59,6 +59,39 @@ void Renderer::SetRoomOcclusion(
 		11, 1, m_pRoomOcclusionBuffer.GetAddressOf());
 }
 
+// 水面の光の揺らぎの値を、ピクセルシェーダーのb12へ設定している
+void Renderer::SetWaterCaustics(
+	const Vector4& floodRect, float waterY, float time, float strength)
+{
+	if (!m_pWaterCausticsBuffer)
+	{
+		return;
+	}
+	m_WaterCaustics.FloodRect = floodRect;
+	m_WaterCaustics.WaterY = waterY;
+	m_WaterCaustics.Time = time;
+	m_WaterCaustics.Strength = strength;
+	m_pDeviceContext->UpdateSubresource(
+		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
+	m_pDeviceContext->PSSetConstantBuffers(
+		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+}
+
+// 水面の光の揺らぎで使うビュー行列を覚え、b12へ設定し直している。ビュー行列のb1は頂点シェーダーにしか設定していないため、
+// ピクセルシェーダーで使う分はこの定数バッファで渡している。
+void Renderer::SetWaterCausticsView(const Matrix& view)
+{
+	if (!m_pWaterCausticsBuffer)
+	{
+		return;
+	}
+	m_WaterCaustics.View = view.Transpose();
+	m_pDeviceContext->UpdateSubresource(
+		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
+	m_pDeviceContext->PSSetConstantBuffers(
+		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+}
+
 // デバッグ表示と壁の古さの定数バッファ（b7）を、覚えている中身で更新している
 void Renderer::UploadDebugViewBuffer()
 {

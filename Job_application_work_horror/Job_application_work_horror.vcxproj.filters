@@ -308,6 +308,9 @@
     <ClInclude Include="shader\roomOcclusion.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="shader\waterCaustics.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="shader\surfaceDetail.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -573,6 +576,9 @@
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="FlashlightWriting.h">
+      <Filter>ソース ファイル\Gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="FlashlightRig.h">
       <Filter>ソース ファイル\Gameplay</Filter>
     </ClInclude>
     <ClInclude Include="Stage1KeypadDoor.h">

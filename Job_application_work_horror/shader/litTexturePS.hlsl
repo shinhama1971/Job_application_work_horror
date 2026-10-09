@@ -13,6 +13,7 @@ SamplerState g_SamplerState : register(s0);
 
 #include "fastNoise.hlsli"
 #include "flashlightLighting.hlsli"
+#include "waterCaustics.hlsli"
 #include "roomOcclusion.hlsli"
 #include "surfaceDetail.hlsli"
 
@@ -474,6 +475,9 @@ float4 main(in LIT_PS_IN input) : SV_Target
                 * flashlightOcclusion;
         }
     }
+
+    // 浸水した床（西棟）の水面で跳ね返った懐中電灯の光が、壁や天井にゆらゆら映る（waterCaustics.hlsli）
+    lighting += Light.Diffuse.rgb * GetWaterCausticLight(input.worldPos, normalize(input.worldNormal));
 
     color.rgb *= lighting;
 

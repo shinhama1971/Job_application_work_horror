@@ -550,20 +550,39 @@ float4 main(in LIT_PS_IN input) : SV_Target
         puddle * RippleStrength;
     reflectionUV = saturate(reflectionUV + waterDistortion);
 
+    // 水面のむら：浮いた埃や油膜を、ゆっくり流れる2つのノイズで表している。
+    // filmは水面の荒さ（反射のぼけ）に、grimeは映り込みの強さに使い、場所ごとに映り方が変わるようにしている。
+    const float2 filmFlow = float2(WetTime * 0.006f, -WetTime * 0.004f);
+    const float film = FastValueNoise(input.worldPos.xz * 0.045f + filmFlow);
+    const float grime = FastValueNoise(input.worldPos.xz * 0.021f - filmFlow * 0.5f + 37.0f);
+    // 荒さ（0=鏡、1=ぼやけた反射）：浅い縁（水たまりの濃さが低い所）と、波が強い所ほど荒くしている
+    const float waterRoughness = saturate(
+        0.18f + film * 0.50f +
+        abs(ripplePattern) * 0.22f +
+        (1.0f - saturate(puddle * 1.6f)) * 0.35f);
+
     // フレネル効果により、真上からは主に水面の下の床を見せている。
     // 浅い角度から見ると、鏡に映った部屋と照明がはっきり見える。
     // 平方根で変換して、中くらいの角度の反射を見やすくしている。
     // 最小値を低く保ち、水たまりが黒い板に戻るのを防いでいる。
+    // 汚れた所（grimeが低い所）は、映り込みを最大で4割弱めている。
     const float viewAngleReflection = sqrt(saturate(fresnel));
     const float reflectionStrength = saturate(
         puddle * reflectionInside *
-        lerp(0.24f, 0.98f, viewAngleReflection) * ReflectionStrength);
+        lerp(0.24f, 0.98f, viewAngleReflection) * ReflectionStrength *
+        lerp(0.60f, 1.0f, smoothstep(0.25f, 0.75f, grime)));
     float3 reflectedScene = 0.0f;
     [branch]
     if (reflectionStrength > 0.001f)
     {
+        // 濡れた床に映る照明は、見る人の方へ縦に伸びて見える。荒いほど、反射の画像を縦長の範囲で読んで平均している。
+        const float2 streak = float2(0.0012f, 0.011f) * waterRoughness;
         reflectedScene =
-            g_PlanarReflection.Sample(g_SamplerState, reflectionUV).rgb;
+            g_PlanarReflection.Sample(g_SamplerState, reflectionUV).rgb * 0.28f +
+            g_PlanarReflection.Sample(g_SamplerState, saturate(reflectionUV + streak * 0.45f)).rgb * 0.20f +
+            g_PlanarReflection.Sample(g_SamplerState, saturate(reflectionUV - streak * 0.45f)).rgb * 0.20f +
+            g_PlanarReflection.Sample(g_SamplerState, saturate(reflectionUV + streak)).rgb * 0.16f +
+            g_PlanarReflection.Sample(g_SamplerState, saturate(reflectionUV - streak)).rgb * 0.16f;
     }
     const float reflectionGain = 1.10f + rippleHighlight * 0.08f;
     color.rgb = lerp(
