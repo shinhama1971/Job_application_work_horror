@@ -47,6 +47,8 @@ class Ground :public Object
 	int m_SizeZ = 0;// 格子の縦のマス数
 	// 濡れた床の定数バッファ、経過時間
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_WetFloorBuffer;
+	// マス目ごとの水たまりの表（定数バッファb13）。起動時に1回だけ書き込んでいる
+	Microsoft::WRL::ComPtr<ID3D11Buffer> m_PuddleCellBuffer;
 	float m_WetTime = 0.0f;
 	// 電力が戻ったときに反射を強める度合い、電力が戻った瞬間の水面の乱れ、前フレームで電力が戻っていたか
 	float m_PowerReflectionBlend = 0.0f;

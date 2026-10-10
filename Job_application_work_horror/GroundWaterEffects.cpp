@@ -140,7 +140,21 @@ void WaterEffectSystem::Init()
 		float DistanceSquared;
 	};
 
-	// 床を82x82のマスに分け、乱数がしきい値を超えたマスにだけ水たまりを置いている（シェーダーと同じ判定）
+	// 床全体のマス目について、水たまりがあるかと形の乱数を表にし、シェーダーへ渡している（Ground::Init）
+	for (int row = 0; row < PuddleCellCount; ++row)
+	{
+		for (int column = 0; column < PuddleCellCount; ++column)
+		{
+			const float cellX = static_cast<float>(PuddleCellMin + column);
+			const float cellZ = static_cast<float>(PuddleCellMin + row);
+			const bool hasPuddle = hash21(cellX + 53.4f, cellZ + 27.9f) >= 0.62f;
+			const Vector2 randomValue = hash22(cellX, cellZ);
+			m_PuddleCells[row * PuddleCellCount + column] = Vector4(
+				hasPuddle ? 1.0f : 0.0f, randomValue.x, randomValue.y, 0.0f);
+		}
+	}
+
+	// 床を82x82のマスに分け、乱数がしきい値を超えたマスにだけ水たまりを置いている（上の表と同じ判定）
 	constexpr float cellSize = 82.0f;
 	std::vector<DropCandidate> candidates;
 	for (int cellZ = -4; cellZ <= 4; ++cellZ)

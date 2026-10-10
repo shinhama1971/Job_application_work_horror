@@ -124,6 +124,14 @@ void Ground::Init()
 		sizeof(WetFloorBuffer),
 		m_WetFloorBuffer.ReleaseAndGetAddressOf());
 
+	// 水たまりの表を渡す定数バッファを作り、WaterEffectSystemで決めた値を書き込んでいる
+	const WaterEffectSystem::PuddleCellTable& puddleCells = m_WaterEffects.GetPuddleCells();
+	Renderer::CreateConstantBuffer(
+		static_cast<unsigned int>(sizeof(puddleCells)),
+		m_PuddleCellBuffer.ReleaseAndGetAddressOf());
+	Renderer::GetDeviceContext()->UpdateSubresource(
+		m_PuddleCellBuffer.Get(), 0, nullptr, puddleCells.data(), 0, 0);
+
 	// 床のテクスチャを読み込んでいる（読めなければファイル名を表示して終了している）
     constexpr const char* fieldTexturePath = "assets/texture/field.jpg";
     if (!m_Texture.Load(fieldTexturePath))
@@ -237,6 +245,9 @@ void Ground::Draw(Camera* cam)
 	// ピクセルシェーダーのb10へ設定している
 	ID3D11Buffer* wetFloorBuffer = m_WetFloorBuffer.Get();
 	devicecontext->PSSetConstantBuffers(10, 1, &wetFloorBuffer);
+	// 水たまりの表をb13へ設定している
+	ID3D11Buffer* puddleCellBuffer = m_PuddleCellBuffer.Get();
+	devicecontext->PSSetConstantBuffers(13, 1, &puddleCellBuffer);
 
 	devicecontext->DrawIndexed(
 		(UINT)m_Indices.size(),	// 描くインデックスの数
@@ -286,6 +297,7 @@ void Ground::Uninit()
 	Renderer::SetWaterCaustics(DirectX::SimpleMath::Vector4(1.0f, 1.0f, 0.0f, 0.0f), 0.0f, 0.0f, 0.0f);
 	m_WaterEffects.Uninit();
 	m_WetFloorBuffer.Reset();
+	m_PuddleCellBuffer.Reset();
 }
 
 

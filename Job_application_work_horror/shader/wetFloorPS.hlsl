@@ -23,6 +23,16 @@ cbuffer WetFloorBuffer : register(b10)
     float4 FloodRect;
 }
 
+// マス目ごとの水たまりの表（b13）。WaterEffectSystem::Init がCPUで決めて渡している。
+// x = 水たまりがあれば1、yz = 中心のずれと回転に使う乱数。マス目(PUDDLE_CELL_MIN, PUDDLE_CELL_MIN)から16x16マス。
+// sin を使った乱数をシェーダーで計算すると、GPUの種類で sin の精度が違い、水たまりの場所が変わるため、表にしている。
+#define PUDDLE_CELL_MIN (-8)
+#define PUDDLE_CELL_COUNT 16
+cbuffer PuddleCellBuffer : register(b13)
+{
+    float4 PuddleCells[PUDDLE_CELL_COUNT * PUDDLE_CELL_COUNT];
+}
+
 // 頂点シェーダー（litTextureVS）から受け取る値（影と反射の座標も使っている）
 struct LIT_PS_IN
 {
@@ -39,7 +49,7 @@ struct LIT_PS_IN
 };
 
 
-// 2次元の値から0〜1の疑似乱数を作っている（GroundWaterEffects.cppの水たまりの位置と同じ式）
+// 2次元の値から0〜1の疑似乱数を作っている（水滴の輪とノイズに使う。水たまりの位置は PuddleCells の表で決めている）
 float Hash21(float2 value)
 {
     return frac(sin(dot(value, float2(127.1f, 311.7f))) * 43758.5453f);
@@ -213,9 +223,14 @@ float GetPuddleMask(
     const float2 cell = floor(gridPosition);
     float2 localPosition = frac(gridPosition) - 0.5f;
 
-    const float hasPuddle = step(
-        0.62f,
-        Hash21(cell + float2(53.4f, 27.9f)));
+    // このマス目の値を表から読んでいる（表の外の床は乾いている扱い）
+    const int2 tableIndex = int2(cell) - PUDDLE_CELL_MIN;
+    float4 cellValue = 0.0f;
+    if (all(tableIndex >= 0) && all(tableIndex < PUDDLE_CELL_COUNT))
+    {
+        cellValue = PuddleCells[tableIndex.y * PUDDLE_CELL_COUNT + tableIndex.x];
+    }
+    const float hasPuddle = cellValue.x;
     // 大半の床のマス目は乾いているため、対象外のマス目では、回転・輪郭のノイズ・波の計算を省いている。
     // （この分岐はワールド空間の大きなマス目の単位でそろうので、画素ごとにばらつかない）
     if (hasPuddle < 0.5f)
@@ -226,7 +241,7 @@ float GetPuddleMask(
     }
 
     // 水たまりの中心をずらし、ランダムに回した楕円にしている
-    const float2 randomValue = Hash22(cell);
+    const float2 randomValue = cellValue.yz;
     localPosition -= (randomValue - 0.5f) * 0.22f;
 
     const float angle = randomValue.x * 6.2831853f;

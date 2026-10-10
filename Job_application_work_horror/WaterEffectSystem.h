@@ -9,6 +9,7 @@
 #include "Shader.h"
 #include "VertexBuffer.h"
 
+#include <array>
 #include <memory>
 #include <vector>
 
@@ -66,6 +67,21 @@ private:
     void DrawWaterRipples(Camera* camera);
 
 public:
+    // 水たまりのマス目（82x82）の表の範囲。床（x・z が -500〜500）を覆う 16x16 マスにしている。
+    // wetFloorPS.hlsl の PuddleCellBuffer と同じ値にする。
+    static constexpr int PuddleCellMin = -8;
+    static constexpr int PuddleCellCount = 16;
+    // マス目ごとの水たまりの値（x = 水たまりがあれば1、y・z = 中心のずれと回転に使う乱数）
+    using PuddleCellTable = std::array<DirectX::SimpleMath::Vector4, PuddleCellCount * PuddleCellCount>;
+
+private:
+    // 水たまりの置き場所はCPUで決め、この表をシェーダーへ渡している。
+    // シェーダーで sin を使った乱数を計算すると、GPUの種類で sin の精度が違い、水たまりの場所が変わってしまうためである。
+    PuddleCellTable m_PuddleCells{};
+
+public:
+    const PuddleCellTable& GetPuddleCells() const { return m_PuddleCells; }
+
     // 作る・更新する・描く・解放する
     void Init();
     void Update(float deltaTime);
