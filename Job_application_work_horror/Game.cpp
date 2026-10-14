@@ -16,6 +16,7 @@
 #include "DebugUI.h"
 #include "Application.h"
 #include "CaptureMode.h"
+#include "TechDemo.h"
 #include "Wall.h"
 #include "Door.h"
 
@@ -81,6 +82,7 @@ namespace Core
         m_Instance->m_ShadowMap.Init();
         m_Instance->m_PostProcess.Init();
         m_Instance->m_TiledLighting.Init();
+        Tools::TechDemo::Init();
         m_Instance->ApplyVisualSettings();
         m_Instance->ChangeScene(SceneName::Title);
         return true;
@@ -148,6 +150,9 @@ namespace Core
 
         // デバッグ画面の調整値を反映し、カメラと画面効果を更新している
         Debug::UI::ApplyTuning(m_Instance->m_PostProcess);
+        // 技術デモ（F2）の切り替えを、デバッグ画面の値の後に反映している。開いている間は方向キーで視点を回さない
+        Tools::TechDemo::Update(m_Instance->m_PostProcess);
+        m_Instance->m_Camera.SetArrowKeyLookEnabled(!Tools::TechDemo::IsActive());
 
         m_Instance->m_Camera.Update();
         m_Instance->m_PostProcess.Update();
@@ -197,6 +202,7 @@ namespace Core
         m_Instance->m_Scene.reset();
 
         m_Instance->m_ObjectManager.DeleteAll();
+        Tools::TechDemo::Uninit();
         m_Instance->m_TiledLighting.Uninit();
         m_Instance->m_PostProcess.Uninit();
         m_Instance->m_ShadowMap.Uninit();

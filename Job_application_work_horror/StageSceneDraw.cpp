@@ -112,7 +112,7 @@ void StageScene::Draw(Camera* camera)
         }
         else if (fuseCount == 2 && m_CorridorLoopCount >= 2)
         {
-            // 3本目は西棟の奥。鍵 → 西側の扉 → ヒューズの順に指している。
+            // 3本目は西棟の奥。鍵 → 西側の扉 → 一番近い排水バルブ → ヒューズの順に指している。
             guideTarget = m_WestWing.GetGuideTarget();
         }
         // ヒューズが3本そろったら、配電盤を指している
@@ -202,5 +202,7 @@ Stage1ObjectiveInput StageScene::MakeObjectiveInput() const
         ? m_ArchiveStalkerNotice
         : std::string_view{};
     input.westWingStep = static_cast<int>(m_WestWing.GetStep());
+    input.westWingValvesOpened = m_WestWing.GetOpenedValveCount();
+    input.westWingText = m_WestWing.GetObjectiveText();
     return input;
 }

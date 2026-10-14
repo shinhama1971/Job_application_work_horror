@@ -17,11 +17,13 @@ namespace Effect
     class ShadowMap
     {
     private:
-        // シェーダーへ渡す値（b8）：ライトのビュー×射影の行列と、x=1テクセルの大きさ、y=深度の比較のずれ（バイアス）、z=near、w=far
+        // シェーダーへ渡す値（b8）：ライトのビュー×射影の行列と、x=1テクセルの大きさ、y=深度の比較のずれ（バイアス）、z=near、w=far、
+        // 影の方式（x=0なら影なし、1なら硬い影、2ならPCSS。技術デモで切り替えている）
         struct ShadowBuffer
         {
             DirectX::SimpleMath::Matrix ViewProjection;
             DirectX::SimpleMath::Vector4 Parameters;
+            DirectX::SimpleMath::Vector4 Options;
         };
 
         // 影のテクスチャの大きさ（1024x1024）

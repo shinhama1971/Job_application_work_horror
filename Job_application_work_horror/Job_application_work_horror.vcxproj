@@ -216,6 +216,7 @@
     <ClCompile Include="Door.cpp" />
     <ClCompile Include="ExitTrigger.cpp" />
     <ClCompile Include="FullScreenQuad.cpp" />
+    <ClCompile Include="DrainValve.cpp" />
     <ClCompile Include="FuseBox.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="GameRendering.cpp" />
@@ -261,6 +262,7 @@
     <ClCompile Include="KeyItem.cpp" />
     <ClCompile Include="Locker.cpp" />
     <ClCompile Include="CaptureMode.cpp" />
+    <ClCompile Include="TechDemo.cpp" />
     <ClCompile Include="StageSceneEvents.cpp" />
     <ClCompile Include="StageSceneDraw.cpp" />
     <ClCompile Include="Stage2Scene.cpp" />
@@ -300,6 +302,7 @@
     <ClInclude Include="ExitTrigger.h" />
     <ClInclude Include="FlashlightSystem.h" />
     <ClInclude Include="FullScreenQuad.h" />
+    <ClInclude Include="DrainValve.h" />
     <ClInclude Include="FuseBox.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="GpuTimer.h" />
@@ -365,6 +368,7 @@
     <ClInclude Include="KeyItem.h" />
     <ClInclude Include="Locker.h" />
     <ClInclude Include="CaptureMode.h" />
+    <ClInclude Include="TechDemo.h" />
     <ClInclude Include="KeypadLock.h" />
     <ClInclude Include="SceneLayoutBuilder.h" />
     <ClInclude Include="StageSurveillanceCameras.h" />

@@ -9,6 +9,7 @@
 #include "ScreenDustOverlay.h"
 #include "Player.h"
 #include "DebugUI.h"
+#include "TechDemo.h"
 
 #include <algorithm>
 #include <cmath>
@@ -177,7 +178,9 @@ namespace Core
         }
 
         // 水面の反射は1面だけ。水たまりが画面に映っているかを先に調べている
-        if (m_Instance->m_CurrentScene == SceneName::Stage)
+        // 技術デモで「水面の反射なし」を選んでいるときは、反射を描かない（床も反射を混ぜない。Ground::Draw）
+        if (m_Instance->m_CurrentScene == SceneName::Stage &&
+            Tools::TechDemo::UsesPlanarReflection())
         {
             bool reflectionVisible = false;
             for (const auto& object :
@@ -292,18 +295,31 @@ namespace Core
         // ・本描画では、奥に隠れた画素が深度の判定で先に捨てられ、重いピクセルシェーダーを動かさずに済む。
         // ・タイルベースライティングでは、タイルごとの一番奥の深度より奥の光源を外せる。
         // 本描画と同じカリングの判定を使い、本描画で描かない物の深度は書かないようにしている。
+        // 技術デモでは、深度プリパスとタイルベースライティングを、使わない方式と見比べられるようにしている。
         Renderer::SetDepthEnable(true);
-        for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
+        const bool useDepthPrepass = Tools::TechDemo::UsesDepthPrepass();
+        if (useDepthPrepass)
         {
-            if (o->IsDestroy() || !o->WritesDepthPrepass() ||
-                !IsVisibleToCamera(*o, m_Instance->m_Camera, true))
+            for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
             {
-                continue;
+                if (o->IsDestroy() || !o->WritesDepthPrepass() ||
+                    !IsVisibleToCamera(*o, m_Instance->m_Camera, true))
+                {
+                    continue;
+                }
+                o->DrawDepthPrepass(&m_Instance->m_Camera);
             }
-            o->DrawDepthPrepass(&m_Instance->m_Camera);
         }
         // プレイヤー視点のタイルごとのライトリストを、Compute Shaderで作ってから描いている。
-        m_Instance->m_TiledLighting.BuildTiles(m_Instance->m_Camera, true);
+        // 使わない方式では、全部の光源を画素ごとに順に計算させている。
+        if (Tools::TechDemo::UsesTiledLighting())
+        {
+            m_Instance->m_TiledLighting.BuildTiles(m_Instance->m_Camera, useDepthPrepass);
+        }
+        else
+        {
+            m_Instance->m_TiledLighting.BindAllLights();
+        }
 
         for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
         {
@@ -341,6 +357,11 @@ namespace Core
         if (m_Instance->m_Scene)
         {
             m_Instance->m_Scene->Draw(&m_Instance->m_Camera);
+        }
+        // 技術デモの操作パネル（ポーズ中は、ポーズメニューと重ならないように出さない）
+        if (!m_Instance->m_PauseMenu.IsOpen())
+        {
+            Tools::TechDemo::Draw(m_Instance->m_GpuTimer);
         }
         Debug::UI::Draw(m_Instance->m_PostProcess);
 

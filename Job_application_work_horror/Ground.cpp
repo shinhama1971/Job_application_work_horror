@@ -8,6 +8,7 @@
 #include "Application.h"
 #include "Game.h"
 #include "Player.h"
+#include "TechDemo.h"
 #include "utility.h"
 #include <algorithm>
 #include <cmath>
@@ -196,7 +197,7 @@ void Ground::Update()
 			: DirectX::SimpleMath::Vector4(1.0f, 1.0f, 0.0f, 0.0f),
 		m_Position.y,
 		m_WetTime,
-		hasFlood ? 1.0f : 0.0f);
+		(hasFlood ? 1.0f : 0.0f) * Tools::TechDemo::GetWaterCausticsScale());
 }
 
 //=======================================
@@ -232,8 +233,10 @@ void Ground::Draw(Camera* cam)
 		(0.55f + 0.45f * std::sin(m_WetTime * 17.0f));
 	wetFloor.RippleStrength =
 		0.92f + m_PowerReflectionBlend * 0.10f + surgeWave * 0.18f;
-	wetFloor.ReflectionStrength =
-		0.96f + m_PowerReflectionBlend * 0.22f + surgeWave * 0.12f;
+	// 技術デモで「水面の反射なし」を選んでいるときは、反射の画像を混ぜない
+	wetFloor.ReflectionStrength = Tools::TechDemo::UsesPlanarReflection()
+		? 0.96f + m_PowerReflectionBlend * 0.22f + surgeWave * 0.12f
+		: 0.0f;
 	// 水に浸かった範囲がなければ、最小(1,1)が最大(0,0)より大きい値を渡して「範囲なし」にしている
 	wetFloor.FloodRect = m_WaterEffects.HasFloodRegion()
 		? DirectX::SimpleMath::Vector4(

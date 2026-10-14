@@ -218,9 +218,10 @@ void StageScene::Update()
     UpdateWallWritings(*player);
     m_HiddenRoom.Update(*player, deltaTime, m_KeypadDoor.IsSolved());
     UpdateArchiveStalker(*player, deltaTime);
-    // 西棟の進行と、水の滴る音・背後で水の中を歩く音などの物音。
+    // 西棟の進行（排水バルブの長押しを含む）と、水の滴る音・背後で水の中を歩く音などの物音。
     m_WestWingCues.clear();
-    m_WestWing.Update(*player, deltaTime, game->GetCamera()->GetForward(), m_WestWingCues);
+    m_WestWing.Update(*player, deltaTime, game->GetCamera()->GetForward(),
+        m_InteractionSystem.GetFocusedInteractable(), m_WestWingCues);
     for (const AmbientSoundCue& cue : m_WestWingCues)
     {
         game->PlayAudioCueAt(

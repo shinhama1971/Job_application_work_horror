@@ -7,6 +7,7 @@
 
 #include "Camera.h"
 #include "FlashlightRig.h"
+#include "TechDemo.h"
 
 using namespace DirectX::SimpleMath;
 
@@ -158,6 +159,8 @@ namespace Effect
             0.0012f,
             2.0f,
             280.0f);
+        buffer.Options = Vector4(
+            static_cast<float>(Tools::TechDemo::GetShadowMode()), 0.0f, 0.0f, 0.0f);
         context->UpdateSubresource(
             m_ShadowBuffer.Get(),
             0,

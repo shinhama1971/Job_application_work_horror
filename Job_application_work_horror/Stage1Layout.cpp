@@ -10,6 +10,7 @@
 #include "BatteryItem.h"
 #include "CeilingLight.h"
 #include "Door.h"
+#include "DrainValve.h"
 #include "ExitTrigger.h"
 #include "FlashlightWriting.h"
 #include "FuseBox.h"
@@ -25,7 +26,10 @@
 #include "Wall.h"
 
 #include <SimpleMath.h>
+#include <array>
 #include <random>
+#include <string>
+#include <utility>
 
 using namespace DirectX::SimpleMath;
 
@@ -75,9 +79,14 @@ namespace Stage1Layout
         wall2->SetPosition(220.0f, -74.0f, 80.0f);
         wall2->SetScale(4.0f, 50.0f, 520.0f);
 
+        // 南側の外壁は、左の倉庫から南西の広間への入口（x=-175〜-145）の分だけ開けて2枚に分けている。
+        Wall* wall3West = builder.Create<Wall>("Wall3West");
+        wall3West->SetPosition(-197.5f, -74.0f, -180.0f);
+        wall3West->SetScale(45.0f, 50.0f, 4.0f);
+
         Wall* wall3 = builder.Create<Wall>("Wall3");
-        wall3->SetPosition(0.0f, -74.0f, -180.0f);
-        wall3->SetScale(440.0f, 50.0f, 4.0f);
+        wall3->SetPosition(37.5f, -74.0f, -180.0f);
+        wall3->SetScale(365.0f, 50.0f, 4.0f);
 
         // 西側の外壁は、西棟の扉（z=-35〜-5）の分だけ開けて2枚に分けている。
         Wall* wall4 = builder.Create<Wall>("Wall4");
@@ -88,8 +97,8 @@ namespace Stage1Layout
         wall4North->SetPosition(-220.0f, -74.0f, 167.5f);
         wall4North->SetScale(4.0f, 50.0f, 345.0f);
 
-        // 西棟（浸水した機械室）。西側の扉から入り、折り返しの多い通路を奥のポンプ室まで進む。
-        // 仕切りの壁は東・西・東と交互に開けて、見通しの悪い蛇行する通路にしている。
+        // 西棟（浸水した機械室）。西側の扉から入る、柱の並ぶ広い部屋（技術デモの部屋と同じ作り）。
+        // 奥（北）は仕切りの壁で区切ったポンプ室で、仕切りの真ん中の切れ目（x=-320〜-280）から入る。
         const auto createWestWingWall = [&builder](const char* name, const Vector3& position, const Vector3& scale)
         {
             Wall* wall = builder.Create<Wall>(name);
@@ -100,9 +109,34 @@ namespace Stage1Layout
         Wall* westWingOuter = createWestWingWall("WestWingOuter", Vector3(-380.0f, -74.0f, 80.0f), Vector3(4.0f, 50.0f, 364.0f));
         Wall* westWingSouth = createWestWingWall("WestWingSouth", Vector3(-300.0f, -74.0f, -100.0f), Vector3(164.0f, 50.0f, 4.0f));
         Wall* westWingNorth = createWestWingWall("WestWingNorth", Vector3(-300.0f, -74.0f, 260.0f), Vector3(164.0f, 50.0f, 4.0f));
-        Wall* westWingInner1 = createWestWingWall("WestWingInner1", Vector3(-320.0f, -74.0f, 0.0f), Vector3(120.0f, 50.0f, 4.0f));
-        Wall* westWingInner2 = createWestWingWall("WestWingInner2", Vector3(-280.0f, -74.0f, 80.0f), Vector3(120.0f, 50.0f, 4.0f));
-        Wall* westWingInner3 = createWestWingWall("WestWingInner3", Vector3(-320.0f, -74.0f, 160.0f), Vector3(120.0f, 50.0f, 4.0f));
+        Wall* pumpRoomWallWest = createWestWingWall("WestWingPumpRoomWallWest", Vector3(-350.0f, -74.0f, 180.0f), Vector3(60.0f, 50.0f, 4.0f));
+        Wall* pumpRoomWallEast = createWestWingWall("WestWingPumpRoomWallEast", Vector3(-250.0f, -74.0f, 180.0f), Vector3(60.0f, 50.0f, 4.0f));
+        // 2列3行の柱。見通しを少しさえぎり、懐中電灯の影と、水面に映る柱を見せている。
+        std::array<Wall*, 6> westWingColumns{};
+        for (int column = 0; column < 6; ++column)
+        {
+            const std::string name = "WestWingColumn" + std::to_string(column + 1);
+            westWingColumns[static_cast<size_t>(column)] = createWestWingWall(name.c_str(),
+                Vector3(column % 2 == 0 ? -330.0f : -270.0f, -74.0f, 10.0f + static_cast<float>(column / 2) * 60.0f),
+                Vector3(10.0f, 50.0f, 10.0f));
+        }
+
+        // 南西の広間（西棟の南、x=-380〜-120・z=-332〜-180）。左の倉庫の南の入口から入る、柱の並ぶ広い部屋。
+        // 技術デモ（GraphicsTechDemo）の部屋と同じ作りで、柱・棚・机・色の付いた警告灯を置いている。
+        // 北の壁は、建物の南の外壁（x>-220）とつながる西側の分だけを足している。
+        Wall* southWestHallNorth = createWestWingWall("SouthWestHallNorth", Vector3(-300.0f, -74.0f, -180.0f), Vector3(160.0f, 50.0f, 4.0f));
+        Wall* southWestHallWest = createWestWingWall("SouthWestHallWest", Vector3(-380.0f, -74.0f, -256.0f), Vector3(4.0f, 50.0f, 152.0f));
+        Wall* southWestHallSouth = createWestWingWall("SouthWestHallSouth", Vector3(-250.0f, -74.0f, -332.0f), Vector3(264.0f, 50.0f, 4.0f));
+        Wall* southWestHallEast = createWestWingWall("SouthWestHallEast", Vector3(-120.0f, -74.0f, -256.0f), Vector3(4.0f, 50.0f, 152.0f));
+        // 2列2行の柱。見通しを少しさえぎり、懐中電灯の影と、天井の照明の映り込みを見せている。
+        std::array<Wall*, 4> southWestHallColumns{};
+        for (int column = 0; column < 4; ++column)
+        {
+            const std::string name = "SouthWestHallColumn" + std::to_string(column + 1);
+            southWestHallColumns[static_cast<size_t>(column)] = createWestWingWall(name.c_str(),
+                Vector3(column % 2 == 0 ? -290.0f : -210.0f, -74.0f, column < 2 ? -225.0f : -285.0f),
+                Vector3(10.0f, 50.0f, 10.0f));
+        }
 
         Wall* wall5 = builder.Create<Wall>("Wall5");
         wall5->SetPosition(-117.5f, -74.0f, 40.0f);
@@ -180,10 +214,11 @@ namespace Stage1Layout
 
         // 建物の壁だけに、パネルの継ぎ目・ひび・水の跡・カビを描いている（棚や配管などの小物には描かない）。
         for (Wall* structuralWall : {
-            wall1, wall2, wall3, wall4, wall4North, wall5, wall6, wall7, wall8, wall9, wall10,
+            wall1, wall2, wall3West, wall3, wall4, wall4North, wall5, wall6, wall7, wall8, wall9, wall10,
             wall11, wall12, wall13, wall13North, wall14, wall15,
             loopWall1, loopWall2, loopWall3, loopWall4,
-            westWingOuter, westWingSouth, westWingNorth, westWingInner1, westWingInner2, westWingInner3 })
+            westWingOuter, westWingSouth, westWingNorth, pumpRoomWallWest, pumpRoomWallEast,
+            southWestHallNorth, southWestHallWest, southWestHallSouth, southWestHallEast })
         {
             structuralWall->SetWeatheringSurface(true);
             // 部屋の角の暗がりの計算用に、壁を上から見た長方形を記録している
@@ -191,6 +226,15 @@ namespace Stage1Layout
             const Vector3 scale = structuralWall->GetScale();
             objects.wallFootprints.emplace_back(
                 position.x, position.z, scale.x * 0.5f, scale.z * 0.5f);
+        }
+        // 西棟と南西の広間の柱も建物の一部として古さを描いている。部屋の角の暗がりは壁32枚までなので、柱は含めていない。
+        for (Wall* column : westWingColumns)
+        {
+            column->SetWeatheringSurface(true);
+        }
+        for (Wall* column : southWestHallColumns)
+        {
+            column->SetWeatheringSurface(true);
         }
 
 
@@ -227,12 +271,18 @@ namespace Stage1Layout
         ceiling->SetCastsShadow(false);
         // 天井も建物の面として、天井板・外れた板の穴・雨漏りの染みを描いている（litTexturePS）。
         ceiling->SetWeatheringSurface(true);
-        // 西棟の天井（照明はなく、懐中電灯だけが頼り）。
+        // 西棟の天井
         Wall* westWingCeiling = createStageProp("PropCeilingWestWing",
             Vector3(-300.0f, -47.0f, 80.0f), Vector3(164.0f, 3.0f, 364.0f),
             Color(0.055f, 0.06f, 0.058f, 1.0f), noEmission, 4.0f, false);
         westWingCeiling->SetCastsShadow(false);
         westWingCeiling->SetWeatheringSurface(true);
+        // 南西の広間の天井
+        Wall* southWestHallCeiling = createStageProp("PropCeilingSouthWestHall",
+            Vector3(-250.0f, -47.0f, -256.0f), Vector3(264.0f, 3.0f, 156.0f),
+            Color(0.055f, 0.06f, 0.058f, 1.0f), noEmission, 4.0f, false);
+        southWestHallCeiling->SetCastsShadow(false);
+        southWestHallCeiling->SetWeatheringSurface(true);
 
         // 壁際と天井近くを走る配管（Stage1AmbientSoundsが、この線に沿って配管の音を鳴らしている）
         createStageProp("PropPipeLeft", Vector3(-205.0f, -55.0f, 60.0f),
@@ -294,10 +344,91 @@ namespace Stage1Layout
         // 西棟の中の機材（ポンプと配管）。水の中に沈んだ機械室らしさを出している。
         createStageProp("PropWestWingPump", Vector3(-345.0f, -86.0f, 235.0f),
             Vector3(30.0f, 26.0f, 26.0f), darkMetal, noEmission, 20.0f, true);
-        createStageProp("PropWestWingTank", Vector3(-250.0f, -82.0f, 120.0f),
+        createStageProp("PropWestWingTank", Vector3(-240.0f, -82.0f, 205.0f),
             Vector3(20.0f, 34.0f, 30.0f), cabinetMetal, noEmission, 14.0f, true);
+        // ポンプ室の床の排水口。排水バルブを回すと、水はここへ向かって引いていく。
+        Wall* westWingDrain = createStageProp("PropWestWingDrain", Vector3(-290.0f, -99.6f, 228.0f),
+            Vector3(16.0f, 0.8f, 16.0f), Color(0.035f, 0.04f, 0.038f, 1.0f), noEmission, 16.0f, false);
+        westWingDrain->SetCastsShadow(false);
         createStageProp("PropWestWingPipe", Vector3(-375.0f, -55.0f, 80.0f),
             Vector3(3.0f, 3.0f, 350.0f), darkMetal, noEmission, 22.0f, false);
+
+        // 南西の広間の中。西の奥は、棚・机・細い柱・木箱の一角（懐中電灯の影が、根元はくっきり、奥の棚ではぼんやり落ちる）。
+        createStageProp("PropSouthWestShelf1", Vector3(-362.0f, -77.0f, -300.0f),
+            Vector3(10.0f, 44.0f, 30.0f), shelfColor, noEmission, 10.0f, true);
+        createStageProp("PropSouthWestShelf2", Vector3(-362.0f, -77.0f, -262.0f),
+            Vector3(10.0f, 44.0f, 30.0f), shelfColor, noEmission, 10.0f, true);
+        createStageProp("PropSouthWestShelf3", Vector3(-362.0f, -77.0f, -224.0f),
+            Vector3(10.0f, 44.0f, 30.0f), shelfColor, noEmission, 10.0f, true);
+        const Color deskWood(0.16f, 0.13f, 0.095f, 1.0f);
+        createStageProp("PropSouthWestDeskTop", Vector3(-322.0f, -76.0f, -300.0f),
+            Vector3(40.0f, 2.0f, 24.0f), deskWood, noEmission, 8.0f, false);
+        for (int leg = 0; leg < 4; ++leg)
+        {
+            const std::string name = "PropSouthWestDeskLeg" + std::to_string(leg + 1);
+            createStageProp(name.c_str(),
+                Vector3(-322.0f + (leg % 2 == 0 ? -18.0f : 18.0f), -88.5f, -300.0f + (leg < 2 ? -10.0f : 10.0f)),
+                Vector3(2.0f, 23.0f, 2.0f), deskWood, noEmission, 8.0f, true);
+        }
+        createStageProp("PropSouthWestPole", Vector3(-268.0f, -75.0f, -252.0f),
+            Vector3(3.0f, 50.0f, 3.0f), darkMetal, noEmission, 20.0f, true);
+        createStageProp("PropSouthWestCrate1", Vector3(-340.0f, -93.0f, -205.0f),
+            Vector3(14.0f, 14.0f, 14.0f), debrisColor, noEmission, 6.0f, true);
+        createStageProp("PropSouthWestCrate2", Vector3(-240.0f, -95.0f, -316.0f),
+            Vector3(10.0f, 10.0f, 10.0f), debrisColor, noEmission, 6.0f, true);
+
+        // 色の付いた警告灯（赤・緑・青・橙）。暗い中で目立ち、自分の色で周りを照らす点光源にもなる（タイルベースライティング）。
+        const auto createWarningLamp = [&createStageProp](const char* name, const Vector3& position, const Vector3& scale, const Color& color)
+        {
+            Wall* lamp = createStageProp(name, position, scale,
+                Color(color.R() * 0.6f, color.G() * 0.6f, color.B() * 0.6f, 1.0f), color, 24.0f, false);
+            lamp->SetCastsShadow(false);
+            lamp->SetGlowLight(55.0f, 2.0f);
+            return lamp;
+        };
+        createWarningLamp("PropSouthWestLampRed", Vector3(-250.0f, -70.0f, -329.5f), Vector3(10.0f, 4.0f, 1.0f), Color(0.90f, 0.08f, 0.05f, 1.0f));
+        createWarningLamp("PropSouthWestLampGreen", Vector3(-122.5f, -70.0f, -256.0f), Vector3(1.0f, 4.0f, 10.0f), Color(0.10f, 0.85f, 0.25f, 1.0f));
+        createWarningLamp("PropSouthWestLampBlue", Vector3(-377.5f, -70.0f, -190.0f), Vector3(1.0f, 4.0f, 10.0f), Color(0.15f, 0.35f, 0.95f, 1.0f));
+        createWarningLamp("PropSouthWestLampAmber", Vector3(-180.0f, -70.0f, -329.5f), Vector3(10.0f, 4.0f, 1.0f), Color(0.95f, 0.55f, 0.10f, 1.0f));
+
+        // 西棟の南西の角。南西の広間と同じ、棚・机・木箱の一角（水面に映り、懐中電灯の影が落ちる）。
+        createStageProp("PropWestWingShelf1", Vector3(-368.0f, -77.0f, -78.0f),
+            Vector3(10.0f, 44.0f, 30.0f), shelfColor, noEmission, 10.0f, true);
+        createStageProp("PropWestWingShelf2", Vector3(-368.0f, -77.0f, -40.0f),
+            Vector3(10.0f, 44.0f, 30.0f), shelfColor, noEmission, 10.0f, true);
+        createStageProp("PropWestWingDeskTop", Vector3(-330.0f, -76.0f, -78.0f),
+            Vector3(40.0f, 2.0f, 24.0f), deskWood, noEmission, 8.0f, false);
+        for (int leg = 0; leg < 4; ++leg)
+        {
+            const std::string name = "PropWestWingDeskLeg" + std::to_string(leg + 1);
+            createStageProp(name.c_str(),
+                Vector3(-330.0f + (leg % 2 == 0 ? -18.0f : 18.0f), -88.5f, -78.0f + (leg < 2 ? -10.0f : 10.0f)),
+                Vector3(2.0f, 23.0f, 2.0f), deskWood, noEmission, 8.0f, true);
+        }
+        createStageProp("PropWestWingCrate", Vector3(-345.0f, -93.0f, -15.0f),
+            Vector3(14.0f, 14.0f, 14.0f), debrisColor, noEmission, 6.0f, true);
+
+        // 西棟の排水バルブ（南・西・東の壁に1つずつ）。上のランプは、回す前は赤く、回したら緑に光る。
+        // バルブの配管は床から天井まで壁を伝い、ランプは配管の横に付けている。
+        const auto createDrainValve = [&builder, &createWarningLamp](
+            const char* valveName, const char* lampName,
+            const Vector3& position, float yaw, const Vector3& lampOffset, const Vector3& lampScale)
+        {
+            DrainValve* valve = builder.Create<DrainValve>(valveName);
+            valve->SetPosition(position.x, position.y, position.z);
+            valve->SetRotation(Vector3(0.0f, yaw, 0.0f));
+            Wall* lamp = createWarningLamp(lampName, position + lampOffset, lampScale, Color(0.90f, 0.08f, 0.05f, 1.0f));
+            lamp->SetGlowLight(45.0f, 1.8f);
+            return std::pair<DrainValve*, Wall*>(valve, lamp);
+        };
+        const auto southValve = createDrainValve("Stage1WestWingValveSouth", "PropWestWingValveLampSouth",
+            Vector3(-290.0f, -88.0f, -98.0f), DirectX::XM_PI, Vector3(9.0f, 24.0f, 0.5f), Vector3(10.0f, 4.0f, 1.0f));
+        const auto westValve = createDrainValve("Stage1WestWingValveWest", "PropWestWingValveLampWest",
+            Vector3(-378.0f, -88.0f, 100.0f), -DirectX::XM_PIDIV2, Vector3(0.5f, 24.0f, 9.0f), Vector3(1.0f, 4.0f, 10.0f));
+        const auto eastValve = createDrainValve("Stage1WestWingValveEast", "PropWestWingValveLampEast",
+            Vector3(-222.0f, -88.0f, 150.0f), DirectX::XM_PIDIV2, Vector3(-0.5f, 24.0f, 9.0f), Vector3(1.0f, 4.0f, 10.0f));
+        objects.westWing.valves = { southValve.first, westValve.first, eastValve.first };
+        objects.westWing.valveLamps = { southValve.second, westValve.second, eastValve.second };
 
         // 脱出のホールの入口の柱と、扉の状態を示すランプ（停電中は赤）
         createStageProp("PropExitColumnLeft", Vector3(-52.0f, -80.0f, 179.0f),
@@ -392,7 +523,7 @@ namespace Stage1Layout
             Vector3(-128.0f, -95.0f, -166.0f)
         };
         // 3本目: 西棟の一番奥のポンプ室（ポンプの陰・奥の角・タンク寄り）。
-        // 右の倉庫で西棟の鍵を拾い、西側の扉を開けて浸水した通路を抜けないと取れない。
+        // 右の倉庫で西棟の鍵を拾って西側の扉を開け、排水バルブで水を抜くまで現れない（Stage1WestWingが出している）。
         const std::array<Vector3, 3> thirdFuseSpots =
         {
             Vector3(-345.0f, -95.0f, 210.0f),
@@ -436,12 +567,40 @@ namespace Stage1Layout
         objects.westWing.door = westWingDoor;
         objects.westWing.key = westWingKey;
         objects.westWing.fuse = item3;
+        objects.westWing.ground = ground;
 
-        // 寄り道のごほうびの電池（西棟の通路・崩れた資材置き場）。
+        // 寄り道のごほうびの電池（西棟の広間・崩れた資材置き場）。
         BatteryItem* westWingBattery = builder.Create<BatteryItem>("Stage1WestWingBattery");
         westWingBattery->SetPosition(-355.0f, -95.0f, 40.0f);
         BatteryItem* debrisBattery = builder.Create<BatteryItem>("Stage1DebrisRoomBattery");
         debrisBattery->SetPosition(-120.0f, -95.0f, 300.0f);
+        // 南西の広間の奥（棚の一角の木箱の陰）にも、寄り道のごほうびの電池を置いている。
+        BatteryItem* southWestHallBattery = builder.Create<BatteryItem>("Stage1SouthWestHallBattery");
+        southWestHallBattery->SetPosition(-348.0f, -95.0f, -222.0f);
+
+        // 南西の広間の天井の照明（停電中は1つだけ赤い非常灯がともり、電力が戻ると両方が点く）
+        CeilingLight* southWestHallLight1 = builder.Create<CeilingLight>("Stage1SouthWestHallLight1");
+        southWestHallLight1->SetPosition(-290.0f, -50.5f, -256.0f);
+        southWestHallLight1->SetScale(24.0f, 2.0f, 11.0f);
+        southWestHallLight1->SetEmergencyLight(false, 5.0f);
+        CeilingLight* southWestHallLight2 = builder.Create<CeilingLight>("Stage1SouthWestHallLight2");
+        southWestHallLight2->SetPosition(-180.0f, -50.5f, -256.0f);
+        southWestHallLight2->SetScale(24.0f, 2.0f, 11.0f);
+        southWestHallLight2->SetEmergencyLight(true, 5.7f);
+
+        // 西棟の天井の照明（停電中は入口側の1つだけが赤い非常灯。奥とポンプ室は懐中電灯とバルブのランプが頼り）
+        CeilingLight* westWingLight1 = builder.Create<CeilingLight>("Stage1WestWingLight1");
+        westWingLight1->SetPosition(-300.0f, -50.5f, -40.0f);
+        westWingLight1->SetScale(24.0f, 2.0f, 11.0f);
+        westWingLight1->SetEmergencyLight(true, 2.9f);
+        CeilingLight* westWingLight2 = builder.Create<CeilingLight>("Stage1WestWingLight2");
+        westWingLight2->SetPosition(-300.0f, -50.5f, 100.0f);
+        westWingLight2->SetScale(24.0f, 2.0f, 11.0f);
+        westWingLight2->SetEmergencyLight(false, 3.4f);
+        CeilingLight* westWingLight3 = builder.Create<CeilingLight>("Stage1WestWingLight3");
+        westWingLight3->SetPosition(-300.0f, -50.5f, 220.0f);
+        westWingLight3->SetScale(20.0f, 2.0f, 9.0f);
+        westWingLight3->SetEmergencyLight(false, 4.1f);
 
         // 中央の扉（ループ廊下へ続く）と、主電源の配電盤
         Door* door = builder.Create<Door>("Door");

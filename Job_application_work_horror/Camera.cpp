@@ -124,26 +124,29 @@ void Camera::Update()
     m_CameraPitch += controllerLookY * controllerPitchSpeed;
 
     // デバッグ用：キーボードの方向キーでも視点を回せるようにしている
-    if (Input::GetKeyPress(VK_LEFT))
+    if (m_ArrowKeyLookEnable)
     {
-        m_CameraDirection += 6.0f * m_LookSensitivityScale * deltaTime;
-    }
+        if (Input::GetKeyPress(VK_LEFT))
+        {
+            m_CameraDirection += 6.0f * m_LookSensitivityScale * deltaTime;
+        }
 
-    if (Input::GetKeyPress(VK_RIGHT))
-    {
-        m_CameraDirection -= 6.0f * m_LookSensitivityScale * deltaTime;
-    }
+        if (Input::GetKeyPress(VK_RIGHT))
+        {
+            m_CameraDirection -= 6.0f * m_LookSensitivityScale * deltaTime;
+        }
 
-    const float pitchStep = 1.8f * m_LookSensitivityScale * deltaTime;
+        const float pitchStep = 1.8f * m_LookSensitivityScale * deltaTime;
 
-    if (Input::GetKeyPress(VK_UP))
-    {
-        m_CameraPitch += pitchStep;
-    }
+        if (Input::GetKeyPress(VK_UP))
+        {
+            m_CameraPitch += pitchStep;
+        }
 
-    if (Input::GetKeyPress(VK_DOWN))
-    {
-        m_CameraPitch -= pitchStep;
+        if (Input::GetKeyPress(VK_DOWN))
+        {
+            m_CameraPitch -= pitchStep;
+        }
     }
 
     // どの入力で動かしても、上下の向きは同じ範囲に制限している

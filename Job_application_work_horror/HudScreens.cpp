@@ -1088,3 +1088,55 @@ void Hud::DrawPause(
 
     Flush();
 }
+
+// 技術デモの操作パネル。左の端に半透明の黒い板を置き、選んでいる項目を緑の帯と「< >」で示している
+void Hud::DrawTechDemoPanel(
+    const std::vector<TechDemoRow>& rows,
+    const std::vector<std::string>& infoLines)
+{
+    m_Vertices.clear();
+
+    const Color green(0.45f, 0.95f, 0.55f, 1.0f);
+    const Color pale(0.84f, 0.88f, 0.86f, 0.95f);
+    const Color dim(0.58f, 0.63f, 0.60f, 0.92f);
+    constexpr float panelX = 24.0f;
+    constexpr float panelY = 140.0f;
+    constexpr float panelWidth = 500.0f;
+    constexpr float rowTop = 86.0f;
+    constexpr float rowHeight = 30.0f;
+    constexpr float infoLineHeight = 26.0f;
+    const float infoTop = rowTop + rowHeight * static_cast<float>(rows.size()) + 14.0f;
+    const float panelHeight = infoTop + infoLineHeight * static_cast<float>(infoLines.size()) + 12.0f;
+
+    AddRectangle(panelX, panelY, panelWidth, panelHeight, Color(0.0f, 0.0f, 0.0f, 0.74f));
+    AddRectangle(panelX, panelY, 4.0f, panelHeight, green);
+    AddText(panelX + 18.0f, panelY + 14.0f, "技術デモ", 2.6f, green);
+    AddText(panelX + 18.0f, panelY + 52.0f, "↑↓ 項目   ←→ 切り替え   F2 閉じる", 1.8f, dim);
+
+    for (std::size_t index = 0; index < rows.size(); ++index)
+    {
+        const TechDemoRow& row = rows[index];
+        const float rowY = panelY + rowTop + rowHeight * static_cast<float>(index);
+        if (row.Selected)
+        {
+            AddRectangle(panelX + 8.0f, rowY - 5.0f, panelWidth - 16.0f, rowHeight - 2.0f,
+                Color(0.30f, 0.80f, 0.40f, 0.16f));
+        }
+        const Color& color = row.Selected ? green : pale;
+        AddText(panelX + 18.0f, rowY, row.Name, 2.0f, color);
+        const std::string variant = row.Selected
+            ? "< " + std::string(row.Variant) + " >"
+            : std::string(row.Variant);
+        AddText(panelX + 250.0f, rowY, variant, 2.0f, color);
+    }
+
+    // 区切りの線と、選んだ項目の説明・GPU時間
+    AddRectangle(panelX + 14.0f, panelY + infoTop - 8.0f, panelWidth - 28.0f, 1.0f, dim);
+    for (std::size_t index = 0; index < infoLines.size(); ++index)
+    {
+        AddText(panelX + 18.0f, panelY + infoTop + infoLineHeight * static_cast<float>(index),
+            infoLines[index], 1.8f, pale);
+    }
+
+    Flush();
+}

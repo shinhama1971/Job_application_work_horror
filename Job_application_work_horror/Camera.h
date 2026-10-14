@@ -20,6 +20,8 @@ private:
     // マウス視点が有効か、ポーズメニューで設定した視点感度の倍率
     bool m_MouseLookEnable = true;
     float m_LookSensitivityScale = 1.0f;
+    // 方向キーで視点を回すか（技術デモで方向キーを使う間は回さない）
+    bool m_ArrowKeyLookEnable = true;
 
     // カメラの位置（プレイヤーの目の高さ）
     DirectX::SimpleMath::Vector3 m_Position =
@@ -112,6 +114,12 @@ public:
     void SetMouseLookEnabled(bool enabled)
     {
         m_MouseLookEnable = enabled;
+    }
+
+    // falseの間は方向キーで視点を回さない（技術デモで方向キーを方式の切り替えに使っている）。
+    void SetArrowKeyLookEnabled(bool enabled)
+    {
+        m_ArrowKeyLookEnable = enabled;
     }
 
     // 上下の向き（ピッチ、ラジアン）を返している。

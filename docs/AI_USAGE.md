@@ -50,6 +50,8 @@
 | 1面の拡張：西棟（浸水した機械室・鍵で開く必須の区画・音だけの演出）、書類保管室の棚の迷路、崩れた資材置き場 | `Stage1WestWing.*`, `Stage1Layout.*`, `StageScene*.cpp`, `Stage1Objective.*`, `Ground.*`, `GroundWaterEffects.cpp`, `WaterEffectSystem.h`, `shader/wetFloorPS.hlsl` | 設計案（地図）・実装 | 方針の選択（区画の追加・西棟は必須・影は出さない） |
 | リザルト画面の「今回の発見」（壁の文字・隠し部屋・2階の異変）、残された記録の総数を4へ修正 | `GameState.h`, `HudScreens.cpp`, `Hud.cpp`, `ResultScene.*` | 実装 | |
 | 1面のヒューズの置き場所をプレイごとに部屋の中の候補からランダムに選ぶ | `Stage1Layout.cpp`, `StageSceneDraw.cpp` | 実装 | |
+| 1面の南西の広間（技術デモの部屋を元にした寄り道の区画：柱・棚と机の一角・色の付いた警告灯・天井の照明・電池）。撮影モードに南西の広間を追加 | `Stage1Layout.cpp`, `CaptureMode.cpp`, `README.md` | 配置の設計・実装 | 方針の選択（技術デモの部屋を1面の西側に入れる） |
+| 1面の西棟を技術デモの部屋の作り（柱・棚と机の一角・天井の照明・色の付いたランプ）に変え、排水バルブの遊びを追加（長押しで回すと水が奥へ引いていき、水の底のヒューズが見つかる）。撮影モードの西棟の場面を変更 | `DrainValve.*`, `Stage1WestWing.*`, `Stage1Layout.cpp`, `Stage1Objective.*`, `StageScene.*`, `StageSceneDraw.cpp`, `StageSceneEvents.cpp`, `CaptureMode.cpp`, `README.md`, `ARCHITECTURE.md` | 遊びの案・配置の設計・実装 | 方針の選択（西棟をデモの部屋の作りに・新しい遊びは排水バルブ） |
 
 ### 設計の整理・品質改善
 

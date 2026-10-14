@@ -284,11 +284,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     else if (loopPhase == 2)
     {
         // 2周目：3本目のヒューズは西棟の奥にある。右の倉庫に西棟の鍵を出し、鍵で西棟の扉を開けさせている。
-        Item* thirdFuse = m_Objects.thirdFuse;
-        if (thirdFuse != nullptr && !thirdFuse->IsCollected())
-        {
-            thirdFuse->SetActive(true);
-        }
+        // ヒューズは、西棟の排水バルブで水を抜いたときにStage1WestWingが出している。
         m_WestWing.Activate();
 
         if (middleLight != nullptr)

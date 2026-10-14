@@ -8,17 +8,24 @@
 namespace
 {
     // 3本目のヒューズを探す段階（西棟）の文章。目的・ヒント（35秒・18秒）の3種類がある。
-    const char* SelectWestWingText(int westWingStep, int variant)
+    // 水を抜く段階の目的には、回し終えたバルブの数を付けている。
+    std::string SelectWestWingText(int westWingStep, int valvesOpened, int variant)
     {
-        static const char* const Texts[3][3] =
+        static const char* const Texts[4][3] =
         {
             { "右側の部屋で鍵を探す", "ヒント 右奥の部屋に鍵が落ちている", "ヒント 右側の部屋を確認する" },
             { "西側の壁の扉を鍵で開ける", "ヒント 配電盤の近く、左の壁の扉", "ヒント 西側の壁沿いを探す" },
-            { "浸水した西棟の奥でヒューズを探す", "ヒント 水に浸かった通路の一番奥", "ヒント 西棟の奥へ進む" },
+            { "排水バルブを回して西棟の水を抜く", "ヒント 赤いランプの下のバルブを、Eを押し続けて回す", "ヒント 赤く光るランプを探す" },
+            { "水の引いた西棟の奥でヒューズを探す", "ヒント 仕切りの奥のポンプ室", "ヒント 西棟の奥へ進む" },
         };
-        // 段階は1〜3の範囲に収めている
-        const int step = westWingStep < 1 ? 1 : (westWingStep > 3 ? 3 : westWingStep);
-        return Texts[step - 1][variant];
+        // 段階は1〜4の範囲に収めている
+        const int step = westWingStep < 1 ? 1 : (westWingStep > 4 ? 4 : westWingStep);
+        std::string text = Texts[step - 1][variant];
+        if (step == 3 && variant == 0)
+        {
+            text += "  " + std::to_string(valvesOpened) + "/3";
+        }
+        return text;
     }
 }
 
@@ -40,7 +47,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
     {
         objectiveText = in.corridorLoopCount < 2
             ? "もう一度廊下の奥まで進む"
-            : SelectWestWingText(in.westWingStep, 0);
+            : SelectWestWingText(in.westWingStep, in.westWingValvesOpened, 0);
     }
     else
     {
@@ -60,6 +67,11 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
     {
         // 照らすと止まる影が現れた・触れられたときの知らせは、短い間だけ普段の目的より優先している。
         objectiveText = std::string(in.archiveStalkerText);
+    }
+    else if (!in.westWingText.empty())
+    {
+        // 西棟のバルブを回している間の進み具合と、水が引いたなどの知らせ。
+        objectiveText = std::string(in.westWingText);
     }
     else if (in.patrolDispatched)
     {
@@ -190,7 +202,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         }
         else if (in.fuseCount == 2)
         {
-            objectiveText = SelectWestWingText(in.westWingStep, 1);
+            objectiveText = SelectWestWingText(in.westWingStep, in.westWingValvesOpened, 1);
         }
         else
         {
@@ -226,7 +238,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         }
         else if (in.fuseCount == 2)
         {
-            objectiveText = SelectWestWingText(in.westWingStep, 2);
+            objectiveText = SelectWestWingText(in.westWingStep, in.westWingValvesOpened, 2);
         }
         else
         {

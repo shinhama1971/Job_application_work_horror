@@ -68,7 +68,7 @@ namespace
         return std::atan2(toX - fromX, toZ - fromZ);
     }
 
-    // 1面: 開始地点 → 中央ホール → 左の倉庫 → 暗証番号の扉 → ループ廊下 → 西棟（浸水した機械室） → 書類保管室
+    // 1面: 開始地点 → 中央ホール → 左の倉庫 → 暗証番号の扉 → ループ廊下 → 西棟（浸水した機械室） → 書類保管室 → 南西の広間
     const std::vector<Keyframe> Stage1Tour =
     {
         { 0.0f, Vector3(0.0f, FloorY, -120.0f), Pi, -0.12f, nullptr, false },
@@ -85,20 +85,18 @@ namespace
         { 41.0f, Vector3(0.0f, FloorY, 185.0f), 0.0f, 0.0f, nullptr, false },
         { 46.5f, Vector3(0.0f, FloorY, 240.0f), 0.0f, -0.10f, L"05_1面_ループ廊下の突き当たり", false },
         { 50.0f, Vector3(0.0f, FloorY, 245.0f), 0.0f, -0.10f, nullptr, false },
-        // 西棟（浸水した機械室）。入口の内側へ場面を切り替え、仕切りの切れ目を通って奥のポンプ室まで進んでいる。
+        // 西棟（浸水した機械室）。入口の内側へ場面を切り替え、柱の並ぶ広間と排水バルブを写し、仕切りの切れ目から奥のポンプ室へ進んでいる。
         // 50.0秒と50.05秒の間はほぼ0秒なので、ループ廊下から西棟へ一瞬で移っている（場面の切り替え）
-        { 50.05f, Vector3(-235.0f, FloorY, -85.0f), YawToward(-235.0f, -85.0f, -370.0f, -20.0f), -0.28f, nullptr, false },
-        { 52.5f, Vector3(-237.0f, FloorY, -82.0f), YawToward(-237.0f, -82.0f, -370.0f, -20.0f), -0.28f, L"05b_1面_西棟の浸水した通路", false },
-        { 54.0f, Vector3(-240.0f, FloorY, 25.0f), 0.0f, -0.10f, nullptr, false },
-        { 56.5f, Vector3(-245.0f, FloorY, 40.0f), -Pi * 0.5f, -0.10f, nullptr, false },
-        { 60.0f, Vector3(-355.0f, FloorY, 40.0f), -Pi * 0.5f, -0.05f, nullptr, false },
-        { 62.0f, Vector3(-360.0f, FloorY, 60.0f), 0.0f, -0.05f, nullptr, false },
-        { 64.5f, Vector3(-360.0f, FloorY, 115.0f), Pi * 0.5f, -0.05f, nullptr, false },
-        { 68.0f, Vector3(-250.0f, FloorY, 120.0f), Pi * 0.5f, -0.05f, nullptr, false },
-        { 70.0f, Vector3(-240.0f, FloorY, 140.0f), 0.0f, -0.05f, nullptr, false },
-        { 72.5f, Vector3(-240.0f, FloorY, 195.0f), -Pi * 0.4f, -0.10f, nullptr, false },
-        { 75.0f, Vector3(-280.0f, FloorY, 210.0f), YawToward(-280.0f, 210.0f, -345.0f, 235.0f), -0.15f, L"05c_1面_西棟のポンプ室", false },
-        { 77.0f, Vector3(-285.0f, FloorY, 212.0f), YawToward(-285.0f, 212.0f, -345.0f, 235.0f), -0.15f, nullptr, false },
+        { 50.05f, Vector3(-232.0f, FloorY, -20.0f), YawToward(-232.0f, -20.0f, -330.0f, 140.0f), -0.16f, nullptr, false },
+        { 52.5f, Vector3(-233.0f, FloorY, -21.0f), YawToward(-233.0f, -21.0f, -330.0f, 140.0f), -0.16f, L"05b_1面_西棟の柱の並ぶ浸水した広間", false },
+        { 55.0f, Vector3(-292.0f, FloorY, -66.0f), Pi, -0.62f, nullptr, false },
+        { 57.0f, Vector3(-292.0f, FloorY, -67.0f), Pi, -0.62f, L"05b2_1面_西棟の排水バルブ", false },
+        { 58.5f, Vector3(-295.0f, FloorY, -70.0f), 0.0f, -0.08f, nullptr, false },
+        { 64.0f, Vector3(-300.0f, FloorY, 150.0f), 0.0f, -0.08f, nullptr, false },
+        { 67.0f, Vector3(-300.0f, FloorY, 195.0f), YawToward(-300.0f, 195.0f, -345.0f, 235.0f), -0.12f, nullptr, false },
+        { 72.5f, Vector3(-262.0f, FloorY, 196.0f), YawToward(-262.0f, 196.0f, -320.0f, 240.0f), -0.30f, nullptr, false },
+        { 75.0f, Vector3(-262.0f, FloorY, 197.0f), YawToward(-262.0f, 197.0f, -320.0f, 240.0f), -0.30f, L"05c_1面_西棟のポンプ室と排水口", false },
+        { 77.0f, Vector3(-262.0f, FloorY, 197.0f), YawToward(-262.0f, 197.0f, -320.0f, 240.0f), -0.30f, nullptr, false },
         // 書類保管室（棚が並ぶ迷路）。棚の間から奥を向き、懐中電灯の影（手元から作る影と、距離で柔らかくなる縁）を写している。
         { 77.05f, Vector3(-60.0f, FloorY, 115.0f), YawToward(-60.0f, 115.0f, -200.0f, 118.0f), -0.12f, nullptr, false },
         { 79.5f, Vector3(-62.0f, FloorY, 115.0f), YawToward(-62.0f, 115.0f, -200.0f, 118.0f), -0.12f, L"05d_1面_書類保管室の棚と影", false },
@@ -107,6 +105,13 @@ namespace
         { 84.0f, Vector3(-62.0f, FloorY, 115.0f), YawToward(-62.0f, 115.0f, -200.0f, 118.0f), -0.12f, L"05e_1面_書類保管室の照らすと止まる影", false },
         { 87.0f, Vector3(-62.0f, FloorY, 115.0f), YawToward(-62.0f, 115.0f, -200.0f, 118.0f), -0.12f, L"05f_1面_照らされて止まった影", false },
         { 88.5f, Vector3(-62.0f, FloorY, 115.0f), YawToward(-62.0f, 115.0f, -200.0f, 118.0f), -0.12f, nullptr, false },
+        // 南西の広間（左の倉庫の南の入口から入る部屋）。入口から柱の並ぶ広間を見渡し、奥の棚と机の一角へ進む。
+        { 88.55f, Vector3(-160.0f, FloorY, -150.0f), Pi, -0.10f, nullptr, false },
+        { 90.5f, Vector3(-160.0f, FloorY, -196.0f), YawToward(-160.0f, -196.0f, -300.0f, -270.0f), -0.14f, nullptr, false },
+        { 92.5f, Vector3(-160.0f, FloorY, -196.0f), YawToward(-160.0f, -196.0f, -300.0f, -270.0f), -0.14f, L"05g_1面_南西の広間", false },
+        { 95.5f, Vector3(-280.0f, FloorY, -262.0f), YawToward(-280.0f, -262.0f, -350.0f, -290.0f), -0.20f, nullptr, false },
+        { 97.0f, Vector3(-280.0f, FloorY, -262.0f), YawToward(-280.0f, -262.0f, -350.0f, -290.0f), -0.20f, L"05h_1面_南西の広間の棚と机", false },
+        { 98.0f, Vector3(-280.0f, FloorY, -262.0f), YawToward(-280.0f, -262.0f, -350.0f, -290.0f), -0.20f, nullptr, false },
     };
 
     // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉
@@ -409,7 +414,7 @@ namespace
         { "暗証番号の扉", Vector3(12.0f, FloorY, 112.0f), Pi * 0.5f, -0.05f },
         { "ループ廊下", Vector3(0.0f, FloorY, 185.0f), 0.0f, 0.0f },
         // 床一面が水に浸かった西棟。水面の反射（平面反射）が画面の広い範囲に出る場所。
-        { "西棟（浸水した通路）", Vector3(-237.0f, FloorY, -82.0f), YawToward(-237.0f, -82.0f, -370.0f, -20.0f), -0.28f },
+        { "西棟（浸水した広間）", Vector3(-233.0f, FloorY, -21.0f), YawToward(-233.0f, -21.0f, -330.0f, 140.0f), -0.16f },
     };
 
     // 各段階のフレーム数。切り替えた直後はGPU時間の結果が数フレーム遅れて届くため、最初の45フレームは捨てている。

@@ -93,7 +93,7 @@ private:
     Stage1KeypadDoor m_KeypadDoor;
     // 暗証番号の扉の先の部屋で、閉じ込められて鍵を探すイベント。
     Stage1HiddenRoomEvent m_HiddenRoom;
-    // 西棟（浸水した機械室）。鍵を拾って扉を開け、奥で3本目のヒューズを取る必須の区画。
+    // 西棟（浸水した機械室）。鍵を拾って扉を開け、排水バルブで水を抜き、奥で3本目のヒューズを取る必須の区画。
     Stage1WestWing m_WestWing;
     // 西棟で鳴らす物音（使い回している）
     std::vector<AmbientSoundCue> m_WestWingCues;

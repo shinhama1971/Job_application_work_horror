@@ -7,11 +7,13 @@
 Texture2D<float> g_FlashlightShadowMap : register(t5);
 SamplerComparisonState g_ShadowSampler : register(s1);
 
-// ライトのビュー×射影の行列と、x=1テクセルの大きさ、y=比較のずれ、z=near、w=far（ShadowMap.cppと同じ並び）
+// ライトのビュー×射影の行列と、x=1テクセルの大きさ、y=比較のずれ、z=near、w=far（ShadowMap.cppと同じ並び）、
+// 影の方式（x=0なら影なし、1なら硬い影、2ならPCSS。技術デモで見比べるために切り替えている）
 cbuffer ShadowBuffer : register(b8)
 {
     matrix ShadowViewProjection;
     float4 ShadowParameters;
+    float4 ShadowOptions;
 }
 
 // 懐中電灯のレンズの大きさ（ワールドの長さ。約10cm）。大きいほど影の縁がぼやける
@@ -43,8 +45,8 @@ float ShadowHash21(float2 value)
 // 影の明るさ（0=影、1=光が当たる）を返している
 float GetFlashlightShadow(float4 shadowPosition)
 {
-    // ライトの後ろや、シャドウマップの範囲の外は、影ではないことにしている
-    if (shadowPosition.w <= 0.0f)
+    // ライトの後ろや、シャドウマップの範囲の外は、影ではないことにしている（「影なし」の方式も同じ）
+    if (shadowPosition.w <= 0.0f || ShadowOptions.x < 0.5f)
     {
         return 1.0f;
     }
@@ -70,6 +72,11 @@ float GetFlashlightShadow(float4 shadowPosition)
         lerp(1.10f, 0.82f, saturate((projected.z - 0.04f) / 0.86f));
     const float compareDepth = projected.z - receiverBias;
     const float texel = ShadowParameters.x;
+    // 「硬い影」の方式は、1か所だけ比べる（PCSSと見比べるため）
+    if (ShadowOptions.x < 1.5f)
+    {
+        return g_FlashlightShadowMap.SampleCmpLevelZero(g_ShadowSampler, shadowUV, compareDepth);
+    }
     const float receiverDistance = LinearizeShadowDepth(projected.z);
 
     // 画素ごとに円の配置を回し、少ない回数でも縁が段々にならず、細かいざらつきになるようにしている。
