@@ -245,6 +245,11 @@ void WaterEffectSystem::UpdateFallingDrops(float deltaTime)
 		{
 			drop.Position.y = -99.35f;
 			drop.Active = false;
+			// 水たまりに落ちた水滴は、小さなおもりとして波を立てる
+			if (IsInsidePuddle(drop.Position))
+			{
+				m_RippleImpulses.emplace_back(drop.Position.x, drop.Position.z, 1.0f, -0.45f);
+			}
 			drop.ImpactTimer = 0.55f;
 			drop.WaitTimer = 0.65f + drop.Seed * 1.9f;
 		}
@@ -352,6 +357,9 @@ bool WaterEffectSystem::TriggerFootstepRipple(
 		m_FootstepRipples.erase(m_FootstepRipples.begin());
 	}
 	m_FootstepRippleCooldown = sprinting ? 0.22f : 0.36f;
+	// 波のシミュレーションへ、足を下ろした所を押し下げるおもりを渡している（走っているほど大きく強い）
+	m_RippleImpulses.emplace_back(playerPosition.x, playerPosition.z,
+		sprinting ? 2.4f : 2.0f, sprinting ? -1.7f : -1.2f);
 
 	// 走っているほど強く長く、レンズの曇りを出している（続けて出しすぎないよう間隔を空けている）
 	if (m_LensSplashCooldown <= 0.0f)
@@ -491,7 +499,7 @@ void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 			0.82f);
 	}
 
-	// 足音の波紋
+	// 足音の波紋（足を下ろした瞬間の小さな輪。そこから広がる波は、波のシミュレーションが描いている）
 	for (const WaterRipple& ripple : m_FootstepRipples)
 	{
 		if (!camera->IsSphereVisible(ripple.Position, ripple.MaxRadius + 1.0f))
@@ -503,7 +511,7 @@ void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 			ripple.Position,
 			progress,
 			0.55f + progress * ripple.MaxRadius,
-			0.62f);
+			0.35f);
 	}
 
 	Renderer::SetBlendState(BS_NONE);

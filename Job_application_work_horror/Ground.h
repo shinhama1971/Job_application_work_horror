@@ -13,6 +13,7 @@
 #include"Object.h"
 #include"Material.h"
 #include "WaterEffectSystem.h"
+#include "WaterRippleSimulation.h"
 class Camera;
 
 //-----------------------------------------------------------------------------
@@ -56,6 +57,14 @@ class Ground :public Object
 	bool m_WasPowerRestored = false;
 	// 水たまりの位置、天井からの水滴、足元の波紋をまとめて管理している
 	WaterEffectSystem m_WaterEffects;
+	// 足音や水滴でできた水たまりの波を、GPUの波の式で計算している
+	WaterRippleSimulation m_RippleSimulation;
+	// 波を進めるのは描画の最初（RunGpuSimulation）なので、更新で受け取った経過時間・中心・浸水した範囲を覚えている
+	float m_PendingRippleSeconds = 0.0f;
+	DirectX::SimpleMath::Vector2 m_RippleCenter;
+	DirectX::SimpleMath::Vector4 m_RippleFloodRect;
+	// 波を跳ね返す、床に立った物を上から見た長方形（カメラに近い順）
+	std::vector<DirectX::SimpleMath::Vector4> m_RippleObstacles;
 
 	// 本描画と深度プリパスで共通のワールド行列（同じ計算にし、深度を一致させている）
 	DirectX::SimpleMath::Matrix MakeWorldMatrix() const;
@@ -69,6 +78,8 @@ public:
 	// 床は不透明なので、深度プリパスに床の面だけを描いている（水滴・波紋の半透明の板は描かない）
 	bool WritesDepthPrepass() const override { return true; }
 	void DrawDepthPrepass(Camera* cam) override;
+	// 描画の最初に、水たまりの波をCompute Shaderで進め、床と壁のシェーダーへ渡している
+	void RunGpuSimulation() override;
 	void Uninit();
 	// 大きさと位置を設定している
 	void SetScale(float x, float y, float z) { m_Scale = DirectX::SimpleMath::Vector3(x, y, z); }
@@ -79,6 +90,15 @@ public:
 	bool TriggerFootstepRipple(
 		const DirectX::SimpleMath::Vector3& position,
 		bool sprinting);
+	// 足元が水面なら、音もレンズの曇りも出さずに、水たまりの波だけを立てている（自動撮影で、歩いた跡の波を写すため）
+	void AddRippleImpulse(const DirectX::SimpleMath::Vector3& position, float radius, float strength)
+	{
+		if (m_WaterEffects.IsInsidePuddle(position))
+		{
+			m_RippleSimulation.AddImpulse(
+				DirectX::SimpleMath::Vector2(position.x, position.z), radius, strength);
+		}
+	}
 	// その位置が水たまり（または水に浸かった範囲）の中かを返している
 	bool IsInsidePuddle(
 		const DirectX::SimpleMath::Vector3& position) const;

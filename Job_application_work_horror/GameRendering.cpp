@@ -113,12 +113,27 @@ namespace Core
 
         // 水面の光の揺らぎ（壁のピクセルシェーダー）で使う、プレイヤーの視点のビュー行列を渡している。
         // 懐中電灯はこの視点から照らしているため、反射を描くときも同じ行列を使う。
+        // 技術デモ（F2）の水面の反射の方式（0=なし、1=平面反射（普段）、2=キューブマップ、3=SSR）も、ここで床のシェーダーへ渡している。
+        const int reflectionMethod = Tools::TechDemo::GetReflectionMethod();
         {
             DirectX::SimpleMath::Matrix mainView;
             DirectX::SimpleMath::Matrix mainProjection;
             m_Instance->m_Camera.GetMainMatrices(mainView, mainProjection);
             Renderer::SetWaterCausticsView(mainView);
+            Renderer::SetReflectionMode(reflectionMethod >= 2 ? reflectionMethod - 1 : 0, mainProjection);
         }
+
+        // 描画の前にGPUで計算する物（水たまりの波のCompute Shader）を実行している。
+        // 更新の処理ではなくここで実行し、そのGPU時間を「水たまりの波」の段階として測っている。
+        m_Instance->m_GpuTimer.BeginPass(GpuPass::WaterRipples, context);
+        for (const auto& object : m_Instance->m_ObjectManager.GetAllObjects())
+        {
+            if (!object->IsDestroy())
+            {
+                object->RunGpuSimulation();
+            }
+        }
+        m_Instance->m_GpuTimer.EndPass(GpuPass::WaterRipples, context);
 
         // 光を放つObjectから、このフレームの点光源を集めてGPUへ送っている。
         // この後の反射・監視映像の描画では全部の光源を、本描画ではタイルごとのリストを使っている。
@@ -179,8 +194,37 @@ namespace Core
 
         // 水面の反射は1面だけ。水たまりが画面に映っているかを先に調べている
         // 技術デモで「水面の反射なし」を選んでいるときは、反射を描かない（床も反射を混ぜない。Ground::Draw）
-        if (m_Instance->m_CurrentScene == SceneName::Stage &&
-            Tools::TechDemo::UsesPlanarReflection())
+        // 技術デモでキューブマップを選んでいる間は、カメラの位置から6方向のうち1面だけを毎フレーム撮り直している
+        // （最初の1フレームだけは6面とも撮る）。平面反射のように景色をもう一度まるごと描かないので軽い。
+        if (reflectionMethod != 2)
+        {
+            m_Instance->m_ReflectionProbe.Invalidate();
+        }
+        if (m_Instance->m_CurrentScene == SceneName::Stage && reflectionMethod == 2)
+        {
+            m_Instance->m_GpuTimer.BeginPass(GpuPass::Reflection, context);
+            const int faceCount = m_Instance->m_ReflectionProbe.HasAllFaces() ? 1 : 6;
+            for (int face = 0; face < faceCount; ++face)
+            {
+                m_Instance->m_ReflectionProbe.BeginFace(
+                    m_Instance->m_Camera, m_Instance->m_Camera.GetPosition());
+                for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
+                {
+                    if (o->IsDestroy() || !o->ContributesToPlanarReflection() ||
+                        !IsNearEnoughForReflection(*o, m_Instance->m_Camera))
+                    {
+                        continue;
+                    }
+                    ++reflectionDrawn;
+                    o->Draw(&m_Instance->m_Camera);
+                }
+                m_Instance->m_ReflectionProbe.EndFace(m_Instance->m_Camera);
+            }
+            m_Instance->m_GpuTimer.EndPass(GpuPass::Reflection, context);
+            m_Instance->m_WasReflectionVisible = false;
+            m_Instance->m_HasReflectionCameraPose = false;
+        }
+        else if (m_Instance->m_CurrentScene == SceneName::Stage && reflectionMethod == 1)
         {
             bool reflectionVisible = false;
             for (const auto& object :
@@ -320,6 +364,15 @@ namespace Core
         {
             m_Instance->m_TiledLighting.BindAllLights();
         }
+        // 技術デモでSSRを選んでいるときは、深度プリパスの深度を写し取り、前のフレームの画面と一緒に床のシェーダーへ渡している。
+        // （反射の光線をたどる計算は、本描画の床のピクセルシェーダーで行う）
+        const bool useScreenSpaceReflection =
+            m_Instance->m_CurrentScene == SceneName::Stage && reflectionMethod == 3 && useDepthPrepass;
+        if (useScreenSpaceReflection)
+        {
+            m_Instance->m_ScreenSpaceReflection.Prepare(
+                m_Instance->m_PostProcess.GetCapturedSceneSRV());
+        }
 
         for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
         {
@@ -336,6 +389,10 @@ namespace Core
             }
         }
         m_Instance->m_GpuTimer.EndPass(GpuPass::MainScene, context);
+        if (useScreenSpaceReflection)
+        {
+            m_Instance->m_ScreenSpaceReflection.Unbind();
+        }
 
         // デバッグ画面に表示する、描いた数と省いた数を渡している
         Debug::UI::SetCullingStats(

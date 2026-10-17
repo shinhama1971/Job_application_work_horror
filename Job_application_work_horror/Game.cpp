@@ -79,6 +79,8 @@ namespace Core
         // カメラ・水面の反射・影・画面効果・タイルベースライティングを作り、設定を反映してからタイトルを始めている
         m_Instance->m_Camera.Init();
         m_Instance->m_PlanarReflection.Init();
+        m_Instance->m_ReflectionProbe.Init();
+        m_Instance->m_ScreenSpaceReflection.Init(Application::GetWidth(), Application::GetHeight());
         m_Instance->m_ShadowMap.Init();
         m_Instance->m_PostProcess.Init();
         m_Instance->m_TiledLighting.Init();
@@ -207,6 +209,8 @@ namespace Core
         m_Instance->m_PostProcess.Uninit();
         m_Instance->m_ShadowMap.Uninit();
         m_Instance->m_PlanarReflection.Uninit();
+        m_Instance->m_ReflectionProbe.Uninit();
+        m_Instance->m_ScreenSpaceReflection.Uninit();
 
         m_Instance->m_Sound.Uninit();
         m_Instance->m_SoundReady = false;

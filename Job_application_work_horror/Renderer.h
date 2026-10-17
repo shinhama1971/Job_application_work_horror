@@ -110,9 +110,15 @@ struct WATER_CAUSTICS_BUFFER
     float Time;      // 揺らぎを動かす時間（秒）
     float Strength;  // 強さ（0なら計算しない）
     float Padding;
+    // 水たまりの波のシミュレーションの範囲と強さ（x,y = 範囲の最小のx・z、z = 範囲の一辺、w = 強さ。0なら使わない）
+    DirectX::SimpleMath::Vector4 Ripple;
+    // 水面の反射の比較（SSR）で使う、プレイヤーの視点の射影行列（転置済み）
+    DirectX::SimpleMath::Matrix Projection;
+    // 水面の反射の方式（x = 0 平面反射（普段）、1 キューブマップ、2 SSR）。「反射なし」は床の反射の強さを0にして表している
+    DirectX::SimpleMath::Vector4 Reflection;
 };
 
-static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 96, "Water caustics buffer must match HLSL layout");
+static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 192, "Water caustics buffer must match HLSL layout");
 
 // サブセット（モデルの中で、同じマテリアルで描く部分）
 struct SUBSET{
@@ -266,6 +272,11 @@ public:
 		const DirectX::SimpleMath::Vector4& floodRect, float waterY, float time, float strength);
 	// 水面の光の揺らぎで使う、プレイヤーの視点のビュー行列を設定している（毎フレーム、描画の最初に呼ぶ）
 	static void SetWaterCausticsView(const DirectX::SimpleMath::Matrix& view);
+	// 水たまりの波のシミュレーションの高さのテクスチャ（t9）と、その範囲・強さを、床と壁のシェーダーへ渡している。strengthが0なら使わない。
+	static void SetWaterRipples(ID3D11ShaderResourceView* heightTexture,
+		const DirectX::SimpleMath::Vector2& origin, float worldSize, float strength);
+	// 水面の反射の方式（0 平面反射、1 キューブマップ、2 SSR）と、SSRで使うプレイヤーの視点の射影行列を、床のシェーダーへ渡している
+	static void SetReflectionMode(int mode, const DirectX::SimpleMath::Matrix& projection);
 	// ライトの計算をするかを切り替える・返している
 	static void SetLightEnable(bool Enable);
 	static bool GetLightEnable();

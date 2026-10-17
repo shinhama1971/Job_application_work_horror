@@ -93,6 +93,11 @@ public:
     {
         m_CollisionEnabled = enabled;
     }
+    // 今、当たり判定があるか（表示していない間はない）。水たまりの波を跳ね返す物を選ぶのにも使っている
+    bool IsCollisionEnabled() const
+    {
+        return m_Visible && m_CollisionEnabled;
+    }
 
     void SetCastsShadow(bool castsShadow)
     {

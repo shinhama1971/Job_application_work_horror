@@ -42,6 +42,8 @@ private:
     void Uninit();
     // 看板・ランプなどの小さな光源を設定している（タイルベースライティングで数を増やせるため）。
     void SetupPracticalLights();
+    // 進む先の天井照明を1灯だけ、不規則にちかちかさせている
+    void UpdateRouteLights();
     // 目的表示の文章を選ぶために、今の状態を集めている（StageSceneDraw.cpp）。
     Stage1ObjectiveInput MakeObjectiveInput() const;
     // 姿の見えない物音を鳴らしてよいか（台本の演出や監視映像と重ならないか）を判断している。
@@ -61,6 +63,9 @@ private:
 
     // 配置で作った、進行で使うObject
     StageObjects m_Objects;
+    // 今ちかちかさせている照明の組（進み具合）と、その組の中で何番目の灯か
+    std::size_t m_ActiveRoute = static_cast<std::size_t>(Stage1RouteLight::Count);
+    std::size_t m_RouteFixtureIndex = 0;
 
     // 1面の進行は「入口の演出 → ヒューズ探し → 電力の復旧 → 出口の演出」の順。
     // 各演出は段階と経過秒で管理し、Updateを止めずに少しずつ進めている。
@@ -95,6 +100,8 @@ private:
     Stage1HiddenRoomEvent m_HiddenRoom;
     // 西棟（浸水した機械室）。鍵を拾って扉を開け、排水バルブで水を抜き、奥で3本目のヒューズを取る必須の区画。
     Stage1WestWing m_WestWing;
+    // 光の安全地帯（暖かい灯りの下）。落ち着きの度合いと、休んでいる間の電池の回復を管理している。
+    Stage1SafeLights m_SafeLights;
     // 西棟で鳴らす物音（使い回している）
     std::vector<AmbientSoundCue> m_WestWingCues;
     // 書類保管室の「照らすと止まる影」。動きのルールはこのクラス、影の表示・音・電池はSceneが行っている。

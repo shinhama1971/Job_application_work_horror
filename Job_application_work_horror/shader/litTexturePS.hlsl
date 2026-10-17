@@ -12,6 +12,7 @@ SamplerState g_SamplerState : register(s0);
 
 
 #include "fastNoise.hlsli"
+#include "horrorMarks.hlsli"
 #include "flashlightLighting.hlsli"
 #include "waterCaustics.hlsli"
 #include "roomOcclusion.hlsli"
@@ -188,9 +189,14 @@ WallAgeing ComputeWallAgeing(float3 worldPosition, float3 normal, float weight)
     const float mold = moldCluster * lerp(1.0f, moldSpeckle, saturate(1.0f - footprint / 0.6f)) *
         saturate(exp(-heightFromFloor * 0.05f) + 0.30f);
 
-    // 継ぎ目・穴・ひびを、へこみの高さと、奥の暗さにしている
-    ageing.height = -(seam * 0.7f + pit * 0.5f + crack * 0.35f) * weight;
-    ageing.cavity = saturate(seam * 0.32f + pit * 0.40f + crack * 0.42f) * weight;
+    // --- ホラーらしい跡（血の手形と引きずった跡、引っかき傷、血の垂れ跡。horrorMarks.hlsli）
+    // 壁の面の位置（法線の向きの座標）も渡し、平行な別の壁に同じ跡が並ばないようにしている。
+    const float planeCoordinate = normal.x > normal.z ? worldPosition.x : worldPosition.z;
+    const HorrorMarks marks = ComputeHorrorMarks(uv.x, heightFromFloor, planeCoordinate, footprint);
+
+    // 継ぎ目・穴・ひび・引っかき傷を、へこみの高さと、奥の暗さにしている
+    ageing.height = -(seam * 0.7f + pit * 0.5f + crack * 0.35f + marks.gouge * 0.9f) * weight;
+    ageing.cavity = saturate(seam * 0.32f + pit * 0.40f + crack * 0.42f + marks.gouge * 0.25f) * weight;
 
     // 色は元の色に掛けている（茶色＝錆、くすんだ緑＝カビ、少し暗い灰緑＝水に浸かっていた部分）。
     const float3 rust = float3(0.66f, 0.50f, 0.38f);
@@ -201,8 +207,13 @@ WallAgeing ComputeWallAgeing(float3 worldPosition, float3 normal, float weight)
     tint = lerp(tint, rust * 0.85f, tideMark * 0.50f);
     tint = lerp(tint, rust, streak * 0.65f);
     tint = lerp(tint, moldColor, mold * 0.75f);
+    // 引っかき傷は、汚れた表面が削れて下の明るいコンクリートが見えている。血は赤黒く、青と緑を強く吸う
+    const float3 bloodColor = float3(0.46f, 0.035f, 0.030f);
+    tint = lerp(tint, tint * 1.35f, marks.gouge * 0.8f);
+    tint = lerp(tint, bloodColor, marks.blood * 0.92f);
     ageing.tint = lerp(1.0f.xxx, tint, weight);
-    ageing.damp = saturate(belowWater * 0.6f + streak * 0.4f) * weight;
+    // 血は乾ききっておらず、浅い角度で懐中電灯の光を返す（湿りの光沢を使っている）
+    ageing.damp = saturate(belowWater * 0.6f + streak * 0.4f + marks.blood * 0.9f) * weight;
     return ageing;
 }
 
@@ -476,7 +487,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         }
     }
 
-    // 浸水した床（西棟）の水面で跳ね返った懐中電灯の光が、壁や天井にゆらゆら映る（waterCaustics.hlsli）
+    // 浸水した床（西棟）や、波の立った水たまりの水面で跳ね返った懐中電灯の光が、壁や天井にゆらゆら映る（waterCaustics.hlsli）
     lighting += Light.Diffuse.rgb * GetWaterCausticLight(input.worldPos, normalize(input.worldNormal));
 
     color.rgb *= lighting;

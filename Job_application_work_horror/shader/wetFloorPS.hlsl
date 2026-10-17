@@ -1,5 +1,5 @@
 // ============================================================================
-// シェーダーの役割: 濡れた床を描いている（床の古さ、水たまりと浸水した範囲、波紋、水面の反射、フレネル、懐中電灯と天井灯の照明、霧）。
+// シェーダーの役割: 濡れた床を描いている（床の古さ、水たまりと浸水した範囲、波紋、足音と水滴の波（波のシミュレーション）、水面の反射、フレネル、懐中電灯と天井灯の照明、霧）。
 // ============================================================================
 
 #include "common.hlsl"
@@ -11,6 +11,10 @@ SamplerState g_SamplerState : register(s0);
 
 // 水面の反射の画像（PlanarReflectionが描いたもの、t6）
 Texture2D g_PlanarReflection : register(t6);
+// 反射の方式の比較で使う画像：キューブマップ（t7、ReflectionProbe）、SSRの前のフレームの画面（t4）と深度（t8、ScreenSpaceReflection）
+TextureCube g_ReflectionProbe : register(t7);
+Texture2D g_SsrScene : register(t4);
+Texture2D<float> g_SsrDepth : register(t8);
 
 // Ground.cppのWetFloorBufferと同じ並び（b10）。経過時間、波紋の強さ、反射の強さ、詰め物
 cbuffer WetFloorBuffer : register(b10)
@@ -21,16 +25,6 @@ cbuffer WetFloorBuffer : register(b10)
     float WetPadding;
     // 床一面が水に浸かった範囲（xy = x・zの最小、zw = x・zの最大）。範囲がないときは、最小が最大より大きい値にしている。
     float4 FloodRect;
-}
-
-// マス目ごとの水たまりの表（b13）。WaterEffectSystem::Init がCPUで決めて渡している。
-// x = 水たまりがあれば1、yz = 中心のずれと回転に使う乱数。マス目(PUDDLE_CELL_MIN, PUDDLE_CELL_MIN)から16x16マス。
-// sin を使った乱数をシェーダーで計算すると、GPUの種類で sin の精度が違い、水たまりの場所が変わるため、表にしている。
-#define PUDDLE_CELL_MIN (-8)
-#define PUDDLE_CELL_COUNT 16
-cbuffer PuddleCellBuffer : register(b13)
-{
-    float4 PuddleCells[PUDDLE_CELL_COUNT * PUDDLE_CELL_COUNT];
 }
 
 // 頂点シェーダー（litTextureVS）から受け取る値（影と反射の座標も使っている）
@@ -70,9 +64,70 @@ float ValueNoise(float2 value)
 }
 
 #include "fastNoise.hlsli"
+#include "puddleMask.hlsli"
 #include "flashlightLighting.hlsli"
+#include "waterCaustics.hlsli"
 #include "roomOcclusion.hlsli"
 #include "surfaceDetail.hlsli"
+
+// ----------------------------------------------------------------------------
+// 水面の反射の方式の比較（ReflectionParams.x：0 平面反射、1 キューブマップ、2 SSR）。ゲームの普段の方式は平面反射。
+// ----------------------------------------------------------------------------
+// キューブマップ：反射の向きで、カメラの位置から撮った6方向の画像を読む。
+// 撮った位置からの景色なので軽いが、撮った位置から離れた所や近くの物では、映る位置がずれる。
+float3 SampleProbeReflection(float3 worldPosition, float3 worldNormal)
+{
+    const float3 eye = -mul((float3x3)CausticView, CausticView[3].xyz);
+    const float3 reflected = reflect(normalize(worldPosition - eye), worldNormal);
+    // キューブマップの面は左手系、このゲームの座標は右手系なので、z を反転して読んでいる（ReflectionProbe.cpp）
+    return g_ReflectionProbe.SampleLevel(g_SamplerState, float3(reflected.x, reflected.y, -reflected.z), 0.0f).rgb;
+}
+
+// SSR：反射の光線をビュー空間で少しずつ（だんだん大きな歩幅で）進め、画面の深度より奥へ入った所を「ぶつかった」とし、
+// その画素の色を前のフレームの画面から読む。画面に映っていない物は映らない。
+// 返り値の xyz は色、w はぶつかった度合い（画面の端と、遠くまで進んだ所では0へ近づけている）。
+float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal)
+{
+    uint width = 0;
+    uint height = 0;
+    g_SsrDepth.GetDimensions(width, height);
+    const float3 viewPosition = mul(float4(worldPosition, 1.0f), CausticView).xyz;
+    const float3 viewNormal = normalize(mul(float4(worldNormal, 0.0f), CausticView).xyz);
+    const float3 rayDirection = reflect(normalize(viewPosition), viewNormal);
+    // 深度バッファの値からビュー空間の z を戻すための、射影行列の値（右手系：z = -[3][2] / (深度 + [2][2])）
+    const float depthScale = CausticProjection[2][2];
+    const float depthOffset = CausticProjection[3][2];
+    const int StepCount = 40;
+    float distance = 1.5f;
+    [loop]
+    for (int step = 0; step < StepCount; ++step)
+    {
+        const float3 rayPosition = viewPosition + rayDirection * distance;
+        const float4 clip = mul(float4(rayPosition, 1.0f), CausticProjection);
+        if (clip.w <= 0.001f)
+        {
+            break;
+        }
+        const float2 ndc = clip.xy / clip.w;
+        const float2 uv = float2(ndc.x * 0.5f + 0.5f, -ndc.y * 0.5f + 0.5f);
+        if (any(uv < 0.0f) || any(uv > 1.0f))
+        {
+            break;
+        }
+        const float sceneDepth = g_SsrDepth.Load(int3(uv * float2(width, height), 0));
+        const float sceneViewZ = -depthOffset / (sceneDepth + depthScale);
+        // 光線が面より奥に入り、その差が面の厚みとみなせる範囲なら、ぶつかったとしている
+        const float behind = sceneViewZ - rayPosition.z;
+        if (behind > 0.0f && behind < 3.0f + distance * 0.06f)
+        {
+            const float2 edge = min(uv, 1.0f - uv);
+            const float fade = saturate(min(edge.x, edge.y) * 12.0f) * (1.0f - float(step) / float(StepCount));
+            return float4(g_SsrScene.SampleLevel(g_SamplerState, uv, 0.0f).rgb, fade);
+        }
+        distance *= 1.12f;
+    }
+    return 0.0f;
+}
 
 
 // ----------------------------------------------------------------------------
@@ -208,79 +263,6 @@ float GetDripRing(float2 worldPosition)
     return ring * activeDrop * (1.0f - phase);
 }
 
-// その位置の水たまりの濃さ（0〜1）を返し、岸の線と波の模様も返している
-float GetPuddleMask(
-    float2 worldPosition,
-    out float shore,
-    out float ripplePattern)
-{
-    shore = 0.0f;
-    ripplePattern = 0.0f;
-    // 大きなワールド空間のマス目ごとに、不規則に回した水たまりを1つ置いている。
-    // 半径をマス目の境目より小さくし、床全体を一様に濡らさず、独立した水たまりにしている。
-    const float cellSize = 82.0f;
-    const float2 gridPosition = worldPosition / cellSize;
-    const float2 cell = floor(gridPosition);
-    float2 localPosition = frac(gridPosition) - 0.5f;
-
-    // このマス目の値を表から読んでいる（表の外の床は乾いている扱い）
-    const int2 tableIndex = int2(cell) - PUDDLE_CELL_MIN;
-    float4 cellValue = 0.0f;
-    if (all(tableIndex >= 0) && all(tableIndex < PUDDLE_CELL_COUNT))
-    {
-        cellValue = PuddleCells[tableIndex.y * PUDDLE_CELL_COUNT + tableIndex.x];
-    }
-    const float hasPuddle = cellValue.x;
-    // 大半の床のマス目は乾いているため、対象外のマス目では、回転・輪郭のノイズ・波の計算を省いている。
-    // （この分岐はワールド空間の大きなマス目の単位でそろうので、画素ごとにばらつかない）
-    if (hasPuddle < 0.5f)
-    {
-        shore = 0.0f;
-        ripplePattern = 0.0f;
-        return 0.0f;
-    }
-
-    // 水たまりの中心をずらし、ランダムに回した楕円にしている
-    const float2 randomValue = cellValue.yz;
-    localPosition -= (randomValue - 0.5f) * 0.22f;
-
-    const float angle = randomValue.x * 6.2831853f;
-    const float cosine = cos(angle);
-    const float sine = sin(angle);
-    const float2 rotated = float2(
-        localPosition.x * cosine - localPosition.y * sine,
-        localPosition.x * sine + localPosition.y * cosine);
-    const float2 axes = float2(
-        0.72f + randomValue.x * 0.25f,
-        0.43f + randomValue.y * 0.20f);
-
-    // 縁をノイズと波形でゆがませ、自然な形の水たまりにしている
-    const float radialDistance = length(rotated / axes);
-    const float polarAngle = atan2(rotated.y, rotated.x);
-    const float organicLobes =
-        sin(polarAngle * 5.0f + randomValue.x * 9.0f) * 0.045f +
-        sin(polarAngle * 9.0f + randomValue.y * 13.0f) * 0.022f;
-    const float edgeWarp =
-        (FastValueNoise(worldPosition * 0.052f + cell * 1.73f) - 0.5f) * 0.22f +
-        organicLobes;
-    const float irregularDistance = radialDistance + edgeWarp;
-
-    // 水たまりの濃さ、岸の細い線、ゆっくり広がる波と交差する波の模様
-    const float puddle =
-        (1.0f - smoothstep(0.34f, 0.40f, irregularDistance)) * hasPuddle;
-    shore = (1.0f - smoothstep(
-        0.012f,
-        0.070f,
-        abs(irregularDistance - 0.37f))) * hasPuddle;
-    const float slowWave = sin(
-        radialDistance * 48.0f + edgeWarp * 18.0f - WetTime * 1.65f);
-    const float crossingWave = sin(
-        rotated.x * 76.0f - rotated.y * 41.0f + WetTime * 1.10f);
-    ripplePattern =
-        (slowWave * 0.72f + crossingWave * 0.28f) * puddle;
-    return puddle;
-}
-
 // 床の画素の色を計算している：床の色と古さ → 水たまり → 照明 → 光沢 → 反射 → 霧 → 色調
 float4 main(in LIT_PS_IN input) : SV_Target
 {
@@ -336,6 +318,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     float ripplePattern = 0.0f;
     float puddle = GetPuddleMask(
         input.worldPos.xz,
+        WetTime,
         shore,
         ripplePattern);
     // 床一面が水に浸かった範囲（1面の西棟）。範囲の内側は全面を水たまりと同じに扱い、ゆるい波を立てている。
@@ -355,6 +338,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
     float dripRing = 0.0f;
     float3 detailWorldNormal = agedWorldNormal;
+    // 足音や水滴でできた波（WaterRippleSimulation）の高さ（x）と傾き（yz）
+    float3 rippleWave = 0.0f;
     // 動く波の法線を作り直す処理は、水たまりと細い岸だけにしている。
     // 乾いた床では、3回のノイズの計算を省いている。
     [branch]
@@ -381,6 +366,13 @@ float4 main(in LIT_PS_IN input) : SV_Target
             puddleBaseNormal +
             float3(ripple - rippleX, 0.0f, ripple - rippleZ) *
             (0.72f + abs(ripplePattern) * 0.55f) * puddle * RippleStrength);
+
+        // 足音や水滴でできた本物の波。広がって重なり、岸で跳ね返る輪の傾きで法線を傾け、
+        // 波の山を光らせている（波の模様に足すと、下の光沢の計算で輪が光る）。
+        rippleWave = GetRippleHeightAndSlope(input.worldPos.xz) * puddle;
+        ripplePattern += rippleWave.x * 1.4f;
+        detailWorldNormal = normalize(
+            detailWorldNormal + float3(-rippleWave.y, 0.0f, -rippleWave.z) * 1.6f);
     }
 
     const float baseLuminance = dot(
@@ -523,6 +515,12 @@ float4 main(in LIT_PS_IN input) : SV_Target
                 * flashlightAmount
                 * puddle
                 * (0.045f + fresnel * 0.12f);
+
+            // 足音や水滴の波：傾いた斜面が懐中電灯の光をきらっと返し、照らした所に光の輪が広がって見える
+            specularLighting += Light.Diffuse.rgb
+                * flashlightAmount
+                * saturate(length(rippleWave.yz) * 3.0f)
+                * 0.40f;
         }
     }
 
@@ -534,6 +532,10 @@ float4 main(in LIT_PS_IN input) : SV_Target
         saturate(ripplePattern * 0.5f + 0.5f),
         10.0f) * puddle;
     specularLighting += float3(0.12f, 0.16f, 0.17f) * rippleHighlight * 0.22f;
+    // 足音や水滴の波の、傾いた斜面が光を返して、輪が細く光る
+    // （懐中電灯が当たっていない所でも、暗い中でうっすら輪が分かる程度に光らせている）
+    specularLighting += float3(0.07f, 0.09f, 0.10f) *
+        saturate(length(rippleWave.yz) * 3.0f) * (0.30f + fresnel * 0.70f);
     specularLighting += float3(0.28f, 0.34f, 0.35f)
         * dripRing * 0.20f * RippleStrength;
     specularLighting += float3(0.10f, 0.13f, 0.125f)
@@ -563,7 +565,9 @@ float4 main(in LIT_PS_IN input) : SV_Target
         detailWorldNormal.xz *
         (0.0045f + abs(ripplePattern) * 0.0022f) *
         puddle * RippleStrength;
-    reflectionUV = saturate(reflectionUV + waterDistortion);
+    // 足音や水滴の波が通ると、映った景色が輪の形に大きく波打つ
+    const float2 rippleDistortion = float2(rippleWave.y, -rippleWave.z) * 0.040f;
+    reflectionUV = saturate(reflectionUV + waterDistortion + rippleDistortion);
 
     // 水面のむら：浮いた埃や油膜を、ゆっくり流れる2つのノイズで表している。
     // filmは水面の荒さ（反射のぼけ）に、grimeは映り込みの強さに使い、場所ごとに映り方が変わるようにしている。
@@ -582,13 +586,28 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 最小値を低く保ち、水たまりが黒い板に戻るのを防いでいる。
     // 汚れた所（grimeが低い所）は、映り込みを最大で4割弱めている。
     const float viewAngleReflection = sqrt(saturate(fresnel));
+    // 反射の方式の比較：キューブマップとSSRは、ここで色と映る度合いを求めている（平面反射は下で反射の画像を読む）
+    const int reflectionMode = int(ReflectionParams.x + 0.5f);
+    float4 alternateReflection = 0.0f;
+    [branch]
+    if (reflectionMode != 0 && puddle > 0.001f)
+    {
+        alternateReflection = reflectionMode == 1
+            ? float4(SampleProbeReflection(input.worldPos, detailWorldNormal), 1.0f)
+            : TraceScreenSpaceReflection(input.worldPos, detailWorldNormal);
+    }
+    const float methodInside = reflectionMode == 0 ? reflectionInside : alternateReflection.w;
     const float reflectionStrength = saturate(
-        puddle * reflectionInside *
+        puddle * methodInside *
         lerp(0.24f, 0.98f, viewAngleReflection) * ReflectionStrength *
         lerp(0.60f, 1.0f, smoothstep(0.25f, 0.75f, grime)));
     float3 reflectedScene = 0.0f;
     [branch]
-    if (reflectionStrength > 0.001f)
+    if (reflectionStrength > 0.001f && reflectionMode != 0)
+    {
+        reflectedScene = alternateReflection.rgb;
+    }
+    else if (reflectionStrength > 0.001f)
     {
         // 濡れた床に映る照明は、見る人の方へ縦に伸びて見える。荒いほど、反射の画像を縦長の範囲で読んで平均している。
         const float2 streak = float2(0.0012f, 0.011f) * waterRoughness;

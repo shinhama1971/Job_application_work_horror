@@ -114,6 +114,68 @@ void CeilingLight::Init()
     m_LightMaterial->Create(panel);
 }
 
+// 切れかけの電球のちかちか。一定の周期や規則的な点滅にならないよう、毎回長さと速さを乱数で変えている。
+// ・ぱちぱち：0.2〜0.8秒の間、1秒に16〜26回の速さで、点いたり消えたりを不規則に繰り返す
+// ・消えかけ：ときどき0.4〜0.9秒ふっと消え、最後に何度か瞬いて点き直す（このときだけ小さく電気の音を鳴らす）
+// ・間：0.5〜2.4秒。間の間も、電球のうなりで明るさが少し揺れている
+void CeilingLight::UpdateRouteFlicker(float& targetBrightness)
+{
+    // 0〜1の乱数。器具ごとの値と回数から決まるので、同じ回の中では同じ並びになる
+    const auto noise = [](float seed)
+    {
+        const float value = std::sin(seed * 12.9898f) * 43758.5453f;
+        return value - std::floor(value);
+    };
+    const float seed = m_FlickerOffset * 3.17f + 0.37f;
+
+    // 選ばれてすぐには始めず、少し間を置いている（選ばれた瞬間に分かってしまわないように）
+    if (m_RouteNextFlicker < 0.0f)
+    {
+        m_RouteNextFlicker = m_Time + 0.8f + noise(seed + m_RouteFlickerSerial * 1.37f) * 1.2f;
+    }
+    if (m_Time >= m_RouteNextFlicker && m_Time >= m_RouteFlickerEnd)
+    {
+        m_RouteFlickerSerial += 1.0f;
+        const float length = noise(seed + m_RouteFlickerSerial * 7.31f);
+        m_RouteDropout = noise(seed + m_RouteFlickerSerial * 3.77f) < 0.22f;
+        m_RouteFlickerStart = m_Time;
+        m_RouteFlickerEnd = m_Time + (m_RouteDropout ? 0.40f + length * 0.50f : 0.20f + length * 0.60f);
+        m_RouteNextFlicker = m_RouteFlickerEnd + 0.50f + noise(seed + m_RouteFlickerSerial * 1.93f) * 1.90f;
+        if (m_RouteDropout)
+        {
+            // 消える瞬間に、電気の接点がはじけるような小さな音
+            Core::Game::GetInstance()->PlayAudioCueAt(
+                SOUND_CUE_FLASHLIGHT, m_Position, 0.55f + length * 0.20f, 0.16f);
+        }
+    }
+
+    if (m_Time < m_RouteFlickerEnd)
+    {
+        const float elapsed = m_Time - m_RouteFlickerStart;
+        bool on = false;
+        if (m_RouteDropout)
+        {
+            // 消えたまま、最後の0.2秒だけ点こうとして瞬いている
+            if (m_RouteFlickerEnd - m_Time < 0.20f)
+            {
+                on = noise(seed + m_RouteFlickerSerial * 5.70f + std::floor(elapsed * 30.0f)) < 0.50f;
+            }
+        }
+        else
+        {
+            const float rate = 16.0f + noise(seed + m_RouteFlickerSerial * 2.30f) * 10.0f;
+            on = noise(seed + m_RouteFlickerSerial * 5.70f + std::floor(elapsed * rate)) < 0.45f;
+        }
+        targetBrightness *= on ? 1.0f : 0.06f;
+        m_RouteFlickering = true;
+    }
+    else
+    {
+        // 間の間も、電球のうなりで明るさが少し揺れている
+        targetBrightness *= 1.0f + std::sin(m_Time * 47.0f + m_FlickerOffset) * 0.04f;
+    }
+}
+
 // 電力の状態と演出から、このフレームの照明の明るさを決めている。
 // 目標の明るさを決めてから、実際の明るさを少しずつ近づけている（急に変わらないように）。
 void CeilingLight::Update()
@@ -201,6 +263,28 @@ void CeilingLight::Update()
             : 0.22f + (unstable + 1.0f) * 0.08f;
     }
 
+    // 進む先の候補の照明。停電中も非常回路の弱い光を残し、候補どうしは同じ明るさ・同じ色にしている。
+    // 今進む先の1灯だけが、切れかけの電球のように不規則にちかちかする（矢印や明るさで道を示さない）。
+    m_RouteFlickering = false;
+    if (m_IsRouteFixture)
+    {
+        if (!powerRestored)
+        {
+            targetBrightness = (m_IsEmergencyLight ? 0.24f : 0.14f) +
+                std::sin(m_Time * 11.7f + m_FlickerOffset) * 0.006f;
+        }
+        if (!m_RouteFlickerEnabled)
+        {
+            // ちかちかしない灯は落ち着いて点けたまま。次に選ばれたら、少し間を置いてから始める
+            m_RouteNextFlicker = -1.0f;
+            m_RouteFlickerEnd = -1.0f;
+        }
+        else
+        {
+            UpdateRouteFlicker(targetBrightness);
+        }
+    }
+
     // 故障した蛍光灯も時々点いて進む方向を示すが、不規則に消えるようにしている。
     // この自然な揺らぎの後からイベント用の明滅を重ね、怖い演出を確実に見せている。
     if (m_IsFaulted && powerRestored)
@@ -248,9 +332,12 @@ void CeilingLight::Update()
     const bool startingUp = powerRestored && m_PowerOnTimer < 1.1f;
     const bool voltageDip =
         powerRestored && !startingUp && targetBrightness < 0.75f;
-    const float response = powerRestored
-        ? (startingUp ? 0.48f : (voltageDip ? 0.24f : 0.08f))
-        : 0.32f;
+    // 進む先の灯がちかちかしている間は、ほぼその場で切り替え、ぱちぱちと瞬いて見えるようにしている
+    const float response = m_RouteFlickering
+        ? 0.90f
+        : (powerRestored
+            ? (startingUp ? 0.48f : (voltageDip ? 0.24f : 0.08f))
+            : 0.32f);
     // フレームレートが変わっても同じ速さで近づくよう、60fpsを基準にした指数で補正している
     const float deltaResponse = 1.0f - std::pow(
         1.0f - response, deltaTime * 60.0f);
@@ -348,7 +435,7 @@ void CeilingLight::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& ligh
         m_Position.x, m_Position.y - 3.0f, m_Position.z,
         powerRestored ? 165.0f : 115.0f);
 
-    // 光の色：通常は青白、故障した灯は黄緑、停電中は赤
+    // 進行先の器具も、周囲と同じ非常灯・蛍光灯の色で照らす。
     if (powerRestored)
     {
         pointLight.ColorIntensity = IsFaulted()

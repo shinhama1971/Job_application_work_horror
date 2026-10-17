@@ -725,7 +725,7 @@ void StageScene::UpdateExitOmen(Player& player)
 
 // ----------------------------------------------------------------------------
 // 姿の見えない物音
-// 台本の演出（照明の連鎖・倉庫の気配・出口の前兆など）の最中や、監視映像を見ている間は鳴らしていない。
+// 台本の演出（照明の連鎖・倉庫の気配・出口の前兆など）の最中や、監視映像を見ている間、暖かい灯りの下（光の安全地帯）にいる間は鳴らしていない。
 // 演出の驚きを物音で打ち消さず、何も起きていない静かな時間にだけ不安を足すためである。
 // ----------------------------------------------------------------------------
 bool StageScene::IsAmbientSoundAllowed() const
@@ -745,6 +745,7 @@ bool StageScene::IsAmbientSoundAllowed() const
         m_FuseWatcherState != 1 &&
         m_ExitOmenSequence.GetTimer() <= 0.0f &&
         !powerRestoring &&
+        m_SafeLights.GetCalm() < 0.5f &&
         (exit == nullptr || !exit->IsEscaping());
 }
 
@@ -828,7 +829,8 @@ float StageScene::ComputeThreatRate(const Player& player) const
     {
         threatRate = (std::max)(threatRate, 0.30f);
     }
-    return threatRate;
+    // 暖かい灯りの下（光の安全地帯）にいる間は、心拍と息が静まっていく
+    return threatRate * (1.0f - m_SafeLights.GetCalm());
 }
 
 void StageScene::UpdateTensionPulse(const Player& player, float deltaTime)

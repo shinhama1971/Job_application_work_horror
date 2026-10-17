@@ -54,6 +54,9 @@ public:
 	virtual bool ContributesToPlanarReflection() const { return false; }
 	// 監視カメラなど、プレイヤー以外の視点で描くワールドに含めるかどうか。
 	virtual bool DrawsInAuxiliaryView() const { return true; }
+	// 描画の前にGPUで計算する物（水たまりの波）は、ここでCompute Shaderを実行している。
+	// Game::Drawが描画の最初に全Objectから呼び、GPU時間を「水たまりの波」の段階として測っている。
+	virtual void RunGpuSimulation() {}
 	// 光を放つObjectは、このフレームの点光源を追加している。
 	// Gameが毎フレーム全Objectから集め、タイルベースのライトカリングへ渡している。
 	virtual void CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const

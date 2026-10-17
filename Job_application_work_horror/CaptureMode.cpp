@@ -10,8 +10,10 @@
 #include "Camera.h"
 #include "Game.h"
 #include "GpuTimer.h"
+#include "Ground.h"
 #include "Locker.h"
 #include "Player.h"
+#include "VideoWriter.h"
 
 #include <SimpleMath.h>
 #include <Windows.h>
@@ -33,9 +35,6 @@
 #include <sstream>
 #include <vector>
 
-#pragma comment(lib, "mfplat.lib")
-#pragma comment(lib, "mfreadwrite.lib")
-#pragma comment(lib, "mfuuid.lib")
 #pragma comment(lib, "windowscodecs.lib")
 
 using Microsoft::WRL::ComPtr;
@@ -68,7 +67,7 @@ namespace
         return std::atan2(toX - fromX, toZ - fromZ);
     }
 
-    // 1面: 開始地点 → 中央ホール → 左の倉庫 → 暗証番号の扉 → ループ廊下 → 西棟（浸水した機械室） → 書類保管室 → 南西の広間
+    // 1面: 開始地点 → 中央ホール → 左の倉庫 → 暗証番号の扉 → ループ廊下 → 西棟（浸水した機械室） → 書類保管室 → 南西の広間 → 光の安全地帯 → 足音の波紋 → 壁の血の手形
     const std::vector<Keyframe> Stage1Tour =
     {
         { 0.0f, Vector3(0.0f, FloorY, -120.0f), Pi, -0.12f, nullptr, false },
@@ -112,6 +111,22 @@ namespace
         { 95.5f, Vector3(-280.0f, FloorY, -262.0f), YawToward(-280.0f, -262.0f, -350.0f, -290.0f), -0.20f, nullptr, false },
         { 97.0f, Vector3(-280.0f, FloorY, -262.0f), YawToward(-280.0f, -262.0f, -350.0f, -290.0f), -0.20f, L"05h_1面_南西の広間の棚と机", false },
         { 98.0f, Vector3(-280.0f, FloorY, -262.0f), YawToward(-280.0f, -262.0f, -350.0f, -290.0f), -0.20f, nullptr, false },
+        // 光の安全地帯（中央ホールの西の裸電球）。少し離れた暗がりから暖かい灯りを見て、灯りの下まで歩き、落ち着いた画面を写している。
+        { 98.05f, Vector3(-150.0f, FloorY, -30.0f), YawToward(-150.0f, -30.0f, -198.0f, 12.0f), 0.02f, nullptr, false },
+        { 100.5f, Vector3(-151.0f, FloorY, -29.0f), YawToward(-151.0f, -29.0f, -198.0f, 12.0f), 0.02f, L"05i_1面_光の安全地帯の裸電球", false },
+        { 103.5f, Vector3(-204.0f, FloorY, 18.0f), YawToward(-204.0f, 18.0f, -150.0f, -40.0f), -0.18f, nullptr, false },
+        { 106.0f, Vector3(-204.0f, FloorY, 17.0f), YawToward(-204.0f, 17.0f, -150.0f, -40.0f), -0.18f, L"05j_1面_光の安全地帯の灯りの下", false },
+        { 107.0f, Vector3(-204.0f, FloorY, 17.0f), YawToward(-204.0f, 17.0f, -150.0f, -40.0f), -0.18f, nullptr, false },
+        // 足音の波紋（西棟の浸水した広間を歩いて振り返る）。歩いた跡から波が広がって重なり、懐中電灯の光の中で輪が光る。
+        { 107.05f, Vector3(-300.0f, FloorY, -88.0f), 0.0f, -0.32f, nullptr, false },
+        { 111.0f, Vector3(-300.0f, FloorY, -40.0f), 0.0f, -0.32f, nullptr, false },
+        { 112.0f, Vector3(-300.0f, FloorY, -39.0f), Pi, -0.45f, nullptr, false },
+        { 112.6f, Vector3(-300.0f, FloorY, -39.0f), Pi, -0.45f, L"05k_1面_足音の波紋と波打つ反射", false },
+        { 113.5f, Vector3(-300.0f, FloorY, -39.0f), Pi, -0.45f, nullptr, false },
+        // 壁のホラーらしい跡（右の倉庫の東の壁の血の手形と、下へ引きずった跡）。懐中電灯で照らすと赤黒く浮かぶ。
+        { 113.55f, Vector3(168.0f, FloorY, -136.0f), YawToward(168.0f, -136.0f, 218.0f, -121.6f), -0.30f, nullptr, false },
+        { 116.0f, Vector3(170.0f, FloorY, -135.0f), YawToward(170.0f, -135.0f, 218.0f, -121.6f), -0.30f, L"05l_1面_右の倉庫の壁の血の手形", false },
+        { 117.0f, Vector3(170.0f, FloorY, -135.0f), YawToward(170.0f, -135.0f, 218.0f, -121.6f), -0.30f, nullptr, false },
     };
 
     // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉
@@ -138,133 +153,6 @@ namespace
         if (delta < -Pi) delta += Pi * 2.0f;
         return from + delta * t;
     }
-
-    // ------------------------------------------------------------------------
-    // 動画の書き出し（Media Foundation の Sink Writer で H.264 / MP4 に符号化している）
-    // ------------------------------------------------------------------------
-    class VideoWriter
-    {
-    public:
-        // MP4ファイルを作り、出力（H.264、8Mbps）と入力（RGB32の非圧縮画像）の形式を設定している
-        bool Open(const std::wstring& path, UINT width, UINT height, UINT fps)
-        {
-            if (FAILED(MFStartup(MF_VERSION)))
-            {
-                return false;
-            }
-            m_Started = true;
-            m_Width = width;
-            m_Height = height;
-            // 1フレームの長さ（Media Foundationの時間の単位は100ナノ秒）
-            m_FrameDuration = 10'000'000LL / fps;
-
-            if (FAILED(MFCreateSinkWriterFromURL(path.c_str(), nullptr, nullptr, &m_Writer)))
-            {
-                return false;
-            }
-
-            // 出力の形式：H.264、プログレッシブ、指定した大きさとフレームレート
-            ComPtr<IMFMediaType> outputType;
-            MFCreateMediaType(&outputType);
-            outputType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
-            outputType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_H264);
-            outputType->SetUINT32(MF_MT_AVG_BITRATE, 8'000'000);
-            outputType->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
-            MFSetAttributeSize(outputType.Get(), MF_MT_FRAME_SIZE, width, height);
-            MFSetAttributeRatio(outputType.Get(), MF_MT_FRAME_RATE, fps, 1);
-            MFSetAttributeRatio(outputType.Get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1);
-            if (FAILED(m_Writer->AddStream(outputType.Get(), &m_Stream)))
-            {
-                return false;
-            }
-
-            // 入力の形式：毎フレーム渡す非圧縮のRGB32画像
-            ComPtr<IMFMediaType> inputType;
-            MFCreateMediaType(&inputType);
-            inputType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
-            inputType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_RGB32);
-            inputType->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
-            MFSetAttributeSize(inputType.Get(), MF_MT_FRAME_SIZE, width, height);
-            MFSetAttributeRatio(inputType.Get(), MF_MT_FRAME_RATE, fps, 1);
-            MFSetAttributeRatio(inputType.Get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1);
-            if (FAILED(m_Writer->SetInputMediaType(m_Stream, inputType.Get(), nullptr)) ||
-                FAILED(m_Writer->BeginWriting()))
-            {
-                return false;
-            }
-            m_Open = true;
-            return true;
-        }
-
-        // rgbaは上の行から並んだRGBA。RGB32（BGRA、下の行から並ぶ）へ詰め替えてから渡している。
-        void WriteFrame(const BYTE* rgba, UINT rowPitch)
-        {
-            if (!m_Open)
-            {
-                return;
-            }
-            const DWORD size = m_Width * m_Height * 4;
-            ComPtr<IMFMediaBuffer> buffer;
-            if (FAILED(MFCreateMemoryBuffer(size, &buffer)))
-            {
-                return;
-            }
-            // 1行ずつ上下を逆にしながら、RとBを入れ替えてコピーしている（透明度は使わないので不透明）
-            BYTE* destination = nullptr;
-            buffer->Lock(&destination, nullptr, nullptr);
-            for (UINT y = 0; y < m_Height; ++y)
-            {
-                const BYTE* sourceRow = rgba + static_cast<size_t>(y) * rowPitch;
-                BYTE* destinationRow = destination +
-                    static_cast<size_t>(m_Height - 1 - y) * m_Width * 4;
-                for (UINT x = 0; x < m_Width; ++x)
-                {
-                    destinationRow[x * 4 + 0] = sourceRow[x * 4 + 2];
-                    destinationRow[x * 4 + 1] = sourceRow[x * 4 + 1];
-                    destinationRow[x * 4 + 2] = sourceRow[x * 4 + 0];
-                    destinationRow[x * 4 + 3] = 255;
-                }
-            }
-            buffer->Unlock();
-            buffer->SetCurrentLength(size);
-
-            // 画像を1枚のサンプルにして、表示する時刻と長さを付けて書き込んでいる
-            ComPtr<IMFSample> sample;
-            MFCreateSample(&sample);
-            sample->AddBuffer(buffer.Get());
-            sample->SetSampleTime(m_Time);
-            sample->SetSampleDuration(m_FrameDuration);
-            m_Writer->WriteSample(m_Stream, sample.Get());
-            m_Time += m_FrameDuration;
-        }
-
-        // 書き込みを終えてファイルを閉じ、Media Foundationを終了している
-        void Close()
-        {
-            if (m_Open)
-            {
-                m_Writer->Finalize();
-                m_Open = false;
-            }
-            m_Writer.Reset();
-            if (m_Started)
-            {
-                MFShutdown();
-                m_Started = false;
-            }
-        }
-
-    private:
-        // 書き込み先、ストリーム番号、画像の大きさ、次のフレームの時刻、1フレームの長さ、開いているか、MFStartupを呼んだか
-        ComPtr<IMFSinkWriter> m_Writer;
-        DWORD m_Stream = 0;
-        UINT m_Width = 0;
-        UINT m_Height = 0;
-        LONGLONG m_Time = 0;
-        LONGLONG m_FrameDuration = 0;
-        bool m_Open = false;
-        bool m_Started = false;
-    };
 
     // RGBA（上の行から並ぶ）の画像をPNGで保存している。
     bool SavePng(const std::wstring& path, const BYTE* rgba, UINT rowPitch, UINT width, UINT height)
@@ -329,6 +217,8 @@ namespace
     size_t g_NextShot = 0;
     const wchar_t* g_PendingShot = nullptr;
     bool g_Finished = false;
+    // 最後に足元へ水たまりの波を立てた位置（位置を直接動かすと足音が出ないため、歩いた距離で代わりに波を立てている）
+    Vector3 g_LastStepPosition;
     bool g_Recording = false;   // 1面・2面を見て回っている間だけ動画に書き出している
     // 動画に書き出したフレーム数
     int g_FramesWritten = 0;
@@ -535,6 +425,7 @@ namespace
             { "本描画", GpuPass::MainScene },
             { "ブルーム", GpuPass::Bloom },
             { "画面効果", GpuPass::PostProcess },
+            { "水たまりの波", GpuPass::WaterRipples },
         };
 
         for (const BenchmarkResult& result : g_BenchmarkResults)
@@ -794,6 +685,21 @@ namespace Tools::CaptureMode
         // 隠れている間は位置をロッカーの中に固定し、向きだけを道順に合わせている。懐中電灯は常に点けている
         if (!player->IsHiding())
         {
+            // 位置を直接動かすと足音が出ないため、9歩分（9.0）進むごとに足元へ水たまりの波だけを立てている。
+            // 場面を切り替える瞬間移動（1回で30以上）は歩いた扱いにしない。
+            const float stepDistance = Vector3::Distance(g_LastStepPosition, pose.Position);
+            if (stepDistance > 30.0f)
+            {
+                g_LastStepPosition = pose.Position;
+            }
+            else if (stepDistance > 9.0f)
+            {
+                g_LastStepPosition = pose.Position;
+                for (Ground* ground : game->GetObjects<Ground>())
+                {
+                    ground->AddRippleImpulse(pose.Position, 2.0f, -1.2f);
+                }
+            }
             player->SetPosition(pose.Position);
         }
         // 道順の途中で電池が切れて懐中電灯が消えないよう、電池を満タンに保っている（計測モードと同じ）

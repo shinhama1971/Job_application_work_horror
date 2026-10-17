@@ -116,6 +116,8 @@ namespace Effect
 
         // 本描画が終わったバックバッファを写し、画面効果の入力にしている。
         void CaptureBackBuffer();
+        // 取り込んだ画面（画面効果を掛ける前）。次のフレームの本描画では「前のフレームの画面」として、SSRの色に使っている
+        ID3D11ShaderResourceView* GetCapturedSceneSRV() { return m_RenderTexture.GetSRV(); }
         void Draw(GpuTimer* gpuTimer); // 写した画面へ画面効果を合成している。
 
         // 一時的な演出。指定した強さから始まり、durationかけて元に戻る。

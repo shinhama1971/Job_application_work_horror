@@ -1,9 +1,10 @@
 // ============================================================================
-// 共通の処理: 浸水した床（1面の西棟）の水面で跳ね返った懐中電灯の光が、壁や天井にゆらゆら映る効果（コースティクス）。
+// 共通の処理: 浸水した床（1面の西棟）と水たまりの水面で跳ね返った懐中電灯の光が、壁や天井にゆらゆら映る効果（コースティクス）。
 // 主な技術: 水面での鏡映（画素を水面で上下に折り返した点）、懐中電灯の配光の再利用、流れるノイズの網目模様
 // ・壁や天井の点Pに水面から届く光は、「Pを水面で折り返した点P'」へ向かう懐中電灯の光が、水面で跳ね返ったもの。
 //   そこで、懐中電灯がP'の方向を照らしているかを、ふつうの照明と同じ配光の式で求めている。
 // ・光が水面に当たる点Wは、カメラとP'を結ぶ線と水面の交点。Wの位置で、波が光を集めてできる明るい網目模様を作っている。
+// ・水たまりでは、足音や水滴でできた波（WaterRippleSimulationの高さ）のへこみが光を集め、光の輪が壁を横切る。
 // ・カメラの位置は、定数バッファで受け取ったプレイヤーの視点のビュー行列から求めている。
 // common.hlsl・fastNoise.hlsli・flashlightLighting.hlsli の後に読み込んでいる。
 // ============================================================================
@@ -22,6 +23,72 @@ cbuffer WaterCausticsBuffer : register(b12)
     float CausticTime;          // 揺らぎを動かす時間（秒）
     float CausticStrength;      // 強さ（0なら計算しない）
     float CausticPadding;
+    // 水たまりの波のシミュレーションの範囲と強さ（xy = 範囲の最小のx・z、z = 範囲の一辺の長さ、w = 強さ。0なら使わない）
+    float4 CausticRipple;
+    // 水面の反射の比較（SSR）で使う、プレイヤーの視点の射影行列
+    matrix CausticProjection;
+    // 水面の反射の方式（x = 0 平面反射（普段）、1 キューブマップ、2 SSR）。「反射なし」は床の反射の強さを0にして表している
+    float4 ReflectionParams;
+}
+
+// 水たまりの波のシミュレーションの高さ（t9。WaterRippleSimulationが毎フレーム計算している）。x = 今の高さ、y = 1つ前の高さ
+Texture2D<float2> g_WaterRipples : register(t9);
+// 波のマス目の数（WaterRippleSimulation::Resolutionと同じ）
+#define WATER_RIPPLE_RESOLUTION 256
+
+// 波のマス目1つの高さを読んでいる（範囲の外は0）
+float LoadRippleHeight(int2 texel)
+{
+    if (any(texel < 0) || any(texel >= WATER_RIPPLE_RESOLUTION))
+    {
+        return 0.0f;
+    }
+    return g_WaterRipples.Load(int3(texel, 0)).x;
+}
+
+// ワールドの点（x・z）の波の高さを、まわりの4マスから補間して返している
+float SampleRippleHeight(float2 positionXZ)
+{
+    const float2 texelPosition =
+        (positionXZ - CausticRipple.xy) / CausticRipple.z * WATER_RIPPLE_RESOLUTION - 0.5f;
+    const int2 baseTexel = int2(floor(texelPosition));
+    const float2 blend = texelPosition - baseTexel;
+    return lerp(
+        lerp(LoadRippleHeight(baseTexel), LoadRippleHeight(baseTexel + int2(1, 0)), blend.x),
+        lerp(LoadRippleHeight(baseTexel + int2(0, 1)), LoadRippleHeight(baseTexel + int2(1, 1)), blend.x),
+        blend.y);
+}
+
+// 波の高さ（x）と、x方向・z方向の傾き（yz）を返している。波がないとき（強さ0）はすべて0
+float3 GetRippleHeightAndSlope(float2 positionXZ)
+{
+    if (CausticRipple.w <= 0.0f)
+    {
+        return 0.0f;
+    }
+    const float step = CausticRipple.z / WATER_RIPPLE_RESOLUTION;
+    const float center = SampleRippleHeight(positionXZ);
+    const float right = SampleRippleHeight(positionXZ + float2(step, 0.0f));
+    const float forward = SampleRippleHeight(positionXZ + float2(0.0f, step));
+    return float3(center, (right - center) / step, (forward - center) / step);
+}
+
+// 波の面のへこみ具合（ラプラシアン）から、波が光を集めて明るくなる度合い（0〜1）を返している。
+// へこんだ所は凹面鏡のように光を集め、盛り上がった所は光を散らすため、正の値の所だけを明るくしている。
+float GetRippleCausticFocus(float2 positionXZ)
+{
+    if (CausticRipple.w <= 0.0f)
+    {
+        return 0.0f;
+    }
+    const float step = CausticRipple.z / WATER_RIPPLE_RESOLUTION;
+    const float center = SampleRippleHeight(positionXZ);
+    const float laplacian = (
+        SampleRippleHeight(positionXZ + float2(step, 0.0f)) +
+        SampleRippleHeight(positionXZ - float2(step, 0.0f)) +
+        SampleRippleHeight(positionXZ + float2(0.0f, step)) +
+        SampleRippleHeight(positionXZ - float2(0.0f, step)) - 4.0f * center) / (step * step);
+    return saturate(laplacian * 0.9f) * CausticRipple.w;
 }
 
 // 水面の点（x・z）での、波が光を集めてできる網目模様（0〜1）を返している。
@@ -43,8 +110,8 @@ float GetCausticPattern(float2 waterPositionXZ, float time)
 // 壁や天井の点（ワールド座標）に、水面で跳ね返って届く懐中電灯の光の明るさ（色は掛ける前）を返している
 float GetWaterCausticLight(float3 worldPosition, float3 worldNormal)
 {
-    // 効果がない面・懐中電灯を消しているとき・水面より下の点では計算しない
-    if (CausticStrength <= 0.0f || !Light.Enable || !Light.FlashlightEnabled ||
+    // 効果がない面（浸水した範囲も水たまりの波もない）・懐中電灯を消しているとき・水面より下の点では計算しない
+    if ((CausticStrength <= 0.0f && CausticRipple.w <= 0.0f) || !Light.Enable || !Light.FlashlightEnabled ||
         worldPosition.y <= CausticWaterY + 0.05f)
     {
         return 0.0f;
@@ -69,8 +136,10 @@ float GetWaterCausticLight(float3 worldPosition, float3 worldNormal)
     const float2 toMaximum = CausticFloodRect.zw - waterPoint.xz;
     const float insideDistance = min(
         min(fromMinimum.x, fromMinimum.y), min(toMaximum.x, toMaximum.y));
-    const float flood = smoothstep(0.0f, 6.0f, insideDistance);
-    if (flood <= 0.0f)
+    const float flood = smoothstep(0.0f, 6.0f, insideDistance) * CausticStrength;
+    // 水たまりの波（足音・水滴でできた本物の波）が光を集めている所。波のない所・乾いた床では0になる
+    const float rippleFocus = GetRippleCausticFocus(waterPoint.xz);
+    if (flood <= 0.0f && rippleFocus <= 0.0f)
     {
         return 0.0f;
     }
@@ -94,12 +163,18 @@ float GetWaterCausticLight(float3 worldPosition, float3 worldNormal)
     const float3 toWater = normalize(waterPoint - worldPosition);
     const float facing = saturate(dot(worldNormal, toWater));
 
-    // 全体をうっすら照らす分は小さくし、波が光を集めた網目の線を主役にしている
-    const float pattern = GetCausticPattern(waterPoint.xz, CausticTime);
-    const float reflected = 0.05f + pattern * 0.55f;
+    // 浸水した範囲：全体をうっすら照らす分は小さくし、波が光を集めた網目の線を主役にしている
+    float reflected = 0.0f;
+    if (flood > 0.0f)
+    {
+        const float pattern = GetCausticPattern(waterPoint.xz, CausticTime);
+        reflected += (0.05f + pattern * 0.55f) * flood;
+    }
+    // 水たまりの波：広がっていく輪が、光の輪になって壁を横切る
+    reflected += rippleFocus * 0.55f;
 
     return Light.Intensity * beamProfile * rangeFade * rangeFade *
-        facing * reflected * flood * CausticStrength;
+        facing * reflected;
 }
 
 #endif

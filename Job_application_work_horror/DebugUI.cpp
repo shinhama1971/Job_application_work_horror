@@ -299,6 +299,8 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
                 drawGpuTiming("Bloom", gpuTimer->GetTiming(GpuPass::Bloom));
                 drawGpuTiming(
                     "PostProcess", gpuTimer->GetTiming(GpuPass::PostProcess));
+                drawGpuTiming(
+                    "Water ripples", gpuTimer->GetTiming(GpuPass::WaterRipples));
                 ImGui::TextDisabled("4-frame query ring / no GPU wait");
             }
         }

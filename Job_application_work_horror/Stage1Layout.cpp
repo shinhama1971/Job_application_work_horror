@@ -430,6 +430,30 @@ namespace Stage1Layout
         objects.westWing.valves = { southValve.first, westValve.first, eastValve.first };
         objects.westWing.valveLamps = { southValve.second, westValve.second, eastValve.second };
 
+        // 光の安全地帯。停電しても消えない、暖かい色の電球（電池式の作業灯）。冷たい蛍光灯・赤い非常灯と色で区別し、
+        // ちかちかせず落ち着いて灯っている。下にいると落ち着き、ライトを消して休むと電池が戻る（Stage1SafeLights）。
+        const Color warmBulb(1.0f, 0.72f, 0.40f, 1.0f);
+        const auto createWarmBulb = [&createStageProp, &warmBulb](const char* name, const Vector3& position, const Vector3& scale)
+        {
+            Wall* bulb = createStageProp(name, position, scale,
+                Color(warmBulb.R() * 0.6f, warmBulb.G() * 0.6f, warmBulb.B() * 0.6f, 1.0f), warmBulb, 30.0f, false);
+            bulb->SetCastsShadow(false);
+            bulb->SetGlowLight(85.0f, 3.2f);
+            return bulb;
+        };
+        // 1つ目：中央ホールの西、配電盤と西棟の扉の間。天井から下がった裸電球（何度も通る場所の休み所）
+        createStageProp("PropSafeLightHubCord", Vector3(-198.0f, -49.5f, 12.0f),
+            Vector3(0.4f, 2.5f, 0.4f), darkMetal, noEmission, 4.0f, false);
+        createWarmBulb("PropSafeLightHubBulb", Vector3(-198.0f, -52.3f, 12.0f), Vector3(2.6f, 3.2f, 2.6f));
+        objects.safeZones.push_back({ Vector3(-198.0f, -99.0f, 12.0f), 30.0f });
+        // 2つ目：南西の広間の机の上の電気スタンド（寄り道の先の休み所）
+        createStageProp("PropSafeLightDeskBase", Vector3(-334.0f, -74.5f, -306.0f),
+            Vector3(4.0f, 1.0f, 4.0f), darkMetal, noEmission, 12.0f, false);
+        createStageProp("PropSafeLightDeskArm", Vector3(-334.0f, -70.0f, -306.0f),
+            Vector3(0.8f, 9.0f, 0.8f), darkMetal, noEmission, 12.0f, false);
+        createWarmBulb("PropSafeLightDeskShade", Vector3(-332.0f, -65.0f, -304.0f), Vector3(5.0f, 3.0f, 5.0f));
+        objects.safeZones.push_back({ Vector3(-322.0f, -99.0f, -292.0f), 34.0f });
+
         // 脱出のホールの入口の柱と、扉の状態を示すランプ（停電中は赤）
         createStageProp("PropExitColumnLeft", Vector3(-52.0f, -80.0f, 179.0f),
             Vector3(10.0f, 38.0f, 10.0f), darkMetal, noEmission, 8.0f, true);
@@ -844,6 +868,32 @@ namespace Stage1Layout
         objects.firstFuse = item1;
         objects.secondFuse = item2;
         objects.thirdFuse = item3;
+        // 通路を灯具で埋めず、曲がり角の暗がりにだけ通常の器具を補う。
+        const auto addCeilingFixture = [&builder](const char* name, float x, float z, float offset)
+        {
+            CeilingLight* light = builder.Create<CeilingLight>(name);
+            light->SetPosition(x, -50.5f, z);
+            light->SetScale(22.0f, 2.0f, 10.0f);
+            light->SetEmergencyLight(false, offset);
+            return light;
+        };
+        CeilingLight* leftEntranceLight = addCeilingFixture("Stage1LeftEntranceLight", -125.0f, -88.0f, 7.3f);
+        CeilingLight* rightEntranceLight = addCeilingFixture("Stage1RightEntranceLight", 125.0f, -88.0f, 8.6f);
+        CeilingLight* westEntranceLight = addCeilingFixture("Stage1WestEntranceLight", -190.0f, -20.0f, 9.7f);
+        CeilingLight* mainPowerLight = addCeilingFixture("Stage1MainPowerLight", -180.0f, 20.0f, 10.9f);
+
+        // 進み具合ごとに、進む先の照明を手前から奥の順に並べている。色や明るさは変えず、そのうち1灯だけをちかちかさせる。
+        objects.routeLights[static_cast<std::size_t>(Stage1RouteLight::StartSearch)] = { light1 };
+        objects.routeLights[static_cast<std::size_t>(Stage1RouteLight::HallEntrance)] = { light4 };
+        objects.routeLights[static_cast<std::size_t>(Stage1RouteLight::CorridorDoor)] = { light4, light5, light8, light7 };
+        objects.routeLights[static_cast<std::size_t>(Stage1RouteLight::LeftStorage)] = { leftEntranceLight, light2 };
+        objects.routeLights[static_cast<std::size_t>(Stage1RouteLight::RightStorage)] = { rightEntranceLight, light3 };
+        objects.routeLights[static_cast<std::size_t>(Stage1RouteLight::WestWing)] = { westEntranceLight, westWingLight1 };
+        objects.routeLights[static_cast<std::size_t>(Stage1RouteLight::PumpRoom)] = { westWingLight2, westWingLight3 };
+        objects.routeLights[static_cast<std::size_t>(Stage1RouteLight::MainPower)] = { westWingLight2, westWingLight1, mainPowerLight };
+        objects.routeLights[static_cast<std::size_t>(Stage1RouteLight::ExitPower)] = { light4, light5, light8, light7 };
+        objects.routeLights[static_cast<std::size_t>(Stage1RouteLight::ExitDoor)] = { light7 };
+
         objects.ceilingLights = {
             light1, light2, light3, light4, light5, light6, light7, light8 };
         return objects;

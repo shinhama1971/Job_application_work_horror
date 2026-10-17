@@ -41,6 +41,21 @@ private:
     bool m_IsFaulted = false;
     bool m_IsForcedOff = false;
     bool m_WasPowerRestored = false;
+    // 進む先の照明：明るさと色はほかと同じまま、切れかけの電球のように不規則にちかちかさせる。
+    // 行き先の候補か、今ちかちかさせる1灯か
+    bool m_IsRouteFixture = false;
+    bool m_RouteFlickerEnabled = false;
+    // 次のちかちかが始まる時刻、今のちかちかの始まりと終わりの時刻、何回目か、一度消えてから点き直す型か
+    float m_RouteNextFlicker = -1.0f;
+    float m_RouteFlickerStart = -1.0f;
+    float m_RouteFlickerEnd = -1.0f;
+    float m_RouteFlickerSerial = 0.0f;
+    bool m_RouteDropout = false;
+    // このフレームでちかちかしている途中か（明るさをすぐ切り替えるため）
+    bool m_RouteFlickering = false;
+
+    // 進む先の1灯のちかちか（切れかけの電球）を、目標の明るさに掛けている
+    void UpdateRouteFlicker(float& targetBrightness);
 
 public:
     void Init() override;
@@ -68,6 +83,13 @@ public:
     void SetScale(float x, float y, float z)
     {
         m_Scale = DirectX::SimpleMath::Vector3(x, y, z);
+    }
+
+    // 進む先の候補の照明にしている（停電中も弱く点ける）。flickerがtrueの1灯だけ、不規則にちかちかさせる。
+    void SetRouteFlicker(bool flicker)
+    {
+        m_IsRouteFixture = true;
+        m_RouteFlickerEnabled = flicker;
     }
 
     // 非常灯にするかどうかと、器具ごとに周期をずらす値を設定している

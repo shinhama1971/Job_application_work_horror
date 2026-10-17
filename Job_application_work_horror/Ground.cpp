@@ -10,6 +10,7 @@
 #include "Player.h"
 #include "TechDemo.h"
 #include "utility.h"
+#include "Wall.h"
 #include <algorithm>
 #include <cmath>
 using namespace DirectX::SimpleMath;
@@ -24,6 +25,7 @@ void Ground::Init()
 	m_PowerSurge = 0.0f;
 	m_WasPowerRestored = false;
 	m_WaterEffects.Init();
+	m_RippleSimulation.Init();
 
 	// 頂点データ：1マスを2つの三角形（6頂点）で作り、原点を中心に並べている
 	m_SizeX = 50;
@@ -189,15 +191,72 @@ void Ground::Update()
 	// 浸水した範囲があれば、水面で跳ね返った懐中電灯の光を壁や天井に揺らして映している（waterCaustics.hlsli）。
 	// 範囲がない面（2面など）は強さを0にし、壁のシェーダーで計算しないようにしている。
 	const bool hasFlood = m_WaterEffects.HasFloodRegion();
+	const DirectX::SimpleMath::Vector4 floodRect = hasFlood
+		? DirectX::SimpleMath::Vector4(
+			m_WaterEffects.GetFloodMin().x, m_WaterEffects.GetFloodMin().y,
+			m_WaterEffects.GetFloodMax().x, m_WaterEffects.GetFloodMax().y)
+		: DirectX::SimpleMath::Vector4(1.0f, 1.0f, 0.0f, 0.0f);
 	Renderer::SetWaterCaustics(
-		hasFlood
-			? DirectX::SimpleMath::Vector4(
-				m_WaterEffects.GetFloodMin().x, m_WaterEffects.GetFloodMin().y,
-				m_WaterEffects.GetFloodMax().x, m_WaterEffects.GetFloodMax().y)
-			: DirectX::SimpleMath::Vector4(1.0f, 1.0f, 0.0f, 0.0f),
+		floodRect,
 		m_Position.y,
 		m_WetTime,
 		(hasFlood ? 1.0f : 0.0f) * Tools::TechDemo::GetWaterCausticsScale());
+
+	// 足音と水滴のおもりを、水たまりの波へ渡している。波を進めるのは描画の最初（RunGpuSimulation）で、
+	// そのための経過時間・計算の中心（カメラ）・浸水した範囲をここで覚えている。
+	for (const DirectX::SimpleMath::Vector4& impulse : m_WaterEffects.TakeRippleImpulses())
+	{
+		m_RippleSimulation.AddImpulse(
+			DirectX::SimpleMath::Vector2(impulse.x, impulse.y), impulse.z, impulse.w);
+	}
+	const DirectX::SimpleMath::Vector3 eye = Core::Game::GetInstance()->GetCamera()->GetPosition();
+	m_PendingRippleSeconds += deltaTime;
+	m_RippleCenter = DirectX::SimpleMath::Vector2(eye.x, eye.z);
+	m_RippleFloodRect = floodRect;
+
+	// 波を跳ね返す物：当たり判定があり、床に立っている箱（柱・棚・机の脚・壁など）を、カメラに近い順に選んでいる。
+	// 上から見た長方形にするため、向きが0度か90度の物だけを使っている（それ以外の向きの物は床に立つ物にはない）。
+	m_RippleObstacles.clear();
+	for (const Wall* wall : Core::Game::GetInstance()->GetObjects<Wall>())
+	{
+		const DirectX::SimpleMath::Vector3 position = wall->GetPosition();
+		const DirectX::SimpleMath::Vector3 scale = wall->GetScale();
+		const float yaw = std::fmod(std::fabs(wall->GetRotation().y), DirectX::XM_PI);
+		const bool straight = yaw < 0.01f || yaw > DirectX::XM_PI - 0.01f;
+		const bool quarter = std::fabs(yaw - DirectX::XM_PIDIV2) < 0.01f;
+		if (!wall->IsCollisionEnabled() || position.y - scale.y * 0.5f > m_Position.y + 1.5f ||
+			(!straight && !quarter))
+		{
+			continue;
+		}
+		m_RippleObstacles.emplace_back(position.x, position.z,
+			(quarter ? scale.z : scale.x) * 0.5f, (quarter ? scale.x : scale.z) * 0.5f);
+	}
+	const DirectX::SimpleMath::Vector2 center = m_RippleCenter;
+	std::sort(m_RippleObstacles.begin(), m_RippleObstacles.end(),
+		[&center](const DirectX::SimpleMath::Vector4& a, const DirectX::SimpleMath::Vector4& b)
+		{
+			return DirectX::SimpleMath::Vector2::DistanceSquared(DirectX::SimpleMath::Vector2(a.x, a.y), center) <
+				DirectX::SimpleMath::Vector2::DistanceSquared(DirectX::SimpleMath::Vector2(b.x, b.y), center);
+		});
+}
+
+// 水たまりの波を、更新で受け取った時間ぶん波の式で進めている（WaterRippleSimulation）。
+// 計算する範囲はカメラのまわりだけ。できた波は、床の反射を波打たせ、壁に光の輪を映す。
+// 描画の最初にGame::Drawから呼ばれ、GPU時間は「水たまりの波」の段階として測っている。
+void Ground::RunGpuSimulation()
+{
+	const float seconds = m_PendingRippleSeconds;
+	m_PendingRippleSeconds = 0.0f;
+	// 技術デモ（F2）で「水たまりの波：なし」を選んでいるときは、波を計算も表示もしない
+	if (!Tools::TechDemo::UsesWaterRipples())
+	{
+		Renderer::SetWaterRipples(nullptr, DirectX::SimpleMath::Vector2::Zero, 0.0f, 0.0f);
+		return;
+	}
+	m_RippleSimulation.Update(seconds, m_RippleCenter, m_PuddleCellBuffer.Get(), m_RippleFloodRect, m_RippleObstacles);
+	Renderer::SetWaterRipples(m_RippleSimulation.GetHeightSRV(), m_RippleSimulation.GetOrigin(),
+		WaterRippleSimulation::WorldSize, 1.0f);
 }
 
 //=======================================
@@ -234,7 +293,7 @@ void Ground::Draw(Camera* cam)
 	wetFloor.RippleStrength =
 		0.92f + m_PowerReflectionBlend * 0.10f + surgeWave * 0.18f;
 	// 技術デモで「水面の反射なし」を選んでいるときは、反射の画像を混ぜない
-	wetFloor.ReflectionStrength = Tools::TechDemo::UsesPlanarReflection()
+	wetFloor.ReflectionStrength = Tools::TechDemo::GetReflectionMethod() != 0
 		? 0.96f + m_PowerReflectionBlend * 0.22f + surgeWave * 0.12f
 		: 0.0f;
 	// 水に浸かった範囲がなければ、最小(1,1)が最大(0,0)より大きい値を渡して「範囲なし」にしている
@@ -299,6 +358,8 @@ void Ground::Uninit()
 	// 次のシーンに水面の光の揺らぎが残らないよう、効果を消している
 	Renderer::SetWaterCaustics(DirectX::SimpleMath::Vector4(1.0f, 1.0f, 0.0f, 0.0f), 0.0f, 0.0f, 0.0f);
 	m_WaterEffects.Uninit();
+	m_RippleSimulation.Uninit();
+	Renderer::SetWaterRipples(nullptr, DirectX::SimpleMath::Vector2::Zero, 0.0f, 0.0f);
 	m_WetFloorBuffer.Reset();
 	m_PuddleCellBuffer.Reset();
 }

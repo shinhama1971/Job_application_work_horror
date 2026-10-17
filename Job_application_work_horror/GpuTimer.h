@@ -11,7 +11,7 @@
 #include <d3d11.h>
 #include <wrl/client.h>
 
-// 測る描画の段階（フレーム全体・影・水面の反射・本描画・ブルーム・その他の画面効果）
+// 測る描画の段階（フレーム全体・影・水面の反射・本描画・ブルーム・その他の画面効果・水たまりの波の計算）
 enum class GpuPass : std::size_t
 {
     Total,
@@ -20,6 +20,7 @@ enum class GpuPass : std::size_t
     MainScene,
     Bloom,
     PostProcess,
+    WaterRipples,
     Count
 };
 

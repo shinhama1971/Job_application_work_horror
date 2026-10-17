@@ -29,15 +29,16 @@ namespace
         FlashlightShadow,
         AutoExposure,
         WaterCaustics,
+        WaterRipples,
         Count
     };
     constexpr int TopicCount = static_cast<int>(Topic::Count);
 
-    // 項目ごとの名前、方式の名前（最大3つ）、普段の方式、説明（2行）
+    // 項目ごとの名前、方式の名前（最大4つ）、方式の数、普段の方式、説明（2行）
     struct TopicInfo
     {
         const char* Name;
-        std::array<const char*, 3> Variants;
+        std::array<const char*, 4> Variants;
         int VariantCount;
         int DefaultVariant;
         std::array<const char*, 2> Description;
@@ -55,9 +56,9 @@ namespace
           { "先に深度だけを描き、奥に隠れた画素の",
             "重いライティングの計算を省いている" } },
         { "水面の反射",
-          { "なし", "あり", nullptr }, 2, 1,
-          { "床の高さで上下を反転したカメラで景色を描き、",
-            "水たまりにだけ、波でゆらして映している" } },
+          { "なし", "平面反射", "キューブマップ", "SSR" }, 4, 1,
+          { "平面反射：上下を反転したカメラでもう一度描く（正確・重い）",
+            "キューブマップは位置がずれ、SSRは画面の外が映らない" } },
         { "懐中電灯の影",
           { "影なし", "硬い影", "PCSS（柔らかい影）" }, 3, 2,
           { "遮る物から離れた所ほど影の縁をぼかしている",
@@ -70,6 +71,10 @@ namespace
           { "なし", "あり", nullptr }, 2, 1,
           { "西棟の水面で跳ね返った懐中電灯の光が、",
             "壁と天井に揺らいで映る（西棟で見られる）" } },
+        { "水たまりの波",
+          { "なし", "あり", nullptr }, 2, 1,
+          { "足音と水滴で立つ波をCompute Shaderの波の式で計算し、",
+            "反射を波打たせ、壁に光の輪を映している" } },
     } };
 
     // 開いているか、選んでいる項目、項目ごとの今の方式
@@ -222,9 +227,9 @@ namespace Tools::TechDemo
         return GetVariant(Topic::DepthPrepass) == 1;
     }
 
-    bool UsesPlanarReflection()
+    int GetReflectionMethod()
     {
-        return GetVariant(Topic::PlanarReflection) == 1;
+        return GetVariant(Topic::PlanarReflection);
     }
 
     int GetShadowMode()
@@ -235,6 +240,11 @@ namespace Tools::TechDemo
     float GetWaterCausticsScale()
     {
         return GetVariant(Topic::WaterCaustics) == 1 ? 1.0f : 0.0f;
+    }
+
+    bool UsesWaterRipples()
+    {
+        return GetVariant(Topic::WaterRipples) == 1;
     }
 
     void Draw(const GpuTimer& gpuTimer)
@@ -280,6 +290,7 @@ namespace Tools::TechDemo
             FormatTiming("反射", GpuPass::Reflection) + "   " +
             FormatTiming("影", GpuPass::Shadow) + "   " +
             FormatTiming("画面効果", GpuPass::PostProcess));
+        infoLines.push_back(FormatTiming("水たまりの波", GpuPass::WaterRipples));
 
         g_Hud->DrawTechDemoPanel(rows, infoLines);
     }

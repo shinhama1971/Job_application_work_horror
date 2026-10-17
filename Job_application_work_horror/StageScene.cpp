@@ -78,6 +78,7 @@ void StageScene::Init()
     m_KeypadDoor.Init(m_Objects.keypad);
     m_HiddenRoom.Init(m_Objects.hiddenRoom);
     m_WestWing.Init(m_Objects.westWing);
+    m_SafeLights.Init(m_Objects.safeZones);
     // 照らすと止まる影の判定と押し戻しに使う壁と扉を、一度だけ集めている（毎フレーム全Objectを調べないため）
     m_ArchiveStalker = Stage1LightStalker{};
     m_StalkerWalls = game->GetObjects<Wall>();
@@ -97,6 +98,9 @@ void StageScene::Init()
     // 監視カメラの巡回は配置したObjectを使うため、配置の後に準備している。
     m_Surveillance.Init(m_Objects);
     SetupPracticalLights();
+    m_ActiveRoute = static_cast<std::size_t>(Stage1RouteLight::Count);
+    m_RouteFixtureIndex = 0;
+    UpdateRouteLights();
 }
 
 // 看板やランプが、自分の光る色で周りの床と壁を照らすようにしている。
@@ -109,6 +113,117 @@ void StageScene::SetupPracticalLights()
     for (Wall* marker : m_Objects.loopMarkers)
     {
         marker->SetGlowLight(40.0f, 1.8f);
+    }
+}
+
+// 進む先の天井照明を1灯だけ、切れかけの電球のように不規則にちかちかさせている（ほかの照明は落ち着いて点いたまま）。
+// 矢印・明るさ・点灯の順番では道を示さず、「あの電気だけ様子がおかしい」と感じて自分から近づくようにしている。
+// 経路の選択は進行を参照するだけで、鍵・アイテム・扉の状態は変更しない。
+void StageScene::UpdateRouteLights()
+{
+    const Core::Game* game = Core::Game::GetInstance();
+    const int fuseCount = game->GetItemCount();
+    const bool powered = game->IsPowerRestored();
+    // 閉じ込めや照明の演出の最中は、演出の明滅と混ざらないよう、どれもちかちかさせない
+    const bool allowed = m_Objects.player != nullptr && m_Objects.player->CanControl() &&
+        !m_HiddenRoom.IsTrapped() && !m_ScareLightSequence.IsActive();
+    const Stage1WestWing::Step westWingStep = m_WestWing.GetStep();
+    Stage1RouteLight selected = Stage1RouteLight::Count;
+    if (allowed)
+    {
+        if (powered)
+        {
+            if (m_PowerSequence.IsExitComplete())
+            {
+                selected = Stage1RouteLight::ExitDoor;
+            }
+            else if (m_Objects.exitPowerPanel != nullptr && !m_Objects.exitPowerPanel->IsActivated())
+            {
+                selected = Stage1RouteLight::ExitPower;
+            }
+        }
+        else if (fuseCount <= 0)
+        {
+            selected = Stage1RouteLight::StartSearch;
+        }
+        else if ((fuseCount == 1 && m_CorridorLoopCount < 1) ||
+            (fuseCount == 2 && m_CorridorLoopCount < 2))
+        {
+            selected = Stage1RouteLight::CorridorDoor;
+        }
+        else if (fuseCount == 1)
+        {
+            selected = Stage1RouteLight::LeftStorage;
+        }
+        else if (fuseCount >= 3)
+        {
+            selected = Stage1RouteLight::MainPower;
+        }
+        else if (westWingStep == Stage1WestWing::Step::FindKey)
+        {
+            selected = Stage1RouteLight::RightStorage;
+        }
+        else if (westWingStep == Stage1WestWing::Step::OpenDoor)
+        {
+            selected = Stage1RouteLight::WestWing;
+        }
+        else if (westWingStep == Stage1WestWing::Step::FindFuse)
+        {
+            selected = Stage1RouteLight::PumpRoom;
+        }
+        // 排水中は、バルブの赤いランプが目印になるので、ちかちかさせない。
+    }
+
+    const std::size_t route = static_cast<std::size_t>(selected);
+    if (route != m_ActiveRoute)
+    {
+        m_ActiveRoute = route;
+        m_RouteFixtureIndex = 0;
+    }
+
+    // いったん全部の候補を「落ち着いて点いている」状態にし、進む先の1灯だけを後でちかちかさせる
+    for (const std::vector<CeilingLight*>& fixtures : m_Objects.routeLights)
+    {
+        for (CeilingLight* light : fixtures)
+        {
+            if (light != nullptr)
+            {
+                light->SetRouteFlicker(false);
+            }
+        }
+    }
+    if (route >= m_Objects.routeLights.size() || m_Objects.routeLights[route].empty())
+    {
+        return;
+    }
+    const std::vector<CeilingLight*>& fixtures = m_Objects.routeLights[route];
+
+    // 時間で次々に移さず、ちかちかしている灯の下まで歩いて来たときだけ、その先の灯へ移している。
+    const Vector3 playerPosition = m_Objects.player->GetPosition();
+    const auto distanceSquared = [&playerPosition](const CeilingLight* light)
+    {
+        if (light == nullptr)
+        {
+            return 1.0e20f;
+        }
+        const Vector3 position = light->GetPosition();
+        const float x = position.x - playerPosition.x;
+        const float z = position.z - playerPosition.z;
+        return x * x + z * z;
+    };
+    while (m_RouteFixtureIndex + 1 < fixtures.size())
+    {
+        const float currentDistance = distanceSquared(fixtures[m_RouteFixtureIndex]);
+        const float nextDistance = distanceSquared(fixtures[m_RouteFixtureIndex + 1]);
+        if (currentDistance > 35.0f * 35.0f && nextDistance >= currentDistance)
+        {
+            break;
+        }
+        ++m_RouteFixtureIndex;
+    }
+    if (CeilingLight* light = fixtures[m_RouteFixtureIndex])
+    {
+        light->SetRouteFlicker(true);
     }
 }
 
@@ -135,6 +250,7 @@ void StageScene::Update()
     UpdateAmbientSounds();
     if (!player->CanControl())
     {
+        UpdateRouteLights();
         return;
     }
 
@@ -148,6 +264,15 @@ void StageScene::Update()
     {
         m_ProgressHintTimer = (std::max)(m_ProgressHintTimer, 35.0f);
         Input::SetVibration(2, 0.04f);
+    }
+
+    // 光の安全地帯：暖かい灯りの下で、ライトを消して休んでいる間は電池が少しずつ戻る。
+    // 落ち着きの度合いは、心拍・物音・画面のざらつきを弱めるのに使っている。
+    const float safeLightCharge = m_SafeLights.Update(
+        deltaTime, player->GetPosition(), player->IsFlashlightOn(), player->GetBattery());
+    if (safeLightCharge > 0.0f)
+    {
+        player->AddBattery(safeLightCharge);
     }
 
     // 各知らせの残り時間を減らしている
@@ -227,6 +352,7 @@ void StageScene::Update()
         game->PlayAudioCueAt(
             cue.Label, cue.Position, cue.Pitch, cue.Volume, cue.MinimumOcclusion);
     }
+    UpdateRouteLights();
     UpdateTensionPulse(*player, deltaTime);
 
     // 出口の扉：送電が終わるまで鍵をかけ、開いた扉を通り抜けたら脱出を始めている
@@ -342,12 +468,14 @@ void StageScene::Update()
         ? 1.12f + (1.01f - 1.12f) * powerBlend
         : (player->IsFlashlightOn() ? 1.04f : 1.15f);
     game->GetPostProcess()->SetExposure(targetExposure);
+    // 暖かい灯りの下（光の安全地帯）では、ざらつきと周辺の暗さを和らげ、ほっとできる画面にしている
+    const float safeCalm = m_SafeLights.GetCalm();
     const float noiseAmount =
         0.18f - powerCalm + lowBattery * 0.18f +
-        sprintStress * 0.04f + corridorTension * 0.055f;
+        sprintStress * 0.04f + corridorTension * 0.055f - safeCalm * 0.07f;
     const float vignetteStrength =
         0.55f - powerCalm + lowBattery * 0.20f +
-        sprintStress * 0.06f + corridorTension * 0.075f;
+        sprintStress * 0.06f + corridorTension * 0.075f - safeCalm * 0.15f;
 
     game->GetPostProcess()->SetAtmosphere(
         noiseAmount,

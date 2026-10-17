@@ -8,6 +8,7 @@
 
 #include "Stage1HiddenRoomEvent.h"
 #include "Stage1KeypadDoor.h"
+#include "Stage1SafeLights.h"
 #include "Stage1WallWritings.h"
 #include "Stage1WestWing.h"
 #include "StageSurveillanceCameras.h"
@@ -31,6 +32,13 @@ class Door;
 class ExitTrigger;
 class Item;
 class CeilingLight;
+
+// 進む先を示す天井照明の候補の組（進み具合ごと）。その組の1灯だけが、切れかけの電球のように不規則にちかちかする。
+enum class Stage1RouteLight : std::size_t
+{
+    StartSearch, HallEntrance, CorridorDoor, LeftStorage, RightStorage,
+    WestWing, MainPower, PumpRoom, ExitPower, ExitDoor, Count
+};
 
 // 1面の進行で使うObject。Stage1Layout::Buildが作ると同時にポインタを入れて返すため、
 // 名前での検索や、名前の打ち間違いは起きない。
@@ -60,6 +68,10 @@ struct StageObjects
     Wall* exitSign = nullptr;
     Wall* doorIndicator = nullptr;
     std::array<Wall*, 3> loopMarkers{};
+    // 進み具合ごとの、進む先の天井照明の候補（手前から奥の順）
+    std::array<std::vector<CeilingLight*>, static_cast<std::size_t>(Stage1RouteLight::Count)> routeLights{};
+    // 光の安全地帯（停電しても消えない、暖かい色の電球の下）の場所と広さ
+    std::vector<Stage1SafeLights::Zone> safeZones;
     // ループ廊下へ続く中央の扉、出口の扉、出口（調べると2面へ）
     Door* loopDoor = nullptr;
     Door* exitDoor = nullptr;

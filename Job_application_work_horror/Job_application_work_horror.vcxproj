@@ -226,6 +226,7 @@
     <ClCompile Include="PauseMenu.cpp" />
     <ClCompile Include="Ground.cpp" />
     <ClCompile Include="GroundWaterEffects.cpp" />
+    <ClCompile Include="WaterRippleSimulation.cpp" />
     <ClCompile Include="Hud.cpp" />
     <ClCompile Include="HudScreens.cpp" />
     <ClCompile Include="input.cpp" />
@@ -236,6 +237,8 @@
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="PlanarReflection.cpp" />
+    <ClCompile Include="ReflectionProbe.cpp" />
+    <ClCompile Include="ScreenSpaceReflection.cpp" />
     <ClCompile Include="PostProcess.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="RendererResources.cpp" />
@@ -258,10 +261,12 @@
     <ClCompile Include="FlashlightWriting.cpp" />
     <ClCompile Include="Stage1KeypadDoor.cpp" />
     <ClCompile Include="Stage1HiddenRoomEvent.cpp" />
+    <ClCompile Include="Stage1SafeLights.cpp" />
     <ClCompile Include="Stage1WestWing.cpp" />
     <ClCompile Include="KeyItem.cpp" />
     <ClCompile Include="Locker.cpp" />
     <ClCompile Include="CaptureMode.cpp" />
+    <ClCompile Include="VideoWriter.cpp" />
     <ClCompile Include="TechDemo.cpp" />
     <ClCompile Include="StageSceneEvents.cpp" />
     <ClCompile Include="StageSceneDraw.cpp" />
@@ -311,6 +316,7 @@
     <ClInclude Include="GameState.h" />
     <ClInclude Include="Ground.h" />
     <ClInclude Include="WaterEffectSystem.h" />
+    <ClInclude Include="WaterRippleSimulation.h" />
     <ClInclude Include="Hud.h" />
     <ClInclude Include="IndexBuffer.h" />
     <ClInclude Include="input.h" />
@@ -328,6 +334,8 @@
     <ClInclude Include="Player.h" />
     <ClInclude Include="PlayerMovement.h" />
     <ClInclude Include="PlanarReflection.h" />
+    <ClInclude Include="ReflectionProbe.h" />
+    <ClInclude Include="ScreenSpaceReflection.h" />
     <ClInclude Include="PostProcess.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="RenderTexture.h" />
@@ -364,10 +372,12 @@
     <ClInclude Include="Stage1KeypadDoor.h" />
     <ClInclude Include="Stage1HiddenRoomEvent.h" />
     <ClInclude Include="Stage1LightStalker.h" />
+    <ClInclude Include="Stage1SafeLights.h" />
     <ClInclude Include="Stage1WestWing.h" />
     <ClInclude Include="KeyItem.h" />
     <ClInclude Include="Locker.h" />
     <ClInclude Include="CaptureMode.h" />
+    <ClInclude Include="VideoWriter.h" />
     <ClInclude Include="TechDemo.h" />
     <ClInclude Include="KeypadLock.h" />
     <ClInclude Include="SceneLayoutBuilder.h" />
@@ -397,6 +407,8 @@
     <ClInclude Include="shader\flashlightLighting.hlsli" />
     <ClInclude Include="shader\roomOcclusion.hlsli" />
     <ClInclude Include="shader\waterCaustics.hlsli" />
+    <ClInclude Include="shader\puddleMask.hlsli" />
+    <ClInclude Include="shader\horrorMarks.hlsli" />
     <ClInclude Include="shader\surfaceDetail.hlsli" />
   </ItemGroup>
   <ItemGroup>
@@ -425,6 +437,9 @@
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\autoExposureCS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\waterRippleCS.hlsl">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\hudPS.hlsl">

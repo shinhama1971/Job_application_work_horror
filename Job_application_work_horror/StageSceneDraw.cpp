@@ -204,5 +204,6 @@ Stage1ObjectiveInput StageScene::MakeObjectiveInput() const
     input.westWingStep = static_cast<int>(m_WestWing.GetStep());
     input.westWingValvesOpened = m_WestWing.GetOpenedValveCount();
     input.westWingText = m_WestWing.GetObjectiveText();
+    input.safeLightText = m_SafeLights.GetNoticeText();
     return input;
 }

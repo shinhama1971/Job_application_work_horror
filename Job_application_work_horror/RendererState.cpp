@@ -92,6 +92,37 @@ void Renderer::SetWaterCausticsView(const Matrix& view)
 		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
 }
 
+// 水たまりの波の高さのテクスチャをピクセルシェーダーのt9へ、範囲と強さをb12へ設定している
+void Renderer::SetWaterRipples(ID3D11ShaderResourceView* heightTexture,
+	const Vector2& origin, float worldSize, float strength)
+{
+	if (!m_pWaterCausticsBuffer)
+	{
+		return;
+	}
+	m_WaterCaustics.Ripple = Vector4(origin.x, origin.y, worldSize, heightTexture != nullptr ? strength : 0.0f);
+	m_pDeviceContext->UpdateSubresource(
+		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
+	m_pDeviceContext->PSSetConstantBuffers(
+		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+	m_pDeviceContext->PSSetShaderResources(9, 1, &heightTexture);
+}
+
+// 水面の反射の方式と、SSRで使う射影行列をb12へ設定している
+void Renderer::SetReflectionMode(int mode, const Matrix& projection)
+{
+	if (!m_pWaterCausticsBuffer)
+	{
+		return;
+	}
+	m_WaterCaustics.Projection = projection.Transpose();
+	m_WaterCaustics.Reflection = Vector4(static_cast<float>(mode), 0.0f, 0.0f, 0.0f);
+	m_pDeviceContext->UpdateSubresource(
+		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
+	m_pDeviceContext->PSSetConstantBuffers(
+		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+}
+
 // デバッグ表示と壁の古さの定数バッファ（b7）を、覚えている中身で更新している
 void Renderer::UploadDebugViewBuffer()
 {

@@ -52,6 +52,8 @@ private:
     VertexBuffer<VERTEX_3D> m_RippleVertexBuffer;
     std::unique_ptr<Material> m_RippleMaterial;
     std::vector<WaterRipple> m_FootstepRipples;
+    // 波のシミュレーションへ渡す、足音と水滴のおもり（xy = x・z、z = 半径、w = 強さ）。Groundが毎フレーム受け取っている
+    std::vector<DirectX::SimpleMath::Vector4> m_RippleImpulses;
     // 次に足音の波紋を作れるまでの秒数、次にレンズの曇りを出せるまでの秒数
     float m_FootstepRippleCooldown = 0.0f;
     float m_LensSplashCooldown = 0.0f;
@@ -81,6 +83,13 @@ private:
 
 public:
     const PuddleCellTable& GetPuddleCells() const { return m_PuddleCells; }
+    // このフレームに起きた足音と水滴のおもりを受け取り、空にしている（波のシミュレーションへ渡すため）
+    std::vector<DirectX::SimpleMath::Vector4> TakeRippleImpulses()
+    {
+        std::vector<DirectX::SimpleMath::Vector4> impulses;
+        impulses.swap(m_RippleImpulses);
+        return impulses;
+    }
 
     // 作る・更新する・描く・解放する
     void Init();

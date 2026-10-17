@@ -66,8 +66,10 @@ struct Stage1ObjectiveInput
     int westWingValvesOpened = 0;
     // 西棟の、バルブを回している間の進み具合と短い知らせ（空なら出さない）
     std::string_view westWingText;
+    // 光の安全地帯に初めて入ったときの知らせ（空なら出さない）
+    std::string_view safeLightText;
 };
 
 // 状態に応じた目的表示の文章を返している。上に書いた条件ほど優先している
-// （移動中 → 隠し部屋 → 書類保管室の影の知らせ → 西棟のバルブ・知らせ → 監視カメラの現地確認 → 一時的な知らせ → 人影・電力の演出 → ヒント → 普段の目的）。
+// （移動中 → 隠し部屋 → 書類保管室の影の知らせ → 西棟のバルブ・知らせ → 光の安全地帯の知らせ → 監視カメラの現地確認 → 一時的な知らせ → 人影・電力の演出 → ヒント → 普段の目的）。
 std::string SelectStage1Objective(const Stage1ObjectiveInput& in);

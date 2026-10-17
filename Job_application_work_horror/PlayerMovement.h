@@ -19,10 +19,13 @@ private:
     static constexpr float DefaultMoveSpeedPerSecond = 30.0f;
     static constexpr float SprintSpeedMultiplier = 1.65f;
     static constexpr float GravityAcceleration = 36.0f;
-    // スタミナの最大値、走っている間に1秒あたり減る量（約7.6秒で空）、休んでいる間に1秒あたり回復する量
+    // スタミナの最大値、走っている間に1秒あたり減る量（約10秒で空）、1秒あたり回復する量（立ち止まっている間・歩いている間）。
+    // 1面が広くなったため、走れる時間を延ばした。歩きながらでは戻りにくくし、息を整えるために立ち止まる間を作っている
+    // （立ち止まれば約3.8秒、歩きながらなら約6.7秒で満タン）。
     static constexpr float MaxStamina = 100.0f;
-    static constexpr float StaminaDrainPerSecond = 13.2f;
-    static constexpr float StaminaRecoveryPerSecond = 22.8f;
+    static constexpr float StaminaDrainPerSecond = 10.0f;
+    static constexpr float StaminaRecoveryPerSecond = 26.0f;
+    static constexpr float StaminaRecoveryWhileWalkingPerSecond = 15.0f;
 
     // 60fpsで1フレームあたりresponseだけ近づける動きを、フレームレートが違っても同じ速さになるよう補正している
     static float GetResponse(float responseAt60Fps, float deltaTime)
@@ -65,8 +68,8 @@ public:
         const float moveLengthSquared = moveDirection.LengthSquared();
         const bool isMoving = moveLengthSquared > 0.0001f;
 
-        // スタミナ切れの後は、30%まで回復するまで走れないようにしている
-        if (m_SprintExhausted && m_Stamina >= MaxStamina * 0.30f)
+        // スタミナ切れの後は、25%まで回復するまで走れないようにしている
+        if (m_SprintExhausted && m_Stamina >= MaxStamina * 0.25f)
         {
             m_SprintExhausted = false;
         }
@@ -95,8 +98,8 @@ public:
         }
         else
         {
-            m_Stamina = (std::min)(
-                MaxStamina, m_Stamina + StaminaRecoveryPerSecond * deltaTime);
+            const float recovery = isMoving ? StaminaRecoveryWhileWalkingPerSecond : StaminaRecoveryPerSecond;
+            m_Stamina = (std::min)(MaxStamina, m_Stamina + recovery * deltaTime);
         }
 
         // 急な入力の変化をそのまま座標へ反映せず、速度をなめらかに近づけて、視点の揺れを抑えている。

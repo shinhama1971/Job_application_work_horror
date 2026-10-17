@@ -73,6 +73,11 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         // 西棟のバルブを回している間の進み具合と、水が引いたなどの知らせ。
         objectiveText = std::string(in.westWingText);
     }
+    else if (!in.safeLightText.empty())
+    {
+        // 光の安全地帯に初めて入ったときの知らせ。
+        objectiveText = std::string(in.safeLightText);
+    }
     else if (in.patrolDispatched)
     {
         // 現地確認の間の残り時間と、光で消した割合は毎フレーム変わるため、ここで文章を組み立てている。

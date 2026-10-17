@@ -18,6 +18,8 @@
 #include"PostProcess.h"
 #include "ShadowMap.h"
 #include "PlanarReflection.h"
+#include "ReflectionProbe.h"
+#include "ScreenSpaceReflection.h"
 #include "TiledLighting.h"
 #include "GameState.h"
 #include "GameSettings.h"
@@ -55,6 +57,9 @@ namespace Core
         Effect::PostProcess m_PostProcess;
         Effect::ShadowMap m_ShadowMap;
         Effect::PlanarReflection m_PlanarReflection;
+        // 水面の反射の方式の比較（技術デモF2）で使う、キューブマップとSSR
+        Effect::ReflectionProbe m_ReflectionProbe;
+        Effect::ScreenSpaceReflection m_ScreenSpaceReflection;
         Effect::TiledLighting m_TiledLighting;
         // 毎フレームObjectから集める点光源。確保し直しを避けるため、同じvectorを使い回している。
         std::vector<ENVIRONMENT_POINT_LIGHT> m_FramePointLights;

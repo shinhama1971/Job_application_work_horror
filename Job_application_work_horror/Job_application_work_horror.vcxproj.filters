@@ -90,6 +90,12 @@
     <ClCompile Include="PlanarReflection.cpp">
       <Filter>ソース ファイル\Rendering</Filter>
     </ClCompile>
+    <ClCompile Include="ReflectionProbe.cpp">
+      <Filter>ソース ファイル\Rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="ScreenSpaceReflection.cpp">
+      <Filter>ソース ファイル\Rendering</Filter>
+    </ClCompile>
     <ClCompile Include="PostProcess.cpp">
       <Filter>ソース ファイル\Rendering</Filter>
     </ClCompile>
@@ -160,6 +166,9 @@
       <Filter>ソース ファイル\Rendering</Filter>
     </ClCompile>
     <ClCompile Include="GroundWaterEffects.cpp">
+      <Filter>ソース ファイル\Warld</Filter>
+    </ClCompile>
+    <ClCompile Include="WaterRippleSimulation.cpp">
       <Filter>ソース ファイル\Warld</Filter>
     </ClCompile>
     <ClCompile Include="HudScreens.cpp">
@@ -252,6 +261,9 @@
     <ClCompile Include="Stage1HiddenRoomEvent.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="Stage1SafeLights.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="Stage1WestWing.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
@@ -262,6 +274,9 @@
       <Filter>ソース ファイル\Gameplay</Filter>
     </ClCompile>
     <ClCompile Include="CaptureMode.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VideoWriter.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="TechDemo.cpp">
@@ -315,6 +330,12 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="shader\waterCaustics.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\puddleMask.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\horrorMarks.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="shader\surfaceDetail.hlsli">
@@ -419,6 +440,12 @@
     <ClInclude Include="PlanarReflection.h">
       <Filter>ソース ファイル\Rendering</Filter>
     </ClInclude>
+    <ClInclude Include="ReflectionProbe.h">
+      <Filter>ソース ファイル\Rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="ScreenSpaceReflection.h">
+      <Filter>ソース ファイル\Rendering</Filter>
+    </ClInclude>
     <ClInclude Include="PostProcess.h">
       <Filter>ソース ファイル\Rendering</Filter>
     </ClInclude>
@@ -432,6 +459,9 @@
       <Filter>ソース ファイル\Warld</Filter>
     </ClInclude>
     <ClInclude Include="WaterEffectSystem.h">
+      <Filter>ソース ファイル\Warld</Filter>
+    </ClInclude>
+    <ClInclude Include="WaterRippleSimulation.h">
       <Filter>ソース ファイル\Warld</Filter>
     </ClInclude>
     <ClInclude Include="Wall.h">
@@ -599,6 +629,9 @@
     <ClInclude Include="Stage1LightStalker.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
+    <ClInclude Include="Stage1SafeLights.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
     <ClInclude Include="Stage1WestWing.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
@@ -609,6 +642,9 @@
       <Filter>ソース ファイル\Gameplay</Filter>
     </ClInclude>
     <ClInclude Include="CaptureMode.h">
+      <Filter>ソース ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VideoWriter.h">
       <Filter>ソース ファイル</Filter>
     </ClInclude>
     <ClInclude Include="TechDemo.h">
@@ -683,6 +719,7 @@
     <FxCompile Include="shader\bloomBlurVerticalCS.hlsl" />
     <FxCompile Include="shader\bloomExtractCS.hlsl" />
     <FxCompile Include="shader\autoExposureCS.hlsl" />
+    <FxCompile Include="shader\waterRippleCS.hlsl" />
     <FxCompile Include="shader\hudPS.hlsl" />
     <FxCompile Include="shader\hudVS.hlsl" />
   </ItemGroup>
