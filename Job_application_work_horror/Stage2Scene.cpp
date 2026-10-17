@@ -67,6 +67,8 @@ bool Stage2Scene::IsRequiredAnomalyFound() const
         return m_PortraitAnomaly.HasChangedThisLoop();
     case Stage2Anomaly::Knocking:
         return m_KnockingAnomaly.WasFound();
+    case Stage2Anomaly::Handprint:
+        return m_HandprintAnomaly.WasFound();
     case Stage2Anomaly::None:
         break;
     }
@@ -104,6 +106,7 @@ void Stage2Scene::Init()
     m_FinalSequence.Reset();
     m_ScratchAnomaly.Reset();
     m_PortraitAnomaly.Reset();
+    m_HandprintAnomaly.Reset();
     m_KnockingAnomaly.Reset();
     m_FalseDoorAnomaly.Reset();
     m_ClockAnomaly.Reset();
@@ -317,10 +320,12 @@ void Stage2Scene::Update()
         m_GuidancePulseCooldown <= 0.0f)
     {
         // しばらく進めていないとき、探すべき異変の近くの照明を揺らしている（偽の扉は奥寄り、時計と肖像画は中央付近、
-        // ノックは音の出どころの近く）。
+        // ノックは音の出どころの近く、血の手形は最後に現れた手形の近く）。
         const Stage2Anomaly requiredAnomaly = m_AnomalyPlan.GetRequired(m_LoopCount);
         CeilingLight* guideLight = m_Objects.Light(
             requiredAnomaly == Stage2Anomaly::FalseDoor ? Stage2Light::Light3 :
+            requiredAnomaly == Stage2Anomaly::Handprint
+                ? Stage2NearestLight(m_HandprintAnomaly.GetLatestPosition().z) :
             requiredAnomaly == Stage2Anomaly::Knocking
                 ? Stage2NearestLight(GetKnockListenPoint().z)
                 : Stage2Light::Light2);
@@ -351,6 +356,7 @@ void Stage2Scene::Update()
     UpdateLightZones(*player);
     UpdateScratchMessage(*player, deltaTime);
     UpdatePortraitAnomaly(*player, deltaTime);
+    UpdateHandprintAnomaly(*player, deltaTime);
     UpdateKnockingAnomaly(*player, deltaTime);
     UpdateFalseDoorAnomaly(*player);
     UpdateClock(deltaTime);
@@ -560,6 +566,8 @@ void Stage2Scene::Uninit()
         return;
     }
 
+    // 血の手形の異変で壁に浮かべた手形を消している（ほかの面の壁に残らないように）
+    Renderer::SetWallHandprints(nullptr, 0);
     game->GetPostProcess()->SetCorridorTension(0.0f);
     game->GetPostProcess()->SetAtmosphere(0.18f, 0.55f);
     game->GetPostProcess()->SetExposure(1.0f);

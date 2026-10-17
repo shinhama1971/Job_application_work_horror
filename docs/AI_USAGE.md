@@ -61,6 +61,8 @@
 | 水たまりの波が、床に立った柱・棚・机の脚でも跳ね返るようにした（当たり判定のある床の箱を上から見た長方形で、カメラに近い順に最大32個をCompute Shaderへ渡す） | `WaterRippleSimulation.*`, `shader/waterRippleCS.hlsl`, `Ground.*`, `Wall.h`, `README.md`, `ARCHITECTURE.md` | 実装 | |
 | 水たまりの反射の方式の比較（平面反射・キューブマップ・SSR）を、ゲームの技術デモ（F2）と別リポジトリの技術デモに追加。キューブマップは1フレームに1面ずつ撮り直し、SSRは深度プリパスの深度と前のフレームの画面を使う | `ReflectionProbe.*`, `ScreenSpaceReflection.*`, `Renderer.h`, `RendererState.cpp`, `PostProcess.h`, `GameRendering.cpp`, `Game.*`, `Ground.cpp`, `TechDemo.*`, `shader/wetFloorPS.hlsl`, `shader/waterCaustics.hlsli`, `README.md`, `ARCHITECTURE.md` | 方式の設計・実装・比較画像と時間の計測 | 方針の選択（審査会の指摘「反射の方式を比べられるように置いておく」に答える。普段の方式は平面反射のまま） |
 | 技術デモの比較動画（`--video <ファイル.mp4>` で全部の方式を3秒ずつ映してMP4に書き出す）。ゲームの撮影モードの動画の書き出しを `VideoWriter` に切り出し、ゲームと技術デモで共通にした | `VideoWriter.*`, `CaptureMode.cpp`, 技術デモの `App.*`・`main.cpp`・`shims/CaptureMode.*`・`README.md` | 実装 | 方針の選択（審査会の指摘「動画を用意する」に答える） |
+| 2面に新しい異変「血の手形」を追加（照らすと奥の反対側の壁に次の手形が現れ、4つ目までたどる。1面の血の跡と同じ形の式を壁のシェーダーで描く。異変の候補は5つから2つ） | `HandprintAnomaly.h`, `Stage2AnomalyPlan.h`, `Stage2Scene.*`, `Stage2SceneHorror.cpp`, `Stage2SceneDraw.cpp`, `Stage2ScenePuzzles.cpp`, `Stage2Objective.*`, `Renderer.h`, `RendererState.cpp`, `shader/litTexturePS.hlsl`, `shader/waterCaustics.hlsli`, `README.md`, `ARCHITECTURE.md` | 遊びの設計・実装 | 方針の選択（2面の血の跡は、背景ではなく新しい異変にする） |
+| 1面の小物の配置をテキストファイル（`assets/layout/stage1_props.txt`）へ移し、Debug構成で `F5` で読み直せる仕組みを追加（書き間違いは行番号付きで画面に出す）。移す前と後で撮影モードの画像が同じことを確認 | `PropLayoutFile.*`, `Stage1Layout.*`, `StageScene.*`, `StageSceneDraw.cpp`, `Stage1Objective.*`, `assets/layout/stage1_props.txt`, `README.md`, `ARCHITECTURE.md` | 書式の設計・実装・配置の移し替え | 方針の選択（審査会の指摘「ツールを使って効率を上げる」に答える） |
 
 ### 設計の整理・品質改善
 

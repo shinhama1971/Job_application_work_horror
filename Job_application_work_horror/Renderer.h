@@ -116,9 +116,11 @@ struct WATER_CAUSTICS_BUFFER
     DirectX::SimpleMath::Matrix Projection;
     // 水面の反射の方式（x = 0 平面反射（普段）、1 キューブマップ、2 SSR）。「反射なし」は床の反射の強さを0にして表している
     DirectX::SimpleMath::Vector4 Reflection;
+    // 2面の「血の手形」の異変で壁に浮かべる手形（x = 壁の表面のx、y = 高さ、z = 奥行き、w = 見え方0〜1。0なら描かない）
+    DirectX::SimpleMath::Vector4 Handprints[4];
 };
 
-static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 192, "Water caustics buffer must match HLSL layout");
+static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 256, "Water caustics buffer must match HLSL layout");
 
 // サブセット（モデルの中で、同じマテリアルで描く部分）
 struct SUBSET{
@@ -277,6 +279,8 @@ public:
 		const DirectX::SimpleMath::Vector2& origin, float worldSize, float strength);
 	// 水面の反射の方式（0 平面反射、1 キューブマップ、2 SSR）と、SSRで使うプレイヤーの視点の射影行列を、床のシェーダーへ渡している
 	static void SetReflectionMode(int mode, const DirectX::SimpleMath::Matrix& projection);
+	// 2面の「血の手形」の異変で壁に浮かべる手形（最大4つ。x = 壁の表面のx、y = 高さ、z = 奥行き、w = 見え方）を、壁のシェーダーへ渡している。countが0なら描かない
+	static void SetWallHandprints(const DirectX::SimpleMath::Vector4* handprints, int count);
 	// ライトの計算をするかを切り替える・返している
 	static void SetLightEnable(bool Enable);
 	static bool GetLightEnable();

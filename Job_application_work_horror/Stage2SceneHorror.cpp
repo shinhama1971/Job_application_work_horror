@@ -648,6 +648,62 @@ void Stage2Scene::UpdateScratchMessage(
     }
 }
 
+// 血の手形を見つける周回（Stage2AnomalyPlanが決める）だけ判定している。
+// 壁に浮かんだ最後の手形を懐中電灯で照らし続けると、奥の反対側の壁に次の手形が「ぺたっ」と現れる。
+// 4つ目まで照らすと見つけたことになる。手形の形と見え方は、毎フレーム壁のシェーダーへ渡している。
+void Stage2Scene::UpdateHandprintAnomaly(const Player& player, float deltaTime)
+{
+    const bool active = m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Handprint);
+    Core::Game* game = Core::Game::GetInstance();
+
+    // 最後に現れた手形を照らしているか（ライトが点いていて、近く（110未満）で正面（内積0.93超）から見ている）
+    bool litLatest = false;
+    if (active && player.IsFlashlightOn())
+    {
+        Vector3 toPrint = m_HandprintAnomaly.GetLatestPosition() - game->GetCamera()->GetPosition();
+        const float distance = toPrint.Length();
+        if (distance > 0.001f)
+        {
+            toPrint /= distance;
+            litLatest = distance < 110.0f && game->GetCamera()->GetForward().Dot(toPrint) > 0.93f;
+        }
+    }
+
+    const HandprintAnomaly::Event handprintEvent = m_HandprintAnomaly.Update(deltaTime, active, litLatest);
+    if (handprintEvent == HandprintAnomaly::Event::NextAppeared)
+    {
+        // 次の手形が現れた所で、濡れた手を壁に押し付けたような低い水音を鳴らし、近くの照明を一瞬揺らしている
+        const Vector3 nextPrint = m_HandprintAnomaly.GetLatestPosition();
+        game->PlayAudioCueAt(SOUND_CUE_WATER_STEP, nextPrint, 0.55f, 0.9f);
+        CeilingLight* nearbyLight = m_Objects.Light(Stage2NearestLight(nextPrint.z));
+        if (nearbyLight != nullptr)
+        {
+            nearbyLight->TriggerEventFlicker(0.45f, 0.30f);
+        }
+        game->GetPostProcess()->TriggerHorrorPulse(0.14f, 0.22f);
+        Input::SetVibration(3, 0.08f);
+    }
+    else if (handprintEvent == HandprintAnomaly::Event::Found)
+    {
+        // 最後の手形を照らした：奥の確認スイッチが押せるようになる
+        m_Notices.loop = 2.8f;
+        game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, m_HandprintAnomaly.GetLatestPosition(), 0.62f, 1.4f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.30f, 0.40f);
+        game->GetPostProcess()->TriggerBloomPulse(0.40f, 0.20f);
+        Input::SetVibration(7, 0.18f);
+    }
+
+    // 壁のシェーダーへ、手形の場所と見え方を渡している（この周回でなければ描かない）
+    std::array<Vector4, HandprintAnomaly::PrintCount> prints{};
+    for (int index = 0; index < HandprintAnomaly::PrintCount; ++index)
+    {
+        const DirectX::XMFLOAT3& position = HandprintAnomaly::Positions[static_cast<std::size_t>(index)];
+        prints[static_cast<std::size_t>(index)] = Vector4(
+            position.x, position.y, position.z, m_HandprintAnomaly.GetVisibility(index));
+    }
+    Renderer::SetWallHandprints(prints.data(), active ? HandprintAnomaly::PrintCount : 0);
+}
+
 // 肖像画を見つける周回（Stage2AnomalyPlanが決める）だけ判定している。
 // 懐中電灯で照らしたまま見つめ続けると、閉じていた目がゆっくり浮かび、やがて開く。
 // 途中で目を離すと、目は消えて最初からやり直しにしている。

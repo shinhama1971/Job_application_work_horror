@@ -1,0 +1,114 @@
+# ============================================================================
+# 1面の小物の配置（PropLayoutFile が読む）。Debug版では、ゲームを動かしたまま F5 で読み直せる。
+# 扉・アイテム・バルブなど、進行のコードが使う物は Stage1Layout.cpp に残している。
+#
+#   color 名前 r g b
+#   prop 名前 x y z 幅 高さ 奥行き 色 光る色 光沢 当たり判定(0/1) [noshadow] [weathering] [glow 範囲 強さ]
+#
+# 座標の単位は全ステージ共通（床の高さは y=-100、天井の下面は y=-48.5）。
+# ============================================================================
+
+# --- 色
+color darkMetal     0.10  0.115 0.11     # 暗い金属（配管・ポンプ・柱）
+color cabinetMetal  0.16  0.18  0.17     # 棚の金属
+color trimColor     0.075 0.08  0.075    # 幅木
+color shelfColor    0.13  0.12  0.10     # 書類棚
+color debrisColor   0.12  0.11  0.095    # 崩れた資材・木箱
+color deskWood      0.16  0.13  0.095    # 机の木
+color ceilingPanel  0.055 0.06  0.058    # 天井の板
+color drainGrate    0.035 0.04  0.038    # 排水口
+# 警告灯（光る色と、それを暗くした本体の色）
+color lampRed       0.90  0.08  0.05
+color lampRedBody   0.54  0.048 0.03
+color lampGreen     0.10  0.85  0.25
+color lampGreenBody 0.06  0.51  0.15
+color lampBlue      0.15  0.35  0.95
+color lampBlueBody  0.09  0.21  0.57
+color lampAmber     0.95  0.55  0.10
+color lampAmberBody 0.57  0.33  0.06
+# 光の安全地帯の暖かい電球
+color warmBulb      1.0   0.72  0.40
+color warmBulbBody  0.6   0.432 0.24
+
+# --- 天井（床から53の高さに施設全体を覆う板。影は落とさず、天井板・外れた板の穴・雨漏りの染みを描く）
+prop PropCeilingMain           0     -47   80     436 3 516   ceilingPanel none 4 0 noshadow weathering
+prop PropCeilingWestWing       -300  -47   80     164 3 364   ceilingPanel none 4 0 noshadow weathering
+prop PropCeilingSouthWestHall  -250  -47   -256   264 3 156   ceilingPanel none 4 0 noshadow weathering
+
+# --- 壁際と天井近くを走る配管（Stage1AmbientSounds が、この線に沿って配管の音を鳴らしている）
+prop PropPipeLeft            -205   -55   60    3 3 450       darkMetal none 22 0
+prop PropPipeRight           205    -55   60    3 3 450       darkMetal none 22 0
+prop PropPipeCrossDoor       -115   -52.5 37    175 2.5 2.5   darkMetal none 22 0
+prop PropPipeCrossDoorRight  115    -52.5 37    175 2.5 2.5   darkMetal none 22 0
+prop PropPipeCrossHall       -132.5 -52.5 177   175 2.5 2.5   darkMetal none 22 0
+prop PropPipeCrossHallRight  132.5  -52.5 177   175 2.5 2.5   darkMetal none 22 0
+
+# --- 幅木（西側は、西棟の扉 z=-35〜-5 の前で途切れさせている）
+prop PropBaseboardLeft       -217.2 -96.5 -105  1.5 6 140   trimColor none 5 0
+prop PropBaseboardLeftNorth  -217.2 -96.5 165   1.5 6 340   trimColor none 5 0
+prop PropBaseboardRight      217.2  -96.5 80    1.5 6 510   trimColor none 5 0
+
+# --- 棚や設備（当たり判定あり）
+prop PropCabinetLeft   -190 -87 -132   28 24 12   cabinetMetal none 14 1
+prop PropCabinetRight  190  -87 -112   28 24 12   cabinetMetal none 14 1
+prop PropCabinetBack   -145 -88 326    36 22 14   cabinetMetal none 14 1
+prop PropServiceBox    205  -82 118    10 30 24   cabinetMetal none 12 1
+
+# --- 書類保管室（廊下の西側の部屋）。目線より高い書類棚を互い違いに並べた迷路。入口は x=-45 の壁の z=110〜130
+prop PropArchiveShelf1  -160 -77 70    80 44 6    shelfColor none 10 1
+prop PropArchiveShelf2  -105 -77 100   90 44 6    shelfColor none 10 1
+prop PropArchiveShelf3  -155 -77 130   90 44 6    shelfColor none 10 1
+prop PropArchiveShelf4  -110 -77 158   100 44 6   shelfColor none 10 1
+prop PropArchiveDesk    -200 -89 160   26 20 14   cabinetMetal none 12 1
+
+# --- 崩れた資材置き場（北西の部屋）
+prop PropDebris1     -150 -84 230   40 30 30   debrisColor none 6 1
+prop PropDebris2     -95  -88 285   50 22 24   debrisColor none 6 1
+prop PropDebris3     -190 -80 300   30 38 40   cabinetMetal none 10 1
+prop PropDebrisBeam  -120 -93 250   60 6 6     darkMetal none 18 1
+
+# --- 西棟の中の機材（ポンプ・タンク・ポンプ室の排水口・西の壁の配管）
+prop PropWestWingPump   -345 -86   235   30 26 26    darkMetal none 20 1
+prop PropWestWingTank   -240 -82   205   20 34 30    cabinetMetal none 14 1
+prop PropWestWingDrain  -290 -99.6 228   16 0.8 16   drainGrate none 16 0 noshadow
+prop PropWestWingPipe   -375 -55   80    3 3 350     darkMetal none 22 0
+
+# --- 南西の広間の西の奥：棚・机・細い柱・木箱の一角
+prop PropSouthWestShelf1    -362 -77   -300   10 44 30   shelfColor none 10 1
+prop PropSouthWestShelf2    -362 -77   -262   10 44 30   shelfColor none 10 1
+prop PropSouthWestShelf3    -362 -77   -224   10 44 30   shelfColor none 10 1
+prop PropSouthWestDeskTop   -322 -76   -300   40 2 24    deskWood none 8 0
+prop PropSouthWestDeskLeg1  -340 -88.5 -310   2 23 2     deskWood none 8 1
+prop PropSouthWestDeskLeg2  -304 -88.5 -310   2 23 2     deskWood none 8 1
+prop PropSouthWestDeskLeg3  -340 -88.5 -290   2 23 2     deskWood none 8 1
+prop PropSouthWestDeskLeg4  -304 -88.5 -290   2 23 2     deskWood none 8 1
+prop PropSouthWestPole      -268 -75   -252   3 50 3     darkMetal none 20 1
+prop PropSouthWestCrate1    -340 -93   -205   14 14 14   debrisColor none 6 1
+prop PropSouthWestCrate2    -240 -95   -316   10 10 10   debrisColor none 6 1
+
+# --- 南西の広間の色の付いた警告灯（暗い中で目立ち、自分の色で周りを照らす点光源になる）
+prop PropSouthWestLampRed    -250   -70 -329.5   10 4 1   lampRedBody lampRed 24 0 noshadow glow 55 2.0
+prop PropSouthWestLampGreen  -122.5 -70 -256     1 4 10   lampGreenBody lampGreen 24 0 noshadow glow 55 2.0
+prop PropSouthWestLampBlue   -377.5 -70 -190     1 4 10   lampBlueBody lampBlue 24 0 noshadow glow 55 2.0
+prop PropSouthWestLampAmber  -180   -70 -329.5   10 4 1   lampAmberBody lampAmber 24 0 noshadow glow 55 2.0
+
+# --- 西棟の南西の角：棚・机・木箱の一角
+prop PropWestWingShelf1    -368 -77   -78   10 44 30   shelfColor none 10 1
+prop PropWestWingShelf2    -368 -77   -40   10 44 30   shelfColor none 10 1
+prop PropWestWingDeskTop   -330 -76   -78   40 2 24    deskWood none 8 0
+prop PropWestWingDeskLeg1  -348 -88.5 -88   2 23 2     deskWood none 8 1
+prop PropWestWingDeskLeg2  -312 -88.5 -88   2 23 2     deskWood none 8 1
+prop PropWestWingDeskLeg3  -348 -88.5 -68   2 23 2     deskWood none 8 1
+prop PropWestWingDeskLeg4  -312 -88.5 -68   2 23 2     deskWood none 8 1
+prop PropWestWingCrate     -345 -93   -15   14 14 14   debrisColor none 6 1
+
+# --- 光の安全地帯の暖かい電球（停電しても消えない電池式の作業灯）。休む範囲は Stage1Layout.cpp の safeZones
+prop PropSafeLightHubCord    -198 -49.5 12     0.4 2.5 0.4   darkMetal none 4 0
+prop PropSafeLightHubBulb    -198 -52.3 12     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 85 3.2
+prop PropSafeLightDeskBase   -334 -74.5 -306   4 1 4         darkMetal none 12 0
+prop PropSafeLightDeskArm    -334 -70   -306   0.8 9 0.8     darkMetal none 12 0
+prop PropSafeLightDeskShade  -332 -65   -304   5 3 5         warmBulbBody warmBulb 30 0 noshadow glow 85 3.2
+
+# --- 脱出のホールの入口の柱
+prop PropExitColumnLeft   -52 -80 179   10 38 10   darkMetal none 8 1
+prop PropExitColumnRight  52  -80 179   10 38 10   darkMetal none 8 1

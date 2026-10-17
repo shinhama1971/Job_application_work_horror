@@ -44,6 +44,8 @@ private:
     void SetupPracticalLights();
     // 進む先の天井照明を1灯だけ、不規則にちかちかさせている
     void UpdateRouteLights();
+    // 小物の配置のファイルを読み直して置き直している（Debug版の F5）
+    void ReloadPropLayout();
     // 目的表示の文章を選ぶために、今の状態を集めている（StageSceneDraw.cpp）。
     Stage1ObjectiveInput MakeObjectiveInput() const;
     // 姿の見えない物音を鳴らしてよいか（台本の演出や監視映像と重ならないか）を判断している。
@@ -102,6 +104,9 @@ private:
     Stage1WestWing m_WestWing;
     // 光の安全地帯（暖かい灯りの下）。落ち着きの度合いと、休んでいる間の電池の回復を管理している。
     Stage1SafeLights m_SafeLights;
+    // 小物の配置のファイルを読み直したときの知らせと、その残り秒数（Debug版の F5）
+    std::string m_LayoutNotice;
+    float m_LayoutNoticeTimer = 0.0f;
     // 西棟で鳴らす物音（使い回している）
     std::vector<AmbientSoundCue> m_WestWingCues;
     // 書類保管室の「照らすと止まる影」。動きのルールはこのクラス、影の表示・音・電池はSceneが行っている。

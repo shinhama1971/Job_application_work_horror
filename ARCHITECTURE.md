@@ -115,6 +115,7 @@ Application
 - `Stage2AnomalyPlan`: 1周目・2周目に見つける必要がある異変を、偽ドア・時計・肖像画・ノックから毎回ランダムに2つ選ぶ（入力や描画に依存しない純粋な状態クラス）
 - `Locker`: 隠れられるロッカーの扉と「隠れる」操作。隠れている間の移動・視点の制限は`Player`、影の振る舞い（見失う・見られて捕まる）は`Stage2Scene::UpdateHiddenFromStalker`が担当
 - `KnockingAnomaly`: 壁の向こうのノック異変（音の出どころの選択、ノックの間隔、出どころの壁の前で耳を澄ませた時間）
+- `HandprintAnomaly`: 血の手形の異変（現れた手形の数、照らし続けた時間、少しずつ浮かぶ見え方）。手形の場所と見え方は `Renderer::SetWallHandprints`（b12）で壁のシェーダーへ渡し、`litTexturePS` が1面の血の跡と同じ `HorrorHandprint` の式で描く
 - `TensionPulse`: 自分の心拍音と呼吸音をいつ・どれくらいの大きさで鳴らすかを、危険度と「隠れているか」から決める（入力や描画に依存しない状態クラス）。危険度は2面では危険ゲージと同じ`Stage2Scene::ComputeThreatRate`、1面では近くの影までの距離（`StageScene::ComputeThreatRate`）から渡す。鳴らす処理は1面・2面共通の`TensionPulseFeedback.h`
 - `ScratchAnomaly`: 引っかき傷メッセージ
 - `ObservedScareSequence`: 注視時の照明演出
@@ -141,6 +142,9 @@ Application
   Sceneの終了時はその一覧で破棄するため、生成・取得・破棄で名前の一覧が食い違うことはありません。
 - 破棄を名前で行うのは、すでに破棄されたObjectに対しても安全だからです。将来、途中で破棄される
   Objectを配置に加えても、解放済みのポインタに触れることがありません。
+- 1面の小物（進行のコードが使わない箱）は `PropLayoutFile` がテキストファイル（`assets/layout/stage1_props.txt`）から読み、
+  `StageObjects::layoutProps` に名前とWallの組で持ちます。Debug構成では `F5` で読み直し、同じ名前の物は置き直し、
+  新しい名前は作り、ファイルから消えた物は隠します。扉・アイテム・バルブなど進行のコードが使う物はコードに残しています。
 - 毎フレームの文字列ハッシュ検索をなくします。
 - ポインタは生成時に受け取るため、名前の打ち間違いでObjectを取得し損ねることがありません。
 - 2面の照明は `Stage2Light` 列挙型で指定し、演出テーブルに名前文字列を持たせません。

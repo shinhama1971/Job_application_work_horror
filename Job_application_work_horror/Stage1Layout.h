@@ -8,6 +8,7 @@
 
 #include "Stage1HiddenRoomEvent.h"
 #include "Stage1KeypadDoor.h"
+#include "PropLayoutFile.h"
 #include "Stage1SafeLights.h"
 #include "Stage1WallWritings.h"
 #include "Stage1WestWing.h"
@@ -72,6 +73,8 @@ struct StageObjects
     std::array<std::vector<CeilingLight*>, static_cast<std::size_t>(Stage1RouteLight::Count)> routeLights{};
     // 光の安全地帯（停電しても消えない、暖かい色の電球の下）の場所と広さ
     std::vector<Stage1SafeLights::Zone> safeZones;
+    // 小物のファイル（assets/layout/stage1_props.txt）から作った小物（名前とWall）。Debug版で F5 を押すと、ファイルを読み直して置き直している
+    PropLayoutFile::SpawnedProps layoutProps;
     // ループ廊下へ続く中央の扉、出口の扉、出口（調べると2面へ）
     Door* loopDoor = nullptr;
     Door* exitDoor = nullptr;
@@ -106,6 +109,9 @@ struct StageObjects
 
 namespace Stage1Layout
 {
+    // 1面の小物の配置のファイル（実行ファイルの作業フォルダから見た場所）
+    inline constexpr const char* PropLayoutPath = "assets/layout/stage1_props.txt";
+
     // 1面の施設を組み立て、進行で使うObjectのポインタをまとめて返している。
     StageObjects Build(Core::Game& game);
 }

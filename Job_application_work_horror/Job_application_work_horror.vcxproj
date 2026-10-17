@@ -267,6 +267,7 @@
     <ClCompile Include="Locker.cpp" />
     <ClCompile Include="CaptureMode.cpp" />
     <ClCompile Include="VideoWriter.cpp" />
+    <ClCompile Include="PropLayoutFile.cpp" />
     <ClCompile Include="TechDemo.cpp" />
     <ClCompile Include="StageSceneEvents.cpp" />
     <ClCompile Include="StageSceneDraw.cpp" />
@@ -352,6 +353,7 @@
     <ClInclude Include="ClockAnomaly.h" />
     <ClInclude Include="FalseDoorAnomaly.h" />
     <ClInclude Include="PortraitAnomaly.h" />
+    <ClInclude Include="HandprintAnomaly.h" />
     <ClInclude Include="ScratchAnomaly.h" />
     <ClInclude Include="ObservedScareSequence.h" />
     <ClInclude Include="CaughtSequence.h" />
@@ -381,6 +383,7 @@
     <ClInclude Include="TechDemo.h" />
     <ClInclude Include="KeypadLock.h" />
     <ClInclude Include="SceneLayoutBuilder.h" />
+    <ClInclude Include="PropLayoutFile.h" />
     <ClInclude Include="StageSurveillanceCameras.h" />
     <ClInclude Include="SurveillancePatrol.h" />
     <ClInclude Include="Stage2Scene.h" />

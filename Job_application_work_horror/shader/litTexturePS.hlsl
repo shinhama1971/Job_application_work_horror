@@ -18,6 +18,38 @@ SamplerState g_SamplerState : register(s0);
 #include "roomOcclusion.hlsli"
 #include "surfaceDetail.hlsli"
 
+// 2面の「血の手形」の異変：Stage2Scene が渡した手形（WallHandprints）を、その壁の面に描き、濃さ（0〜1）を返している。
+// 形は1面の壁の血の跡と同じ式（HorrorHandprint）。見え方（w）で少しずつ浮かぶ。
+float GetAnomalyHandprint(float3 worldPosition, float3 worldNormal)
+{
+    // 1画素がワールドで何単位か（手形の縁のぼかしに使う。分岐の外で求めている）
+    const float footprint = max(length(fwidth(worldPosition.zy)), 0.0001f);
+    float mask = 0.0f;
+    [unroll]
+    for (int index = 0; index < 4; ++index)
+    {
+        const float4 print = WallHandprints[index];
+        // 浮かんでいない手形と、その手形の壁の面ではない所（x が離れている・壁の向きではない）は描かない
+        if (print.w <= 0.0f || abs(worldPosition.x - print.x) > 0.6f || abs(worldNormal.x) < 0.7f)
+        {
+            continue;
+        }
+        // 壁を正面から見たときの右向きを横の軸にし（右の壁は+z、左の壁は-z）、手形ごとに少し傾けている
+        const float side = print.x > 0.0f ? 1.0f : -1.0f;
+        const float2 local = float2((worldPosition.z - print.z) * side, worldPosition.y - print.y);
+        const float angle = (float(index) - 1.5f) * 0.18f;
+        const float2x2 rotation = float2x2(cos(angle), -sin(angle), sin(angle), cos(angle));
+        const float2 handPoint = mul(rotation, local) / 1.25f;
+        const float hand = HorrorHandprint(handPoint, ((uint(index) & 1u) == 0u) ? 1.0f : -1.0f, footprint / 1.25f);
+        // 手のひらの下へ、少し引きずった跡
+        const float drag = (1.0f - smoothstep(1.4f, 1.9f, abs(handPoint.x))) * step(handPoint.y, 0.0f) *
+            (1.0f - saturate(-handPoint.y / 5.0f)) * (0.5f + 0.5f * sin(handPoint.x * 7.0f)) * 0.6f;
+        const float smudge = 0.6f + 0.4f * FastValueNoise(local * 0.8f + float(index) * 13.0f);
+        mask = max(mask, max(hand, drag) * smudge * print.w);
+    }
+    return mask;
+}
+
 // 頂点シェーダー（litTextureVS）から受け取る値（反射の座標は使わないので省いている）
 struct LIT_PS_IN
 {
@@ -384,6 +416,11 @@ float4 main(in LIT_PS_IN input) : SV_Target
         color.rgb *= ageing.tint;
         color.rgb *= 1.0f - ageing.cavity * 0.55f;
         wetness = saturate(grime + ageing.damp * 0.8f);
+
+        // 2面の「血の手形」の異変（その周回だけ、照らすと次の手形が奥に現れる）。濡れた血として光沢も返す
+        const float anomalyHandprint = GetAnomalyHandprint(input.worldPos, normalize(input.worldNormal));
+        color.rgb *= lerp(1.0f.xxx, float3(0.85f, 0.05f, 0.04f), anomalyHandprint * 0.92f);
+        wetness = max(wetness, anomalyHandprint * 0.9f);
 
         // 汚れと古さの凹凸で、法線を傾けている（古さが濃いほど強く）
         detailWorldNormal = GetBumpedWorldNormal(

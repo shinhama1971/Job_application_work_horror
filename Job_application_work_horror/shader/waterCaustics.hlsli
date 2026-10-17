@@ -29,6 +29,8 @@ cbuffer WaterCausticsBuffer : register(b12)
     matrix CausticProjection;
     // 水面の反射の方式（x = 0 平面反射（普段）、1 キューブマップ、2 SSR）。「反射なし」は床の反射の強さを0にして表している
     float4 ReflectionParams;
+    // 2面の「血の手形」の異変で壁に浮かべる手形（x = 壁の表面のx、y = 高さ、z = 奥行き、w = 見え方0〜1。0なら描かない）
+    float4 WallHandprints[4];
 }
 
 // 水たまりの波のシミュレーションの高さ（t9。WaterRippleSimulationが毎フレーム計算している）。x = 今の高さ、y = 1つ前の高さ

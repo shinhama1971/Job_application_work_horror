@@ -19,11 +19,13 @@
 #include "Item.h"
 #include "KeyItem.h"
 #include "PipeProp.h"
+#include "PropLayoutFile.h"
 #include "Player.h"
 #include "ScareTrigger.h"
 #include "ScreenDustOverlay.h"
 #include "ShadowMan.h"
 #include "Wall.h"
+#include "utility.h"
 
 #include <SimpleMath.h>
 #include <array>
@@ -238,9 +240,8 @@ namespace Stage1Layout
         }
 
 
-        // 配管や設備で区画ごとの見た目の形を変え、今いる場所を分かりやすくしている。
-        // 縁と天井の配管は飾りだけ、床の設備には当たり判定を持たせている。
-        // Wallを、色と当たり判定の有無を指定した小物として作る関数
+        // Wallを、色と当たり判定の有無を指定した小物として作る関数（進行のコードが色や表示を変える物だけに使っている。
+        // それ以外の小物は、下で小物のファイルから読んでいる）
         const auto createStageProp = [&builder](
             const char* name,
             const Vector3& position,
@@ -258,166 +259,36 @@ namespace Stage1Layout
             return prop;
         };
 
-        // 小物の色（暗い金属・棚の金属・縁取り）
-        const Color darkMetal(0.10f, 0.115f, 0.11f, 1.0f);
-        const Color cabinetMetal(0.16f, 0.18f, 0.17f, 1.0f);
-        const Color trimColor(0.075f, 0.08f, 0.075f, 1.0f);
         const Color noEmission(0.0f, 0.0f, 0.0f, 1.0f);
 
-        // 天井（床から53の高さに、施設全体を覆う板を置いている。影は落とさない）
-        Wall* ceiling = createStageProp("PropCeilingMain",
-            Vector3(0.0f, -47.0f, 80.0f), Vector3(436.0f, 3.0f, 516.0f),
-            Color(0.055f, 0.06f, 0.058f, 1.0f), noEmission, 4.0f, false);
-        ceiling->SetCastsShadow(false);
-        // 天井も建物の面として、天井板・外れた板の穴・雨漏りの染みを描いている（litTexturePS）。
-        ceiling->SetWeatheringSurface(true);
-        // 西棟の天井
-        Wall* westWingCeiling = createStageProp("PropCeilingWestWing",
-            Vector3(-300.0f, -47.0f, 80.0f), Vector3(164.0f, 3.0f, 364.0f),
-            Color(0.055f, 0.06f, 0.058f, 1.0f), noEmission, 4.0f, false);
-        westWingCeiling->SetCastsShadow(false);
-        westWingCeiling->SetWeatheringSurface(true);
-        // 南西の広間の天井
-        Wall* southWestHallCeiling = createStageProp("PropCeilingSouthWestHall",
-            Vector3(-250.0f, -47.0f, -256.0f), Vector3(264.0f, 3.0f, 156.0f),
-            Color(0.055f, 0.06f, 0.058f, 1.0f), noEmission, 4.0f, false);
-        southWestHallCeiling->SetCastsShadow(false);
-        southWestHallCeiling->SetWeatheringSurface(true);
-
-        // 壁際と天井近くを走る配管（Stage1AmbientSoundsが、この線に沿って配管の音を鳴らしている）
-        createStageProp("PropPipeLeft", Vector3(-205.0f, -55.0f, 60.0f),
-            Vector3(3.0f, 3.0f, 450.0f), darkMetal, noEmission, 22.0f, false);
-        createStageProp("PropPipeRight", Vector3(205.0f, -55.0f, 60.0f),
-            Vector3(3.0f, 3.0f, 450.0f), darkMetal, noEmission, 22.0f, false);
-        createStageProp("PropPipeCrossDoor", Vector3(-115.0f, -52.5f, 37.0f),
-            Vector3(175.0f, 2.5f, 2.5f), darkMetal, noEmission, 22.0f, false);
-        createStageProp("PropPipeCrossDoorRight", Vector3(115.0f, -52.5f, 37.0f),
-            Vector3(175.0f, 2.5f, 2.5f), darkMetal, noEmission, 22.0f, false);
-        createStageProp("PropPipeCrossHall", Vector3(-132.5f, -52.5f, 177.0f),
-            Vector3(175.0f, 2.5f, 2.5f), darkMetal, noEmission, 22.0f, false);
-        createStageProp("PropPipeCrossHallRight", Vector3(132.5f, -52.5f, 177.0f),
-            Vector3(175.0f, 2.5f, 2.5f), darkMetal, noEmission, 22.0f, false);
-
-        // 西側の幅木は、西棟の扉（z=-35〜-5）の前で途切れさせている。
-        createStageProp("PropBaseboardLeft", Vector3(-217.2f, -96.5f, -105.0f),
-            Vector3(1.5f, 6.0f, 140.0f), trimColor, noEmission, 5.0f, false);
-        createStageProp("PropBaseboardLeftNorth", Vector3(-217.2f, -96.5f, 165.0f),
-            Vector3(1.5f, 6.0f, 340.0f), trimColor, noEmission, 5.0f, false);
-        createStageProp("PropBaseboardRight", Vector3(217.2f, -96.5f, 80.0f),
-            Vector3(1.5f, 6.0f, 510.0f), trimColor, noEmission, 5.0f, false);
-
-        // 棚や設備（当たり判定あり）
-        createStageProp("PropCabinetLeft", Vector3(-190.0f, -87.0f, -132.0f),
-            Vector3(28.0f, 24.0f, 12.0f), cabinetMetal, noEmission, 14.0f, true);
-        createStageProp("PropCabinetRight", Vector3(190.0f, -87.0f, -112.0f),
-            Vector3(28.0f, 24.0f, 12.0f), cabinetMetal, noEmission, 14.0f, true);
-        createStageProp("PropCabinetBack", Vector3(-145.0f, -88.0f, 326.0f),
-            Vector3(36.0f, 22.0f, 14.0f), cabinetMetal, noEmission, 14.0f, true);
-        createStageProp("PropServiceBox", Vector3(205.0f, -82.0f, 118.0f),
-            Vector3(10.0f, 30.0f, 24.0f), cabinetMetal, noEmission, 12.0f, true);
-
-        // 書類保管室（廊下の西側の部屋）。目線より高い書類棚を互い違いに並べ、見通しの悪い迷路にしている。
-        // 入口は x=-45 の壁の z=110〜130。
-        const Color shelfColor(0.13f, 0.12f, 0.10f, 1.0f);
-        createStageProp("PropArchiveShelf1", Vector3(-160.0f, -77.0f, 70.0f),
-            Vector3(80.0f, 44.0f, 6.0f), shelfColor, noEmission, 10.0f, true);
-        createStageProp("PropArchiveShelf2", Vector3(-105.0f, -77.0f, 100.0f),
-            Vector3(90.0f, 44.0f, 6.0f), shelfColor, noEmission, 10.0f, true);
-        createStageProp("PropArchiveShelf3", Vector3(-155.0f, -77.0f, 130.0f),
-            Vector3(90.0f, 44.0f, 6.0f), shelfColor, noEmission, 10.0f, true);
-        createStageProp("PropArchiveShelf4", Vector3(-110.0f, -77.0f, 158.0f),
-            Vector3(100.0f, 44.0f, 6.0f), shelfColor, noEmission, 10.0f, true);
-        createStageProp("PropArchiveDesk", Vector3(-200.0f, -89.0f, 160.0f),
-            Vector3(26.0f, 20.0f, 14.0f), cabinetMetal, noEmission, 12.0f, true);
-
-        // 崩れた資材置き場（北西の部屋）。崩れた資材と機材で視界をさえぎっている。
-        const Color debrisColor(0.12f, 0.11f, 0.095f, 1.0f);
-        createStageProp("PropDebris1", Vector3(-150.0f, -84.0f, 230.0f),
-            Vector3(40.0f, 30.0f, 30.0f), debrisColor, noEmission, 6.0f, true);
-        createStageProp("PropDebris2", Vector3(-95.0f, -88.0f, 285.0f),
-            Vector3(50.0f, 22.0f, 24.0f), debrisColor, noEmission, 6.0f, true);
-        createStageProp("PropDebris3", Vector3(-190.0f, -80.0f, 300.0f),
-            Vector3(30.0f, 38.0f, 40.0f), cabinetMetal, noEmission, 10.0f, true);
-        createStageProp("PropDebrisBeam", Vector3(-120.0f, -93.0f, 250.0f),
-            Vector3(60.0f, 6.0f, 6.0f), darkMetal, noEmission, 18.0f, true);
-
-        // 西棟の中の機材（ポンプと配管）。水の中に沈んだ機械室らしさを出している。
-        createStageProp("PropWestWingPump", Vector3(-345.0f, -86.0f, 235.0f),
-            Vector3(30.0f, 26.0f, 26.0f), darkMetal, noEmission, 20.0f, true);
-        createStageProp("PropWestWingTank", Vector3(-240.0f, -82.0f, 205.0f),
-            Vector3(20.0f, 34.0f, 30.0f), cabinetMetal, noEmission, 14.0f, true);
-        // ポンプ室の床の排水口。排水バルブを回すと、水はここへ向かって引いていく。
-        Wall* westWingDrain = createStageProp("PropWestWingDrain", Vector3(-290.0f, -99.6f, 228.0f),
-            Vector3(16.0f, 0.8f, 16.0f), Color(0.035f, 0.04f, 0.038f, 1.0f), noEmission, 16.0f, false);
-        westWingDrain->SetCastsShadow(false);
-        createStageProp("PropWestWingPipe", Vector3(-375.0f, -55.0f, 80.0f),
-            Vector3(3.0f, 3.0f, 350.0f), darkMetal, noEmission, 22.0f, false);
-
-        // 南西の広間の中。西の奥は、棚・机・細い柱・木箱の一角（懐中電灯の影が、根元はくっきり、奥の棚ではぼんやり落ちる）。
-        createStageProp("PropSouthWestShelf1", Vector3(-362.0f, -77.0f, -300.0f),
-            Vector3(10.0f, 44.0f, 30.0f), shelfColor, noEmission, 10.0f, true);
-        createStageProp("PropSouthWestShelf2", Vector3(-362.0f, -77.0f, -262.0f),
-            Vector3(10.0f, 44.0f, 30.0f), shelfColor, noEmission, 10.0f, true);
-        createStageProp("PropSouthWestShelf3", Vector3(-362.0f, -77.0f, -224.0f),
-            Vector3(10.0f, 44.0f, 30.0f), shelfColor, noEmission, 10.0f, true);
-        const Color deskWood(0.16f, 0.13f, 0.095f, 1.0f);
-        createStageProp("PropSouthWestDeskTop", Vector3(-322.0f, -76.0f, -300.0f),
-            Vector3(40.0f, 2.0f, 24.0f), deskWood, noEmission, 8.0f, false);
-        for (int leg = 0; leg < 4; ++leg)
+        // 天井の板・配管・幅木・棚・机・崩れた資材・木箱・色の付いた警告灯・暖かい電球など、進行のコードが使わない小物は、
+        // テキストファイル（assets/layout/stage1_props.txt）から読んで置いている（PropLayoutFile）。
+        // ビルドし直さずに配置を直せ、Debug版ではゲームを動かしたまま F5 で読み直せる（StageScene）。
+        const PropLayout propLayout = PropLayoutFile::Load(PropLayoutPath);
+        if (!propLayout.IsValid())
         {
-            const std::string name = "PropSouthWestDeskLeg" + std::to_string(leg + 1);
-            createStageProp(name.c_str(),
-                Vector3(-322.0f + (leg % 2 == 0 ? -18.0f : 18.0f), -88.5f, -300.0f + (leg < 2 ? -10.0f : 10.0f)),
-                Vector3(2.0f, 23.0f, 2.0f), deskWood, noEmission, 8.0f, true);
+            utility::ReportFatalError("1面の小物の配置を読めませんでした（" + std::to_string(propLayout.ErrorLine) +
+                "行目）: " + propLayout.Error);
         }
-        createStageProp("PropSouthWestPole", Vector3(-268.0f, -75.0f, -252.0f),
-            Vector3(3.0f, 50.0f, 3.0f), darkMetal, noEmission, 20.0f, true);
-        createStageProp("PropSouthWestCrate1", Vector3(-340.0f, -93.0f, -205.0f),
-            Vector3(14.0f, 14.0f, 14.0f), debrisColor, noEmission, 6.0f, true);
-        createStageProp("PropSouthWestCrate2", Vector3(-240.0f, -95.0f, -316.0f),
-            Vector3(10.0f, 10.0f, 10.0f), debrisColor, noEmission, 6.0f, true);
+        objects.layoutProps = PropLayoutFile::Spawn(builder, propLayout);
 
-        // 色の付いた警告灯（赤・緑・青・橙）。暗い中で目立ち、自分の色で周りを照らす点光源にもなる（タイルベースライティング）。
-        const auto createWarningLamp = [&createStageProp](const char* name, const Vector3& position, const Vector3& scale, const Color& color)
-        {
-            Wall* lamp = createStageProp(name, position, scale,
-                Color(color.R() * 0.6f, color.G() * 0.6f, color.B() * 0.6f, 1.0f), color, 24.0f, false);
-            lamp->SetCastsShadow(false);
-            lamp->SetGlowLight(55.0f, 2.0f);
-            return lamp;
-        };
-        createWarningLamp("PropSouthWestLampRed", Vector3(-250.0f, -70.0f, -329.5f), Vector3(10.0f, 4.0f, 1.0f), Color(0.90f, 0.08f, 0.05f, 1.0f));
-        createWarningLamp("PropSouthWestLampGreen", Vector3(-122.5f, -70.0f, -256.0f), Vector3(1.0f, 4.0f, 10.0f), Color(0.10f, 0.85f, 0.25f, 1.0f));
-        createWarningLamp("PropSouthWestLampBlue", Vector3(-377.5f, -70.0f, -190.0f), Vector3(1.0f, 4.0f, 10.0f), Color(0.15f, 0.35f, 0.95f, 1.0f));
-        createWarningLamp("PropSouthWestLampAmber", Vector3(-180.0f, -70.0f, -329.5f), Vector3(10.0f, 4.0f, 1.0f), Color(0.95f, 0.55f, 0.10f, 1.0f));
-
-        // 西棟の南西の角。南西の広間と同じ、棚・机・木箱の一角（水面に映り、懐中電灯の影が落ちる）。
-        createStageProp("PropWestWingShelf1", Vector3(-368.0f, -77.0f, -78.0f),
-            Vector3(10.0f, 44.0f, 30.0f), shelfColor, noEmission, 10.0f, true);
-        createStageProp("PropWestWingShelf2", Vector3(-368.0f, -77.0f, -40.0f),
-            Vector3(10.0f, 44.0f, 30.0f), shelfColor, noEmission, 10.0f, true);
-        createStageProp("PropWestWingDeskTop", Vector3(-330.0f, -76.0f, -78.0f),
-            Vector3(40.0f, 2.0f, 24.0f), deskWood, noEmission, 8.0f, false);
-        for (int leg = 0; leg < 4; ++leg)
-        {
-            const std::string name = "PropWestWingDeskLeg" + std::to_string(leg + 1);
-            createStageProp(name.c_str(),
-                Vector3(-330.0f + (leg % 2 == 0 ? -18.0f : 18.0f), -88.5f, -78.0f + (leg < 2 ? -10.0f : 10.0f)),
-                Vector3(2.0f, 23.0f, 2.0f), deskWood, noEmission, 8.0f, true);
-        }
-        createStageProp("PropWestWingCrate", Vector3(-345.0f, -93.0f, -15.0f),
-            Vector3(14.0f, 14.0f, 14.0f), debrisColor, noEmission, 6.0f, true);
-
-        // 西棟の排水バルブ（南・西・東の壁に1つずつ）。上のランプは、回す前は赤く、回したら緑に光る。
+        // 西棟の排水バルブ（南・西・東の壁に1つずつ）。上のランプは、回す前は赤く、回したら緑に光る（色はStage1WestWingが変える）。
         // バルブの配管は床から天井まで壁を伝い、ランプは配管の横に付けている。
-        const auto createDrainValve = [&builder, &createWarningLamp](
+        const auto createDrainValve = [&builder](
             const char* valveName, const char* lampName,
             const Vector3& position, float yaw, const Vector3& lampOffset, const Vector3& lampScale)
         {
             DrainValve* valve = builder.Create<DrainValve>(valveName);
             valve->SetPosition(position.x, position.y, position.z);
             valve->SetRotation(Vector3(0.0f, yaw, 0.0f));
-            Wall* lamp = createWarningLamp(lampName, position + lampOffset, lampScale, Color(0.90f, 0.08f, 0.05f, 1.0f));
+            const Color red(0.90f, 0.08f, 0.05f, 1.0f);
+            Wall* lamp = builder.Create<Wall>(lampName);
+            const Vector3 lampPosition = position + lampOffset;
+            lamp->SetPosition(lampPosition.x, lampPosition.y, lampPosition.z);
+            lamp->SetScale(lampScale.x, lampScale.y, lampScale.z);
+            lamp->SetAppearance(Color(red.R() * 0.6f, red.G() * 0.6f, red.B() * 0.6f, 1.0f), red, 24.0f);
+            lamp->SetCollisionEnabled(false);
+            lamp->SetCastsShadow(false);
             lamp->SetGlowLight(45.0f, 1.8f);
             return std::pair<DrainValve*, Wall*>(valve, lamp);
         };
@@ -430,35 +301,14 @@ namespace Stage1Layout
         objects.westWing.valves = { southValve.first, westValve.first, eastValve.first };
         objects.westWing.valveLamps = { southValve.second, westValve.second, eastValve.second };
 
-        // 光の安全地帯。停電しても消えない、暖かい色の電球（電池式の作業灯）。冷たい蛍光灯・赤い非常灯と色で区別し、
-        // ちかちかせず落ち着いて灯っている。下にいると落ち着き、ライトを消して休むと電池が戻る（Stage1SafeLights）。
-        const Color warmBulb(1.0f, 0.72f, 0.40f, 1.0f);
-        const auto createWarmBulb = [&createStageProp, &warmBulb](const char* name, const Vector3& position, const Vector3& scale)
-        {
-            Wall* bulb = createStageProp(name, position, scale,
-                Color(warmBulb.R() * 0.6f, warmBulb.G() * 0.6f, warmBulb.B() * 0.6f, 1.0f), warmBulb, 30.0f, false);
-            bulb->SetCastsShadow(false);
-            bulb->SetGlowLight(85.0f, 3.2f);
-            return bulb;
-        };
-        // 1つ目：中央ホールの西、配電盤と西棟の扉の間。天井から下がった裸電球（何度も通る場所の休み所）
-        createStageProp("PropSafeLightHubCord", Vector3(-198.0f, -49.5f, 12.0f),
-            Vector3(0.4f, 2.5f, 0.4f), darkMetal, noEmission, 4.0f, false);
-        createWarmBulb("PropSafeLightHubBulb", Vector3(-198.0f, -52.3f, 12.0f), Vector3(2.6f, 3.2f, 2.6f));
+        // 光の安全地帯（暖かい電球の下）の範囲。電球そのものは小物のファイルに置いている（PropSafeLight...）。
+        // 下にいると落ち着き、ライトを消して休むと電池が戻る（Stage1SafeLights）。
+        // 1つ目：中央ホールの西、配電盤と西棟の扉の間の裸電球（何度も通る場所の休み所）
         objects.safeZones.push_back({ Vector3(-198.0f, -99.0f, 12.0f), 30.0f });
         // 2つ目：南西の広間の机の上の電気スタンド（寄り道の先の休み所）
-        createStageProp("PropSafeLightDeskBase", Vector3(-334.0f, -74.5f, -306.0f),
-            Vector3(4.0f, 1.0f, 4.0f), darkMetal, noEmission, 12.0f, false);
-        createStageProp("PropSafeLightDeskArm", Vector3(-334.0f, -70.0f, -306.0f),
-            Vector3(0.8f, 9.0f, 0.8f), darkMetal, noEmission, 12.0f, false);
-        createWarmBulb("PropSafeLightDeskShade", Vector3(-332.0f, -65.0f, -304.0f), Vector3(5.0f, 3.0f, 5.0f));
         objects.safeZones.push_back({ Vector3(-322.0f, -99.0f, -292.0f), 34.0f });
 
-        // 脱出のホールの入口の柱と、扉の状態を示すランプ（停電中は赤）
-        createStageProp("PropExitColumnLeft", Vector3(-52.0f, -80.0f, 179.0f),
-            Vector3(10.0f, 38.0f, 10.0f), darkMetal, noEmission, 8.0f, true);
-        createStageProp("PropExitColumnRight", Vector3(52.0f, -80.0f, 179.0f),
-            Vector3(10.0f, 38.0f, 10.0f), darkMetal, noEmission, 8.0f, true);
+        // 扉の状態を示すランプ（停電中は赤）。色は進行のコードが変えるので、小物のファイルではなくここで作っている
         Wall* doorIndicator = createStageProp("PropDoorIndicator", Vector3(58.0f, -68.0f, 177.4f),
             Vector3(10.0f, 5.0f, 1.0f), Color(0.26f, 0.025f, 0.018f, 1.0f),
             Color(0.30f, 0.005f, 0.002f, 1.0f), 28.0f, false);

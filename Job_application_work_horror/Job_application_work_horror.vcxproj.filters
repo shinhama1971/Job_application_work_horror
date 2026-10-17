@@ -279,6 +279,9 @@
     <ClCompile Include="VideoWriter.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="PropLayoutFile.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="TechDemo.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -396,6 +399,9 @@
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
     <ClInclude Include="PortraitAnomaly.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="HandprintAnomaly.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
     <ClInclude Include="KnockingAnomaly.h">
@@ -654,6 +660,9 @@
       <Filter>ソース ファイル\Gameplay</Filter>
     </ClInclude>
     <ClInclude Include="SceneLayoutBuilder.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="PropLayoutFile.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="StageSurveillanceCameras.h">

@@ -205,5 +205,6 @@ Stage1ObjectiveInput StageScene::MakeObjectiveInput() const
     input.westWingValvesOpened = m_WestWing.GetOpenedValveCount();
     input.westWingText = m_WestWing.GetObjectiveText();
     input.safeLightText = m_SafeLights.GetNoticeText();
+    input.layoutNotice = m_LayoutNoticeTimer > 0.0f ? std::string_view(m_LayoutNotice) : std::string_view{};
     return input;
 }

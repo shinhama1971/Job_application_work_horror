@@ -54,7 +54,12 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         objectiveText = "左の部屋にある配電盤を調べる";
     }
     // ここから下は、上に書いたものほど優先して、普段の目的を上書きしている
-    if (in.escaping)
+    if (!in.layoutNotice.empty())
+    {
+        // Debug版で小物の配置のファイルを読み直したときの結果（読めなかった行も伝える）
+        objectiveText = std::string(in.layoutNotice);
+    }
+    else if (in.escaping)
     {
         objectiveText = "ドアの先へ移動中";
     }

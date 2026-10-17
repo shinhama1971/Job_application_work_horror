@@ -14,6 +14,7 @@
 #include "ClockAnomaly.h"
 #include "FalseDoorAnomaly.h"
 #include "PortraitAnomaly.h"
+#include "HandprintAnomaly.h"
 #include "KnockingAnomaly.h"
 #include "ScratchAnomaly.h"
 #include "ObservedScareSequence.h"
@@ -75,6 +76,8 @@ private:
     void UpdateScratchMessage(const Player& player, float deltaTime);
     // 肖像画の異変を更新している
     void UpdatePortraitAnomaly(const Player& player, float deltaTime);
+    // 血の手形の異変：照らすと奥に次の手形が現れ、4つ目までたどると見つけたことになる
+    void UpdateHandprintAnomaly(const Player& player, float deltaTime);
     // この周回で見つけるべき異変（Stage2AnomalyPlanが決めたもの）を見つけ終えたかを返している。
     bool IsRequiredAnomalyFound() const;
     // ノックの異変を更新している／耳を澄ませる位置を返している
@@ -120,6 +123,7 @@ private:
     ClockAnomaly m_ClockAnomaly;
     FalseDoorAnomaly m_FalseDoorAnomaly;
     PortraitAnomaly m_PortraitAnomaly;
+    HandprintAnomaly m_HandprintAnomaly;
     KnockingAnomaly m_KnockingAnomaly;
     ScratchAnomaly m_ScratchAnomaly;
     ObservedScareSequence m_ObservedScareSequence;

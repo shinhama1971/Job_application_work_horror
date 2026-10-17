@@ -108,11 +108,12 @@ void Stage2Scene::Draw(Camera* camera)
         const Stage2Anomaly requiredAnomaly = m_AnomalyPlan.GetRequired(m_LoopCount);
         if (requiredAnomaly != Stage2Anomaly::None && !IsRequiredAnomalyFound())
         {
-            // 探すべき異変の場所を指している（偽の扉・時計・肖像画・ノックの出どころ）。
+            // 探すべき異変の場所を指している（偽の扉・時計・肖像画・最後に現れた血の手形・ノックの出どころ）。
             guideTarget =
                 requiredAnomaly == Stage2Anomaly::FalseDoor ? Vector3(-38.3f, -72.0f, 70.0f) :
                 requiredAnomaly == Stage2Anomaly::Clock ? Vector3(-38.0f, -70.0f, -25.0f) :
                 requiredAnomaly == Stage2Anomaly::Portrait ? Vector3(38.72f, -69.0f, -25.0f) :
+                requiredAnomaly == Stage2Anomaly::Handprint ? m_HandprintAnomaly.GetLatestPosition() :
                 GetKnockListenPoint();
         }
         else if (confirmationPending)
@@ -233,6 +234,7 @@ Stage2ObjectiveInput Stage2Scene::MakeObjectiveInput(bool confirmationPending) c
     input.requiredAnomalyFound = IsRequiredAnomalyFound();
     input.falseDoorObserved = m_FalseDoorAnomaly.WasObserved();
     input.portraitStaring = m_PortraitAnomaly.IsStaring();
+    input.handprintFollowing = m_HandprintAnomaly.IsFollowing();
     input.hiding = m_Objects.player != nullptr && m_Objects.player->IsHiding();
     input.hidingNotice = m_Notices.hiding > 0.0f;
     input.knockListening = m_KnockingAnomaly.IsListening();
@@ -265,6 +267,7 @@ Stage2ObjectiveInput Stage2Scene::MakeObjectiveInput(bool confirmationPending) c
     input.falseDoorNotice = m_FalseDoorAnomaly.GetNoticeTimer() > 0.0f;
     input.clockNotice = m_ClockAnomaly.GetNoticeTimer() > 0.0f;
     input.portraitNotice = m_PortraitAnomaly.GetNoticeTimer() > 0.0f;
+    input.handprintNotice = m_HandprintAnomaly.GetNoticeTimer() > 0.0f;
     input.knockNotice = m_KnockingAnomaly.GetNoticeTimer() > 0.0f;
     input.loopNotice = m_Notices.loop > 0.0f;
     return input;

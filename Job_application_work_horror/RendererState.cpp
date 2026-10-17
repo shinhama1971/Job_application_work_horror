@@ -123,6 +123,23 @@ void Renderer::SetReflectionMode(int mode, const Matrix& projection)
 		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
 }
 
+// 2面の「血の手形」の異変の手形をb12へ設定している（渡さなかった分は見え方0にして描かない）
+void Renderer::SetWallHandprints(const Vector4* handprints, int count)
+{
+	if (!m_pWaterCausticsBuffer)
+	{
+		return;
+	}
+	for (int index = 0; index < 4; ++index)
+	{
+		m_WaterCaustics.Handprints[index] = (handprints != nullptr && index < count) ? handprints[index] : Vector4::Zero;
+	}
+	m_pDeviceContext->UpdateSubresource(
+		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
+	m_pDeviceContext->PSSetConstantBuffers(
+		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+}
+
 // デバッグ表示と壁の古さの定数バッファ（b7）を、覚えている中身で更新している
 void Renderer::UploadDebugViewBuffer()
 {

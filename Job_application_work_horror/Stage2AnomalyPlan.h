@@ -2,7 +2,7 @@
 // ファイルの役割: 2面の1周目・2周目に、どの異変を「見つけないと扉が開かない異変」にするかを決めている。
 // 主な技術: プレイごとのランダムな組み合わせ、入力や描画に依存しない状態クラス
 //
-// 偽の扉・時計・肖像画・壁の向こうのノックの4つから2つを選んで並べている。毎回違う組み合わせになるため、
+// 偽の扉・時計・肖像画・壁の向こうのノック・血の手形の5つから2つを選んで並べている。毎回違う組み合わせになるため、
 // 答えを覚えて進むのではなく、周回ごとに廊下を観察して変化を探す遊びにしている。
 // 3周目以降（信号盤パズル）は固定。
 // ============================================================================
@@ -21,7 +21,8 @@ enum class Stage2Anomaly
     FalseDoor,  // 偽の扉: ライトで照らしてから目を離すと、反対側の壁へ移っている
     Clock,      // 時計: ライトを消して見ると、針が逆回りしている
     Portrait,   // 肖像画: ライトで照らしたまま見つめ続けると、目が開く
-    Knocking    // ノック: 壁の向こうから叩く音がする。音を頼りに出どころの壁を探し、耳を澄ます
+    Knocking,   // ノック: 壁の向こうから叩く音がする。音を頼りに出どころの壁を探し、耳を澄ます
+    Handprint   // 血の手形: 照らすと奥の反対側の壁に次の手形が現れる。手形を4つ目までたどる
 };
 
 class Stage2AnomalyPlan final
@@ -30,14 +31,15 @@ public:
     // 異変を探す周回の数（1周目と2周目）。
     static constexpr int PlannedLoopCount = 2;
 
-    // 4つの候補を混ぜて、先頭の2つを1周目・2周目の異変にしている
+    // 5つの候補を混ぜて、先頭の2つを1周目・2周目の異変にしている
     template<typename RandomEngine>
     void Randomize(RandomEngine& random)
     {
-        std::array<Stage2Anomaly, 4> candidates =
+        std::array<Stage2Anomaly, 5> candidates =
         {
             Stage2Anomaly::FalseDoor, Stage2Anomaly::Clock,
-            Stage2Anomaly::Portrait, Stage2Anomaly::Knocking
+            Stage2Anomaly::Portrait, Stage2Anomaly::Knocking,
+            Stage2Anomaly::Handprint
         };
         std::shuffle(candidates.begin(), candidates.end(), random);
         m_Loops = { candidates[0], candidates[1] };
@@ -68,6 +70,7 @@ public:
         case Stage2Anomaly::Clock: return "時計";
         case Stage2Anomaly::Portrait: return "肖像画";
         case Stage2Anomaly::Knocking: return "壁のノック";
+        case Stage2Anomaly::Handprint: return "血の手形";
         case Stage2Anomaly::None: break;
         }
         return "なし";
@@ -82,6 +85,7 @@ public:
         case Stage2Anomaly::Clock: return "Clock";
         case Stage2Anomaly::Portrait: return "Portrait";
         case Stage2Anomaly::Knocking: return "Knocking";
+        case Stage2Anomaly::Handprint: return "Handprint";
         case Stage2Anomaly::None: break;
         }
         return "None";

@@ -17,6 +17,8 @@
 #include "CeilingLight.h"
 #include "ExitTrigger.h"
 #include "ShadowMan.h"
+#include "SceneLayoutBuilder.h"
+#include "PropLayoutFile.h"
 #include <SimpleMath.h>
 #include <algorithm>
 #include <cmath>
@@ -114,6 +116,23 @@ void StageScene::SetupPracticalLights()
     {
         marker->SetGlowLight(40.0f, 1.8f);
     }
+}
+
+// 小物の配置のファイルを読み直し、今の小物を置き直している（Debug版の F5）。
+// 書き間違いがあれば置き直さず、何行目が読めなかったかを画面の左上に出している。
+void StageScene::ReloadPropLayout()
+{
+    const PropLayout layout = PropLayoutFile::Load(Stage1Layout::PropLayoutPath);
+    if (!layout.IsValid())
+    {
+        m_LayoutNotice = "配置のファイルの" + std::to_string(layout.ErrorLine) + "行目が読めない " + layout.Error;
+        m_LayoutNoticeTimer = 6.0f;
+        return;
+    }
+    SceneLayoutBuilder builder(*Core::Game::GetInstance(), m_Objects.objectNames);
+    PropLayoutFile::Reload(builder, layout, m_Objects.layoutProps);
+    m_LayoutNotice = "配置のファイルを読み直した（小物 " + std::to_string(layout.Props.size()) + "個）";
+    m_LayoutNoticeTimer = 3.0f;
 }
 
 // 進む先の天井照明を1灯だけ、切れかけの電球のように不規則にちかちかさせている（ほかの照明は落ち着いて点いたまま）。
@@ -282,6 +301,15 @@ void StageScene::Update()
         0.0f, m_FuseWatcherNoticeTimer - deltaTime);
     m_ChargerNoticeTimer = (std::max)(
         0.0f, m_ChargerNoticeTimer - deltaTime);
+    m_LayoutNoticeTimer = (std::max)(0.0f, m_LayoutNoticeTimer - deltaTime);
+#if defined(_DEBUG)
+    // Debug版だけ：F5 で小物の配置のファイル（assets/layout/stage1_props.txt）を読み直し、ゲームを動かしたまま置き直している。
+    // 位置を少し直すたびにビルドし直さずに済むようにするため（Release版では効かない）。
+    if (Input::GetKeyTrigger(VK_F5))
+    {
+        ReloadPropLayout();
+    }
+#endif
     m_EvidenceNoticeTimer = (std::max)(
         0.0f, m_EvidenceNoticeTimer - deltaTime);
     m_StorageScareNoticeTimer = (std::max)(
