@@ -17,6 +17,7 @@
 #include "Stage1AmbientSounds.h"
 #include "TensionPulse.h"
 #include "Stage1LightStalker.h"
+#include "PropLayoutEditor.h"
 
 #include <array>
 #include <cstddef>
@@ -107,6 +108,8 @@ private:
     // 小物の配置のファイルを読み直したときの知らせと、その残り秒数（Debug版の F5）
     std::string m_LayoutNotice;
     float m_LayoutNoticeTimer = 0.0f;
+    // Debug版のデバッグ画面（F1）に出す、小物の配置エディタ（選んで動かし、配置のファイルへ書き戻す）
+    PropLayoutEditor m_PropLayoutEditor{ Stage1Layout::PropLayoutPath };
     // 西棟で鳴らす物音（使い回している）
     std::vector<AmbientSoundCue> m_WestWingCues;
     // 書類保管室の「照らすと止まる影」。動きのルールはこのクラス、影の表示・音・電池はSceneが行っている。

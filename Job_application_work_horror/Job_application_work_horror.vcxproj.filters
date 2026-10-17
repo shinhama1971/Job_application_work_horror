@@ -282,6 +282,9 @@
     <ClCompile Include="PropLayoutFile.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="PropLayoutEditor.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="TechDemo.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -663,6 +666,9 @@
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="PropLayoutFile.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="PropLayoutEditor.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="StageSurveillanceCameras.h">

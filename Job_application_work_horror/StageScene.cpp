@@ -131,6 +131,7 @@ void StageScene::ReloadPropLayout()
     }
     SceneLayoutBuilder builder(*Core::Game::GetInstance(), m_Objects.objectNames);
     PropLayoutFile::Reload(builder, layout, m_Objects.layoutProps);
+    m_PropLayoutEditor.SetLayout(layout);
     m_LayoutNotice = "配置のファイルを読み直した（小物 " + std::to_string(layout.Props.size()) + "個）";
     m_LayoutNoticeTimer = 3.0f;
 }

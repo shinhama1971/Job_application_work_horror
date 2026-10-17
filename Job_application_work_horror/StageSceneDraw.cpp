@@ -20,6 +20,7 @@
 #include "ScareTrigger.h"
 #include "ShadowMan.h"
 #include "KeyItem.h"
+#include "SceneLayoutBuilder.h"
 #include <SimpleMath.h>
 #include <algorithm>
 #include <cmath>
@@ -43,6 +44,32 @@ void StageScene::Draw(Camera* camera)
     {
         return;
     }
+
+#if defined(ENABLE_IMGUI)
+    // Debug版だけ：デバッグ画面（F1）の配置エディタで小物を選んで動かし、Save で配置のファイルへ書き戻している。
+    // 書き戻したら読み直して、ファイルの行番号を新しくしている。
+    if (camera != nullptr)
+    {
+        SceneLayoutBuilder builder(*game, m_Objects.objectNames);
+        switch (m_PropLayoutEditor.Draw(builder, m_Objects.layoutProps, *camera))
+        {
+        case PropLayoutEditor::Action::Saved:
+            ReloadPropLayout();
+            m_LayoutNotice = "配置のファイルに書き戻した";
+            m_LayoutNoticeTimer = 3.0f;
+            break;
+        case PropLayoutEditor::Action::SaveFailed:
+            m_LayoutNotice = m_PropLayoutEditor.GetError();
+            m_LayoutNoticeTimer = 6.0f;
+            break;
+        case PropLayoutEditor::Action::ReloadFile:
+            ReloadPropLayout();
+            break;
+        case PropLayoutEditor::Action::None:
+            break;
+        }
+    }
+#endif
 
     // 監視映像を見ている間は、映像の画面（とポーズ）だけを描いている
     if (m_Surveillance.IsViewing())
