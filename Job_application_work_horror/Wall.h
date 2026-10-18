@@ -120,6 +120,15 @@ public:
     }
     // 時計の針の角度（12時が0、右回りが+）を設定している（文字盤のシェーダーが針を描く）
     void SetClockHands(float hourAngle, float minuteAngle);
+    // 2面の偽の扉のように、木の扉（羽目板・木目・剥げた塗装・部屋番号の札・鍵穴）を計算で描く面にしている（doorPS）
+    void SetDoorSurface()
+    {
+        m_HasSurfaceParams = true;
+        m_Shader.Create("shader/litTextureVS.hlsl", "shader/doorPS.hlsl");
+    }
+    // 絵を計算で描く面へ渡す値（肖像画は目の状態、時計は針の角度、扉は取っ手の側）を設定している。
+    // シェーダーには、これらの面では使っていないマテリアルの環境の色（Ambient）に入れて渡している
+    void SetSurfaceParams(const DirectX::SimpleMath::Color& params);
 
     // 壁の鏡（2面）の面にしている。facingは鏡が映す側の向き（壁から廊下へ向かう単位ベクトル）。
     // 映る景色は Game::Draw が鏡の面で反転したカメラから描き、鏡のピクセルシェーダー（mirrorPS）がそれを読んでいる。

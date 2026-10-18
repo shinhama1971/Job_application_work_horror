@@ -35,6 +35,9 @@ class Ground :public Object
 		// 濡れた足跡（WetFootprints::Fill）。x = 数、と、1つにつき2つの値（位置と向き、濡れ具合・左右・裸足か）
 		DirectX::SimpleMath::Vector4 FootprintInfo;
 		DirectX::SimpleMath::Vector4 Footprints[WetFootprints::MaxCount * 2];
+		// 天井の雨漏りの真下の水たまり。x = 数、と、1つにつき xy = 中心のx・z、z = 半径
+		DirectX::SimpleMath::Vector4 LeakInfo;
+		DirectX::SimpleMath::Vector4 Leaks[WaterEffectSystem::MaxLeakCount];
 	};
 	
 	// 頂点データ（50x50マスの格子）
@@ -128,6 +131,8 @@ public:
 	{
 		m_Footprints.Add(position, yaw, side, bare, wetness);
 	}
+	// 天井の雨漏りを足している（centerの真上から水滴が落ち続け、真下の水たまりが growSeconds かけて半径 maxRadius まで広がる）
+	void AddLeak(const DirectX::SimpleMath::Vector2& center, float maxRadius, float growSeconds);
 	// プレイヤーが水から出た瞬間なら、その場所を返してtrueにしている（1回だけ）
 	bool ConsumeWaterExit(DirectX::SimpleMath::Vector2& exitPoint) { return m_Footprints.ConsumeWaterExit(exitPoint); }
 	// 水たまりを決まった場所に置き直している（2面の廊下）。足音・波紋・水滴・シェーダーの表のすべてに反映される。

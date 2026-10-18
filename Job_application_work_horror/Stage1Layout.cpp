@@ -72,6 +72,10 @@ namespace Stage1Layout
             Vector2(Stage1WestWing::MinX, Stage1WestWing::MinZ),
             Vector2(Stage1WestWing::MaxX, Stage1WestWing::MaxZ));
         objects.ground = ground;
+        // 西棟の周りの天井の雨漏り（水滴が落ち続け、真下の水たまりが約2分かけて広がる）
+        ground->AddLeak(Vector2(-195.0f, -25.0f), 6.0f, 120.0f);
+        ground->AddLeak(Vector2(-150.0f, -45.0f), 5.0f, 140.0f);
+        ground->AddLeak(Vector2(-100.0f, -95.0f), 5.0f, 160.0f);
 
         // 壁（外周の4面と、部屋を区切る壁）
         Wall* wall1 = builder.Create<Wall>("Wall1");

@@ -103,6 +103,29 @@ private:
     void BuildPuddles(const PuddleLayout& layout);
 
 public:
+    // 天井の雨漏り：天井の一点から水滴が落ち続け、真下に小さな水たまりが少しずつ広がっていく
+    struct Leak
+    {
+        DirectX::SimpleMath::Vector2 Center;
+        float MaxRadius = 6.0f;      // 広がりきったときの半径
+        float GrowSeconds = 60.0f;   // 広がりきるまでの秒数
+        float Age = 0.0f;
+        float Radius = 0.0f;         // 今の半径
+    };
+    // シェーダーへ渡す雨漏りの最大数（wetFloorPS の LEAK_COUNT と同じ）
+    static constexpr int MaxLeakCount = 8;
+
+private:
+    std::vector<Leak> m_Leaks;
+    // 雨漏りの真上から落ち続ける水滴を、2つ足している
+    void AddLeakDrops(const Leak& leak);
+
+public:
+    // 雨漏りを足す（最大 MaxLeakCount 個）・すべて消す・今の雨漏りの一覧
+    void AddLeak(const DirectX::SimpleMath::Vector2& center, float maxRadius, float growSeconds);
+    void ClearLeaks() { m_Leaks.clear(); }
+    const std::vector<Leak>& GetLeaks() const { return m_Leaks; }
+
     const PuddleCellBufferData& GetPuddleCellData() const { return m_PuddleCellData; }
     // 水たまりを置き直している（2面）。シェーダーへの表は、Groundが書き込み直している
     void SetPuddleLayout(const PuddleLayout& layout) { BuildPuddles(layout); }

@@ -139,6 +139,11 @@ namespace
     constexpr float PortraitAnomalyRequestTime = 62.5f;
     // この時刻からは、電池を25%にして弱った懐中電灯を写している
     constexpr float LowBatteryTime = 73.5f;
+    constexpr float LowBatteryEndTime = 77.0f;
+    // 偽の扉の場面の前に、偽の扉の異変を出している
+    constexpr float FalseDoorRequestTime = 77.5f;
+    // 最後の停電と追跡を始める時刻
+    constexpr float FinalSequenceRequestTime = 83.0f;
     const std::vector<Keyframe> Stage2Tour =
     {
         { 0.0f, Vector3(0.0f, FloorY, -125.0f), 0.0f, 0.0f, nullptr, false },
@@ -180,6 +185,17 @@ namespace
         { 74.5f, Vector3(0.0f, FloorY, -25.0f), -Pi * 0.5f, -0.10f, nullptr, false },
         { 76.0f, Vector3(0.0f, FloorY, -25.0f), -Pi * 0.5f, -0.10f, L"19_2面_電池が弱った懐中電灯", false },
         { 77.0f, Vector3(0.0f, FloorY, -25.0f), -Pi * 0.5f, -0.10f, nullptr, false },
+        // 左の壁に現れた偽の扉（羽目板・木目・剥げた塗装・部屋番号の札）を、少し斜めから見る
+        { 80.0f, Vector3(4.0f, FloorY, 46.0f), YawToward(4.0f, 46.0f, -39.3f, 70.0f), -0.08f, nullptr, false },
+        { 81.5f, Vector3(4.0f, FloorY, 46.0f), YawToward(4.0f, 46.0f, -39.3f, 70.0f), -0.08f, L"20_2面_偽の扉", false },
+        { 82.5f, Vector3(4.0f, FloorY, 46.0f), YawToward(4.0f, 46.0f, -39.3f, 70.0f), -0.08f, nullptr, false },
+        // 最後の停電：肖像画が目を見開き、振り返って床を見ると、照明を消しながら濡れた足跡を残して影が迫ってくる
+        // （影の胸を視線の中心に入れると崩れて消えるため、影の通り道を視界の端に入れて、斜め後ろの床を見ている）
+        { 83.0f, Vector3(0.0f, FloorY, -8.0f), YawToward(0.0f, -8.0f, 38.9f, -25.0f), -0.06f, nullptr, false },
+        { 84.0f, Vector3(0.0f, FloorY, -8.0f), YawToward(0.0f, -8.0f, 38.9f, -25.0f), -0.06f, L"21_2面_停電で目を開く肖像画", false },
+        { 84.5f, Vector3(25.0f, FloorY, -8.0f), YawToward(25.0f, -8.0f, -30.0f, -40.0f), -0.50f, nullptr, false },
+        { 85.0f, Vector3(25.0f, FloorY, -8.0f), YawToward(25.0f, -8.0f, -30.0f, -40.0f), -0.50f, L"22_2面_最後の追跡", false },
+        { 85.5f, Vector3(25.0f, FloorY, -8.0f), YawToward(25.0f, -8.0f, -30.0f, -40.0f), -0.50f, nullptr, false },
     };
 
     // 角度の補間。差を-π〜πに直してから補間し、遠回りの方向へ回らないようにしている
@@ -264,6 +280,10 @@ namespace
     bool g_SecondLoopRequested = false;
     // 2面の道順で、肖像画の異変を出したか
     bool g_PortraitAnomalyRequested = false;
+    // 2面の道順で、偽の扉の異変を出したか
+    bool g_FalseDoorRequested = false;
+    // 2面の道順で、最後の停電を始めたか
+    bool g_FinalSequenceRequested = false;
     bool g_Recording = false;   // 1面・2面を見て回っている間だけ動画に書き出している
     // 動画に書き出したフレーム数
     int g_FramesWritten = 0;
@@ -689,6 +709,8 @@ namespace Tools::CaptureMode
             g_MirrorAnomalyRequested = false;
             g_SecondLoopRequested = false;
             g_PortraitAnomalyRequested = false;
+            g_FalseDoorRequested = false;
+            g_FinalSequenceRequested = false;
             Log(std::string("start tour: ") + SceneLabel(scene));
         }
         g_Recording = true;
@@ -750,6 +772,26 @@ namespace Tools::CaptureMode
                 Log("show portrait anomaly");
             }
         }
+        // 2面: 偽の扉の場面の前に、偽の扉の異変を出している
+        if (scene == SceneName::Stage2 && !g_FalseDoorRequested && g_TourTime >= FalseDoorRequestTime)
+        {
+            g_FalseDoorRequested = true;
+            if (Scene* currentScene = game->GetScene())
+            {
+                currentScene->RequestDebugAction(SceneDebugAction::ShowFalseDoorAnomaly);
+                Log("show false door anomaly");
+            }
+        }
+        // 2面: 最後の停電と追跡を始めている
+        if (scene == SceneName::Stage2 && !g_FinalSequenceRequested && g_TourTime >= FinalSequenceRequestTime)
+        {
+            g_FinalSequenceRequested = true;
+            if (Scene* currentScene = game->GetScene())
+            {
+                currentScene->RequestDebugAction(SceneDebugAction::PlayFinalSequence);
+                Log("play final sequence");
+            }
+        }
 
         Player* player = game->GetObj<Player>("Player");
         Camera* camera = game->GetCamera();
@@ -796,7 +838,7 @@ namespace Tools::CaptureMode
         // 道順の途中で電池が切れて懐中電灯が消えないよう、電池を満タンに保っている（計測モードと同じ）
         player->AddBattery(100.0f);
         // 2面の最後の場面だけ、電池を25%にして、弱った懐中電灯の光（暗く黄色い光と、輪のむら）を写している
-        if (scene == SceneName::Stage2 && g_TourTime >= LowBatteryTime)
+        if (scene == SceneName::Stage2 && g_TourTime >= LowBatteryTime && g_TourTime < LowBatteryEndTime)
         {
             player->AddBattery(-75.0f);
         }

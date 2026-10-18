@@ -11,6 +11,7 @@
 #include "ExitTrigger.h"
 #include "FuseBox.h"
 #include "Game.h"
+#include "Ground.h"
 #include "Input.h"
 #include "Player.h"
 #include "ShadowMan.h"
@@ -79,6 +80,8 @@ bool Stage2Scene::UpdateHiddenFromStalker(Player& player, float deltaTime)
         }
         // 見失った影は、辺りを探すように、ロッカーのすぐ前までゆっくり歩いて来る。
         noiseShadow->EnableChase(HiddenStalkerSearchSpeed, HiddenStalkerStopDistance);
+        m_SearcherSoundTimer = 1.0f;
+        m_SearcherTouchedLocker = false;
         m_HiddenStalkerTimer = HiddenStalkerLingerSeconds;
         game->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, noiseShadow->GetPosition(), 0.70f, 1.4f);
         return true;
@@ -88,6 +91,20 @@ bool Stage2Scene::UpdateHiddenFromStalker(Player& player, float deltaTime)
     Vector3 toSearcher = noiseShadow->GetPosition() - player.GetPosition();
     toSearcher.y = 0.0f;
     const bool searcherNear = toSearcher.Length() <= BreathHold::DangerDistance;
+    // 探している影の気配：近くにいる間は低い息づかいがときどき聞こえ、すぐ前まで来るとロッカーに一度触れる
+    const float searcherDistance = toSearcher.Length();
+    m_SearcherSoundTimer -= deltaTime;
+    if (searcherDistance < 45.0f && m_SearcherSoundTimer <= 0.0f)
+    {
+        game->PlayAudioCueAt(SOUND_CUE_BREATH, noiseShadow->GetPosition() + Vector3(0.0f, 30.0f, 0.0f), 0.62f, 0.55f);
+        m_SearcherSoundTimer = 1.8f;
+    }
+    if (!m_SearcherTouchedLocker && searcherDistance < HiddenStalkerStopDistance + 3.0f)
+    {
+        game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, player.GetPosition(), 0.55f, 0.45f);
+        Input::SetVibration(3, 0.10f);
+        m_SearcherTouchedLocker = true;
+    }
     const BreathHold::Event breathEvent =
         m_BreathHold.Update(deltaTime, IsBreathHoldPressed(), searcherNear);
     if (breathEvent == BreathHold::Event::Gasped)
@@ -346,6 +363,12 @@ void Stage2Scene::AdvanceLoop(Player& player)
     m_HandprintAnomaly.ResetProgressForLoop();
     m_MirrorAnomaly.ResetProgressForLoop();
     m_FootprintFollowerUsedThisLoop = false;
+    // 周回ごとに、天井の雨漏りを1か所ずつ増やしている（3周目まで。周回を重ねるほど廊下が濡れていく）
+    const Vector2 leakSpots[] = { Vector2(-22.0f, -40.0f), Vector2(24.0f, 58.0f), Vector2(-20.0f, -128.0f) };
+    if (m_Objects.ground != nullptr && m_LoopCount >= 1 && m_LoopCount <= 3)
+    {
+        m_Objects.ground->AddLeak(leakSpots[m_LoopCount - 1], 6.0f, 45.0f);
+    }
     m_KnockingAnomaly.ResetProgressForLoop();
     m_FalseDoorAnomaly.ResetProgressForLoop();
     m_ConfirmationHandledThisLoop = false;
@@ -554,7 +577,15 @@ void Stage2Scene::UpdateClock(float deltaTime)
     Wall* face = m_Objects.clockFace;
     if (face != nullptr)
     {
-        face->SetClockHands(displayedHourAngle, displayedMinuteAngle);
+        // 最後の停電と追跡の間は、針が狂ったように逆回りし続ける
+        if (m_FinalSequence.IsSequenceActive() || m_FinalSequence.IsPursuitActive())
+        {
+            face->SetClockHands(-m_VisualTimer * 1.6f, -m_VisualTimer * 9.5f);
+        }
+        else
+        {
+            face->SetClockHands(displayedHourAngle, displayedMinuteAngle);
+        }
     }
 }
 
@@ -973,6 +1004,8 @@ void Stage2Scene::SetFalseDoorState(bool visible, bool rightSide)
     }
 
     panel->SetPosition(surfaceX, -76.0f, centerZ);
+    // 扉の絵の鍵穴を、取っ手の側（左の壁なら見て左、右の壁なら見て右）に描いている
+    panel->SetSurfaceParams(Color(rightSide ? 1.0f : -1.0f, 0.0f, 0.0f, 0.0f));
     frameNear->SetPosition(frameX, -76.0f, centerZ - 12.0f);
     frameFar->SetPosition(frameX, -76.0f, centerZ + 12.0f);
     frameTop->SetPosition(frameX, -54.0f, centerZ);

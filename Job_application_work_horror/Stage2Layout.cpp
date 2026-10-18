@@ -390,7 +390,8 @@ namespace Stage2Layout
             Color(0.24f, 0.012f, 0.008f, 1.0f),
             Color(0.18f, 0.001f, 0.0f, 1.0f), 24.0f);
 
-        // 偽の扉（板・枠・取っ手）。異変の周回だけ表示している
+        // 偽の扉（板・枠・取っ手）。異変の周回だけ表示している。板は、本物の扉と見分けがつかないよう、
+        // 羽目板・木目・剥げた塗装・部屋番号の札・鍵穴をシェーダー（doorPS）で描いている
         Wall* falseDoorPanel = createWall(
             "Stage2FalseDoorPanel", Vector3(-39.3f, -76.0f, 70.0f),
             Vector3(1.2f, 40.0f, 22.0f),
@@ -408,6 +409,10 @@ namespace Stage2Layout
             "Stage2FalseDoorHandle", Vector3(-38.3f, -76.0f, 62.0f),
             Vector3(2.0f, 5.0f, 2.0f),
             Color(0.16f, 0.09f, 0.025f, 1.0f), false);
+        falseDoorPanel->SetDoorSurface();
+        falseDoorPanel->SetSurfaceParams(Color(-1.0f, 0.0f, 0.0f, 0.0f));
+        // 取っ手は、くすんだ真鍮の光沢にしている
+        falseDoorHandle->SetAppearance(Color(0.30f, 0.21f, 0.08f, 1.0f), Color(0.0f, 0.0f, 0.0f, 1.0f), 40.0f);
         Wall* falseDoorPieces[] =
         {
             falseDoorPanel, falseDoorFrameNear, falseDoorFrameFar,

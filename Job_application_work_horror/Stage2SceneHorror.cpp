@@ -218,6 +218,20 @@ void Stage2Scene::StartFinalSequence()
                 Input::SetVibration(16, 0.45f);
             });
     }
+    // 影が通り過ぎて消した照明を、やり直したときのために点け直し、影の足跡を数え直している
+    for (CeilingLight* light : m_Objects.lights)
+    {
+        if (light != nullptr)
+        {
+            light->SetForcedOff(false);
+        }
+    }
+    if (shadow != nullptr)
+    {
+        m_PursuitLastShadowPosition = shadow->GetPosition();
+    }
+    m_PursuitStepDistance = 0.0f;
+    m_PursuitStepSide = 1.0f;
     // 壁の傷を全部見せ、強く驚かせている
     RevealScratchPieces(0, Stage2ScratchCount, 0.34f);
     game->GetPostProcess()->TriggerHorrorPulse(0.82f, 0.72f);
@@ -326,6 +340,36 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
     {
         StartCaughtSequence(*player, CaughtSequence::Reason::FinalPursuit);
         return;
+    }
+
+    // 追ってくる影は、裸足の濡れた足跡を残していく（左右の足を交互に、歩いた向きに合わせている）
+    {
+        Vector3 moved = shadow->GetPosition() - m_PursuitLastShadowPosition;
+        moved.y = 0.0f;
+        const float travel = moved.Length();
+        m_PursuitLastShadowPosition = shadow->GetPosition();
+        m_PursuitStepDistance += travel;
+        Ground* ground = m_Objects.ground;
+        if (ground != nullptr && travel > 0.001f && m_PursuitStepDistance >= FootprintFollower::Stride)
+        {
+            m_PursuitStepDistance -= FootprintFollower::Stride;
+            const float yaw = std::atan2(moved.x, moved.z);
+            const Vector2 right(std::cos(yaw), -std::sin(yaw));
+            const Vector2 position = Vector2(shadow->GetPosition().x, shadow->GetPosition().z) +
+                right * (FootprintFollower::SideOffset * m_PursuitStepSide);
+            ground->AddFootprint(position, yaw, m_PursuitStepSide, true, 1.0f);
+            m_PursuitStepSide = -m_PursuitStepSide;
+        }
+    }
+    // 影が通り過ぎた照明は、ぱちっと消える（背後から闇が迫ってくる）
+    for (CeilingLight* light : m_Objects.lights)
+    {
+        if (light != nullptr && !light->IsForcedOff() &&
+            shadow->GetPosition().z > light->GetPosition().z + 4.0f)
+        {
+            light->SetForcedOff(true);
+            game->PlayAudioCueAt(SOUND_CUE_FLASHLIGHT, light->GetPosition(), 0.55f, 0.9f);
+        }
     }
 
     // 近さ（0〜1）：30〜102の距離で、近いほど1に近づく
@@ -836,7 +880,9 @@ void Stage2Scene::UpdatePortraitEyes(float deltaTime)
         return;
     }
     const bool required = m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Portrait);
-    const bool opened = required && m_PortraitAnomaly.HasChangedThisLoop();
+    // 最後の停電と追跡の間も、目を見開いて、逃げる人を目で追う
+    const bool finalEvent = m_FinalSequence.IsSequenceActive() || m_FinalSequence.IsPursuitActive();
+    const bool opened = (required && m_PortraitAnomaly.HasChangedThisLoop()) || finalEvent;
     const float targetOpen = opened
         ? 1.0f
         : (required && m_PortraitAnomaly.IsStaring() ? 0.30f * m_PortraitAnomaly.GetStareRate() : 0.0f);

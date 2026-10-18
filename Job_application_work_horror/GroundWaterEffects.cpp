@@ -17,6 +17,7 @@ using namespace DirectX::SimpleMath;
 void WaterEffectSystem::Init()
 {
 	m_FallingDrops.clear();
+	m_Leaks.clear();
 	m_PuddleCenters.clear();
 	m_DropVertices.clear();
 	m_RippleVertices.clear();
@@ -266,6 +267,11 @@ void WaterEffectSystem::BuildPuddles(const PuddleLayout& layout)
 		drop.Active = drop.WaitTimer <= 0.01f;
 		m_FallingDrops.push_back(drop);
 	}
+	// 雨漏りの水滴は、水たまりを置き直しても残している
+	for (const Leak& leak : m_Leaks)
+	{
+		AddLeakDrops(leak);
+	}
 }
 
 // 水滴を落とし、床に着いたら着水の時間を始め、少し待ってからまた上から落としている
@@ -309,6 +315,14 @@ bool WaterEffectSystem::IsInsidePuddle(const Vector3& position) const
 	{
 		return true;
 	}
+	for (const Leak& leak : m_Leaks)
+	{
+		const Vector2 offset(position.x - leak.Center.x, position.z - leak.Center.y);
+		if (offset.Length() <= leak.Radius * 0.85f)
+		{
+			return true;
+		}
+	}
 	for (size_t index = 0; index < m_PuddleCenters.size(); ++index)
 	{
 		const float offsetX = position.x - m_PuddleCenters[index].x;
@@ -349,6 +363,13 @@ bool WaterEffectSystem::IsAnyPuddleVisible(const Camera& camera) const
 			{
 				return true;
 			}
+		}
+	}
+	for (const Leak& leak : m_Leaks)
+	{
+		if (camera.IsSphereVisible(Vector3(leak.Center.x, -99.35f, leak.Center.y), leak.Radius + 2.0f))
+		{
+			return true;
 		}
 	}
 	for (const Vector2& center : m_PuddleCenters)
@@ -569,6 +590,13 @@ void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 // 水滴と足音の波紋を更新している
 void WaterEffectSystem::Update(float deltaTime)
 {
+	// 雨漏りの水たまりを、広がりきるまで少しずつ広げている（最初から小さな濡れ跡がある）
+	for (Leak& leak : m_Leaks)
+	{
+		leak.Age += deltaTime;
+		const float growth = (std::clamp)(leak.Age / (std::max)(leak.GrowSeconds, 0.01f), 0.0f, 1.0f);
+		leak.Radius = 1.2f + (leak.MaxRadius - 1.2f) * growth * growth * (3.0f - 2.0f * growth);
+	}
 	UpdateFallingDrops(deltaTime);
 	UpdateFootstepRipples(deltaTime);
 }
@@ -622,4 +650,42 @@ bool Ground::IsInsidePuddle(const Vector3& position) const
 bool Ground::IsAnyPuddleVisible(const Camera& camera) const
 {
 	return m_WaterEffects.IsAnyPuddleVisible(camera);
+}
+
+void WaterEffectSystem::AddLeak(const Vector2& center, float maxRadius, float growSeconds)
+{
+	if (static_cast<int>(m_Leaks.size()) >= MaxLeakCount)
+	{
+		return;
+	}
+	Leak leak;
+	leak.Center = center;
+	leak.MaxRadius = maxRadius;
+	leak.GrowSeconds = growSeconds;
+	leak.Radius = 1.2f;
+	m_Leaks.push_back(leak);
+	AddLeakDrops(leak);
+}
+
+// 雨漏りの真上（天井のすぐ下）から、ずらした間隔で落ち続ける水滴を2つ足している
+void WaterEffectSystem::AddLeakDrops(const Leak& leak)
+{
+	for (int index = 0; index < 2; ++index)
+	{
+		FallingDrop drop{};
+		drop.Seed = std::fmod(std::abs(leak.Center.x * 0.137f + leak.Center.y * 0.311f) + index * 0.47f, 1.0f);
+		drop.Position = Vector3(
+			leak.Center.x + (index == 0 ? 0.0f : 0.6f),
+			-52.0f - drop.Seed * 4.0f,
+			leak.Center.y + (index == 0 ? 0.0f : -0.4f));
+		drop.Speed = 24.0f + drop.Seed * 6.0f;
+		drop.WaitTimer = 0.3f + index * 0.9f;
+		drop.Active = false;
+		m_FallingDrops.push_back(drop);
+	}
+}
+
+void Ground::AddLeak(const Vector2& center, float maxRadius, float growSeconds)
+{
+	m_WaterEffects.AddLeak(center, maxRadius, growSeconds);
 }

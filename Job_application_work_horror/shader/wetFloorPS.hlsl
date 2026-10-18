@@ -19,6 +19,8 @@ Texture2D<float> g_SsrDepth : register(t8);
 // Ground.cppのWetFloorBufferと同じ並び（b10）。経過時間、波紋の強さ、反射の強さ、詰め物
 // 濡れた足跡の最大数（WetFootprints::MaxCount と同じ）
 #define FOOTPRINT_COUNT 32
+// 天井の雨漏りの最大数（WaterEffectSystem::MaxLeakCount と同じ）
+#define LEAK_COUNT 8
 cbuffer WetFloorBuffer : register(b10)
 {
     float WetTime;
@@ -30,6 +32,9 @@ cbuffer WetFloorBuffer : register(b10)
     // 濡れた足跡（WetFootprints::Fill）。x = 数。1つにつき2つ（xy = 位置、z = sin(向き)、w = cos(向き)/ x = 濡れ具合、y = 左右、z = 裸足か）
     float4 FootprintInfo;
     float4 Footprints[FOOTPRINT_COUNT * 2];
+    // 天井の雨漏りの真下の水たまり（Ground）。x = 数。1つにつき xy = 中心のx・z、z = 半径
+    float4 LeakInfo;
+    float4 Leaks[LEAK_COUNT];
 }
 
 // 頂点シェーダー（litTextureVS）から受け取る値（影と反射の座標も使っている）
@@ -337,6 +342,28 @@ float4 main(in LIT_PS_IN input) : SV_Target
         ripplePattern += sin(input.worldPos.x * 0.21f + input.worldPos.z * 0.13f + WetTime * 0.9f) *
             0.35f * flood * (1.0f - puddle);
         puddle = max(puddle, flood);
+    }
+    // 天井の雨漏りの真下にできた小さな水たまり（少しずつ広がる。縁はノイズでゆがめ、落ちてくる水滴の輪が広がる）
+    {
+        const int leakCount = (int)(LeakInfo.x + 0.5f);
+        [loop]
+        for (int leakIndex = 0; leakIndex < leakCount; ++leakIndex)
+        {
+            const float4 leak = Leaks[leakIndex];
+            const float2 leakOffset = input.worldPos.xz - leak.xy;
+            const float reach = leak.z + 3.0f;
+            if (dot(leakOffset, leakOffset) > reach * reach)
+            {
+                continue;
+            }
+            const float leakDistance = length(leakOffset);
+            const float edgeNoise = (FastValueNoise(input.worldPos.xz * 0.35f + leak.xy) - 0.5f) * 0.35f;
+            const float normalizedDistance = leakDistance / max(leak.z, 0.01f) + edgeNoise;
+            const float leakPuddle = 1.0f - smoothstep(0.80f, 1.0f, normalizedDistance);
+            shore = max(shore, (1.0f - smoothstep(0.0f, 0.08f, abs(normalizedDistance - 0.97f))) * 0.6f);
+            ripplePattern += sin(leakDistance * 2.2f - WetTime * 6.0f) * 0.30f * leakPuddle * exp(-leakDistance * 0.25f);
+            puddle = max(puddle, leakPuddle);
+        }
     }
     // 上を向いた面（床）だけを水たまりにしている
     puddle *= smoothstep(0.55f, 0.92f, saturate(input.worldNormal.y));

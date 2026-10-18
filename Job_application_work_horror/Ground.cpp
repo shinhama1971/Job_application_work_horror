@@ -306,6 +306,15 @@ void Ground::Draw(Camera* cam)
 		: DirectX::SimpleMath::Vector4(1.0f, 1.0f, 0.0f, 0.0f);
 	// 床に残る濡れた足跡（乾いたものは詰めて、数だけを渡している）
 	m_Footprints.Fill(wetFloor.Footprints, wetFloor.FootprintInfo);
+	// 天井の雨漏りの真下の水たまり（今の半径）
+	const std::vector<WaterEffectSystem::Leak>& leaks = m_WaterEffects.GetLeaks();
+	const int leakCount = (std::min)(static_cast<int>(leaks.size()), WaterEffectSystem::MaxLeakCount);
+	for (int leakIndex = 0; leakIndex < leakCount; ++leakIndex)
+	{
+		const WaterEffectSystem::Leak& leak = leaks[static_cast<std::size_t>(leakIndex)];
+		wetFloor.Leaks[leakIndex] = DirectX::SimpleMath::Vector4(leak.Center.x, leak.Center.y, leak.Radius, 0.0f);
+	}
+	wetFloor.LeakInfo = DirectX::SimpleMath::Vector4(static_cast<float>(leakCount), 0.0f, 0.0f, 0.0f);
 	devicecontext->UpdateSubresource(
 		m_WetFloorBuffer.Get(), 0, nullptr, &wetFloor, 0, 0);
 	// ピクセルシェーダーのb10へ設定している

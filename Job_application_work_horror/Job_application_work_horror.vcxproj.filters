@@ -353,6 +353,9 @@
     <ClInclude Include="shader\clockFace.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="shader\doorPainting.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="shader\surfaceDetail.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -746,6 +749,9 @@
       <Filter>リソース ファイル</Filter>
     </FxCompile>
     <FxCompile Include="shader\clockPS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\doorPS.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>
     <FxCompile Include="shader\flashlightRevealPS.hlsl">

@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <iostream>
 #include <vector>
 #include <memory>
@@ -69,6 +70,8 @@ namespace Core
         GpuTimer m_GpuTimer;
         Sound m_Sound;
         bool m_SoundReady = false;
+        // 聞き手のまわりがふさがれている度合い（SetListenerMuffle）
+        float m_ListenerMuffle = 0.0f;
 
         // 全Objectの持ち主と、予約されたシーンの切り替え先
         ObjectManager m_ObjectManager;
@@ -156,9 +159,13 @@ namespace Core
         {
             if (m_SoundReady)
             {
-                m_Sound.PlayAt(label, position, pitch, volume, minimumOcclusion);
+                // 聞き手がロッカーの中などにいる間は、すべての位置付きの音を、少なくともその分こもらせている
+                m_Sound.PlayAt(label, position, pitch, volume, (std::max)(minimumOcclusion, m_ListenerMuffle));
             }
         }
+
+        // 聞き手のまわりがふさがれている度合い（0〜1）。ロッカーに隠れている間は、扉越しにこもった音にしている
+        void SetListenerMuffle(float muffle) { m_ListenerMuffle = muffle; }
 
         // デバッグ表示用。今鳴っている位置付きの音の数を返している。
         size_t GetActiveSpatialVoiceCount() const

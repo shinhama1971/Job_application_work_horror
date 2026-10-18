@@ -279,6 +279,20 @@ void Stage2Scene::Update()
                 m_PortraitAnomaly.ResetProgressForLoop();
             }
             break;
+        case SceneDebugAction::ShowFalseDoorAnomaly:
+            // 異変を探す周回にし、その周回の異変を偽の扉にして、左の壁に偽の扉を出している
+            if (m_LoopCount < 1)
+            {
+                m_AnomalyPlan.ForceLoop(1, Stage2Anomaly::FalseDoor);
+                AdvanceLoop(*player);
+            }
+            if (m_LoopCount <= Stage2AnomalyPlan::PlannedLoopCount)
+            {
+                m_AnomalyPlan.ForceLoop(m_LoopCount, Stage2Anomaly::FalseDoor);
+                m_FalseDoorAnomaly.ResetProgressForLoop();
+                SetFalseDoorState(true, false);
+            }
+            break;
         }
     }
 
@@ -368,6 +382,8 @@ void Stage2Scene::Update()
     UpdateHandprintAnomaly(*player, deltaTime);
     UpdateMirrorAnomaly(*player, deltaTime);
     UpdateFootprintFollower(*player, deltaTime);
+    // ロッカーの中では、扉越しに聞こえるよう、すべての位置付きの音をこもらせている
+    Core::Game::GetInstance()->SetListenerMuffle(player->IsHiding() ? 0.45f : 0.0f);
     UpdateKnockingAnomaly(*player, deltaTime);
     UpdateFalseDoorAnomaly(*player);
     UpdateClock(deltaTime);

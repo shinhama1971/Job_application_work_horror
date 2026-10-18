@@ -139,6 +139,13 @@ private:
     FootprintFollower m_FootprintFollower;
     // ロッカーに隠れている間の、息を止める操作
     BreathHold m_BreathHold;
+    // ロッカーの前を探している影の、次に息づかいを鳴らすまでの秒数と、ロッカーに触れたか
+    float m_SearcherSoundTimer = 0.0f;
+    bool m_SearcherTouchedLocker = false;
+    // 最後の追跡で、影が前のフレームにいた位置・次の足跡までの距離・次は右足か
+    DirectX::SimpleMath::Vector3 m_PursuitLastShadowPosition;
+    float m_PursuitStepDistance = 0.0f;
+    float m_PursuitStepSide = 1.0f;
     // 肖像画の絵の中の目の開き具合（0〜1）と、瞳の赤い光（0〜1）
     float m_PortraitEyeOpen = 0.0f;
     float m_PortraitEyeGlow = 0.0f;

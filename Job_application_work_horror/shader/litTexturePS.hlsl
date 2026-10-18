@@ -23,6 +23,9 @@ SamplerState g_SamplerState : register(s0);
 #if defined(CLOCK_SURFACE)
 #include "clockFace.hlsli"
 #endif
+#if defined(DOOR_SURFACE)
+#include "doorPainting.hlsli"
+#endif
 
 // 2面の「血の手形」の異変：Stage2Scene が渡した手形（WallHandprints）を、その壁の面に描き、濃さ（0〜1）を返している。
 // 形は1面の壁の血の跡と同じ式（HorrorHandprint）。見え方（w）で少しずつ浮かぶ。
@@ -423,6 +426,15 @@ float4 main(in LIT_PS_IN input) : SV_Target
         const float3 clockBaseDiffuse = float3(0.095f, 0.086f, 0.070f);
         color.rgb = clockPaint.albedo * (Material.Diffuse.rgb / clockBaseDiffuse);
         paintingRelief = clockPaint.relief;
+    }
+#endif
+    // 2面の偽の扉（doorPS.hlsl）：元の色を、計算で描いた木の扉の色に差し替えている。取っ手の側はマテリアルの Ambuent で受け取っている
+#if defined(DOOR_SURFACE)
+    {
+        const DoorPaint doorPaint = GetDoorPainting(saturate(input.tex), Material.Ambuent);
+        const float3 doorBaseDiffuse = float3(0.07f, 0.025f, 0.018f);
+        color.rgb = doorPaint.albedo * (Material.Diffuse.rgb / doorBaseDiffuse);
+        paintingRelief = doorPaint.relief;
     }
 #endif
 

@@ -347,6 +347,7 @@ namespace Core
         // ポーズメニューを閉じ、音量を戻し、前のシーンを解放している。反射と影の描き直しの数え方も最初からにしている
         m_CurrentScene = sName;
         m_PauseMenu.Close();
+        m_ListenerMuffle = 0.0f;
         ApplyAudioVolume(false);
         m_Scene.reset();
         m_ReflectionFrameIndex = 0;

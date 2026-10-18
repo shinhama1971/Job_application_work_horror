@@ -444,9 +444,9 @@ void Wall::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) cons
     lights.push_back(light);
 }
 
-void Wall::SetPortraitEyes(float openness, float gazeX, float gazeY, float glow)
+void Wall::SetSurfaceParams(const Color& params)
 {
-    m_SurfaceParams = Color(openness, gazeX, gazeY, glow);
+    m_SurfaceParams = params;
     m_SurfaceMaterial.Ambient = m_SurfaceParams;
     if (m_Material != nullptr)
     {
@@ -454,12 +454,12 @@ void Wall::SetPortraitEyes(float openness, float gazeX, float gazeY, float glow)
     }
 }
 
+void Wall::SetPortraitEyes(float openness, float gazeX, float gazeY, float glow)
+{
+    SetSurfaceParams(Color(openness, gazeX, gazeY, glow));
+}
+
 void Wall::SetClockHands(float hourAngle, float minuteAngle)
 {
-    m_SurfaceParams = Color(hourAngle, minuteAngle, 0.0f, 0.0f);
-    m_SurfaceMaterial.Ambient = m_SurfaceParams;
-    if (m_Material != nullptr)
-    {
-        m_Material->SetMaterial(m_SurfaceMaterial);
-    }
+    SetSurfaceParams(Color(hourAngle, minuteAngle, 0.0f, 0.0f));
 }
