@@ -14,6 +14,8 @@
 #include "Input.h"
 #include "Player.h"
 #include "ShadowMan.h"
+#include "MirrorSelf.h"
+#include "Ground.h"
 #include "TensionPulseFeedback.h"
 #include "Wall.h"
 
@@ -509,7 +511,11 @@ void Stage2Scene::RevealScratchPieces(int first, int last, float emission)
         }
 
         const float variation = static_cast<float>(index % 3) * 0.018f;
-        scratch->SetVisible(true);
+        // 新しく出る傷は、焦げた縁が広がるように壁へ浮かび上がらせている
+        if (!scratch->IsVisible())
+        {
+            scratch->DissolveIn(1.4f);
+        }
         scratch->SetAppearance(
             Color(0.20f + variation, 0.008f, 0.004f, 1.0f),
             Color(emission + variation, 0.001f, 0.0f, 1.0f),
@@ -714,6 +720,12 @@ void Stage2Scene::UpdateMirrorAnomaly(const Player& player, float deltaTime)
     const Camera* camera = game->GetCamera();
     const MirrorAnomaly::Event mirrorEvent = m_MirrorAnomaly.Update(
         deltaTime, active, camera->GetPosition(), camera->GetForward(), player.GetPosition());
+
+    // 鏡の異変の周回で、まだ見つけていない間は、鏡の中の自分だけが少し遅れて動く
+    if (m_Objects.mirrorSelf != nullptr)
+    {
+        m_Objects.mirrorSelf->SetDelaySeconds(active && !m_MirrorAnomaly.WasFound() ? 0.45f : 0.0f);
+    }
 
     // 鏡の中の人影を、異変の周回で、まだ見つけていない間だけ表示している
     ShadowMan* figure = m_Objects.mirrorFigure;
@@ -1079,4 +1091,59 @@ void Stage2Scene::UpdateTensionPulse(const Player& player, float deltaTime)
     // 観察の間違いの回数は含めていない（一度間違えると心拍が鳴りやまなくなるため）。今まさに迫っている危険だけを使っている。
     PlayTensionPulse(m_TensionPulse.Update(
         deltaTime, ComputeThreatRate(player, false), player.IsHiding()));
+}
+
+// 誰かの濡れた足跡：2周目以降、その周回で初めて水たまりから出ると、少し遅れて同じ水たまりから
+// 裸足の濡れた足跡が一歩ずつ現れ、プレイヤーの方へ近づいてくる（姿は見えず、足跡と水音だけ）。
+// 一番新しい足跡を懐中電灯で照らすとそこで止まり、照らさずにすぐ近くまで来させると、照明が揺れて止まる。
+void Stage2Scene::UpdateFootprintFollower(const Player& player, float deltaTime)
+{
+    Ground* ground = m_Objects.ground;
+    if (ground == nullptr)
+    {
+        return;
+    }
+    Core::Game* game = Core::Game::GetInstance();
+
+    Vector2 waterExit;
+    const bool leftWater = ground->ConsumeWaterExit(waterExit);
+    if (leftWater && m_LoopCount >= 2 && !m_FootprintFollowerUsedThisLoop &&
+        !m_FootprintFollower.IsActive() && !m_FinalSequence.IsSequenceActive())
+    {
+        m_FootprintFollower.Start(waterExit);
+        m_FootprintFollowerUsedThisLoop = true;
+    }
+
+    const Camera* camera = game->GetCamera();
+    FootprintFollower::Step step;
+    const FootprintFollower::Event followerEvent = m_FootprintFollower.Update(
+        deltaTime, player.GetPosition(), camera->GetPosition(), camera->GetForward(),
+        player.IsFlashlightOn(), step);
+    if (followerEvent == FootprintFollower::Event::Step)
+    {
+        // 裸足の濡れた足跡を床に残し、その場所から、ぺたりと濡れた足音を鳴らしている
+        ground->AddFootprint(step.Position, step.Yaw, step.Side, true, 1.0f);
+        game->PlayAudioCueAt(SOUND_CUE_WATER_STEP, Vector3(step.Position.x, -99.0f, step.Position.y), 0.78f, 0.55f);
+    }
+    else if (followerEvent == FootprintFollower::Event::Lit)
+    {
+        // 照らされて止まった：心拍がひとつ跳ねるだけにしている
+        game->GetPostProcess()->TriggerHorrorPulse(0.14f, 0.26f);
+        Input::SetVibration(2, 0.08f);
+    }
+    else if (followerEvent == FootprintFollower::Event::Reached)
+    {
+        // すぐ近くまで来た：近くの照明が揺れ、すぐ後ろで息づかいが聞こえる
+        const Vector3 playerPosition = player.GetPosition();
+        CeilingLight* nearbyLight = m_Objects.Light(Stage2NearestLight(playerPosition.z));
+        if (nearbyLight != nullptr)
+        {
+            nearbyLight->TriggerEventFlicker(0.70f, 0.60f);
+        }
+        Vector3 behind = playerPosition - camera->GetForward() * 10.0f;
+        behind.y = playerPosition.y;
+        game->PlayAudioCueAt(SOUND_CUE_BREATH, behind, 0.85f, 0.45f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.30f, 0.40f);
+        Input::SetVibration(5, 0.14f);
+    }
 }

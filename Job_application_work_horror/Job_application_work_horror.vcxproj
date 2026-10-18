@@ -269,6 +269,7 @@
     <ClCompile Include="VideoWriter.cpp" />
     <ClCompile Include="PropLayoutFile.cpp" />
     <ClCompile Include="PropLayoutEditor.cpp" />
+    <ClCompile Include="MirrorSelf.cpp" />
     <ClCompile Include="TechDemo.cpp" />
     <ClCompile Include="StageSceneEvents.cpp" />
     <ClCompile Include="StageSceneDraw.cpp" />
@@ -355,6 +356,10 @@
     <ClInclude Include="FalseDoorAnomaly.h" />
     <ClInclude Include="PortraitAnomaly.h" />
     <ClInclude Include="HandprintAnomaly.h" />
+    <ClInclude Include="MirrorAnomaly.h" />
+    <ClInclude Include="FootprintFollower.h" />
+    <ClInclude Include="WetFootprints.h" />
+    <ClInclude Include="shader\wetFootprints.hlsli" />
     <ClInclude Include="ScratchAnomaly.h" />
     <ClInclude Include="ObservedScareSequence.h" />
     <ClInclude Include="CaughtSequence.h" />
@@ -386,6 +391,7 @@
     <ClInclude Include="SceneLayoutBuilder.h" />
     <ClInclude Include="PropLayoutFile.h" />
     <ClInclude Include="PropLayoutEditor.h" />
+    <ClInclude Include="MirrorSelf.h" />
     <ClInclude Include="StageSurveillanceCameras.h" />
     <ClInclude Include="SurveillancePatrol.h" />
     <ClInclude Include="Stage2Scene.h" />

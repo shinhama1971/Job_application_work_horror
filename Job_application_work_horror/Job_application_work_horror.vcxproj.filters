@@ -285,6 +285,9 @@
     <ClCompile Include="PropLayoutEditor.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="MirrorSelf.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="TechDemo.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -409,6 +412,18 @@
     </ClInclude>
     <ClInclude Include="HandprintAnomaly.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="MirrorAnomaly.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="FootprintFollower.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="WetFootprints.h">
+      <Filter>ソース ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\wetFootprints.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="KnockingAnomaly.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
@@ -672,6 +687,9 @@
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="PropLayoutEditor.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="MirrorSelf.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="StageSurveillanceCameras.h">

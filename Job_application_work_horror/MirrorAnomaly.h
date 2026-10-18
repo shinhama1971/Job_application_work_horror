@@ -29,9 +29,11 @@ public:
     // 影が鏡に映っているのを見続ける秒数、見てから振り返るまでの猶予の秒数
     static constexpr float RequiredSeenSeconds = 0.5f;
     static constexpr float TurnWindowSeconds = 8.0f;
-    // 影の頭と胸の高さ（ShadowManの形に合わせている）
-    static constexpr float FigureHeadY = -69.0f;
-    static constexpr float FigureChestY = -79.0f;
+    // 影の大きさ（プレイヤーと同じ背の高さにし、鏡の中で自分の顔のすぐ横に顔が並ぶようにしている）と、頭と胸の高さ
+    static constexpr float FigureScaleXZ = 9.0f;
+    static constexpr float FigureScaleY = 21.0f;
+    static constexpr float FigureHeadY = -60.0f;
+    static constexpr float FigureChestY = -73.0f;
 
     // Updateの結果（何も起きていない・鏡の中の影を見た・振り返って見つけた・振り返らずに離れた）
     enum class Event
@@ -68,11 +70,11 @@ public:
         m_TurnTimer = 0.0f;
     }
 
-    // 影の立つ位置：鏡に映したとき、プレイヤーのすぐ後ろ（鏡と反対の側、少し手前）に立つ位置
+    // 影の立つ位置：鏡に映したとき、プレイヤーのすぐ後ろ（鏡と反対の側）で、鏡に映る自分の肩の横から覗く位置
     static DirectX::SimpleMath::Vector3 FigurePositionBehind(const DirectX::SimpleMath::Vector3& playerPosition) noexcept
     {
         return DirectX::SimpleMath::Vector3(
-            (std::min)(playerPosition.x + 16.0f, 34.0f), -99.0f, playerPosition.z - 4.0f);
+            (std::min)(playerPosition.x + 16.0f, 34.0f), -99.0f, playerPosition.z - 11.5f);
     }
 
     // 目の位置eyeから見て、pointが鏡に映っているかを調べている。
@@ -142,7 +144,7 @@ public:
             return Event::Seen;
         }
 
-        // 見た後：振り返って、影が立っていた所を正面（水平の向きで内積0.80超）に見ると、そこには誰もいない（見つけた）。
+        // 見た後：振り返って、影が立っていた所をおおよそ正面（水平の向きで内積0.70超）に見ると、そこには誰もいない（見つけた）。
         // 影はすぐ近くに立つため、上下の向きまで比べると、目の高さとの差で正面を向いていても外れてしまう。水平の向きだけで比べている
         DirectX::SimpleMath::Vector3 toFigure = m_FigurePosition - eye;
         toFigure.y = 0.0f;
@@ -151,7 +153,7 @@ public:
         const float distance = toFigure.Length();
         const float forwardLength = flatForward.Length();
         if (distance > 0.001f && forwardLength > 0.001f &&
-            (flatForward / forwardLength).Dot(toFigure / distance) > 0.80f)
+            (flatForward / forwardLength).Dot(toFigure / distance) > 0.70f)
         {
             m_Found = true;
             m_NoticeTimer = 2.6f;

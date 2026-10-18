@@ -14,6 +14,7 @@
 #include"Material.h"
 #include "WaterEffectSystem.h"
 #include "WaterRippleSimulation.h"
+#include "WetFootprints.h"
 class Camera;
 
 //-----------------------------------------------------------------------------
@@ -31,6 +32,9 @@ class Ground :public Object
 		float Padding;
 		// 床一面が水に浸かった範囲（x・zの最小と最大）。範囲がないときは、最小が最大より大きい値にしている。
 		DirectX::SimpleMath::Vector4 FloodRect;
+		// 濡れた足跡（WetFootprints::Fill）。x = 数、と、1つにつき2つの値（位置と向き、濡れ具合・左右・裸足か）
+		DirectX::SimpleMath::Vector4 FootprintInfo;
+		DirectX::SimpleMath::Vector4 Footprints[WetFootprints::MaxCount * 2];
 	};
 	
 	// 頂点データ（50x50マスの格子）
@@ -57,6 +61,8 @@ class Ground :public Object
 	bool m_WasPowerRestored = false;
 	// 水たまりの位置、天井からの水滴、足元の波紋をまとめて管理している
 	WaterEffectSystem m_WaterEffects;
+	// 床に残る濡れた足跡
+	WetFootprints m_Footprints;
 	// 足音や水滴でできた水たまりの波を、GPUの波の式で計算している
 	WaterRippleSimulation m_RippleSimulation;
 	// 波を進めるのは描画の最初（RunGpuSimulation）なので、更新で受け取った経過時間・中心・浸水した範囲を覚えている
@@ -111,6 +117,19 @@ public:
 	{
 		m_WaterEffects.SetFloodRegion(minimum, maximum);
 	}
+	// 一歩ごとに、濡れた足跡を残すかを決めている（水の中の一歩なら、その後の数歩に濡れた靴の跡を残す）。
+	// プレイヤーの足音（TriggerFootstepRipple）と、自動撮影の歩いた扱いから呼んでいる
+	void RecordFootstep(const DirectX::SimpleMath::Vector3& position)
+	{
+		m_Footprints.OnPlayerStep(position, IsInsidePuddle(position));
+	}
+	// 足跡を1つ足している（2面の「誰か」の裸足の足跡）。yawは足の向き、sideは右足1・左足-1
+	void AddFootprint(const DirectX::SimpleMath::Vector2& position, float yaw, float side, bool bare, float wetness)
+	{
+		m_Footprints.Add(position, yaw, side, bare, wetness);
+	}
+	// プレイヤーが水から出た瞬間なら、その場所を返してtrueにしている（1回だけ）
+	bool ConsumeWaterExit(DirectX::SimpleMath::Vector2& exitPoint) { return m_Footprints.ConsumeWaterExit(exitPoint); }
 	// 水たまりを決まった場所に置き直している（2面の廊下）。足音・波紋・水滴・シェーダーの表のすべてに反映される。
 	void SetPuddleLayout(const WaterEffectSystem::PuddleLayout& layout);
 	// 壁の鏡（2面）には、床も映している（水たまりの反射は床そのものなので、床は映さない）

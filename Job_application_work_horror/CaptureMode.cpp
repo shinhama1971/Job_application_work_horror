@@ -133,6 +133,8 @@ namespace
     // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉 → 鏡（普段・鏡の異変で人影が映る・振り返ると誰もいない）
     // 鏡の異変は、MirrorAnomalyRequestTime にデバッグの操作（SceneDebugAction::ShowMirrorAnomaly）で出している。
     constexpr float MirrorAnomalyRequestTime = 40.0f;
+    // 濡れた足跡の場面の前に、2周目へ進めている（誰かの足跡は2周目から出る）
+    constexpr float SecondLoopRequestTime = 50.5f;
     const std::vector<Keyframe> Stage2Tour =
     {
         { 0.0f, Vector3(0.0f, FloorY, -125.0f), 0.0f, 0.0f, nullptr, false },
@@ -148,11 +150,21 @@ namespace
         { 36.0f, Vector3(0.0f, FloorY, 112.0f), 0.0f, 0.0f, nullptr, false },
         { 38.0f, Vector3(0.0f, FloorY, 37.0f), -Pi * 0.5f, -0.06f, nullptr, false },
         { 39.0f, Vector3(0.0f, FloorY, 37.0f), -Pi * 0.5f, -0.06f, L"12_2面_鏡", false },
+        // 鏡の異変の周回へ進んだ直後：左の壁の赤い印が、焦げた縁が広がるように浮かび上がる途中
+        { 40.9f, Vector3(0.0f, FloorY, 37.0f), -Pi * 0.5f, -0.06f, L"12b_2面_焦げて浮かぶ印", false },
         { 46.0f, Vector3(0.0f, FloorY, 37.0f), -Pi * 0.5f, -0.06f, L"13_2面_鏡に映る人影", false },
         { 47.0f, Vector3(0.0f, FloorY, 37.0f), -Pi * 0.5f, -0.06f, nullptr, false },
         { 48.2f, Vector3(0.0f, FloorY, 37.0f), Pi * 0.5f, -0.06f, nullptr, false },
         { 48.8f, Vector3(0.0f, FloorY, 37.0f), Pi * 0.5f, -0.06f, L"14_2面_振り返ると誰もいない", false },
         { 50.0f, Vector3(0.0f, FloorY, 37.0f), Pi * 0.5f, -0.06f, nullptr, false },
+        // 2周目へ進めた後、水たまりを踏んで乾いた床へ出て、振り返って濡れた足跡（自分の靴の跡と、後をついて来る誰かの裸足の跡）を見る
+        { 51.0f, Vector3(0.0f, FloorY, 37.0f), Pi, -0.10f, nullptr, false },
+        { 53.5f, Vector3(0.0f, FloorY, 5.0f), Pi, -0.10f, nullptr, false },
+        { 57.5f, Vector3(0.0f, FloorY, -60.0f), Pi, -0.10f, nullptr, false },
+        { 60.0f, Vector3(0.0f, FloorY, -60.0f), Pi, -0.10f, nullptr, false },
+        { 60.6f, Vector3(0.0f, FloorY, -60.0f), 0.0f, -0.75f, nullptr, false },
+        { 61.0f, Vector3(0.0f, FloorY, -60.0f), 0.0f, -0.75f, L"15_2面_濡れた足跡", false },
+        { 62.0f, Vector3(0.0f, FloorY, -60.0f), 0.0f, -0.75f, nullptr, false },
     };
 
     // 角度の補間。差を-π〜πに直してから補間し、遠回りの方向へ回らないようにしている
@@ -233,6 +245,8 @@ namespace
     Vector3 g_LastStepPosition;
     // 2面の道順で、鏡の異変を出したか
     bool g_MirrorAnomalyRequested = false;
+    // 2面の道順で、2周目へ進めたか
+    bool g_SecondLoopRequested = false;
     bool g_Recording = false;   // 1面・2面を見て回っている間だけ動画に書き出している
     // 動画に書き出したフレーム数
     int g_FramesWritten = 0;
@@ -656,6 +670,7 @@ namespace Tools::CaptureMode
             g_TourTime = 0.0f;
             g_NextShot = 0;
             g_MirrorAnomalyRequested = false;
+            g_SecondLoopRequested = false;
             Log(std::string("start tour: ") + SceneLabel(scene));
         }
         g_Recording = true;
@@ -697,6 +712,16 @@ namespace Tools::CaptureMode
                 Log("show mirror anomaly");
             }
         }
+        // 2面: 濡れた足跡の場面の前に、2周目へ進めている
+        if (scene == SceneName::Stage2 && !g_SecondLoopRequested && g_TourTime >= SecondLoopRequestTime)
+        {
+            g_SecondLoopRequested = true;
+            if (Scene* currentScene = game->GetScene())
+            {
+                currentScene->RequestDebugAction(SceneDebugAction::AdvanceProgression);
+                Log("advance to second loop");
+            }
+        }
 
         Player* player = game->GetObj<Player>("Player");
         Camera* camera = game->GetCamera();
@@ -735,6 +760,7 @@ namespace Tools::CaptureMode
                 for (Ground* ground : game->GetObjects<Ground>())
                 {
                     ground->AddRippleImpulse(pose.Position, 2.0f, -1.2f);
+                ground->RecordFootstep(pose.Position);
                 }
             }
             player->SetPosition(pose.Position);

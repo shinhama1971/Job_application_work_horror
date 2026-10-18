@@ -24,6 +24,7 @@ void Ground::Init()
 	m_PowerReflectionBlend = 0.0f;
 	m_PowerSurge = 0.0f;
 	m_WasPowerRestored = false;
+	m_Footprints.Clear();
 	m_WaterEffects.Init();
 	m_RippleSimulation.Init();
 
@@ -187,6 +188,7 @@ void Ground::Update()
 	// 水面の乱れは約2.4秒で収まる
 	m_PowerSurge = (std::max)(0.0f, m_PowerSurge - deltaTime * 0.42f);
 	m_WaterEffects.Update(deltaTime);
+	m_Footprints.Update(deltaTime);
 
 	// 浸水した範囲があれば、水面で跳ね返った懐中電灯の光を壁や天井に揺らして映している（waterCaustics.hlsli）。
 	// 範囲がない面（2面など）は強さを0にし、壁のシェーダーで計算しないようにしている。
@@ -302,6 +304,8 @@ void Ground::Draw(Camera* cam)
 			m_WaterEffects.GetFloodMin().x, m_WaterEffects.GetFloodMin().y,
 			m_WaterEffects.GetFloodMax().x, m_WaterEffects.GetFloodMax().y)
 		: DirectX::SimpleMath::Vector4(1.0f, 1.0f, 0.0f, 0.0f);
+	// 床に残る濡れた足跡（乾いたものは詰めて、数だけを渡している）
+	m_Footprints.Fill(wetFloor.Footprints, wetFloor.FootprintInfo);
 	devicecontext->UpdateSubresource(
 		m_WetFloorBuffer.Get(), 0, nullptr, &wetFloor, 0, 0);
 	// ピクセルシェーダーのb10へ設定している

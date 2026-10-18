@@ -599,6 +599,8 @@ bool Ground::TriggerFootstepRipple(
 	const Vector3& position,
 	bool sprinting)
 {
+	// 水の中の一歩なら、その後の数歩に濡れた靴の跡を残している
+	RecordFootstep(position);
 	return m_WaterEffects.TriggerFootstepRipple(position, sprinting);
 }
 

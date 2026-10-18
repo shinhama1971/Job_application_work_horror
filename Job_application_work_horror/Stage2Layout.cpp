@@ -19,6 +19,7 @@
 #include "Wall.h"
 #include "Locker.h"
 #include "MirrorAnomaly.h"
+#include "MirrorSelf.h"
 
 #include <SimpleMath.h>
 
@@ -175,6 +176,7 @@ namespace Stage2Layout
             Vector4(0.0f, 0.0f, 1.0f, 1.0f),    // 中央：中心(9, 9)。大きく、左側を回れる
             Vector4(0.0f, 1.0f, 0.0f, 1.0f) };  // 出口側：中心(-9, 91)。右側を回れる
         ground->SetPuddleLayout(puddleLayout);
+        objects.ground = ground;
 
         // 天井（1面と同じく、天井板・外れた板の穴・雨漏りの染みを描いている）、床際の縁取り、天井近くの配管
         Wall* ceiling = createWall("Stage2Ceiling", Vector3(0.0f, -47.0f, -10.0f),
@@ -363,7 +365,10 @@ namespace Stage2Layout
         ShadowMan* mirrorFigure = builder.Create<ShadowMan>("Stage2MirrorFigure");
         mirrorFigure->SetExternallyControlled(true);
         mirrorFigure->SetMirrorOnly(true);
+        mirrorFigure->SetScale(Vector3(MirrorAnomaly::FigureScaleXZ, MirrorAnomaly::FigureScaleY, MirrorAnomaly::FigureScaleXZ));
         mirrorFigure->SetActive(false);
+        // 鏡にだけ映る自分の姿（一人称で体がないため、鏡を描く間だけ体を描いている）
+        objects.mirrorSelf = builder.Create<MirrorSelf>("Stage2MirrorSelf");
         objects.mirror = mirror;
         objects.mirrorFigure = mirrorFigure;
 

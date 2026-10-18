@@ -110,6 +110,8 @@ void Stage2Scene::Init()
     m_PortraitAnomaly.Reset();
     m_HandprintAnomaly.Reset();
     m_MirrorAnomaly.Reset();
+    m_FootprintFollower.Reset();
+    m_FootprintFollowerUsedThisLoop = false;
     m_KnockingAnomaly.Reset();
     m_FalseDoorAnomaly.Reset();
     m_ClockAnomaly.Reset();
@@ -251,9 +253,11 @@ void Stage2Scene::Update()
             StartObservedScare();
             break;
         case SceneDebugAction::ShowMirrorAnomaly:
-            // 異変を探す周回（1周目か2周目）にし、その周回の異変を鏡にしている
-            while (m_LoopCount < 1)
+            // 異変を探す周回（1周目か2周目）にし、その周回の異変を鏡にしている。
+            // 周回を進める前に異変を決めておき、ほかの異変（偽の扉など）が出ないようにしている
+            if (m_LoopCount < 1)
             {
+                m_AnomalyPlan.ForceLoop(1, Stage2Anomaly::Mirror);
                 AdvanceLoop(*player);
             }
             if (m_LoopCount <= Stage2AnomalyPlan::PlannedLoopCount)
@@ -349,6 +353,7 @@ void Stage2Scene::Update()
     UpdatePortraitAnomaly(*player, deltaTime);
     UpdateHandprintAnomaly(*player, deltaTime);
     UpdateMirrorAnomaly(*player, deltaTime);
+    UpdateFootprintFollower(*player, deltaTime);
     UpdateKnockingAnomaly(*player, deltaTime);
     UpdateFalseDoorAnomaly(*player);
     UpdateClock(deltaTime);

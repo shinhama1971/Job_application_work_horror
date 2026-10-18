@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "Wall.h"
+#include "Application.h"
 #include "Camera.h"
 #include "Game.h"
 #include "Renderer.h"
@@ -111,9 +112,70 @@ void Wall::Init()
     m_Material->Create(m_SurfaceMaterial);
 }
 
-// 動かないので、毎フレームの処理はない
+// 崩れて現れる・消える途中なら、崩れ具合を進めている（消え終わったら非表示にしている）
 void Wall::Update()
 {
+    if (m_DissolveSpeed <= 0.0f)
+    {
+        return;
+    }
+    const float step = m_DissolveSpeed * Application::GetDeltaTime();
+    const float dissolve = m_Dissolve < m_DissolveTarget
+        ? (std::min)(m_Dissolve + step, m_DissolveTarget)
+        : (std::max)(m_Dissolve - step, m_DissolveTarget);
+    ApplyDissolve(dissolve);
+    if (m_Dissolve == m_DissolveTarget)
+    {
+        m_DissolveSpeed = 0.0f;
+        if (m_DissolveTarget >= 1.0f)
+        {
+            // 消え終わった：非表示にし、次に表示するときは元の形から始めている
+            m_Visible = false;
+            ApplyDissolve(0.0f);
+        }
+    }
+}
+
+void Wall::SetVisible(bool visible)
+{
+    m_Visible = visible;
+    m_DissolveSpeed = 0.0f;
+    if (m_Dissolve != 0.0f)
+    {
+        ApplyDissolve(0.0f);
+    }
+}
+
+void Wall::DissolveIn(float seconds)
+{
+    // 消えている物は、崩れきった形から現れ始めている（表示中なら今の崩れ具合から戻している）
+    if (!m_Visible)
+    {
+        m_Visible = true;
+        ApplyDissolve(1.0f);
+    }
+    m_DissolveTarget = 0.0f;
+    m_DissolveSpeed = 1.0f / (std::max)(seconds, 0.01f);
+}
+
+void Wall::DissolveOut(float seconds)
+{
+    if (!m_Visible)
+    {
+        return;
+    }
+    m_DissolveTarget = 1.0f;
+    m_DissolveSpeed = 1.0f / (std::max)(seconds, 0.01f);
+}
+
+void Wall::ApplyDissolve(float dissolve)
+{
+    m_Dissolve = dissolve;
+    m_SurfaceMaterial.Dissolve = dissolve;
+    if (m_Material != nullptr)
+    {
+        m_Material->SetMaterial(m_SurfaceMaterial);
+    }
 }
 
 // 拡大・回転・移動の順に掛けたワールド行列を返している

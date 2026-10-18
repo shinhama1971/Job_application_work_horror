@@ -267,6 +267,9 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 | 壁のホラーらしい跡（血の手形・引っかき傷・血の垂れ跡） | GPU（PS） | `horrorMarks.hlsli`（`litTexturePS` の壁の古さから呼ぶ） | 壁に沿ったマス目ごとの乱数で置き場所と種類を決め、距離関数で形を作る。画像素材を読まない |
 | 水たまりの反射 | GPU | `PlanarReflection`（縦横半分の解像度）、`wetFloorPS.hlsl`（水面の荒さのむらに合わせて縦に伸ばしてぼかす） | 上下を反転したカメラで別に描画 |
 | 壁の鏡（2面） | GPU | `PlanarReflection::BeginPlane`（任意の面で反転したカメラ。鏡はテクスチャ t13・行列はピクセルシェーダーのb9）、`mirrorPS.hlsl`、`GameRendering.cpp`（鏡が見えるときだけ、水たまりの反射より先に描く） | 定数バッファの b0〜b13 はすべて使われているため、床が頂点シェーダー側でだけ使うb9のピクセルシェーダー側に、鏡の行列を置いている |
+| 鏡に映る自分の姿（2面） | CPU・GPU | `MirrorSelf`（箱を組み合わせた体を、鏡を描く間だけ描く。1秒60回の姿勢の記録から遅らせた姿勢を選ぶ） | 一人称で体がないため、鏡にだけ体を出している |
+| 濡れた足跡 | CPU・GPU（PS） | `WetFootprints`（輪のバッファ・乾き）、`Ground`（b10へ渡す）、`shader/wetFootprints.hlsli`、`FootprintFollower`（2面の誰かの足跡） | 足跡ごとに近くの画素だけ形を計算し、遠い画素は距離で省いている |
+| 崩れて現れる・消える | GPU（PS） | `Wall::DissolveIn` / `DissolveOut`、`litTexturePS.hlsl`（clip と焦げた縁） | マテリアルの詰め物を崩れ具合に使い、定数バッファを増やしていない |
 | 水たまりの反射の比較（技術デモF2） | GPU | `ReflectionProbe`（キューブマップ128x128を1フレームに1面）、`ScreenSpaceReflection`（深度の写し取り）、`wetFloorPS.hlsl`（キューブマップを反射の向きで読む・SSRの光線をたどる） | 平面反射と、重さと正確さの違いを見比べるため。普段は平面反射 |
 | 西棟の水面の光の揺らぎ（コースティクス） | GPU（PS） | `waterCaustics.hlsli`（`litTexturePS` から呼ぶ） | 壁・天井の画素ごとに、水面で折り返した点と懐中電灯の配光から求める |
 | 水たまりの波のシミュレーション | GPU（CS） | `WaterRippleSimulation`、`waterRippleCS.hlsl`（256x256マス、ピンポン、1秒に60歩）。床は `wetFloorPS`、壁は `waterCaustics.hlsli` が高さを読む | 全マスが同じ式で隣のマスだけを読むので、GPUで並列に計算できる。結果のテクスチャはCPUへ読み戻さない。描画の最初（`Object::RunGpuSimulation`）で実行し、GPU時間は約0.012ms |

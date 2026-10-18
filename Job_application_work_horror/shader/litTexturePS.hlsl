@@ -410,6 +410,23 @@ float4 main(in LIT_PS_IN input) : SV_Target
     }
 #endif
 
+    // 崩れて現れる・消える物（Wall::DissolveIn / DissolveOut）：ワールドの位置から作ったノイズが崩れ具合より小さい画素を捨て、
+    // 残った所の縁を、焦げて燃えているように赤く光らせている（縁の明るさは下の「自ら光る色」の後で足している）。
+    float dissolveEdge = 0.0f;
+    [branch]
+    if (Material.Dissolve > 0.0f)
+    {
+        const float3 dissolvePosition = input.worldPos * 0.55f;
+        const float dissolveNoise =
+            FastValueNoise(dissolvePosition.xy + dissolvePosition.z * 0.37f) * 0.55f +
+            FastValueNoise(dissolvePosition.zy * 2.3f + 7.0f) * 0.30f +
+            FastValueNoise(dissolvePosition.xz * 5.1f - 3.0f) * 0.15f;
+        // 崩れ具合0で何も捨てず、1ですべて捨てるよう、しきい値を少し広げている
+        const float dissolveThreshold = Material.Dissolve * 1.08f - 0.04f;
+        clip(dissolveNoise - dissolveThreshold);
+        dissolveEdge = 1.0f - smoothstep(0.0f, 0.07f, dissolveNoise - dissolveThreshold);
+    }
+
     // デバッグのフルブライト表示では、照明を使わずに返している
     if (DebugViewMode == DEBUG_VIEW_FULLBRIGHT)
     {
@@ -566,6 +583,9 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
     // 自ら光る色を足している
     color.rgb += Material.Emission.rgb;
+    // 崩れている縁：焦げて黒ずみ、その外側が燃えるように赤く光る
+    color.rgb *= 1.0f - dissolveEdge * 0.55f;
+    color.rgb += float3(0.95f, 0.34f, 0.07f) * (dissolveEdge * dissolveEdge) * 1.5f;
 
     // 高さの違う霧を重ね、近くの見やすさを保ちながら、遠くの輪郭を分けている。
     // 部屋全体を一様に白くせず、床の近くに霧を集めている。

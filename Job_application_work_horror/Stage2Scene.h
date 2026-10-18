@@ -16,6 +16,7 @@
 #include "PortraitAnomaly.h"
 #include "HandprintAnomaly.h"
 #include "MirrorAnomaly.h"
+#include "FootprintFollower.h"
 #include "KnockingAnomaly.h"
 #include "ScratchAnomaly.h"
 #include "ObservedScareSequence.h"
@@ -81,6 +82,8 @@ private:
     void UpdateHandprintAnomaly(const Player& player, float deltaTime);
     // 鏡の異変：鏡をのぞくとすぐ後ろに人影が映り、振り返ると誰もいない（見つけたことになる）
     void UpdateMirrorAnomaly(const Player& player, float deltaTime);
+    // 誰かの濡れた足跡：2周目以降、水たまりから出ると、同じ水たまりから裸足の足跡が一歩ずつ後をついて来る
+    void UpdateFootprintFollower(const Player& player, float deltaTime);
     // この周回で見つけるべき異変（Stage2AnomalyPlanが決めたもの）を見つけ終えたかを返している。
     bool IsRequiredAnomalyFound() const;
     // ノックの異変を更新している／耳を澄ませる位置を返している
@@ -128,6 +131,9 @@ private:
     PortraitAnomaly m_PortraitAnomaly;
     HandprintAnomaly m_HandprintAnomaly;
     MirrorAnomaly m_MirrorAnomaly;
+    FootprintFollower m_FootprintFollower;
+    // この周回で、誰かの足跡をもう出したか（1周に1回だけ）
+    bool m_FootprintFollowerUsedThisLoop = false;
     KnockingAnomaly m_KnockingAnomaly;
     ScratchAnomaly m_ScratchAnomaly;
     ObservedScareSequence m_ObservedScareSequence;

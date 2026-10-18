@@ -80,8 +80,8 @@ struct MATERIAL
     float Shiness;
     bool TextureEnable;
     bool WeatheringSurface;   // 建物の壁ならtrue（壁の古さを描く面）
-    // 16バイトにそろえるための詰め物
-    bool Dummy;
+    // 崩れて現れる・消える度合い（0 = 元の形、1 = 消えた。Wall::DissolveIn / DissolveOut）
+    float Dissolve;
 };
 // ----------------------------------------------------------------------------
 // タイルベースライティング

@@ -146,8 +146,8 @@ struct MATERIAL
 	// 建物の壁（構造の壁）ならTRUE。壁の古さ（パネルの継ぎ目・ひびなど）はこの面だけに描いている。
 	// 棚や配管などの小物に継ぎ目が出ないようにするための印。
 	BOOL WeatheringSurface;
-	// 16バイトにそろえるための詰め物
-	BOOL Dummy;
+	// 崩れて現れる・消える度合い（0 = 元の形、1 = 消えた）。Wall::DissolveIn / DissolveOut が変えている
+	float Dissolve;
 
 
 };

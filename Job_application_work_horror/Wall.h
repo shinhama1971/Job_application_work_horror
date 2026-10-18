@@ -37,6 +37,12 @@ private:
     // 自分の光る色で周りを照らす点光源の範囲と強さ（0なら照らさない）
     float m_GlowRange = 0.0f;
     float m_GlowStrength = 0.0f;
+    // 崩れ具合（0 = 元の形、1 = 消えた）と、向かう値、1秒あたりの変化（0なら止まっている）
+    float m_Dissolve = 0.0f;
+    float m_DissolveTarget = 0.0f;
+    float m_DissolveSpeed = 0.0f;
+    // 崩れ具合をマテリアルへ入れている
+    void ApplyDissolve(float dissolve);
     // 壁の鏡の面か、映す側の向き
     bool m_IsMirror = false;
     DirectX::SimpleMath::Vector3 m_MirrorFacing = DirectX::SimpleMath::Vector3(1.0f, 0.0f, 0.0f);
@@ -55,7 +61,8 @@ public:
     // 半透明の色は後ろの物が透けて見えるため、描かない。
     bool WritesDepthPrepass() const override
     {
-        return m_Visible && m_SurfaceMaterial.Diffuse.w >= 0.999f;
+        // 崩れている途中は、ピクセルシェーダーで画素を捨てるため描かない
+        return m_Visible && m_SurfaceMaterial.Diffuse.w >= 0.999f && m_Dissolve <= 0.0f;
     }
     void DrawDepthPrepass(Camera* cam) override;
     bool UsesCameraCulling() const override { return true; }
@@ -152,10 +159,16 @@ public:
     void CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const override;
 
     // 表示・非表示（非表示の間は当たり判定と影もなくなる）
-    void SetVisible(bool visible)
-    {
-        m_Visible = visible;
-    }
+    // すぐに切り替える（崩れて現れる・消える途中なら、それをやめて元の形に戻している）
+    void SetVisible(bool visible);
+    bool IsVisible() const { return m_Visible; }
+
+    // 焦げた縁が広がるように崩れて現れる・消える（secondsかけて。消え終わったら非表示にしている）。
+    // 崩れ具合はマテリアルの Dissolve でシェーダー（litTexturePS）へ渡し、ノイズより小さい所を捨てている。
+    void DissolveIn(float seconds);
+    void DissolveOut(float seconds);
+    // 崩れて消えていく途中か
+    bool IsDissolvingOut() const { return m_DissolveSpeed > 0.0f && m_DissolveTarget >= 1.0f; }
 
     // 大きさと位置を設定している
     void SetScale(float x, float y, float z)

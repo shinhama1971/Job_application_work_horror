@@ -17,6 +17,8 @@ Texture2D g_SsrScene : register(t4);
 Texture2D<float> g_SsrDepth : register(t8);
 
 // Ground.cppのWetFloorBufferと同じ並び（b10）。経過時間、波紋の強さ、反射の強さ、詰め物
+// 濡れた足跡の最大数（WetFootprints::MaxCount と同じ）
+#define FOOTPRINT_COUNT 32
 cbuffer WetFloorBuffer : register(b10)
 {
     float WetTime;
@@ -25,6 +27,9 @@ cbuffer WetFloorBuffer : register(b10)
     float WetPadding;
     // 床一面が水に浸かった範囲（xy = x・zの最小、zw = x・zの最大）。範囲がないときは、最小が最大より大きい値にしている。
     float4 FloodRect;
+    // 濡れた足跡（WetFootprints::Fill）。x = 数。1つにつき2つ（xy = 位置、z = sin(向き)、w = cos(向き)/ x = 濡れ具合、y = 左右、z = 裸足か）
+    float4 FootprintInfo;
+    float4 Footprints[FOOTPRINT_COUNT * 2];
 }
 
 // 頂点シェーダー（litTextureVS）から受け取る値（影と反射の座標も使っている）
@@ -69,6 +74,7 @@ float ValueNoise(float2 value)
 #include "waterCaustics.hlsli"
 #include "roomOcclusion.hlsli"
 #include "surfaceDetail.hlsli"
+#include "wetFootprints.hlsli"
 
 // ----------------------------------------------------------------------------
 // 水面の反射の方式の比較（ReflectionParams.x：0 平面反射、1 キューブマップ、2 SSR）。ゲームの普段の方式は平面反射。
@@ -335,6 +341,9 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 上を向いた面（床）だけを水たまりにしている
     puddle *= smoothstep(0.55f, 0.92f, saturate(input.worldNormal.y));
     shore *= smoothstep(0.55f, 0.92f, saturate(input.worldNormal.y));
+    // 濡れた足跡（水たまりの外の乾いた床だけ。WetFootprints が場所と濡れ具合を渡している）
+    const float footprintWet = GetWetFootprints(input.worldPos.xz) *
+        smoothstep(0.55f, 0.92f, saturate(input.worldNormal.y)) * (1.0f - saturate(puddle * 2.0f));
 
     float dripRing = 0.0f;
     float3 detailWorldNormal = agedWorldNormal;
@@ -387,6 +396,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
         0.38f);
     color.rgb = lerp(color.rgb, wetColor, puddle * 0.84f);
     color.rgb *= 1.0f - shore * 0.035f;
+    // 濡れた足跡は、水を吸って暗くなっている
+    color.rgb = lerp(color.rgb, color.rgb * 0.38f + float3(0.004f, 0.007f, 0.008f), footprintWet * 0.90f);
 
     // 上下で色を変えた環境光と、浅い角度ほど強い反射（フレネル）
     float3 lighting = GetHemisphereAmbient(detailWorldNormal);
@@ -508,6 +519,11 @@ float4 main(in LIT_PS_IN input) : SV_Target
                 * flashlightAmount
                 * wetSpecular
                 * lerp(0.025f, 1.15f, puddle);
+            // 濡れた足跡も、懐中電灯の光を細く返す
+            specularLighting += Light.Diffuse.rgb
+                * flashlightAmount
+                * pow(saturate(dot(normal, halfVector)), 48.0f)
+                * 0.55f * footprintWet;
 
             // 完全な鏡面反射の方向がカメラを外れても、浅い水は懐中電灯を弱く広く反射する。
             // 水面が黒く沈むのを防いでいる。
@@ -528,6 +544,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 水面の空の映り込み・波の光・水滴の輪・岸の光を足している
     specularLighting += float3(0.19f, 0.25f, 0.28f)
         * puddle * (0.15f + fresnel * 0.76f);
+    specularLighting += float3(0.08f, 0.10f, 0.11f) * footprintWet * (0.06f + fresnel * 0.55f);
     const float rippleHighlight = pow(
         saturate(ripplePattern * 0.5f + 0.5f),
         10.0f) * puddle;

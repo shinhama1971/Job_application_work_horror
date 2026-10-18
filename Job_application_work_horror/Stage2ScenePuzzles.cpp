@@ -315,6 +315,7 @@ void Stage2Scene::AdvanceLoop(Player& player)
     m_PortraitAnomaly.ResetProgressForLoop();
     m_HandprintAnomaly.ResetProgressForLoop();
     m_MirrorAnomaly.ResetProgressForLoop();
+    m_FootprintFollowerUsedThisLoop = false;
     m_KnockingAnomaly.ResetProgressForLoop();
     m_FalseDoorAnomaly.ResetProgressForLoop();
     m_ConfirmationHandledThisLoop = false;
@@ -377,7 +378,15 @@ void Stage2Scene::AdvanceLoop(Player& player)
         }
 
         const bool revealed = markIndex < m_LoopCount;
-        cycleMark->SetVisible(revealed);
+        // 新しく増えた印は、焦げた縁が広がるように浮かび上がらせている
+        if (revealed && !cycleMark->IsVisible())
+        {
+            cycleMark->DissolveIn(1.6f);
+        }
+        else if (!revealed)
+        {
+            cycleMark->SetVisible(false);
+        }
         if (revealed)
         {
             const float emission =
@@ -414,7 +423,10 @@ void Stage2Scene::AdvanceLoop(Player& player)
         }
         if (loopMark != nullptr)
         {
-            loopMark->SetVisible(true);
+            if (!loopMark->IsVisible())
+            {
+                loopMark->DissolveIn(1.6f);
+            }
             loopMark->SetAppearance(
                 Color(0.28f, 0.008f, 0.004f, 1.0f),
                 Color(0.16f, 0.001f, 0.0f, 1.0f), 22.0f);
@@ -941,8 +953,17 @@ void Stage2Scene::SetFalseDoorState(bool visible, bool rightSide)
     frameTop->SetPosition(frameX, -54.0f, centerZ);
     handle->SetPosition(handleX, -76.0f, centerZ - 8.0f);
 
+    // 現れるときと消えるときは、焦げた縁が広がるように崩していく。表示したまま反対側の壁へ移るときは、
+    // 見ていない間に一瞬で移している（移る瞬間を見せない）
     for (Wall* piece : { panel, frameNear, frameFar, frameTop, handle })
     {
-        piece->SetVisible(visible);
+        if (visible && (!piece->IsVisible() || piece->IsDissolvingOut()))
+        {
+            piece->DissolveIn(1.6f);
+        }
+        else if (!visible && piece->IsVisible())
+        {
+            piece->DissolveOut(1.2f);
+        }
     }
 }
