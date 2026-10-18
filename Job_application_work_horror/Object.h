@@ -52,6 +52,15 @@ public:
 	virtual bool UsesCameraCulling() const { return false; }
 	// trueなら水たまりの平面反射に映る。
 	virtual bool ContributesToPlanarReflection() const { return false; }
+	// trueなら壁の鏡（2面）に映る。水たまりに映る物に加えて、床（Ground）も映る。
+	virtual bool ContributesToWallMirror() const { return ContributesToPlanarReflection(); }
+	// 壁の鏡の面なら、面の上の点と、映す側の向き（法線）を返してtrueにしている（Game::Drawが鏡の描画に使っている）。
+	virtual bool GetMirrorPlane(DirectX::SimpleMath::Vector3& point, DirectX::SimpleMath::Vector3& normal) const
+	{
+		(void)point;
+		(void)normal;
+		return false;
+	}
 	// 監視カメラなど、プレイヤー以外の視点で描くワールドに含めるかどうか。
 	virtual bool DrawsInAuxiliaryView() const { return true; }
 	// 描画の前にGPUで計算する物（水たまりの波）は、ここでCompute Shaderを実行している。

@@ -712,6 +712,9 @@
     <FxCompile Include="shader\signalPanelPS.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>
+    <FxCompile Include="shader\mirrorPS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
     <FxCompile Include="shader\flashlightRevealPS.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>

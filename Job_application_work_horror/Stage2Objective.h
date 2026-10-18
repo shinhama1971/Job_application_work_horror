@@ -62,6 +62,7 @@ struct Stage2ObjectiveInput
     bool falseDoorObserved = false;     // 偽の扉を照らした（あとは目を離すだけ）
     bool portraitStaring = false;       // 肖像画を見つめている途中
     bool handprintFollowing = false;    // 血の手形を照らして、次の手形をたどっている途中
+    bool mirrorWaitingForTurn = false;  // 鏡に映った人影を見た（あとは振り返るだけ）
     bool knockListening = false;        // ノックの出どころの壁の前で、耳を澄ませている途中
 
     // 信号盤パズル（解けたか、段階、知らせを出しているか、知らせの種類、間違えた回数）
@@ -100,6 +101,7 @@ struct Stage2ObjectiveInput
     bool clockNotice = false;
     bool portraitNotice = false;
     bool handprintNotice = false;
+    bool mirrorNotice = false;
     bool knockNotice = false;
     bool loopNotice = false;
 };

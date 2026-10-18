@@ -301,6 +301,8 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
                     "PostProcess", gpuTimer->GetTiming(GpuPass::PostProcess));
                 drawGpuTiming(
                     "Water ripples", gpuTimer->GetTiming(GpuPass::WaterRipples));
+                drawGpuTiming(
+                    "Wall mirror", gpuTimer->GetTiming(GpuPass::Mirror));
                 ImGui::TextDisabled("4-frame query ring / no GPU wait");
             }
         }
@@ -380,6 +382,12 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             {
                 scene->RequestDebugAction(
                     SceneDebugAction::PlayLightingEvent);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("鏡の異変を出す"))
+            {
+                scene->RequestDebugAction(
+                    SceneDebugAction::ShowMirrorAnomaly);
             }
             ImGui::TextDisabled(
                 "操作は次のゲーム更新開始時に安全に実行されます。");

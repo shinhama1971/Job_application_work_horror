@@ -57,6 +57,8 @@ namespace Core
         Effect::PostProcess m_PostProcess;
         Effect::ShadowMap m_ShadowMap;
         Effect::PlanarReflection m_PlanarReflection;
+        // 2面の壁の鏡に映す景色（鏡の面で反転したカメラから描き、鏡のシェーダーが t13 で読む）
+        Effect::PlanarReflection m_WallMirror;
         // 水面の反射の方式の比較（技術デモF2）で使う、キューブマップとSSR
         Effect::ReflectionProbe m_ReflectionProbe;
         Effect::ScreenSpaceReflection m_ScreenSpaceReflection;

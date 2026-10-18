@@ -113,6 +113,8 @@ public:
 	}
 	// 水たまりを決まった場所に置き直している（2面の廊下）。足音・波紋・水滴・シェーダーの表のすべてに反映される。
 	void SetPuddleLayout(const WaterEffectSystem::PuddleLayout& layout);
+	// 壁の鏡（2面）には、床も映している（水たまりの反射は床そのものなので、床は映さない）
+	bool ContributesToWallMirror() const override { return true; }
 	// 水面が画面に映っているときだけ、反射を描くようにしている
 	bool IsPlanarReflectionSurfaceVisible(const Camera& camera) const override
 	{

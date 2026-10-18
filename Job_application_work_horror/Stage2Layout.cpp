@@ -18,6 +18,7 @@
 #include "ShadowMan.h"
 #include "Wall.h"
 #include "Locker.h"
+#include "MirrorAnomaly.h"
 
 #include <SimpleMath.h>
 
@@ -323,6 +324,46 @@ namespace Stage2Layout
             clockHourAngle, 0.0f, 0.0f));
         clockMinuteHand->SetRotation(Vector3(
             clockMinuteAngle, 0.0f, 0.0f));
+
+        // 左の壁の古い鏡（どの周回にもある）。鏡の面は廊下の側（+x）を向き、MirrorAnomaly の面の位置・大きさと合わせている。
+        // 映る景色は Game::Draw が鏡の面で反転したカメラから描き、鏡のシェーダー（mirrorPS）が読んでいる。
+        Wall* mirror = createWall(
+            "Stage2Mirror", Vector3(MirrorAnomaly::SurfaceX - 0.3f, MirrorAnomaly::CenterY, MirrorAnomaly::CenterZ),
+            Vector3(0.6f, MirrorAnomaly::HalfHeight * 2.0f, MirrorAnomaly::HalfWidth * 2.0f),
+            Color(0.5f, 0.5f, 0.5f, 1.0f), false);
+        mirror->SetMirrorSurface(Vector3(1.0f, 0.0f, 0.0f));
+        mirror->SetCastsShadow(false);
+        // 鏡の枠（黒ずんだ木の4本）。鏡の面より少し手前へ出し、剥げた縁を半分隠している
+        const Color mirrorFrameColor(0.065f, 0.048f, 0.034f, 1.0f);
+        const float frameX = MirrorAnomaly::SurfaceX + 0.3f;
+        const float frameTop = MirrorAnomaly::CenterY + MirrorAnomaly::HalfHeight;
+        const float frameBottom = MirrorAnomaly::CenterY - MirrorAnomaly::HalfHeight;
+        const float frameNear = MirrorAnomaly::CenterZ - MirrorAnomaly::HalfWidth;
+        const float frameFar = MirrorAnomaly::CenterZ + MirrorAnomaly::HalfWidth;
+        const struct { const char* Name; Vector3 Position; Vector3 Scale; } mirrorFrames[] =
+        {
+            { "Stage2MirrorFrameTop", Vector3(frameX, frameTop, MirrorAnomaly::CenterZ),
+                Vector3(1.8f, 2.0f, MirrorAnomaly::HalfWidth * 2.0f + 4.0f) },
+            { "Stage2MirrorFrameBottom", Vector3(frameX, frameBottom, MirrorAnomaly::CenterZ),
+                Vector3(1.8f, 2.0f, MirrorAnomaly::HalfWidth * 2.0f + 4.0f) },
+            { "Stage2MirrorFrameNear", Vector3(frameX, MirrorAnomaly::CenterY, frameNear),
+                Vector3(1.8f, MirrorAnomaly::HalfHeight * 2.0f, 2.0f) },
+            { "Stage2MirrorFrameFar", Vector3(frameX, MirrorAnomaly::CenterY, frameFar),
+                Vector3(1.8f, MirrorAnomaly::HalfHeight * 2.0f, 2.0f) },
+        };
+        for (const auto& frame : mirrorFrames)
+        {
+            Wall* piece = createWall(frame.Name, frame.Position, frame.Scale, mirrorFrameColor, false);
+            piece->SetAppearance(mirrorFrameColor, Color(0.0f, 0.0f, 0.0f, 1.0f), 14.0f);
+            piece->SetCastsShadow(false);
+        }
+        // 鏡の中にだけ映る人影（鏡の異変の周回だけ表示する）。位置は MirrorAnomaly が決め、プレイヤーの方を向くだけにしている
+        ShadowMan* mirrorFigure = builder.Create<ShadowMan>("Stage2MirrorFigure");
+        mirrorFigure->SetExternallyControlled(true);
+        mirrorFigure->SetMirrorOnly(true);
+        mirrorFigure->SetActive(false);
+        objects.mirror = mirror;
+        objects.mirrorFigure = mirrorFigure;
 
         // 周回によって現れる赤い印（最初は隠している）
         Wall* loopMark = createWall("Stage2LoopMark", Vector3(-39.4f, -68.0f, 52.0f),

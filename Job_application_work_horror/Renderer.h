@@ -180,6 +180,8 @@ private:
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pDebugViewBuffer;
 	// デバッグ表示と壁の古さは同じ定数バッファにあるため、片方だけ変えるときのために中身を覚えている。
 	static DEBUG_VIEW_BUFFER m_DebugView;
+	// 壁の鏡に映す景色を描いている最中か（鏡の中にだけ現れる物が、この間だけ自分を描く）
+	static bool m_DrawingWallMirror;
 	// 覚えている中身を定数バッファへ送っている
 	static void UploadDebugViewBuffer();
 	// 部屋の角の暗がりとマテリアルの定数バッファ、今のライト、ライトの計算をするか
@@ -283,6 +285,9 @@ public:
 	static void SetReflectionMode(int mode, const DirectX::SimpleMath::Matrix& projection);
 	// 2面の「血の手形」の異変で壁に浮かべる手形（最大4つ。x = 壁の表面のx、y = 高さ、z = 奥行き、w = 見え方）を、壁のシェーダーへ渡している。countが0なら描かない
 	static void SetWallHandprints(const DirectX::SimpleMath::Vector4* handprints, int count);
+	// 壁の鏡に映す景色を描いている最中かを設定・取得している（Game::Drawが鏡の描画の前後で切り替えている）
+	static void SetDrawingWallMirror(bool drawing) { m_DrawingWallMirror = drawing; }
+	static bool IsDrawingWallMirror() { return m_DrawingWallMirror; }
 	// ライトの計算をするかを切り替える・返している
 	static void SetLightEnable(bool Enable);
 	static bool GetLightEnable();

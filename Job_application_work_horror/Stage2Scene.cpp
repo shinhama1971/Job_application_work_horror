@@ -69,6 +69,8 @@ bool Stage2Scene::IsRequiredAnomalyFound() const
         return m_KnockingAnomaly.WasFound();
     case Stage2Anomaly::Handprint:
         return m_HandprintAnomaly.WasFound();
+    case Stage2Anomaly::Mirror:
+        return m_MirrorAnomaly.WasFound();
     case Stage2Anomaly::None:
         break;
     }
@@ -107,6 +109,7 @@ void Stage2Scene::Init()
     m_ScratchAnomaly.Reset();
     m_PortraitAnomaly.Reset();
     m_HandprintAnomaly.Reset();
+    m_MirrorAnomaly.Reset();
     m_KnockingAnomaly.Reset();
     m_FalseDoorAnomaly.Reset();
     m_ClockAnomaly.Reset();
@@ -247,6 +250,18 @@ void Stage2Scene::Update()
         case SceneDebugAction::PlayLightingEvent:
             StartObservedScare();
             break;
+        case SceneDebugAction::ShowMirrorAnomaly:
+            // 異変を探す周回（1周目か2周目）にし、その周回の異変を鏡にしている
+            while (m_LoopCount < 1)
+            {
+                AdvanceLoop(*player);
+            }
+            if (m_LoopCount <= Stage2AnomalyPlan::PlannedLoopCount)
+            {
+                m_AnomalyPlan.ForceLoop(m_LoopCount, Stage2Anomaly::Mirror);
+                m_MirrorAnomaly.ResetProgressForLoop();
+            }
+            break;
         }
     }
 
@@ -295,10 +310,11 @@ void Stage2Scene::Update()
         m_GuidancePulseCooldown <= 0.0f)
     {
         // しばらく進めていないとき、探すべき異変の近くの照明を揺らしている（偽の扉は奥寄り、時計と肖像画は中央付近、
-        // ノックは音の出どころの近く、血の手形は最後に現れた手形の近く）。
+        // ノックは音の出どころの近く、血の手形は最後に現れた手形の近く、鏡は鏡の真上）。
         const Stage2Anomaly requiredAnomaly = m_AnomalyPlan.GetRequired(m_LoopCount);
         CeilingLight* guideLight = m_Objects.Light(
             requiredAnomaly == Stage2Anomaly::FalseDoor ? Stage2Light::Light3 :
+            requiredAnomaly == Stage2Anomaly::Mirror ? Stage2NearestLight(MirrorAnomaly::CenterZ) :
             requiredAnomaly == Stage2Anomaly::Handprint
                 ? Stage2NearestLight(m_HandprintAnomaly.GetLatestPosition().z) :
             requiredAnomaly == Stage2Anomaly::Knocking
@@ -332,6 +348,7 @@ void Stage2Scene::Update()
     UpdateScratchMessage(*player, deltaTime);
     UpdatePortraitAnomaly(*player, deltaTime);
     UpdateHandprintAnomaly(*player, deltaTime);
+    UpdateMirrorAnomaly(*player, deltaTime);
     UpdateKnockingAnomaly(*player, deltaTime);
     UpdateFalseDoorAnomaly(*player);
     UpdateClock(deltaTime);

@@ -62,6 +62,9 @@ struct Stage2Objects
     ShadowMan* shadow = nullptr;
     ShadowMan* noiseShadow = nullptr;
     ShadowMan* presence = nullptr;      // 背後の気配
+    // 左の壁の鏡（どの周回にもある）と、鏡の異変の周回だけ鏡の中に映る人影
+    Wall* mirror = nullptr;
+    ShadowMan* mirrorFigure = nullptr;
     // 隠れられるロッカー（左の壁と右の壁に1つずつ）
     std::array<Locker*, 2> lockers{};
     // 異常確認のスイッチ、非常用充電器、棚の上の電池

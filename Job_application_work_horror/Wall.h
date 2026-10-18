@@ -12,6 +12,8 @@
 #include "Texture.h"
 #include "Material.h"
 
+#include <cmath>
+
 class Camera;
 
 // 1x1x1の箱を、大きさ（Scale）で好きな形に伸ばして使っている。ステージの壁・床・天井・小物の多くがこのクラス。
@@ -35,6 +37,9 @@ private:
     // 自分の光る色で周りを照らす点光源の範囲と強さ（0なら照らさない）
     float m_GlowRange = 0.0f;
     float m_GlowStrength = 0.0f;
+    // 壁の鏡の面か、映す側の向き
+    bool m_IsMirror = false;
+    DirectX::SimpleMath::Vector3 m_MirrorFacing = DirectX::SimpleMath::Vector3(1.0f, 0.0f, 0.0f);
 
     // 本描画・影・深度プリパスで共通のワールド行列（同じ計算にし、深度プリパスと本描画の深度を一致させている）
     DirectX::SimpleMath::Matrix MakeWorldMatrix() const;
@@ -86,6 +91,31 @@ public:
             enabled
                 ? "shader/signalPanelPS.hlsl"
                 : "shader/litTexturePS.hlsl");
+    }
+
+    // 壁の鏡（2面）の面にしている。facingは鏡が映す側の向き（壁から廊下へ向かう単位ベクトル）。
+    // 映る景色は Game::Draw が鏡の面で反転したカメラから描き、鏡のピクセルシェーダー（mirrorPS）がそれを読んでいる。
+    void SetMirrorSurface(const DirectX::SimpleMath::Vector3& facing)
+    {
+        m_IsMirror = true;
+        m_MirrorFacing = facing;
+        m_MirrorFacing.Normalize();
+        m_Shader.Create("shader/litTextureVS.hlsl", "shader/mirrorPS.hlsl");
+    }
+    // 鏡の面（箱の、映す側の面）の上の点と向きを返している
+    bool GetMirrorPlane(DirectX::SimpleMath::Vector3& point, DirectX::SimpleMath::Vector3& normal) const override
+    {
+        if (!m_IsMirror || !m_Visible)
+        {
+            return false;
+        }
+        const float halfThickness = 0.5f * (
+            std::abs(m_Scale.x * m_MirrorFacing.x) +
+            std::abs(m_Scale.y * m_MirrorFacing.y) +
+            std::abs(m_Scale.z * m_MirrorFacing.z));
+        point = m_Position + m_MirrorFacing * halfThickness;
+        normal = m_MirrorFacing;
+        return true;
     }
 
     // 当たり判定の有無、影の有無を切り替えている

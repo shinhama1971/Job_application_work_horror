@@ -32,6 +32,8 @@ namespace
             return "ヒント 立ち止まって壁を叩く音の方向を探す";
         case Stage2Anomaly::Handprint:
             return "ヒント ライトで壁を照らし 浮かんだ手形を探す";
+        case Stage2Anomaly::Mirror:
+            return "ヒント 左の壁の鏡をのぞき込む";
         case Stage2Anomaly::None:
             break;
         }
@@ -53,6 +55,8 @@ namespace
             return "ヒント 音のする壁の前で止まり 壁の方を向いて耳を澄ます";
         case Stage2Anomaly::Handprint:
             return "ヒント 手形をライトで照らすと 奥の反対側の壁に次の手形が現れる";
+        case Stage2Anomaly::Mirror:
+            return "ヒント 鏡の前で鏡をのぞき 映った物を確かめに振り返る";
         case Stage2Anomaly::None:
             break;
         }
@@ -103,6 +107,10 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
         else if (in.requiredAnomaly == Stage2Anomaly::Handprint && in.handprintFollowing)
         {
             objective = "手形をライトでたどる";
+        }
+        else if (in.requiredAnomaly == Stage2Anomaly::Mirror && in.mirrorWaitingForTurn)
+        {
+            objective = "後ろを振り返る";
         }
         else
         {
@@ -303,6 +311,10 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
     else if (in.handprintNotice)
     {
         objective = "手形が出口へ続いている 奥のスイッチへ進む";
+    }
+    else if (in.mirrorNotice)
+    {
+        objective = "誰もいない 奥のスイッチへ進む";
     }
     // 周回が変わったときの知らせ
     else if (in.loopNotice)

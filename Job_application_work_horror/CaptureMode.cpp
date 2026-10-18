@@ -13,6 +13,7 @@
 #include "Ground.h"
 #include "Locker.h"
 #include "Player.h"
+#include "Scene.h"
 #include "VideoWriter.h"
 
 #include <SimpleMath.h>
@@ -129,7 +130,9 @@ namespace
         { 117.0f, Vector3(170.0f, FloorY, -135.0f), YawToward(170.0f, -135.0f, 218.0f, -121.6f), -0.30f, nullptr, false },
     };
 
-    // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉
+    // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉 → 鏡（普段・鏡の異変で人影が映る・振り返ると誰もいない）
+    // 鏡の異変は、MirrorAnomalyRequestTime にデバッグの操作（SceneDebugAction::ShowMirrorAnomaly）で出している。
+    constexpr float MirrorAnomalyRequestTime = 40.0f;
     const std::vector<Keyframe> Stage2Tour =
     {
         { 0.0f, Vector3(0.0f, FloorY, -125.0f), 0.0f, 0.0f, nullptr, false },
@@ -143,6 +146,13 @@ namespace
         { 27.0f, Vector3(14.0f, FloorY, 40.0f), -Pi * 0.5f, 0.0f, nullptr, false },
         { 33.0f, Vector3(0.0f, FloorY, 108.0f), 0.0f, 0.0f, L"11_2面_奥の扉", false },
         { 36.0f, Vector3(0.0f, FloorY, 112.0f), 0.0f, 0.0f, nullptr, false },
+        { 38.0f, Vector3(0.0f, FloorY, 37.0f), -Pi * 0.5f, -0.06f, nullptr, false },
+        { 39.0f, Vector3(0.0f, FloorY, 37.0f), -Pi * 0.5f, -0.06f, L"12_2面_鏡", false },
+        { 46.0f, Vector3(0.0f, FloorY, 37.0f), -Pi * 0.5f, -0.06f, L"13_2面_鏡に映る人影", false },
+        { 47.0f, Vector3(0.0f, FloorY, 37.0f), -Pi * 0.5f, -0.06f, nullptr, false },
+        { 48.2f, Vector3(0.0f, FloorY, 37.0f), Pi * 0.5f, -0.06f, nullptr, false },
+        { 48.8f, Vector3(0.0f, FloorY, 37.0f), Pi * 0.5f, -0.06f, L"14_2面_振り返ると誰もいない", false },
+        { 50.0f, Vector3(0.0f, FloorY, 37.0f), Pi * 0.5f, -0.06f, nullptr, false },
     };
 
     // 角度の補間。差を-π〜πに直してから補間し、遠回りの方向へ回らないようにしている
@@ -219,6 +229,8 @@ namespace
     bool g_Finished = false;
     // 最後に足元へ水たまりの波を立てた位置（位置を直接動かすと足音が出ないため、歩いた距離で代わりに波を立てている）
     Vector3 g_LastStepPosition;
+    // 2面の道順で、鏡の異変を出したか
+    bool g_MirrorAnomalyRequested = false;
     bool g_Recording = false;   // 1面・2面を見て回っている間だけ動画に書き出している
     // 動画に書き出したフレーム数
     int g_FramesWritten = 0;
@@ -426,6 +438,7 @@ namespace
             { "ブルーム", GpuPass::Bloom },
             { "画面効果", GpuPass::PostProcess },
             { "水たまりの波", GpuPass::WaterRipples },
+            { "壁の鏡", GpuPass::Mirror },
         };
 
         for (const BenchmarkResult& result : g_BenchmarkResults)
@@ -630,6 +643,7 @@ namespace Tools::CaptureMode
             g_TourScene = scene;
             g_TourTime = 0.0f;
             g_NextShot = 0;
+            g_MirrorAnomalyRequested = false;
             Log(std::string("start tour: ") + SceneLabel(scene));
         }
         g_Recording = true;
@@ -659,6 +673,17 @@ namespace Tools::CaptureMode
                 g_PendingShot = (*tour)[g_NextShot].Shot;
             }
             ++g_NextShot;
+        }
+
+        // 2面: 鏡の前に立った後で、鏡の異変を出している（鏡の中にだけ、すぐ後ろの人影が映る）
+        if (scene == SceneName::Stage2 && !g_MirrorAnomalyRequested && g_TourTime >= MirrorAnomalyRequestTime)
+        {
+            g_MirrorAnomalyRequested = true;
+            if (Scene* currentScene = game->GetScene())
+            {
+                currentScene->RequestDebugAction(SceneDebugAction::ShowMirrorAnomaly);
+                Log("show mirror anomaly");
+            }
         }
 
         Player* player = game->GetObj<Player>("Player");

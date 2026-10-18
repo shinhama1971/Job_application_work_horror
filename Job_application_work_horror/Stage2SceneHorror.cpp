@@ -704,6 +704,57 @@ void Stage2Scene::UpdateHandprintAnomaly(const Player& player, float deltaTime)
     Renderer::SetWallHandprints(prints.data(), active ? HandprintAnomaly::PrintCount : 0);
 }
 
+// 鏡を見つける周回（Stage2AnomalyPlanが決める）だけ判定している。
+// 左の壁の鏡をのぞくと、すぐ後ろに黒い人影が映っている（人影は鏡に映す景色を描くときだけ描かれる）。
+// 鏡で見た後に振り返り、人影が立っていた所を見ると、そこには誰もいない。それで見つけたことになる。
+void Stage2Scene::UpdateMirrorAnomaly(const Player& player, float deltaTime)
+{
+    const bool active = m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Mirror);
+    Core::Game* game = Core::Game::GetInstance();
+    const Camera* camera = game->GetCamera();
+    const MirrorAnomaly::Event mirrorEvent = m_MirrorAnomaly.Update(
+        deltaTime, active, camera->GetPosition(), camera->GetForward(), player.GetPosition());
+
+    // 鏡の中の人影を、異変の周回で、まだ見つけていない間だけ表示している
+    ShadowMan* figure = m_Objects.mirrorFigure;
+    if (figure != nullptr)
+    {
+        const bool showFigure = active && m_MirrorAnomaly.IsFigureVisible();
+        if (showFigure != figure->IsActive())
+        {
+            figure->SetActive(showFigure);
+        }
+        if (showFigure)
+        {
+            const Vector3 position = m_MirrorAnomaly.GetFigurePosition();
+            figure->SetPosition(position.x, position.y, position.z);
+        }
+    }
+
+    if (mirrorEvent == MirrorAnomaly::Event::Seen)
+    {
+        // 鏡の中の人影に気づいた：すぐ後ろから、かすかな息づかいが聞こえ、心拍がひとつ跳ねる
+        game->PlayAudioCueAt(SOUND_CUE_BREATH, m_MirrorAnomaly.GetFigurePosition(), 0.82f, 0.42f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.16f, 0.30f);
+        Input::SetVibration(3, 0.10f);
+    }
+    else if (mirrorEvent == MirrorAnomaly::Event::Found)
+    {
+        // 振り返ると誰もいない：鏡の上の照明が一瞬揺れ、奥の確認スイッチが押せるようになる
+        m_Notices.loop = 2.8f;
+        CeilingLight* mirrorLight = m_Objects.Light(Stage2NearestLight(MirrorAnomaly::CenterZ));
+        if (mirrorLight != nullptr)
+        {
+            mirrorLight->TriggerEventFlicker(0.80f, 0.70f);
+        }
+        game->PlayAudioCueAt(
+            SOUND_CUE_PIPE_KNOCK,
+            Vector3(MirrorAnomaly::SurfaceX, MirrorAnomaly::CenterY, MirrorAnomaly::CenterZ), 0.70f, 0.50f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.32f, 0.42f);
+        Input::SetVibration(6, 0.16f);
+    }
+}
+
 // 肖像画を見つける周回（Stage2AnomalyPlanが決める）だけ判定している。
 // 懐中電灯で照らしたまま見つめ続けると、閉じていた目がゆっくり浮かび、やがて開く。
 // 途中で目を離すと、目は消えて最初からやり直しにしている。

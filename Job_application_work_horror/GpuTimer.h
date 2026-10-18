@@ -21,6 +21,7 @@ enum class GpuPass : std::size_t
     Bloom,
     PostProcess,
     WaterRipples,
+    Mirror,
     Count
 };
 

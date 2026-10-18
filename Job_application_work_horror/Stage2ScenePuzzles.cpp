@@ -314,6 +314,7 @@ void Stage2Scene::AdvanceLoop(Player& player)
     m_ScratchAnomaly.ResetProgressForLoop();
     m_PortraitAnomaly.ResetProgressForLoop();
     m_HandprintAnomaly.ResetProgressForLoop();
+    m_MirrorAnomaly.ResetProgressForLoop();
     m_KnockingAnomaly.ResetProgressForLoop();
     m_FalseDoorAnomaly.ResetProgressForLoop();
     m_ConfirmationHandledThisLoop = false;

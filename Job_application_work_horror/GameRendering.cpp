@@ -192,6 +192,52 @@ namespace Core
             m_Instance->m_ShadowMap.Bind();
         }
 
+        // 壁の鏡（2面）：鏡が画面に映り、カメラが鏡の表側にいるときだけ、鏡の面で反転したカメラから景色を描いている。
+        // 鏡の面より奥（鏡の付いた壁など）は描かない。鏡の中にだけ映る物（鏡の異変の影）は、この間だけ自分を描く。
+        // 水たまりの反射より先に描き、床の反射の行列（頂点シェーダーのb9）は、床の反射の側で設定し直している。
+        {
+            DirectX::SimpleMath::Vector3 mirrorPoint;
+            DirectX::SimpleMath::Vector3 mirrorNormal;
+            const Object* mirror = nullptr;
+            for (const auto& object : m_Instance->m_ObjectManager.GetAllObjects())
+            {
+                if (!object->IsDestroy() && object->GetMirrorPlane(mirrorPoint, mirrorNormal))
+                {
+                    mirror = object.get();
+                    break;
+                }
+            }
+            const bool drawMirror = mirror != nullptr &&
+                (m_Instance->m_Camera.GetPosition() - mirrorPoint).Dot(mirrorNormal) > 0.5f &&
+                IsVisibleToCamera(*mirror, m_Instance->m_Camera, true);
+            if (drawMirror)
+            {
+                m_Instance->m_GpuTimer.BeginPass(GpuPass::Mirror, context);
+                // 反射の画像は縦横半分の解像度で、画面のタイルとは合わないため、全部の光源を画素ごとに計算させている
+                m_Instance->m_TiledLighting.BindAllLights();
+                Renderer::SetDrawingWallMirror(true);
+                m_Instance->m_WallMirror.BeginPlane(m_Instance->m_Camera, mirrorPoint, mirrorNormal);
+                for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
+                {
+                    if (o->IsDestroy() || !o->ContributesToWallMirror() ||
+                        !IsNearEnoughForReflection(*o, m_Instance->m_Camera) ||
+                        (o->GetPosition() - mirrorPoint).Dot(mirrorNormal) < 0.6f)
+                    {
+                        continue;
+                    }
+                    ++reflectionDrawn;
+                    o->Draw(&m_Instance->m_Camera);
+                }
+                m_Instance->m_WallMirror.End(m_Instance->m_Camera);
+                Renderer::SetDrawingWallMirror(false);
+                m_Instance->m_GpuTimer.EndPass(GpuPass::Mirror, context);
+            }
+            else
+            {
+                m_Instance->m_GpuTimer.SkipPass(GpuPass::Mirror);
+            }
+        }
+
         // 水面の反射は、濡れた床（Ground）のある1面と2面だけ。水たまりが画面に映っているかを先に調べている
         // 技術デモで「水面の反射なし」を選んでいるときは、反射を描かない（床も反射を混ぜない。Ground::Draw）
         // 技術デモでキューブマップを選んでいる間は、カメラの位置から6方向のうち1面だけを毎フレーム撮り直している

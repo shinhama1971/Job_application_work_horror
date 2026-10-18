@@ -47,6 +47,8 @@ private:
     bool m_DeactivateOnExpire = false;
     // 位置を外から決めているか（SetExternallyControlled）
     bool m_ExternallyControlled = false;
+    // 壁の鏡の中にだけ映るか（SetMirrorOnly）
+    bool m_MirrorOnly = false;
     // 見られたときに呼ぶ処理（Sceneが演出を足すのに使っている）
     std::function<void()> m_OnObserved;
     // 最初のUpdateで名前で探して、その後は覚えておいている。PlayerとShadowManは同じSceneで作られ、
@@ -135,5 +137,12 @@ public:
     void SetDeactivateOnExpire(bool deactivate)
     {
         m_DeactivateOnExpire = deactivate;
+    }
+
+    // 壁の鏡の中にだけ映る影にしている（2面の鏡の異変）。trueの間は、鏡に映す景色を描くときだけ自分を描き、
+    // 本描画・水たまりの反射・監視映像には描かない（振り返っても、そこには誰もいない）。
+    void SetMirrorOnly(bool mirrorOnly)
+    {
+        m_MirrorOnly = mirrorOnly;
     }
 };
