@@ -43,9 +43,9 @@ private:
     float m_DissolveSpeed = 0.0f;
     // 崩れ具合をマテリアルへ入れている
     void ApplyDissolve(float dissolve);
-    // 肖像画の面か、その目の状態（SetPortraitEyes）
-    bool m_IsPortrait = false;
-    DirectX::SimpleMath::Color m_PortraitEyes = DirectX::SimpleMath::Color(0.0f, 0.0f, 0.0f, 0.0f);
+    // 絵を計算で描く面（肖像画・時計）か、その絵へ渡す値（肖像画は目の状態、時計は針の角度）
+    bool m_HasSurfaceParams = false;
+    DirectX::SimpleMath::Color m_SurfaceParams = DirectX::SimpleMath::Color(0.0f, 0.0f, 0.0f, 0.0f);
     // 壁の鏡の面か、映す側の向き
     bool m_IsMirror = false;
     DirectX::SimpleMath::Vector3 m_MirrorFacing = DirectX::SimpleMath::Vector3(1.0f, 0.0f, 0.0f);
@@ -106,12 +106,20 @@ public:
     // 2面の肖像画のように、古い油絵の人物を計算で描く面にしている（portraitPS。照明は壁と同じ）
     void SetPortraitSurface()
     {
-        m_IsPortrait = true;
+        m_HasSurfaceParams = true;
         m_Shader.Create("shader/litTextureVS.hlsl", "shader/portraitPS.hlsl");
     }
     // 肖像画の目の状態（開き具合0〜1、瞳の向き-1〜1の横と縦、瞳の赤い光0〜1）を設定している。
     // 絵のシェーダーには、肖像画では使っていないマテリアルの環境の色（Ambient）に入れて渡している
     void SetPortraitEyes(float openness, float gazeX, float gazeY, float glow);
+    // 2面の時計の文字盤のように、文字盤・目盛り・数字・針を計算で描く面にしている（clockPS。照明は壁と同じ）
+    void SetClockSurface()
+    {
+        m_HasSurfaceParams = true;
+        m_Shader.Create("shader/litTextureVS.hlsl", "shader/clockPS.hlsl");
+    }
+    // 時計の針の角度（12時が0、右回りが+）を設定している（文字盤のシェーダーが針を描く）
+    void SetClockHands(float hourAngle, float minuteAngle);
 
     // 壁の鏡（2面）の面にしている。facingは鏡が映す側の向き（壁から廊下へ向かう単位ベクトル）。
     // 映る景色は Game::Draw が鏡の面で反転したカメラから描き、鏡のピクセルシェーダー（mirrorPS）がそれを読んでいる。

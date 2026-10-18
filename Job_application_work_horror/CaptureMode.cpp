@@ -137,6 +137,8 @@ namespace
     constexpr float SecondLoopRequestTime = 50.5f;
     // 肖像画の場面の前に、肖像画の異変を出している
     constexpr float PortraitAnomalyRequestTime = 62.5f;
+    // この時刻からは、電池を25%にして弱った懐中電灯を写している
+    constexpr float LowBatteryTime = 73.5f;
     const std::vector<Keyframe> Stage2Tour =
     {
         { 0.0f, Vector3(0.0f, FloorY, -125.0f), 0.0f, 0.0f, nullptr, false },
@@ -174,6 +176,10 @@ namespace
         { 71.5f, Vector3(14.0f, FloorY, -5.0f), YawToward(14.0f, -5.0f, 38.9f, -25.0f), -0.12f, nullptr, false },
         { 72.0f, Vector3(14.0f, FloorY, -5.0f), YawToward(14.0f, -5.0f, 38.9f, -25.0f), -0.12f, L"18_2面_目で追う肖像画", false },
         { 73.0f, Vector3(14.0f, FloorY, -5.0f), YawToward(14.0f, -5.0f, 38.9f, -25.0f), -0.12f, nullptr, false },
+        // 時計の前で、電池が弱った懐中電灯の光を見る（07 の満タンの光と見比べられる）
+        { 74.5f, Vector3(0.0f, FloorY, -25.0f), -Pi * 0.5f, -0.10f, nullptr, false },
+        { 76.0f, Vector3(0.0f, FloorY, -25.0f), -Pi * 0.5f, -0.10f, L"19_2面_電池が弱った懐中電灯", false },
+        { 77.0f, Vector3(0.0f, FloorY, -25.0f), -Pi * 0.5f, -0.10f, nullptr, false },
     };
 
     // 角度の補間。差を-π〜πに直してから補間し、遠回りの方向へ回らないようにしている
@@ -789,6 +795,11 @@ namespace Tools::CaptureMode
         }
         // 道順の途中で電池が切れて懐中電灯が消えないよう、電池を満タンに保っている（計測モードと同じ）
         player->AddBattery(100.0f);
+        // 2面の最後の場面だけ、電池を25%にして、弱った懐中電灯の光（暗く黄色い光と、輪のむら）を写している
+        if (scene == SceneName::Stage2 && g_TourTime >= LowBatteryTime)
+        {
+            player->AddBattery(-75.0f);
+        }
         player->SetFlashlightOn(true);
         camera->SetCameraDirection(pose.Yaw);
         camera->SetCameraPitch(pose.Pitch);

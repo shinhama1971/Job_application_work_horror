@@ -70,7 +70,8 @@ void Stage2Scene::Draw(Camera* camera)
             // 足音の影が近いほど、すき間の縁を赤くしている（20〜100の距離で変化）
             hidingDanger = 1.0f - (std::clamp)((toStalker.Length() - 20.0f) / 80.0f, 0.0f, 1.0f);
         }
-        m_Hud.DrawHidingView(m_VisualTimer, hidingDanger);
+        m_Hud.DrawHidingView(m_VisualTimer, hidingDanger,
+            m_BreathHold.GetBreath(), m_BreathHold.IsHolding(), m_BreathHold.GetExposure());
     }
     // 普段のHUD（2面はヒューズがないので-1を渡している）
     m_Hud.Draw(*player, -1, m_InteractionSystem.GetPrompt(),

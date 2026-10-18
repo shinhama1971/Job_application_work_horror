@@ -33,6 +33,7 @@ class Door;
 class ExitTrigger;
 class Item;
 class CeilingLight;
+class Ground;
 
 // 進む先を示す天井照明の候補の組（進み具合ごと）。その組の1灯だけが、切れかけの電球のように不規則にちかちかする。
 enum class Stage1RouteLight : std::size_t
@@ -51,6 +52,8 @@ struct StageObjects
 
     // プレイヤー
     Player* player = nullptr;
+    // 濡れた床（水たまり・西棟の浸水・濡れた足跡）
+    Ground* ground = nullptr;
     // 建物の壁を上から見た長方形（x,y = 中心のx・z、z,w = 幅と奥行きの半分）。部屋の角の暗がりの計算に使っている。
     std::vector<DirectX::SimpleMath::Vector4> wallFootprints;
     // 演出用の人影（ヒューズを拾った後に廊下に立つ影・左の倉庫の影・監視カメラの確認で現れる影・出口の前兆の影）

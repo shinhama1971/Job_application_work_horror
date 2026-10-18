@@ -83,6 +83,8 @@ void StageScene::Init()
     m_SafeLights.Init(m_Objects.safeZones);
     // 照らすと止まる影の判定と押し戻しに使う壁と扉を、一度だけ集めている（毎フレーム全Objectを調べないため）
     m_ArchiveStalker = Stage1LightStalker{};
+    m_FootprintFollower.Reset();
+    m_FootprintFollowerUsed = false;
     m_StalkerWalls = game->GetObjects<Wall>();
     m_StalkerDoors = game->GetObjects<Door>();
     m_ArchiveStalkerNoticeTimer = 0.0f;
@@ -370,6 +372,7 @@ void StageScene::Update()
     UpdateExitPowerSequence();
     UpdateExitOmen(*player);
     UpdateWallWritings(*player);
+    UpdateFootprintFollower(*player);
     m_HiddenRoom.Update(*player, deltaTime, m_KeypadDoor.IsSolved());
     UpdateArchiveStalker(*player, deltaTime);
     // 西棟の進行（排水バルブの長押しを含む）と、水の滴る音・背後で水の中を歩く音などの物音。

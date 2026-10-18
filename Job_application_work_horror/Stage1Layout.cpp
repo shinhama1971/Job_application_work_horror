@@ -71,6 +71,7 @@ namespace Stage1Layout
         ground->SetFloodRegion(
             Vector2(Stage1WestWing::MinX, Stage1WestWing::MinZ),
             Vector2(Stage1WestWing::MaxX, Stage1WestWing::MaxZ));
+        objects.ground = ground;
 
         // 壁（外周の4面と、部屋を区切る壁）
         Wall* wall1 = builder.Create<Wall>("Wall1");

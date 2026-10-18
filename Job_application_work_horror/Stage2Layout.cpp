@@ -274,7 +274,7 @@ namespace Stage2Layout
             piece->SetCastsShadow(false);
         }
 
-        // 時計（文字盤・枠・時針・分針）。針はx軸の回転で動かしている
+        // 時計（文字盤と枠）。文字盤・目盛り・ローマ数字・針・ガラスは、文字盤のシェーダー（clockPS）で描いている
         Wall* clockFace = createWall(
             "Stage2ClockFace", Vector3(-39.3f, -70.0f, -25.0f),
             Vector3(1.0f, 20.0f, 20.0f),
@@ -291,27 +291,17 @@ namespace Stage2Layout
         Wall* clockFrameFar = createWall(
             "Stage2ClockFrameFar", Vector3(-38.9f, -70.0f, -14.0f),
             Vector3(1.8f, 24.0f, 2.0f), trimColor, false);
-        Wall* clockHourHand = createWall(
-            "Stage2ClockHourHand", Vector3(-38.0f, -70.0f, -25.0f),
-            Vector3(1.6f, 9.0f, 1.4f),
-            Color(0.025f, 0.021f, 0.017f, 1.0f), false);
-        Wall* clockMinuteHand = createWall(
-            "Stage2ClockMinuteHand", Vector3(-37.7f, -70.0f, -25.0f),
-            Vector3(1.4f, 14.0f, 1.0f),
-            Color(0.035f, 0.028f, 0.020f, 1.0f), false);
         Wall* clockPieces[] =
         {
             clockFace, clockFrameTop, clockFrameBottom,
-            clockFrameNear, clockFrameFar, clockHourHand, clockMinuteHand
+            clockFrameNear, clockFrameFar
         };
         for (Wall* piece : clockPieces)
         {
             piece->SetCastsShadow(false);
         }
-        clockHourHand->SetRotation(Vector3(
-            clockHourAngle, 0.0f, 0.0f));
-        clockMinuteHand->SetRotation(Vector3(
-            clockMinuteAngle, 0.0f, 0.0f));
+        clockFace->SetClockSurface();
+        clockFace->SetClockHands(clockHourAngle, clockMinuteAngle);
 
         // 左の壁の古い鏡（どの周回にもある）。鏡の面は廊下の側（+x）を向き、MirrorAnomaly の面の位置・大きさと合わせている。
         // 映る景色は Game::Draw が鏡の面で反転したカメラから描き、鏡のシェーダー（mirrorPS）が読んでいる。
@@ -517,8 +507,6 @@ namespace Stage2Layout
         objects.portrait = portrait;
         objects.loopMark = loopMark;
         objects.clockFace = clockFace;
-        objects.clockHourHand = clockHourHand;
-        objects.clockMinuteHand = clockMinuteHand;
         objects.falseDoorPanel = falseDoorPanel;
         objects.falseDoorFrameNear = falseDoorFrameNear;
         objects.falseDoorFrameFar = falseDoorFrameFar;

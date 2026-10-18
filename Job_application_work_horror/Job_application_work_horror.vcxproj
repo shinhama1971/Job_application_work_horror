@@ -358,6 +358,7 @@
     <ClInclude Include="HandprintAnomaly.h" />
     <ClInclude Include="MirrorAnomaly.h" />
     <ClInclude Include="FootprintFollower.h" />
+    <ClInclude Include="BreathHold.h" />
     <ClInclude Include="WetFootprints.h" />
     <ClInclude Include="shader\wetFootprints.hlsli" />
     <ClInclude Include="ScratchAnomaly.h" />
@@ -421,6 +422,7 @@
     <ClInclude Include="shader\puddleMask.hlsli" />
     <ClInclude Include="shader\horrorMarks.hlsli" />
     <ClInclude Include="shader\portraitPainting.hlsli" />
+    <ClInclude Include="shader\clockFace.hlsli" />
     <ClInclude Include="shader\surfaceDetail.hlsli" />
   </ItemGroup>
   <ItemGroup>
@@ -479,6 +481,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\signalPanelPS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\clockPS.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>

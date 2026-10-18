@@ -23,7 +23,8 @@ float GetFlashlightBeamProfile(float3 pixelDirection)
     return shapedCone * lerp(0.82f, 1.08f, smoothstep(0.38f, 1.0f, cone));
 }
 
-// 懐中電灯のレンズの模様：中心を明るくし、レンズの汚れのような細かいむらを付けている
+// 懐中電灯のレンズの模様：中心を明るくし、レンズの汚れのような細かいむら、反射鏡の輪、指紋のくもりと傷の影を付けている。
+// 電池が弱るほど（Light.SpotParams.w）、中心が暗くなり、輪のむらがはっきりする
 float GetFlashlightLensPattern(float3 pixelDirection)
 {
     const float outerCosine = max(Light.SpotParams.y, 0.05f);
@@ -50,9 +51,24 @@ float GetFlashlightLensPattern(float3 pixelDirection)
         ((largeDust - 0.5f) * 0.030f +
          (fineDust - 0.5f) * 0.012f) * patternFade;
 
-    // 外周は少し暗く、中心は明るい、本物の懐中電灯に近い光の形にしている。
+    // 電池の弱り具合（0〜1。Player が SpotParams.w で渡している）。弱るほど、光のむらがはっきりする
+    const float weakness = saturate(Light.SpotParams.w);
+    // 反射鏡の同心円の輪（ほんのりした明暗）と、明るい中心のすぐ外側の暗い輪（安い懐中電灯の光の形）
+    const float rings = sin(radius * 31.0f) * 0.5f + 0.5f;
+    const float ringPattern =
+        (rings - 0.5f) * lerp(0.030f, 0.075f, weakness) * smoothstep(0.15f, 0.5f, radius) * patternFade;
+    const float darkRingOffset = (radius - 0.30f) / 0.06f;
+    const float darkRing = -exp(-darkRingOffset * darkRingOffset) * lerp(0.045f, 0.10f, weakness);
+    // レンズに残った指紋のようなくもり（右上が少し暗い）と、1本の細い傷の影
+    const float smudge = -(1.0f - smoothstep(0.0f, 1.0f,
+        length((lensUV - float2(0.35f, 0.25f)) / float2(0.35f, 0.22f)))) * 0.06f;
+    const float scratch = -(1.0f - smoothstep(0.0f, 0.012f, abs(lensUV.y - lensUV.x * 0.4f + 0.18f))) *
+        0.07f * step(abs(lensUV.x), 0.6f);
+
+    // 外周は少し暗く、中心は明るい、本物の懐中電灯に近い光の形にしている。電池が弱ると、中心の明るさが落ちる
     return saturate(
-        0.90f + centerHotspot * 0.16f + lensDirt);
+        0.90f + centerHotspot * lerp(0.16f, 0.06f, weakness) +
+        lensDirt * (1.0f + weakness) + ringPattern + darkRing + smudge + scratch);
 }
 
 #endif

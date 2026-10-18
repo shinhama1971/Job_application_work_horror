@@ -31,12 +31,16 @@ using namespace DirectX::SimpleMath;
 // 足音の影が離れているうちに隠れれば、影は見失って立ち止まり、しばらくして去っていく。
 // 影がすぐ近くまで来てから隠れても、入るところを見られていて捕まる。
 // 隠れている間は足音の危険度が下がり、新しい影も出ない。
+// 見失った影は、ロッカーのすぐ前まで探しに来る。近くにいる間は息を止めていないと呼吸を聞かれて見つかり、
+// 息を止めすぎると大きく吐いてしまう（BreathHold）。
 // ----------------------------------------------------------------------------
 namespace
 {
     constexpr float HidingSeenDistance = 30.0f;     // これより近くで隠れると見られている
-    // 見失った影がその場に留まる秒数
-    constexpr float HiddenStalkerLingerSeconds = 3.2f;
+    // 見失った影が、ロッカーの前まで探しに来て留まる秒数と、近づく速さ・止まる距離
+    constexpr float HiddenStalkerLingerSeconds = 7.0f;
+    constexpr float HiddenStalkerSearchSpeed = 5.5f;
+    constexpr float HiddenStalkerStopDistance = 14.0f;
 }
 
 // 隠れている間の処理。隠れていなければfalseを返している
@@ -45,6 +49,7 @@ bool Stage2Scene::UpdateHiddenFromStalker(Player& player, float deltaTime)
     if (!player.IsHiding())
     {
         m_HiddenStalkerTimer = -1.0f;
+        m_BreathHold.Reset();
         return false;
     }
 
@@ -56,6 +61,8 @@ bool Stage2Scene::UpdateHiddenFromStalker(Player& player, float deltaTime)
     if (noiseShadow == nullptr || !noiseShadow->IsActive())
     {
         m_HiddenStalkerTimer = -1.0f;
+        // 影がいなくても、息を止める操作はできる（息のゲージだけが動く）
+        m_BreathHold.Update(deltaTime, IsBreathHoldPressed(), false);
         return true;
     }
 
@@ -70,10 +77,33 @@ bool Stage2Scene::UpdateHiddenFromStalker(Player& player, float deltaTime)
             StartCaughtSequence(player, CaughtSequence::Reason::NoiseStalker);
             return true;
         }
-        // 見失った影はその場で立ち止まり、辺りを探すように留まっている。
-        noiseShadow->EnableChase(0.0f, 12.0f);
+        // 見失った影は、辺りを探すように、ロッカーのすぐ前までゆっくり歩いて来る。
+        noiseShadow->EnableChase(HiddenStalkerSearchSpeed, HiddenStalkerStopDistance);
         m_HiddenStalkerTimer = HiddenStalkerLingerSeconds;
         game->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, noiseShadow->GetPosition(), 0.70f, 1.4f);
+        return true;
+    }
+
+    // 影がロッカーの近くにいる間は、息を止めていないと呼吸を聞かれる。息が続かず吐いてしまっても、近ければ見つかる
+    Vector3 toSearcher = noiseShadow->GetPosition() - player.GetPosition();
+    toSearcher.y = 0.0f;
+    const bool searcherNear = toSearcher.Length() <= BreathHold::DangerDistance;
+    const BreathHold::Event breathEvent =
+        m_BreathHold.Update(deltaTime, IsBreathHoldPressed(), searcherNear);
+    if (breathEvent == BreathHold::Event::Gasped)
+    {
+        // 息が続かず、大きく吐いてしまった
+        game->PlayAudioCueAt(SOUND_CUE_BREATH, player.GetPosition(), 1.15f, 1.0f);
+        Input::SetVibration(4, 0.12f);
+        if (searcherNear)
+        {
+            StartCaughtSequence(player, CaughtSequence::Reason::NoiseStalker);
+            return true;
+        }
+    }
+    else if (breathEvent == BreathHold::Event::Heard)
+    {
+        StartCaughtSequence(player, CaughtSequence::Reason::NoiseStalker);
         return true;
     }
 
@@ -520,16 +550,11 @@ void Stage2Scene::UpdateClock(float deltaTime)
     const float displayedMinuteAngle =
         m_ClockAnomaly.GetDisplayedMinuteAngle(clockLoop);
 
-    // 針は、時計に向かって手前向きのx軸の回転で動かしている
-    Wall* hourHand = m_Objects.clockHourHand;
-    Wall* minuteHand = m_Objects.clockMinuteHand;
-    if (hourHand != nullptr)
+    // 針は、文字盤のシェーダーが角度から描いている（12時が0、右回りが+）
+    Wall* face = m_Objects.clockFace;
+    if (face != nullptr)
     {
-        hourHand->SetRotation(Vector3(displayedHourAngle, 0.0f, 0.0f));
-    }
-    if (minuteHand != nullptr)
-    {
-        minuteHand->SetRotation(Vector3(displayedMinuteAngle, 0.0f, 0.0f));
+        face->SetClockHands(displayedHourAngle, displayedMinuteAngle);
     }
 }
 
@@ -966,4 +991,10 @@ void Stage2Scene::SetFalseDoorState(bool visible, bool rightSide)
             piece->DissolveOut(1.2f);
         }
     }
+}
+
+// 息を止めるボタン（キーボードは Space、コントローラーは RB）を押しているか
+bool Stage2Scene::IsBreathHoldPressed()
+{
+    return Input::GetKeyPress(VK_SPACE) || Input::GetButtonPress(XINPUT_RIGHT_SHOULDER);
 }

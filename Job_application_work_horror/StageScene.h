@@ -18,6 +18,7 @@
 #include "TensionPulse.h"
 #include "Stage1LightStalker.h"
 #include "PropLayoutEditor.h"
+#include "FootprintFollower.h"
 
 #include <array>
 #include <cstddef>
@@ -55,6 +56,8 @@ private:
     void UpdateAmbientSounds();
     // 懐中電灯で照らすと浮かぶ壁の文字。書き換わった文字を読んだら物音の演出を起こしている。
     void UpdateWallWritings(class Player& player);
+    // 誰かの濡れた足跡：西棟の水から初めて乾いた床へ出ると、同じ水から裸足の足跡が一歩ずつ後をついて来る（1回だけ）
+    void UpdateFootprintFollower(class Player& player);
     // 今の危険度（0〜1）を返している。一番近くに出ている影までの距離と、隠し部屋に閉じ込められているかから求めている。
     float ComputeThreatRate(const class Player& player) const;
     // 危険度に合わせて、自分の心拍音と呼吸音を鳴らしている。
@@ -110,6 +113,9 @@ private:
     float m_LayoutNoticeTimer = 0.0f;
     // Debug版のデバッグ画面（F1）に出す、小物の配置エディタ（選んで動かし、配置のファイルへ書き戻す）
     PropLayoutEditor m_PropLayoutEditor{ Stage1Layout::PropLayoutPath };
+    // 西棟の水から後をついて来る誰かの濡れた足跡と、もう出したか（1回のプレイで1回だけ）
+    FootprintFollower m_FootprintFollower;
+    bool m_FootprintFollowerUsed = false;
     // 西棟で鳴らす物音（使い回している）
     std::vector<AmbientSoundCue> m_WestWingCues;
     // 書類保管室の「照らすと止まる影」。動きのルールはこのクラス、影の表示・音・電池はSceneが行っている。

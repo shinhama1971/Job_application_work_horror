@@ -930,7 +930,7 @@ void Hud::DrawKeypad(
     Flush();
 }
 
-void Hud::DrawHidingView(float elapsedSeconds, float dangerRate)
+void Hud::DrawHidingView(float elapsedSeconds, float dangerRate, float breathLeft, bool holding, float exposure)
 {
     m_Vertices.clear();
     const float screenWidth = GetCanvasWidth();
@@ -970,6 +970,34 @@ void Hud::DrawHidingView(float elapsedSeconds, float dangerRate)
         static_cast<float>(CountDisplayedCharacters(prompt)) * promptPixelSize * 6.0f;
     AddText((screenWidth - promptWidth) * 0.5f, screenHeight - 90.0f,
         prompt, promptPixelSize, Color(0.62f, 0.70f, 0.66f, 0.80f));
+
+    // 影が近いときと、息を止めているときだけ、息のゲージと「息を止める」操作を出している。
+    // 聞かれそうになるほど、ゲージの枠が赤く点滅する
+    if (danger > 0.0f || holding || breathLeft < 0.999f)
+    {
+        const float meterWidth = 260.0f;
+        const float meterX = (screenWidth - meterWidth) * 0.5f;
+        const float meterY = screenHeight - 140.0f;
+        const float warning = (std::clamp)(exposure, 0.0f, 1.0f);
+        const float blink = 0.5f + 0.5f * std::sin(elapsedSeconds * 18.0f);
+        const Color frame(0.30f + warning * blink * 0.6f, 0.30f - warning * 0.2f, 0.28f - warning * 0.2f, 0.85f);
+        AddRectangle(meterX - 2.0f, meterY - 2.0f, meterWidth + 4.0f, 14.0f, frame);
+        AddRectangle(meterX, meterY, meterWidth, 10.0f, Color(0.02f, 0.03f, 0.03f, 0.95f));
+        const float remaining = (std::clamp)(breathLeft, 0.0f, 1.0f);
+        const Color fill = remaining < 0.25f
+            ? Color(0.85f, 0.30f, 0.20f, 0.95f)
+            : Color(0.45f, 0.72f, 0.80f, 0.95f);
+        AddRectangle(meterX, meterY, meterWidth * remaining, 10.0f, fill);
+
+        const std::string_view breathPrompt = holding
+            ? "息を止めている"
+            : (Input::IsControllerConnected() ? "RB 長押しで息を止める" : "SPACE 長押しで息を止める");
+        constexpr float breathPixelSize = 2.0f;
+        const float breathWidth =
+            static_cast<float>(CountDisplayedCharacters(breathPrompt)) * breathPixelSize * 6.0f;
+        AddText((screenWidth - breathWidth) * 0.5f, meterY - 26.0f, breathPrompt, breathPixelSize,
+            holding ? Color(0.62f, 0.78f, 0.84f, 0.90f) : Color(0.86f, 0.62f, 0.52f, 0.90f));
+    }
     Flush();
 }
 

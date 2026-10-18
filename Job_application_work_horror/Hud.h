@@ -90,7 +90,9 @@ public:
         int mistakes);
     // ロッカーに隠れている間の視界。扉の横長のすき間以外を暗くし、出る操作を表示している。
     // dangerRateは影の近さ（0〜1）で、近いほどすき間の縁が赤くにじむ。
-    void DrawHidingView(float elapsedSeconds, float dangerRate);
+    // breathLeftは残りの息（0〜1）、holdingは息を止めているか、exposureは呼吸を聞かれそうな度合い（0〜1）。
+    // 影が近いときと息を止めているときだけ、息のゲージと「息を止める」操作を出している。
+    void DrawHidingView(float elapsedSeconds, float dangerRate, float breathLeft, bool holding, float exposure);
     // 息を殺して影をやり過ごす操作の進み具合を描いている
     void DrawQuietRecovery(float progressRate, float cooldown, bool success, bool tooClose);
     // ポーズメニューを描いている（設定の各段階・選んでいる項目・今の階・経過時間・捕まった回数）

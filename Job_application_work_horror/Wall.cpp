@@ -397,8 +397,8 @@ void Wall::SetAppearance(
     float shininess)
 {
     m_SurfaceMaterial.Diffuse = diffuse;
-    // 肖像画の面では、環境の色の値を目の状態として使っている（SetPortraitEyes）
-    m_SurfaceMaterial.Ambient = m_IsPortrait ? m_PortraitEyes : Color(0.025f, 0.025f, 0.025f, 1.0f);
+    // 絵を計算で描く面（肖像画・時計）では、環境の色の値を絵へ渡す値として使っている（SetPortraitEyes・SetClockHands）
+    m_SurfaceMaterial.Ambient = m_HasSurfaceParams ? m_SurfaceParams : Color(0.025f, 0.025f, 0.025f, 1.0f);
     m_SurfaceMaterial.Specular = Color(0.10f, 0.11f, 0.10f, 1.0f);
     m_SurfaceMaterial.Emission = emission;
     m_SurfaceMaterial.Shininess = (std::max)(shininess, 1.0f);
@@ -446,8 +446,18 @@ void Wall::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) cons
 
 void Wall::SetPortraitEyes(float openness, float gazeX, float gazeY, float glow)
 {
-    m_PortraitEyes = Color(openness, gazeX, gazeY, glow);
-    m_SurfaceMaterial.Ambient = m_PortraitEyes;
+    m_SurfaceParams = Color(openness, gazeX, gazeY, glow);
+    m_SurfaceMaterial.Ambient = m_SurfaceParams;
+    if (m_Material != nullptr)
+    {
+        m_Material->SetMaterial(m_SurfaceMaterial);
+    }
+}
+
+void Wall::SetClockHands(float hourAngle, float minuteAngle)
+{
+    m_SurfaceParams = Color(hourAngle, minuteAngle, 0.0f, 0.0f);
+    m_SurfaceMaterial.Ambient = m_SurfaceParams;
     if (m_Material != nullptr)
     {
         m_Material->SetMaterial(m_SurfaceMaterial);

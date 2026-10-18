@@ -20,6 +20,9 @@ SamplerState g_SamplerState : register(s0);
 #if defined(PORTRAIT_SURFACE)
 #include "portraitPainting.hlsli"
 #endif
+#if defined(CLOCK_SURFACE)
+#include "clockFace.hlsli"
+#endif
 
 // 2面の「血の手形」の異変：Stage2Scene が渡した手形（WallHandprints）を、その壁の面に描き、濃さ（0〜1）を返している。
 // 形は1面の壁の血の跡と同じ式（HorrorHandprint）。見え方（w）で少しずつ浮かぶ。
@@ -410,6 +413,16 @@ float4 main(in LIT_PS_IN input) : SV_Target
         color.rgb = painting.albedo * (Material.Diffuse.rgb / portraitBaseDiffuse);
         paintingRelief = painting.relief;
         paintingEmission = painting.emission;
+    }
+#endif
+    // 2面の時計（clockPS.hlsl）：元の色を、計算で描いた文字盤の色に差し替えている。針の角度はマテリアルの Ambuent で受け取り
+    // （Wall::SetClockHands）、マテリアルの色（3周目以降に赤黒く変わる）は、普段の色との比として掛けている。
+#if defined(CLOCK_SURFACE)
+    {
+        const ClockPaint clockPaint = GetClockFace(saturate(input.tex), Material.Ambuent);
+        const float3 clockBaseDiffuse = float3(0.095f, 0.086f, 0.070f);
+        color.rgb = clockPaint.albedo * (Material.Diffuse.rgb / clockBaseDiffuse);
+        paintingRelief = clockPaint.relief;
     }
 #endif
 

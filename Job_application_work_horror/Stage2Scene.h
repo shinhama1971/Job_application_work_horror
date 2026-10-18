@@ -17,6 +17,7 @@
 #include "HandprintAnomaly.h"
 #include "MirrorAnomaly.h"
 #include "FootprintFollower.h"
+#include "BreathHold.h"
 #include "KnockingAnomaly.h"
 #include "ScratchAnomaly.h"
 #include "ObservedScareSequence.h"
@@ -84,6 +85,8 @@ private:
     void UpdateHandprintAnomaly(const Player& player, float deltaTime);
     // 鏡の異変：鏡をのぞくとすぐ後ろに人影が映り、振り返ると誰もいない（見つけたことになる）
     void UpdateMirrorAnomaly(const Player& player, float deltaTime);
+    // 息を止めるボタン（Space か RB）を押しているか
+    static bool IsBreathHoldPressed();
     // 誰かの濡れた足跡：2周目以降、水たまりから出ると、同じ水たまりから裸足の足跡が一歩ずつ後をついて来る
     void UpdateFootprintFollower(const Player& player, float deltaTime);
     // この周回で見つけるべき異変（Stage2AnomalyPlanが決めたもの）を見つけ終えたかを返している。
@@ -134,6 +137,8 @@ private:
     HandprintAnomaly m_HandprintAnomaly;
     MirrorAnomaly m_MirrorAnomaly;
     FootprintFollower m_FootprintFollower;
+    // ロッカーに隠れている間の、息を止める操作
+    BreathHold m_BreathHold;
     // 肖像画の絵の中の目の開き具合（0〜1）と、瞳の赤い光（0〜1）
     float m_PortraitEyeOpen = 0.0f;
     float m_PortraitEyeGlow = 0.0f;

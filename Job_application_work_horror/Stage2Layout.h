@@ -77,13 +77,11 @@ struct Stage2Objects
     FuseBox* confirmationPanel = nullptr;
     FuseBox* emergencyCharger = nullptr;
     BatteryItem* battery = nullptr;
-    // 扉のランプ、肖像画、周回の印、時計（文字盤・時針・分針）
+    // 扉のランプ、肖像画、周回の印、時計の文字盤（針も文字盤のシェーダーが描く）
     Wall* doorIndicator = nullptr;
     Wall* portrait = nullptr;
     Wall* loopMark = nullptr;
     Wall* clockFace = nullptr;
-    Wall* clockHourHand = nullptr;
-    Wall* clockMinuteHand = nullptr;
     // 偽の扉（板・手前の枠・奥の枠・上の枠・取っ手）
     Wall* falseDoorPanel = nullptr;
     Wall* falseDoorFrameNear = nullptr;

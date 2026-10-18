@@ -350,6 +350,9 @@
     <ClInclude Include="shader\portraitPainting.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="shader\clockFace.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="shader\surfaceDetail.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -417,6 +420,9 @@
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
     <ClInclude Include="FootprintFollower.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="BreathHold.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
     <ClInclude Include="WetFootprints.h">
@@ -737,6 +743,9 @@
       <Filter>リソース ファイル</Filter>
     </FxCompile>
     <FxCompile Include="shader\portraitPS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\clockPS.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>
     <FxCompile Include="shader\flashlightRevealPS.hlsl">

@@ -317,6 +317,9 @@ void Player::Update()
         (nearSurfaceTarget - m_FlashlightNearSurfaceBlend) *
         nearSurfaceResponse;
 
+    // 電池の弱り具合（60%を切ると0から増え、空で1）。弱るほど光が暗く・黄色く・短くなり、光の輪のむらがはっきりする
+    const float batteryWeakness = (std::clamp)((60.0f - m_Flashlight.GetBattery()) / 60.0f, 0.0f, 1.0f);
+
     // シェーダーへ渡す懐中電灯の光（スポットライト）を作っている
     LIGHT light{};
 
@@ -326,9 +329,10 @@ void Player::Update()
         1.0f - m_FlashlightNearSurfaceBlend * 0.42f;
     light.Intensity = renderFlashlight
         ? 1.50f * lightOutput * proximityExposure *
-            flashlightState.powerBlend
+            flashlightState.powerBlend *
+            (1.0f - batteryWeakness * 0.30f)
         : 0.0f;
-    light.Range = 275.0f - m_FlashlightNearSurfaceBlend * 48.0f;
+    light.Range = (275.0f - m_FlashlightNearSurfaceBlend * 48.0f) * (1.0f - batteryWeakness * 0.18f);
     // 手で持ったライトの小さな揺れを加えている。電池が少ないときは視点は動かさず、
     // 光だけに電気的・機械的な不安定さを足している。
     const float flashlightSway = renderFlashlight
@@ -349,16 +353,16 @@ void Player::Update()
         cosf(DirectX::XMConvertToRadians(13.0f)),
         cosf(DirectX::XMConvertToRadians(29.0f)),
         1.55f,
-        0.0f
+        batteryWeakness
     );
 
     if (renderFlashlight)
     {
-        // 電池が弱るほど光を少し暖かい色へ寄せ、残りが少ないことを色でも伝えている。
+        // 電池が弱るほど光を暖かい色（弱った電球のような黄色）へ寄せ、残りが少ないことを色でも伝えている。
         light.Diffuse = Color(
             m_LightDiffuseR * (1.0f + batteryStress * 0.04f),
-            m_LightDiffuseG * (1.0f - batteryStress * 0.06f),
-            m_LightDiffuseB * (1.0f - batteryStress * 0.18f),
+            m_LightDiffuseG * (1.0f - batteryStress * 0.06f - batteryWeakness * 0.10f),
+            m_LightDiffuseB * (1.0f - batteryStress * 0.18f - batteryWeakness * 0.32f),
             1.0f);
         light.Ambient = Color(0.255f, 0.252f, 0.246f, 1.0f);
     }

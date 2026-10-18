@@ -964,3 +964,54 @@ void StageScene::UpdateArchiveStalker(Player& player, float deltaTime)
         m_ArchiveStalkerNoticeTimer = 2.8f;
     }
 }
+
+// ----------------------------------------------------------------------------
+// 誰かの濡れた足跡
+// 西棟の水から初めて乾いた床へ出ると、少し遅れて同じ水から裸足の濡れた足跡が一歩ずつ現れ、
+// プレイヤーの足跡のすぐ横に並んで近づいてくる（姿は見えず、足跡と水音だけ。1回のプレイで1回だけ）。
+// 一番新しい足跡を懐中電灯で照らすとそこで止まり、照らさずにすぐ近くまで来させると、すぐ後ろで息づかいが聞こえる。
+// ----------------------------------------------------------------------------
+void StageScene::UpdateFootprintFollower(Player& player)
+{
+    Ground* ground = m_Objects.ground;
+    if (ground == nullptr)
+    {
+        return;
+    }
+    Core::Game* game = Core::Game::GetInstance();
+    const float deltaTime = Application::GetDeltaTime();
+
+    // 水から出た瞬間は毎回知らせが来るので、西棟の水から出たときだけ使っている（ほかの水たまりは足跡が残るだけ）
+    Vector2 waterExit;
+    if (ground->ConsumeWaterExit(waterExit) && !m_FootprintFollowerUsed &&
+        Stage1WestWing::IsInside(Vector3(waterExit.x, player.GetPosition().y, waterExit.y)))
+    {
+        m_FootprintFollower.Start(waterExit);
+        m_FootprintFollowerUsed = true;
+    }
+
+    const Camera* camera = game->GetCamera();
+    FootprintFollower::Step step;
+    const FootprintFollower::Event followerEvent = m_FootprintFollower.Update(
+        deltaTime, player.GetPosition(), camera->GetPosition(), camera->GetForward(),
+        player.IsFlashlightOn(), step);
+    if (followerEvent == FootprintFollower::Event::Step)
+    {
+        ground->AddFootprint(step.Position, step.Yaw, step.Side, true, 1.0f);
+        game->PlayAudioCueAt(SOUND_CUE_WATER_STEP, Vector3(step.Position.x, -99.0f, step.Position.y), 0.78f, 0.55f);
+    }
+    else if (followerEvent == FootprintFollower::Event::Lit)
+    {
+        game->GetPostProcess()->TriggerHorrorPulse(0.14f, 0.26f);
+        Input::SetVibration(2, 0.08f);
+    }
+    else if (followerEvent == FootprintFollower::Event::Reached)
+    {
+        const Vector3 playerPosition = player.GetPosition();
+        Vector3 behind = playerPosition - camera->GetForward() * 10.0f;
+        behind.y = playerPosition.y;
+        game->PlayAudioCueAt(SOUND_CUE_BREATH, behind, 0.85f, 0.45f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.30f, 0.40f);
+        Input::SetVibration(5, 0.14f);
+    }
+}
