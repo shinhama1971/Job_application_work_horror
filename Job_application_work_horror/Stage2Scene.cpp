@@ -111,6 +111,8 @@ void Stage2Scene::Init()
     m_HandprintAnomaly.Reset();
     m_MirrorAnomaly.Reset();
     m_FootprintFollower.Reset();
+    m_PortraitEyeOpen = 0.0f;
+    m_PortraitEyeGlow = 0.0f;
     m_FootprintFollowerUsedThisLoop = false;
     m_KnockingAnomaly.Reset();
     m_FalseDoorAnomaly.Reset();
@@ -171,10 +173,8 @@ void Stage2Scene::SetupPracticalLights()
     {
         marker->SetGlowLight(40.0f, 1.8f);
     }
-    for (Wall* eye : m_Objects.portraitEyes)
-    {
-        eye->SetGlowLight(30.0f, 2.4f);
-    }
+    // 肖像画は、目が開いて赤く光ったとき（自ら光る色が付いたとき）だけ、周りを赤く照らす
+    m_Objects.portrait->SetGlowLight(30.0f, 2.4f);
 }
 
 // 周回の数、視線、足音、信号盤パズル、追われる演出を同時に見て、進行を更新している。
@@ -266,6 +266,19 @@ void Stage2Scene::Update()
                 m_MirrorAnomaly.ResetProgressForLoop();
             }
             break;
+        case SceneDebugAction::ShowPortraitAnomaly:
+            // 異変を探す周回にし、その周回の異変を肖像画にしている（鏡と同じく、周回を進める前に決めている）
+            if (m_LoopCount < 1)
+            {
+                m_AnomalyPlan.ForceLoop(1, Stage2Anomaly::Portrait);
+                AdvanceLoop(*player);
+            }
+            if (m_LoopCount <= Stage2AnomalyPlan::PlannedLoopCount)
+            {
+                m_AnomalyPlan.ForceLoop(m_LoopCount, Stage2Anomaly::Portrait);
+                m_PortraitAnomaly.ResetProgressForLoop();
+            }
+            break;
         }
     }
 
@@ -351,6 +364,7 @@ void Stage2Scene::Update()
     UpdateLightZones(*player);
     UpdateScratchMessage(*player, deltaTime);
     UpdatePortraitAnomaly(*player, deltaTime);
+    UpdatePortraitEyes(deltaTime);
     UpdateHandprintAnomaly(*player, deltaTime);
     UpdateMirrorAnomaly(*player, deltaTime);
     UpdateFootprintFollower(*player, deltaTime);

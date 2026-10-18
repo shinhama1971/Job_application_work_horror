@@ -29,7 +29,9 @@ enum class SceneDebugAction
     PlayFinalSequence,
     PlayLightingEvent,
     // 2面：鏡の異変の周回にしている（手で試すときと、自動撮影で鏡の中の人影を写すときに使っている）
-    ShowMirrorAnomaly
+    ShowMirrorAnomaly,
+    // 2面：肖像画の異変の周回にしている（手で試すときと、自動撮影で絵の中の目が開くところを写すときに使っている）
+    ShowPortraitAnomaly
 };
 
 // シーンの基底クラス。Gameが今のシーンを1つだけunique_ptrで持ち、毎フレーム更新・描画している。

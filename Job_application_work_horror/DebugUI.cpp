@@ -389,6 +389,12 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
                 scene->RequestDebugAction(
                     SceneDebugAction::ShowMirrorAnomaly);
             }
+            ImGui::SameLine();
+            if (ImGui::Button("肖像画の異変を出す"))
+            {
+                scene->RequestDebugAction(
+                    SceneDebugAction::ShowPortraitAnomaly);
+            }
             ImGui::TextDisabled(
                 "操作は次のゲーム更新開始時に安全に実行されます。");
             ImGui::Separator();

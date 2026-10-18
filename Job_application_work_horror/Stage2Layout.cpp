@@ -255,7 +255,7 @@ namespace Stage2Layout
             Vector3(1.0f, 22.0f, 16.0f), Color(0.075f, 0.058f, 0.044f, 1.0f), false);
         // 古い油絵のように、ニスの弱い光沢を返している
         portrait->SetAppearance(Color(0.075f, 0.058f, 0.044f, 1.0f), Color(0.0f, 0.0f, 0.0f, 1.0f), 18.0f);
-        // 絵は、古い油絵の人物をシェーダーで描いている（目は閉じていて、異変ではここに赤い目が浮かぶ）
+        // 絵は、古い油絵の人物をシェーダーで描いている（目は閉じていて、異変では絵の中で目が開き、見る人を目で追う）
         portrait->SetPortraitSurface();
         portrait->SetCastsShadow(false);
         // 肖像画の額縁（くすんだ金色の4本）。時計の枠と同じく、壁から少し浮かせている
@@ -273,22 +273,6 @@ namespace Stage2Layout
             piece->SetAppearance(portraitFrameColor, Color(0.0f, 0.0f, 0.0f, 1.0f), 26.0f);
             piece->SetCastsShadow(false);
         }
-        Wall* portraitEyeLeft = createWall(
-            "Stage2PortraitEyeLeft",
-            Vector3(38.72f, -67.5f, -28.5f),
-            Vector3(0.3f, 2.2f, 1.8f),
-            Color(0.14f, 0.012f, 0.004f, 1.0f),
-            false);
-        portraitEyeLeft->SetCastsShadow(false);
-        portraitEyeLeft->SetVisible(false);
-        Wall* portraitEyeRight = createWall(
-            "Stage2PortraitEyeRight",
-            Vector3(38.72f, -67.5f, -21.5f),
-            Vector3(0.3f, 2.2f, 1.8f),
-            Color(0.14f, 0.012f, 0.004f, 1.0f),
-            false);
-        portraitEyeRight->SetCastsShadow(false);
-        portraitEyeRight->SetVisible(false);
 
         // 時計（文字盤・枠・時針・分針）。針はx軸の回転で動かしている
         Wall* clockFace = createWall(
@@ -543,7 +527,6 @@ namespace Stage2Layout
         objects.lights = { light1, light2, light3, light4 };
         objects.evidenceTerminals = { evidenceTerminal1, evidenceTerminal2 };
         objects.evidenceMarkers = { evidenceMarker1, evidenceMarker2 };
-        objects.portraitEyes = { portraitEyeLeft, portraitEyeRight };
 
         // 隠れられるロッカー。本体は当たり判定のある箱（Wall）、扉と「隠れる」操作はLockerが担当している。
         // 時計・偽の扉・肖像画・端末・信号盤・電池と重ならない位置に、左右1つずつ置いている。

@@ -397,7 +397,8 @@ void Wall::SetAppearance(
     float shininess)
 {
     m_SurfaceMaterial.Diffuse = diffuse;
-    m_SurfaceMaterial.Ambient = Color(0.025f, 0.025f, 0.025f, 1.0f);
+    // 肖像画の面では、環境の色の値を目の状態として使っている（SetPortraitEyes）
+    m_SurfaceMaterial.Ambient = m_IsPortrait ? m_PortraitEyes : Color(0.025f, 0.025f, 0.025f, 1.0f);
     m_SurfaceMaterial.Specular = Color(0.10f, 0.11f, 0.10f, 1.0f);
     m_SurfaceMaterial.Emission = emission;
     m_SurfaceMaterial.Shininess = (std::max)(shininess, 1.0f);
@@ -441,4 +442,14 @@ void Wall::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) cons
         emission.R() / peak, emission.G() / peak, emission.B() / peak,
         peak * m_GlowStrength);
     lights.push_back(light);
+}
+
+void Wall::SetPortraitEyes(float openness, float gazeX, float gazeY, float glow)
+{
+    m_PortraitEyes = Color(openness, gazeX, gazeY, glow);
+    m_SurfaceMaterial.Ambient = m_PortraitEyes;
+    if (m_Material != nullptr)
+    {
+        m_Material->SetMaterial(m_SurfaceMaterial);
+    }
 }

@@ -1,6 +1,6 @@
 // ============================================================================
 // 共通の処理: 2面の肖像画（古い油絵の人物）を、テクスチャを使わずに計算で描いている。
-// 主な技術: 楕円と曲線の距離で描く形（顔・髪・服・閉じた目・口）、筆の跡のノイズ、
+// 主な技術: 楕円と曲線の距離で描く形（顔・髪・服・開閉する目と見る人を追う瞳・口）、筆の跡のノイズ、
 //           ずらした格子の点による絵の具のひび割れ（クラクリュール）、ニスの黄ばみ
 // litTexturePS.hlsl を PORTRAIT_SURFACE を付けて読み込んだとき（portraitPS.hlsl）だけ使っている。
 // fastNoise.hlsli の後に読み込んでいる。
@@ -13,6 +13,8 @@ struct PortraitPaint
 {
     float3 albedo;
     float relief;
+    // 自ら光る色（目が開いたときの、瞳の赤い光）
+    float3 emission;
 };
 
 // 楕円の内側で1、外側で0を返している（縁をwidthの割合でぼかしている）
@@ -59,11 +61,10 @@ float PortraitCracks(float2 position)
     return 1.0f - smoothstep(0.0f, 0.07f, second - nearest);
 }
 
-// キャンバスのUV（u = 左から右、v = 上から下）から、その点の絵の色と凹凸を求めている
-PortraitPaint GetPortraitPainting(float2 uv)
+// キャンバスのUV（u = 左から右、v = 上から下）と目の状態（開き具合・瞳の向き・赤い光）から、その点の絵の色と凹凸を求めている
+PortraitPaint GetPortraitPainting(float2 uv, float4 eyeState)
 {
-    // キャンバスの単位（幅16・高さ22、中心が0、上が+）。閉じた目は (±3.5, 2.5) にあり、
-    // 肖像画の異変で現れる赤い目（Stage2Layout の Stage2PortraitEyeLeft/Right）と同じ位置にしている
+    // キャンバスの単位（幅16・高さ22、中心が0、上が+）。目は (±3.5, 2.5) にある（Stage2Scene の目の向きの計算と合わせている）
     const float2 p = float2((uv.x - 0.5f) * 16.0f, (0.5f - uv.y) * 22.0f);
     // 1画素がキャンバスで何単位か（細い線のぼかしと、遠くでひびを薄めるのに使っている）
     const float footprint = max(length(fwidth(p)), 0.0001f);
@@ -100,16 +101,49 @@ PortraitPaint GetPortraitPainting(float2 uv)
         saturate(smoothstep(hairline - 0.3f, hairline + 0.3f, p.y) + smoothstep(4.8f, 5.6f, abs(p.x)));
     color = lerp(color, float3(0.034f, 0.027f, 0.021f), hair);
 
-    // 閉じた目（くぼみの影と、下向きの弧のまぶたの線）と眉。目が開く異変では、ここに赤い目が浮かぶ
+    // 目（くぼみの影・まぶた・眉）。eyeState.x が開き具合（0 = 閉じた線、1 = 大きく見開いた目）、
+    // yz が瞳の向き（-1〜1。見ている人の方へ動く）、w が瞳の赤い光（肖像画の異変で目が開いたとき）
+    const float openness = saturate(eyeState.x);
+    const float2 gaze = clamp(eyeState.yz, -1.0f.xx, 1.0f.xx);
+    float eyeGlow = 0.0f;
     [unroll]
     for (int side = -1; side <= 1; side += 2)
     {
         const float2 eye = p - float2(3.5f * side, 2.5f);
         const float socket = PortraitEllipse(eye, float2(0.0f, 0.0f), float2(1.8f, 1.1f), 0.35f);
-        color *= 1.0f - socket * 0.42f * face;
-        const float lid = PortraitStroke(eye, 0.22f * eye.x * eye.x - 0.15f, 0.07f, 1.35f, footprint);
-        const float brow = PortraitStroke(eye, 1.55f - 0.10f * eye.x * eye.x + eye.x * side * 0.10f, 0.13f, 1.7f, footprint);
-        color = lerp(color, float3(0.055f, 0.040f, 0.030f), saturate(lid + brow * 0.85f) * face);
+        color *= 1.0f - socket * (0.42f + openness * 0.18f) * face;
+
+        // 開いた目の形（アーモンド形）：閉じた線から、上のまぶたが大きく、下のまぶたが少し開く
+        const float across = saturate(1.0f - (eye.x / 1.35f) * (eye.x / 1.35f));
+        const float closedLine = 0.22f * eye.x * eye.x - 0.15f;
+        const float upperLid = closedLine + 0.80f * openness * across;
+        const float lowerLid = closedLine - 0.28f * openness * across;
+        const float edgeSoftness = 0.04f + footprint;
+        const float opening =
+            smoothstep(lowerLid - edgeSoftness, lowerLid + edgeSoftness, eye.y) *
+            (1.0f - smoothstep(upperLid - edgeSoftness, upperLid + edgeSoftness, eye.y)) *
+            (1.0f - smoothstep(1.25f, 1.35f, abs(eye.x))) *
+            step(0.001f, openness);
+        // 白目は黄ばんで、縁ほど暗い。黒目と瞳は、見ている人の方へ寄せている
+        const float2 irisCenter = float2(gaze.x * 0.62f, gaze.y * 0.30f * openness + (upperLid + lowerLid - 2.0f * closedLine) * 0.5f);
+        const float irisDistance = length(eye - float2(irisCenter.x, closedLine + irisCenter.y));
+        const float iris = 1.0f - smoothstep(0.40f, 0.44f + footprint, irisDistance);
+        const float pupil = 1.0f - smoothstep(0.16f, 0.20f + footprint, irisDistance);
+        float3 eyeColor = float3(0.50f, 0.45f, 0.36f) * lerp(0.55f, 1.0f, across);
+        eyeColor = lerp(eyeColor, float3(0.10f, 0.055f, 0.035f), iris);
+        eyeColor = lerp(eyeColor, float3(0.010f, 0.008f, 0.008f), pupil);
+        // 瞳に映る小さな光
+        const float glint = 1.0f - smoothstep(0.04f, 0.08f + footprint,
+            length(eye - float2(irisCenter.x - 0.12f, closedLine + irisCenter.y + 0.12f)));
+        eyeColor += glint * 0.25f * (1.0f - pupil * 0.5f);
+        color = lerp(color, eyeColor, opening * face);
+        eyeGlow = max(eyeGlow, iris * opening * face);
+
+        // 閉じているときは線だけ、開くほど上のまぶたの線が太く暗くなる
+        const float lid = PortraitStroke(eye, closedLine, 0.07f, 1.35f, footprint) * (1.0f - openness);
+        const float upperLine = PortraitStroke(eye, upperLid, 0.06f + openness * 0.05f, 1.4f, footprint) * openness;
+        const float brow = PortraitStroke(eye, 1.55f + openness * 0.20f - 0.10f * eye.x * eye.x + eye.x * side * 0.10f, 0.13f, 1.7f, footprint);
+        color = lerp(color, float3(0.055f, 0.040f, 0.030f), saturate(lid + upperLine + brow * 0.85f) * face);
     }
 
     // 鼻の右側の細い影と、端の下がった真一文字の口（無表情で不気味にしている）
@@ -137,6 +171,7 @@ PortraitPaint GetPortraitPainting(float2 uv)
     PortraitPaint paint;
     paint.albedo = color;
     paint.relief = stroke * 0.25f - cracks * 0.35f - flake * 0.15f;
+    paint.emission = float3(0.55f, 0.02f, 0.01f) * eyeGlow * saturate(eyeState.w);
     return paint;
 }
 

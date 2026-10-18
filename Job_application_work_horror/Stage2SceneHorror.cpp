@@ -768,8 +768,8 @@ void Stage2Scene::UpdateMirrorAnomaly(const Player& player, float deltaTime)
 }
 
 // 肖像画を見つける周回（Stage2AnomalyPlanが決める）だけ判定している。
-// 懐中電灯で照らしたまま見つめ続けると、閉じていた目がゆっくり浮かび、やがて開く。
-// 途中で目を離すと、目は消えて最初からやり直しにしている。
+// 懐中電灯で照らしたまま見つめ続けると、絵の中の閉じていた目がかすかに開きかけ、やがて見開く。
+// 途中で目を離すと、目は閉じて最初からやり直しにしている。
 void Stage2Scene::UpdatePortraitAnomaly(const Player& player, float deltaTime)
 {
     if (!m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Portrait) ||
@@ -793,43 +793,15 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player, float deltaTime)
     // ライトが点いていて、近く（105未満）で正面（内積0.91超）から見ているか
     const bool lookingAtPortrait =
         player.IsFlashlightOn() && distance < 105.0f && facing > 0.91f;
-    const bool wasStaring = m_PortraitAnomaly.IsStaring();
+    // 見つめている間は、絵の中の閉じた目がかすかに開きかけ、目を離すと閉じる（目の見え方は UpdatePortraitEyes）。
     if (!m_PortraitAnomaly.UpdateStare(lookingAtPortrait, deltaTime))
     {
-        // 見つめている間は目がかすかに浮かび、目を離すと消える。
-        const float stareRate = m_PortraitAnomaly.GetStareRate();
-        if (m_PortraitAnomaly.IsStaring() || wasStaring)
-        {
-            for (Wall* eye : m_Objects.portraitEyes)
-            {
-                if (eye != nullptr)
-                {
-                    eye->SetVisible(m_PortraitAnomaly.IsStaring());
-                    eye->SetAppearance(
-                        Color(0.05f + stareRate * 0.08f, 0.004f, 0.002f, 1.0f),
-                        Color(stareRate * stareRate * 0.05f, 0.0f, 0.0f, 1.0f),
-                        28.0f);
-                }
-            }
-        }
         return;
     }
 
-    // 見つめ続けた: 目が開き、奥の確認スイッチが押せるようになる。
+    // 見つめ続けた: 絵の中で目が見開かれ、赤く光る瞳がこちらを追い始める。奥の確認スイッチが押せるようになる。
     m_Notices.loop = 2.8f;
     constexpr float emission = 0.28f;
-    for (Wall* eye : m_Objects.portraitEyes)
-    {
-        if (eye != nullptr)
-        {
-            eye->SetVisible(true);
-            eye->SetAppearance(
-                Color(0.18f, 0.008f, 0.003f, 1.0f),
-                Color(emission, 0.002f, 0.0f, 1.0f),
-                28.0f);
-        }
-    }
-
     Wall* portrait = m_Objects.portrait;
     if (portrait != nullptr)
     {
@@ -852,6 +824,36 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player, float deltaTime)
     }
     game->GetPostProcess()->TriggerHorrorPulse(0.36f, 0.30f);
     Input::SetVibration(6, 0.17f);
+}
+
+// 肖像画の絵の中の目：普段は閉じている。肖像画の異変の周回で見つめている間はかすかに開きかけ（目を離すとすぐ閉じる）、
+// 見つめ続けて異変を見つけると見開かれ、赤く光る瞳が、見ている人の方へ動いて目で追い続ける。
+void Stage2Scene::UpdatePortraitEyes(float deltaTime)
+{
+    Wall* portrait = m_Objects.portrait;
+    if (portrait == nullptr)
+    {
+        return;
+    }
+    const bool required = m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Portrait);
+    const bool opened = required && m_PortraitAnomaly.HasChangedThisLoop();
+    const float targetOpen = opened
+        ? 1.0f
+        : (required && m_PortraitAnomaly.IsStaring() ? 0.30f * m_PortraitAnomaly.GetStareRate() : 0.0f);
+    // 開くときはゆっくり、閉じるときはすばやく（目を離した瞬間に閉じる）
+    const float openSpeed = targetOpen > m_PortraitEyeOpen ? 1.4f : 5.0f;
+    m_PortraitEyeOpen = targetOpen > m_PortraitEyeOpen
+        ? (std::min)(targetOpen, m_PortraitEyeOpen + openSpeed * deltaTime)
+        : (std::max)(targetOpen, m_PortraitEyeOpen - openSpeed * deltaTime);
+    m_PortraitEyeGlow = (std::clamp)(m_PortraitEyeGlow + (opened ? 1.0f : -3.0f) * deltaTime, 0.0f, 1.0f);
+
+    // 瞳の向き：絵の目の高さ・位置から見たカメラの方向（絵の面からの距離で割った横と縦のずれ）
+    const Vector3 eyeCenter(38.9f, -67.5f, -25.0f);
+    const Vector3 toCamera = Core::Game::GetInstance()->GetCamera()->GetPosition() - eyeCenter;
+    const float depth = (std::max)(-toCamera.x, 1.0f);
+    const float gazeX = (std::clamp)(toCamera.z / depth, -1.0f, 1.0f);
+    const float gazeY = (std::clamp)(toCamera.y / depth, -1.0f, 1.0f);
+    portrait->SetPortraitEyes(m_PortraitEyeOpen, gazeX, gazeY, m_PortraitEyeGlow);
 }
 
 // ----------------------------------------------------------------------------

@@ -401,12 +401,15 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 2面の肖像画（portraitPS.hlsl）：元の色を、計算で描いた古い油絵の色に差し替えている。
     // マテリアルの色（肖像画の異変で赤黒く変わる）は、普段の色との比として掛けている。
     float paintingRelief = 0.0f;
+    float3 paintingEmission = 0.0f;
 #if defined(PORTRAIT_SURFACE)
     {
-        const PortraitPaint painting = GetPortraitPainting(saturate(input.tex));
+        // 目の状態は、肖像画の面ではマテリアルの Ambuent（使っていない値）で受け取っている（Wall::SetPortraitEyes）
+        const PortraitPaint painting = GetPortraitPainting(saturate(input.tex), Material.Ambuent);
         const float3 portraitBaseDiffuse = float3(0.075f, 0.058f, 0.044f);
         color.rgb = painting.albedo * (Material.Diffuse.rgb / portraitBaseDiffuse);
         paintingRelief = painting.relief;
+        paintingEmission = painting.emission;
     }
 #endif
 
@@ -583,6 +586,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
     // 自ら光る色を足している
     color.rgb += Material.Emission.rgb;
+    color.rgb += paintingEmission;
     // 崩れている縁：焦げて黒ずみ、その外側が燃えるように赤く光る
     color.rgb *= 1.0f - dissolveEdge * 0.55f;
     color.rgb += float3(0.95f, 0.34f, 0.07f) * (dissolveEdge * dissolveEdge) * 1.5f;

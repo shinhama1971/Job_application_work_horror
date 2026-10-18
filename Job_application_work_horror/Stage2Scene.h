@@ -78,6 +78,8 @@ private:
     void UpdateScratchMessage(const Player& player, float deltaTime);
     // 肖像画の異変を更新している
     void UpdatePortraitAnomaly(const Player& player, float deltaTime);
+    // 肖像画の絵の中の目（開き具合・瞳の向き・赤い光）を、毎フレーム絵のシェーダーへ渡している
+    void UpdatePortraitEyes(float deltaTime);
     // 血の手形の異変：照らすと奥に次の手形が現れ、4つ目までたどると見つけたことになる
     void UpdateHandprintAnomaly(const Player& player, float deltaTime);
     // 鏡の異変：鏡をのぞくとすぐ後ろに人影が映り、振り返ると誰もいない（見つけたことになる）
@@ -132,6 +134,9 @@ private:
     HandprintAnomaly m_HandprintAnomaly;
     MirrorAnomaly m_MirrorAnomaly;
     FootprintFollower m_FootprintFollower;
+    // 肖像画の絵の中の目の開き具合（0〜1）と、瞳の赤い光（0〜1）
+    float m_PortraitEyeOpen = 0.0f;
+    float m_PortraitEyeGlow = 0.0f;
     // この周回で、誰かの足跡をもう出したか（1周に1回だけ）
     bool m_FootprintFollowerUsedThisLoop = false;
     KnockingAnomaly m_KnockingAnomaly;

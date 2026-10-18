@@ -90,11 +90,10 @@ struct Stage2Objects
     Wall* falseDoorFrameFar = nullptr;
     Wall* falseDoorFrameTop = nullptr;
     Wall* falseDoorHandle = nullptr;
-    // 照明、残された記録の端末とその目印、肖像画の目、周回を数える傷の印
+    // 照明、残された記録の端末とその目印、周回を数える傷の印
     std::array<CeilingLight*, static_cast<std::size_t>(Stage2Light::Count)> lights{};
     std::array<FuseBox*, 2> evidenceTerminals{};
     std::array<Wall*, 2> evidenceMarkers{};
-    std::array<Wall*, 2> portraitEyes{};
     std::array<Wall*, 3> cycleMarks{};
     // 信号盤とその色の目印、壁の引っかき傷
     std::array<FuseBox*, 3> signalTerminals{};

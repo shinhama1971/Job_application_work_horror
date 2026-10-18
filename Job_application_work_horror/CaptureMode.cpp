@@ -135,6 +135,8 @@ namespace
     constexpr float MirrorAnomalyRequestTime = 40.0f;
     // 濡れた足跡の場面の前に、2周目へ進めている（誰かの足跡は2周目から出る）
     constexpr float SecondLoopRequestTime = 50.5f;
+    // 肖像画の場面の前に、肖像画の異変を出している
+    constexpr float PortraitAnomalyRequestTime = 62.5f;
     const std::vector<Keyframe> Stage2Tour =
     {
         { 0.0f, Vector3(0.0f, FloorY, -125.0f), 0.0f, 0.0f, nullptr, false },
@@ -165,6 +167,13 @@ namespace
         { 60.6f, Vector3(0.0f, FloorY, -60.0f), 0.0f, -0.75f, nullptr, false },
         { 61.0f, Vector3(0.0f, FloorY, -60.0f), 0.0f, -0.75f, L"15_2面_濡れた足跡", false },
         { 62.0f, Vector3(0.0f, FloorY, -60.0f), 0.0f, -0.75f, nullptr, false },
+        // 肖像画の異変の周回にして、肖像画を照らして見つめ続ける（絵の中の目が見開く）。その後、横へ動いて、瞳が目で追うのを見る
+        { 64.5f, Vector3(0.0f, FloorY, -25.0f), Pi * 0.5f, -0.10f, nullptr, false },
+        { 66.0f, Vector3(0.0f, FloorY, -25.0f), Pi * 0.5f, -0.10f, L"16_2面_肖像画を見つめる", false },
+        { 69.5f, Vector3(0.0f, FloorY, -25.0f), Pi * 0.5f, -0.10f, L"17_2面_肖像画の目が開く", false },
+        { 71.5f, Vector3(14.0f, FloorY, -5.0f), YawToward(14.0f, -5.0f, 38.9f, -25.0f), -0.12f, nullptr, false },
+        { 72.0f, Vector3(14.0f, FloorY, -5.0f), YawToward(14.0f, -5.0f, 38.9f, -25.0f), -0.12f, L"18_2面_目で追う肖像画", false },
+        { 73.0f, Vector3(14.0f, FloorY, -5.0f), YawToward(14.0f, -5.0f, 38.9f, -25.0f), -0.12f, nullptr, false },
     };
 
     // 角度の補間。差を-π〜πに直してから補間し、遠回りの方向へ回らないようにしている
@@ -247,6 +256,8 @@ namespace
     bool g_MirrorAnomalyRequested = false;
     // 2面の道順で、2周目へ進めたか
     bool g_SecondLoopRequested = false;
+    // 2面の道順で、肖像画の異変を出したか
+    bool g_PortraitAnomalyRequested = false;
     bool g_Recording = false;   // 1面・2面を見て回っている間だけ動画に書き出している
     // 動画に書き出したフレーム数
     int g_FramesWritten = 0;
@@ -671,6 +682,7 @@ namespace Tools::CaptureMode
             g_NextShot = 0;
             g_MirrorAnomalyRequested = false;
             g_SecondLoopRequested = false;
+            g_PortraitAnomalyRequested = false;
             Log(std::string("start tour: ") + SceneLabel(scene));
         }
         g_Recording = true;
@@ -720,6 +732,16 @@ namespace Tools::CaptureMode
             {
                 currentScene->RequestDebugAction(SceneDebugAction::AdvanceProgression);
                 Log("advance to second loop");
+            }
+        }
+        // 2面: 肖像画の場面の前に、肖像画の異変を出している
+        if (scene == SceneName::Stage2 && !g_PortraitAnomalyRequested && g_TourTime >= PortraitAnomalyRequestTime)
+        {
+            g_PortraitAnomalyRequested = true;
+            if (Scene* currentScene = game->GetScene())
+            {
+                currentScene->RequestDebugAction(SceneDebugAction::ShowPortraitAnomaly);
+                Log("show portrait anomaly");
             }
         }
 
