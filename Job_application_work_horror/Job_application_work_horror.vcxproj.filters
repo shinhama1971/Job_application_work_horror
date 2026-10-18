@@ -344,6 +344,9 @@
     <ClInclude Include="shader\horrorMarks.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="shader\portraitPainting.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="shader\surfaceDetail.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -713,6 +716,9 @@
       <Filter>リソース ファイル</Filter>
     </FxCompile>
     <FxCompile Include="shader\mirrorPS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\portraitPS.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>
     <FxCompile Include="shader\flashlightRevealPS.hlsl">

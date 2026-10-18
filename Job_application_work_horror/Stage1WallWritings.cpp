@@ -69,15 +69,21 @@ bool Stage1WallWritings::Update(
         return false;
     }
 
-    // 読んだ後、プレイヤーが目を離した隙に書き換えている。見ている目の前では変えない。
+    // 読んだ後、プレイヤーが本当に振り返った（文字に背を向けた）ときだけ書き換えている。
+    // 横を見ただけ・後ろ向きのまま離れただけでは変えない（「ふりかえるな」を破ったときにだけ「ふりかえったな」になる）。
+    // 床や天井を見ていても向きを正しく比べられるよう、水平の向きだけで比べている。
     if (m_Read[Turn] && !m_TurnChanged)
     {
         Vector3 toWriting = turn->GetPosition() - cameraPosition;
+        toWriting.y = 0.0f;
+        Vector3 flatForward = cameraForward;
+        flatForward.y = 0.0f;
         const float distance = toWriting.Length();
-        const float facing = distance > 0.001f
-            ? cameraForward.Dot(toWriting / distance)
+        const float forwardLength = flatForward.Length();
+        const float facing = distance > 0.001f && forwardLength > 0.001f
+            ? (flatForward / forwardLength).Dot(toWriting / distance)
             : 1.0f;
-        if (facing <= LookAwayFacing || distance >= LookAwayDistance)
+        if (facing <= TurnedAwayFacing)
         {
             turn->ShowAlternate();
             m_TurnChanged = turn->IsShowingAlternate();

@@ -93,6 +93,12 @@ public:
                 : "shader/litTexturePS.hlsl");
     }
 
+    // 2面の肖像画のように、古い油絵の人物を計算で描く面にしている（portraitPS。照明は壁と同じ）
+    void SetPortraitSurface()
+    {
+        m_Shader.Create("shader/litTextureVS.hlsl", "shader/portraitPS.hlsl");
+    }
+
     // 壁の鏡（2面）の面にしている。facingは鏡が映す側の向き（壁から廊下へ向かう単位ベクトル）。
     // 映る景色は Game::Draw が鏡の面で反転したカメラから描き、鏡のピクセルシェーダー（mirrorPS）がそれを読んでいる。
     void SetMirrorSurface(const DirectX::SimpleMath::Vector3& facing)

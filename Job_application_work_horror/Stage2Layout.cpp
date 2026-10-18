@@ -253,6 +253,8 @@ namespace Stage2Layout
             Vector3(1.0f, 22.0f, 16.0f), Color(0.075f, 0.058f, 0.044f, 1.0f), false);
         // 古い油絵のように、ニスの弱い光沢を返している
         portrait->SetAppearance(Color(0.075f, 0.058f, 0.044f, 1.0f), Color(0.0f, 0.0f, 0.0f, 1.0f), 18.0f);
+        // 絵は、古い油絵の人物をシェーダーで描いている（目は閉じていて、異変ではここに赤い目が浮かぶ）
+        portrait->SetPortraitSurface();
         portrait->SetCastsShadow(false);
         // 肖像画の額縁（くすんだ金色の4本）。時計の枠と同じく、壁から少し浮かせている
         const Color portraitFrameColor(0.15f, 0.11f, 0.055f, 1.0f);

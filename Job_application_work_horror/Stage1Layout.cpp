@@ -571,7 +571,8 @@ namespace Stage1Layout
         objects.writings[Stage1WallWritings::Power] = createWriting(
             "Stage1WritingPower", "assets/texture/writing_power.png", "",
             Vector3(-128.0f, -69.0f, 38.0f), Vector3(0.0f, 0.0f, -1.0f), 64.0f);
-        // ループ廊下を北へ進むと正面に見える突き当たりの壁。右へ曲がると目を離すことになる（その間に書き換わる）。
+        // ループ廊下を北へ進むと正面に見える突き当たりの壁。右へ曲がって先へ進み、文字が背中側になると書き換わる
+        // （横を見ただけでは変わらない。振り返って見ると「ふりかえったな」になっている）。
         objects.writings[Stage1WallWritings::Turn] = createWriting(
             "Stage1WritingTurn", "assets/texture/writing_turn.png",
             "assets/texture/writing_turned.png",

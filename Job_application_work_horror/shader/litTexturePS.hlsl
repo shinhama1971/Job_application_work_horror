@@ -17,6 +17,9 @@ SamplerState g_SamplerState : register(s0);
 #include "waterCaustics.hlsli"
 #include "roomOcclusion.hlsli"
 #include "surfaceDetail.hlsli"
+#if defined(PORTRAIT_SURFACE)
+#include "portraitPainting.hlsli"
+#endif
 
 // 2面の「血の手形」の異変：Stage2Scene が渡した手形（WallHandprints）を、その壁の面に描き、濃さ（0〜1）を返している。
 // 形は1面の壁の血の跡と同じ式（HorrorHandprint）。見え方（w）で少しずつ浮かぶ。
@@ -395,6 +398,17 @@ float4 main(in LIT_PS_IN input) : SV_Target
     {
         color *= Material.Diffuse;
     }
+    // 2面の肖像画（portraitPS.hlsl）：元の色を、計算で描いた古い油絵の色に差し替えている。
+    // マテリアルの色（肖像画の異変で赤黒く変わる）は、普段の色との比として掛けている。
+    float paintingRelief = 0.0f;
+#if defined(PORTRAIT_SURFACE)
+    {
+        const PortraitPaint painting = GetPortraitPainting(saturate(input.tex));
+        const float3 portraitBaseDiffuse = float3(0.075f, 0.058f, 0.044f);
+        color.rgb = painting.albedo * (Material.Diffuse.rgb / portraitBaseDiffuse);
+        paintingRelief = painting.relief;
+    }
+#endif
 
     // デバッグのフルブライト表示では、照明を使わずに返している
     if (DebugViewMode == DEBUG_VIEW_FULLBRIGHT)
@@ -438,7 +452,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         detailWorldNormal = GetBumpedWorldNormal(
             input.worldPos,
             input.worldNormal,
-            ageing.height,
+            ageing.height + paintingRelief,
             0.72f * (1.0f + 0.8f * weathering));
     }
     const float3 detailViewNormal = normalize(mul(

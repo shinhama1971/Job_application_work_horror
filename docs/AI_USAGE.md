@@ -67,6 +67,8 @@
 | 2面の見た目を1面とそろえた（床を濡れた床 `Ground` に替えて水たまりの反射と波を出し、水たまりを廊下の決まった3か所に置ける仕組みを追加。壁と天井に古さと角の暗がりを付け、2面では決まった血の跡・傷を描かない設定を追加。肖像画に額縁を追加。明るい壁に出ていたレンガのような格子を、壁のざらつきのノイズを替えて解消） | `Stage2Layout.*`, `Stage2Scene.cpp`, `Ground.*`, `GroundWaterEffects.cpp`, `WaterEffectSystem.h`, `GameRendering.cpp`, `Renderer.h`, `RendererState.cpp`, `shader/puddleMask.hlsli`, `shader/common.hlsl`, `shader/litTexturePS.hlsl`, 技術デモの `DemoScene.h`, `README.md`, `ARCHITECTURE.md`, `docs/images/*.jpg` | 原因の調査（撮影の比較）・実装 | 方針の選択（2面の見た目を1面とそん色ないようにする） |
 | 2面に新しい異変「鏡」を追加（左の壁の古い鏡をのぞくと、すぐ後ろに人影が映り、振り返ると誰もいない）。水たまりの平面反射を任意の面へ一般化して壁の鏡を描き、鏡の中にだけ映る人影の仕組みを追加。古い鏡のシェーダー（銀の剥げ・くもり・照り返し）。デバッグ画面と自動撮影に鏡の異変を出す操作を追加 | `MirrorAnomaly.h`, `PlanarReflection.*`, `shader/mirrorPS.hlsl`, `GameRendering.cpp`, `Game.*`, `Object.h`, `Wall.h`, `Ground.h`, `ShadowMan.*`, `Renderer.*`, `GpuTimer.h`, `Scene.h`, `Stage2AnomalyPlan.h`, `Stage2Layout.*`, `Stage2Scene*.cpp`, `Stage2Scene.h`, `Stage2Objective.*`, `DebugUI.cpp`, `CaptureMode.cpp`, `README.md`, `ARCHITECTURE.md` | 遊びの設計・描画の設計・実装 | 方針の選択（次の制作は「鏡の異変」） |
 | タイトルで始める面（1面・2面）を選べるようにした（2面から始めたプレイはクリアしてもベスト記録に残さない）。自動撮影でタイトル画面を1枚撮るようにした。2面から直接始めても、1面から進んだときと同じ画面になることを撮影で確認 | `TitleScene.*`, `Hud.h`, `HudScreens.cpp`, `GameState.h`, `Game.cpp`, `CaptureMode.cpp`, `README.md` | 実装・確認 | 方針の選択（タイトルから1面と2面を選べるようにする） |
+| 2面の肖像画を、シェーダーで描いた古い油絵の人物にした（閉じた目・ひび割れ・ニスの黄ばみ。照明は壁と同じシェーダーを読み込んで使う） | `shader/portraitPainting.hlsli`, `shader/portraitPS.hlsl`, `shader/litTexturePS.hlsl`, `Wall.h`, `Stage2Layout.cpp`, `README.md` | 絵の設計・実装 | 方針の選択（肖像画を絵にする） |
+| 1面の「ふりかえるな」の文字が、振り返っていないのに書き換わる不具合を修正（横を見ただけで変わっていた。文字に背を向けたときだけ変えるようにした） | `Stage1WallWritings.*`, `Stage1Layout.cpp`, `StageSceneEvents.cpp`, `README.md` | 原因の調査・修正 | 不具合の指摘（振り返っていないのに文字が変わる） |
 
 ### 設計の整理・品質改善
 
