@@ -13,13 +13,13 @@
 #include "ExitTrigger.h"
 #include "FuseBox.h"
 #include "Game.h"
+#include "Ground.h"
 #include "Player.h"
 #include "ShadowMan.h"
 #include "Wall.h"
 #include "Locker.h"
 
 #include <SimpleMath.h>
-#include <iterator>
 
 using namespace DirectX::SimpleMath;
 
@@ -136,53 +136,50 @@ namespace Stage2Layout
             return wall;
         };
 
-        // 壁・縁取り・床の色
-        const Color wallColor(0.17f, 0.16f, 0.145f, 1.0f);
+        // 壁・縁取り・天井の色。壁は1面より少し暖かい色にし、古い住まいの廊下らしくしている
+        const Color wallColor(0.31f, 0.295f, 0.265f, 1.0f);
         const Color trimColor(0.075f, 0.068f, 0.06f, 1.0f);
-        const Color floorColor(0.105f, 0.085f, 0.065f, 1.0f);
+        const Color ceilingColor(0.06f, 0.058f, 0.054f, 1.0f);
 
-        // 廊下の左右の壁と、奥の壁、出口の扉の左右の壁
-        createWall("Stage2WallLeft", Vector3(-42.0f, -74.0f, -10.0f),
-            Vector3(4.0f, 50.0f, 300.0f), wallColor, true);
-        createWall("Stage2WallRight", Vector3(42.0f, -74.0f, -10.0f),
-            Vector3(4.0f, 50.0f, 300.0f), wallColor, true);
-        createWall("Stage2WallBack", Vector3(0.0f, -74.0f, -160.0f),
-            Vector3(88.0f, 50.0f, 4.0f), wallColor, true);
-        createWall("Stage2WallFrontLeft", Vector3(-28.5f, -74.0f, 140.0f),
-            Vector3(27.0f, 50.0f, 4.0f), wallColor, true);
-        createWall("Stage2WallFrontRight", Vector3(28.5f, -74.0f, 140.0f),
-            Vector3(27.0f, 50.0f, 4.0f), wallColor, true);
-
-        // 床（Groundの濡れた床ではなく、色を付けた板を敷いている）
-        Wall* floor = createWall("Stage2Floor", Vector3(0.0f, -100.5f, -10.0f),
-            Vector3(84.0f, 2.0f, 300.0f), floorColor, false);
-        floor->SetCastsShadow(false);
-
-        // 水たまりは安全な近道と静かな回り道の間に置き、上を通るほど（走るほど）敵へ音が伝わるようにしている。
-        struct CorridorPuddle { const char* Name; float X; float Z; float Width; float Depth; };
-        const CorridorPuddle corridorPuddles[] =
+        // 廊下の左右の壁と、奥の壁、出口の扉の左右の壁。
+        // 1面の建物の壁と同じく、パネルの継ぎ目・ひび・水の跡・カビを描き（SetWeatheringSurface）、
+        // 部屋の角の暗がりの計算用に、上から見た長方形を記録している
+        const auto createCorridorWall = [&createWall, &objects, &wallColor](
+            const char* name, const Vector3& position, const Vector3& scale)
         {
-            { "Stage2Puddle1", -9.0f, -82.0f, 40.0f, 22.0f },
-            { "Stage2Puddle2", 10.0f, 12.0f, 38.0f, 25.0f },
-            { "Stage2Puddle3", -7.0f, 92.0f, 44.0f, 20.0f }
+            Wall* wall = createWall(name, position, scale, wallColor, true);
+            wall->SetAppearance(wallColor, Color(0.0f, 0.0f, 0.0f, 1.0f), 4.0f);
+            wall->SetWeatheringSurface(true);
+            objects.wallFootprints.emplace_back(position.x, position.z, scale.x * 0.5f, scale.z * 0.5f);
+            return wall;
         };
-        for (std::size_t puddleIndex = 0; puddleIndex < std::size(corridorPuddles); ++puddleIndex)
-        {
-            const CorridorPuddle& puddle = corridorPuddles[puddleIndex];
-            Wall* surface = createWall(
-                puddle.Name,
-                Vector3(puddle.X, -99.32f, puddle.Z),
-                Vector3(puddle.Width, 0.12f, puddle.Depth),
-                Color(0.025f, 0.052f, 0.060f, 0.72f), false);
-            surface->SetAppearance(
-                Color(0.025f, 0.052f, 0.060f, 0.72f),
-                Color(0.045f, 0.095f, 0.11f, 1.0f), 92.0f);
-            surface->SetCastsShadow(false);
-            objects.puddles[puddleIndex] = surface;
-        }
-        // 天井、床際の縁取り、天井近くの配管
+        createCorridorWall("Stage2WallLeft", Vector3(-42.0f, -74.0f, -10.0f), Vector3(4.0f, 50.0f, 300.0f));
+        createCorridorWall("Stage2WallRight", Vector3(42.0f, -74.0f, -10.0f), Vector3(4.0f, 50.0f, 300.0f));
+        createCorridorWall("Stage2WallBack", Vector3(0.0f, -74.0f, -160.0f), Vector3(88.0f, 50.0f, 4.0f));
+        createCorridorWall("Stage2WallFrontLeft", Vector3(-28.5f, -74.0f, 140.0f), Vector3(27.0f, 50.0f, 4.0f));
+        createCorridorWall("Stage2WallFrontRight", Vector3(28.5f, -74.0f, 140.0f), Vector3(27.0f, 50.0f, 4.0f));
+
+        // 床は1面と同じ濡れた床（Ground）にし、タイルの継ぎ目・汚れ・水たまりの反射と波を描いている。
+        // 水たまりは安全な近道と静かな回り道の間に置き、上を通るほど（走るほど）敵へ音が伝わるようにしている
+        // （足音が水音になるのは、Groundの水たまりの判定を Player が使っているため）。
+        Ground* ground = builder.Create<Ground>("Stage2Ground");
+        ground->SetPosition(0.0f, -100.0f, 0.0f);
+        ground->SetScale(20.0f, 1.0f, 20.0f);
+        // 水たまりのマス目（82x82）を41ずらし、廊下の中心（x=0）と z=-82・0・82 にマス目の中心が来るようにしている。
+        // 形の値（0〜1）で、横のずれ（0なら左へ9、1なら右へ9）と奥行きのずれ・幅を決め、片側に回り道を残している。
+        WaterEffectSystem::PuddleLayout puddleLayout;
+        puddleLayout.GridOffset = Vector2(41.0f, 41.0f);
+        puddleLayout.Cells = {
+            Vector4(0.0f, -1.0f, 0.0f, 0.5f),   // 入口側：中心(-9, -82)。右側を回れる
+            Vector4(0.0f, 0.0f, 1.0f, 1.0f),    // 中央：中心(9, 9)。大きく、左側を回れる
+            Vector4(0.0f, 1.0f, 0.0f, 1.0f) };  // 出口側：中心(-9, 91)。右側を回れる
+        ground->SetPuddleLayout(puddleLayout);
+
+        // 天井（1面と同じく、天井板・外れた板の穴・雨漏りの染みを描いている）、床際の縁取り、天井近くの配管
         Wall* ceiling = createWall("Stage2Ceiling", Vector3(0.0f, -47.0f, -10.0f),
-            Vector3(84.0f, 3.0f, 300.0f), trimColor, false);
+            Vector3(84.0f, 3.0f, 300.0f), ceilingColor, false);
+        ceiling->SetAppearance(ceilingColor, Color(0.0f, 0.0f, 0.0f, 1.0f), 4.0f);
+        ceiling->SetWeatheringSurface(true);
         ceiling->SetCastsShadow(false);
 
         createWall("Stage2TrimLeft", Vector3(-39.4f, -96.0f, -10.0f),
@@ -252,8 +249,25 @@ namespace Stage2Layout
 
         // 肖像画と、目が開いたときに出す赤い目（最初は隠している）
         Wall* portrait = createWall("Stage2Portrait", Vector3(39.4f, -70.0f, -25.0f),
-            Vector3(1.0f, 22.0f, 16.0f), Color(0.055f, 0.042f, 0.034f, 1.0f), false);
+            Vector3(1.0f, 22.0f, 16.0f), Color(0.075f, 0.058f, 0.044f, 1.0f), false);
+        // 古い油絵のように、ニスの弱い光沢を返している
+        portrait->SetAppearance(Color(0.075f, 0.058f, 0.044f, 1.0f), Color(0.0f, 0.0f, 0.0f, 1.0f), 18.0f);
         portrait->SetCastsShadow(false);
+        // 肖像画の額縁（くすんだ金色の4本）。時計の枠と同じく、壁から少し浮かせている
+        const Color portraitFrameColor(0.15f, 0.11f, 0.055f, 1.0f);
+        const struct { const char* Name; Vector3 Position; Vector3 Scale; } portraitFrames[] =
+        {
+            { "Stage2PortraitFrameTop", Vector3(39.1f, -58.0f, -25.0f), Vector3(1.8f, 2.0f, 20.0f) },
+            { "Stage2PortraitFrameBottom", Vector3(39.1f, -82.0f, -25.0f), Vector3(1.8f, 2.0f, 20.0f) },
+            { "Stage2PortraitFrameNear", Vector3(39.1f, -70.0f, -34.0f), Vector3(1.8f, 26.0f, 2.0f) },
+            { "Stage2PortraitFrameFar", Vector3(39.1f, -70.0f, -16.0f), Vector3(1.8f, 26.0f, 2.0f) },
+        };
+        for (const auto& frame : portraitFrames)
+        {
+            Wall* piece = createWall(frame.Name, frame.Position, frame.Scale, portraitFrameColor, false);
+            piece->SetAppearance(portraitFrameColor, Color(0.0f, 0.0f, 0.0f, 1.0f), 26.0f);
+            piece->SetCastsShadow(false);
+        }
         Wall* portraitEyeLeft = createWall(
             "Stage2PortraitEyeLeft",
             Vector3(38.72f, -67.5f, -28.5f),

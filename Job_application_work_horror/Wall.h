@@ -47,7 +47,7 @@ public:
     void DrawShadow() override;
     bool CastsShadow() const override { return m_Visible && m_CastsShadow; }
     // 天井や影を落とさない小物も含め、不透明な箱は深度プリパスに描いている。
-    // 半透明の色（2面の水たまりの面など）は後ろの物が透けて見えるため、描かない。
+    // 半透明の色は後ろの物が透けて見えるため、描かない。
     bool WritesDepthPrepass() const override
     {
         return m_Visible && m_SurfaceMaterial.Diffuse.w >= 0.999f;

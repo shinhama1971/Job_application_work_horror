@@ -75,14 +75,37 @@ public:
     static constexpr int PuddleCellCount = 16;
     // マス目ごとの水たまりの値（x = 水たまりがあれば1、y・z = 中心のずれと回転に使う乱数）
     using PuddleCellTable = std::array<DirectX::SimpleMath::Vector4, PuddleCellCount * PuddleCellCount>;
+    // シェーダーへ渡す水たまりの表（puddleMask.hlsli の PuddleCellBuffer と同じ並び）
+    struct PuddleCellBufferData
+    {
+        PuddleCellTable Cells{};
+        // マス目の区切りをずらす量（x・y = ワールドのx・z）
+        DirectX::SimpleMath::Vector4 GridOffset{};
+    };
+    // 水たまりの置き方。Cellsが空なら、床全体のマス目に乱数で置いている（1面）。
+    // 2面のように決まった場所に置くときは、マス目の区切りをずらし、置くマス目と形の乱数を指定する。
+    struct PuddleLayout
+    {
+        // マス目の区切りをずらす量（x・z）。マス目 (i, k) の中心は (i + 0.5, k + 0.5) * 82 - GridOffset になる
+        DirectX::SimpleMath::Vector2 GridOffset{};
+        // 水たまりを置くマス目と形（x・y = マス目、z = 横のずれと向き、w = 奥行きのずれと幅に使う値。どちらも0〜1）
+        std::vector<DirectX::SimpleMath::Vector4> Cells;
+    };
 
 private:
     // 水たまりの置き場所はCPUで決め、この表をシェーダーへ渡している。
     // シェーダーで sin を使った乱数を計算すると、GPUの種類で sin の精度が違い、水たまりの場所が変わってしまうためである。
-    PuddleCellTable m_PuddleCells{};
+    PuddleCellBufferData m_PuddleCellData{};
+    // 足元の判定に使う水たまりの楕円の半径（x・z）と向き（m_PuddleCentersと同じ順）
+    std::vector<DirectX::SimpleMath::Vector2> m_PuddleRadii;
+    std::vector<float> m_PuddleAngles;
+    // 水たまりの表・中心・水滴を、置き方に合わせて作っている
+    void BuildPuddles(const PuddleLayout& layout);
 
 public:
-    const PuddleCellTable& GetPuddleCells() const { return m_PuddleCells; }
+    const PuddleCellBufferData& GetPuddleCellData() const { return m_PuddleCellData; }
+    // 水たまりを置き直している（2面）。シェーダーへの表は、Groundが書き込み直している
+    void SetPuddleLayout(const PuddleLayout& layout) { BuildPuddles(layout); }
     // このフレームに起きた足音と水滴のおもりを受け取り、空にしている（波のシミュレーションへ渡すため）
     std::vector<DirectX::SimpleMath::Vector4> TakeRippleImpulses()
     {

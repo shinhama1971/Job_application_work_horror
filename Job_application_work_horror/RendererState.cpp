@@ -27,10 +27,11 @@ void Renderer::SetDebugViewMode(int mode, float wallDampStrength)
 	UploadDebugViewBuffer();
 }
 
-// 壁の古さを0〜1に収めて設定している
-void Renderer::SetWallWeathering(float weathering)
+// 壁の古さと、ホラーの跡の濃さを0〜1に収めて設定している
+void Renderer::SetWallWeathering(float weathering, float horrorMarks)
 {
 	m_DebugView.WallWeathering = weathering < 0.0f ? 0.0f : (weathering > 1.0f ? 1.0f : weathering);
+	m_DebugView.HorrorMarksStrength = horrorMarks < 0.0f ? 0.0f : (horrorMarks > 1.0f ? 1.0f : horrorMarks);
 	UploadDebugViewBuffer();
 }
 

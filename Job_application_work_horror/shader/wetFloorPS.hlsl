@@ -131,7 +131,7 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal)
 
 
 // ----------------------------------------------------------------------------
-// 床の古さ（1面）。壁の古さと同じ WallWeathering で有効になり、2面（0）では何もしない。
+// 床の古さ（1面と2面）。壁の古さと同じ WallWeathering で有効になり、0の面では何もしない。
 // コンクリートの床版の目地・ひびを凹凸として、油や水の染み・物を引きずった跡・壁際の埃を色として描いている。
 // ----------------------------------------------------------------------------
 struct FloorAgeing
@@ -296,7 +296,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
             lerp(0.88f, 1.04f, broadVariation);
         color.rgb *= concreteFloor;
 
-        // 床の古さ（1面だけ）。色を掛け、目地とひびの凹凸で法線を作っている。
+        // 床の古さ（WallWeathering が0より大きい面だけ）。色を掛け、目地とひびの凹凸で法線を作っている。
         // TextureEnable は描画の単位で一定なので、この中で画面上の偏微分を使っても問題ない。
         const FloorAgeing floorAgeing = GetFloorAgeing(input.worldPos, WallWeathering);
         color.rgb *= floorAgeing.tint;

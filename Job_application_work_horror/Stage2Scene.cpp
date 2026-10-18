@@ -139,6 +139,13 @@ void Stage2Scene::Init()
     // 壁・照明・端末などの配置はStage2Layoutが担当し、使うObjectのポインタをまとめて返している。
     m_Objects = Stage2Layout::Build(
         *game, m_ClockAnomaly.GetHourAngle(), m_ClockAnomaly.GetMinuteAngle());
+    // 壁と天井の古さ（継ぎ目・ひび・水の跡・カビ・天井板）と、部屋の角の暗がりを1面と同じ仕組みで描いている。
+    // 血の手形や引っかき傷は2面では異変として出すため、決まった跡は描かない（ホラーの跡の濃さを0にしている）。
+    Renderer::SetWallWeathering(0.85f, 0.0f);
+    Renderer::SetRoomOcclusion(
+        m_Objects.wallFootprints.data(),
+        static_cast<unsigned int>(m_Objects.wallFootprints.size()),
+        -100.0f, -48.5f, 0.55f);
 
     // カメラの位置を最初から合わせるため、プレイヤーを一度更新している
     m_Objects.player->Update();
@@ -275,39 +282,7 @@ void Stage2Scene::Update()
     m_NoiseThreatSystem.UpdateTimers(deltaTime);
     UpdateTensionPulse(*player, deltaTime);
 
-    // 水たまりの上にいるかを調べ、足音を水音にしている（3つの水たまりの範囲は配置と同じ）
-    const Vector3 playerPosition = player->GetPosition();
-    const bool onWetSurface =
-        (std::abs(playerPosition.x + 9.0f) <= 20.0f &&
-            std::abs(playerPosition.z + 82.0f) <= 11.0f) ||
-        (std::abs(playerPosition.x - 10.0f) <= 19.0f &&
-            std::abs(playerPosition.z - 12.0f) <= 12.5f) ||
-        (std::abs(playerPosition.x + 7.0f) <= 22.0f &&
-            std::abs(playerPosition.z - 92.0f) <= 10.0f);
-    player->SetWetSurface(onWetSurface);
-
-    // 濡れた面は止まった絵にせず、細かな反射の揺れと、危険なときの照明の反射を加えている。
-    for (int puddleIndex = 0; puddleIndex < static_cast<int>(m_Objects.puddles.size()); ++puddleIndex)
-    {
-        Wall* puddle = m_Objects.puddles[puddleIndex];
-        if (puddle == nullptr)
-        {
-            continue;
-        }
-        const float shimmer = std::sin(
-            m_VisualTimer * (1.25f + puddleIndex * 0.17f) + puddleIndex * 2.1f)
-            * 0.5f + 0.5f;
-        const float dangerReflection =
-            m_NoiseThreatSystem.GetThreat() * 0.055f;
-        puddle->SetAppearance(
-            Color(0.020f + shimmer * 0.010f,
-                0.045f + shimmer * 0.014f,
-                0.052f + shimmer * 0.018f, 0.76f),
-            Color(0.035f + dangerReflection,
-                0.078f + dangerReflection * 0.55f,
-                0.095f + shimmer * 0.025f, 1.0f),
-            96.0f + shimmer * 28.0f);
-    }
+    // 水たまりの上の足音は、濡れた床（Ground）の判定で Player が水音にしている（水たまりの反射・波も1面と同じ）
     m_LoopBlinkTimer =
         (std::max)(0.0f, m_LoopBlinkTimer - deltaTime);
     m_FinalSequence.UpdateCountdowns(deltaTime);
@@ -568,6 +543,8 @@ void Stage2Scene::Uninit()
 
     // 血の手形の異変で壁に浮かべた手形を消している（ほかの面の壁に残らないように）
     Renderer::SetWallHandprints(nullptr, 0);
+    Renderer::SetWallWeathering(0.0f);
+    Renderer::SetRoomOcclusion(nullptr, 0, 0.0f, 0.0f, 0.0f);
     game->GetPostProcess()->SetCorridorTension(0.0f);
     game->GetPostProcess()->SetAtmosphere(0.18f, 0.55f);
     game->GetPostProcess()->SetExposure(1.0f);

@@ -114,12 +114,14 @@ float GetProceduralSurfaceHeight(float3 worldPosition, float3 worldNormal)
 
     const float broad = FastValueNoise(wallUV * 0.19f + 3.7f);
     const float plaster = FastValueNoise(wallUV * 0.63f - 12.4f);
-    const float fine = FastHash21(floor(wallUV * 1.45f + 27.1f));
+    // 細かいざらつきは、マス目ごとの乱数（段差のある値）ではなく、なめらかなノイズにしている。
+    // 段差があると、画面の微分で求める法線がマス目の縁で折れ、明るく照らした壁にレンガのような格子が見えるため。
+    const float fine = FastValueNoise(wallUV * 1.45f + 27.1f);
     return broad * 0.52f + plaster * 0.33f + fine * 0.15f;
 }
 
 // ----------------------------------------------------------------------------
-// 壁の古さ（1面）。WallWeathering（面ごと）と Material.WeatheringSurface（建物の壁だけ）で有効になる。
+// 壁の古さ（1面と2面）。WallWeathering（面ごと）と Material.WeatheringSurface（建物の壁と天井だけ）で有効になる。
 // コンクリートのパネルの継ぎ目・小さな穴・ひびを凹凸として、水の垂れた跡・床際の水位線・カビを色として描いている。
 // 画像の素材は使わず、ワールド座標から計算するため、壁の長さが違っても模様の大きさはそろう。
 // ----------------------------------------------------------------------------
@@ -224,7 +226,17 @@ WallAgeing ComputeWallAgeing(float3 worldPosition, float3 normal, float weight)
     // --- ホラーらしい跡（血の手形と引きずった跡、引っかき傷、血の垂れ跡。horrorMarks.hlsli）
     // 壁の面の位置（法線の向きの座標）も渡し、平行な別の壁に同じ跡が並ばないようにしている。
     const float planeCoordinate = normal.x > normal.z ? worldPosition.x : worldPosition.z;
-    const HorrorMarks marks = ComputeHorrorMarks(uv.x, heightFromFloor, planeCoordinate, footprint);
+    // 2面（HorrorMarksStrength = 0）は、手形や傷を異変として出すため、決まった跡を描かない（計算も省いている）
+    HorrorMarks marks;
+    marks.blood = 0.0f;
+    marks.gouge = 0.0f;
+    [branch]
+    if (HorrorMarksStrength > 0.0f)
+    {
+        marks = ComputeHorrorMarks(uv.x, heightFromFloor, planeCoordinate, footprint);
+        marks.blood *= HorrorMarksStrength;
+        marks.gouge *= HorrorMarksStrength;
+    }
 
     // 継ぎ目・穴・ひび・引っかき傷を、へこみの高さと、奥の暗さにしている
     ageing.height = -(seam * 0.7f + pit * 0.5f + crack * 0.35f + marks.gouge * 0.9f) * weight;
@@ -409,7 +421,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
             color.rgb * float3(0.72f, 0.80f, 0.69f),
             grime * 0.20f);
 
-        // 壁の古さ（1面の建物の壁だけ）。0のときは前と同じ見た目になる。
+        // 壁の古さ（建物の壁と天井だけ）。0のときは前と同じ見た目になる。
         const float weathering = Material.WeatheringSurface ? WallWeathering : 0.0f;
         const WallAgeing ageing = GetWallAgeing(
             input.worldPos, input.worldNormal, weathering);

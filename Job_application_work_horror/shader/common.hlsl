@@ -58,9 +58,10 @@ cbuffer DebugViewBuffer : register(b7)
 {
     int DebugViewMode;
     float WallDampStrength;
-    // 壁の古さ（0〜1）。1面は1、2面は0（Renderer::SetWallWeathering）。
+    // 壁の古さ（0〜1）と、壁の古さに混ぜるホラーの跡（血の手形・引っかき傷・血の垂れ跡）の濃さ（Renderer::SetWallWeathering）。
+    // 2面は異変として手形や傷を出すため、決まった跡は描かない（0）。
     float WallWeathering;
-    float DebugViewPadding;
+    float HorrorMarksStrength;
 };
 
 // 懐中電灯と環境光の定数バッファ（b3）

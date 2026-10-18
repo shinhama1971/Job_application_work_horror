@@ -15,6 +15,8 @@
 cbuffer PuddleCellBuffer : register(b13)
 {
     float4 PuddleCells[PUDDLE_CELL_COUNT * PUDDLE_CELL_COUNT];
+    // マス目の区切りをずらす量（xy = x・z）。1面は0、2面は廊下の中心にマス目の中心が来るようにずらしている
+    float4 PuddleGridOffset;
 }
 
 // その位置の水たまりの濃さ（0〜1）を返し、岸の線と波の模様も返している（timeは波を動かす時間）
@@ -29,7 +31,7 @@ float GetPuddleMask(
     // 大きなワールド空間のマス目ごとに、不規則に回した水たまりを1つ置いている。
     // 半径をマス目の境目より小さくし、床全体を一様に濡らさず、独立した水たまりにしている。
     const float cellSize = 82.0f;
-    const float2 gridPosition = worldPosition / cellSize;
+    const float2 gridPosition = (worldPosition + PuddleGridOffset.xy) / cellSize;
     const float2 cell = floor(gridPosition);
     float2 localPosition = frac(gridPosition) - 0.5f;
 

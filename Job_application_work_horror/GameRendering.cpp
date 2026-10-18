@@ -192,15 +192,18 @@ namespace Core
             m_Instance->m_ShadowMap.Bind();
         }
 
-        // 水面の反射は1面だけ。水たまりが画面に映っているかを先に調べている
+        // 水面の反射は、濡れた床（Ground）のある1面と2面だけ。水たまりが画面に映っているかを先に調べている
         // 技術デモで「水面の反射なし」を選んでいるときは、反射を描かない（床も反射を混ぜない。Ground::Draw）
         // 技術デモでキューブマップを選んでいる間は、カメラの位置から6方向のうち1面だけを毎フレーム撮り直している
         // （最初の1フレームだけは6面とも撮る）。平面反射のように景色をもう一度まるごと描かないので軽い。
+        const bool hasWetFloor =
+            m_Instance->m_CurrentScene == SceneName::Stage ||
+            m_Instance->m_CurrentScene == SceneName::Stage2;
         if (reflectionMethod != 2)
         {
             m_Instance->m_ReflectionProbe.Invalidate();
         }
-        if (m_Instance->m_CurrentScene == SceneName::Stage && reflectionMethod == 2)
+        if (hasWetFloor && reflectionMethod == 2)
         {
             m_Instance->m_GpuTimer.BeginPass(GpuPass::Reflection, context);
             const int faceCount = m_Instance->m_ReflectionProbe.HasAllFaces() ? 1 : 6;
@@ -224,7 +227,7 @@ namespace Core
             m_Instance->m_WasReflectionVisible = false;
             m_Instance->m_HasReflectionCameraPose = false;
         }
-        else if (m_Instance->m_CurrentScene == SceneName::Stage && reflectionMethod == 1)
+        else if (hasWetFloor && reflectionMethod == 1)
         {
             bool reflectionVisible = false;
             for (const auto& object :
@@ -367,7 +370,7 @@ namespace Core
         // 技術デモでSSRを選んでいるときは、深度プリパスの深度を写し取り、前のフレームの画面と一緒に床のシェーダーへ渡している。
         // （反射の光線をたどる計算は、本描画の床のピクセルシェーダーで行う）
         const bool useScreenSpaceReflection =
-            m_Instance->m_CurrentScene == SceneName::Stage && reflectionMethod == 3 && useDepthPrepass;
+            hasWetFloor && reflectionMethod == 3 && useDepthPrepass;
         if (useScreenSpaceReflection)
         {
             m_Instance->m_ScreenSpaceReflection.Prepare(

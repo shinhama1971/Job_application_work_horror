@@ -8,6 +8,8 @@
 
 #include "Stage2SceneConstants.h"
 
+#include <SimpleMath.h>
+
 #include <array>
 #include <cstddef>
 #include <string>
@@ -79,9 +81,8 @@ struct Stage2Objects
     Wall* falseDoorFrameFar = nullptr;
     Wall* falseDoorFrameTop = nullptr;
     Wall* falseDoorHandle = nullptr;
-    // 照明、水たまり、残された記録の端末とその目印、肖像画の目、周回を数える傷の印
+    // 照明、残された記録の端末とその目印、肖像画の目、周回を数える傷の印
     std::array<CeilingLight*, static_cast<std::size_t>(Stage2Light::Count)> lights{};
-    std::array<Wall*, 3> puddles{};
     std::array<FuseBox*, 2> evidenceTerminals{};
     std::array<Wall*, 2> evidenceMarkers{};
     std::array<Wall*, 2> portraitEyes{};
@@ -90,6 +91,8 @@ struct Stage2Objects
     std::array<FuseBox*, 3> signalTerminals{};
     std::array<Wall*, 3> signalMarkers{};
     std::array<Wall*, Stage2ScratchCount> scratches{};
+    // 部屋の角の暗がりの計算に使う、廊下の壁を上から見た長方形（中心x・z、半分の幅・奥行き）
+    std::vector<DirectX::SimpleMath::Vector4> wallFootprints;
 
     // 作ったすべてのObjectの名前。Sceneの終了時にこの一覧で破棄している。
     // 名前での破棄は、すでに破棄されたObjectに対しても安全。将来、途中で破棄されるObjectを

@@ -155,7 +155,7 @@ public:
         return m_Movement.IsMovingHorizontally();
     }
 
-    // Sceneが持つ特別な濡れた床（2面の水たまりなど）の上にいることを、次のUpdateへ伝えている。
+    // Groundの水たまり以外の、Sceneが持つ特別な濡れた床の上にいることを、次のUpdateへ伝えている。
     void SetWetSurface(bool wet) { m_WetSurfaceOverride = wet; }
     // 直前の足音がどれだけ大きかったか（0〜1）。水たまりや走っているときに大きくなり、2面の危険度に足されている。
     float GetSurfaceNoisePulse() const { return m_SurfaceNoisePulse; }

@@ -111,6 +111,8 @@ public:
 	{
 		m_WaterEffects.SetFloodRegion(minimum, maximum);
 	}
+	// 水たまりを決まった場所に置き直している（2面の廊下）。足音・波紋・水滴・シェーダーの表のすべてに反映される。
+	void SetPuddleLayout(const WaterEffectSystem::PuddleLayout& layout);
 	// 水面が画面に映っているときだけ、反射を描くようにしている
 	bool IsPlanarReflectionSurfaceVisible(const Camera& camera) const override
 	{

@@ -128,12 +128,12 @@ void Ground::Init()
 		m_WetFloorBuffer.ReleaseAndGetAddressOf());
 
 	// 水たまりの表を渡す定数バッファを作り、WaterEffectSystemで決めた値を書き込んでいる
-	const WaterEffectSystem::PuddleCellTable& puddleCells = m_WaterEffects.GetPuddleCells();
+	const WaterEffectSystem::PuddleCellBufferData& puddleCells = m_WaterEffects.GetPuddleCellData();
 	Renderer::CreateConstantBuffer(
 		static_cast<unsigned int>(sizeof(puddleCells)),
 		m_PuddleCellBuffer.ReleaseAndGetAddressOf());
 	Renderer::GetDeviceContext()->UpdateSubresource(
-		m_PuddleCellBuffer.Get(), 0, nullptr, puddleCells.data(), 0, 0);
+		m_PuddleCellBuffer.Get(), 0, nullptr, &puddleCells, 0, 0);
 
 	// 床のテクスチャを読み込んでいる（読めなければファイル名を表示して終了している）
     constexpr const char* fieldTexturePath = "assets/texture/field.jpg";

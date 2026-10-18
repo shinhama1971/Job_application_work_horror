@@ -114,6 +114,20 @@ void WaterEffectSystem::Init()
 	m_RippleMaterial = std::make_unique<Material>();
 	m_RippleMaterial->Create(rippleMaterial);
 
+	// 水たまりは、床全体のマス目に乱数で置いている（1面）。2面は Ground::SetPuddleLayout で置き直している
+	BuildPuddles(PuddleLayout{});
+}
+
+// 水たまりの表（シェーダーへ渡す）と、足元の判定に使う中心・楕円、水滴を落とす場所を、置き方に合わせて作っている
+void WaterEffectSystem::BuildPuddles(const PuddleLayout& layout)
+{
+	m_FallingDrops.clear();
+	m_PuddleCenters.clear();
+	m_PuddleRadii.clear();
+	m_PuddleAngles.clear();
+	m_PuddleCellData = PuddleCellBufferData{};
+	m_PuddleCellData.GridOffset = Vector4(layout.GridOffset.x, layout.GridOffset.y, 0.0f, 0.0f);
+
 	// 0〜1の疑似乱数。wetFloorPS.hlslの水たまりと同じ式を使い、見た目と判定の位置をそろえている
 	const auto fraction = [](float value)
 	{
@@ -140,54 +154,86 @@ void WaterEffectSystem::Init()
 		float DistanceSquared;
 	};
 
-	// 床全体のマス目について、水たまりがあるかと形の乱数を表にし、シェーダーへ渡している（Ground::Init）
-	for (int row = 0; row < PuddleCellCount; ++row)
-	{
-		for (int column = 0; column < PuddleCellCount; ++column)
-		{
-			const float cellX = static_cast<float>(PuddleCellMin + column);
-			const float cellZ = static_cast<float>(PuddleCellMin + row);
-			const bool hasPuddle = hash21(cellX + 53.4f, cellZ + 27.9f) >= 0.62f;
-			const Vector2 randomValue = hash22(cellX, cellZ);
-			m_PuddleCells[row * PuddleCellCount + column] = Vector4(
-				hasPuddle ? 1.0f : 0.0f, randomValue.x, randomValue.y, 0.0f);
-		}
-	}
-
-	// 床を82x82のマスに分け、乱数がしきい値を超えたマスにだけ水たまりを置いている（上の表と同じ判定）
+	// 水たまりを1つ足している（中心はシェーダーと同じ式。radiiとangleは足元の判定に使う楕円の半径と向き）
 	constexpr float cellSize = 82.0f;
 	std::vector<DropCandidate> candidates;
-	for (int cellZ = -4; cellZ <= 4; ++cellZ)
+	const auto addPuddle = [&](int cellX, int cellZ, const Vector2& randomValue, const Vector2& radii, float angle)
 	{
-		for (int cellX = -4; cellX <= 4; ++cellX)
+		const Vector2 puddleCenter =
+			(Vector2(static_cast<float>(cellX), static_cast<float>(cellZ)) +
+			 Vector2(0.5f, 0.5f) +
+			 (randomValue - Vector2(0.5f, 0.5f)) * 0.22f) * cellSize - layout.GridOffset;
+		m_PuddleCenters.push_back(puddleCenter);
+		m_PuddleRadii.push_back(radii);
+		m_PuddleAngles.push_back(angle);
+		// 遊ぶ範囲はZの正の方へ少し寄っているため、候補をその中心からの距離順に並べている。
+		// 限られた数の水滴が、マップの端のマスだけで埋まらないようにしている。
+		const Vector2 fromGameplayCenter =
+			puddleCenter - Vector2(0.0f, 70.0f);
+		candidates.push_back({
+			cellX,
+			cellZ,
+			randomValue,
+			puddleCenter,
+			fromGameplayCenter.x * fromGameplayCenter.x +
+			fromGameplayCenter.y * fromGameplayCenter.y });
+	};
+
+	if (layout.Cells.empty())
+	{
+		// 床全体のマス目について、水たまりがあるかと形の乱数を表にし、シェーダーへ渡している（Ground::Init）
+		for (int row = 0; row < PuddleCellCount; ++row)
 		{
-			const float puddleSeed = hash21(
-				static_cast<float>(cellX) + 53.4f,
-				static_cast<float>(cellZ) + 27.9f);
-			if (puddleSeed < 0.62f)
+			for (int column = 0; column < PuddleCellCount; ++column)
+			{
+				const float cellX = static_cast<float>(PuddleCellMin + column);
+				const float cellZ = static_cast<float>(PuddleCellMin + row);
+				const bool hasPuddle = hash21(cellX + 53.4f, cellZ + 27.9f) >= 0.62f;
+				const Vector2 randomValue = hash22(cellX, cellZ);
+				m_PuddleCellData.Cells[row * PuddleCellCount + column] = Vector4(
+					hasPuddle ? 1.0f : 0.0f, randomValue.x, randomValue.y, 0.0f);
+			}
+		}
+
+		// 床を82x82のマスに分け、乱数がしきい値を超えたマスにだけ水たまりを置いている（上の表と同じ判定）。
+		// 足元の判定は、どの水たまりも横24・縦17の楕円として扱っている
+		for (int cellZ = -4; cellZ <= 4; ++cellZ)
+		{
+			for (int cellX = -4; cellX <= 4; ++cellX)
+			{
+				const float puddleSeed = hash21(
+					static_cast<float>(cellX) + 53.4f,
+					static_cast<float>(cellZ) + 27.9f);
+				if (puddleSeed < 0.62f)
+				{
+					continue;
+				}
+				const Vector2 randomValue = hash22(
+					static_cast<float>(cellX),
+					static_cast<float>(cellZ));
+				addPuddle(cellX, cellZ, randomValue, Vector2(24.0f, 17.0f), 0.0f);
+			}
+		}
+	}
+	else
+	{
+		// 決まったマス目にだけ水たまりを置いている（2面）。足元の判定は、シェーダーの楕円と同じ半径と向きにしている
+		for (const Vector4& cell : layout.Cells)
+		{
+			const int cellX = static_cast<int>(cell.x);
+			const int cellZ = static_cast<int>(cell.y);
+			const int column = cellX - PuddleCellMin;
+			const int row = cellZ - PuddleCellMin;
+			if (column < 0 || column >= PuddleCellCount || row < 0 || row >= PuddleCellCount)
 			{
 				continue;
 			}
-
-			const Vector2 randomValue = hash22(
-				static_cast<float>(cellX),
-				static_cast<float>(cellZ));
-			const Vector2 puddleCenter =
-				(Vector2(static_cast<float>(cellX), static_cast<float>(cellZ)) +
-				 Vector2(0.5f, 0.5f) +
-				 (randomValue - Vector2(0.5f, 0.5f)) * 0.22f) * cellSize;
-			m_PuddleCenters.push_back(puddleCenter);
-			// 遊ぶ範囲はZの正の方へ少し寄っているため、候補をその中心からの距離順に並べている。
-			// 限られた数の水滴が、マップの端のマスだけで埋まらないようにしている。
-			const Vector2 fromGameplayCenter =
-				puddleCenter - Vector2(0.0f, 70.0f);
-			candidates.push_back({
-				cellX,
-				cellZ,
-				randomValue,
-				puddleCenter,
-				fromGameplayCenter.x * fromGameplayCenter.x +
-				fromGameplayCenter.y * fromGameplayCenter.y });
+			const Vector2 randomValue(cell.z, cell.w);
+			m_PuddleCellData.Cells[row * PuddleCellCount + column] =
+				Vector4(1.0f, randomValue.x, randomValue.y, 0.0f);
+			// puddleMask.hlsli の楕円（軸の長さ）と、縁の濃さが半分になる距離（0.37）から半径を求めている
+			const Vector2 axes(0.72f + randomValue.x * 0.25f, 0.43f + randomValue.y * 0.20f);
+			addPuddle(cellX, cellZ, randomValue, axes * (0.37f * cellSize), randomValue.x * DirectX::XM_2PI);
 		}
 	}
 
@@ -263,13 +309,16 @@ bool WaterEffectSystem::IsInsidePuddle(const Vector3& position) const
 	{
 		return true;
 	}
-	for (const Vector2& center : m_PuddleCenters)
+	for (size_t index = 0; index < m_PuddleCenters.size(); ++index)
 	{
-		const float offsetX = position.x - center.x;
-		const float offsetZ = position.z - center.y;
-		// 水たまりは横24・縦17の楕円として判定している
-		if ((offsetX * offsetX) / (24.0f * 24.0f) +
-			(offsetZ * offsetZ) / (17.0f * 17.0f) <= 1.0f)
+		const float offsetX = position.x - m_PuddleCenters[index].x;
+		const float offsetZ = position.z - m_PuddleCenters[index].y;
+		// 水たまりを、シェーダーと同じ向きに回した楕円として判定している
+		const float cosine = std::cos(m_PuddleAngles[index]);
+		const float sine = std::sin(m_PuddleAngles[index]);
+		const float rotatedX = (offsetX * cosine - offsetZ * sine) / m_PuddleRadii[index].x;
+		const float rotatedZ = (offsetX * sine + offsetZ * cosine) / m_PuddleRadii[index].y;
+		if (rotatedX * rotatedX + rotatedZ * rotatedZ <= 1.0f)
 		{
 			return true;
 		}
@@ -536,6 +585,8 @@ void WaterEffectSystem::Uninit()
 {
 	m_FallingDrops.clear();
 	m_PuddleCenters.clear();
+	m_PuddleRadii.clear();
+	m_PuddleAngles.clear();
 	m_DropVertices.clear();
 	m_DropMaterial.reset();
 	m_RippleVertices.clear();
@@ -549,6 +600,16 @@ bool Ground::TriggerFootstepRipple(
 	bool sprinting)
 {
 	return m_WaterEffects.TriggerFootstepRipple(position, sprinting);
+}
+
+void Ground::SetPuddleLayout(const WaterEffectSystem::PuddleLayout& layout)
+{
+	m_WaterEffects.SetPuddleLayout(layout);
+	if (m_PuddleCellBuffer)
+	{
+		Renderer::GetDeviceContext()->UpdateSubresource(
+			m_PuddleCellBuffer.Get(), 0, nullptr, &m_WaterEffects.GetPuddleCellData(), 0, 0);
+	}
 }
 
 bool Ground::IsInsidePuddle(const Vector3& position) const

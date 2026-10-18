@@ -75,10 +75,11 @@ struct DEBUG_VIEW_BUFFER
     int Mode;
     float WallDampStrength;
     // 壁の古さ（0〜1）。パネルの継ぎ目・穴・ひび・水の垂れた跡・床際の水位線・カビの濃さ。
-    // 面ごとに雰囲気を変えるため、各SceneのInitで設定している（1面は1、2面は0で前と同じ見た目）。
+    // 面ごとに雰囲気を変えるため、各SceneのInitで設定している。
     float WallWeathering;
-    // 16バイトにそろえるための詰め物
-    float Padding;
+    // 壁の古さに混ぜるホラーの跡（血の手形・引っかき傷・血の垂れ跡）の濃さ（0〜1）。
+    // 2面は異変として手形や傷を出すため、決まった跡は描かない（0）。
+    float HorrorMarksStrength;
 };
 
 static_assert(sizeof(DEBUG_VIEW_BUFFER) == 16, "Debug view buffer must be 16 bytes");
@@ -263,8 +264,9 @@ public:
 	// デバッグ用のシェーダーの表示（法線・光源のタイルなど）を切り替えている。0で普段の表示。
 	static void SetDebugViewMode(
 		int mode, float wallDampStrength = 1.0f);
-	// 壁の古さ（0〜1）を設定している。0なら前と同じ見た目のまま。
-	static void SetWallWeathering(float weathering);
+	// 壁の古さ（0〜1）と、それに混ぜるホラーの跡（血の手形・引っかき傷・血の垂れ跡）の濃さ（0〜1）を設定している。
+	// 古さが0なら前と同じ見た目のまま。
+	static void SetWallWeathering(float weathering, float horrorMarks = 1.0f);
 	// 部屋の角の暗がりに使う壁の形と、床・天井の高さを設定している。boxCount が0なら暗がりを付けない。
 	static void SetRoomOcclusion(
 		const DirectX::SimpleMath::Vector4* boxes, unsigned int boxCount,
