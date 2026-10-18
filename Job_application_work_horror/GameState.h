@@ -33,6 +33,8 @@ namespace Core
             int Stage2FirstAnomaly = 0;  // 2面の1周目・2周目に出た異変（Stage2Anomalyの値）
             // （2周目の異変）
             int Stage2SecondAnomaly = 0;
+            // 1面から始めたプレイか（タイトルで2面を選んで始めたプレイは、ベスト記録に残さない）
+            bool FullRun = true;
         };
 
         RunProgress m_Run;
@@ -51,9 +53,11 @@ namespace Core
     public:
         // 新しく1面を始めるときだけ、今回のプレイの結果を初期化している。
         // 保存してあるベスト記録はそのまま残している。
-        void BeginRun()
+        // fullRunがfalseなら、タイトルで2面を選んで始めたプレイ（クリアしてもベスト記録を更新しない）。
+        void BeginRun(bool fullRun = true)
         {
             m_Run = RunProgress{};
+            m_Run.FullRun = fullRun;
             m_Stage2Start = RunProgress{};
             m_LastRunBestTime = false;
             m_LastRunBestCaught = false;
@@ -79,6 +83,13 @@ namespace Core
         {
             // クリアタイムが短い・捕まった回数が少ない方をベストとして残している（初めてのクリアなら両方ベスト）
             m_LastClearTimeSeconds = m_Run.RunTimeSeconds;
+            // 2面から始めたプレイは1面の分だけ短くなるため、ベスト記録とは比べず、記録も付けない
+            if (!m_Run.FullRun)
+            {
+                m_LastRunBestTime = false;
+                m_LastRunBestCaught = false;
+                return;
+            }
             m_LastRunBestTime = !m_HasClearRecord ||
                 m_LastClearTimeSeconds < m_BestClearTimeSeconds;
             m_LastRunBestCaught = !m_HasClearRecord ||

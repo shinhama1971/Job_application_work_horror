@@ -363,7 +363,8 @@ namespace Core
 
         DeleteAllObject();
 
-        // 新しいシーンを作っている。1面の開始でプレイ全体の記録を始め、2面の開始で2面の開始時点を覚えている
+        // 新しいシーンを作っている。1面の開始でプレイ全体の記録を始め、2面の開始で2面の開始時点を覚えている。
+        // タイトルで2面を選んで始めたときは、そこで記録を始めている（ベスト記録には残さないプレイにしている）
         switch (sName)
         {
         case SceneName::Title:
@@ -376,6 +377,10 @@ namespace Core
             break;
 
         case SceneName::Stage2:
+            if (previousScene == SceneName::Title)
+            {
+                m_State.BeginRun(false);
+            }
             m_State.EnterStage2();
             m_Scene = std::make_unique<Stage2Scene>();
             break;
@@ -388,7 +393,6 @@ namespace Core
         // 階ごとに違う環境音へ切り替え、タイトルとリザルトでは止めている。
         if (m_SoundReady)
         {
-            (void)previousScene;
             m_Sound.Stop(SOUND_CUE_AMBIENCE_STAGE1);
             m_Sound.Stop(SOUND_CUE_AMBIENCE_STAGE2);
             if (sName == SceneName::Stage)

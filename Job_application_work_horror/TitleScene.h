@@ -8,7 +8,7 @@
 #include "Object.h"
 #include "Hud.h"
 
-// TitleSceneクラス：題名と操作の説明を表示し、Enterで1面を始め、Qでゲームを終えている
+// TitleSceneクラス：題名と操作の説明を表示し、始める面（1面・2面）を選んでEnterで始め、Qでゲームを終えている
 class TitleScene : public Scene
 {
 private:
@@ -16,6 +16,10 @@ private:
     // タイトル画面を描くHUD、表示してからの経過秒（文字の明滅に使っている）
     Hud m_Hud;
     float m_TitleTime = 0.0f;
+    // 選んでいる面（0 = 1面、1 = 2面）。前に選んだ面を、次にタイトルへ戻ったときも選んだままにしている
+    static int s_SelectedStage;
+    // 左スティックを倒したままのとき、選ぶ面が続けて動かないよう、一度戻すまで待っている
+    bool m_StickReleased = true;
 
 	void Init(); // HUDを準備している
 	void Uninit(); // HUDを片付けている

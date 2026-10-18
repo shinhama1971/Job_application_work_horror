@@ -226,6 +226,8 @@ namespace
     float g_TourTime = 0.0f;
     size_t g_NextShot = 0;
     const wchar_t* g_PendingShot = nullptr;
+    // タイトル画面を表示してからのフレーム数（タイトルを1枚撮ってから1面を始めるため）
+    int g_TitleFrames = 0;
     bool g_Finished = false;
     // 最後に足元へ水たまりの波を立てた位置（位置を直接動かすと足音が出ないため、歩いた距離で代わりに波を立てている）
     Vector3 g_LastStepPosition;
@@ -619,11 +621,21 @@ namespace Tools::CaptureMode
 
         Core::Game* game = Core::Game::GetInstance();
         const SceneName scene = game->GetCurrentSceneName();
-        // タイトルはすぐに抜け、1面から始めている。視点はマウスで動かさないようにしている。
+        // タイトルは、始める面の選択が写るよう1枚撮ってから抜け、1面から始めている（計測モードはすぐに抜ける）。
+        // 視点はマウスで動かさないようにしている。
         if (scene == SceneName::Title)
         {
             game->GetCamera()->SetMouseLookEnabled(false);
-            game->RequestSceneChange(SceneName::Stage);
+            ++g_TitleFrames;
+            if (!g_Benchmark && g_TitleFrames == 20)
+            {
+                g_Recording = true;
+                g_PendingShot = L"00_タイトル";
+            }
+            if (g_Benchmark || g_TitleFrames >= 30)
+            {
+                game->RequestSceneChange(SceneName::Stage);
+            }
             return;
         }
         if (g_Benchmark)

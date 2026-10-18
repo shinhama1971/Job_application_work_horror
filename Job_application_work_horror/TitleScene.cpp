@@ -10,6 +10,10 @@
 #include "Game.h"
 #include "Input.h"
 
+#include <cmath>
+
+int TitleScene::s_SelectedStage = 0;
+
 // 作るときに初期化している
 TitleScene::TitleScene()
 {
@@ -29,7 +33,8 @@ void TitleScene::Init()
     m_Hud.Init();
 }
 
-// Q（B）でゲームを終える（終了の確認が出る）、Enter（AかSTART）で1面を始めている
+// Q（B）でゲームを終える（終了の確認が出る）。←→（A・D、十字キー、左スティック）か1・2のキーで始める面を選び、
+// Enter（AかSTART）で選んだ面を始めている。2面から始めたプレイは、クリアしてもベスト記録に残さない（Game::ChangeScene）。
 void TitleScene::Update()
 {
     m_TitleTime += Application::GetDeltaTime();
@@ -40,15 +45,53 @@ void TitleScene::Update()
         return;
     }
 
+    // 左スティックは、倒した瞬間に1回だけ動かしている（戻すまで次は動かさない）
+    const float stickX = Input::GetLeftAnalogStick().x;
+    const bool stickLeft = m_StickReleased && stickX < -0.6f;
+    const bool stickRight = m_StickReleased && stickX > 0.6f;
+    if (stickLeft || stickRight)
+    {
+        m_StickReleased = false;
+    }
+    else if (std::abs(stickX) < 0.3f)
+    {
+        m_StickReleased = true;
+    }
+
+    const int previousStage = s_SelectedStage;
+    if (Input::GetKeyTrigger(VK_LEFT) || Input::GetKeyTrigger(VK_A) ||
+        Input::GetButtonTrigger(XINPUT_LEFT) || stickLeft)
+    {
+        s_SelectedStage = 0;
+    }
+    if (Input::GetKeyTrigger(VK_RIGHT) || Input::GetKeyTrigger(VK_D) ||
+        Input::GetButtonTrigger(XINPUT_RIGHT) || stickRight)
+    {
+        s_SelectedStage = 1;
+    }
+    if (Input::GetKeyTrigger(VK_1))
+    {
+        s_SelectedStage = 0;
+    }
+    if (Input::GetKeyTrigger(VK_2))
+    {
+        s_SelectedStage = 1;
+    }
+    if (s_SelectedStage != previousStage)
+    {
+        Input::SetVibration(1, 0.05f);
+    }
+
     if (Input::GetKeyTrigger(VK_RETURN) ||
         Input::GetButtonTrigger(XINPUT_A) ||
         Input::GetButtonTrigger(XINPUT_START))
     {
-        Core::Game::GetInstance()->RequestSceneChange(SceneName::Stage);
+        Core::Game::GetInstance()->RequestSceneChange(
+            s_SelectedStage == 0 ? SceneName::Stage : SceneName::Stage2);
     }
 }
 
-// 題名・操作の説明・ベスト記録を描いている
+// 題名・操作の説明・ベスト記録・始める面の選択を描いている
 void TitleScene::Draw(Camera* camera)
 {
     (void)camera;
@@ -57,7 +100,8 @@ void TitleScene::Draw(Camera* camera)
         m_TitleTime,
         game->HasClearRecord(),
         game->GetBestClearTimeSeconds(),
-        game->GetBestCaughtCount());
+        game->GetBestCaughtCount(),
+        s_SelectedStage);
 }
 
 // HUDを片付けている

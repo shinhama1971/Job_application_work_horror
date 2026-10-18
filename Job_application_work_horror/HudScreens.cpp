@@ -39,12 +39,13 @@ namespace
     }
 }
 
-// タイトル画面：題名・操作の説明・ベスト記録・開始と終了の操作を、中央のパネルに並べている
+// タイトル画面：題名・操作の説明・ベスト記録・始める面の選択・開始と終了の操作を、中央のパネルに並べている
 void Hud::DrawTitle(
     float time,
     bool hasClearRecord,
     float bestClearTimeSeconds,
-    int bestCaughtCount)
+    int bestCaughtCount,
+    int selectedStage)
 {
     m_Vertices.clear();
 
@@ -76,7 +77,7 @@ void Hud::DrawTitle(
 
     // 中央のパネル（左端に緑の線、上下に細い線）
     const float panelWidth = (std::min)(screenWidth * 0.76f, 980.0f);
-    const float panelHeight = 430.0f;
+    const float panelHeight = 520.0f;
     const float panelX = (screenWidth - panelWidth) * 0.5f;
     const float panelY = (screenHeight - panelHeight) * 0.5f;
     AddRectangle(panelX, panelY, panelWidth, panelHeight,
@@ -168,15 +169,56 @@ void Hud::DrawTitle(
     AddText((screenWidth - guidanceWidth) * 0.5f,
         panelY + 310.0f, guidance, guidancePixelSize, controlsColor);
 
+    // 始める面の選択：2つの枠を横に並べ、選んでいる面の枠を明るくし、その下に説明を出している
+    constexpr std::string_view stageNames[] = { "1面  電力の復旧", "2面  ループする廊下" };
+    constexpr std::string_view stageNotes[] =
+    {
+        "最初から遊ぶ  クリアの記録が残る",
+        "2面から遊ぶ  クリアしても記録には残らない"
+    };
+    const int stage = selectedStage == 1 ? 1 : 0;
+    constexpr float stageBoxWidth = 300.0f;
+    constexpr float stageBoxHeight = 46.0f;
+    constexpr float stageBoxGap = 24.0f;
+    constexpr float stageTextPixelSize = 2.4f;
+    const float stageRowX = (screenWidth - (stageBoxWidth * 2.0f + stageBoxGap)) * 0.5f;
+    const float stageRowY = panelY + 340.0f;
+    for (int index = 0; index < 2; ++index)
+    {
+        const bool selected = index == stage;
+        const float boxX = stageRowX + static_cast<float>(index) * (stageBoxWidth + stageBoxGap);
+        AddRectangle(boxX, stageRowY, stageBoxWidth, stageBoxHeight,
+            selected ? Color(0.05f, 0.14f, 0.09f, 0.95f) : Color(0.012f, 0.024f, 0.018f, 0.90f));
+        // 選んでいる枠は、緑の縁取りを明滅させている
+        const Color border = selected ? promptColor : dimGreen;
+        AddRectangle(boxX, stageRowY, stageBoxWidth, 2.0f, border);
+        AddRectangle(boxX, stageRowY + stageBoxHeight - 2.0f, stageBoxWidth, 2.0f, border);
+        AddRectangle(boxX, stageRowY, 2.0f, stageBoxHeight, border);
+        AddRectangle(boxX + stageBoxWidth - 2.0f, stageRowY, 2.0f, stageBoxHeight, border);
+        const std::string_view name = stageNames[index];
+        const float nameWidth =
+            static_cast<float>(CountDisplayedCharacters(name)) * stageTextPixelSize * 6.0f;
+        AddText(boxX + (stageBoxWidth - nameWidth) * 0.5f,
+            stageRowY + (stageBoxHeight - stageTextPixelSize * 7.0f) * 0.5f,
+            name, stageTextPixelSize,
+            selected ? titleGreen : Color(0.34f, 0.46f, 0.38f, 0.70f));
+    }
+    const std::string_view stageNote = stageNotes[stage];
+    constexpr float stageNotePixelSize = 1.7f;
+    const float stageNoteWidth =
+        static_cast<float>(CountDisplayedCharacters(stageNote)) * stageNotePixelSize * 6.0f;
+    AddText((screenWidth - stageNoteWidth) * 0.5f,
+        stageRowY + stageBoxHeight + 12.0f, stageNote, stageNotePixelSize, controlsColor);
+
     const std::string_view prompt = Input::IsControllerConnected()
-        ? "Aでゲーム開始"
-        : "ENTERでゲーム開始";
+        ? "左右で面を選ぶ  Aでゲーム開始"
+        : "左右で面を選ぶ  ENTERでゲーム開始";
     constexpr float promptPixelSize = 3.0f;
     const float promptWidth =
         static_cast<float>(CountDisplayedCharacters(prompt)) *
         promptPixelSize * 6.0f;
     AddText((screenWidth - promptWidth) * 0.5f,
-        panelY + 338.0f, prompt, promptPixelSize, promptColor);
+        panelY + 430.0f, prompt, promptPixelSize, promptColor);
 
     const std::string_view quitPrompt = Input::IsControllerConnected()
         ? "Bでゲーム終了"
@@ -186,7 +228,7 @@ void Hud::DrawTitle(
         static_cast<float>(CountDisplayedCharacters(quitPrompt)) *
         quitPixelSize * 6.0f;
     AddText((screenWidth - quitWidth) * 0.5f,
-        panelY + 382.0f, quitPrompt, quitPixelSize, controlsColor);
+        panelY + 474.0f, quitPrompt, quitPixelSize, controlsColor);
 
     Flush();
 }
