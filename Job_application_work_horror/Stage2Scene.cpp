@@ -90,7 +90,7 @@ void Stage2Scene::Init()
     // 2面は電力が戻った状態から始め、画面効果を2面の雰囲気（少し暗く、光の筋あり）にしている
     game->SetPowerRestored(true);
     game->GetPostProcess()->SetCorridorTension(0.38f);
-    game->GetPostProcess()->SetExposure(1.02f);
+    game->GetPostProcess()->SetExposure(0.95f);
     game->GetPostProcess()->SetAtmosphere(0.20f, 0.62f);
     game->GetPostProcess()->SetLensDistortionStrength(0.20f);
     game->GetPostProcess()->SetFilmGradeStrength(0.58f);
@@ -444,8 +444,8 @@ void Stage2Scene::Update()
             if (marker != nullptr)
             {
                 marker->SetAppearance(
-                    Color(0.08f, 0.18f, 0.10f, 1.0f),
-                    Color(0.16f, 0.52f, 0.22f, 1.0f),
+                    Color(0.06f, 0.14f, 0.08f, 1.0f),
+                    Color(0.08f, 0.30f, 0.12f, 1.0f),
                     44.0f);
             }
             game->GetPostProcess()->TriggerBloomPulse(0.38f, 0.18f);

@@ -20,6 +20,7 @@ SamplerState g_SamplerState : register(s0);
 
 #include "fastNoise.hlsli"
 #include "flashlightLighting.hlsli"
+#include "horrorGrade.hlsli"
 
 // 頂点シェーダー（litTextureVS）から受け取る値（反射の座標は使わないので省いている）
 struct LIT_PS_IN
@@ -94,8 +95,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
     // 壁と同じ距離の霧をかけ、文字だけが浮いて見えないようにしている。
     const float distanceFog = smoothstep(110.0f, 390.0f, distanceFromCamera) * 0.72f;
-    const float3 fogColor = max(Light.Ambient.rgb * 0.38f,
-        float3(0.070f, 0.078f, 0.084f));
+    const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb);
     color = lerp(color, fogColor, distanceFog);
 
     return float4(color, alpha);

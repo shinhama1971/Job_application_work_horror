@@ -204,7 +204,7 @@ namespace Stage2Layout
             Color(0.025f, 0.11f, 0.09f, 1.0f), false);
         evidenceMarker1->SetAppearance(
             Color(0.025f, 0.11f, 0.09f, 1.0f),
-            Color(0.02f, 0.24f, 0.16f, 1.0f), 36.0f);
+            Color(0.012f, 0.13f, 0.09f, 1.0f), 36.0f);
         evidenceMarker1->SetCastsShadow(false);
         Wall* evidenceMarker2 = createWall(
             "Stage2EvidenceMarker2", Vector3(-39.4f, -65.0f, 108.0f),
@@ -212,7 +212,7 @@ namespace Stage2Layout
             Color(0.025f, 0.11f, 0.09f, 1.0f), false);
         evidenceMarker2->SetAppearance(
             Color(0.025f, 0.11f, 0.09f, 1.0f),
-            Color(0.02f, 0.24f, 0.16f, 1.0f), 36.0f);
+            Color(0.012f, 0.13f, 0.09f, 1.0f), 36.0f);
         evidenceMarker2->SetCastsShadow(false);
 
         // 信号盤の上の、色付きで光る目印（信号の面として、シェーダーで模様を描いている）

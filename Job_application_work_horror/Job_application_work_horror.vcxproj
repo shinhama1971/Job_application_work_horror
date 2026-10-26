@@ -424,6 +424,7 @@
     <ClInclude Include="shader\portraitPainting.hlsli" />
     <ClInclude Include="shader\clockFace.hlsli" />
     <ClInclude Include="shader\doorPainting.hlsli" />
+    <ClInclude Include="shader\horrorGrade.hlsli" />
     <ClInclude Include="shader\surfaceDetail.hlsli" />
   </ItemGroup>
   <ItemGroup>

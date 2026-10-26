@@ -433,14 +433,15 @@ void CeilingLight::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& ligh
     // 発光パネルより少し下へ光源を置き、天井に埋もれず室内を照らすようにしている。
     pointLight.PositionRange = Vector4(
         m_Position.x, m_Position.y - 3.0f, m_Position.z,
-        powerRestored ? 165.0f : 115.0f);
+        powerRestored ? 140.0f : 115.0f);
 
     // 進行先の器具も、周囲と同じ非常灯・蛍光灯の色で照らす。
+    // 電力が戻っても、古い蛍光灯のように少し緑がかった弱い光にし、照明と照明の間に暗がりが残るようにしている。
     if (powerRestored)
     {
         pointLight.ColorIntensity = IsFaulted()
-            ? Vector4(0.70f, 0.78f, 0.56f, brightness * 1.08f)
-            : Vector4(0.84f, 0.91f, 1.0f, brightness * 1.32f);
+            ? Vector4(0.70f, 0.78f, 0.56f, brightness * 0.80f)
+            : Vector4(0.88f, 0.94f, 0.84f, brightness * 0.95f);
     }
     else
     {

@@ -85,6 +85,11 @@ float4 main(SIGNAL_PS_IN input) : SV_Target
         sin(input.pos.y * 3.1415926f) * 0.035f;
     color *= phosphor;
 
+    // 古く汚れたパネルらしく、全体を暗く・色を少し抜いている（廊下の中でおもちゃのように浮いて見えないように）。
+    // 次に押すパネルの脈打つ光（光る色）は残るので、信号盤パズルの手がかりは見える
+    const float panelLuminance = dot(color, float3(0.2126f, 0.7152f, 0.0722f));
+    color = lerp(panelLuminance.xxx, color, 0.70f) * 0.62f;
+
     // デバッグ表示1：法線を色で表示している
     if (DebugViewMode == 1)
     {

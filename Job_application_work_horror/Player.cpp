@@ -348,11 +348,11 @@ void Player::Update()
         flashlightDirection.y,
         flashlightDirection.z,
         0.0f);
-    // スポットライトの形：13度の内側は全部の明るさ、29度の外側で消え、その間は1.55乗でなめらかに暗くしている
+    // スポットライトの形：11度の内側は全部の明るさ、26度の外側で消え、その間は1.8乗で暗くしている（照らした輪の外がすぐ闇になる）
     light.SpotParams = Vector4(
-        cosf(DirectX::XMConvertToRadians(13.0f)),
-        cosf(DirectX::XMConvertToRadians(29.0f)),
-        1.55f,
+        cosf(DirectX::XMConvertToRadians(11.0f)),
+        cosf(DirectX::XMConvertToRadians(26.0f)),
+        1.8f,
         batteryWeakness
     );
 
@@ -364,23 +364,24 @@ void Player::Update()
             m_LightDiffuseG * (1.0f - batteryStress * 0.06f - batteryWeakness * 0.10f),
             m_LightDiffuseB * (1.0f - batteryStress * 0.18f - batteryWeakness * 0.32f),
             1.0f);
-        light.Ambient = Color(0.255f, 0.252f, 0.246f, 1.0f);
+        // 懐中電灯を点けている間は、光の外を暗く沈め、照らした所だけが見えるようにしている
+        light.Ambient = Color(0.150f, 0.152f, 0.150f, 1.0f);
     }
     else
     {
         light.Diffuse = Color(0.0f, 0.0f, 0.0f, 1.0f);
         light.Ambient = Color(
-            0.245f, // 懐中電灯を消しても、壁と進む方向を見分けられる最低限の明るさ
-            0.248f,
-            0.252f,
+            0.190f, // 懐中電灯を消しても、壁と進む方向をかろうじて見分けられる最低限の明るさ
+            0.194f,
+            0.198f,
             1.0f
         );
     }
 
-    // 電力が戻ったら、環境光を少し明るくしている
+    // 電力が戻ったら、環境光を少し明るくしている（それでも照明の間には暗がりが残る程度にしている）
     if (Core::Game::GetInstance()->IsPowerRestored())
     {
-        light.Ambient = Color(0.285f, 0.292f, 0.304f, 1.0f);
+        light.Ambient = Color(0.200f, 0.205f, 0.212f, 1.0f);
     }
 
     Renderer::SetLight(light);

@@ -187,8 +187,9 @@ float4 main(PS_IN input) : SV_TARGET
     const float chromaAlpha = saturate(
         eventAberration * edgeAberration * 0.022f +
         chromaDifference * horrorPulseStrength * 0.75f);
-    float vignette = smoothstep(0.30f, 0.72f, edgeDistance) *
-        0.25f * eventVignette;
+    // 周辺減光は強めにし、画面の端から闇が迫って見えるようにしている（中央は暗くしない）
+    float vignette = smoothstep(0.22f, 0.80f, edgeDistance) *
+        0.55f * eventVignette;
 
     // 1行おきの走査線。SV_POSITIONを使っているので、
     // ウィンドウの解像度が違っても線の太さが変わらない。
@@ -198,8 +199,11 @@ float4 main(PS_IN input) : SV_TARGET
     // 1/30秒ごとに変わる粒状のノイズ（暗い粒）
     float frame = floor(time * 30.0f);
     float noise = Hash(floor(input.pos.xy) + frame * float2(17.0f, 31.0f));
-    float darkGrain = smoothstep(0.68f, 1.0f, noise) *
-        0.012f * eventNoise;
+    // 粒は暗い所ほど強く出し、闇がざらついて見えるようにしている
+    const float grainLuminance = dot(sceneCenter,
+        float3(0.2126f, 0.7152f, 0.0722f));
+    float darkGrain = smoothstep(0.55f, 1.0f, noise) *
+        lerp(0.040f, 0.012f, smoothstep(0.02f, 0.25f, grainLuminance)) * eventNoise;
 
     // ごく薄い、ゆっくり流れる帯で、アナログ映像らしい動きを出している。
     float rolling = sin(input.uv.y * 10.0f - time * 1.8f) * 0.5f + 0.5f;

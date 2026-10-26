@@ -218,33 +218,8 @@ FloorAgeing GetFloorAgeing(float3 worldPosition, float amount)
     return ageing;
 }
 
-// 映画のような色調にしている（litTexturePSと同じ処理）
-float3 ApplyFilmicHorrorGrade(float3 color)
-{
-    color = max(color, 0.0f);
-    const float3 acesColor = saturate(
-        (color * (2.51f * color + 0.03f)) /
-        (color * (2.43f * color + 0.59f) + 0.14f));
-    color = lerp(color, acesColor, 0.28f);
-
-    const float luminance = dot(
-        color,
-        float3(0.2126f, 0.7152f, 0.0722f));
-    color = lerp(luminance.xxx, color, 0.86f);
-    const float shadowWeight =
-        1.0f - smoothstep(0.08f, 0.42f, luminance);
-    const float highlightWeight =
-        smoothstep(0.38f, 0.90f, luminance);
-    color *= lerp(
-        1.0f.xxx,
-        float3(0.91f, 0.96f, 1.035f),
-        shadowWeight * 0.48f);
-    color *= lerp(
-        1.0f.xxx,
-        float3(1.025f, 0.995f, 0.955f),
-        highlightWeight * 0.36f);
-    return saturate(color);
-}
+// ホラー向けの色調と、遠くの闇の色（litTexturePSと共通。horrorGrade.hlsli）
+#include "horrorGrade.hlsli"
 
 // 2次元の値から、0〜1の乱数を2つ作っている
 float2 Hash22(float2 value)
@@ -681,9 +656,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     const float heightFog =
         heightDensity * nearSuppression * fogVariation * 0.22f;
     const float fogFactor = saturate(distanceFog + heightFog);
-    const float3 fogColor = max(
-        Light.Ambient.rgb * 0.38f,
-        float3(0.070f, 0.078f, 0.084f));
+    // 遠くは灰色のもやではなく、闇に溶けていく
+    const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb);
     color.rgb = lerp(color.rgb, fogColor, fogFactor);
     color.rgb = ApplyFilmicHorrorGrade(color.rgb);
 
