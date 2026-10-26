@@ -258,9 +258,10 @@ void CeilingLight::Update()
             std::sin(flickerTime * 29.0f);
         const bool shortBlackout =
             std::fmod(flickerTime, 4.3f) < 0.12f;
+        // 懐中電灯を消すとほとんど闇なので、赤い光だまりが見えるよう、前より明るくしている
         targetBrightness = shortBlackout
             ? 0.015f
-            : 0.22f + (unstable + 1.0f) * 0.08f;
+            : 0.48f + (unstable + 1.0f) * 0.10f;
     }
 
     // 進む先の候補の照明。停電中も非常回路の弱い光を残し、候補どうしは同じ明るさ・同じ色にしている。
@@ -270,7 +271,7 @@ void CeilingLight::Update()
     {
         if (!powerRestored)
         {
-            targetBrightness = (m_IsEmergencyLight ? 0.24f : 0.14f) +
+            targetBrightness = (m_IsEmergencyLight ? 0.56f : 0.36f) +
                 std::sin(m_Time * 11.7f + m_FlickerOffset) * 0.006f;
         }
         if (!m_RouteFlickerEnabled)
@@ -397,9 +398,9 @@ void CeilingLight::Draw(Camera* camera)
     else
     {
         panel.Emission = Color(
-            0.75f * m_Brightness,
+            1.60f * m_Brightness,
+            0.050f * m_Brightness,
             0.025f * m_Brightness,
-            0.015f * m_Brightness,
             1.0f);
     }
     panel.TextureEnable = FALSE;
@@ -439,7 +440,7 @@ void CeilingLight::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& ligh
     // 発光パネルより少し下へ光源を置き、天井に埋もれず室内を照らすようにしている。
     pointLight.PositionRange = Vector4(
         m_Position.x, m_Position.y - 3.0f, m_Position.z,
-        powerRestored ? 140.0f : 115.0f);
+        powerRestored ? 140.0f : 135.0f);
 
     // 進行先の器具も、周囲と同じ非常灯・蛍光灯の色で照らす。
     // 電力が戻っても、古い蛍光灯のように少し緑がかった弱い光にし、照明と照明の間に暗がりが残るようにしている。
@@ -456,8 +457,9 @@ void CeilingLight::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& ligh
     }
     else
     {
+        // 停電中の非常灯：懐中電灯を消すとほとんど闇なので、赤い光だまりが道しるべになるよう強めにしている
         pointLight.ColorIntensity = Vector4(
-            1.0f, 0.055f, 0.025f, brightness * 1.05f);
+            1.0f, 0.055f, 0.025f, brightness * 3.4f);
     }
     lights.push_back(pointLight);
 }

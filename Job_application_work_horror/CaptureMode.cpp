@@ -80,6 +80,8 @@ namespace
         { 19.5f, Vector3(-60.0f, FloorY, -88.0f), YawToward(-60.0f, -88.0f, -150.0f, -140.0f), 0.0f, nullptr, false },
         { 24.0f, Vector3(-150.0f, FloorY, -110.0f), 0.0f, -0.26f, L"03_1面_左の倉庫の壁の文字", false },
         { 28.0f, Vector3(-60.0f, FloorY, -30.0f), YawToward(-60.0f, -30.0f, 0.0f, 40.0f), 0.0f, nullptr, false },
+        // 中央ホールで懐中電灯を消した画面（天井の照明の光だまりの外は、ほとんど闇）
+        { 29.0f, Vector3(-45.0f, FloorY, -5.0f), YawToward(-45.0f, -5.0f, 120.0f, -20.0f), 0.08f, L"02c_1面_懐中電灯を消した中央ホール", false },
         { 32.0f, Vector3(0.0f, FloorY, 70.0f), 0.0f, 0.0f, nullptr, false },
         { 36.5f, Vector3(12.0f, FloorY, 112.0f), Pi * 0.5f, -0.05f, L"04_1面_暗証番号の扉", false },
         { 41.0f, Vector3(0.0f, FloorY, 185.0f), 0.0f, 0.0f, nullptr, false },
@@ -133,6 +135,9 @@ namespace
     // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉 → 鏡（普段・鏡の異変で人影が映る・振り返ると誰もいない）
     // 鏡の異変は、MirrorAnomalyRequestTime にデバッグの操作（SceneDebugAction::ShowMirrorAnomaly）で出している。
     constexpr float MirrorAnomalyRequestTime = 40.0f;
+    // 1面で、この時刻の間だけ懐中電灯を消している（消したときの暗さを写すため）
+    constexpr float Stage1FlashlightOffStart = 28.5f;
+    constexpr float Stage1FlashlightOffEnd = 29.4f;
     // 濡れた足跡の場面の前に、2周目へ進めている（誰かの足跡は2周目から出る）
     constexpr float SecondLoopRequestTime = 50.5f;
     // 肖像画の場面の前に、肖像画の異変を出している
@@ -842,7 +847,8 @@ namespace Tools::CaptureMode
         {
             player->AddBattery(-75.0f);
         }
-        player->SetFlashlightOn(true);
+        player->SetFlashlightOn(!(scene == SceneName::Stage &&
+            g_TourTime >= Stage1FlashlightOffStart && g_TourTime < Stage1FlashlightOffEnd));
         camera->SetCameraDirection(pose.Yaw);
         camera->SetCameraPitch(pose.Pitch);
     }

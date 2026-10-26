@@ -22,8 +22,9 @@ float3 ApplyFilmicHorrorGrade(float3 color)
 
     const float luminance = dot(color, float3(0.2126f, 0.7152f, 0.0722f));
 
-    // 彩度：暗い所ほど色を抜き（55%）、照らされた所に少しだけ色を残している（80%）
-    const float saturation = lerp(0.55f, 0.80f, smoothstep(0.05f, 0.50f, luminance));
+    // 彩度：暗い所ほど色を抜き（70%）、照らされた所に少しだけ色を残している（82%）。
+    // 暗い所でも、非常灯の赤や電球の橙の光だまりの色は残るようにしている
+    const float saturation = lerp(0.70f, 0.82f, smoothstep(0.05f, 0.50f, luminance));
     color = lerp(luminance.xxx, color, saturation);
 
     // 黒を沈める：とても暗い所ほど、さらに暗くしている（光の届かない所が、灰色ではなく闇に見える）
