@@ -38,10 +38,10 @@ namespace
     // 1スレッドグループのマスの数（シェーダーのGROUP_SIZEと同じ）
     constexpr int GroupSize = 16;
     // (波の速さ × 1歩の秒数 ÷ マス目の長さ)²。0.5を超えると計算が発散するので、余裕を持たせている。
-    // マス目0.75、1秒60歩なので、波の速さは約27（1秒で水たまりの半分ほど進む）
-    constexpr float WaveSpeedSquared = 0.35f;
-    // 1歩ごとに高さに掛ける値。約1.1秒で半分の高さになり、波がいつまでも残らないようにしている
-    constexpr float Damping = 0.990f;
+    // マス目0.75、1秒60歩なので、波の速さは約13.5（静かな水面に広がる、ゆっくりした輪にしている。前の0.35では速すぎた）
+    constexpr float WaveSpeedSquared = 0.09f;
+    // 1歩ごとに高さに掛ける値。約1.6秒で半分の高さになる（波が遅くなった分、少し長く残している）
+    constexpr float Damping = 0.993f;
 }
 
 void WaterRippleSimulation::Init()

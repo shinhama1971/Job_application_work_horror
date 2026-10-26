@@ -371,7 +371,13 @@ void CeilingLight::Draw(Camera* camera)
     panel.Diffuse = Color(0.22f, 0.21f, 0.18f, 1.0f);
     if (Core::Game::GetInstance()->IsPowerRestored())
     {
-        if (m_IsFaulted)
+        if (m_IsWarmBulb && !m_IsFaulted)
+        {
+            // 暖かい白熱電球：橙がかった黄色で、電圧の揺れに合わせて少し沈む
+            const float warm = m_Brightness * GetWarmBulbSag();
+            panel.Emission = Color(0.95f * warm, 0.62f * warm, 0.30f * warm, 1.0f);
+        }
+        else         if (m_IsFaulted)
         {
             panel.Emission = Color(
                 0.52f * m_Brightness,
@@ -442,6 +448,11 @@ void CeilingLight::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& ligh
         pointLight.ColorIntensity = IsFaulted()
             ? Vector4(0.70f, 0.78f, 0.56f, brightness * 0.80f)
             : Vector4(0.88f, 0.94f, 0.84f, brightness * 0.95f);
+        if (m_IsWarmBulb && !IsFaulted())
+        {
+            // 暖かい白熱電球：照らす光も橙がかった色にし、電圧の揺れで少し沈む（P.T. の廊下の光）
+            pointLight.ColorIntensity = Vector4(1.0f, 0.66f, 0.36f, brightness * 1.40f * GetWarmBulbSag());
+        }
     }
     else
     {
@@ -449,4 +460,14 @@ void CeilingLight::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& ligh
             1.0f, 0.055f, 0.025f, brightness * 1.05f);
     }
     lights.push_back(pointLight);
+}
+
+// 白熱電球の電圧の揺れ：ゆっくりした小さな揺れに、数秒に一度だけ短く沈む揺れを重ねている（器具ごとに時間をずらしている）
+float CeilingLight::GetWarmBulbSag() const
+{
+    const float time = m_Time + m_FlickerOffset * 3.7f;
+    const float slow = std::sin(time * 1.3f) * 0.5f + 0.5f;
+    const float dipPhase = std::fmod(time, 6.3f);
+    const float dip = dipPhase < 0.18f ? std::sin(dipPhase / 0.18f * 3.14159265f) : 0.0f;
+    return 1.0f - slow * 0.04f - dip * 0.10f;
 }

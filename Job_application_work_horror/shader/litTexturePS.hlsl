@@ -361,6 +361,7 @@ float3 GetBumpedWorldNormal(
 
 // ホラー向けの色調と、遠くの闇の色（wetFloorPSと共通。horrorGrade.hlsli）
 #include "horrorGrade.hlsli"
+#include "horrorMist.hlsli"
 
 
 // 画素の色を計算している：元の色 → 汚れと古さ → 環境光・天井灯・懐中電灯 → 濡れた光沢 → 自己発光 → 霧 → 色調
@@ -545,6 +546,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
                 1.0f - normalizedDistance * normalizedDistance);
             const float attenuation = rangeFade * rangeFade;
             const float lensPattern = GetFlashlightLensPattern(pixelDirection);
+            const float3 flashlightColor = Light.Diffuse.rgb * GetFlashlightTint(pixelDirection);
             // 実際の光のように距離の2乗で弱まる分を、少しだけ混ぜている
             const float physicalFalloff = rcp(
                 1.0f + distanceFromCamera * distanceFromCamera * 0.000018f);
@@ -557,7 +559,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
             // 横から当たる面も真っ暗にならないよう、明るさの下限を設けている
             const float softenedLambert = 0.25f + lambert * 0.75f;
 
-            lighting += Light.Diffuse.rgb
+            lighting += flashlightColor
                 * Light.Intensity
                 * beamProfile
                 * naturalAttenuation
@@ -605,6 +607,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 遠くは灰色のもやではなく、闇に溶けていく
     const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb);
     color.rgb = lerp(color.rgb, fogColor, fogFactor);
+    // 床の近くに溜まって流れる霧（懐中電灯の円錐の中だけ白く浮かぶ。horrorMist.hlsli）
+    color.rgb = ApplyHorrorMist(color.rgb, input.worldPos, input.viewPos, lighting);
     color.rgb = ApplyFilmicHorrorGrade(color.rgb);
 
     // デバッグ表示：1=法線、2=懐中電灯の影、3=照明だけ、6=壁の湿り気、7=タイルごとの光源の数。4・5は床（水たまり・反射）用の表示なので、壁は黒にしている

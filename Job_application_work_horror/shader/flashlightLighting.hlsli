@@ -23,6 +23,15 @@ float GetFlashlightBeamProfile(float3 pixelDirection)
     return shapedCone * lerp(0.82f, 1.08f, smoothstep(0.38f, 1.0f, cone));
 }
 
+// 懐中電灯の光の色：中心は少し青みのある白、縁へ行くほど黄色く暖かくにじむ（安い懐中電灯の光。サイレントヒルの懐中電灯を参考）
+float3 GetFlashlightTint(float3 pixelDirection)
+{
+    const float coneDot = dot(pixelDirection, normalize(Light.Direction.xyz));
+    const float cone = smoothstep(Light.SpotParams.y, Light.SpotParams.x, coneDot);
+    const float edge = smoothstep(0.15f, 1.0f, 1.0f - cone);
+    return lerp(float3(0.96f, 1.0f, 1.07f), float3(1.10f, 0.88f, 0.58f), edge);
+}
+
 // 懐中電灯のレンズの模様：中心を明るくし、レンズの汚れのような細かいむら、反射鏡の輪、指紋のくもりと傷の影を付けている。
 // 電池が弱るほど（Light.SpotParams.w）、中心が暗くなり、輪のむらがはっきりする
 float GetFlashlightLensPattern(float3 pixelDirection)

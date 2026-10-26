@@ -829,7 +829,7 @@ namespace Tools::CaptureMode
                 g_LastStepPosition = pose.Position;
                 for (Ground* ground : game->GetObjects<Ground>())
                 {
-                    ground->AddRippleImpulse(pose.Position, 2.0f, -1.2f);
+                    ground->AddRippleImpulse(pose.Position, 1.4f, -1.2f);
                 ground->RecordFootstep(pose.Position);
                 }
             }

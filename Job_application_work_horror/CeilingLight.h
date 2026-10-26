@@ -40,6 +40,10 @@ private:
     bool m_IsEmergencyLight = false;
     bool m_IsFaulted = false;
     bool m_IsForcedOff = false;
+    // 暖かい白熱電球の色か（SetWarmBulb）
+    bool m_IsWarmBulb = false;
+    // 白熱電球の電圧の揺れ（0.86〜1）。時間で、ゆっくりした揺れと、まれに沈む揺れを重ねている
+    float GetWarmBulbSag() const;
     bool m_WasPowerRestored = false;
     // 進む先の照明：明るさと色はほかと同じまま、切れかけの電球のように不規則にちかちかさせる。
     // 行き先の候補か、今ちかちかさせる1灯か
@@ -97,6 +101,12 @@ public:
     {
         m_IsEmergencyLight = emergency;
         m_FlickerOffset = flickerOffset;
+    }
+
+    // P.T. の廊下のような、暖かい白熱電球の色の照明にしている（電力が戻った後の色。電圧が揺れて、ときどき少し暗くなる）
+    void SetWarmBulb(bool warm)
+    {
+        m_IsWarmBulb = warm;
     }
 
     // 故障した灯にしている（電力が戻っても不規則に消える）

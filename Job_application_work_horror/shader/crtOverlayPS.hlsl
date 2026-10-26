@@ -118,8 +118,9 @@ float4 main(PS_IN input) : SV_TARGET
         horrorPulseStrength * 1.15f +
         highTension * 0.32f +
         signalInterference);
+    // 画面の端には、いつもわずかな色ずれを残している（古いレンズのような、P.T. の画面の質感）
     const float eventAberration = saturate(
-        horrorPulseStrength +
+        0.30f + horrorPulseStrength +
         highTension * lensDistortionStrength * 0.22f +
         signalInterference * 0.72f);
     const float edgeAberration = smoothstep(0.20f, 0.72f, edgeDistance);
@@ -140,7 +141,7 @@ float4 main(PS_IN input) : SV_TARGET
         input.uv + centered * radialSquared * radialWarp +
         float2(signalJitter, 0.0f));
     const float chromaOffset =
-        (horrorPulseStrength * 0.0038f +
+        (0.0014f + horrorPulseStrength * 0.0038f +
          highTension * lensDistortionStrength * 0.0012f) *
         edgeAberration + signalInterference * signalGate * 0.0024f;
     const float3 sceneCenter = SceneTexture.SampleLevel(
@@ -186,7 +187,7 @@ float4 main(PS_IN input) : SV_TARGET
         abs(chromaticScene - sceneCenter));
     const float chromaAlpha = saturate(
         eventAberration * edgeAberration * 0.022f +
-        chromaDifference * horrorPulseStrength * 0.75f);
+        chromaDifference * (horrorPulseStrength * 0.75f + edgeAberration * 0.45f));
     // 周辺減光は強めにし、画面の端から闇が迫って見えるようにしている（中央は暗くしない）
     float vignette = smoothstep(0.22f, 0.80f, edgeDistance) *
         0.55f * eventVignette;
@@ -202,8 +203,12 @@ float4 main(PS_IN input) : SV_TARGET
     // 粒は暗い所ほど強く出し、闇がざらついて見えるようにしている
     const float grainLuminance = dot(sceneCenter,
         float3(0.2126f, 0.7152f, 0.0722f));
-    float darkGrain = smoothstep(0.55f, 1.0f, noise) *
-        lerp(0.040f, 0.012f, smoothstep(0.02f, 0.25f, grainLuminance)) * eventNoise;
+    // フィルムの粒：暗い粒と明るい粒の両方を、はっきり見える強さで出している（サイレントヒルの画面の粒を参考）。
+    // 暗い所ほど強く出し、闇がざらついて見えるようにしている
+    const float grainStrength = (0.35f + eventNoise) * lerp(1.0f, 0.40f, smoothstep(0.02f, 0.30f, grainLuminance));
+    float darkGrain = smoothstep(0.55f, 1.0f, noise) * 0.080f * grainStrength;
+    const float brightNoise = Hash(floor(input.pos.xy) + frame * float2(31.0f, 17.0f) + 7.3f);
+    const float brightGrain = smoothstep(0.62f, 1.0f, brightNoise) * 0.055f * grainStrength;
 
     // ごく薄い、ゆっくり流れる帯で、アナログ映像らしい動きを出している。
     float rolling = sin(input.uv.y * 10.0f - time * 1.8f) * 0.5f + 0.5f;
@@ -213,7 +218,7 @@ float4 main(PS_IN input) : SV_TARGET
     float dust = step(0.9985f, noise);
 
     float darkAlpha = saturate(vignette + scanline + darkGrain + rolling);
-    float dustAlpha = dust * 0.030f * eventNoise;
+    float dustAlpha = dust * 0.030f * eventNoise + brightGrain;
 
     // レンズの水滴は、プレイヤーが水たまりを踏んだ後だけ出る。水滴ごとに
     // 流れ落ちる速さを変え、模様がスタンプのように見えないようにしている。
@@ -316,10 +321,11 @@ float4 main(PS_IN input) : SV_TARGET
         signalAlpha);
 
     // 重ねる層の色：埃・裂け目・信号の乱れ・歪み・色ずれ・水滴を、それぞれの強さで混ぜている
+    // 暗い層（周辺減光・暗い粒）と明るい層（埃・明るい粒）を、それぞれの強さの割合で混ぜた色にしている
     float3 overlayColor = lerp(
         float3(0.0f, 0.0f, 0.0f),
-        float3(0.70f, 0.74f, 0.70f),
-        dust
+        float3(0.62f, 0.65f, 0.62f),
+        saturate(dustAlpha / max(darkAlpha + dustAlpha, 0.0001f))
     );
     float channelChoice = Hash(float2(bandId + 13.0f, floor(time * 24.0f)));
     float3 tearColor = channelChoice < 0.5f

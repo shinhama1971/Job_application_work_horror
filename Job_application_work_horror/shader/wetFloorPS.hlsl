@@ -220,6 +220,7 @@ FloorAgeing GetFloorAgeing(float3 worldPosition, float amount)
 
 // ホラー向けの色調と、遠くの闇の色（litTexturePSと共通。horrorGrade.hlsli）
 #include "horrorGrade.hlsli"
+#include "horrorMist.hlsli"
 
 // 2次元の値から、0〜1の乱数を2つ作っている
 float2 Hash22(float2 value)
@@ -239,7 +240,7 @@ float GetDripRing(float2 worldPosition)
     const float2 dropPosition = 0.18f + Hash22(cell) * 0.64f;
     const float dropSeed = Hash21(cell + float2(31.7f, 19.3f));
     const float activeDrop = step(0.76f, dropSeed);
-    const float phase = frac(WetTime * 0.18f + dropSeed);
+    const float phase = frac(WetTime * 0.11f + dropSeed);
     const float radius = phase * 0.48f;
     const float distanceToDrop = length(localPosition - dropPosition);
     const float ring = 1.0f - smoothstep(
@@ -314,7 +315,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         const float insideDistance = min(
             min(fromMinimum.x, fromMinimum.y), min(toMaximum.x, toMaximum.y));
         const float flood = smoothstep(-0.5f, 1.5f, insideDistance);
-        ripplePattern += sin(input.worldPos.x * 0.21f + input.worldPos.z * 0.13f + WetTime * 0.9f) *
+        ripplePattern += sin(input.worldPos.x * 0.21f + input.worldPos.z * 0.13f + WetTime * 0.5f) *
             0.35f * flood * (1.0f - puddle);
         puddle = max(puddle, flood);
     }
@@ -336,7 +337,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
             const float normalizedDistance = leakDistance / max(leak.z, 0.01f) + edgeNoise;
             const float leakPuddle = 1.0f - smoothstep(0.80f, 1.0f, normalizedDistance);
             shore = max(shore, (1.0f - smoothstep(0.0f, 0.08f, abs(normalizedDistance - 0.97f))) * 0.6f);
-            ripplePattern += sin(leakDistance * 2.2f - WetTime * 6.0f) * 0.30f * leakPuddle * exp(-leakDistance * 0.25f);
+            ripplePattern += sin(leakDistance * 2.2f - WetTime * 2.6f) * 0.30f * leakPuddle * exp(-leakDistance * 0.25f);
             puddle = max(puddle, leakPuddle);
         }
     }
@@ -491,6 +492,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
                 1.0f - normalizedDistance * normalizedDistance);
             const float attenuation = rangeFade * rangeFade;
             const float lensPattern = GetFlashlightLensPattern(pixelDirection);
+            const float3 flashlightColor = Light.Diffuse.rgb * GetFlashlightTint(pixelDirection);
             const float physicalFalloff = rcp(
                 1.0f + distanceFromCamera * distanceFromCamera * 0.000018f);
             const float naturalAttenuation = attenuation *
@@ -508,7 +510,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
             const float flashlightAmount = Light.Intensity
                 * beamProfile * naturalAttenuation * lensPattern * shadow * flashlightOcclusion;
 
-            lighting += Light.Diffuse.rgb
+            lighting += flashlightColor
                 * flashlightAmount
                 * softenedLambert;
 
@@ -517,25 +519,25 @@ float4 main(in LIT_PS_IN input) : SV_Target
             const float wetSpecular = pow(
                 saturate(dot(normal, halfVector)),
                 lerp(18.0f, 92.0f, puddle));
-            specularLighting += Light.Diffuse.rgb
+            specularLighting += flashlightColor
                 * flashlightAmount
                 * wetSpecular
                 * lerp(0.025f, 1.15f, puddle);
             // 濡れた足跡も、懐中電灯の光を細く返す
-            specularLighting += Light.Diffuse.rgb
+            specularLighting += flashlightColor
                 * flashlightAmount
                 * pow(saturate(dot(normal, halfVector)), 48.0f)
                 * 0.55f * footprintWet;
 
             // 完全な鏡面反射の方向がカメラを外れても、浅い水は懐中電灯を弱く広く反射する。
             // 水面が黒く沈むのを防いでいる。
-            specularLighting += Light.Diffuse.rgb
+            specularLighting += flashlightColor
                 * flashlightAmount
                 * puddle
                 * (0.045f + fresnel * 0.12f);
 
             // 足音や水滴の波：傾いた斜面が懐中電灯の光をきらっと返し、照らした所に光の輪が広がって見える
-            specularLighting += Light.Diffuse.rgb
+            specularLighting += flashlightColor
                 * flashlightAmount
                 * saturate(length(rippleWave.yz) * 3.0f)
                 * 0.40f;
@@ -659,6 +661,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 遠くは灰色のもやではなく、闇に溶けていく
     const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb);
     color.rgb = lerp(color.rgb, fogColor, fogFactor);
+    // 床の近くに溜まって流れる霧（懐中電灯の円錐の中だけ白く浮かぶ。horrorMist.hlsli）
+    color.rgb = ApplyHorrorMist(color.rgb, input.worldPos, input.viewPos, lighting);
     color.rgb = ApplyFilmicHorrorGrade(color.rgb);
 
     // デバッグ表示：1=法線、2=懐中電灯の影、3=照明だけ、4=水たまりの濃さ、5=反射の画像、7=タイルごとの光源の数（6は壁用なので黒）

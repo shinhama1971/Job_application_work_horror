@@ -150,10 +150,16 @@ float4 main(PS_IN input) : SV_Target
     const float driftingDust = nearDust + farDust;
     const float slowVariation =
         sin(input.uv.y * 38.0f - time * 1.7f) * 0.5f + 0.5f;
+    // 光の中に漂う煙：大きさの違う2つのノイズを逆向きにゆっくり流し、光の筋に濃い所と薄い所のむらを作っている
+    const float smokeLarge = ValueNoise(
+        input.uv * float2(4.5f * screenAspect, 3.2f) + float2(time * 0.055f, -time * 0.030f));
+    const float smokeSmall = ValueNoise(
+        input.uv * float2(10.0f * screenAspect, 7.0f) + float2(-time * 0.085f, time * 0.045f) + 5.0f);
+    const float smoke = smoothstep(0.30f, 0.85f, smokeLarge * 0.65f + smokeSmall * 0.35f);
 
     // 光の筋の濃さ：驚かせる演出や緊張が高いほど濃くしている
     float density =
-        (0.032f + slowVariation * 0.012f + driftingDust) *
+        (0.026f + slowVariation * 0.010f + driftingDust + smoke * 0.040f) *
         softBeam * visibleLength * floorFade * volumeIntensity;
     density *= 1.0f + horrorPulseStrength * 0.32f;
     density *= 1.0f + corridorTension * 0.48f;

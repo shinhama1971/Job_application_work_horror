@@ -488,6 +488,11 @@ namespace Stage2Layout
         light4->SetPosition(0.0f, -50.5f, 112.0f);
         light4->SetScale(18.0f, 2.0f, 8.0f);
         light4->SetEmergencyLight(false, 4.1f);
+        // 2面の廊下は、P.T. の廊下のような暖かい白熱電球の光にしている（1面は古い蛍光灯のまま）
+        for (CeilingLight* bulb : { light1, light2, light3, light4 })
+        {
+            bulb->SetWarmBulb(true);
+        }
 
         // 出口の扉と、その先の出口（調べるとリザルト画面へ）
         Door* door = builder.Create<Door>("Stage2Door");
