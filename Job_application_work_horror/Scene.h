@@ -33,7 +33,9 @@ enum class SceneDebugAction
     // 2面：肖像画の異変の周回にしている（手で試すときと、自動撮影で絵の中の目が開くところを写すときに使っている）
     ShowPortraitAnomaly,
     // 2面：偽の扉の異変の周回にしている（手で試すときと、自動撮影で偽の扉を写すときに使っている）
-    ShowFalseDoorAnomaly
+    ShowFalseDoorAnomaly,
+    // 1面：ループ廊下の突き当たりの最後のドアを開けている（自動撮影で、開けた瞬間に開始地点の奥のドアへつながる様子を写すときに使っている）
+    OpenStage1EndDoor
 };
 
 // シーンの基底クラス。Gameが今のシーンを1つだけunique_ptrで持ち、毎フレーム更新・描画している。

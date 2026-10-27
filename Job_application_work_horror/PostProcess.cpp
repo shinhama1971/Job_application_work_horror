@@ -40,6 +40,7 @@ namespace Effect
         m_LensDirtStrength = 0.10f;
         m_SignalInterference = 0.0f;
         m_TargetSignalInterference = 0.0f;
+        m_PresenceStatic = 0.0f;
 
         m_RenderTexture.Init(
             Application::GetWidth(),
@@ -409,6 +410,6 @@ namespace Effect
             (std::clamp)(m_CorridorTension * effectScale, 0.0f, 1.0f),
             (std::clamp)(m_FilmGradeStrength * effectScale, 0.0f, 1.0f),
             (std::clamp)(m_LensDirtStrength * effectScale, 0.0f, 1.0f),
-            (std::clamp)(m_SignalInterference * effectScale, 0.0f, 1.0f));
+            (std::clamp)((std::max)(m_SignalInterference, m_PresenceStatic) * effectScale, 0.0f, 1.0f));
     }
 }

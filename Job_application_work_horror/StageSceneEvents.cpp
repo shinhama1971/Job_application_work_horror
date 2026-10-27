@@ -186,7 +186,7 @@ void StageScene::UpdateStorageScare(Player& player)
     });
 }
 
-// ループ廊下：電力が戻る前に、廊下の出口（右の奥）へ入ったら開始地点へ戻している
+// ループ廊下：電力が戻る前に、突き当たりの最後のドアを開けたら、その瞬間に開始地点の奥のドアの裏側へ移して次の周回を始めている
 void StageScene::UpdateCorridorLoop(Player& player)
 {
     const float deltaTime = Application::GetDeltaTime();
@@ -200,30 +200,70 @@ void StageScene::UpdateCorridorLoop(Player& player)
     }
 
     Core::Game* game = Core::Game::GetInstance();
+
+    // 開始地点の奥のドア：通ってきたプレイヤーが部屋へ入り、ドアに背を向けたら、音を立てて閉めて鍵をかけている
+    Door* startDoor = m_Objects.startDoor;
+    if (startDoor != nullptr && startDoor->IsOpen())
+    {
+        const bool walkedIntoRoom = player.GetPosition().z > Stage1StartDoorZ + 30.0f;
+        const bool facingAway = game->GetCamera()->GetForward().z > 0.2f;
+        if (walkedIntoRoom && facingAway)
+        {
+            startDoor->ResetClosed(0);
+            startDoor->SetLocked(true);
+            game->PlayAudioCueAt(SOUND_CUE_DOOR, startDoor->GetPosition());
+        }
+    }
+
     if (game->IsPowerRestored() || m_LoopCooldown > 0.0f)
     {
         return;
     }
 
-    const Vector3 position = player.GetPosition();
-    const bool insideLoopExit =
-        position.x > 178.0f &&
-        position.z > 237.0f && position.z < 273.0f;
-    if (insideLoopExit)
+    Door* endDoor = m_Objects.exitDoor;
+    if (endDoor != nullptr && endDoor->IsOpening())
     {
         AdvanceCorridorLoop(player);
     }
 }
 
-// ループ廊下を1周進めている：開始地点へ戻し、周回の数に応じて印・扉・照明・ヒューズ・影を変えている
+// 突き当たりの最後のドアが開いていて、プレイヤーがドアの位置を越えて向こう側へ出たか
+bool StageScene::IsThroughEndDoor(const Vector3& position) const
+{
+    const Door* endDoor = m_Objects.exitDoor;
+    return endDoor != nullptr &&
+        endDoor->IsOpen() &&
+        position.x > Stage1EndDoorX &&
+        std::abs(position.z - Stage1EndDoorZ) < Stage1EndDoorHalfWidth + 2.0f;
+}
+
+// ループ廊下を1周進めている：開始地点の奥のドアの裏側へ移し、周回の数に応じて印・扉・照明・ヒューズ・影を変えている
 void StageScene::AdvanceCorridorLoop(Player& player)
 {
     Core::Game* game = Core::Game::GetInstance();
+    // 最後のドアは、前の周回の開き方で開き始めている。奥のドアも同じ開き方で開けて、続きに見せている。
+    const int openingPhase = (std::min)(m_CorridorLoopCount, 3);
     ++m_CorridorLoopCount;
 
-    // 同じフレームの後半でPlayerがカメラを更新するため、場所を移した瞬間を隠しつつ、
-    // プレイヤーが見ていた方向をそのまま保てる。
-    player.SetPosition(Vector3(0.0f, -99.0f, -150.0f));
+    // 最後のドアに対する立ち位置と向きを、そのまま奥のドアの裏側へ写している。
+    // 最後のドアを通る向き（+x）が奥のドアを通る向き（+z）になるよう、水平に90度回している（(x, z) → (-z, x)）。
+    // 同じフレームの後半でPlayerがカメラを更新するため、移った瞬間も1フレームもずれない。
+    const Vector3 position = player.GetPosition();
+    const float alongDoor = position.x - Stage1EndDoorX;
+    const float acrossDoor = position.z - Stage1EndDoorZ;
+    player.SetPosition(Vector3(
+        Stage1StartDoorX - acrossDoor, position.y, Stage1StartDoorZ + alongDoor));
+    Camera* camera = game->GetCamera();
+    camera->SetCameraDirection(camera->GetCameraDirection() - DirectX::XM_PIDIV2);
+
+    // 奥のドアを開け始めている。開いた向こうに開始地点が見える。
+    Door* startDoor = m_Objects.startDoor;
+    if (startDoor != nullptr)
+    {
+        startDoor->ResetClosed(openingPhase);
+        startDoor->StartOpeningQuietly();
+        game->PlayAudioCueAt(SOUND_CUE_DOOR, startDoor->GetPosition());
+    }
     m_LoopCooldown = 1.0f;
     m_ProgressHintTimer = 0.0f;
     m_LoopNoticeTimer = 2.4f;
@@ -258,6 +298,12 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     if (loopDoor != nullptr)
     {
         loopDoor->ResetClosed(loopPhase);
+    }
+    // 最後のドアは閉じた状態に戻し、周回に合わせた開き方に変えている（次の周回でもう一度開けさせる）
+    Door* endDoor = m_Objects.exitDoor;
+    if (endDoor != nullptr)
+    {
+        endDoor->ResetClosed(loopPhase);
     }
 
     CeilingLight* entranceLight =
@@ -325,7 +371,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
             game->RequestAddObject<ShadowMan>(
                 [this](ShadowMan& shadow)
                 {
-                    shadow.SetPosition(0.0f, -99.0f, -170.0f);
+                    shadow.SetPosition(Stage1StartDoorX, -99.0f, Stage1StartDoorZ - 70.0f);
                     shadow.EnableGazeScare();
                     shadow.SetOnObserved(
                         [this]()
@@ -836,7 +882,10 @@ float StageScene::ComputeThreatRate(const Player& player) const
 void StageScene::UpdateTensionPulse(const Player& player, float deltaTime)
 {
     // 1面には隠れる場所がないため、隠れている扱いにはしていない。
-    PlayTensionPulse(m_TensionPulse.Update(deltaTime, ComputeThreatRate(player), false));
+    const float threatRate = ComputeThreatRate(player);
+    PlayTensionPulse(m_TensionPulse.Update(deltaTime, threatRate, false));
+    // 影が近いほど、携帯ラジオの雑音が大きくなる（監視映像を見ている間は鳴らさない）
+    m_RadioStatic.Update(deltaTime, threatRate, !m_Surveillance.IsViewing());
 }
 
 // 点が懐中電灯で照らされているかを返している。

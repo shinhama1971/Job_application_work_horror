@@ -363,6 +363,8 @@ void Stage2Scene::AdvanceLoop(Player& player)
     m_HandprintAnomaly.ResetProgressForLoop();
     m_MirrorAnomaly.ResetProgressForLoop();
     m_FootprintFollowerUsedThisLoop = false;
+    // 周回が切り替わった瞬間、吊るした裸電球が大きく揺れる（同じ廊下に戻ってきた合図）
+    KickHangingBulbs(0.5f);
     // 周回ごとに、天井の雨漏りを1か所ずつ増やしている（3周目まで。周回を重ねるほど廊下が濡れていく）
     const Vector2 leakSpots[] = { Vector2(-22.0f, -40.0f), Vector2(24.0f, 58.0f), Vector2(-20.0f, -128.0f) };
     if (m_Objects.ground != nullptr && m_LoopCount >= 1 && m_LoopCount <= 3)

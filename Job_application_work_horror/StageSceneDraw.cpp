@@ -108,25 +108,26 @@ void StageScene::Draw(Camera* camera)
         m_InteractionSystem.GetPrompt(),
         game->IsGuideEnabled() ? std::string_view(objectiveText) : std::string_view{});
 
-    // 目的地の方向：始まりの4.2秒の後、進み具合に合わせて次に行く場所を指している（普段は出口）
+    // 目的地の方向：始まりの4.2秒の後、進み具合に合わせて次に行く場所を指している（普段はループ廊下の突き当たりの最後のドア）
     if (game->IsGuideEnabled() &&
         m_StageVisualTimer >= 4.20f &&
         (exitTrigger == nullptr || !exitTrigger->IsEscaping()))
     {
-        Vector3 guideTarget(0.0f, -99.0f, 315.0f);
+        const Vector3 endDoorTarget(Stage1EndDoorX, -74.0f, Stage1EndDoorZ);
+        Vector3 guideTarget = endDoorTarget;
         if (m_HiddenRoom.IsTrapped() && m_Objects.hiddenRoom.key != nullptr)
         {
             // 隠し部屋に閉じ込められている間は、鍵の場所を指している。
             guideTarget = m_Objects.hiddenRoom.key->GetPosition();
         }
-        // 電力が戻った後は、出口の送電盤、次に出口の扉を指している
+        // 電力が戻った後は、出口の送電盤、次に最後のドアを指している
         else if (game->IsPowerRestored() && !exitPowerActivated)
         {
             guideTarget = Vector3(145.0f, -90.0f, 270.0f);
         }
         else if (game->IsPowerRestored())
         {
-            guideTarget = Vector3(202.0f, -74.0f, 307.5f);
+            guideTarget = endDoorTarget;
         }
         // ヒューズの位置はプレイごとに変わるため、配置したObjectから読んでいる。
         else if (fuseCount <= 0 && m_Objects.firstFuse != nullptr)

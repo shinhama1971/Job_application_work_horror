@@ -361,6 +361,7 @@ namespace Core
         {
             m_Sound.StopAllSpatial();
         }
+        m_PostProcess.SetPresenceStatic(0.0f);
 
         DeleteAllObject();
 
@@ -396,6 +397,7 @@ namespace Core
         {
             m_Sound.Stop(SOUND_CUE_AMBIENCE_STAGE1);
             m_Sound.Stop(SOUND_CUE_AMBIENCE_STAGE2);
+            m_Sound.Stop(SOUND_CUE_RADIO_STATIC);
             if (sName == SceneName::Stage)
             {
                 m_Sound.Play(SOUND_CUE_AMBIENCE_STAGE1);
@@ -403,6 +405,11 @@ namespace Core
             else if (sName == SceneName::Stage2)
             {
                 m_Sound.Play(SOUND_CUE_AMBIENCE_STAGE2);
+            }
+            // 携帯ラジオの雑音は、1面と2面の間ずっと音量0で鳴らしておき、影が近いときだけ大きくしている（RadioStatic）
+            if (sName == SceneName::Stage || sName == SceneName::Stage2)
+            {
+                m_Sound.Play(SOUND_CUE_RADIO_STATIC, 1.0f, 0.0f);
             }
         }
     }

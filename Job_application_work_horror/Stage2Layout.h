@@ -30,6 +30,7 @@ class CeilingLight;
 class Locker;
 class MirrorSelf;
 class Ground;
+class HangingBulb;
 
 // 2面の廊下の照明。演出の表では、名前の文字列ではなくこの値で照明を指定している。
 enum class Stage2Light
@@ -71,6 +72,8 @@ struct Stage2Objects
     MirrorSelf* mirrorSelf = nullptr;
     // 濡れた床（水たまり・濡れた足跡）
     Ground* ground = nullptr;
+    // 天井から吊るした、揺れる裸電球（P.T. の廊下の電球）
+    std::array<HangingBulb*, 2> hangingBulbs{};
     // 隠れられるロッカー（左の壁と右の壁に1つずつ）
     std::array<Locker*, 2> lockers{};
     // 異常確認のスイッチ、非常用充電器、棚の上の電池

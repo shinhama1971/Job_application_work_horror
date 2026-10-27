@@ -17,6 +17,7 @@
 #include "Stage1AmbientSounds.h"
 #include "TensionPulse.h"
 #include "Stage1LightStalker.h"
+#include "RadioStatic.h"
 #include "PropLayoutEditor.h"
 #include "FootprintFollower.h"
 
@@ -80,6 +81,8 @@ private:
     void UpdateEntranceThresholdEvent(class Player& player);
     void UpdateStorageScare(class Player& player);
     void AdvanceCorridorLoop(class Player& player);
+    // 突き当たりの最後のドアが開いていて、プレイヤーがその向こう側へ出たか
+    bool IsThroughEndDoor(const DirectX::SimpleMath::Vector3& position) const;
 
     // 照明が次々に明滅する演出、電力が戻る演出、出口へ送電する演出、ヒューズを拾った後の影、出口の前兆
     void StartScareLightSequence();
@@ -116,6 +119,8 @@ private:
     // 西棟の水から後をついて来る誰かの濡れた足跡と、もう出したか（1回のプレイで1回だけ）
     FootprintFollower m_FootprintFollower;
     bool m_FootprintFollowerUsed = false;
+    // 影が近いと鳴る携帯ラジオの雑音
+    RadioStatic m_RadioStatic;
     // 西棟で鳴らす物音（使い回している）
     std::vector<AmbientSoundCue> m_WestWingCues;
     // 書類保管室の「照らすと止まる影」。動きのルールはこのクラス、影の表示・音・電池はSceneが行っている。
@@ -167,4 +172,6 @@ public:
     void RenderOffscreen() override;
     // HUD・目的表示・監視映像などを描いている
     void Draw(Camera* camera) override;
+    // 自動撮影から、最後のドアを開ける操作を受け付けている
+    void RequestDebugAction(SceneDebugAction action) override;
 };

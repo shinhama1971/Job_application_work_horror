@@ -40,13 +40,13 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
     else if (in.fuseCount == 1)
     {
         objectiveText = in.corridorLoopCount < 1
-            ? "中央のドアを開けて廊下の奥へ進む"
+            ? "廊下の突き当たりのドアを開けて進む"
             : "左側の部屋でヒューズを探す";
     }
     else if (in.fuseCount == 2)
     {
         objectiveText = in.corridorLoopCount < 2
-            ? "もう一度廊下の奥まで進む"
+            ? "もう一度、廊下の突き当たりのドアを開ける"
             : SelectWestWingText(in.westWingStep, in.westWingValvesOpened, 0);
     }
     else
@@ -192,7 +192,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         }
         else if (in.powerRestored)
         {
-            objectiveText = "ヒント 右奥の緑色の出口へ向かう";
+            objectiveText = "ヒント 廊下の突き当たりの緑色の出口へ";
         }
         else if (in.fuseCount <= 0)
         {
@@ -200,7 +200,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         }
         else if (in.fuseCount == 1 && in.corridorLoopCount < 1)
         {
-            objectiveText = "ヒント 中央のドアを開け廊下の奥へ進む";
+            objectiveText = "ヒント 中央のドアから廊下の奥のドアへ";
         }
         else if (in.fuseCount == 1)
         {
@@ -208,7 +208,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         }
         else if (in.fuseCount == 2 && in.corridorLoopCount < 2)
         {
-            objectiveText = "ヒント もう一度廊下の奥まで進む";
+            objectiveText = "ヒント もう一度廊下の奥のドアを開ける";
         }
         else if (in.fuseCount == 2)
         {
@@ -244,7 +244,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         }
         else if (in.fuseCount == 2 && in.corridorLoopCount < 2)
         {
-            objectiveText = "ヒント 長い廊下をもう一度進む";
+            objectiveText = "ヒント 長い廊下の奥のドアをもう一度";
         }
         else if (in.fuseCount == 2)
         {
@@ -264,7 +264,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
     {
         objectiveText = in.exitDoorOpen
             ? "開いた出口ドアを通り抜ける"
-            : "右奥の出口ドアを開ける";
+            : "廊下の突き当たりのドアを開ける";
     }
     return objectiveText;
 }

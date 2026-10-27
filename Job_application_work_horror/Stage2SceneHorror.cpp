@@ -16,6 +16,7 @@
 #include "ShadowMan.h"
 #include "MirrorSelf.h"
 #include "Ground.h"
+#include "HangingBulb.h"
 #include "TensionPulseFeedback.h"
 #include "Wall.h"
 
@@ -165,6 +166,7 @@ void Stage2Scene::UpdateObservedScare(float deltaTime)
 void Stage2Scene::StartFinalSequence()
 {
     m_FinalSequence.Start();
+    KickHangingBulbs(0.9f);
     m_NoiseThreatSystem.SetThreat(0.0f);
     m_NoiseThreatSystem.SetWarningTimer(0.0f);
     m_Notices.loop = 2.8f;
@@ -798,6 +800,7 @@ void Stage2Scene::UpdateMirrorAnomaly(const Player& player, float deltaTime)
     {
         // 振り返ると誰もいない：鏡の上の照明が一瞬揺れ、奥の確認スイッチが押せるようになる
         m_Notices.loop = 2.8f;
+        KickHangingBulbs(0.55f);
         CeilingLight* mirrorLight = m_Objects.Light(Stage2NearestLight(MirrorAnomaly::CenterZ));
         if (mirrorLight != nullptr)
         {
@@ -1139,6 +1142,28 @@ void Stage2Scene::UpdateTensionPulse(const Player& player, float deltaTime)
     // 観察の間違いの回数は含めていない（一度間違えると心拍が鳴りやまなくなるため）。今まさに迫っている危険だけを使っている。
     PlayTensionPulse(m_TensionPulse.Update(
         deltaTime, ComputeThreatRate(player, false), player.IsHiding()));
+
+    // 携帯ラジオの雑音：足音で上がる危険度ではなく、実際に近くにいる影（足音の影・最後の追跡の影・背後の気配）の近さで鳴らしている
+    float presence = 0.0f;
+    for (const ShadowMan* figure : { m_Objects.noiseShadow, m_Objects.shadow, m_Objects.presence })
+    {
+        if (figure == nullptr || !figure->IsActive())
+        {
+            continue;
+        }
+        Vector3 toFigure = figure->GetPosition() - player.GetPosition();
+        toFigure.y = 0.0f;
+        presence = (std::max)(presence, 1.0f - (std::clamp)((toFigure.Length() - 14.0f) / 96.0f, 0.0f, 1.0f));
+    }
+    m_RadioStatic.Update(deltaTime, presence, true);
+    // 影が近いほど、吊るした裸電球がすきま風にあおられるように大きく揺れる
+    for (HangingBulb* bulb : m_Objects.hangingBulbs)
+    {
+        if (bulb != nullptr)
+        {
+            bulb->SetDisturbance(m_RadioStatic.GetLevel());
+        }
+    }
 }
 
 // 誰かの濡れた足跡：2周目以降、その周回で初めて水たまりから出ると、少し遅れて同じ水たまりから
@@ -1182,6 +1207,7 @@ void Stage2Scene::UpdateFootprintFollower(const Player& player, float deltaTime)
     else if (followerEvent == FootprintFollower::Event::Reached)
     {
         // すぐ近くまで来た：近くの照明が揺れ、すぐ後ろで息づかいが聞こえる
+        KickHangingBulbs(0.45f);
         const Vector3 playerPosition = player.GetPosition();
         CeilingLight* nearbyLight = m_Objects.Light(Stage2NearestLight(playerPosition.z));
         if (nearbyLight != nullptr)
@@ -1193,5 +1219,17 @@ void Stage2Scene::UpdateFootprintFollower(const Player& player, float deltaTime)
         game->PlayAudioCueAt(SOUND_CUE_BREATH, behind, 0.85f, 0.45f);
         game->GetPostProcess()->TriggerHorrorPulse(0.30f, 0.40f);
         Input::SetVibration(5, 0.14f);
+    }
+}
+
+// 吊るした裸電球を揺さぶっている（周回の切り替え・異変を見つけたとき・影がすぐ近くまで来たとき）
+void Stage2Scene::KickHangingBulbs(float strength)
+{
+    for (HangingBulb* bulb : m_Objects.hangingBulbs)
+    {
+        if (bulb != nullptr)
+        {
+            bulb->Kick(strength);
+        }
     }
 }

@@ -18,6 +18,7 @@
 #include "MirrorAnomaly.h"
 #include "FootprintFollower.h"
 #include "BreathHold.h"
+#include "RadioStatic.h"
 #include "KnockingAnomaly.h"
 #include "ScratchAnomaly.h"
 #include "ObservedScareSequence.h"
@@ -85,6 +86,8 @@ private:
     void UpdateHandprintAnomaly(const Player& player, float deltaTime);
     // 鏡の異変：鏡をのぞくとすぐ後ろに人影が映り、振り返ると誰もいない（見つけたことになる）
     void UpdateMirrorAnomaly(const Player& player, float deltaTime);
+    // 吊るした裸電球を揺さぶっている（異変や物音の演出に合わせて）
+    void KickHangingBulbs(float strength);
     // 息を止めるボタン（Space か RB）を押しているか
     static bool IsBreathHoldPressed();
     // 誰かの濡れた足跡：2周目以降、水たまりから出ると、同じ水たまりから裸足の足跡が一歩ずつ後をついて来る
@@ -139,6 +142,8 @@ private:
     FootprintFollower m_FootprintFollower;
     // ロッカーに隠れている間の、息を止める操作
     BreathHold m_BreathHold;
+    // 影が近いと鳴る携帯ラジオの雑音
+    RadioStatic m_RadioStatic;
     // ロッカーの前を探している影の、次に息づかいを鳴らすまでの秒数と、ロッカーに触れたか
     float m_SearcherSoundTimer = 0.0f;
     bool m_SearcherTouchedLocker = false;

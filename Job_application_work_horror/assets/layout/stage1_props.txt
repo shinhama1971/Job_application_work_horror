@@ -34,6 +34,7 @@ color warmBulbBody  0.6   0.432 0.24
 prop PropCeilingMain           0     -47   80     436 3 516   ceilingPanel none 4 0 noshadow weathering
 prop PropCeilingWestWing       -300  -47   80     164 3 364   ceilingPanel none 4 0 noshadow weathering
 prop PropCeilingSouthWestHall  -250  -47   -256   264 3 156   ceilingPanel none 4 0 noshadow weathering
+prop PropCeilingStartPassage   0     -47   -230   44 3 104      ceilingPanel none 4 0 noshadow weathering
 
 # --- 壁際と天井近くを走る配管（Stage1AmbientSounds が、この線に沿って配管の音を鳴らしている）
 prop PropPipeLeft            -205   -55   60    3 3 450       darkMetal none 22 0

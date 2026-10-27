@@ -64,6 +64,8 @@ namespace Effect
         float m_LensDirtStrength = 0.35f;
         float m_SignalInterference = 0.0f;
         float m_TargetSignalInterference = 0.0f;
+        // 携帯ラジオの雑音の強さ（影が近いほど強い）。信号の乱れと同じ画面の乱れを、弱めに重ねている
+        float m_PresenceStatic = 0.0f;
 
         // 本描画を一度RenderTextureへ写し、その後で複数の画面効果を合成している。
         Graphics::RenderTexture m_RenderTexture;
@@ -214,6 +216,11 @@ namespace Effect
         }
 
         // 監視映像の電波障害のような横線と色ずれ（0〜1）。
+        // 影が近いときの、ラジオの雑音に合わせた画面の乱れの強さ（0〜1）を設定している
+        void SetPresenceStatic(float strength)
+        {
+            m_PresenceStatic = (std::clamp)(strength, 0.0f, 1.0f);
+        }
         void SetSignalInterference(float strength)
         {
             m_TargetSignalInterference =

@@ -85,6 +85,7 @@ void StageScene::Init()
     m_ArchiveStalker = Stage1LightStalker{};
     m_FootprintFollower.Reset();
     m_FootprintFollowerUsed = false;
+    m_RadioStatic.Reset();
     m_StalkerWalls = game->GetObjects<Wall>();
     m_StalkerDoors = game->GetObjects<Door>();
     m_ArchiveStalkerNoticeTimer = 0.0f;
@@ -112,6 +113,7 @@ void StageScene::Init()
 void StageScene::SetupPracticalLights()
 {
     m_Objects.exitSign->SetGlowLight(60.0f, 2.2f);
+    m_Objects.startDoorSign->SetGlowLight(60.0f, 2.2f);
     m_Objects.doorIndicator->SetGlowLight(45.0f, 2.0f);
     m_Objects.evidenceMarker->SetGlowLight(45.0f, 2.0f);
     for (Wall* marker : m_Objects.loopMarkers)
@@ -246,6 +248,18 @@ void StageScene::UpdateRouteLights()
     if (CeilingLight* light = fixtures[m_RouteFixtureIndex])
     {
         light->SetRouteFlicker(true);
+    }
+}
+
+// 自動撮影から、最後のドアを調べたのと同じように開けている（開けた瞬間の周回の切り替えは、次のUpdateで普段どおり行われる）
+void StageScene::RequestDebugAction(SceneDebugAction action)
+{
+    Door* endDoor = m_Objects.exitDoor;
+    Player* player = m_Objects.player;
+    if (action == SceneDebugAction::OpenStage1EndDoor &&
+        endDoor != nullptr && player != nullptr && endDoor->IsInteractionEnabled())
+    {
+        endDoor->Interact(*player);
     }
 }
 
@@ -387,19 +401,21 @@ void StageScene::Update()
     UpdateRouteLights();
     UpdateTensionPulse(*player, deltaTime);
 
-    // 出口の扉：送電が終わるまで鍵をかけ、開いた扉を通り抜けたら脱出を始めている
+    // 最後のドア：電力が戻る前は開けて通ると次の周回へ進む（UpdateCorridorLoop）。
+    // 電力が戻ってから出口の送電が終わるまでは鍵をかけ、送電が終わったら、開けて通り抜けたときに2面への脱出を始めている。
     Door* stageExitDoor = m_Objects.exitDoor;
     ExitTrigger* stageExit = m_Objects.exitTrigger;
     const bool exitPowerReady = m_PowerSequence.IsExitComplete();
     if (stageExitDoor != nullptr)
     {
-        stageExitDoor->SetLocked(!exitPowerReady);
-        const Vector3 exitPosition = player->GetPosition();
-        const bool crossedOpenedDoor =
-            stageExitDoor->IsOpen() &&
-            exitPosition.x >= 199.0f &&
-            std::abs(exitPosition.z - 307.5f) <= 34.0f;
-        if (crossedOpenedDoor && stageExit != nullptr)
+        const bool waitingForExitPower = game->IsPowerRestored() && !exitPowerReady;
+        // 周回のために開けたまま電力を戻した場合は、閉じてから鍵をかけている（送電の前に通れないようにする）
+        if (waitingForExitPower && !stageExitDoor->IsLocked())
+        {
+            stageExitDoor->ResetClosed(0);
+        }
+        stageExitDoor->SetLocked(waitingForExitPower);
+        if (exitPowerReady && stageExit != nullptr && IsThroughEndDoor(player->GetPosition()))
         {
             stageExit->BeginEscape(*player);
         }
@@ -426,6 +442,15 @@ void StageScene::Update()
                 Color(0.32f * pulse, 0.004f, 0.002f, 1.0f),
                 30.0f);
         }
+    }
+    // 開始地点の奥のドアの裏側の表示は、最後のドアの表示（送電の前の赤）と同じように脈打たせている
+    if (m_Objects.startDoorSign != nullptr)
+    {
+        const float pulse = 0.78f + std::sin(m_StageVisualTimer * 7.4f) * 0.16f;
+        m_Objects.startDoorSign->SetAppearance(
+            Color(0.24f, 0.025f, 0.018f, 1.0f),
+            Color(0.32f * pulse, 0.004f, 0.002f, 1.0f),
+            30.0f);
     }
 
     // 扉のランプ：出口の前兆の間は速く点滅させている

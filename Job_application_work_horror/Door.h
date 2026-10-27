@@ -88,6 +88,17 @@ public:
     // 鍵をかける・外す、鍵がかかっているかを返している
     void SetLocked(bool locked) { m_IsLocked = locked; }
     bool IsLocked() const { return m_IsLocked; }
+    // 開け始めてから開ききるまでの途中か
+    bool IsOpening() const { return m_IsOpening; }
+    // 音や画面の演出を出さずに開け始めている（ループ廊下で、別のドアの開きかけをそのまま引き継ぐときに使っている）
+    void StartOpeningQuietly()
+    {
+        if (!m_IsOpen && !m_IsOpening)
+        {
+            m_IsOpening = true;
+            m_OpenDelayTimer = m_OpenDelayDuration;
+        }
+    }
 
     // 置き場所を決めている（閉じた位置としても覚えている）
     void SetPosition(float x, float y, float z)

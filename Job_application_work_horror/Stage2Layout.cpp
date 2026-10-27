@@ -20,6 +20,7 @@
 #include "Locker.h"
 #include "MirrorAnomaly.h"
 #include "MirrorSelf.h"
+#include "HangingBulb.h"
 
 #include <SimpleMath.h>
 
@@ -488,6 +489,15 @@ namespace Stage2Layout
         light4->SetPosition(0.0f, -50.5f, 112.0f);
         light4->SetScale(18.0f, 2.0f, 8.0f);
         light4->SetEmergencyLight(false, 4.1f);
+        // 廊下の中ほどに、天井から吊るした裸電球を2つ下げている（すきま風でゆっくり揺れ、異変や影が近いときに大きく揺れる）
+        const float bulbZ[] = { 0.0f, 75.0f };
+        for (std::size_t index = 0; index < objects.hangingBulbs.size(); ++index)
+        {
+            HangingBulb* bulb = builder.Create<HangingBulb>(index == 0 ? "Stage2HangingBulb1" : "Stage2HangingBulb2");
+            bulb->Place(Vector3(0.0f, -48.5f, bulbZ[index]), 1.3f + static_cast<float>(index) * 2.1f);
+            objects.hangingBulbs[index] = bulb;
+        }
+
         // 2面の廊下は、P.T. の廊下のような暖かい白熱電球の光にしている（1面は古い蛍光灯のまま）
         for (CeilingLight* bulb : { light1, light2, light3, light4 })
         {

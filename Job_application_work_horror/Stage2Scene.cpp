@@ -114,6 +114,7 @@ void Stage2Scene::Init()
     m_PortraitEyeOpen = 0.0f;
     m_PortraitEyeGlow = 0.0f;
     m_FootprintFollowerUsedThisLoop = false;
+    m_RadioStatic.Reset();
     m_KnockingAnomaly.Reset();
     m_FalseDoorAnomaly.Reset();
     m_ClockAnomaly.Reset();

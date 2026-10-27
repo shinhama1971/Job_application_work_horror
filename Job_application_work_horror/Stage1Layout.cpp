@@ -92,9 +92,14 @@ namespace Stage1Layout
         wall3West->SetPosition(-197.5f, -74.0f, -180.0f);
         wall3West->SetScale(45.0f, 50.0f, 4.0f);
 
+        // 開始地点の奥（x=-18〜18）は、ループ廊下から戻ってくるドアの分だけ開けている。
         Wall* wall3 = builder.Create<Wall>("Wall3");
-        wall3->SetPosition(37.5f, -74.0f, -180.0f);
-        wall3->SetScale(365.0f, 50.0f, 4.0f);
+        wall3->SetPosition(-81.5f, -74.0f, -180.0f);
+        wall3->SetScale(127.0f, 50.0f, 4.0f);
+
+        Wall* wall3East = builder.Create<Wall>("Wall3East");
+        wall3East->SetPosition(119.0f, -74.0f, -180.0f);
+        wall3East->SetScale(202.0f, 50.0f, 4.0f);
 
         // 西側の外壁は、西棟の扉（z=-35〜-5）の分だけ開けて2枚に分けている。
         Wall* wall4 = builder.Create<Wall>("Wall4");
@@ -222,7 +227,7 @@ namespace Stage1Layout
 
         // 建物の壁だけに、パネルの継ぎ目・ひび・水の跡・カビを描いている（棚や配管などの小物には描かない）。
         for (Wall* structuralWall : {
-            wall1, wall2, wall3West, wall3, wall4, wall4North, wall5, wall6, wall7, wall8, wall9, wall10,
+            wall1, wall2, wall3West, wall3, wall3East, wall4, wall4North, wall5, wall6, wall7, wall8, wall9, wall10,
             wall11, wall12, wall13, wall13North, wall14, wall15,
             loopWall1, loopWall2, loopWall3, loopWall4,
             westWingOuter, westWingSouth, westWingNorth, pumpRoomWallWest, pumpRoomWallEast,
@@ -522,13 +527,13 @@ namespace Stage1Layout
         evidenceMarker->SetCastsShadow(false);
 
 
-        // 1面の出口は、見える扉を調べて通ったときだけ成り立つようにしている。
-        // 廊下を歩きながら操作キーを押すだけで、見えない出口が反応してしまう問題を防いでいる。
+        // 1面の最後のドア。ループ廊下の突き当たりをふさいでいる（蝶番は北側で、廊下側へ開く）。
+        // 電力が戻る前は開けて通ると次の周回へ、出口の送電が終わった後は開けて通ると2面へ進む（StageSceneが判定）。
+        // 見える扉を調べて通ったときだけ進むので、廊下を歩きながら操作キーを押しただけで反応することはない。
         Door* stageExitDoor = builder.Create<Door>("Stage1ExitDoor");
-        stageExitDoor->SetPosition(202.0f, -74.0f, 307.5f);
+        stageExitDoor->SetPosition(Stage1EndDoorX, -74.0f, Stage1EndDoorZ);
         stageExitDoor->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
-        stageExitDoor->SetScale(Vector3(60.0f, 50.0f, 4.0f));
-        stageExitDoor->SetLocked(true);
+        stageExitDoor->SetScale(Vector3(Stage1EndDoorHalfWidth * 2.0f, 50.0f, 4.0f));
 
         // 監視カメラの異常用に、壁際へ開かずの扉を置いている。開いても先は壁。
         for (int index = 0; index < StageSealedDoorCount; ++index)
@@ -542,16 +547,53 @@ namespace Stage1Layout
             objects.sealedDoors[static_cast<std::size_t>(index)] = sealedDoor;
         }
 
-        // 出口の上の赤い非常口の表示
+        // 最後のドアの上の赤い非常口の表示（廊下側の面）
         Wall* stageExitSign = createStageProp(
             "PropStage1ExitSign",
-            Vector3(198.0f, -51.5f, 307.5f),
-            Vector3(2.0f, 5.0f, 24.0f),
+            Vector3(Stage1EndDoorX - 3.0f, -52.0f, Stage1EndDoorZ),
+            Vector3(2.0f, 3.5f, 14.0f),
             Color(0.24f, 0.025f, 0.018f, 1.0f),
             Color(0.30f, 0.005f, 0.002f, 1.0f),
             30.0f,
             false);
         stageExitSign->SetCastsShadow(false);
+
+        // 開始地点の奥の壁のドア（最後のドアと同じ形・同じ大きさ）。普段は鍵がかかっていて、開始地点の側からは開かない。
+        // 最後のドアを90度回した向きに置き、蝶番も同じ側（通る向きの左）にしている。
+        Door* startDoor = builder.Create<Door>("Stage1StartDoor");
+        startDoor->SetPosition(Stage1StartDoorX, -74.0f, Stage1StartDoorZ);
+        startDoor->SetScale(Vector3(Stage1EndDoorHalfWidth * 2.0f, 50.0f, 4.0f));
+        startDoor->SetLocked(true);
+
+        // ドアの裏側の通路（建物の外へ張り出した、最後の廊下の突き当たりと同じ幅・高さの行き止まり）。
+        // 移った直後に振り返っても、暗い廊下が続いているように見える長さ（調べられる距離より長く）にしている。
+        constexpr float passageLength = 100.0f;
+        const float passageCenterZ = Stage1StartDoorZ - passageLength * 0.5f;
+        const float passageWallX = Stage1EndDoorHalfWidth + 2.0f;
+        Wall* passageWest = builder.Create<Wall>("Stage1StartPassageWest");
+        passageWest->SetPosition(Stage1StartDoorX - passageWallX, -74.0f, passageCenterZ);
+        passageWest->SetScale(4.0f, 50.0f, passageLength);
+        Wall* passageEast = builder.Create<Wall>("Stage1StartPassageEast");
+        passageEast->SetPosition(Stage1StartDoorX + passageWallX, -74.0f, passageCenterZ);
+        passageEast->SetScale(4.0f, 50.0f, passageLength);
+        Wall* passageEnd = builder.Create<Wall>("Stage1StartPassageEnd");
+        passageEnd->SetPosition(Stage1StartDoorX, -74.0f, Stage1StartDoorZ - passageLength - 2.0f);
+        passageEnd->SetScale(passageWallX * 2.0f + 4.0f, 50.0f, 4.0f);
+        for (Wall* passageWall : { passageWest, passageEast, passageEnd })
+        {
+            passageWall->SetWeatheringSurface(true);
+        }
+
+        // 最後のドアの上の表示と同じ物を、通路側の同じ位置に置いている（移った瞬間に景色が変わらないように）
+        Wall* startDoorSign = createStageProp(
+            "PropStage1StartDoorSign",
+            Vector3(Stage1StartDoorX, -52.0f, Stage1StartDoorZ - 3.0f),
+            Vector3(14.0f, 3.5f, 2.0f),
+            Color(0.24f, 0.025f, 0.018f, 1.0f),
+            Color(0.30f, 0.005f, 0.002f, 1.0f),
+            30.0f,
+            false);
+        startDoorSign->SetCastsShadow(false);
 
         // 懐中電灯で照らしたときだけ浮かぶ壁の文字。進む道筋に沿って、目的の手がかりと不安を置いている。
         // 位置は壁の表面、向きは壁から通路側へ向かう法線。画像は横長(4:1)。
@@ -570,7 +612,7 @@ namespace Stage1Layout
         };
         objects.writings[Stage1WallWritings::Warning] = createWriting(
             "Stage1WritingWarning", "assets/texture/writing_warning.png", "",
-            Vector3(0.0f, -71.0f, -178.0f), Vector3(0.0f, 0.0f, 1.0f), 56.0f);
+            Vector3(-62.0f, -71.0f, -178.0f), Vector3(0.0f, 0.0f, 1.0f), 56.0f);
         objects.writings[Stage1WallWritings::Three] = createWriting(
             "Stage1WritingThree", "assets/texture/writing_three.png", "",
             Vector3(-150.0f, -70.0f, -72.0f), Vector3(0.0f, 0.0f, -1.0f), 64.0f);
@@ -661,9 +703,9 @@ namespace Stage1Layout
         archiveStalker->SetActive(false);
         objects.archiveStalker = archiveStalker;
 
-        // 出口（出口の扉の前。電力が戻るまでは調べられない）
+        // 出口（最後のドアの向こう。調べる対象にはせず、開いたドアを通ったときにStageSceneが脱出を始めている）
         ExitTrigger* exit = builder.Create<ExitTrigger>("ExitTrigger");
-        exit->SetPosition(207.0f, -80.0f, 307.5f);
+        exit->SetPosition(Stage1EndDoorX + 4.0f, -80.0f, Stage1EndDoorZ);
         exit->SetNextScene(SceneName::Stage2);
         exit->SetInteractionEnabled(false);
 
@@ -718,9 +760,11 @@ namespace Stage1Layout
         objects.exitPowerPanel = exitPowerPanel;
         objects.evidenceMarker = evidenceMarker;
         objects.exitSign = stageExitSign;
+        objects.startDoorSign = startDoorSign;
         objects.doorIndicator = doorIndicator;
         objects.loopDoor = door;
         objects.exitDoor = stageExitDoor;
+        objects.startDoor = startDoor;
         objects.exitTrigger = exit;
         objects.firstFuse = item1;
         objects.secondFuse = item2;

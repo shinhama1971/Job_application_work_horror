@@ -42,6 +42,17 @@ enum class Stage1RouteLight : std::size_t
     WestWing, MainPower, PumpRoom, ExitPower, ExitDoor, Count
 };
 
+// ループ廊下の突き当たりのドア（1面の最後のドア）の位置。廊下（z=237〜273）をふさぐ向きに置いている。
+// 電力が戻る前に開けて通ると開始地点へ戻って次の周回が始まり、出口の送電が終わった後に開けて通ると2面へ進む。
+constexpr float Stage1EndDoorX = 196.0f;
+constexpr float Stage1EndDoorZ = 255.0f;
+constexpr float Stage1EndDoorHalfWidth = 18.0f;
+// 開始地点の奥の壁（南の外壁）のドア。最後のドアと同じ形で、裏側（壁の外）には最後の廊下の突き当たりと同じ幅の通路を作っている。
+// 電力が戻る前に最後のドアを開けると、その瞬間に、このドアの裏側の同じ位置・同じ向きへ移し、このドアを開け始めている。
+// 開いたドアの向こうに開始地点が見えるので、P.T.のように「ドアの先が最初の場所にそのまま続いている」ように見える。
+constexpr float Stage1StartDoorX = 0.0f;
+constexpr float Stage1StartDoorZ = -180.0f;
+
 // 1面の進行で使うObject。Stage1Layout::Buildが作ると同時にポインタを入れて返すため、
 // 名前での検索や、名前の打ち間違いは起きない。
 // 実体はObjectManagerが所有し、どれもSceneが終わるまで破棄されないため、所有しないポインタで持っている。
@@ -70,6 +81,8 @@ struct StageObjects
     // 光る目印（監視端末の目印・出口の表示・扉のランプ）と、ループ廊下で出たり消えたりする目印
     Wall* evidenceMarker = nullptr;
     Wall* exitSign = nullptr;
+    // 開始地点の奥のドアの裏側にある、最後のドアの上と同じ赤い表示（移った瞬間に同じ景色に見せるため）
+    Wall* startDoorSign = nullptr;
     Wall* doorIndicator = nullptr;
     std::array<Wall*, 3> loopMarkers{};
     // 進み具合ごとの、進む先の天井照明の候補（手前から奥の順）
@@ -78,9 +91,10 @@ struct StageObjects
     std::vector<Stage1SafeLights::Zone> safeZones;
     // 小物のファイル（assets/layout/stage1_props.txt）から作った小物（名前とWall）。Debug版で F5 を押すと、ファイルを読み直して置き直している
     PropLayoutFile::SpawnedProps layoutProps;
-    // ループ廊下へ続く中央の扉、出口の扉、出口（調べると2面へ）
+    // ループ廊下へ続く中央の扉、ループ廊下の突き当たりの最後のドア、開始地点の奥のドア、出口（通ると2面へ）
     Door* loopDoor = nullptr;
     Door* exitDoor = nullptr;
+    Door* startDoor = nullptr;
     ExitTrigger* exitTrigger = nullptr;
     // ヒューズ。部屋の中の位置はプレイごとに変わるため、案内の矢印はここから位置を読んでいる。
     Item* firstFuse = nullptr;

@@ -640,3 +640,15 @@ HRESULT Sound::ReadChunkData(HANDLE hFile, void* buffer, DWORD buffersize, DWORD
 		hr = HRESULT_FROM_WIN32(GetLastError());
 	return hr;
 }
+
+//=============================================================================
+// 鳴っている音の大きさを変えている（ループする音を、鳴らしたまま強弱させる）
+//=============================================================================
+void Sound::SetVolume(SOUND_LABEL label, float volume)
+{
+	if (!IsValidLabel(label) || m_pSourceVoice[(int)label] == nullptr)
+	{
+		return;
+	}
+	m_pSourceVoice[(int)label]->SetVolume(m_param[(int)label].volume * (std::max)(volume, 0.0f));
+}

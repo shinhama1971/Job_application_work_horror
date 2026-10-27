@@ -28,6 +28,7 @@ typedef enum
 	SOUND_CUE_PIPE_KNOCK,   // 配管を叩いたような金属音（tools/generate-pipe-knock.ps1で合成）
 	SOUND_CUE_HEARTBEAT,    // 自分の心拍「ドクン」1回分（tools/generate-heartbeat-breath.ps1で合成）
 	SOUND_CUE_BREATH,       // 自分の呼吸「吐いて吸う」1回分（同上）
+	SOUND_CUE_RADIO_STATIC, // 携帯ラジオの雑音のループ（影が近いほど大きくなる。tools/generate-radio-static.ps1で合成）
 
 	// 音の種類の数
 	SOUND_LABEL_MAX,
@@ -66,6 +67,7 @@ private:
 		{"assets/Audio/pipe_knock.wav", false, 0.50f},
 		{"assets/Audio/heartbeat.wav", false, 0.70f},
 		{"assets/Audio/breath.wav", false, 0.32f},
+		{"assets/Audio/radio_static.wav", true, 0.34f},
 	};
 
 	// XAudio2本体はCOMなのでComPtrで管理している。ボイスはCOMではないので、DestroyVoiceで解放している。
@@ -142,6 +144,9 @@ public:
 
 	// 指定した音を止めている
 	void Stop(SOUND_LABEL label);
+
+	// 鳴っている音の大きさを変えている（ループする音を、鳴らしたまま強弱させるのに使う）。volume は素材ごとの音量に掛ける倍率
+	void SetVolume(SOUND_LABEL label, float volume);
 
 	// 指定した音の再生を、止めた所から再開している
 	void Resume(SOUND_LABEL label);

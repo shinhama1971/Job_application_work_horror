@@ -173,6 +173,15 @@ namespace Core
             return m_SoundReady ? m_Sound.GetActiveSpatialVoiceCount() : 0;
         }
 
+        // 鳴っている音（ループする音）の大きさを変えている
+        void SetAudioCueVolume(SOUND_LABEL label, float volume)
+        {
+            if (m_SoundReady)
+            {
+                m_Sound.SetVolume(label, volume);
+            }
+        }
+
         // 環境音のループなど、PlayAudioCueで鳴らした音を止めている。
         void StopAudioCue(SOUND_LABEL label)
         {

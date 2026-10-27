@@ -72,7 +72,7 @@ namespace
     const std::vector<Keyframe> Stage1Tour =
     {
         { 0.0f, Vector3(0.0f, FloorY, -120.0f), Pi, -0.12f, nullptr, false },
-        { 4.5f, Vector3(0.0f, FloorY, -128.0f), Pi, -0.12f, L"01_1面_開始地点_照らすと浮かぶ壁の文字", false },
+        { 4.5f, Vector3(0.0f, FloorY, -128.0f), YawToward(0.0f, -128.0f, -42.0f, -178.0f), -0.12f, L"01_1面_開始地点_照らすと浮かぶ壁の文字", false },
         { 8.0f, Vector3(0.0f, FloorY, -90.0f), 0.0f, 0.0f, nullptr, false },
         { 13.0f, Vector3(0.0f, FloorY, -10.0f), YawToward(0.0f, -10.0f, -180.0f, 35.0f), 0.0f, nullptr, false },
         { 15.5f, Vector3(-10.0f, FloorY, 0.0f), YawToward(-10.0f, 0.0f, -180.0f, 35.0f), -0.05f, L"02_1面_中央ホールと配電盤", false },
@@ -130,6 +130,19 @@ namespace
         { 113.55f, Vector3(168.0f, FloorY, -136.0f), YawToward(168.0f, -136.0f, 218.0f, -121.6f), -0.30f, nullptr, false },
         { 116.0f, Vector3(170.0f, FloorY, -135.0f), YawToward(170.0f, -135.0f, 218.0f, -121.6f), -0.30f, L"05l_1面_右の倉庫の壁の血の手形", false },
         { 117.0f, Vector3(170.0f, FloorY, -135.0f), YawToward(170.0f, -135.0f, 218.0f, -121.6f), -0.30f, nullptr, false },
+        // ループ廊下の突き当たりの最後のドア。開けた瞬間（Stage1EndDoorOpenTime）に開始地点の奥のドアの裏側へ移り、
+        // 開いていくドアの向こうに開始地点が見える（P.T.のように、ドアの先が最初の場所へそのまま続いている）。
+        // 部屋へ入ってドアに背を向けると、後ろでドアが閉まり、振り返ると閉じたドアだけが残っている。
+        { 117.05f, Vector3(171.0f, FloorY, 255.0f), Pi * 0.5f, 0.02f, nullptr, false },
+        { 118.5f, Vector3(171.0f, FloorY, 255.0f), Pi * 0.5f, 0.02f, L"05m_1面_ループ廊下の突き当たりのドア", false },
+        { 119.0f, Vector3(171.0f, FloorY, 255.0f), Pi * 0.5f, 0.02f, nullptr, false },
+        { 119.05f, Vector3(0.0f, FloorY, -205.0f), 0.0f, 0.02f, nullptr, false },
+        { 119.8f, Vector3(0.0f, FloorY, -205.0f), 0.0f, 0.02f, L"05n_1面_ドアの先は開始地点", false },
+        { 121.5f, Vector3(0.0f, FloorY, -172.0f), 0.0f, 0.0f, nullptr, false },
+        { 122.8f, Vector3(0.0f, FloorY, -140.0f), 0.0f, 0.0f, nullptr, false },
+        { 123.8f, Vector3(0.0f, FloorY, -140.0f), Pi, -0.05f, nullptr, false },
+        { 124.4f, Vector3(0.0f, FloorY, -140.0f), Pi, -0.05f, L"05o_1面_振り返ると閉じたドア", false },
+        { 125.0f, Vector3(0.0f, FloorY, -140.0f), Pi, -0.05f, nullptr, false },
     };
 
     // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉 → 鏡（普段・鏡の異変で人影が映る・振り返ると誰もいない）
@@ -138,6 +151,8 @@ namespace
     // 1面で、この時刻の間だけ懐中電灯を消している（消したときの暗さを写すため）
     constexpr float Stage1FlashlightOffStart = 28.5f;
     constexpr float Stage1FlashlightOffEnd = 29.4f;
+    // 1面の最後で、この時刻に突き当たりの最後のドアを開けている（開けた瞬間に開始地点の奥のドアへつながる様子を写すため）
+    constexpr float Stage1EndDoorOpenTime = 119.0f;
     // 濡れた足跡の場面の前に、2周目へ進めている（誰かの足跡は2周目から出る）
     constexpr float SecondLoopRequestTime = 50.5f;
     // 肖像画の場面の前に、肖像画の異変を出している
@@ -281,6 +296,7 @@ namespace
     Vector3 g_LastStepPosition;
     // 2面の道順で、鏡の異変を出したか
     bool g_MirrorAnomalyRequested = false;
+    bool g_EndDoorOpenRequested = false;
     // 2面の道順で、2周目へ進めたか
     bool g_SecondLoopRequested = false;
     // 2面の道順で、肖像画の異変を出したか
@@ -712,6 +728,7 @@ namespace Tools::CaptureMode
             g_TourTime = 0.0f;
             g_NextShot = 0;
             g_MirrorAnomalyRequested = false;
+            g_EndDoorOpenRequested = false;
             g_SecondLoopRequested = false;
             g_PortraitAnomalyRequested = false;
             g_FalseDoorRequested = false;
@@ -747,6 +764,16 @@ namespace Tools::CaptureMode
             ++g_NextShot;
         }
 
+        // 1面: 最後に、突き当たりの最後のドアを開けている（開けた瞬間に、開始地点の奥のドアの裏側へ移る）
+        if (scene == SceneName::Stage && !g_EndDoorOpenRequested && g_TourTime >= Stage1EndDoorOpenTime)
+        {
+            g_EndDoorOpenRequested = true;
+            if (Scene* currentScene = game->GetScene())
+            {
+                currentScene->RequestDebugAction(SceneDebugAction::OpenStage1EndDoor);
+                Log("open stage 1 end door");
+            }
+        }
         // 2面: 鏡の前に立った後で、鏡の異変を出している（鏡の中にだけ、すぐ後ろの人影が映る）
         if (scene == SceneName::Stage2 && !g_MirrorAnomalyRequested && g_TourTime >= MirrorAnomalyRequestTime)
         {

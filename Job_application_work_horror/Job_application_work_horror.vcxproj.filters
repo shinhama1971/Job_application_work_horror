@@ -288,6 +288,9 @@
     <ClCompile Include="MirrorSelf.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="HangingBulb.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="TechDemo.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -433,6 +436,9 @@
     </ClInclude>
     <ClInclude Include="BreathHold.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="RadioStatic.h">
+      <Filter>ソース ファイル</Filter>
     </ClInclude>
     <ClInclude Include="WetFootprints.h">
       <Filter>ソース ファイル</Filter>
@@ -705,6 +711,9 @@
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="MirrorSelf.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="HangingBulb.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="StageSurveillanceCameras.h">

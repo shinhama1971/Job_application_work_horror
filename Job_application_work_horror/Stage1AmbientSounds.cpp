@@ -301,7 +301,8 @@ bool Stage1AmbientSounds::ScheduleDistantDoor(
     std::vector<Vector3> doors =
     {
         Vector3(0.0f, -74.0f, 40.0f),       // 中央の廊下の扉
-        Vector3(202.0f, -74.0f, 307.5f)     // 出口の扉
+        Vector3(196.0f, -74.0f, 255.0f),    // ループ廊下の突き当たりの最後のドア
+        Vector3(0.0f, -74.0f, -180.0f)      // 開始地点の奥のドア
     };
     // 監視カメラで見られる閉ざされた扉も候補に加えている
     for (const StageSealedDoor& sealed : StageSealedDoors)
