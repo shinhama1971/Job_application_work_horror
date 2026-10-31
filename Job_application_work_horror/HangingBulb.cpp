@@ -173,6 +173,11 @@ Vector3 HangingBulb::GetBulbPosition() const
     return Vector3::Transform(Vector3(0.0f, -m_CordLength - 1.1f - BulbRadius, 0.0f), MakeWorldMatrix());
 }
 
+float HangingBulb::GetLightRange() const
+{
+    return LightRange;
+}
+
 void HangingBulb::Draw(Camera* camera)
 {
     camera->SetCamera();

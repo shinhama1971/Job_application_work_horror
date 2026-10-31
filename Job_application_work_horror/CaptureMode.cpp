@@ -133,6 +133,7 @@ namespace
         // ループ廊下の突き当たりの最後のドア。開けた瞬間（Stage1EndDoorOpenTime）に開始地点の奥のドアの裏側へ移り、
         // 開いていくドアの向こうに開始地点が見える（P.T.のように、ドアの先が最初の場所へそのまま続いている）。
         // 部屋へ入ってドアに背を向けると、後ろでドアが閉まり、振り返ると閉じたドアだけが残っている。
+        // 戻ってきた部屋の壁には、1周目の文字「おかえり」がじわりと浮かんでいる。
         { 117.05f, Vector3(171.0f, FloorY, 255.0f), Pi * 0.5f, 0.02f, nullptr, false },
         { 118.5f, Vector3(171.0f, FloorY, 255.0f), Pi * 0.5f, 0.02f, L"05m_1面_ループ廊下の突き当たりのドア", false },
         { 119.0f, Vector3(171.0f, FloorY, 255.0f), Pi * 0.5f, 0.02f, nullptr, false },
@@ -140,9 +141,9 @@ namespace
         { 119.8f, Vector3(0.0f, FloorY, -205.0f), 0.0f, 0.02f, L"05n_1面_ドアの先は開始地点", false },
         { 121.5f, Vector3(0.0f, FloorY, -172.0f), 0.0f, 0.0f, nullptr, false },
         { 122.8f, Vector3(0.0f, FloorY, -140.0f), 0.0f, 0.0f, nullptr, false },
-        { 123.8f, Vector3(0.0f, FloorY, -140.0f), Pi, -0.05f, nullptr, false },
-        { 124.4f, Vector3(0.0f, FloorY, -140.0f), Pi, -0.05f, L"05o_1面_振り返ると閉じたドア", false },
-        { 125.0f, Vector3(0.0f, FloorY, -140.0f), Pi, -0.05f, nullptr, false },
+        { 123.8f, Vector3(0.0f, FloorY, -140.0f), YawToward(0.0f, -140.0f, 34.0f, -178.0f), -0.05f, nullptr, false },
+        { 124.4f, Vector3(0.0f, FloorY, -140.0f), YawToward(0.0f, -140.0f, 34.0f, -178.0f), -0.05f, L"05o_1面_振り返ると閉じたドアと浮かんだ文字", false },
+        { 125.0f, Vector3(0.0f, FloorY, -140.0f), YawToward(0.0f, -140.0f, 34.0f, -178.0f), -0.05f, nullptr, false },
     };
 
     // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉 → 鏡（普段・鏡の異変で人影が映る・振り返ると誰もいない）
@@ -168,7 +169,9 @@ namespace
     {
         { 0.0f, Vector3(0.0f, FloorY, -125.0f), 0.0f, 0.0f, nullptr, false },
         { 4.5f, Vector3(0.0f, FloorY, -118.0f), 0.0f, 0.0f, L"06_2面_ループ廊下", false },
-        { 9.0f, Vector3(0.0f, FloorY, -45.0f), 0.0f, 0.0f, nullptr, false },
+        // 天井から吊るした裸電球の下へ近づき、電球の光が作る影（ロッカーや人の影が、揺れに合わせて床と壁の上を動く）を写している
+        { 8.0f, Vector3(-8.0f, FloorY, -38.0f), YawToward(-8.0f, -38.0f, 10.0f, 30.0f), -0.30f, nullptr, false },
+        { 9.0f, Vector3(-8.0f, FloorY, -37.0f), YawToward(-8.0f, -37.0f, 10.0f, 30.0f), -0.30f, L"06b_2面_揺れる電球の影", false },
         { 12.0f, Vector3(0.0f, FloorY, -25.0f), -Pi * 0.5f, -0.10f, L"07_2面_時計", false },
         { 15.5f, Vector3(0.0f, FloorY, -25.0f), Pi * 0.5f, -0.10f, L"08_2面_肖像画", false },
         { 19.5f, Vector3(14.0f, FloorY, 40.0f), Pi * 0.5f, -0.12f, L"09_2面_ロッカー", false },
@@ -514,6 +517,7 @@ namespace
             { "水たまりの波", GpuPass::WaterRipples },
             { "壁の鏡", GpuPass::Mirror },
             { "環境マップ", GpuPass::EnvironmentProbe },
+            { "電球の影", GpuPass::BulbShadow },
         };
 
         for (const BenchmarkResult& result : g_BenchmarkResults)

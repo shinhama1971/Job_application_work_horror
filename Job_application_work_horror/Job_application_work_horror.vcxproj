@@ -251,6 +251,7 @@
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="ShadowMan.cpp" />
     <ClCompile Include="ShadowMap.cpp" />
+    <ClCompile Include="PointShadowMap.cpp" />
     <ClCompile Include="sound.cpp" />
     <ClCompile Include="StageScene.cpp" />
     <ClCompile Include="Stage1Layout.cpp" />
@@ -371,6 +372,7 @@
     <ClInclude Include="PuzzleFeedback.h" />
     <ClInclude Include="ShadowMan.h" />
     <ClInclude Include="ShadowMap.h" />
+    <ClInclude Include="PointShadowMap.h" />
     <ClInclude Include="sound.h" />
     <ClInclude Include="StageScene.h" />
     <ClInclude Include="Stage1Layout.h" />
@@ -403,6 +405,7 @@
     <ClInclude Include="Stage2Objective.h" />
     <ClInclude Include="Stage2AnomalyPlan.h" />
     <ClInclude Include="KnockingAnomaly.h" />
+    <ClInclude Include="UnseenPresenceAnomaly.h" />
     <ClInclude Include="TensionPulse.h" />
     <ClInclude Include="TensionPulseFeedback.h" />
     <ClInclude Include="BehindPresence.h" />
@@ -421,6 +424,7 @@
     <ClInclude Include="shader\flashlightShadow.hlsli" />
     <ClInclude Include="shader\flashlightLighting.hlsli" />
     <ClInclude Include="shader\pbrLighting.hlsli" />
+    <ClInclude Include="shader\pointShadow.hlsli" />
     <ClInclude Include="shader\roomOcclusion.hlsli" />
     <ClInclude Include="shader\waterCaustics.hlsli" />
     <ClInclude Include="shader\puddleMask.hlsli" />
@@ -443,6 +447,12 @@
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\shadowDepthVS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\pointShadowVS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\pointShadowPS.hlsl">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\shadowDissolvePS.hlsl">

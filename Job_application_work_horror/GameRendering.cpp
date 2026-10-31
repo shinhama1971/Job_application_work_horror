@@ -10,6 +10,7 @@
 #include "Player.h"
 #include "DebugUI.h"
 #include "TechDemo.h"
+#include "HangingBulb.h"
 
 #include <algorithm>
 #include <cmath>
@@ -190,6 +191,62 @@ namespace Core
         {
             m_Instance->m_GpuTimer.SkipPass(GpuPass::Shadow);
             m_Instance->m_ShadowMap.Bind();
+        }
+
+        // 揺れる裸電球の影（2面）：カメラに一番近い電球から6方向を撮り、電球からの距離をキューブマップへ書いている。
+        // 電球は毎フレーム揺れるので、6面とも毎フレーム描き直している。描く物は懐中電灯の影と同じく、影を落とす物だけで、
+        // 光の届く範囲の外の物は省いている。物のDrawShadowが使うシェーダーを、この間だけ距離を書くシェーダーに差し替えている。
+        {
+            const HangingBulb* shadowBulb = nullptr;
+            float nearestDistanceSquared = 0.0f;
+            for (const HangingBulb* bulb : m_Instance->GetObjects<HangingBulb>())
+            {
+                const float distanceSquared = DirectX::SimpleMath::Vector3::DistanceSquared(
+                    bulb->GetBulbPosition(), m_Instance->m_Camera.GetPosition());
+                if (shadowBulb == nullptr || distanceSquared < nearestDistanceSquared)
+                {
+                    shadowBulb = bulb;
+                    nearestDistanceSquared = distanceSquared;
+                }
+            }
+
+            if (shadowBulb != nullptr)
+            {
+                m_Instance->m_GpuTimer.BeginPass(GpuPass::BulbShadow, context);
+                const DirectX::SimpleMath::Vector3 lightPosition = shadowBulb->GetBulbPosition();
+                const float lightRange = shadowBulb->GetLightRange();
+                m_Instance->m_ShadowMap.SetPointShadow(lightPosition, lightRange, true);
+                m_Instance->m_ShadowMap.SetShaderOverride(&m_Instance->m_PointShadowMap.GetShader());
+                for (int face = 0; face < 6; ++face)
+                {
+                    m_Instance->m_PointShadowMap.BeginFace(face, lightPosition);
+                    for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
+                    {
+                        if (o->IsDestroy() || !o->CastsShadow())
+                        {
+                            continue;
+                        }
+                        const WorldBoundingSphere bounds = GetConservativeCullingBounds(*o);
+                        const float reach = lightRange + bounds.Radius;
+                        if (DirectX::SimpleMath::Vector3::DistanceSquared(bounds.Center, lightPosition) > reach * reach)
+                        {
+                            continue;
+                        }
+                        o->DrawShadow();
+                    }
+                }
+                m_Instance->m_PointShadowMap.End();
+                m_Instance->m_ShadowMap.SetShaderOverride(nullptr);
+                // 面ごとに差し替えたビュー・射影の行列を、プレイヤーの視点に戻している
+                m_Instance->m_Camera.SetCamera();
+                m_Instance->m_GpuTimer.EndPass(GpuPass::BulbShadow, context);
+            }
+            else
+            {
+                m_Instance->m_ShadowMap.SetPointShadow(DirectX::SimpleMath::Vector3::Zero, 0.0f, false);
+                m_Instance->m_PointShadowMap.Unbind();
+                m_Instance->m_GpuTimer.SkipPass(GpuPass::BulbShadow);
+            }
         }
 
         // 壁の鏡（2面）：鏡が画面に映り、カメラが鏡の表側にいるときだけ、鏡の面で反転したカメラから景色を描いている。

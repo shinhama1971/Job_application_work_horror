@@ -2,7 +2,7 @@
 // 共通の処理: 物理ベースの鏡面反射（PBR、金属・粗さの方式）。壁・扉・金属の小物（litTexturePS）で使っている。
 // 主な技術: GGX（Trowbridge-Reitz）の法線分布、高さを考えたSmithの遮蔽（GGXの近似）、Schlickのフレネル、
 //           環境光の鏡面反射を求める解析的な近似（Karis 2014「Physically Based Shading on Mobile」）
-// common.hlslと、g_SamplerState（s0）の宣言の後に読み込んでいる。
+// common.hlsl・fastNoise.hlsliと、g_SamplerState（s0）の宣言の後に読み込んでいる。
 //
 // ・拡散反射はこれまでどおり「色 × 光の明るさ × 面の向き」で計算しているため（1/πを光の強さに含めている）、
 //   鏡面反射にはπを掛けて、同じ光の強さの単位にそろえている。
@@ -90,6 +90,68 @@ float3 EvaluateSpecularGGX(PbrSurface surface, float3 normal, float3 toView, flo
     const float visibility = VisibilitySmithGGX(nDotV, nDotL, surface.alpha);
     const float3 fresnel = FresnelSchlick(surface.f0, vDotH);
     return distribution * visibility * fresnel * (PBR_PI * nDotL);
+}
+
+// 使い込まれた金属の跡（錆・擦れ傷・拭き跡のむら）。金属らしさのある面だけに、場所ごとに色・金属らしさ・粗さを変えている。
+// 一様な金属は、暗い場所では形の分からない黒い板に見えやすい。光り方がまだらになることで、金属だと分かる。
+struct MetalWear
+{
+    float3 baseColor;
+    float metallic;
+    float roughness;
+    // 錆の盛り上がり（法線を傾ける高さ）
+    float height;
+};
+
+MetalWear GetMetalWear(float3 baseColor, float metallic, float roughness, float3 worldPosition, float3 worldNormal)
+{
+    MetalWear wear;
+    wear.baseColor = baseColor;
+    wear.metallic = metallic;
+    wear.roughness = roughness;
+    wear.height = 0.0f;
+    [branch]
+    if (metallic > 0.05f)
+    {
+        // 面の向きで、模様を作る2次元の座標を選んでいる（箱のどの面でも、ワールドの大きさのまま模様を作る）
+        const float3 axis = abs(normalize(worldNormal));
+        const float2 uv = axis.y > max(axis.x, axis.z)
+            ? worldPosition.xz
+            : (axis.x > axis.z ? worldPosition.zy : worldPosition.xy);
+
+        // 錆：大きなまだらの染みに、床に近いほど濃くなる分（水と湿気が溜まる）を足している。
+        // 錆は鉄の上にできた酸化物なので、金属ではなく、ざらざらで光らない
+        const float floorDamp = saturate(1.0f - (worldPosition.y + 100.0f) / 45.0f);
+        const float rustPatches = FastFractalNoise3(uv * 0.11f + 17.3f) + floorDamp * 0.15f;
+        const float rustMask = smoothstep(0.57f, 0.76f, rustPatches);
+        const float rustGrain = FastValueNoise(uv * 1.7f + 5.3f);
+        // 鉄のような灰色の金属は赤茶の錆、真鍮や金のような色の付いた金属は黒ずんだくすみにしている
+        const float maxChannel = max(baseColor.r, max(baseColor.g, baseColor.b));
+        const float minChannel = min(baseColor.r, min(baseColor.g, baseColor.b));
+        const float grayness = 1.0f - saturate((maxChannel - minChannel) / max(maxChannel, 0.001f) * 2.5f);
+        const float3 ironRust = lerp(float3(0.20f, 0.075f, 0.030f), float3(0.36f, 0.16f, 0.060f), rustGrain);
+        const float3 tarnish = baseColor * lerp(0.28f, 0.42f, rustGrain);
+        const float3 rustColor = lerp(tarnish, ironRust, grayness);
+
+        // 擦れ傷：斜めの向きに細長く引き伸ばしたノイズで細い線を作り、所々にだけ散らしている。
+        // 傷の所は地の金属が出て、なめらかに光る
+        const float2 scratchUV = float2(uv.x * 0.8f + uv.y * 0.6f, uv.y * 0.8f - uv.x * 0.6f);
+        const float scratchLines = FastValueNoise(scratchUV * float2(0.35f, 9.0f) + 3.1f);
+        const float scratchArea = smoothstep(0.35f, 0.65f, FastValueNoise(uv * 0.07f + 41.0f));
+        const float scratchMask = smoothstep(0.86f, 0.95f, scratchLines) * scratchArea * (1.0f - rustMask);
+
+        // 拭き跡や手の脂のような、光沢の細かな濃淡
+        const float smudge = FastValueNoise(uv * 0.45f + 9.0f);
+
+        wear.roughness = clamp(roughness + (smudge - 0.5f) * 0.20f, PBR_MIN_ROUGHNESS, 1.0f);
+        wear.roughness = lerp(wear.roughness, 0.14f, scratchMask);
+        wear.roughness = lerp(wear.roughness, 0.88f, rustMask);
+        wear.baseColor = lerp(baseColor, baseColor * 1.25f + 0.04f, scratchMask * 0.6f);
+        wear.baseColor = lerp(wear.baseColor, rustColor, rustMask);
+        wear.metallic = metallic * (1.0f - rustMask);
+        wear.height = rustMask * (0.4f + rustGrain * 0.6f);
+    }
+    return wear;
 }
 
 // 環境マップ（カメラの位置から6方向を撮った景色。GameRendering の EnvironmentProbe、ReflectionProbe.cpp）。

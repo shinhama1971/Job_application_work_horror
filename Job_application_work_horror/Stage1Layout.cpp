@@ -626,6 +626,23 @@ namespace Stage1Layout
             "assets/texture/writing_turned.png",
             Vector3(0.0f, -70.0f, 273.0f), Vector3(0.0f, 0.0f, -1.0f), 60.0f);
 
+        // ループの周回ごとに、開始地点の部屋に1つずつ浮かぶ文字。最初は隠しておき、StageScene が周回に合わせて浮かばせている。
+        // 1周目は奥のドアの右、2周目は東の壁、3周目は西の壁（戻ってくるたびに、部屋の中の文字が増えていく）
+        const struct { const char* Name; const char* Texture; Vector3 Center; Vector3 Normal; float Width; } lapWritingSpots[] =
+        {
+            { "Stage1WritingLap1", "assets/texture/writing_lap1.png", Vector3(54.0f, -71.0f, -178.0f), Vector3(0.0f, 0.0f, 1.0f), 44.0f },
+            { "Stage1WritingLap2", "assets/texture/writing_lap2.png", Vector3(88.0f, -70.0f, -140.0f), Vector3(-1.0f, 0.0f, 0.0f), 64.0f },
+            { "Stage1WritingLap3", "assets/texture/writing_lap3.png", Vector3(-88.0f, -70.0f, -140.0f), Vector3(1.0f, 0.0f, 0.0f), 60.0f },
+        };
+        for (std::size_t lap = 0; lap < objects.lapWritings.size(); ++lap)
+        {
+            FlashlightWriting* writing = createWriting(
+                lapWritingSpots[lap].Name, lapWritingSpots[lap].Texture, "",
+                lapWritingSpots[lap].Center, lapWritingSpots[lap].Normal, lapWritingSpots[lap].Width);
+            writing->SetPresenceImmediately(0.0f);
+            objects.lapWritings[lap] = writing;
+        }
+
         // 暗証番号の扉（任意で探索）。中央の扉の先の細い廊下の東の壁にあり、ループ廊下へ向かうたびに目に入る。
         Door* keypadDoor = builder.Create<Door>("Stage1KeypadDoor");
         keypadDoor->SetPosition(45.0f, -74.0f, 110.0f);

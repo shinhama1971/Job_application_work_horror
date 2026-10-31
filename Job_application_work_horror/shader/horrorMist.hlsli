@@ -2,6 +2,7 @@
 // 共通の処理: 床の近くに溜まり、部屋全体にも薄く漂って、ゆっくり流れる霧（壁・天井・小物の litTexturePS と、床の wetFloorPS で共通）。
 // 主な技術: 高さで薄くなる霧の、視線に沿った量の解析的な積分、時間で流れる2層のノイズ（霧の濃淡・筋）、
 //           懐中電灯の円錐の中だけ霧が光る散乱（懐中電灯は目の位置にあるので、視線の方向の光の強さを霧全体に使える）
+//           天井の照明から下へ広がる光の筋（視線が光の届く球を通る区間だけを、少ない点で調べて足す）
 // waterCaustics.hlsli（プレイヤーのビュー行列と時間）・flashlightLighting.hlsli・fastNoise.hlsli の後に読み込んでいる。
 //
 // ・懐中電灯の外では、霧は闇とほとんど同じ色で、遠くと足元をぼかすだけにしている。
@@ -66,6 +67,83 @@ float3 ApplyHorrorMist(float3 color, float3 worldPosition, float3 viewPosition, 
         mistColor += Light.Diffuse.rgb * GetFlashlightTint(pixelDirection) * Light.Intensity * beam * (0.06f + reach * 0.15f);
     }
     return lerp(color, mistColor, mist);
+}
+
+// 天井の照明・非常灯・裸電球から下へ広がる光の筋（霧に散った光）。
+// 視線が光の届く球を通る区間だけを、少ない点で調べて足し合わせている（光の届く範囲の外は計算しない）。
+// 点光源の一覧は、その画素のタイルの一覧を使っている（タイルの一覧は、画面の奥の面より手前の光源をすべて含む）。
+// 光の筋の調べる点の数と、霧が光を散らす濃さ
+#define LIGHT_SHAFT_SAMPLES 8
+#define LIGHT_SHAFT_DENSITY 0.0018f
+// 光の筋を出す光源の高さの下限。天井の近くの照明（天井の器具・吊るした電球）だけにし、壁の表示や肖像画の光のように
+// 面に付いた光源は除いている（光源が面の上にあると、その面に向かう視線の終わりで光の筋が強く出すぎるため）
+#define LIGHT_SHAFT_MIN_HEIGHT (-58.0f)
+
+float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCount, float2 pixelPosition)
+{
+    const float3 eye = GetMistEyePosition();
+    const float3 toPixel = worldPosition - eye;
+    const float rayLength = length(toPixel);
+    const float3 rayDirection = toPixel / max(rayLength, 0.001f);
+    // 画素ごとに調べる位置を少しずらし、少ない点でも縞模様が出ないようにしている（インターリーブド・グラディエント・ノイズ）
+    const float jitter = frac(52.9829189f * frac(dot(pixelPosition, float2(0.06711056f, 0.00583715f))));
+    const float2 flow = float2(CausticTime * 0.60f, CausticTime * 0.25f);
+
+    float3 scattered = 0.0f;
+    [loop]
+    for (uint i = 0; i < lightCount; ++i)
+    {
+        const ENVIRONMENT_POINT_LIGHT pointLight = GetPixelLight(lightListOffset, i);
+        const float3 center = pointLight.PositionRange.xyz;
+        const float range = max(pointLight.PositionRange.w, 0.001f);
+        [branch]
+        if (center.y < LIGHT_SHAFT_MIN_HEIGHT)
+        {
+            continue;
+        }
+        // 視線が光の届く球を通る区間（球と直線の交わり）を、カメラから画素までの間に切り詰めている
+        const float closest = dot(center - eye, rayDirection);
+        const float3 offsetFromRay = center - (eye + rayDirection * closest);
+        const float missSquared = dot(offsetFromRay, offsetFromRay);
+        [branch]
+        if (missSquared >= range * range)
+        {
+            continue;
+        }
+        const float halfChord = sqrt(range * range - missSquared);
+        const float segmentStart = max(closest - halfChord, 0.0f);
+        const float segmentEnd = min(closest + halfChord, rayLength);
+        [branch]
+        if (segmentEnd <= segmentStart)
+        {
+            continue;
+        }
+
+        const float stepLength = (segmentEnd - segmentStart) / LIGHT_SHAFT_SAMPLES;
+        float lightScatter = 0.0f;
+        [unroll]
+        for (int sampleIndex = 0; sampleIndex < LIGHT_SHAFT_SAMPLES; ++sampleIndex)
+        {
+            const float3 samplePoint = eye + rayDirection *
+                (segmentStart + (float(sampleIndex) + jitter) * stepLength);
+            const float3 toLight = center - samplePoint;
+            const float lightDistance = length(toLight);
+            float attenuation = saturate(1.0f - lightDistance / range);
+            attenuation *= attenuation;
+            // 天井の器具から下へ広がる円錐の中だけを光らせている（真下ほど濃く、約60度より横では消える）
+            const float downward = saturate(toLight.y / max(lightDistance, 0.001f));
+            const float cone = smoothstep(0.55f, 0.92f, downward);
+            // 光源のすぐそばは、照明そのものの明るさに任せて薄くしている
+            const float awayFromFixture = smoothstep(2.0f, 9.0f, lightDistance);
+            // 霧のむら：ゆっくり流れるノイズで、光の筋の中に濃い所と薄い所を作っている
+            const float haze = 0.45f + FastValueNoise(samplePoint.xz * 0.05f + flow) * 0.90f;
+            lightScatter += attenuation * cone * haze * awayFromFixture;
+        }
+        scattered += pointLight.ColorIntensity.rgb * pointLight.ColorIntensity.a * lightScatter * stepLength;
+    }
+    // 光源の真下を長く見通したときに白く飛ばないよう、明るいほど伸びを抑えている（上限はおよそ0.35）
+    const float3 shaft = scattered * LIGHT_SHAFT_DENSITY;
+    return shaft / (1.0f + shaft * 2.8f);
 }
 
 #endif

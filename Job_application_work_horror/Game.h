@@ -20,6 +20,7 @@
 #include "ShadowMap.h"
 #include "PlanarReflection.h"
 #include "ReflectionProbe.h"
+#include "PointShadowMap.h"
 #include "ScreenSpaceReflection.h"
 #include "TiledLighting.h"
 #include "GameState.h"
@@ -64,6 +65,8 @@ namespace Core
         Effect::ReflectionProbe m_ReflectionProbe;
         // PBRの金属や濡れた面に映す景色（環境マップ）。カメラの位置から1フレームに1面ずつ撮り直し、t14 で読ませている
         Effect::ReflectionProbe m_EnvironmentProbe;
+        // 揺れる裸電球（2面）の影。電球から6方向を撮った「電球からの距離」のキューブマップで、t2 で読ませている
+        Effect::PointShadowMap m_PointShadowMap;
         Effect::ScreenSpaceReflection m_ScreenSpaceReflection;
         Effect::TiledLighting m_TiledLighting;
         // 毎フレームObjectから集める点光源。確保し直しを避けるため、同じvectorを使い回している。

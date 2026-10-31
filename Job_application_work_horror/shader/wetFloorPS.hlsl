@@ -8,6 +8,7 @@
 Texture2D g_Texture : register(t0);
 SamplerState g_SamplerState : register(s0);
 #include "flashlightShadow.hlsli"
+#include "pointShadow.hlsli"
 
 // 水面の反射の画像（PlanarReflectionが描いたもの、t6）
 Texture2D g_PlanarReflection : register(t6);
@@ -438,6 +439,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
             offsetToLight / max(distanceToLight, 0.001f);
         float pointAttenuation = saturate(1.0f - distanceToLight / lightRange);
         pointAttenuation *= pointAttenuation;
+        // 揺れる裸電球の光は、電球との間に物があれば届かない（床に落ちる、揺れる影。pointShadow.hlsli）
+        pointAttenuation *= GetPointLightShadow(input.worldPos, input.worldNormal, pointLight.PositionRange.xyz);
 
         const float pointLambert = saturate(dot(
             detailWorldNormal, directionToPointLight));
@@ -663,6 +666,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     color.rgb = lerp(color.rgb, fogColor, fogFactor);
     // 床の近くに溜まって流れる霧（懐中電灯の円錐の中だけ白く浮かぶ。horrorMist.hlsli）
     color.rgb = ApplyHorrorMist(color.rgb, input.worldPos, input.viewPos, lighting);
+    // 天井の照明や非常灯から下へ落ちる光の筋（霧に散った光。horrorMist.hlsli）
+    color.rgb += GetLightShafts(input.worldPos, pointLightListOffset, pointLightCount, input.pos.xy);
     color.rgb = ApplyFilmicHorrorGrade(color.rgb);
 
     // デバッグ表示：1=法線、2=懐中電灯の影、3=照明だけ、4=水たまりの濃さ、5=反射の画像、7=タイルごとの光源の数（6は壁用なので黒）

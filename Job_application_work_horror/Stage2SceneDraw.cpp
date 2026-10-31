@@ -242,6 +242,7 @@ Stage2ObjectiveInput Stage2Scene::MakeObjectiveInput(bool confirmationPending) c
     input.hiding = m_Objects.player != nullptr && m_Objects.player->IsHiding();
     input.hidingNotice = m_Notices.hiding > 0.0f;
     input.knockListening = m_KnockingAnomaly.IsListening();
+    input.unseenNear = m_Objects.player != nullptr && m_UnseenPresence.IsNear(m_Objects.player->GetPosition());
 
     input.signalPuzzleComplete = m_SignalPuzzle.IsComplete();
     input.signalPuzzleStep = m_SignalPuzzle.GetStep();
@@ -274,6 +275,7 @@ Stage2ObjectiveInput Stage2Scene::MakeObjectiveInput(bool confirmationPending) c
     input.handprintNotice = m_HandprintAnomaly.GetNoticeTimer() > 0.0f;
     input.mirrorNotice = m_MirrorAnomaly.GetNoticeTimer() > 0.0f;
     input.knockNotice = m_KnockingAnomaly.GetNoticeTimer() > 0.0f;
+    input.unseenNotice = m_UnseenPresence.GetNoticeTimer() > 0.0f;
     input.loopNotice = m_Notices.loop > 0.0f;
     return input;
 }

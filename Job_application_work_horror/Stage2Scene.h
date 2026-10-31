@@ -20,6 +20,7 @@
 #include "BreathHold.h"
 #include "RadioStatic.h"
 #include "KnockingAnomaly.h"
+#include "UnseenPresenceAnomaly.h"
 #include "ScratchAnomaly.h"
 #include "ObservedScareSequence.h"
 #include "CaughtSequence.h"
@@ -94,6 +95,8 @@ private:
     void UpdateFootprintFollower(const Player& player, float deltaTime);
     // この周回で見つけるべき異変（Stage2AnomalyPlanが決めたもの）を見つけ終えたかを返している。
     bool IsRequiredAnomalyFound() const;
+    // 見えない影の異変を更新している（携帯ラジオの雑音だけを頼りにやり過ごす）
+    void UpdateUnseenPresence(Player& player, float deltaTime);
     // ノックの異変を更新している／耳を澄ませる位置を返している
     void UpdateKnockingAnomaly(const Player& player, float deltaTime);
     DirectX::SimpleMath::Vector3 GetKnockListenPoint() const;
@@ -157,6 +160,7 @@ private:
     // この周回で、誰かの足跡をもう出したか（1周に1回だけ）
     bool m_FootprintFollowerUsedThisLoop = false;
     KnockingAnomaly m_KnockingAnomaly;
+    UnseenPresenceAnomaly m_UnseenPresence;
     ScratchAnomaly m_ScratchAnomaly;
     ObservedScareSequence m_ObservedScareSequence;
     CaughtSequence m_CaughtSequence;

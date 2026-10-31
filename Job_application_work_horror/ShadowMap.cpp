@@ -151,8 +151,8 @@ namespace Effect
             2.0f,
             280.0f);
 
-        // 行列とパラメーターをシェーダーの形にしてb8へ送っている
-        ShadowBuffer buffer{};
+        // 行列とパラメーターをシェーダーの形にしてb8へ送っている（電球の影の値は、前に決めたものをそのまま使う）
+        ShadowBuffer& buffer = m_BufferData;
         buffer.ViewProjection = (lightView * lightProjection).Transpose();
         buffer.Parameters = Vector4(
             1.0f / static_cast<float>(ShadowResolution),
@@ -161,16 +161,23 @@ namespace Effect
             280.0f);
         buffer.Options = Vector4(
             static_cast<float>(Tools::TechDemo::GetShadowMode()), 0.0f, 0.0f, 0.0f);
-        context->UpdateSubresource(
-            m_ShadowBuffer.Get(),
-            0,
-            nullptr,
-            &buffer,
-            0,
-            0);
+        UploadBuffer();
+    }
+
+    void ShadowMap::UploadBuffer()
+    {
+        ID3D11DeviceContext* context = Renderer::GetDeviceContext();
+        context->UpdateSubresource(m_ShadowBuffer.Get(), 0, nullptr, &m_BufferData, 0, 0);
         ID3D11Buffer* shadowBuffer = m_ShadowBuffer.Get();
         context->VSSetConstantBuffers(8, 1, &shadowBuffer);
         context->PSSetConstantBuffers(8, 1, &shadowBuffer);
+    }
+
+    void ShadowMap::SetPointShadow(const Vector3& lightPosition, float range, bool enabled)
+    {
+        m_BufferData.PointShadowLight = Vector4(lightPosition.x, lightPosition.y, lightPosition.z, range);
+        m_BufferData.PointShadowOptions = Vector4(enabled ? 1.0f : 0.0f, 0.0f, 0.0f, 0.0f);
+        UploadBuffer();
     }
 
     // 描画先・ビューポート・ラスタライザーを元に戻し、影のテクスチャと比較サンプラーを設定している
@@ -208,6 +215,12 @@ namespace Effect
     // 深度だけを書く頂点シェーダーを設定している
     void ShadowMap::SetShader()
     {
+        // 揺れる裸電球の影を描いている間は、電球からの距離を書くシェーダー（頂点・ピクセルの両方）を使っている
+        if (m_ShaderOverride != nullptr)
+        {
+            m_ShaderOverride->SetGPU();
+            return;
+        }
         m_DepthShader.SetGPU();
 
         // 影の描画は深度だけを書き込んでいる。普通のピクセルシェーダーが残っていると、

@@ -982,6 +982,45 @@ void Stage2Scene::UpdateKnockingAnomaly(const Player& player, float deltaTime)
     Input::SetVibration(7, 0.18f);
 }
 
+// 見えない影の異変：姿の見えない影を廊下の奥から歩かせ、近づかれたら捕まえ、すれ違えたら見つけたことにしている。
+// 影の近さは、携帯ラジオの雑音（UpdateTensionPulse）と心拍（ComputeThreatRate）でだけ伝えている。
+void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
+{
+    const bool enabled = m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Unseen) &&
+        !m_FinalSequence.IsSequenceActive();
+    const UnseenPresenceAnomaly::Result result = m_UnseenPresence.Update(
+        deltaTime, player.GetPosition(), player.IsMovingHorizontally(), player.IsHiding(), enabled);
+
+    Core::Game* game = Core::Game::GetInstance();
+    if (result == UnseenPresenceAnomaly::Result::Caught)
+    {
+        // 捕まった：足音の影に捕まったときと同じく、周回はそのままで入口へ戻している
+        StartCaughtSequence(player, CaughtSequence::Reason::NoiseStalker);
+        return;
+    }
+    if (result != UnseenPresenceAnomaly::Result::Passed)
+    {
+        return;
+    }
+
+    // すれ違えた：通り過ぎた先の照明が一度明滅し、吊るした裸電球が大きく揺れて、雑音が遠ざかっていく
+    const Vector3 presencePosition = m_UnseenPresence.GetPosition();
+    CeilingLight* passedLight = m_Objects.Light(Stage2NearestLight(presencePosition.z));
+    if (passedLight != nullptr)
+    {
+        passedLight->TriggerEventFlicker(0.86f, 0.70f);
+    }
+    CeilingLight* doorLight = m_Objects.Light(Stage2Light::DoorLight);
+    if (doorLight != nullptr)
+    {
+        doorLight->TriggerEventFlicker(0.90f, 0.76f);
+    }
+    KickHangingBulbs(0.7f);
+    game->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, presencePosition, 0.62f, 1.4f);
+    game->GetPostProcess()->TriggerHorrorPulse(0.30f, 0.34f);
+    Input::SetVibration(6, 0.20f);
+}
+
 // ----------------------------------------------------------------------------
 // 背後の気配
 // 視界の外に人影を出し、見ていない間だけ近づけている。振り向けば消え、
@@ -1106,6 +1145,8 @@ void Stage2Scene::UpdateBehindPresence(Player& player, float deltaTime)
 float Stage2Scene::ComputeThreatRate(const Player& player, bool includeMistakes) const
 {
     float threatRate = m_NoiseThreatSystem.GetThreat() * 0.78f;
+    // 見えない影が近いほど、心拍も速くなる
+    threatRate = (std::max)(threatRate, m_UnseenPresence.GetProximity(player.GetPosition()) * 0.85f);
     if (includeMistakes && (m_LoopCount == 1 || m_LoopCount == 2))
     {
         const float observationDanger =
@@ -1143,7 +1184,7 @@ void Stage2Scene::UpdateTensionPulse(const Player& player, float deltaTime)
     PlayTensionPulse(m_TensionPulse.Update(
         deltaTime, ComputeThreatRate(player, false), player.IsHiding()));
 
-    // 携帯ラジオの雑音：足音で上がる危険度ではなく、実際に近くにいる影（足音の影・最後の追跡の影・背後の気配）の近さで鳴らしている
+    // 携帯ラジオの雑音：足音で上がる危険度ではなく、実際に近くにいる影（足音の影・最後の追跡の影・背後の気配・見えない影）の近さで鳴らしている
     float presence = 0.0f;
     for (const ShadowMan* figure : { m_Objects.noiseShadow, m_Objects.shadow, m_Objects.presence })
     {
@@ -1155,6 +1196,8 @@ void Stage2Scene::UpdateTensionPulse(const Player& player, float deltaTime)
         toFigure.y = 0.0f;
         presence = (std::max)(presence, 1.0f - (std::clamp)((toFigure.Length() - 14.0f) / 96.0f, 0.0f, 1.0f));
     }
+    // 見えない影の異変の周回では、姿の見えない影の近さも雑音に含めている（手がかりはこの雑音だけ）
+    presence = (std::max)(presence, m_UnseenPresence.GetProximity(player.GetPosition()));
     m_RadioStatic.Update(deltaTime, presence, true);
     // 影が近いほど、吊るした裸電球がすきま風にあおられるように大きく揺れる
     for (HangingBulb* bulb : m_Objects.hangingBulbs)

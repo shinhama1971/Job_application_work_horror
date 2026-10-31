@@ -18,12 +18,16 @@ namespace Effect
     {
     private:
         // シェーダーへ渡す値（b8）：ライトのビュー×射影の行列と、x=1テクセルの大きさ、y=深度の比較のずれ（バイアス）、z=near、w=far、
-        // 影の方式（x=0なら影なし、1なら硬い影、2ならPCSS。技術デモで切り替えている）
+        // 影の方式（x=0なら影なし、1なら硬い影、2ならPCSS。技術デモで切り替えている）、
+        // 揺れる裸電球の影（PointShadowMap。xyz=電球の位置、w=光の届く範囲）と、その設定（x=1なら使う）。
+        // 定数バッファの番号（b0〜b13）がすべて使われているため、懐中電灯の影と同じ定数バッファにまとめている。
         struct ShadowBuffer
         {
             DirectX::SimpleMath::Matrix ViewProjection;
             DirectX::SimpleMath::Vector4 Parameters;
             DirectX::SimpleMath::Vector4 Options;
+            DirectX::SimpleMath::Vector4 PointShadowLight;
+            DirectX::SimpleMath::Vector4 PointShadowOptions;
         };
 
         // 影のテクスチャの大きさ（1024x1024）
@@ -45,6 +49,12 @@ namespace Effect
         UINT m_PreviousViewportCount = 1;
         // 深度だけを書くシェーダー
         Shader m_DepthShader;
+        // 最後にb8へ送った値（電球の影の値だけを変えて送り直すときに使う）と、影を描くシェーダーの差し替え先
+        ShadowBuffer m_BufferData{};
+        Shader* m_ShaderOverride = nullptr;
+
+        // m_BufferData をb8へ送り、頂点・ピクセルシェーダーに設定している
+        void UploadBuffer();
 
     public:
         // テクスチャ・サンプラー・ラスタライザー・定数バッファ・シェーダーを作る／解放する
@@ -58,5 +68,9 @@ namespace Effect
         void Bind();
         // 深度だけを書くシェーダーを設定している
         void SetShader();
+        // 別の影（揺れる裸電球の影）を描く間だけ、DrawShadowが使うシェーダーを差し替えている（nullptrで元に戻る）
+        void SetShaderOverride(Shader* shader) { m_ShaderOverride = shader; }
+        // 揺れる裸電球の影の位置と範囲を、シェーダーへ渡している（enabledがfalseなら影を使わない）
+        void SetPointShadow(const DirectX::SimpleMath::Vector3& lightPosition, float range, bool enabled);
     };
 }

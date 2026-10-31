@@ -71,6 +71,8 @@ bool Stage2Scene::IsRequiredAnomalyFound() const
         return m_HandprintAnomaly.WasFound();
     case Stage2Anomaly::Mirror:
         return m_MirrorAnomaly.WasFound();
+    case Stage2Anomaly::Unseen:
+        return m_UnseenPresence.WasFound();
     case Stage2Anomaly::None:
         break;
     }
@@ -117,8 +119,9 @@ void Stage2Scene::Init()
     m_RadioStatic.Reset();
     m_KnockingAnomaly.Reset();
     m_FalseDoorAnomaly.Reset();
+    m_UnseenPresence.Reset();
     m_ClockAnomaly.Reset();
-    // 1周目・2周目に探させる異変を、偽の扉・時計・肖像画・壁のノックから毎回ランダムに2つ選んでいる。
+    // 1周目・2周目に探させる異変を、7つの候補（Stage2AnomalyPlan）から毎回ランダムに2つ選んでいる。
     m_AnomalyPlan.Randomize(m_PresenceRandom);
     // 今回出る異変は、リザルト画面の「今回の発見」に出している。
     game->SetStage2Anomalies(
@@ -294,6 +297,19 @@ void Stage2Scene::Update()
                 SetFalseDoorState(true, false);
             }
             break;
+        case SceneDebugAction::ShowUnseenAnomaly:
+            // 異変を探す周回にし、その周回の異変を見えない影にしている（廊下の奥から歩き直させる）
+            if (m_LoopCount < 1)
+            {
+                m_AnomalyPlan.ForceLoop(1, Stage2Anomaly::Unseen);
+                AdvanceLoop(*player);
+            }
+            if (m_LoopCount <= Stage2AnomalyPlan::PlannedLoopCount)
+            {
+                m_AnomalyPlan.ForceLoop(m_LoopCount, Stage2Anomaly::Unseen);
+                m_UnseenPresence.ResetProgressForLoop();
+            }
+            break;
         }
     }
 
@@ -323,6 +339,7 @@ void Stage2Scene::Update()
     m_ScratchAnomaly.UpdateNoticeTimer(deltaTime);
     m_PortraitAnomaly.UpdateNoticeTimer(deltaTime);
     m_KnockingAnomaly.UpdateNoticeTimer(deltaTime);
+    m_UnseenPresence.UpdateNoticeTimer(deltaTime);
     m_FalseDoorAnomaly.UpdateNoticeTimer(deltaTime);
     m_ClockAnomaly.UpdateNoticeTimer(deltaTime);
     m_PuzzleFeedback.Update(deltaTime);
@@ -342,7 +359,7 @@ void Stage2Scene::Update()
         m_GuidancePulseCooldown <= 0.0f)
     {
         // しばらく進めていないとき、探すべき異変の近くの照明を揺らしている（偽の扉は奥寄り、時計と肖像画は中央付近、
-        // ノックは音の出どころの近く、血の手形は最後に現れた手形の近く、鏡は鏡の真上）。
+        // ノックは音の出どころの近く、血の手形は最後に現れた手形の近く、鏡は鏡の真上、見えない影はその影の真上）。
         const Stage2Anomaly requiredAnomaly = m_AnomalyPlan.GetRequired(m_LoopCount);
         CeilingLight* guideLight = m_Objects.Light(
             requiredAnomaly == Stage2Anomaly::FalseDoor ? Stage2Light::Light3 :
@@ -350,7 +367,9 @@ void Stage2Scene::Update()
             requiredAnomaly == Stage2Anomaly::Handprint
                 ? Stage2NearestLight(m_HandprintAnomaly.GetLatestPosition().z) :
             requiredAnomaly == Stage2Anomaly::Knocking
-                ? Stage2NearestLight(GetKnockListenPoint().z)
+                ? Stage2NearestLight(GetKnockListenPoint().z) :
+            requiredAnomaly == Stage2Anomaly::Unseen
+                ? Stage2NearestLight(m_UnseenPresence.GetPosition().z)
                 : Stage2Light::Light2);
         if (guideLight != nullptr)
         {
@@ -386,6 +405,7 @@ void Stage2Scene::Update()
     // ロッカーの中では、扉越しに聞こえるよう、すべての位置付きの音をこもらせている
     Core::Game::GetInstance()->SetListenerMuffle(player->IsHiding() ? 0.45f : 0.0f);
     UpdateKnockingAnomaly(*player, deltaTime);
+    UpdateUnseenPresence(*player, deltaTime);
     UpdateFalseDoorAnomaly(*player);
     UpdateClock(deltaTime);
     UpdateClockObservation();

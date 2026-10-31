@@ -42,8 +42,6 @@ private:
     float m_Brightness = 1.0f;
     float m_Seed = 0.0f;
 
-    // 電球の中心のワールド座標（揺れを含む）
-    DirectX::SimpleMath::Vector3 GetBulbPosition() const;
     // 揺れを含めたワールド行列
     DirectX::SimpleMath::Matrix MakeWorldMatrix() const;
 
@@ -55,6 +53,10 @@ public:
     bool UsesCameraCulling() const override { return true; }
     bool ContributesToPlanarReflection() const override { return true; }
     void CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const override;
+    // 電球の中心のワールド座標（揺れを含む）。揺れる電球の影を描く位置にも使っている
+    DirectX::SimpleMath::Vector3 GetBulbPosition() const;
+    // 電球の光の届く範囲（揺れる電球の影を描く範囲にも使っている）
+    float GetLightRange() const;
 
     // 天井の吊るす位置（コードの付け根）と、揺れの向きと風をずらす値
     void Place(const DirectX::SimpleMath::Vector3& anchor, float seed);

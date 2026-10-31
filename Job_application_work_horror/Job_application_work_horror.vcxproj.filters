@@ -87,6 +87,9 @@
     <ClCompile Include="ShadowMap.cpp">
       <Filter>ソース ファイル\Rendering</Filter>
     </ClCompile>
+    <ClCompile Include="PointShadowMap.cpp">
+      <Filter>ソース ファイル\Rendering</Filter>
+    </ClCompile>
     <ClCompile Include="PlanarReflection.cpp">
       <Filter>ソース ファイル\Rendering</Filter>
     </ClCompile>
@@ -341,6 +344,9 @@
     <ClInclude Include="shader\pbrLighting.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="shader\pointShadow.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="shader\roomOcclusion.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -452,6 +458,9 @@
     <ClInclude Include="KnockingAnomaly.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
+    <ClInclude Include="UnseenPresenceAnomaly.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
     <ClInclude Include="TensionPulse.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
@@ -486,6 +495,9 @@
       <Filter>ソース ファイル\Rendering</Filter>
     </ClInclude>
     <ClInclude Include="ShadowMap.h">
+      <Filter>ソース ファイル\Rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="PointShadowMap.h">
       <Filter>ソース ファイル\Rendering</Filter>
     </ClInclude>
     <ClInclude Include="PlanarReflection.h">
@@ -788,6 +800,8 @@
     <FxCompile Include="shader\wetFloorPS.hlsl" />
     <FxCompile Include="shader\volumetricFlashlightPS.hlsl" />
     <FxCompile Include="shader\shadowDepthPS.hlsl" />
+    <FxCompile Include="shader\pointShadowVS.hlsl" />
+    <FxCompile Include="shader\pointShadowPS.hlsl" />
     <FxCompile Include="shader\shadowDepthVS.hlsl" />
     <FxCompile Include="shader\shadowDissolvePS.hlsl" />
     <FxCompile Include="shader\bloomBlurHorizontalCS.hlsl" />

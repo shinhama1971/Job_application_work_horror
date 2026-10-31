@@ -50,6 +50,8 @@ public:
 
     // 0で消え、1で見える。指定した値へ向かってゆっくり変化させている。
     void SetTargetPresence(float presence) { m_TargetPresence = presence; }
+    // 濃さを、ゆっくり変えずにすぐ決めている（最初は隠しておく文字に使っている）
+    void SetPresenceImmediately(float presence) { m_Presence = presence; m_TargetPresence = presence; }
 
     // 懐中電灯の中心付近で、さえぎる物なく照らして読める状態かどうかを返している。
     bool IsBeingRead(

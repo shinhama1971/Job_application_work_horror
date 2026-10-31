@@ -151,6 +151,10 @@ private:
     float m_EvidenceNoticeTimer = 0.0f;
     float m_LoopCooldown = 0.0f;
     float m_LoopNoticeTimer = 0.0f;
+    // 2周目以降、開始地点の奥のドアの向こうから叩く音：次に鳴らすまでの秒数、続けて叩く残りの回数、これまでに鳴らした回数
+    float m_StartDoorKnockTimer = 0.0f;
+    int m_StartDoorKnocksLeft = 0;
+    int m_StartDoorKnockEvents = 0;
     // 入口の演出（起きたか・経過秒・段階）、左の倉庫の演出（段階・経過秒・知らせ）
     bool m_EntranceEventTriggered = false;
     float m_EntranceEventTimer = -1.0f;

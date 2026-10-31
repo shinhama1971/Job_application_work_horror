@@ -14,6 +14,9 @@ cbuffer ShadowBuffer : register(b8)
     matrix ShadowViewProjection;
     float4 ShadowParameters;
     float4 ShadowOptions;
+    // 揺れる裸電球の影（xyz=電球の位置、w=光の届く範囲）と、その設定（x=1なら使う）。pointShadow.hlsli で使っている
+    float4 PointShadowLight;
+    float4 PointShadowOptions;
 }
 
 // 懐中電灯のレンズの大きさ（ワールドの長さ。約10cm）。大きいほど影の縁がぼやける

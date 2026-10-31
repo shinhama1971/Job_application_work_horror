@@ -215,7 +215,11 @@ for ($digit = 1; $digit -le 9; ++$digit)
 }
 $writings += @(
     # 暗証番号の扉の先の部屋
-    @{ Name = 'writing_watched'; Text = 'ずっと みていた'; Seed = 2201 }
+    @{ Name = 'writing_watched'; Text = 'ずっと みていた'; Seed = 2201 },
+    # 1面のループで、突き当たりのドアを通って開始地点へ戻るたびに、開始地点の部屋に1つずつ現れる文字（StageScene）
+    @{ Name = 'writing_lap1'; Text = 'おかえり'; Seed = 2301 },
+    @{ Name = 'writing_lap2'; Text = 'なんど あけても ここ'; Seed = 2302 },
+    @{ Name = 'writing_lap3'; Text = 'もう でられない'; Seed = 2303 }
 )
 
 foreach ($writing in $writings)

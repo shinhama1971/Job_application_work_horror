@@ -372,6 +372,7 @@ void Stage2Scene::AdvanceLoop(Player& player)
         m_Objects.ground->AddLeak(leakSpots[m_LoopCount - 1], 6.0f, 45.0f);
     }
     m_KnockingAnomaly.ResetProgressForLoop();
+    m_UnseenPresence.ResetProgressForLoop();
     m_FalseDoorAnomaly.ResetProgressForLoop();
     m_ConfirmationHandledThisLoop = false;
     ResetSignalPuzzle();

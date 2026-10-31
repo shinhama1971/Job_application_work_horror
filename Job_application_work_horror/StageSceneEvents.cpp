@@ -20,6 +20,7 @@
 #include "ScreenDustOverlay.h"
 #include "ScareTrigger.h"
 #include "ShadowMan.h"
+#include "FlashlightWriting.h"
 #include "Camera.h"
 #include "TensionPulseFeedback.h"
 #include <SimpleMath.h>
@@ -220,6 +221,48 @@ void StageScene::UpdateCorridorLoop(Player& player)
         return;
     }
 
+    // 2周目以降：開始地点の奥のドアが閉まった後、部屋にいる間だけ、ドアの向こうから誰かが叩く（2〜4回続けて叩き、間を空けてまた叩く）。
+    // 3周目からは、叩く合間に取っ手がガタガタ揺れる（通ってきたドアの向こうに、何かがついて来ている）。
+    if (m_CorridorLoopCount >= 2 && startDoor != nullptr && startDoor->IsLocked())
+    {
+        const Vector3 position = player.GetPosition();
+        const bool inStartRoom = position.z < -70.0f && std::abs(position.x) < 90.0f;
+        if (!inStartRoom)
+        {
+            // 部屋の外では鳴らさず、戻ってきてから少し間を置いて鳴らしている
+            m_StartDoorKnocksLeft = 0;
+            m_StartDoorKnockTimer = (std::max)(m_StartDoorKnockTimer, 2.5f);
+        }
+        else if ((m_StartDoorKnockTimer -= deltaTime) <= 0.0f)
+        {
+            if (m_StartDoorKnocksLeft <= 0)
+            {
+                ++m_StartDoorKnockEvents;
+                const bool rattle = m_CorridorLoopCount >= 3 && (m_StartDoorKnockEvents % 2) == 0;
+                if (rattle)
+                {
+                    // 鍵のかかったドアを調べたときと同じく、取っ手が揺れて音が鳴り、画面がわずかに脈打つ
+                    startDoor->Interact(player);
+                    m_StartDoorKnockTimer = 6.5f + std::fmod(static_cast<float>(m_StartDoorKnockEvents) * 2.7f, 4.0f);
+                }
+                else
+                {
+                    m_StartDoorKnocksLeft = 2 + m_StartDoorKnockEvents % 3;
+                }
+            }
+            if (m_StartDoorKnocksLeft > 0)
+            {
+                // 拳で木の扉を叩くような鈍い音。続けて叩く間は短く、叩き終えたら長く間を空けている
+                --m_StartDoorKnocksLeft;
+                game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, startDoor->GetPosition(),
+                    0.58f + static_cast<float>(m_StartDoorKnocksLeft) * 0.03f, 1.5f);
+                m_StartDoorKnockTimer = m_StartDoorKnocksLeft > 0
+                    ? 0.38f
+                    : 6.5f + std::fmod(static_cast<float>(m_StartDoorKnockEvents) * 2.7f, 4.0f);
+            }
+        }
+    }
+
     Door* endDoor = m_Objects.exitDoor;
     if (endDoor != nullptr && endDoor->IsOpening())
     {
@@ -271,6 +314,16 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     const int loopPhase = m_CorridorLoopCount < 3
         ? m_CorridorLoopCount
         : 3;
+
+    // 開始地点の部屋に、この周回の壁の文字をじわりと浮かばせている（戻ってくるたびに、部屋の文字が1つずつ増えていく）
+    if (m_CorridorLoopCount >= 1 && m_CorridorLoopCount <= static_cast<int>(m_Objects.lapWritings.size()))
+    {
+        FlashlightWriting* lapWriting = m_Objects.lapWritings[static_cast<std::size_t>(m_CorridorLoopCount - 1)];
+        if (lapWriting != nullptr)
+        {
+            lapWriting->SetTargetPresence(1.0f);
+        }
+    }
 
     // 周回の数だけ、壁の赤い印を出している
     for (int markerIndex = 1; markerIndex <= 3; ++markerIndex)
@@ -332,6 +385,12 @@ void StageScene::AdvanceCorridorLoop(Player& player)
         // 2周目：3本目のヒューズは西棟の奥にある。右の倉庫に西棟の鍵を出し、鍵で西棟の扉を開けさせている。
         // ヒューズは、西棟の排水バルブで水を抜いたときにStage1WestWingが出している。
         m_WestWing.Activate();
+
+        // 開始地点の部屋の照明が、この周回から故障したように不規則に消えるようになる
+        if (entranceLight != nullptr)
+        {
+            entranceLight->SetFaulted(true);
+        }
 
         if (middleLight != nullptr)
         {

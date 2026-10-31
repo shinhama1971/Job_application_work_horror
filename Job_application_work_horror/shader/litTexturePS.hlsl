@@ -9,6 +9,7 @@
 Texture2D g_Texture : register(t0);
 SamplerState g_SamplerState : register(s0);
 #include "flashlightShadow.hlsli"
+#include "pointShadow.hlsli"
 
 
 #include "fastNoise.hlsli"
@@ -444,6 +445,10 @@ float4 main(in LIT_PS_IN input) : SV_Target
     float3 detailWorldNormal = normalize(input.worldNormal);
     float grime = 0.0f;
     float wetness = 0.0f;
+    // PBRの金属らしさと粗さ（金属の面は、下で錆と擦れ傷の分だけ場所ごとに変える）
+    float pbrMetallic = Material.Metallic;
+    float pbrRoughness = GetMaterialRoughness();
+    float metalRustHeight = 0.0f;
     if (!Material.TextureEnable && emissionEnergy < 0.001f)
     {
         grime = GetProceduralGrime(
@@ -468,11 +473,19 @@ float4 main(in LIT_PS_IN input) : SV_Target
         color.rgb *= lerp(1.0f.xxx, float3(0.85f, 0.05f, 0.04f), anomalyHandprint * 0.92f);
         wetness = max(wetness, anomalyHandprint * 0.9f);
 
+        // 金属の錆と擦れ傷（金属らしさのある面だけ。pbrLighting.hlsli）。色・金属らしさ・粗さを場所ごとに変えている
+        const MetalWear metalWear = GetMetalWear(
+            color.rgb, pbrMetallic, pbrRoughness, input.worldPos, input.worldNormal);
+        color.rgb = metalWear.baseColor;
+        pbrMetallic = metalWear.metallic;
+        pbrRoughness = metalWear.roughness;
+        metalRustHeight = metalWear.height;
+
         // 汚れと古さの凹凸で、法線を傾けている（古さが濃いほど強く）
         detailWorldNormal = GetBumpedWorldNormal(
             input.worldPos,
             input.worldNormal,
-            ageing.height + paintingRelief,
+            ageing.height + paintingRelief + metalRustHeight * 0.6f,
             0.72f * (1.0f + 0.8f * weathering));
     }
     const float3 detailViewNormal = normalize(mul(
@@ -482,7 +495,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // PBRの材質（金属・粗さの方式。pbrLighting.hlsli）。汚れと古さを付けた後の色を元の色にし、濡れた所は粗さを下げている。
     // 拡散反射（lighting）と鏡面反射（specularLighting）を光ごとに分けて足し、最後に材質の色と合わせている。
     const PbrSurface surface = MakePbrSurface(
-        color.rgb, Material.Metallic, GetMaterialRoughness(), wetness);
+        color.rgb, pbrMetallic, pbrRoughness, wetness);
     const float3 viewDirection = normalize(-input.viewPos);
     float3 specularLighting = 0.0f;
 
@@ -527,10 +540,12 @@ float4 main(in LIT_PS_IN input) : SV_Target
             1.0f,
             smoothstep(0.04f, 0.72f, downwardAmount));
 
+        // 揺れる裸電球の光は、電球との間に物があれば届かない（pointShadow.hlsli）
         const float3 pointRadiance = pointLight.ColorIntensity.rgb
             * pointLight.ColorIntensity.a
             * pointAttenuation
-            * fixtureDistribution;
+            * fixtureDistribution
+            * GetPointLightShadow(input.worldPos, input.worldNormal, pointLight.PositionRange.xyz);
         lighting += pointRadiance * softPointLambert;
 
         // 鏡面反射は、懐中電灯と同じビュー空間で計算している（光の向きだけをビュー空間へ回している）
@@ -635,6 +650,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     color.rgb = lerp(color.rgb, fogColor, fogFactor);
     // 床の近くに溜まって流れる霧（懐中電灯の円錐の中だけ白く浮かぶ。horrorMist.hlsli）
     color.rgb = ApplyHorrorMist(color.rgb, input.worldPos, input.viewPos, lighting);
+    // 天井の照明や非常灯から下へ落ちる光の筋（霧に散った光。horrorMist.hlsli）
+    color.rgb += GetLightShafts(input.worldPos, pointLightListOffset, pointLightCount, input.pos.xy);
     color.rgb = ApplyFilmicHorrorGrade(color.rgb);
 
     // デバッグ表示：1=法線、2=懐中電灯の影、3=照明だけ、6=壁の湿り気、7=タイルごとの光源の数。4・5は床（水たまり・反射）用の表示なので、壁は黒にしている

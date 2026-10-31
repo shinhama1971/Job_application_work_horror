@@ -59,6 +59,9 @@ void StageScene::Init()
     m_EvidenceNoticeTimer = 0.0f;
     m_LoopCooldown = 0.0f;
     m_LoopNoticeTimer = 0.0f;
+    m_StartDoorKnockTimer = 4.0f;
+    m_StartDoorKnocksLeft = 0;
+    m_StartDoorKnockEvents = 0;
     m_EntranceEventTriggered = false;
     m_EntranceEventTimer = -1.0f;
     m_EntranceEventPhase = -1;
