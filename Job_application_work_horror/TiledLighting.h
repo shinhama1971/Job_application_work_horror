@@ -41,6 +41,8 @@ namespace Effect
 
         // 反射や監視映像など、本描画以外の視点では、全部のライトを順に計算させている。
         void BindAllLights();
+        // 画面空間の環境遮蔽を使わせるかを決めている（本描画の直前にtrue、それ以外の視点ではfalse）。次にb6を送り直したときに反映される
+        void SetAmbientOcclusionActive(bool active) { m_AmbientOcclusionActive = active; }
 
         // 本描画の直前に呼び、プレイヤー視点のタイルごとのライトリストを作って使わせている。
         // hasDepthPrepassがtrueなら、本描画の深度バッファに描いた深度プリパスの深度から、タイルごとに
@@ -78,7 +80,9 @@ namespace Effect
             uint32_t TilesX;
             uint32_t TilesY;
             DirectX::SimpleMath::Vector2 ViewportOffset;
-            DirectX::SimpleMath::Vector2 Padding;
+            // 1なら、画面空間の環境遮蔽（AmbientOcclusion、t15）を使う（本描画だけ。反射や環境マップの視点では0）
+            float AmbientOcclusionEnabled;
+            float Padding;
         };
         static_assert(sizeof(ShadingParams) == 32,
             "ShadingParams must match common.hlsl");
@@ -111,5 +115,7 @@ namespace Effect
         uint32_t m_TilesX = 1;
         uint32_t m_TilesY = 1;
         DirectX::SimpleMath::Vector2 m_ViewportOffset;
+        // このフレームの画面空間の環境遮蔽を、ピクセルシェーダーに使わせるか
+        bool m_AmbientOcclusionActive = false;
     };
 }

@@ -18,6 +18,7 @@ SamplerState g_SamplerState : register(s0);
 #include "pbrLighting.hlsli"
 #include "waterCaustics.hlsli"
 #include "roomOcclusion.hlsli"
+#include "screenAmbientOcclusion.hlsli"
 #include "surfaceDetail.hlsli"
 #if defined(PORTRAIT_SURFACE)
 #include "portraitPainting.hlsli"
@@ -361,6 +362,45 @@ float3 GetBumpedWorldNormal(
     return ApplyHeightToNormal(worldPosition, normal, height, strength);
 }
 
+// 壁を伝う水の筋（建物の壁の、湿った所だけ）。0〜1の濡れ具合を返している。
+// 壁の横方向を細い列に分け、列ごとに乱数で筋があるか・太さ・流れる速さを決め、少しくねらせた細い線にしている。
+// 線の中では、薄い水の膜の上を、水の粒が上から下へゆっくり流れ落ちていく（時間で縦方向の濃淡をずらしている）。
+// 濡れた所は粗さが下がるので、懐中電灯で照らすと筋だけが細く光る（pbrLighting.hlsli）。
+float GetWallTrickle(float3 worldPosition, float3 worldNormal, float damp)
+{
+    const float3 axis = abs(normalize(worldNormal));
+    // 縦の面だけ（天井や床、上を向いた面には流れない）
+    const float verticalSurface = saturate(1.0f - axis.y * 4.0f);
+    const float along = axis.x > axis.z ? worldPosition.z : worldPosition.x;
+
+    const float columnWidth = 3.6f;
+    const float column = floor(along / columnWidth);
+    const float local = frac(along / columnWidth) - 0.5f;
+    const float seed = FastHash21(float2(column, 3.7f));
+    // 約2割の列にだけ筋がある
+    const float present = step(0.80f, seed);
+    // 筋の線：列ごとの太さで、高さに沿ってわずかにくねらせている
+    const float wobble = (FastValueNoise(float2(column * 1.3f, worldPosition.y * 0.08f)) - 0.5f) * 0.6f;
+    const float width = lerp(0.07f, 0.17f, FastHash21(float2(column, 9.1f)));
+    const float trickleLine = 1.0f - smoothstep(width * 0.5f, width, abs(local - wobble * 0.6f));
+
+    // 上から下へ流れ落ちる水の粒（濃淡の模様を、時間とともに下へずらしている）
+    const float speed = lerp(2.5f, 6.0f, FastHash21(float2(column, 5.3f)));
+    const float flowPhase = worldPosition.y * 0.11f + CausticTime * speed * 0.11f + seed * 7.0f;
+    const float beads = smoothstep(0.55f, 0.95f, frac(flowPhase));
+    const float film = 0.55f + beads * 0.45f;
+
+    // 天井の際から流れ始め、床に近いほど水が多い
+    const float height = (worldPosition.y - WallFloorY) / WallHeight;
+    const float fromCeiling = saturate((1.0f - height) * 8.0f);
+    const float lowerAmount = lerp(1.0f, 0.55f, saturate(height));
+
+    // 壁の湿った区間（壁に沿った大きなまだら）だけに流している。床際の水の跡（damp）がある所は、少し流れやすくしている
+    const float wetSection = FastValueNoise(float2(along * 0.035f, 7.0f)) + damp * 0.25f;
+    const float dampArea = smoothstep(0.56f, 0.72f, wetSection);
+    return present * trickleLine * film * fromCeiling * lowerAmount * dampArea * verticalSurface;
+}
+
 // ホラー向けの色調と、遠くの闇の色（wetFloorPSと共通。horrorGrade.hlsli）
 #include "horrorGrade.hlsli"
 #include "horrorMist.hlsli"
@@ -467,6 +507,12 @@ float4 main(in LIT_PS_IN input) : SV_Target
         color.rgb *= ageing.tint;
         color.rgb *= 1.0f - ageing.cavity * 0.55f;
         wetness = saturate(grime + ageing.damp * 0.8f);
+        // 壁を伝う水の筋：湿った壁の所々を、細い水の筋が流れ落ちている（濡れて少し暗く、光沢が出る）
+        const float trickle = weathering > 0.0f
+            ? GetWallTrickle(input.worldPos, input.worldNormal, ageing.damp)
+            : 0.0f;
+        color.rgb *= 1.0f - trickle * 0.30f;
+        wetness = max(wetness, trickle);
 
         // 2面の「血の手形」の異変（その周回だけ、照らすと次の手形が奥に現れる）。濡れた血として光沢も返す
         const float anomalyHandprint = GetAnomalyHandprint(input.worldPos, normalize(input.worldNormal));
@@ -556,7 +602,9 @@ float4 main(in LIT_PS_IN input) : SV_Target
     }
 
     // 部屋の角の暗がり。環境光と天井灯には全部、懐中電灯には一部だけ掛けている（照らせば角も見えるように）。
-    const float roomOcclusion = GetRoomOcclusion(input.worldPos, normalize(input.worldNormal));
+    // 画面空間の環境遮蔽（SSAO）も重ね、小物の下や物と物の隙間まで暗くしている（懐中電灯には一部だけ）
+    const float screenOcclusion = GetScreenAmbientOcclusion(input.pos.xy);
+    const float roomOcclusion = GetRoomOcclusion(input.worldPos, normalize(input.worldNormal)) * screenOcclusion;
     lighting *= roomOcclusion;
     specularLighting *= roomOcclusion;
     const float flashlightOcclusion = lerp(1.0f, roomOcclusion, 0.4f);
@@ -678,6 +726,10 @@ float4 main(in LIT_PS_IN input) : SV_Target
         return GetLightTileHeatmap(input.pos.xy, pointLightCount);
     }
     // 9 = PBRの材質（赤 = 金属らしさ、緑 = 粗さ、青 = 濡れ具合）
+    if (DebugViewMode == DEBUG_VIEW_AMBIENT_OCCLUSION)
+    {
+        return float4(screenOcclusion.xxx, 1.0f);
+    }
     if (DebugViewMode == DEBUG_VIEW_PBR_MATERIAL)
     {
         return float4(surface.metallic, surface.roughness, saturate(wetness), 1.0f);

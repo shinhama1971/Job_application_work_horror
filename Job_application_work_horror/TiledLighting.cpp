@@ -266,6 +266,7 @@ namespace Effect
         params.TilesX = m_TilesX;
         params.TilesY = m_TilesY;
         params.ViewportOffset = m_ViewportOffset;
+        params.AmbientOcclusionEnabled = m_AmbientOcclusionActive ? 1.0f : 0.0f;
         Renderer::GetDeviceContext()->UpdateSubresource(
             m_ShadingParamsBuffer.Get(), 0, nullptr, &params, 0, 0);
     }

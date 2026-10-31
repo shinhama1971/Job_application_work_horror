@@ -108,7 +108,9 @@ cbuffer TiledLightBuffer : register(b6)
     uint LightTilesX;
     uint LightTilesY;
     float2 LightViewportOffset;
-    float2 TiledLightPadding;
+    // 1なら、画面空間の環境遮蔽（t15。screenAmbientOcclusion.hlsli）を使う（本描画だけ）
+    float ScreenAmbientOcclusionEnabled;
+    float TiledLightPadding;
 };
 
 // 点光源の一覧（t10）、タイルごとの光源の番号の並び（t11）、タイルごとの光源の数（t12）
@@ -186,6 +188,8 @@ cbuffer TextureBuffer : register(b5)
 static const int DEBUG_VIEW_FULLBRIGHT = 8;
 // PBRの材質を色で見る表示（赤 = 金属らしさ、緑 = 粗さ、青 = 濡れ具合。壁・扉・小物だけ。床は黒）
 static const int DEBUG_VIEW_PBR_MATERIAL = 9;
+// 画面空間の環境遮蔽（SSAO）だけを白黒で見る表示（白 = 遮る物なし、黒 = 囲まれている）
+static const int DEBUG_VIEW_AMBIENT_OCCLUSION = 10;
 
 float4 GetFullbrightColor(float3 baseColor, float3 viewNormal, float3 viewPosition)
 {

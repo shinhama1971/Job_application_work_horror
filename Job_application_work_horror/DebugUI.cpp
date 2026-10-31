@@ -307,6 +307,8 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
                     "Environment probe", gpuTimer->GetTiming(GpuPass::EnvironmentProbe));
                 drawGpuTiming(
                     "Bulb shadow", gpuTimer->GetTiming(GpuPass::BulbShadow));
+                drawGpuTiming(
+                    "Ambient occlusion", gpuTimer->GetTiming(GpuPass::AmbientOcclusion));
                 ImGui::TextDisabled("4-frame query ring / no GPU wait");
             }
         }
@@ -417,7 +419,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         }
 
         // 番号はシェーダーのDebugViewModeと対応している（8のフルブライトはcommon.hlslのDEBUG_VIEW_FULLBRIGHT）。
-        const char* debugViews[] = { "Final", "World normals", "Flashlight shadow", "Lighting only", "Puddle mask", "Planar reflection", "Wall damp mask", "Light tiles (lights per 16x16 tile)", "Fullbright (照明・影・霧なしで全体を明るく)", "PBR material (R=metallic G=roughness B=wet)" };
+        const char* debugViews[] = { "Final", "World normals", "Flashlight shadow", "Lighting only", "Puddle mask", "Planar reflection", "Wall damp mask", "Light tiles (lights per 16x16 tile)", "Fullbright (照明・影・霧なしで全体を明るく)", "PBR material (R=metallic G=roughness B=wet)", "Ambient occlusion (SSAO)" };
         ImGui::Combo("Shader debug view", &g_DebugViewMode,
             debugViews, IM_ARRAYSIZE(debugViews));
         // 水面の反射を描き直す頻度（何フレームに1回か）

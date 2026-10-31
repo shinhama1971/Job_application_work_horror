@@ -11,7 +11,7 @@
 #include <d3d11.h>
 #include <wrl/client.h>
 
-// 測る描画の段階（フレーム全体・影・水面の反射・本描画・ブルーム・その他の画面効果・水たまりの波の計算・壁の鏡・PBRの環境マップ・揺れる電球の影）
+// 測る描画の段階（フレーム全体・影・水面の反射・本描画・ブルーム・その他の画面効果・水たまりの波の計算・壁の鏡・PBRの環境マップ・揺れる電球の影・画面空間の環境遮蔽）
 enum class GpuPass : std::size_t
 {
     Total,
@@ -24,6 +24,7 @@ enum class GpuPass : std::size_t
     Mirror,
     EnvironmentProbe,
     BulbShadow,
+    AmbientOcclusion,
     Count
 };
 

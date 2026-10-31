@@ -79,6 +79,7 @@ float ValueNoise(float2 value)
 #include "flashlightLighting.hlsli"
 #include "waterCaustics.hlsli"
 #include "roomOcclusion.hlsli"
+#include "screenAmbientOcclusion.hlsli"
 #include "surfaceDetail.hlsli"
 #include "wetFootprints.hlsli"
 
@@ -477,7 +478,9 @@ float4 main(in LIT_PS_IN input) : SV_Target
     }
 
     // 部屋の角の暗がり。環境光と天井灯には全部、懐中電灯には一部だけ掛けている（照らせば角も見えるように）。
-    const float roomOcclusion = GetRoomOcclusion(input.worldPos, normalize(input.worldNormal));
+    // 画面空間の環境遮蔽（SSAO）も重ね、柱や棚の根元の床まで暗くしている（懐中電灯には一部だけ）
+    const float screenOcclusion = GetScreenAmbientOcclusion(input.pos.xy);
+    const float roomOcclusion = GetRoomOcclusion(input.worldPos, normalize(input.worldNormal)) * screenOcclusion;
     lighting *= roomOcclusion;
     const float flashlightOcclusion = lerp(1.0f, roomOcclusion, 0.4f);
 
@@ -696,6 +699,10 @@ float4 main(in LIT_PS_IN input) : SV_Target
     if (DebugViewMode == 7)
     {
         return GetLightTileHeatmap(input.pos.xy, pointLightCount);
+    }
+    if (DebugViewMode == DEBUG_VIEW_AMBIENT_OCCLUSION)
+    {
+        return float4(screenOcclusion.xxx, 1.0f);
     }
     if (DebugViewMode >= 6)
     {

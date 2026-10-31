@@ -518,6 +518,7 @@ namespace
             { "壁の鏡", GpuPass::Mirror },
             { "環境マップ", GpuPass::EnvironmentProbe },
             { "電球の影", GpuPass::BulbShadow },
+            { "環境遮蔽", GpuPass::AmbientOcclusion },
         };
 
         for (const BenchmarkResult& result : g_BenchmarkResults)

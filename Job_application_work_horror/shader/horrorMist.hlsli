@@ -73,7 +73,7 @@ float3 ApplyHorrorMist(float3 color, float3 worldPosition, float3 viewPosition, 
 // 視線が光の届く球を通る区間だけを、少ない点で調べて足し合わせている（光の届く範囲の外は計算しない）。
 // 点光源の一覧は、その画素のタイルの一覧を使っている（タイルの一覧は、画面の奥の面より手前の光源をすべて含む）。
 // 光の筋の調べる点の数と、霧が光を散らす濃さ
-#define LIGHT_SHAFT_SAMPLES 8
+#define LIGHT_SHAFT_SAMPLES 5
 #define LIGHT_SHAFT_DENSITY 0.0018f
 // 光の筋を出す光源の高さの下限。天井の近くの照明（天井の器具・吊るした電球）だけにし、壁の表示や肖像画の光のように
 // 面に付いた光源は除いている（光源が面の上にあると、その面に向かう視線の終わりで光の筋が強く出すぎるため）
@@ -111,8 +111,21 @@ float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCoun
             continue;
         }
         const float halfChord = sqrt(range * range - missSquared);
-        const float segmentStart = max(closest - halfChord, 0.0f);
-        const float segmentEnd = min(closest + halfChord, rayLength);
+        float segmentStart = max(closest - halfChord, 0.0f);
+        float segmentEnd = min(closest + halfChord, rayLength);
+        // 光の円錐は照明より下にしかないので、視線が照明の高さより上を通る部分は調べない
+        if (abs(rayDirection.y) > 0.0001f)
+        {
+            const float crossing = (center.y - eye.y) / rayDirection.y;
+            if (eye.y < center.y)
+            {
+                segmentEnd = rayDirection.y > 0.0f ? min(segmentEnd, crossing) : segmentEnd;
+            }
+            else
+            {
+                segmentStart = rayDirection.y < 0.0f ? max(segmentStart, crossing) : segmentEnd;
+            }
+        }
         [branch]
         if (segmentEnd <= segmentStart)
         {
@@ -120,6 +133,9 @@ float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCoun
         }
 
         const float stepLength = (segmentEnd - segmentStart) / LIGHT_SHAFT_SAMPLES;
+        // 霧のむら：ゆっくり流れるノイズで、光の筋の中に濃い所と薄い所を作っている（区間の真ん中で1回だけ求めている）
+        const float3 middlePoint = eye + rayDirection * ((segmentStart + segmentEnd) * 0.5f);
+        const float haze = 0.45f + FastValueNoise(middlePoint.xz * 0.05f + flow) * 0.90f;
         float lightScatter = 0.0f;
         [unroll]
         for (int sampleIndex = 0; sampleIndex < LIGHT_SHAFT_SAMPLES; ++sampleIndex)
@@ -135,11 +151,9 @@ float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCoun
             const float cone = smoothstep(0.55f, 0.92f, downward);
             // 光源のすぐそばは、照明そのものの明るさに任せて薄くしている
             const float awayFromFixture = smoothstep(2.0f, 9.0f, lightDistance);
-            // 霧のむら：ゆっくり流れるノイズで、光の筋の中に濃い所と薄い所を作っている
-            const float haze = 0.45f + FastValueNoise(samplePoint.xz * 0.05f + flow) * 0.90f;
-            lightScatter += attenuation * cone * haze * awayFromFixture;
+            lightScatter += attenuation * cone * awayFromFixture;
         }
-        scattered += pointLight.ColorIntensity.rgb * pointLight.ColorIntensity.a * lightScatter * stepLength;
+        scattered += pointLight.ColorIntensity.rgb * pointLight.ColorIntensity.a * lightScatter * haze * stepLength;
     }
     // 光源の真下を長く見通したときに白く飛ばないよう、明るいほど伸びを抑えている（上限はおよそ0.35）
     const float3 shaft = scattered * LIGHT_SHAFT_DENSITY;

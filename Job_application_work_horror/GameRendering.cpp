@@ -111,6 +111,8 @@ namespace Core
         Debug::UI::BeginFrame();
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
         m_Instance->m_GpuTimer.BeginFrame(context);
+        // 画面空間の環境遮蔽は本描画の直前に作るまで使わせない（反射・環境マップ・影など、先に描くほかの視点では使わない）
+        m_Instance->m_TiledLighting.SetAmbientOcclusionActive(false);
 
         // 水面の光の揺らぎ（壁のピクセルシェーダー）で使う、プレイヤーの視点のビュー行列を渡している。
         // 懐中電灯はこの視点から照らしているため、反射を描くときも同じ行列を使う。
@@ -510,6 +512,26 @@ namespace Core
                 }
                 o->DrawDepthPrepass(&m_Instance->m_Camera);
             }
+        }
+        // 画面空間の環境遮蔽（SSAO）：深度プリパスの深度から、物と物の隙間や壁の根元など光が届きにくい所を求めている（1面・2面）。
+        // 結果は t15 に設定し、下のライトリストの準備で、本描画のときだけ使う印をシェーダーへ送っている。
+        if (useDepthPrepass && hasWetFloor)
+        {
+            m_Instance->m_GpuTimer.BeginPass(GpuPass::AmbientOcclusion, context);
+            DirectX::SimpleMath::Matrix occlusionView;
+            DirectX::SimpleMath::Matrix occlusionProjection;
+            m_Instance->m_Camera.GetMainMatrices(occlusionView, occlusionProjection);
+            UINT viewportCount = 1;
+            D3D11_VIEWPORT viewport{};
+            context->RSGetViewports(&viewportCount, &viewport);
+            m_Instance->m_AmbientOcclusion.Compute(occlusionProjection, viewport);
+            m_Instance->m_TiledLighting.SetAmbientOcclusionActive(true);
+            m_Instance->m_GpuTimer.EndPass(GpuPass::AmbientOcclusion, context);
+        }
+        else
+        {
+            m_Instance->m_AmbientOcclusion.Unbind();
+            m_Instance->m_GpuTimer.SkipPass(GpuPass::AmbientOcclusion);
         }
         // プレイヤー視点のタイルごとのライトリストを、Compute Shaderで作ってから描いている。
         // 使わない方式では、全部の光源を画素ごとに順に計算させている。
