@@ -148,6 +148,11 @@ struct MATERIAL
 	BOOL WeatheringSurface;
 	// 崩れて現れる・消える度合い（0 = 元の形、1 = 消えた）。Wall::DissolveIn / DissolveOut が変えている
 	float Dissolve;
+	// PBR（金属・粗さの方式。shader/pbrLighting.hlsli）。Metallic は金属らしさ（0 = 金属でない、1 = 金属。金属は色がそのまま映り込みの色になる）。
+	// Roughness は表面の粗さ（0.045〜1）。0 は指定なしで、Shininess（光沢の強さ）から換算している。
+	float Metallic;
+	float Roughness;
+	float PbrPadding[2];
 
 
 };

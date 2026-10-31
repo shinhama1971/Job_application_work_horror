@@ -14,6 +14,7 @@ SamplerState g_SamplerState : register(s0);
 #include "fastNoise.hlsli"
 #include "horrorMarks.hlsli"
 #include "flashlightLighting.hlsli"
+#include "pbrLighting.hlsli"
 #include "waterCaustics.hlsli"
 #include "roomOcclusion.hlsli"
 #include "surfaceDetail.hlsli"
@@ -478,6 +479,13 @@ float4 main(in LIT_PS_IN input) : SV_Target
         float4(detailWorldNormal, 0.0f),
         View).xyz);
 
+    // PBRの材質（金属・粗さの方式。pbrLighting.hlsli）。汚れと古さを付けた後の色を元の色にし、濡れた所は粗さを下げている。
+    // 拡散反射（lighting）と鏡面反射（specularLighting）を光ごとに分けて足し、最後に材質の色と合わせている。
+    const PbrSurface surface = MakePbrSurface(
+        color.rgb, Material.Metallic, GetMaterialRoughness(), wetness);
+    const float3 viewDirection = normalize(-input.viewPos);
+    float3 specularLighting = 0.0f;
+
     // 上下で色を変えた環境光から始めている
     float3 lighting = GetHemisphereAmbient(detailWorldNormal);
     const float distanceFromCamera = length(input.viewPos);
@@ -519,17 +527,40 @@ float4 main(in LIT_PS_IN input) : SV_Target
             1.0f,
             smoothstep(0.04f, 0.72f, downwardAmount));
 
-        lighting += pointLight.ColorIntensity.rgb
+        const float3 pointRadiance = pointLight.ColorIntensity.rgb
             * pointLight.ColorIntensity.a
             * pointAttenuation
-            * softPointLambert
             * fixtureDistribution;
+        lighting += pointRadiance * softPointLambert;
+
+        // 鏡面反射は、懐中電灯と同じビュー空間で計算している（光の向きだけをビュー空間へ回している）
+        const float3 viewSpaceDirectionToLight = normalize(mul(
+            float4(directionToPointLight, 0.0f), View).xyz);
+        specularLighting += pointRadiance * EvaluateSpecularGGX(
+            surface, detailViewNormal, viewDirection, viewSpaceDirectionToLight);
     }
 
     // 部屋の角の暗がり。環境光と天井灯には全部、懐中電灯には一部だけ掛けている（照らせば角も見えるように）。
     const float roomOcclusion = GetRoomOcclusion(input.worldPos, normalize(input.worldNormal));
     lighting *= roomOcclusion;
+    specularLighting *= roomOcclusion;
     const float flashlightOcclusion = lerp(1.0f, roomOcclusion, 0.4f);
+
+    // 環境の映り込み（IBL）：視線を面で反射した向きの景色を、環境マップから粗さに応じたぼやけ具合で読み、
+    // 粗さと見る角度に応じた割合で足している。金属は拡散反射を持たないので、この映り込みで金属に見える
+    // （非常灯や照明の光だまりが、配管や額縁に赤く・白く映る）。環境マップのない所でも、環境光だけは映している。
+    {
+        const float nDotV = saturate(dot(detailViewNormal, viewDirection));
+        const float3 reflectedView = reflect(-viewDirection, detailViewNormal);
+        // ビュー空間の向きをワールドへ戻している（回転の逆 = 転置）
+        const float3 reflectedWorld = mul((float3x3)View, reflectedView);
+        const float3 environment = max(
+            GetHemisphereAmbient(reflectedWorld),
+            SampleEnvironment(reflectedWorld, surface.roughness));
+        specularLighting += environment
+            * EnvironmentBrdfApprox(surface.f0, surface.roughness, nDotV)
+            * GetSpecularOcclusion(nDotV, roomOcclusion, surface.roughness);
+    }
 
     // 懐中電灯の光：円錐の形・距離による弱まり・レンズの模様・面の向き・影を掛け合わせている
     if (Light.Enable && Light.FlashlightEnabled && distanceFromCamera > 0.001f)
@@ -559,30 +590,25 @@ float4 main(in LIT_PS_IN input) : SV_Target
             // 横から当たる面も真っ暗にならないよう、明るさの下限を設けている
             const float softenedLambert = 0.25f + lambert * 0.75f;
 
-            lighting += flashlightColor
+            const float3 flashlightRadiance = flashlightColor
                 * Light.Intensity
                 * beamProfile
                 * naturalAttenuation
                 * lensPattern
-                * softenedLambert
                 * GetFlashlightShadow(input.shadowPos)
                 * flashlightOcclusion;
+            lighting += flashlightRadiance * softenedLambert;
+            // 懐中電灯は目のすぐそばにあるので、金属や濡れた面を正面から照らすと、光の芯がはっきり映る
+            specularLighting += flashlightRadiance * EvaluateSpecularGGX(
+                surface, normal, viewDirection, directionToLight);
         }
     }
 
     // 浸水した床（西棟）や、波の立った水たまりの水面で跳ね返った懐中電灯の光が、壁や天井にゆらゆら映る（waterCaustics.hlsli）
     lighting += Light.Diffuse.rgb * GetWaterCausticLight(input.worldPos, normalize(input.worldNormal));
 
-    color.rgb *= lighting;
-
-    // 湿った漆喰は、浅い角度で見たときに、細く冷たい光沢を返す。
-    // 同じ汚れのマスクを、光の吸収と光沢の両方に使い、読み取りを増やさずに見た目をそろえている。
-    const float3 viewDirection = normalize(-input.viewPos);
-    const float dampFresnel = pow(
-        1.0f - saturate(dot(detailViewNormal, viewDirection)),
-        4.0f);
-    color.rgb += float3(0.055f, 0.070f, 0.076f) * wetness *
-        (0.045f + dampFresnel * 0.42f);
+    // 拡散反射（金属ほど弱い）と鏡面反射を合わせている。湿った壁の冷たい光沢も、濡れて粗さが下がった鏡面反射として出ている。
+    color.rgb = surface.diffuseColor * lighting + specularLighting;
 
     // 自ら光る色を足している
     color.rgb += Material.Emission.rgb;
@@ -633,6 +659,11 @@ float4 main(in LIT_PS_IN input) : SV_Target
     if (DebugViewMode == 7)
     {
         return GetLightTileHeatmap(input.pos.xy, pointLightCount);
+    }
+    // 9 = PBRの材質（赤 = 金属らしさ、緑 = 粗さ、青 = 濡れ具合）
+    if (DebugViewMode == DEBUG_VIEW_PBR_MATERIAL)
+    {
+        return float4(surface.metallic, surface.roughness, saturate(wetness), 1.0f);
     }
     if (DebugViewMode >= 4)
     {

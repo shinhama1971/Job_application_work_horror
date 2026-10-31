@@ -81,6 +81,8 @@ namespace Core
         m_Instance->m_PlanarReflection.Init();
         m_Instance->m_WallMirror.Init(13, 9, true);
         m_Instance->m_ReflectionProbe.Init();
+        m_Instance->m_EnvironmentProbe.Init(14, true);
+        m_Instance->m_EnvironmentProbe.SetClearColor(DirectX::SimpleMath::Color(0.012f, 0.013f, 0.014f, 1.0f));
         m_Instance->m_ScreenSpaceReflection.Init(Application::GetWidth(), Application::GetHeight());
         m_Instance->m_ShadowMap.Init();
         m_Instance->m_PostProcess.Init();
@@ -212,6 +214,7 @@ namespace Core
         m_Instance->m_PlanarReflection.Uninit();
         m_Instance->m_WallMirror.Uninit();
         m_Instance->m_ReflectionProbe.Uninit();
+        m_Instance->m_EnvironmentProbe.Uninit();
         m_Instance->m_ScreenSpaceReflection.Uninit();
 
         m_Instance->m_Sound.Uninit();
@@ -362,6 +365,8 @@ namespace Core
             m_Sound.StopAllSpatial();
         }
         m_PostProcess.SetPresenceStatic(0.0f);
+        // 前の場所の景色を金属に映さないよう、環境マップを次の描画で6面とも撮り直させている
+        m_EnvironmentProbe.Invalidate();
 
         DeleteAllObject();
 

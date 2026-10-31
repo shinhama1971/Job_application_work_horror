@@ -99,6 +99,8 @@ void Door::Init()
            Color(0.16f, 0.055f, 0.025f, 1.0f));
     addBox(Vector3(0.0f, -0.22f, -0.54f), Vector3(0.35f, 0.17f, 0.035f),
            Color(0.16f, 0.055f, 0.025f, 1.0f));
+    // ここまでが木の部分。取っ手は金属のマテリアルで描くので、インデックスの位置を覚えている
+    m_HandleIndexStart = m_Indices.size();
     // 蝶番をローカル座標の左端に置くため、取っ手は扉板の反対側（右端寄り）に付けている。
     addBox(Vector3(0.28f, 0.0f, -0.64f), Vector3(0.055f, 0.075f, 0.11f),
            Color(0.72f, 0.48f, 0.12f, 1.0f));
@@ -114,14 +116,23 @@ void Door::Init()
     m_IndexBuffer.Create(m_Indices);
     m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
-    // 扉本体のマテリアル。色は頂点の色を使い、光沢は弱くしている
+    // 扉本体のマテリアル。色は頂点の色を使い、ニスの剥げかけた木として、やや粗い光沢にしている（PBR）
     m_Material = std::make_unique<Material>();
     MATERIAL material{};
     material.Diffuse = Color(1.0f, 1.0f, 1.0f, 1.0f);
     material.Specular = Color(0.08f, 0.08f, 0.06f, 1.0f);
     material.Shininess = 8.0f;
     material.TextureEnable = FALSE;
+    material.Roughness = 0.58f;
     m_Material->Create(material);
+
+    // 取っ手のマテリアル。真鍮の金属で、手で触れて少し磨かれた粗さにしている（頂点の色が映り込みの色になる）。
+    // 手の脂と汚れの膜の分だけ、金属らしさを少し下げている
+    m_HandleMaterial = std::make_unique<Material>();
+    MATERIAL handleMaterial = material;
+    handleMaterial.Metallic = 0.85f;
+    handleMaterial.Roughness = 0.36f;
+    m_HandleMaterial->Create(handleMaterial);
 
     // 漏れ光のマテリアル（光る色はDrawで毎回決め直している）
     m_LeakMaterial = std::make_unique<Material>();
@@ -454,7 +465,12 @@ void Door::Draw(Camera* camera)
     m_VertexBuffer.SetGPU();
     m_IndexBuffer.SetGPU();
     m_Material->SetGPU();
-    context->DrawIndexed(static_cast<UINT>(m_DoorIndexCount), 0, 0);
+    context->DrawIndexed(static_cast<UINT>(m_HandleIndexStart), 0, 0);
+    m_HandleMaterial->SetGPU();
+    context->DrawIndexed(
+        static_cast<UINT>(m_DoorIndexCount - m_HandleIndexStart),
+        static_cast<UINT>(m_HandleIndexStart),
+        0);
 
     // 開き具合（0〜1）をなめらかな曲線（smoothstep）に変えている
     const float normalizedOpen = (std::clamp)(m_OpenAngle / 1.20f, 0.0f, 1.0f);

@@ -89,6 +89,9 @@ public:
         const DirectX::SimpleMath::Color& emission,
         float shininess);
 
+    // PBRの表面の仕上げ（金属らしさ0〜1、粗さ0.045〜1。粗さ0は光沢の強さから換算する）を決めている
+    void SetSurfaceFinish(float metallic, float roughness);
+
     // 建物の壁として、壁の古さ（パネルの継ぎ目・ひび・水の跡・カビ）を描くかどうかを決めている。
     // 古さの濃さは面ごとに Renderer::SetWallWeathering で決めている。小物（棚・配管・標識）には使っていない。
     void SetWeatheringSurface(bool enabled);

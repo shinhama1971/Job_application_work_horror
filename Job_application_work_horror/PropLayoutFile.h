@@ -5,10 +5,11 @@
 // ・配置をコードに直接書くと、1つ動かすたびにビルドし直す必要がある。ファイルにすると、Debug版ではゲームを
 //   動かしたまま F5 で読み直せる（StageScene）。扉・アイテムなど、進行のコードが使う物はコードに残している。
 // ・書式（# から行の終わりまではコメント）
-//     color 名前 r g b
+//     color 名前 r g b [metal 粗さ [金属らしさ]] [rough 粗さ]
 //     prop 名前 x y z 幅 高さ 奥行き 色 光る色 光沢 当たり判定(0/1) [noshadow] [weathering] [glow 範囲 強さ]
 //   色と光る色は color で付けた名前（光らないときは none）。noshadow は影を落とさない、weathering は壁の古さを描く、
 //   glow は自分の光る色で周りを照らす点光源にする。
+//   色の後ろの metal は金属（色がそのまま映り込みの色になる。金属らしさを続けて書ける。省くと1）、rough は金属でない物の粗さ（0.045〜1）。PBRの仕上げで、その色の小物すべてに付く。
 // ・Debug版では、デバッグ画面（F1）の配置エディタ（PropLayoutEditor）で、画面を見ながら動かして Save でこのファイルへ書き戻せる。
 // ============================================================================
 
@@ -22,6 +23,14 @@
 
 class SceneLayoutBuilder;
 class Wall;
+
+// PBRの表面の仕上げ（color の行の metal・rough で、色ごとに決めている）
+struct PropSurfaceFinish
+{
+    float Metallic = 0.0f;
+    // 0は指定なし（光沢の強さから換算する）
+    float Roughness = 0.0f;
+};
 
 // 小物1つ分の設定
 struct PropDescription
@@ -37,6 +46,8 @@ struct PropDescription
     bool Weathering = false;
     float GlowRange = 0.0f;
     float GlowStrength = 0.0f;
+    // PBRの仕上げ（色の名前から決まる）
+    PropSurfaceFinish Finish;
     // 色の名前（保存するときに書き戻す）と、ファイルの何行目にあったか（0は、まだファイルにない）
     std::string DiffuseName = "none";
     std::string EmissionName = "none";
@@ -49,6 +60,8 @@ struct PropLayout
     std::vector<PropDescription> Props;
     // color で付けた名前と色（ファイルの順。先頭は光らないことを表す none）
     std::vector<std::pair<std::string, DirectX::SimpleMath::Color>> Colors;
+    // 色の名前ごとのPBRの仕上げ（metal・rough を付けた色だけ）
+    std::vector<std::pair<std::string, PropSurfaceFinish>> Finishes;
     std::string Error;
     int ErrorLine = 0;
     bool IsValid() const { return Error.empty(); }
@@ -68,6 +81,8 @@ namespace PropLayoutFile
     void Apply(Wall& wall, const PropDescription& description);
     // 色の名前から色を探している（見つからなければnullptr）
     const DirectX::SimpleMath::Color* FindColor(const PropLayout& layout, const std::string& name);
+    // 色の名前からPBRの仕上げを探している（付けていない色は、金属でなく粗さは光沢から換算する仕上げを返す）
+    PropSurfaceFinish FindFinish(const PropLayout& layout, const std::string& name);
     // 小物1つ分を、ファイルの prop の行の書式にしている
     std::string FormatProp(const PropDescription& description);
     // 今の配置をファイルへ書き戻している。変わった小物の行だけを書き換え、コメント・色の行・並びはそのまま残す。

@@ -62,6 +62,8 @@ namespace Core
         Effect::PlanarReflection m_WallMirror;
         // 水面の反射の方式の比較（技術デモF2）で使う、キューブマップとSSR
         Effect::ReflectionProbe m_ReflectionProbe;
+        // PBRの金属や濡れた面に映す景色（環境マップ）。カメラの位置から1フレームに1面ずつ撮り直し、t14 で読ませている
+        Effect::ReflectionProbe m_EnvironmentProbe;
         Effect::ScreenSpaceReflection m_ScreenSpaceReflection;
         Effect::TiledLighting m_TiledLighting;
         // 毎フレームObjectから集める点光源。確保し直しを避けるため、同じvectorを使い回している。

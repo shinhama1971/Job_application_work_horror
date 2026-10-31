@@ -129,6 +129,9 @@ void FuseBox::Init()
     material.Specular = Color(0.14f, 0.14f, 0.12f, 1.0f);
     material.Shininess = 18.0f;
     material.TextureEnable = FALSE;
+    // PBR：塗装が擦れて地の鋼が少し出た配電盤（塗装の光沢に、わずかに金属の映り込みを混ぜている）
+    material.Metallic = 0.30f;
+    material.Roughness = 0.48f;
     m_Material->Create(material);
 
     m_Scale = Vector3(12.0f, 18.0f, 4.0f);

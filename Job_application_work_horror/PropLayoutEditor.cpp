@@ -262,6 +262,8 @@ PropLayoutEditor::Action PropLayoutEditor::Draw(
             }
         };
         colorCombo("Color", description->DiffuseName, description->Diffuse);
+        // PBRの仕上げは色の名前で決まるので、色を選び直したら合わせている
+        description->Finish = PropLayoutFile::FindFinish(m_Layout, description->DiffuseName);
         colorCombo("Emission", description->EmissionName, description->Emission);
         changed |= ImGui::DragFloat("Shininess", &description->Shininess, 0.2f, 0.0f, 128.0f);
         changed |= ImGui::Checkbox("Collision", &description->Collision);

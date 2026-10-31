@@ -31,26 +31,28 @@ namespace
         { Vector3(0.0f, 0.0f, -1.0f), Vector3(0.0f, 1.0f, 0.0f) },
         { Vector3(0.0f, 0.0f, 1.0f), Vector3(0.0f, 1.0f, 0.0f) },
     };
-    // キューブマップを読むテクスチャの番号
-    constexpr UINT ProbeSlot = 7;
 }
 
 namespace Effect
 {
-    void ReflectionProbe::Init()
+    void ReflectionProbe::Init(UINT slot, bool withMipChain)
     {
+        m_Slot = slot;
+        m_HasMipChain = withMipChain;
         ID3D11Device* device = Renderer::GetDevice();
 
         D3D11_TEXTURE2D_DESC textureDesc{};
         textureDesc.Width = FaceSize;
         textureDesc.Height = FaceSize;
-        textureDesc.MipLevels = 1;
+        // 0は、1画素まで縮めた縮小画像をすべて持つ指定
+        textureDesc.MipLevels = withMipChain ? 0 : 1;
         textureDesc.ArraySize = 6;
         textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         textureDesc.SampleDesc.Count = 1;
         textureDesc.Usage = D3D11_USAGE_DEFAULT;
         textureDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-        textureDesc.MiscFlags = D3D11_RESOURCE_MISC_TEXTURECUBE;
+        textureDesc.MiscFlags = D3D11_RESOURCE_MISC_TEXTURECUBE |
+            (withMipChain ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0u);
         bool created = SUCCEEDED(device->CreateTexture2D(&textureDesc, nullptr, m_Texture.ReleaseAndGetAddressOf()));
 
         // 6面それぞれを描画先にする口と、6面まとめてキューブとして読む口
@@ -67,7 +69,7 @@ namespace Effect
         D3D11_SHADER_RESOURCE_VIEW_DESC cubeDesc{};
         cubeDesc.Format = textureDesc.Format;
         cubeDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
-        cubeDesc.TextureCube.MipLevels = 1;
+        cubeDesc.TextureCube.MipLevels = withMipChain ? static_cast<UINT>(-1) : 1u;
         created = created && SUCCEEDED(device->CreateShaderResourceView(
             m_Texture.Get(), &cubeDesc, m_CubeView.ReleaseAndGetAddressOf()));
 
@@ -107,14 +109,13 @@ namespace Effect
     void ReflectionProbe::BeginFace(Camera& camera, const Vector3& position)
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
-        // 描画先にする間は読めないため、先に t7 から外している
+        // 描画先にする間は読めないため、先に設定から外している
         ID3D11ShaderResourceView* nullResource = nullptr;
-        context->PSSetShaderResources(ProbeSlot, 1, &nullResource);
+        context->PSSetShaderResources(m_Slot, 1, &nullResource);
 
         ID3D11RenderTargetView* faceView = m_FaceViews[static_cast<size_t>(m_NextFace)].Get();
         context->OMSetRenderTargets(1, &faceView, m_DepthView.Get());
-        const float clearColor[4] = { 0.1f, 0.1f, 0.13f, 1.0f };
-        context->ClearRenderTargetView(faceView, clearColor);
+        context->ClearRenderTargetView(faceView, &m_ClearColor.x);
         context->ClearDepthStencilView(m_DepthView.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
         D3D11_VIEWPORT viewport{};
         viewport.Width = static_cast<float>(FaceSize);
@@ -124,10 +125,10 @@ namespace Effect
 
         // 撮る位置から面の向きを、画角90度・縦横同じで見ている（6面で全方向をすき間なく覆う）
         const FaceDirection& face = FaceDirections[m_NextFace];
-        const Matrix view = Matrix::CreateLookAt(position, position + face.Forward, face.Up);
+        m_FaceView = Matrix::CreateLookAt(position, position + face.Forward, face.Up);
         const Matrix projection = Matrix::CreatePerspectiveFieldOfView(
             DirectX::XM_PIDIV2, 1.0f, 0.5f, 600.0f);
-        camera.SetOverrideMatrices(view, projection);
+        camera.SetOverrideMatrices(m_FaceView, projection);
     }
 
     void ReflectionProbe::EndFace(Camera& camera)
@@ -139,12 +140,23 @@ namespace Effect
         {
             ++m_FacesDrawn;
         }
+        // 粗い面のぼやけた映り込み用に、描き直した面から縮小画像を作り直している
+        if (m_HasMipChain)
+        {
+            Renderer::GetDeviceContext()->GenerateMips(m_CubeView.Get());
+        }
         Bind();
+    }
+
+    void ReflectionProbe::Unbind()
+    {
+        ID3D11ShaderResourceView* nullResource = nullptr;
+        Renderer::GetDeviceContext()->PSSetShaderResources(m_Slot, 1, &nullResource);
     }
 
     void ReflectionProbe::Bind()
     {
         ID3D11ShaderResourceView* cubeView = m_CubeView.Get();
-        Renderer::GetDeviceContext()->PSSetShaderResources(ProbeSlot, 1, &cubeView);
+        Renderer::GetDeviceContext()->PSSetShaderResources(m_Slot, 1, &cubeView);
     }
 }

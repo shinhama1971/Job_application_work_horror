@@ -102,6 +102,9 @@ void Locker::Init()
     material.Specular = Color(0.30f, 0.32f, 0.30f, 1.0f);
     material.Shininess = 24.0f;
     material.TextureEnable = FALSE;
+    // PBR：塗装の剥げかけた鋼板のロッカー（叩かれてへこんだ金属の鈍い光沢）
+    material.Metallic = 0.50f;
+    material.Roughness = 0.45f;
     m_Material = std::make_unique<Material>();
     m_Material->Create(material);
 }

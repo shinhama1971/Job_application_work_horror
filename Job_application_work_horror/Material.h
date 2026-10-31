@@ -71,6 +71,8 @@ public:
 		m_Material.Emission = mtrl.Emission;
 		m_Material.Shininess = mtrl.Shininess;
 		m_Material.TextureEnable = mtrl.TextureEnable;
+		m_Material.Metallic = mtrl.Metallic;
+		m_Material.Roughness = mtrl.Roughness;
 
 		Update();
 
@@ -171,6 +173,12 @@ public:
 
 	void SetShininess(float shininess) {
 		m_Material.Shininess = shininess;
+	}
+
+	// PBRの金属らしさ（0〜1）と粗さ（0は指定なし）
+	void SetSurfaceFinish(float metallic, float roughness) {
+		m_Material.Metallic = metallic;
+		m_Material.Roughness = roughness;
 	}
 
 	// 一緒に設定するシェーダーとテクスチャを決めている

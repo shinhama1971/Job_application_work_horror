@@ -513,6 +513,7 @@ namespace
             { "画面効果", GpuPass::PostProcess },
             { "水たまりの波", GpuPass::WaterRipples },
             { "壁の鏡", GpuPass::Mirror },
+            { "環境マップ", GpuPass::EnvironmentProbe },
         };
 
         for (const BenchmarkResult& result : g_BenchmarkResults)

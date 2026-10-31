@@ -259,8 +259,9 @@ namespace Stage2Layout
         // 絵は、古い油絵の人物をシェーダーで描いている（目は閉じていて、異変では絵の中で目が開き、見る人を目で追う）
         portrait->SetPortraitSurface();
         portrait->SetCastsShadow(false);
-        // 肖像画の額縁（くすんだ金色の4本）。時計の枠と同じく、壁から少し浮かせている
-        const Color portraitFrameColor(0.15f, 0.11f, 0.055f, 1.0f);
+        // 肖像画の額縁（くすんだ金色の4本）。時計の枠と同じく、壁から少し浮かせている。
+        // PBRでは金箔の金属として描くので、色は金の映り込みの色（黒ずんだ分だけ暗く）にし、埃の膜の分だけ金属らしさを下げている
+        const Color portraitFrameColor(0.52f, 0.38f, 0.17f, 1.0f);
         const struct { const char* Name; Vector3 Position; Vector3 Scale; } portraitFrames[] =
         {
             { "Stage2PortraitFrameTop", Vector3(39.1f, -58.0f, -25.0f), Vector3(1.8f, 2.0f, 20.0f) },
@@ -272,6 +273,7 @@ namespace Stage2Layout
         {
             Wall* piece = createWall(frame.Name, frame.Position, frame.Scale, portraitFrameColor, false);
             piece->SetAppearance(portraitFrameColor, Color(0.0f, 0.0f, 0.0f, 1.0f), 26.0f);
+            piece->SetSurfaceFinish(0.75f, 0.45f);
             piece->SetCastsShadow(false);
         }
 
@@ -302,6 +304,8 @@ namespace Stage2Layout
             piece->SetCastsShadow(false);
         }
         clockFace->SetClockSurface();
+        // 文字盤はガラスで覆われているので、なめらかな面の映り込みにしている（PBR）
+        clockFace->SetSurfaceFinish(0.0f, 0.12f);
         clockFace->SetClockHands(clockHourAngle, clockMinuteAngle);
 
         // 左の壁の古い鏡（どの周回にもある）。鏡の面は廊下の側（+x）を向き、MirrorAnomaly の面の位置・大きさと合わせている。
@@ -334,6 +338,8 @@ namespace Stage2Layout
         {
             Wall* piece = createWall(frame.Name, frame.Position, frame.Scale, mirrorFrameColor, false);
             piece->SetAppearance(mirrorFrameColor, Color(0.0f, 0.0f, 0.0f, 1.0f), 14.0f);
+            // 古いニスの木の枠（PBR：金属でなく、少し艶のある粗さ）
+            piece->SetSurfaceFinish(0.0f, 0.48f);
             piece->SetCastsShadow(false);
         }
         // 鏡の中にだけ映る人影（鏡の異変の周回だけ表示する）。位置は MirrorAnomaly が決め、プレイヤーの方を向くだけにしている
@@ -412,8 +418,10 @@ namespace Stage2Layout
             Color(0.16f, 0.09f, 0.025f, 1.0f), false);
         falseDoorPanel->SetDoorSurface();
         falseDoorPanel->SetSurfaceParams(Color(-1.0f, 0.0f, 0.0f, 0.0f));
-        // 取っ手は、くすんだ真鍮の光沢にしている
-        falseDoorHandle->SetAppearance(Color(0.30f, 0.21f, 0.08f, 1.0f), Color(0.0f, 0.0f, 0.0f, 1.0f), 40.0f);
+        // 取っ手は、くすんだ真鍮の金属にしている（PBR。色は真鍮の映り込みの色）。板は本物の扉と同じ木の粗さ
+        falseDoorHandle->SetAppearance(Color(0.72f, 0.50f, 0.20f, 1.0f), Color(0.0f, 0.0f, 0.0f, 1.0f), 40.0f);
+        falseDoorHandle->SetSurfaceFinish(0.85f, 0.36f);
+        falseDoorPanel->SetSurfaceFinish(0.0f, 0.58f);
         Wall* falseDoorPieces[] =
         {
             falseDoorPanel, falseDoorFrameNear, falseDoorFrameFar,

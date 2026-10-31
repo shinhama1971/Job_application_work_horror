@@ -375,6 +375,57 @@ namespace Core
             m_Instance->m_HasReflectionCameraPose = false;
         }
 
+        // PBRの環境マップ：金属や濡れた面に映す景色を、カメラの位置から1フレームに1面ずつ撮り直している（最初だけ6面）。
+        // 懐中電灯の向きは、目の前を向くビュー空間で決めている。面ごとに視点が違うので、懐中電灯の向きを
+        // その面の視点へ回して渡し、プレイヤーが照らしている壁が、そのまま金属に映るようにしている。
+        if (hasWetFloor)
+        {
+            m_Instance->m_GpuTimer.BeginPass(GpuPass::EnvironmentProbe, context);
+            const LIGHT sceneLight = Renderer::GetLight();
+            DirectX::SimpleMath::Matrix mainView;
+            DirectX::SimpleMath::Matrix mainProjection;
+            m_Instance->m_Camera.GetMainMatrices(mainView, mainProjection);
+            const DirectX::SimpleMath::Vector3 flashlightWorldDirection =
+                DirectX::SimpleMath::Vector3::TransformNormal(
+                    DirectX::SimpleMath::Vector3(
+                        sceneLight.Direction.x, sceneLight.Direction.y, sceneLight.Direction.z),
+                    mainView.Invert());
+            // 別の視点から描くので、プレイヤー視点のタイルのリストではなく、全部の光源を順に計算させている
+            m_Instance->m_TiledLighting.BindAllLights();
+            const int faceCount = m_Instance->m_EnvironmentProbe.HasAllFaces() ? 1 : 6;
+            for (int face = 0; face < faceCount; ++face)
+            {
+                m_Instance->m_EnvironmentProbe.BeginFace(
+                    m_Instance->m_Camera, m_Instance->m_Camera.GetPosition());
+                LIGHT faceLight = sceneLight;
+                DirectX::SimpleMath::Vector3 faceDirection =
+                    DirectX::SimpleMath::Vector3::TransformNormal(
+                        flashlightWorldDirection, m_Instance->m_EnvironmentProbe.GetFaceView());
+                faceDirection.Normalize();
+                faceLight.Direction = DirectX::SimpleMath::Vector4(
+                    faceDirection.x, faceDirection.y, faceDirection.z, 0.0f);
+                Renderer::SetLight(faceLight);
+                for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
+                {
+                    if (o->IsDestroy() || !o->ContributesToPlanarReflection() ||
+                        !IsNearEnoughForReflection(*o, m_Instance->m_Camera))
+                    {
+                        continue;
+                    }
+                    o->Draw(&m_Instance->m_Camera);
+                }
+                m_Instance->m_EnvironmentProbe.EndFace(m_Instance->m_Camera);
+            }
+            Renderer::SetLight(sceneLight);
+            m_Instance->m_GpuTimer.EndPass(GpuPass::EnvironmentProbe, context);
+        }
+        else
+        {
+            m_Instance->m_EnvironmentProbe.Invalidate();
+            m_Instance->m_EnvironmentProbe.Unbind();
+            m_Instance->m_GpuTimer.SkipPass(GpuPass::EnvironmentProbe);
+        }
+
         // 監視映像など、Sceneが持つ補助カメラの映像は、本描画の前に描いておいている。
         if (m_Instance->m_Scene)
         {

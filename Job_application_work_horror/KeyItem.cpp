@@ -76,12 +76,15 @@ void KeyItem::Init()
 
     // くすんだ真鍮。暗い部屋でもライトを当てれば光るよう、弱い自己発光と強い鏡面反射を持たせている。
     MATERIAL material{};
-    material.Diffuse = Color(0.46f, 0.34f, 0.12f, 1.0f);
+    // PBR：真鍮の鍵（金属なので、色は真鍮の映り込みの色。手で磨かれた細かい傷の粗さ）
+    material.Diffuse = Color(0.78f, 0.60f, 0.28f, 1.0f);
     material.Ambient = Color(0.15f, 0.11f, 0.04f, 1.0f);
     material.Specular = Color(0.95f, 0.80f, 0.45f, 1.0f);
     material.Emission = Color(0.030f, 0.020f, 0.006f, 1.0f);
     material.Shininess = 64.0f;
     material.TextureEnable = FALSE;
+    material.Metallic = 1.0f;
+    material.Roughness = 0.32f;
     m_Material = std::make_unique<Material>();
     m_Material->Create(material);
 

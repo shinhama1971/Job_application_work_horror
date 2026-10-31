@@ -23,6 +23,9 @@ private:
     IndexBuffer m_IndexBuffer;
     std::unique_ptr<Material> m_Material;
     std::unique_ptr<Material> m_LeakMaterial;
+    // 取っ手だけは金属（真鍮）のマテリアルで描いている。扉本体のインデックスのうち、取っ手が始まる位置
+    std::unique_ptr<Material> m_HandleMaterial;
+    size_t m_HandleIndexStart = 0;
     size_t m_DoorIndexCount = 0;
 
     // 開ききったか、開いている途中か、鍵がかかっているか、鍵がかかった扉を揺らす残り秒数

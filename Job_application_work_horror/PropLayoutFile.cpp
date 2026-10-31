@@ -113,6 +113,42 @@ namespace PropLayoutFile
                 {
                     layout.Colors.emplace_back(name, Color(r, g, b, 1.0f));
                 }
+
+                // 色の後ろに付けるPBRの仕上げ（metal 粗さ ／ rough 粗さ）
+                std::string option;
+                while (line >> option)
+                {
+                    float roughness = 0.0f;
+                    if ((option != "metal" && option != "rough") || !(line >> roughness))
+                    {
+                        return fail(lineNumber, "color の後ろには metal 粗さ [金属らしさ] か rough 粗さ を書く: " + option);
+                    }
+                    // metal の後ろには、金属らしさ（0〜1。汚れや酸化の膜がある金属ほど低い）を続けて書ける。省くと1
+                    float metallic = option == "metal" ? 1.0f : 0.0f;
+                    if (option == "metal")
+                    {
+                        const std::streampos beforeAmount = line.tellg();
+                        if (!(line >> metallic))
+                        {
+                            line.clear();
+                            line.seekg(beforeAmount);
+                            metallic = 1.0f;
+                        }
+                    }
+                    PropSurfaceFinish finish;
+                    finish.Metallic = std::clamp(metallic, 0.0f, 1.0f);
+                    finish.Roughness = std::clamp(roughness, 0.045f, 1.0f);
+                    const auto existingFinish = std::find_if(layout.Finishes.begin(), layout.Finishes.end(),
+                        [&name](const auto& entry) { return entry.first == name; });
+                    if (existingFinish != layout.Finishes.end())
+                    {
+                        existingFinish->second = finish;
+                    }
+                    else
+                    {
+                        layout.Finishes.emplace_back(name, finish);
+                    }
+                }
             }
             else if (command == "prop")
             {
@@ -135,6 +171,7 @@ namespace PropLayoutFile
                 }
                 prop.Diffuse = *diffuse;
                 prop.Emission = *emission;
+                prop.Finish = FindFinish(layout, diffuseName);
                 prop.DiffuseName = diffuseName;
                 prop.EmissionName = emissionName;
                 prop.Collision = collision != 0;
@@ -186,6 +223,7 @@ namespace PropLayoutFile
         wall.SetPosition(description.Position.x, description.Position.y, description.Position.z);
         wall.SetScale(description.Scale.x, description.Scale.y, description.Scale.z);
         wall.SetAppearance(description.Diffuse, description.Emission, description.Shininess);
+        wall.SetSurfaceFinish(description.Finish.Metallic, description.Finish.Roughness);
         wall.SetCollisionEnabled(description.Collision);
         wall.SetCastsShadow(description.CastsShadow);
         wall.SetWeatheringSurface(description.Weathering);
@@ -229,6 +267,18 @@ namespace PropLayoutFile
                 props.emplace_back(description.Name, wall);
             }
         }
+    }
+
+    PropSurfaceFinish FindFinish(const PropLayout& layout, const std::string& name)
+    {
+        for (const auto& [colorName, finish] : layout.Finishes)
+        {
+            if (colorName == name)
+            {
+                return finish;
+            }
+        }
+        return PropSurfaceFinish{};
     }
 
     const Color* FindColor(const PropLayout& layout, const std::string& name)

@@ -2,33 +2,37 @@
 # 1面の小物の配置（PropLayoutFile が読む）。Debug版では、ゲームを動かしたまま F5 で読み直せる。
 # 扉・アイテム・バルブなど、進行のコードが使う物は Stage1Layout.cpp に残している。
 #
-#   color 名前 r g b
+#   color 名前 r g b [metal 粗さ [金属らしさ]] [rough 粗さ]
 #   prop 名前 x y z 幅 高さ 奥行き 色 光る色 光沢 当たり判定(0/1) [noshadow] [weathering] [glow 範囲 強さ]
+#
+#   PBRの仕上げ：metal は金属（色が映り込みの色。磨いた鉄で0.55前後、錆びて黒ずむほど低い）、rough は金属でない物。
+#   metal の後ろの金属らしさ（省くと1）は、汚れや酸化の膜で覆われた分だけ下げている（暗い場所でも形が分かるよう、拡散反射を少し残す）。
+#   粗さは 0.045（鏡）〜1（ざらざら）。付けない色は、光沢の強さから粗さを換算する。
 #
 # 座標の単位は全ステージ共通（床の高さは y=-100、天井の下面は y=-48.5）。
 # ============================================================================
 
 # --- 色
-color darkMetal     0.10  0.115 0.11     # 暗い金属（配管・ポンプ・柱）
-color cabinetMetal  0.16  0.18  0.17     # 棚の金属
-color trimColor     0.075 0.08  0.075    # 幅木
-color shelfColor    0.13  0.12  0.10     # 書類棚
-color debrisColor   0.12  0.11  0.095    # 崩れた資材・木箱
-color deskWood      0.16  0.13  0.095    # 机の木
-color ceilingPanel  0.055 0.06  0.058    # 天井の板
-color drainGrate    0.035 0.04  0.038    # 排水口
+color darkMetal     0.24  0.25  0.24   metal 0.50 0.75    # 暗い金属（配管・ポンプ・柱）。錆びて黒ずんだ鉄
+color cabinetMetal  0.34  0.36  0.35   metal 0.42 0.80    # 棚の金属。少し磨かれた鋼
+color trimColor     0.075 0.08  0.075  rough 0.70    # 幅木（塗装）
+color shelfColor    0.13  0.12  0.10   rough 0.55    # 書類棚（焼き付け塗装の鋼板）
+color debrisColor   0.12  0.11  0.095  rough 0.92    # 崩れた資材・木箱
+color deskWood      0.16  0.13  0.095  rough 0.62    # 机の木（ニスがはげかけている）
+color ceilingPanel  0.055 0.06  0.058  rough 0.90    # 天井の板（石膏）
+color drainGrate    0.12  0.13  0.12   metal 0.62 0.70    # 排水口（錆びた鋳鉄）
 # 警告灯（光る色と、それを暗くした本体の色）
 color lampRed       0.90  0.08  0.05
-color lampRedBody   0.54  0.048 0.03
+color lampRedBody   0.54  0.048 0.03  rough 0.35
 color lampGreen     0.10  0.85  0.25
-color lampGreenBody 0.06  0.51  0.15
+color lampGreenBody 0.06  0.51  0.15  rough 0.35
 color lampBlue      0.15  0.35  0.95
-color lampBlueBody  0.09  0.21  0.57
+color lampBlueBody  0.09  0.21  0.57  rough 0.35
 color lampAmber     0.95  0.55  0.10
-color lampAmberBody 0.57  0.33  0.06
+color lampAmberBody 0.57  0.33  0.06  rough 0.35
 # 光の安全地帯の暖かい電球
 color warmBulb      1.0   0.72  0.40
-color warmBulbBody  0.6   0.432 0.24
+color warmBulbBody  0.6   0.432 0.24  rough 0.10
 
 # --- 天井（床から53の高さに施設全体を覆う板。影は落とさず、天井板・外れた板の穴・雨漏りの染みを描く）
 prop PropCeilingMain           0     -47   80     436 3 516   ceilingPanel none 4 0 noshadow weathering

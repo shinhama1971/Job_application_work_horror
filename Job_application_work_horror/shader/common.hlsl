@@ -82,6 +82,10 @@ struct MATERIAL
     bool WeatheringSurface;   // 建物の壁ならtrue（壁の古さを描く面）
     // 崩れて現れる・消える度合い（0 = 元の形、1 = 消えた。Wall::DissolveIn / DissolveOut）
     float Dissolve;
+    // PBR（金属・粗さの方式。pbrLighting.hlsli）。金属らしさ0〜1と、粗さ（0は指定なし。光沢の強さから換算する）
+    float Metallic;
+    float Roughness;
+    float2 PbrPadding;
 };
 // ----------------------------------------------------------------------------
 // タイルベースライティング
@@ -180,6 +184,8 @@ cbuffer TextureBuffer : register(b5)
 // DebugUIはDebug構成だけなので、Release版の見た目には影響しない。
 // ----------------------------------------------------------------------------
 static const int DEBUG_VIEW_FULLBRIGHT = 8;
+// PBRの材質を色で見る表示（赤 = 金属らしさ、緑 = 粗さ、青 = 濡れ具合。壁・扉・小物だけ。床は黒）
+static const int DEBUG_VIEW_PBR_MATERIAL = 9;
 
 float4 GetFullbrightColor(float3 baseColor, float3 viewNormal, float3 viewPosition)
 {

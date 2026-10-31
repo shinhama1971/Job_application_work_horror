@@ -117,6 +117,9 @@ void Item::Init()
     material.Emission = Color(0.065f, 0.035f, 0.008f, 1.0f);
     material.Shininess = 32.0f;
     material.TextureEnable = FALSE;
+    // PBR：ヒューズの金属の口金とガラス（半分ほど金属。懐中電灯で照らすと芯が光る）
+    material.Metallic = 0.50f;
+    material.Roughness = 0.30f;
     m_Material->Create(material);
 
     m_Scale = Vector3(5.0f, 5.0f, 5.0f);

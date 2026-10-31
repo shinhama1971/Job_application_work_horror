@@ -410,6 +410,17 @@ void Wall::SetAppearance(
     }
 }
 
+// PBRの表面の仕上げ（金属らしさと粗さ）を、マテリアルの値として変えている
+void Wall::SetSurfaceFinish(float metallic, float roughness)
+{
+    m_SurfaceMaterial.Metallic = metallic;
+    m_SurfaceMaterial.Roughness = roughness;
+    if (m_Material != nullptr)
+    {
+        m_Material->SetMaterial(m_SurfaceMaterial);
+    }
+}
+
 // 壁の古さを描く面かどうかを、マテリアルの印として変えている
 void Wall::SetWeatheringSurface(bool enabled)
 {

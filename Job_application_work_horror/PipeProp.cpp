@@ -40,6 +40,9 @@ void PipeProp::Init()
         materialData.Emission = Color(0.0f, 0.0f, 0.0f, 1.0f);
         materialData.Shininess = 24.0f;
         materialData.TextureEnable = albedoLoaded ? TRUE : FALSE;
+        // PBR：塗装した配管（金属の上に光沢のある塗料。塗料なので金属ではなく、粗さで光沢を出している）
+        materialData.Metallic = 0.0f;
+        materialData.Roughness = 0.38f;
 
         auto material = std::make_unique<Material>();
         material->Create(materialData);
