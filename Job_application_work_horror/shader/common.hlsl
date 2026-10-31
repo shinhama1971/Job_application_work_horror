@@ -110,7 +110,7 @@ cbuffer TiledLightBuffer : register(b6)
     float2 LightViewportOffset;
     // 1なら、画面空間の環境遮蔽（t15。screenAmbientOcclusion.hlsli）を使う（本描画だけ）
     float ScreenAmbientOcclusionEnabled;
-    float TiledLightPadding;
+    float ScreenLightShaftsEnabled;
 };
 
 // 点光源の一覧（t10）、タイルごとの光源の番号の並び（t11）、タイルごとの光源の数（t12）

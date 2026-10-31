@@ -120,6 +120,8 @@ void Stage2Scene::Init()
     m_KnockingAnomaly.Reset();
     m_FalseDoorAnomaly.Reset();
     m_UnseenPresence.Reset();
+    m_UnseenHasStep = false;
+    m_UnseenWetSteps = 0;
     m_ClockAnomaly.Reset();
     // 1周目・2周目に探させる異変を、7つの候補（Stage2AnomalyPlan）から毎回ランダムに2つ選んでいる。
     m_AnomalyPlan.Randomize(m_PresenceRandom);

@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // ファイルの役割: 画面をタイルに分け、タイルごとに影響する点光源だけを
 //                 Compute Shaderで絞り込む「タイルベースライティング」を管理している。
 // 主な技術: Compute Shader、StructuredBuffer(SRV/UAV)、グループ共有メモリ、
@@ -267,6 +267,7 @@ namespace Effect
         params.TilesY = m_TilesY;
         params.ViewportOffset = m_ViewportOffset;
         params.AmbientOcclusionEnabled = m_AmbientOcclusionActive ? 1.0f : 0.0f;
+        params.LightShaftsEnabled = m_LightShaftsDisabled ? -1.0f : (m_LightShaftsActive ? 1.0f : 0.0f);
         Renderer::GetDeviceContext()->UpdateSubresource(
             m_ShadingParamsBuffer.Get(), 0, nullptr, &params, 0, 0);
     }

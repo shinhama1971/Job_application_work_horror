@@ -79,9 +79,30 @@ float3 ApplyHorrorMist(float3 color, float3 worldPosition, float3 viewPosition, 
 // 面に付いた光源は除いている（光源が面の上にあると、その面に向かう視線の終わりで光の筋が強く出すぎるため）
 #define LIGHT_SHAFT_MIN_HEIGHT (-58.0f)
 
+Texture2D<float4> g_HalfLightShafts : register(t16);
 float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCount, float2 pixelPosition)
 {
     const float3 eye = GetMistEyePosition();
+    // 低設定では積分も復元も実行しない。0は別視点用の従来計算。
+    if (ScreenLightShaftsEnabled < -0.5f) return 0.0f;
+    if (ScreenLightShaftsEnabled > 0.5f)
+    {
+        // 近い深度の4画素から復元する。壁の縁をまたぐ試料には小さい重みを与える。
+        uint width, height; g_HalfLightShafts.GetDimensions(width, height);
+        float2 p = (pixelPosition - LightViewportOffset - 0.5f) * 0.5f;
+        int2 base = int2(floor(p)); float2 f = frac(p);
+        float distance = length(worldPosition-eye); float3 sum=0; float weights=0;
+        [unroll] for(int y=0;y<2;++y) [unroll] for(int x=0;x<2;++x) {
+            int2 cell=clamp(base+int2(x,y),int2(0,0),int2(width,height)-1);
+            float4 shaftSample = g_HalfLightShafts.Load(int3(cell,0));
+            // 奥行きの差による重みは、距離に比べて大きな差（物の縁をまたぐ所）だけで下げている。
+            // 小さな差でも重みを変えると、斜めに見える壁で重みが画素ごとに揺れ、斜めの細かい格子模様になったため。
+            const float depthGap = max(abs(shaftSample.w - distance) - distance * 0.04f - 1.0f, 0.0f);
+            float weight=(x?f.x:1-f.x)*(y?f.y:1-f.y)/(1+depthGap*0.5f);
+            sum+=shaftSample.rgb*weight; weights+=weight;
+        }
+        return sum/max(weights,0.00001f);
+    }
     const float3 toPixel = worldPosition - eye;
     const float rayLength = length(toPixel);
     const float3 rayDirection = toPixel / max(rayLength, 0.001f);

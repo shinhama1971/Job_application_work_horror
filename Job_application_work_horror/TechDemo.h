@@ -45,6 +45,14 @@ namespace Tools::TechDemo
     float GetWaterCausticsScale();
     // 水たまりの波（足音と水滴の波の式）を計算して映すか
     bool UsesWaterRipples();
+    // 画面空間の環境遮蔽（SSAO）を計算して使うか
+    bool UsesAmbientOcclusion();
+    // 物理ベースの材質（PBR）で描くか（falseなら拡散反射だけで、環境マップも撮らない）
+    bool UsesPbr();
+    // 天井の照明の光の筋を描くか
+    bool UsesLightShafts();
+    // 揺れる電球の影（2面）を描くか
+    bool UsesBulbShadow();
 
     // 開いているときだけ、操作パネルを描いている（HUDより後、デバッグ画面より前に呼ぶ）
     void Draw(const GpuTimer& gpuTimer);

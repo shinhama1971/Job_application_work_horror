@@ -671,7 +671,10 @@ float4 main(in LIT_PS_IN input) : SV_Target
     lighting += Light.Diffuse.rgb * GetWaterCausticLight(input.worldPos, normalize(input.worldNormal));
 
     // 拡散反射（金属ほど弱い）と鏡面反射を合わせている。湿った壁の冷たい光沢も、濡れて粗さが下がった鏡面反射として出ている。
-    color.rgb = surface.diffuseColor * lighting + specularLighting;
+    // 技術デモでPBRを止めているときは、これまでの拡散反射だけの描き方にしている（金属も色のまま、鏡面反射なし）
+    color.rgb = PointShadowOptions.y > 0.5f
+        ? color.rgb * lighting
+        : surface.diffuseColor * lighting + specularLighting;
 
     // 自ら光る色を足している
     color.rgb += Material.Emission.rgb;

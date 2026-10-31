@@ -991,6 +991,39 @@ void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
     const UnseenPresenceAnomaly::Result result = m_UnseenPresence.Update(
         deltaTime, player.GetPosition(), player.IsMovingHorizontally(), player.IsHiding(), enabled);
 
+    // 無効化・捕獲・周回切替時の瞬間移動は歩行距離に数えない。
+    Ground* ground = m_Objects.ground;
+    if (!enabled || result != UnseenPresenceAnomaly::Result::None || !m_UnseenPresence.IsActive())
+    {
+        m_UnseenHasStep = false;
+        m_UnseenWetSteps = 0;
+    }
+    else if (ground != nullptr)
+    {
+        const Vector3 position = m_UnseenPresence.GetPosition();
+        if (!m_UnseenHasStep)
+        {
+            m_UnseenLastStep = position;
+            m_UnseenHasStep = true;
+        }
+        // 水に触れた直後だけ9歩残す。乾いた通路では新しく濡れない。
+        if (ground->IsInsidePuddle(position)) m_UnseenWetSteps = 9;
+        Vector3 direction = position - m_UnseenLastStep;
+        direction.y = 0.0f;
+        if (direction.LengthSquared() >= 7.0f * 7.0f)
+        {
+            const float yaw = std::atan2(direction.x, direction.z);
+            if (m_UnseenWetSteps > 0)
+            {
+                const Vector2 right(std::cos(yaw), -std::sin(yaw));
+                ground->AddFootprint(Vector2(position.x, position.z) + right * (2.4f * m_UnseenFootSide),
+                    yaw, m_UnseenFootSide, true, 0.35f + 0.65f * m_UnseenWetSteps / 9.0f);
+                --m_UnseenWetSteps;
+                m_UnseenFootSide = -m_UnseenFootSide;
+            }
+            m_UnseenLastStep = position;
+        }
+    }
     Core::Game* game = Core::Game::GetInstance();
     if (result == UnseenPresenceAnomaly::Result::Caught)
     {
@@ -1223,7 +1256,8 @@ void Stage2Scene::UpdateFootprintFollower(const Player& player, float deltaTime)
 
     Vector2 waterExit;
     const bool leftWater = ground->ConsumeWaterExit(waterExit);
-    if (leftWater && m_LoopCount >= 2 && !m_FootprintFollowerUsedThisLoop &&
+    if (leftWater && !m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Unseen) &&
+        m_LoopCount >= 2 && !m_FootprintFollowerUsedThisLoop &&
         !m_FootprintFollower.IsActive() && !m_FinalSequence.IsSequenceActive())
     {
         m_FootprintFollower.Start(waterExit);

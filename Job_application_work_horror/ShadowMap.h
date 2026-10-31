@@ -19,7 +19,7 @@ namespace Effect
     private:
         // シェーダーへ渡す値（b8）：ライトのビュー×射影の行列と、x=1テクセルの大きさ、y=深度の比較のずれ（バイアス）、z=near、w=far、
         // 影の方式（x=0なら影なし、1なら硬い影、2ならPCSS。技術デモで切り替えている）、
-        // 揺れる裸電球の影（PointShadowMap。xyz=電球の位置、w=光の届く範囲）と、その設定（x=1なら使う）。
+        // 揺れる裸電球の影（PointShadowMap。xyz=電球の位置、w=光の届く範囲）と、その設定（x=1なら使う、y=1ならPBRを止める（技術デモ））。
         // 定数バッファの番号（b0〜b13）がすべて使われているため、懐中電灯の影と同じ定数バッファにまとめている。
         struct ShadowBuffer
         {
@@ -72,5 +72,7 @@ namespace Effect
         void SetShaderOverride(Shader* shader) { m_ShaderOverride = shader; }
         // 揺れる裸電球の影の位置と範囲を、シェーダーへ渡している（enabledがfalseなら影を使わない）
         void SetPointShadow(const DirectX::SimpleMath::Vector3& lightPosition, float range, bool enabled);
+        // 壁と小物を物理ベースの材質（PBR）で描くかを、シェーダーへ渡している（技術デモの比較用。falseなら拡散反射だけ）
+        void SetPbrEnabled(bool enabled);
     };
 }

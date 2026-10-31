@@ -1,0 +1,90 @@
+{
+  "date": "2026-10-31",
+  "method": "実機自動撮影。コピー後のバイト一致を確認。画像の明るさ・色は未加工。",
+  "images": [
+    {
+      "source": "capture/01_1面_開始地点_照らすと浮かぶ壁の文字.png",
+      "target": "docs/images/game_01_writing_20261031.png",
+      "role": "懐中電灯で浮かぶ文字",
+      "view": "通常表示",
+      "sha256": "40e998ca8349fa07e6ec4f0855e8dc9802acc53b4b6a9067057474a88138c814"
+    },
+    {
+      "source": "capture/05b_1面_西棟の柱の並ぶ浸水した広間.png",
+      "target": "docs/images/game_02_west_wing_20261031.png",
+      "role": "西棟の浸水した広間",
+      "view": "通常表示",
+      "sha256": "fc8fdd5d0baa9f373d47271f4167095d7bc01341633688c61f48a7fbfcfbdb23"
+    },
+    {
+      "source": "capture/05l_1面_右の倉庫の壁の血の手形.png",
+      "target": "docs/images/game_03_handprint_20261031.png",
+      "role": "壁の血の手形",
+      "view": "通常表示",
+      "sha256": "adbe116bc4fa2f906ad915faa0760f5c072b530bbfd6216fac1575b6da4895a3"
+    },
+    {
+      "source": "capture/05i_1面_光の安全地帯の裸電球.png",
+      "target": "docs/images/game_04_safe_light_20261031.png",
+      "role": "安全地帯の灯り",
+      "view": "通常表示",
+      "sha256": "61486a3cb02a84834ba0e80cbac2c249d7065a28e8500185282da32b4cf45a3a"
+    },
+    {
+      "source": "capture/06_2面_ループ廊下.png",
+      "target": "docs/images/game_05_stage2_corridor_20261031.png",
+      "role": "2面の廊下",
+      "view": "通常表示",
+      "sha256": "4dde3129cc732bfcd155974db8ca985edbc7b4f1e61e92e932aeed9b30d5c631"
+    },
+    {
+      "source": "capture/05c_1面_西棟のポンプ室と排水口.png",
+      "target": "docs/images/tech_01_ripple_wall_light_20261031.png",
+      "role": "金属ポンプの錆と水面からの光",
+      "view": "通常表示",
+      "sha256": "553e8df5ed335293cb54adb58abc2f41f9cea82470add9f271d81e26fa0b6b68"
+    },
+    {
+      "source": "capture/05k_1面_足音の波紋と波打つ反射.png",
+      "target": "docs/images/tech_02_ripple_floor_20261031.png",
+      "role": "水面の波と反射",
+      "view": "通常表示",
+      "sha256": "9aea9314733a905232a8a78999780696b1d77cc68ddc6fe93fc21c0f99fa953a"
+    },
+    {
+      "source": "demo-shots-final/09_懐中電灯の影（PCSS）_PCSS（柔らかい影）.png",
+      "target": "docs/images/tech_03_pcss_shadow_20261031.png",
+      "role": "PCSSの影（技術デモ）",
+      "view": "検証用デモ",
+      "sha256": "f0aa3148692c60e6f6b0974b2fd12542a6beeab47cd5d5aa5dfa3a518a7ba2b9"
+    },
+    {
+      "source": "quality-final-3/benchmark_spot2_light_on.png",
+      "target": "docs/images/tech_04_light_shafts_20261031.png",
+      "role": "天井灯の光の筋",
+      "view": "通常表示・画質3",
+      "sha256": "f8ac58ccebee0e52a463d4e22ff1cf3638711b74b5685c18243c3e23431b4646"
+    },
+    {
+      "source": "features-final/feature_unseen_2.png",
+      "target": "docs/images/game_06_unseen_footprints_20261031.png",
+      "role": "見えない影が残す裸足の足跡",
+      "view": "異変の固定条件で自動撮影",
+      "sha256": "aff496d868e371359cbafdedf9d057af125c9eab7a3cc1614bdab617c4410b55"
+    },
+    {
+      "source": "ssao/benchmark_spot2_light_on.png",
+      "target": "docs/images/tech_05_ssao_20261031.png",
+      "role": "SSAOの確認表示",
+      "view": "確認用表示10。HUD・壁文字など別パスは残る",
+      "sha256": "bac7e568155ee2c70d846ebabeaec4460f2c7169b0fd74cde460d7cebca38ba6"
+    },
+    {
+      "source": "capture/06b_2面_揺れる電球の影.png",
+      "target": "docs/images/tech_06_bulb_shadow_20261031.png",
+      "role": "揺れる電球の点光源影",
+      "view": "通常表示・画質3",
+      "sha256": "7bcfa471051136755b1f3f1d056816d169d914dd582c9958ea721b47095ed1aa"
+    }
+  ]
+}

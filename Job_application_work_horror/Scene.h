@@ -37,7 +37,9 @@ enum class SceneDebugAction
     // 1面：ループ廊下の突き当たりの最後のドアを開けている（自動撮影で、開けた瞬間に開始地点の奥のドアへつながる様子を写すときに使っている）
     OpenStage1EndDoor,
     // 2面：見えない影の異変の周回にしている（手で試すときに使っている）
-    ShowUnseenAnomaly
+    ShowUnseenAnomaly,
+    // 撮影用：通常プレイでは呼ばず、4周目の開始部屋を再現する。
+    ShowHauntedStartDoor
 };
 
 // シーンの基底クラス。Gameが今のシーンを1つだけunique_ptrで持ち、毎フレーム更新・描画している。

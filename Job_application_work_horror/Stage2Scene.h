@@ -161,6 +161,11 @@ private:
     bool m_FootprintFollowerUsedThisLoop = false;
     KnockingAnomaly m_KnockingAnomaly;
     UnseenPresenceAnomaly m_UnseenPresence;
+    // 見えない影の足跡は、追従する別の影と混同せず、実際の位置から残す。
+    DirectX::SimpleMath::Vector3 m_UnseenLastStep{};
+    bool m_UnseenHasStep = false;
+    int m_UnseenWetSteps = 0;
+    float m_UnseenFootSide = 1.0f;
     ScratchAnomaly m_ScratchAnomaly;
     ObservedScareSequence m_ObservedScareSequence;
     CaughtSequence m_CaughtSequence;

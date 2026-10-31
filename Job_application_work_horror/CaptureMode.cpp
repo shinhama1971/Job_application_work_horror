@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // ファイルの役割: 作業報告用の「自動撮影モード」と「処理の重さの計測モード」を実装している（説明はCaptureMode.hを参照）。
 // 主な技術: Media Foundation（Sink WriterでH.264へ符号化）、WIC（PNG保存）、
 //           バックバッファの読み戻し（ステージングテクスチャ）、キーフレームの補間
@@ -11,6 +11,7 @@
 #include "Game.h"
 #include "GpuTimer.h"
 #include "Ground.h"
+#include "Door.h"
 #include "Locker.h"
 #include "Player.h"
 #include "Scene.h"
@@ -290,6 +291,8 @@ namespace
     // 今見て回っているシーン、そのシーンの道順の経過秒、次に調べるキーフレーム、次に描いた画面で保存する名前、見て回り終えたか
     SceneName g_TourScene = SceneName::Title;
     float g_TourTime = 0.0f;
+    bool g_FeatureTour = false;
+    bool g_FeatureActionRequested = false;
     size_t g_NextShot = 0;
     const wchar_t* g_PendingShot = nullptr;
     // タイトル画面を表示してからのフレーム数（タイトルを1枚撮ってから1面を始めるため）
@@ -335,8 +338,28 @@ namespace
     }
 
     // シーンに対応する道順を返している（タイトルとリザルトには道順がない）
+    // 同じカメラ位置で、実際のドア更新と不可視の影の移動を撮る。足跡は注入しない。
+    const std::vector<Keyframe> FeatureStage1 = {
+        { 0.0f, Vector3(0,FloorY,-128), Pi, -0.05f, nullptr, false },
+        { 9.0f, Vector3(0,FloorY,-128), Pi, -0.05f, L"feature_door_1_open", false },
+        { 12.0f, Vector3(0,FloorY,-128), Pi, -0.05f, L"feature_door_2_lit_closed", false },
+        { 20.0f, Vector3(0,FloorY,-128), Pi, -0.05f, L"feature_door_3_reopen", false },
+        { 21.0f, Vector3(0,FloorY,-128), Pi, -0.05f, nullptr, false },
+        { 21.05f, Vector3(-292,FloorY,-79), Pi, -0.98f, nullptr, false },
+        { 24.0f, Vector3(-292,FloorY,-79), Pi, -0.98f, L"feature_valve_close", false },
+        { 25.0f, Vector3(-292,FloorY,-79), Pi, -0.98f, nullptr, false },
+    };
+    const std::vector<Keyframe> FeatureStage2 = {
+        { 0.0f, Vector3(-28,FloorY,-85), 0.15f, -0.40f, nullptr, false },
+        { 14.0f, Vector3(-28,FloorY,-85), 0.15f, -0.40f, L"feature_unseen_1", false },
+        { 24.0f, Vector3(-28,FloorY,-85), 0.15f, -0.40f, L"feature_unseen_2", false },
+        { 32.0f, Vector3(-28,FloorY,-85), 0.15f, -0.55f, L"feature_unseen_3", false },
+        { 34.0f, Vector3(-28,FloorY,-85), 0.15f, -0.55f, nullptr, false },
+    };
     const std::vector<Keyframe>* GetTour(SceneName scene)
     {
+        if (g_FeatureTour && scene == SceneName::Stage) return &FeatureStage1;
+        if (g_FeatureTour && scene == SceneName::Stage2) return &FeatureStage2;
         if (scene == SceneName::Stage) return &Stage1Tour;
         if (scene == SceneName::Stage2) return &Stage2Tour;
         return nullptr;
@@ -382,6 +405,7 @@ namespace
         Vector3 Position;
         float Yaw;
         float Pitch;
+        SceneName Scene = SceneName::Stage;
     };
 
     const std::vector<BenchmarkSpot> BenchmarkSpots =
@@ -394,6 +418,8 @@ namespace
         { "ループ廊下", Vector3(0.0f, FloorY, 185.0f), 0.0f, 0.0f },
         // 床一面が水に浸かった西棟。水面の反射（平面反射）が画面の広い範囲に出る場所。
         { "西棟（浸水した広間）", Vector3(-233.0f, FloorY, -21.0f), YawToward(-233.0f, -21.0f, -330.0f, 140.0f), -0.16f },
+        { "2面（裸電球の下）", Vector3(12.0f, FloorY, -25.0f), 0.0f, 0.04f, SceneName::Stage2 },
+        { "2面（廊下の奥）", Vector3(-12.0f, FloorY, 60.0f), Pi, -0.10f, SceneName::Stage2 },
     };
 
     // 各段階のフレーム数。切り替えた直後はGPU時間の結果が数フレーム遅れて届くため、最初の45フレームは捨てている。
@@ -497,10 +523,10 @@ namespace
         std::ostringstream text;
         text << std::fixed << std::setprecision(2);
         // 先頭に、画面の大きさ・描画解像度・エフェクト設定・GPUの名前を書いている
-        text << "処理の重さの計測結果（1面・ライトOFFとONの比較）\n";
+        text << "処理の重さの計測結果（1・2面・ライトOFFとONの比較）\n";
         text << "画面: " << Application::GetWindowWidth() << "x" << Application::GetWindowHeight()
              << "  描画解像度: " << Application::GetWidth() << "x" << Application::GetHeight()
-             << "  垂直同期: なし  エフェクト設定: " << game->GetEffectLevel()
+             << "  垂直同期: なし  エフェクト設定: " << (game->GetEffectLevel() + 1)
              << "  GPU: " << g_AdapterName << "\n";
         text << "各条件 " << BenchmarkMeasureFrames << " フレームの平均（ms）。"
                 "1%遅は遅い方から1%のフレーム時間で、かくつきの目安です。\n\n";
@@ -563,8 +589,11 @@ namespace
         g_HasLastFrameTime = true;
 
         // タイトルからの切り替えが終わり、1面が始まるまでは何もしていない
-        if (game->GetCurrentSceneName() != SceneName::Stage)
+        const SceneName benchmarkScene = g_BenchmarkSpot < BenchmarkSpots.size()
+            ? BenchmarkSpots[g_BenchmarkSpot].Scene : SceneName::Stage2;
+        if (game->GetCurrentSceneName() != benchmarkScene)
         {
+            game->RequestSceneChange(benchmarkScene);
             return;
         }
         Player* player = game->GetObj<Player>("Player");
@@ -636,6 +665,10 @@ namespace
 namespace Tools::CaptureMode
 {
     // 起動オプションを読み、--capture か --benchmark の次の引数を保存先のフォルダにしている
+    int g_EffectOverride = -1;
+    int g_ViewOverride = -1;
+    int GetEffectLevelOverride() { return g_EffectOverride; }
+
     void ConfigureFromCommandLine()
     {
         int argumentCount = 0;
@@ -647,7 +680,7 @@ namespace Tools::CaptureMode
         for (int index = 1; index + 1 < argumentCount; ++index)
         {
             const std::wstring option = arguments[index];
-            if (option == L"--capture" || option == L"--benchmark")
+            if (option == L"--capture" || option == L"--benchmark" || option == L"--capture-features")
             {
                 g_OutputDirectory = arguments[index + 1];
                 std::error_code error;
@@ -655,7 +688,19 @@ namespace Tools::CaptureMode
                 std::filesystem::create_directories(g_OutputDirectory, error);
                 g_Active = !error;
                 g_Benchmark = g_Active && option == L"--benchmark";
+                g_FeatureTour = g_Active && option == L"--capture-features";
                 break;
+            }
+        }
+        if (g_Active)
+        {
+            for (int i = 1; i + 1 < argumentCount; ++i)
+            {
+                const std::wstring option = arguments[i];
+                const std::wstring value = arguments[i + 1];
+                if (option == L"--effect-level" && value.size() == 1 && value[0] >= L'1' && value[0] <= L'3')
+                    g_EffectOverride = static_cast<int>(value[0] - L'1');
+                if (option == L"--debug-view" && value == L"10") g_ViewOverride = 10;
             }
         }
         LocalFree(arguments);
@@ -686,6 +731,7 @@ namespace Tools::CaptureMode
         {
             return;
         }
+        if (g_ViewOverride >= 0) Renderer::SetDebugViewMode(g_ViewOverride);
         if (g_Finished)
         {
             // 最後のスクリーンショットを書き出す画面を描いてから終了している。
@@ -733,6 +779,7 @@ namespace Tools::CaptureMode
             g_TourScene = scene;
             g_TourTime = 0.0f;
             g_NextShot = 0;
+            g_FeatureActionRequested = false;
             g_MirrorAnomalyRequested = false;
             g_EndDoorOpenRequested = false;
             g_SecondLoopRequested = false;
@@ -770,6 +817,14 @@ namespace Tools::CaptureMode
             ++g_NextShot;
         }
 
+        if (g_FeatureTour && !g_FeatureActionRequested && g_TourTime >= 0.2f)
+        {
+            g_FeatureActionRequested = true;
+            if (Scene* current = game->GetScene())
+                current->RequestDebugAction(scene == SceneName::Stage
+                    ? SceneDebugAction::ShowHauntedStartDoor : SceneDebugAction::ShowUnseenAnomaly);
+            Log("feature setup");
+        }
         // 1面: 最後に、突き当たりの最後のドアを開けている（開けた瞬間に、開始地点の奥のドアの裏側へ移る）
         if (scene == SceneName::Stage && !g_EndDoorOpenRequested && g_TourTime >= Stage1EndDoorOpenTime)
         {
@@ -882,6 +937,11 @@ namespace Tools::CaptureMode
         }
         player->SetFlashlightOn(!(scene == SceneName::Stage &&
             g_TourTime >= Stage1FlashlightOffStart && g_TourTime < Stage1FlashlightOffEnd));
+        if (g_FeatureTour && scene == SceneName::Stage)
+            player->SetFlashlightOn((g_TourTime >= 10.0f && g_TourTime < 13.0f) || g_TourTime >= 21.0f);
+        // ドア検証の20秒まではFullbrightで形を見せる。通常表示の資料画像には使わない。
+        if (g_FeatureTour && g_ViewOverride < 0)
+            Renderer::SetDebugViewMode(scene == SceneName::Stage && g_TourTime < 21.0f ? 8 : 0);
         camera->SetCameraDirection(pose.Yaw);
         camera->SetCameraPitch(pose.Pitch);
     }
@@ -983,6 +1043,11 @@ namespace Tools::CaptureMode
         if (g_PendingShot != nullptr)
         {
             Log("shot at " + std::to_string(g_TourTime) + "s");
+            if (g_FeatureTour)
+            {
+                if (Door* door = Core::Game::GetInstance()->GetObj<Door>("Stage1StartDoor"))
+                    Log("door angle = " + std::to_string(door->GetOpenAngle()));
+            }
             SavePng((g_OutputDirectory / (std::wstring(g_PendingShot) + L".png")).wstring(),
                 pixels, mapped.RowPitch, description.Width, description.Height);
             g_PendingShot = nullptr;

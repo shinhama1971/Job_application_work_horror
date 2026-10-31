@@ -173,10 +173,16 @@ namespace Effect
         context->PSSetConstantBuffers(8, 1, &shadowBuffer);
     }
 
+    void ShadowMap::SetPbrEnabled(bool enabled)
+    {
+        m_BufferData.PointShadowOptions.y = enabled ? 0.0f : 1.0f;
+        UploadBuffer();
+    }
+
     void ShadowMap::SetPointShadow(const Vector3& lightPosition, float range, bool enabled)
     {
         m_BufferData.PointShadowLight = Vector4(lightPosition.x, lightPosition.y, lightPosition.z, range);
-        m_BufferData.PointShadowOptions = Vector4(enabled ? 1.0f : 0.0f, 0.0f, 0.0f, 0.0f);
+        m_BufferData.PointShadowOptions.x = enabled ? 1.0f : 0.0f;
         UploadBuffer();
     }
 

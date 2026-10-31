@@ -216,6 +216,12 @@ void StageScene::UpdateCorridorLoop(Player& player)
         }
     }
 
+    if (startDoor != nullptr)
+    {
+        // 既存の遮蔽判定を使い、壁越しにライトを向けただけでは閉じない。
+        const bool lit = IsLitByFlashlight(player, startDoor->GetPosition());
+        startDoor->SetHauntedGap(m_CorridorLoopCount >= 4 && !game->IsPowerRestored(), lit);
+    }
     if (game->IsPowerRestored() || m_LoopCooldown > 0.0f)
     {
         return;

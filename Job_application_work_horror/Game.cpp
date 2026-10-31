@@ -84,12 +84,15 @@ namespace Core
         m_Instance->m_EnvironmentProbe.Init(14, true);
         m_Instance->m_EnvironmentProbe.SetClearColor(DirectX::SimpleMath::Color(0.012f, 0.013f, 0.014f, 1.0f));
         m_Instance->m_PointShadowMap.Init();
+        m_Instance->m_LightShafts.Init(static_cast<int>(Application::GetWidth()), static_cast<int>(Application::GetHeight()));
         m_Instance->m_AmbientOcclusion.Init(static_cast<int>(Application::GetWidth()), static_cast<int>(Application::GetHeight()));
         m_Instance->m_ScreenSpaceReflection.Init(Application::GetWidth(), Application::GetHeight());
         m_Instance->m_ShadowMap.Init();
         m_Instance->m_PostProcess.Init();
         m_Instance->m_TiledLighting.Init();
         Tools::TechDemo::Init();
+        if (Tools::CaptureMode::GetEffectLevelOverride() >= 0)
+            m_Instance->m_Settings.SetEffectLevel(Tools::CaptureMode::GetEffectLevelOverride());
         m_Instance->ApplyVisualSettings();
         m_Instance->ChangeScene(SceneName::Title);
         return true;

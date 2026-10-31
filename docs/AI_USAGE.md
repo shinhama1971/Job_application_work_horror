@@ -11,7 +11,8 @@
 
 | 項目 | 内容 |
 |---|---|
-| ツール | Claude Code（Anthropic） |
+| ツール | Claude Code（Anthropic）、Codex（OpenAI） |
+| Codexの利用範囲 | 2026年10月31日：見えない影の濡れた足跡、4周目以降のドア、光の筋の半解像度化。後始末・画質設定・撮影・技術デモ同期と確認も支援 |
 | 使用期間 | 2026年9月24日〜 |
 | 使い方 | 作者が内容を指示し、AIがコードの読解・実装・修正・ビルド確認を行う。変更はすべて作者が確認し、コミット・push・マージは作者が行う（AIはコミットしない運用） |
 | それ以前（2026年8月〜9月19日） | 【作者が記入・確認する欄】他のAIツール（ChatGPT・Copilotなど）を使ったかどうか |
@@ -21,6 +22,17 @@
 「AIの関与」の意味:
 - **実装**: AIが新しくコードを書いた
 - **修正**: 作者が作った既存のコードを、AIが直した・整理した
+
+### Codexが担当した追加・調整（2026年10月31日）
+
+| 内容 | 主なファイル | 関与 |
+|---|---|---|
+| 見えない影が水を踏んだ後の裸足の跡 | Stage2Scene.h、Stage2Scene.cpp、Stage2SceneHorror.cpp | Codexが実装 |
+| 4周目以降、ひとりでに開き、照らすと閉じるドア | Door.*、StageSceneEvents.cpp | Codexが実装 |
+| 光の筋の半解像度計算と深度を使った拡大 | LightShafts.h、shader/lightShaftsCS.hlsl、horrorMist.hlsli、GameRendering.cpp、TiledLighting.* | Codexが実装・計測 |
+| プロジェクト登録・改行、画質1〜3、撮影用の一時設定、デモ同期、README | vcxproj/filters、Game.*、CaptureMode.*、同期スクリプト、App.*、README | Codexが修正・確認。結果は作業報告参照 |
+
+作者が3つの追加内容と作業の優先順位を指定しました。今回の作業はコミット・pushせず、作者の差分確認を待つ運用です。
 
 ### ゲームの機能
 
@@ -82,6 +94,7 @@
 | 壁・扉・小物を物理ベースの材質（PBR）で描くようにした（GGX・Smith・Schlickの鏡面反射、金属・粗さ・濡れ具合、配置ファイルの色ごとの仕上げ、扉の真鍮の取っ手、環境マップによる映り込みと粗さに応じたぼかし、材質のデバッグ表示、GPU時間の計測項目） | `shader/pbrLighting.hlsli`, `shader/litTexturePS.hlsl`, `shader/common.hlsl`, `Renderer.h`, `Material.h`, `Wall.*`, `Door.*`, `ReflectionProbe.*`, `GameRendering.cpp`, `Game.*`, `GpuTimer.h`, `PropLayoutFile.*`, `PropLayoutEditor.cpp`, `assets/layout/stage1_props.txt`, `FuseBox.cpp`, `DrainValve.cpp`, `Locker.cpp`, `Item.cpp`, `KeyItem.cpp`, `PipeProp.cpp`, `Stage2Layout.cpp`, `DebugUI.cpp`, `CaptureMode.cpp`, `README.md` | 設計・実装・撮影と計測での確認 | 方針の選択（PBRで壁・扉・金属を表現したい） |
 | 金属の錆と擦れ傷（場所ごとの色・金属らしさ・粗さ）、揺れる裸電球の点光源の影（距離のキューブマップ）、天井の照明から落ちる光の筋、2面の新しい異変「見えない影」（携帯ラジオの雑音だけを頼りにやり過ごす）、1面のループで戻るたびに開始地点の部屋が崩れていく演出（浮かぶ文字・故障する照明・ドアの向こうの叩く音と取っ手の揺れ）を追加 | `shader/pbrLighting.hlsli`, `shader/pointShadow.hlsli`, `shader/pointShadowVS.hlsl`, `shader/pointShadowPS.hlsl`, `shader/horrorMist.hlsli`, `shader/flashlightShadow.hlsli`, `shader/litTexturePS.hlsl`, `shader/wetFloorPS.hlsl`, `PointShadowMap.*`, `ShadowMap.*`, `GameRendering.cpp`, `Game.*`, `GpuTimer.h`, `HangingBulb.*`, `UnseenPresenceAnomaly.h`, `Stage2AnomalyPlan.h`, `Stage2Scene*.cpp`, `Stage2Scene.h`, `Stage2Objective.*`, `Scene.h`, `DebugUI.cpp`, `FlashlightWriting.h`, `Stage1Layout.*`, `StageScene.*`, `StageSceneEvents.cpp`, `tools/generate-wall-writings.ps1`, `assets/texture/writing_lap*.png`, `CaptureMode.cpp`, `README.md` | 設計・実装・撮影での確認 | 方針の選択（次の作業の候補1〜5を順に作る） |
 | 画面空間の環境遮蔽（SSAO。Compute Shaderで半分の解像度で計算し、深さを見ながらぼかす）と、壁を伝う水の筋を追加。光の筋の重さを計測して軽くした（照明より下の区間だけを5点で調べ、霧のむらを1回だけ求める）。本描画のGPU時間を約8msから約4msへ | `AmbientOcclusion.*`, `shader/ambientOcclusionCS.hlsl`, `shader/ambientOcclusionBlurCS.hlsl`, `shader/screenAmbientOcclusion.hlsli`, `shader/horrorMist.hlsli`, `shader/litTexturePS.hlsl`, `shader/wetFloorPS.hlsl`, `shader/common.hlsl`, `TiledLighting.*`, `GameRendering.cpp`, `Game.*`, `GpuTimer.h`, `CaptureMode.cpp`, `DebugUI.cpp`, `README.md` | 設計・実装・撮影と計測での確認 | 方針の選択（シェーダーを一気に追加・修正する） |
+| 技術デモ（ゲームの F2 と GraphicsTechDemo）に、画面空間の環境遮蔽・PBR・天井の照明の光の筋・揺れる電球の影の「なし／あり」の切り替えを追加（PBRを止める印を影の定数バッファで渡す、デモの部屋の棚・柱・机・木箱に金属らしさと粗さを付ける）。半分の解像度の光の筋で出ていた斜めの縞を修正（2画素おきのずらしをやめて調べる点を増やし、拡大の重みを物の縁だけで下げる）。同期スクリプトと確認スクリプトの文字コード（BOM）を修正 | `TechDemo.*`, `GameRendering.cpp`, `ShadowMap.*`, `shader/flashlightShadow.hlsli`, `shader/litTexturePS.hlsl`, `shader/lightShaftsCS.hlsl`, `shader/horrorMist.hlsli`, `tools/check-text-format.ps1`, GraphicsTechDemo の `src/App.*`・`src/DemoScene.*`・`tools/sync-from-game.ps1`・`README.md`, `README.md` | 実装・撮影での確認（Claude Code） | 不具合の報告（斜めの線が見える）、作業の指示 |
 
 ### 設計の整理・品質改善
 

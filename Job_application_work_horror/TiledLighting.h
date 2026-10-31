@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // ファイルの役割: 画面をタイルに分け、タイルごとに影響する点光源だけを
 //                 Compute Shaderで絞り込む「タイルベースライティング」を管理している。
 // 主な技術: Compute Shader、StructuredBuffer(SRV/UAV)、グループ共有メモリ、
@@ -82,7 +82,7 @@ namespace Effect
             DirectX::SimpleMath::Vector2 ViewportOffset;
             // 1なら、画面空間の環境遮蔽（AmbientOcclusion、t15）を使う（本描画だけ。反射や環境マップの視点では0）
             float AmbientOcclusionEnabled;
-            float Padding;
+            float LightShaftsEnabled;
         };
         static_assert(sizeof(ShadingParams) == 32,
             "ShadingParams must match common.hlsl");
@@ -117,5 +117,10 @@ namespace Effect
         DirectX::SimpleMath::Vector2 m_ViewportOffset;
         // このフレームの画面空間の環境遮蔽を、ピクセルシェーダーに使わせるか
         bool m_AmbientOcclusionActive = false;
+        bool m_LightShaftsActive = false;
+        bool m_LightShaftsDisabled = false;
+    public:
+        void SetLightShaftsDisabled(bool disabled) { m_LightShaftsDisabled = disabled; }
+        void SetLightShaftsActive(bool enabled) { m_LightShaftsActive = enabled; }
     };
 }

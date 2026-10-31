@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "Game.h"
+#include "Application.h"
 #include "Scene.h"
 #include "Renderer.h"
 #include "ScreenDustOverlay.h"
@@ -111,8 +112,16 @@ namespace Core
         Debug::UI::BeginFrame();
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
         m_Instance->m_GpuTimer.BeginFrame(context);
+        const int quality = m_Instance->m_Settings.GetEffectLevel();
+        ++m_Instance->m_EnvironmentQualityFrame;
+        // 技術デモ（F2）で切り替えた効果も、画質設定と同じように止めている
+        m_Instance->m_TiledLighting.SetLightShaftsDisabled(quality == 0 || !Tools::TechDemo::UsesLightShafts());
+        // PBRを止めたとき、壁と小物のシェーダーは拡散反射だけで描く（技術デモの比較用。印はb8で渡している）
+        m_Instance->m_ShadowMap.SetPbrEnabled(Tools::TechDemo::UsesPbr());
         // 画面空間の環境遮蔽は本描画の直前に作るまで使わせない（反射・環境マップ・影など、先に描くほかの視点では使わない）
         m_Instance->m_TiledLighting.SetAmbientOcclusionActive(false);
+        m_Instance->m_TiledLighting.SetLightShaftsActive(false);
+        m_Instance->m_LightShafts.Unbind();
 
         // 水面の光の揺らぎ（壁のピクセルシェーダー）で使う、プレイヤーの視点のビュー行列を渡している。
         // 懐中電灯はこの視点から照らしているため、反射を描くときも同じ行列を使う。
@@ -212,7 +221,7 @@ namespace Core
                 }
             }
 
-            if (shadowBulb != nullptr)
+            if (shadowBulb != nullptr && quality >= 2 && Tools::TechDemo::UsesBulbShadow())
             {
                 m_Instance->m_GpuTimer.BeginPass(GpuPass::BulbShadow, context);
                 const DirectX::SimpleMath::Vector3 lightPosition = shadowBulb->GetBulbPosition();
@@ -437,7 +446,11 @@ namespace Core
         // PBRの環境マップ：金属や濡れた面に映す景色を、カメラの位置から1フレームに1面ずつ撮り直している（最初だけ6面）。
         // 懐中電灯の向きは、目の前を向くビュー空間で決めている。面ごとに視点が違うので、懐中電灯の向きを
         // その面の視点へ回して渡し、プレイヤーが照らしている壁が、そのまま金属に映るようにしている。
-        if (hasWetFloor)
+        const bool updateEnvironment = quality >= 2 || !m_Instance->m_EnvironmentProbe.HasAllFaces() ||
+            (m_Instance->m_EnvironmentQualityFrame % 4u) == 0u;
+        // PBRを止めているとき（技術デモ）は映り込みを使わないので、環境マップも撮らない
+        const bool usesEnvironment = hasWetFloor && quality >= 1 && Tools::TechDemo::UsesPbr();
+        if (usesEnvironment && updateEnvironment)
         {
             m_Instance->m_GpuTimer.BeginPass(GpuPass::EnvironmentProbe, context);
             const LIGHT sceneLight = Renderer::GetLight();
@@ -478,6 +491,12 @@ namespace Core
             Renderer::SetLight(sceneLight);
             m_Instance->m_GpuTimer.EndPass(GpuPass::EnvironmentProbe, context);
         }
+        else if (usesEnvironment)
+        {
+            // 更新を休むだけでキャッシュを破棄すると、次回に6面を描き直して逆に重くなる。
+            m_Instance->m_EnvironmentProbe.Bind();
+            m_Instance->m_GpuTimer.SkipPass(GpuPass::EnvironmentProbe);
+        }
         else
         {
             m_Instance->m_EnvironmentProbe.Invalidate();
@@ -515,7 +534,7 @@ namespace Core
         }
         // 画面空間の環境遮蔽（SSAO）：深度プリパスの深度から、物と物の隙間や壁の根元など光が届きにくい所を求めている（1面・2面）。
         // 結果は t15 に設定し、下のライトリストの準備で、本描画のときだけ使う印をシェーダーへ送っている。
-        if (useDepthPrepass && hasWetFloor)
+        if (useDepthPrepass && hasWetFloor && quality >= 1 && Tools::TechDemo::UsesAmbientOcclusion())
         {
             m_Instance->m_GpuTimer.BeginPass(GpuPass::AmbientOcclusion, context);
             DirectX::SimpleMath::Matrix occlusionView;
@@ -533,6 +552,17 @@ namespace Core
             m_Instance->m_AmbientOcclusion.Unbind();
             m_Instance->m_GpuTimer.SkipPass(GpuPass::AmbientOcclusion);
         }
+        bool halfShafts = false;
+        if (useDepthPrepass && hasWetFloor && quality >= 1 && Tools::TechDemo::UsesLightShafts())
+        {
+            DirectX::SimpleMath::Matrix view, projection;
+            m_Instance->m_Camera.GetMainMatrices(view, projection);
+            UINT count = 1; D3D11_VIEWPORT viewport{};
+            context->RSGetViewports(&count, &viewport);
+            halfShafts = m_Instance->m_LightShafts.Compute(view, projection, viewport,
+                m_Instance->m_TiledLighting.GetLights(), Application::GetDeltaTime());
+        }
+        m_Instance->m_TiledLighting.SetLightShaftsActive(halfShafts);
         // プレイヤー視点のタイルごとのライトリストを、Compute Shaderで作ってから描いている。
         // 使わない方式では、全部の光源を画素ごとに順に計算させている。
         if (Tools::TechDemo::UsesTiledLighting())

@@ -257,6 +257,13 @@ void StageScene::UpdateRouteLights()
 // 自動撮影から、最後のドアを調べたのと同じように開けている（開けた瞬間の周回の切り替えは、次のUpdateで普段どおり行われる）
 void StageScene::RequestDebugAction(SceneDebugAction action)
 {
+    if (action == SceneDebugAction::ShowHauntedStartDoor && m_Objects.startDoor != nullptr)
+    {
+        m_CorridorLoopCount = 4;
+        m_Objects.startDoor->ResetClosed(3);
+        m_Objects.startDoor->SetLocked(true);
+        return;
+    }
     Door* endDoor = m_Objects.exitDoor;
     Player* player = m_Objects.player;
     if (action == SceneDebugAction::OpenStage1EndDoor &&

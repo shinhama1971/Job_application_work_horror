@@ -168,6 +168,12 @@ void Door::Update()
 
     if (!m_IsOpening)
     {
+        if (!m_IsOpen && m_IsLocked)
+        {
+            const float target = m_HauntedGap && !m_HauntedLit ? 0.18f : 0.0f;
+            const float speed = target > m_OpenAngle ? 0.025f : 0.65f;
+            m_OpenAngle += (std::clamp)(target - m_OpenAngle, -speed * deltaTime, speed * deltaTime);
+        }
         return;
     }
 

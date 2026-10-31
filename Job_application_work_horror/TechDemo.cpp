@@ -30,6 +30,10 @@ namespace
         AutoExposure,
         WaterCaustics,
         WaterRipples,
+        AmbientOcclusion,
+        Pbr,
+        LightShafts,
+        BulbShadow,
         Count
     };
     constexpr int TopicCount = static_cast<int>(Topic::Count);
@@ -75,6 +79,22 @@ namespace
           { "なし", "あり", nullptr }, 2, 1,
           { "足音と水滴で立つ波をCompute Shaderの波の式で計算し、",
             "反射を波打たせ、壁に光の輪を映している" } },
+        { "画面空間の環境遮蔽（SSAO）",
+          { "なし", "あり", nullptr }, 2, 1,
+          { "深度プリパスの深度から、物の隙間や壁の根元など",
+            "光が届きにくい所を、半分の解像度で求めて暗くしている" } },
+        { "物理ベースの材質（PBR）",
+          { "なし（拡散反射だけ）", "あり", nullptr }, 2, 1,
+          { "GGXの鏡面反射と環境マップの映り込みで、金属・濡れた壁・",
+            "ニスの木を描き分けている（なしでは環境マップも撮らない）" } },
+        { "天井の照明の光の筋",
+          { "なし", "あり", nullptr }, 2, 1,
+          { "照明の下の円錐の中の霧に散る光を、",
+            "半分の解像度で積分して、奥行きを見ながら重ねている" } },
+        { "揺れる電球の影",
+          { "なし", "あり", nullptr }, 2, 1,
+          { "2面の吊るした電球から6方向の距離を撮り、",
+            "揺れに合わせて動く影を落としている（2面だけ）" } },
     } };
 
     // 開いているか、選んでいる項目、項目ごとの今の方式
@@ -247,6 +267,26 @@ namespace Tools::TechDemo
         return GetVariant(Topic::WaterRipples) == 1;
     }
 
+    bool UsesAmbientOcclusion()
+    {
+        return GetVariant(Topic::AmbientOcclusion) == 1;
+    }
+
+    bool UsesPbr()
+    {
+        return GetVariant(Topic::Pbr) == 1;
+    }
+
+    bool UsesLightShafts()
+    {
+        return GetVariant(Topic::LightShafts) == 1;
+    }
+
+    bool UsesBulbShadow()
+    {
+        return GetVariant(Topic::BulbShadow) == 1;
+    }
+
     void Draw(const GpuTimer& gpuTimer)
     {
         for (std::size_t pass = 0; pass < static_cast<std::size_t>(GpuPass::Count); ++pass)
@@ -290,7 +330,12 @@ namespace Tools::TechDemo
             FormatTiming("反射", GpuPass::Reflection) + "   " +
             FormatTiming("影", GpuPass::Shadow) + "   " +
             FormatTiming("画面効果", GpuPass::PostProcess));
-        infoLines.push_back(FormatTiming("水たまりの波", GpuPass::WaterRipples));
+        infoLines.push_back(
+            FormatTiming("水たまりの波", GpuPass::WaterRipples) + "   " +
+            FormatTiming("環境遮蔽", GpuPass::AmbientOcclusion));
+        infoLines.push_back(
+            FormatTiming("環境マップ", GpuPass::EnvironmentProbe) + "   " +
+            FormatTiming("電球の影", GpuPass::BulbShadow));
 
         g_Hud->DrawTechDemoPanel(rows, infoLines);
     }

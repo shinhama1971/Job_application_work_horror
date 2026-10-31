@@ -38,6 +38,8 @@ private:
     DirectX::SimpleMath::Vector3 m_StartPosition;
     // 開いた角度（ラジアン）、開く速さ、開く前のためる残り秒数とその長さ、ループ廊下の周回
     float m_OpenAngle = 0.0f;
+    bool m_HauntedGap = false;
+    bool m_HauntedLit = false;
     float m_OpenSpeedPerSecond = 1.92f;
     float m_OpenDelayTimer = 0.0f;
     float m_OpenDelayDuration = 0.06f;
@@ -47,6 +49,8 @@ private:
     DirectX::SimpleMath::Matrix GetDoorWorldMatrix() const;
 
 public:
+    // 進行用の開閉状態を変えずに、鍵のかかった扉だけをわずかに開く。
+    void SetHauntedGap(bool enabled, bool lit) { m_HauntedGap = enabled; m_HauntedLit = lit; }
     void Init() override;
     void Update() override;
     void Draw(Camera* cam) override;
@@ -91,6 +95,8 @@ public:
     // 鍵をかける・外す、鍵がかかっているかを返している
     void SetLocked(bool locked) { m_IsLocked = locked; }
     bool IsLocked() const { return m_IsLocked; }
+    // 固定条件の撮影で、隙間の開閉が実際に更新されたかを数値でも確認する。
+    float GetOpenAngle() const { return m_OpenAngle; }
     // 開け始めてから開ききるまでの途中か
     bool IsOpening() const { return m_IsOpening; }
     // 音や画面の演出を出さずに開け始めている（ループ廊下で、別のドアの開きかけをそのまま引き継ぐときに使っている）
