@@ -73,6 +73,8 @@ bool Stage2Scene::IsRequiredAnomalyFound() const
         return m_MirrorAnomaly.WasFound();
     case Stage2Anomaly::Unseen:
         return m_UnseenPresence.WasFound();
+    case Stage2Anomaly::Puddle:
+        return m_PuddleAnomaly.WasFound();
     case Stage2Anomaly::None:
         break;
     }
@@ -102,6 +104,8 @@ void Stage2Scene::Init()
 
     // 進行の状態をすべて最初に戻している
     m_LoopCount = 0;
+    m_LoopDepth = 0.0f;
+    Renderer::SetLoopDepth(0.0f);
     m_LoopCooldown = 0.0f;
     m_Notices.Reset();
     m_Notices.loop = 2.8f;
@@ -112,6 +116,8 @@ void Stage2Scene::Init()
     m_PortraitAnomaly.Reset();
     m_HandprintAnomaly.Reset();
     m_MirrorAnomaly.Reset();
+    m_PuddleAnomaly.Reset();
+    Renderer::SetPuddleFigure(Vector3::Zero, 0.0f);
     m_FootprintFollower.Reset();
     m_PortraitEyeOpen = 0.0f;
     m_PortraitEyeGlow = 0.0f;
@@ -122,8 +128,10 @@ void Stage2Scene::Init()
     m_UnseenPresence.Reset();
     m_UnseenHasStep = false;
     m_UnseenWetSteps = 0;
+    m_UnseenShadowVisibility = 0.0f;
+    Renderer::SetUnseenFigure(Vector3::Zero, 0.0f);
     m_ClockAnomaly.Reset();
-    // 1周目・2周目に探させる異変を、7つの候補（Stage2AnomalyPlan）から毎回ランダムに2つ選んでいる。
+    // 1周目・2周目に探させる異変を、8つの候補（Stage2AnomalyPlan）から毎回ランダムに2つ選んでいる。
     m_AnomalyPlan.Randomize(m_PresenceRandom);
     // 今回出る異変は、リザルト画面の「今回の発見」に出している。
     game->SetStage2Anomalies(
@@ -312,6 +320,19 @@ void Stage2Scene::Update()
                 m_UnseenPresence.ResetProgressForLoop();
             }
             break;
+        case SceneDebugAction::ShowPuddleAnomaly:
+            // 異変を探す周回にし、その周回の異変を水たまりにしている（鏡と同じく、周回を進める前に決めている）
+            if (m_LoopCount < 1)
+            {
+                m_AnomalyPlan.ForceLoop(1, Stage2Anomaly::Puddle);
+                AdvanceLoop(*player);
+            }
+            if (m_LoopCount <= Stage2AnomalyPlan::PlannedLoopCount)
+            {
+                m_AnomalyPlan.ForceLoop(m_LoopCount, Stage2Anomaly::Puddle);
+                m_PuddleAnomaly.ResetProgressForLoop();
+            }
+            break;
         }
     }
 
@@ -361,11 +382,12 @@ void Stage2Scene::Update()
         m_GuidancePulseCooldown <= 0.0f)
     {
         // しばらく進めていないとき、探すべき異変の近くの照明を揺らしている（偽の扉は奥寄り、時計と肖像画は中央付近、
-        // ノックは音の出どころの近く、血の手形は最後に現れた手形の近く、鏡は鏡の真上、見えない影はその影の真上）。
+        // ノックは音の出どころの近く、血の手形は最後に現れた手形の近く、鏡は鏡の真上、見えない影はその影の真上、水たまりは中央の水たまりの真上）。
         const Stage2Anomaly requiredAnomaly = m_AnomalyPlan.GetRequired(m_LoopCount);
         CeilingLight* guideLight = m_Objects.Light(
             requiredAnomaly == Stage2Anomaly::FalseDoor ? Stage2Light::Light3 :
             requiredAnomaly == Stage2Anomaly::Mirror ? Stage2NearestLight(MirrorAnomaly::CenterZ) :
+            requiredAnomaly == Stage2Anomaly::Puddle ? Stage2NearestLight(PuddleReflectionAnomaly::PuddleCenterZ) :
             requiredAnomaly == Stage2Anomaly::Handprint
                 ? Stage2NearestLight(m_HandprintAnomaly.GetLatestPosition().z) :
             requiredAnomaly == Stage2Anomaly::Knocking
@@ -403,6 +425,7 @@ void Stage2Scene::Update()
     UpdatePortraitEyes(deltaTime);
     UpdateHandprintAnomaly(*player, deltaTime);
     UpdateMirrorAnomaly(*player, deltaTime);
+    UpdatePuddleAnomaly(*player, deltaTime);
     UpdateFootprintFollower(*player, deltaTime);
     // ロッカーの中では、扉越しに聞こえるよう、すべての位置付きの音をこもらせている
     Core::Game::GetInstance()->SetListenerMuffle(player->IsHiding() ? 0.45f : 0.0f);
@@ -514,6 +537,9 @@ void Stage2Scene::Update()
 
     // 画面効果を、周回の進み具合・近くの照明の明るさ・危険度に合わせて変えている
     const float loopRate = static_cast<float>(m_LoopCount) / 3.0f;
+    // P.T. のように、周回が進むほど廊下の色調を赤黒く沈め、霧を濃くしている（扉を抜けた直後の暗転の間に、約1秒で変わる）
+    m_LoopDepth += (loopRate - m_LoopDepth) * (std::min)(deltaTime * 2.5f, 1.0f);
+    Renderer::SetLoopDepth(m_LoopDepth);
     float localFixtureLight = 0.0f;
     for (CeilingLight* fixture : m_Objects.lights)
     {
@@ -618,7 +644,10 @@ void Stage2Scene::Uninit()
 
     // 血の手形の異変で壁に浮かべた手形を消している（ほかの面の壁に残らないように）
     Renderer::SetWallHandprints(nullptr, 0);
+    Renderer::SetPuddleFigure(DirectX::SimpleMath::Vector3::Zero, 0.0f);
+    Renderer::SetUnseenFigure(DirectX::SimpleMath::Vector3::Zero, 0.0f);
     Renderer::SetWallWeathering(0.0f);
+    Renderer::SetLoopDepth(0.0f);
     Renderer::SetRoomOcclusion(nullptr, 0, 0.0f, 0.0f, 0.0f);
     game->GetPostProcess()->SetCorridorTension(0.0f);
     game->GetPostProcess()->SetAtmosphere(0.18f, 0.55f);

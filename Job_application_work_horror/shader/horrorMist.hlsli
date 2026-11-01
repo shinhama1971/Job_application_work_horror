@@ -53,12 +53,16 @@ float3 ApplyHorrorMist(float3 color, float3 worldPosition, float3 viewPosition, 
     const float broad = FastValueNoise(mistPoint * 0.022f + flow * 0.020f);
     const float wisps = FastValueNoise(float2(mistPoint.x * 0.060f - flow.x * 0.045f, mistPoint.y * 0.030f + flow.y * 0.040f) + 7.0f);
     amount *= 0.35f + broad * 0.95f + wisps * 0.55f;
+    // 2面の周回が進むほど、霧を濃くしている（LoopDepth。common.hlsl の b7）
+    amount *= 1.0f + saturate(LoopDepth) * 0.85f;
     const float mist = saturate(1.0f - exp(-amount));
 
     // 霧の色：懐中電灯の外は闇に近い暗い灰緑。円錐の中は、懐中電灯の光を散らして白く浮かぶ（遠いほど光が届かない）
     float3 mistColor = float3(0.012f, 0.015f, 0.015f) + Light.Ambient.rgb * 0.035f;
     // 電球や非常灯の光を受けた霧は、その光の色でかすむ（P.T. の廊下の電球のまわりの暖かいもや）
     mistColor += surroundingLight * 0.10f;
+    // 周回が深いほど、霧そのものも赤黒く濁らせている
+    mistColor = lerp(mistColor, mistColor * float3(1.25f, 0.55f, 0.50f) + float3(0.010f, 0.0f, 0.0f), saturate(LoopDepth));
     if (Light.Enable && Light.FlashlightEnabled)
     {
         const float3 pixelDirection = viewPosition / max(length(viewPosition), 0.001f);

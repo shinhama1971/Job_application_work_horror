@@ -66,6 +66,14 @@ namespace Effect
         float m_TargetSignalInterference = 0.0f;
         // 携帯ラジオの雑音の強さ（影が近いほど強い）。信号の乱れと同じ画面の乱れを、弱めに重ねている
         float m_PresenceStatic = 0.0f;
+        // コマ落ち：雑音が強いとき、ときどき映像が一瞬止まり、縦に少しずれる。止めている残り秒数、次に止めるまでの秒数、
+        // 縦のずれ（画面の高さに対する割合）、間隔とずれを決める乱数の状態
+        float m_FrameHoldTimer = 0.0f;
+        float m_FrameHoldCooldown = 1.0f;
+        float m_FrameHoldOffset = 0.0f;
+        unsigned int m_FrameHoldRandom = 0x9E3779B9u;
+        // 0〜1の乱数（xorshift）
+        float NextFrameHoldRandom();
 
         // 本描画を一度RenderTextureへ写し、その後で複数の画面効果を合成している。
         Graphics::RenderTexture m_RenderTexture;

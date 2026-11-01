@@ -61,6 +61,16 @@ public:
 		(void)normal;
 		return false;
 	}
+	// レイ反射（水たまり）で、画面の外にあっても水面に映す小物なら、その物を囲む箱（ワールドの最小・最大の角）と色を返してtrueにしている。
+	// GameRendering がカメラに近い物から MaxReflectionProps 個を選び、床のシェーダーへ渡している（建物の壁と天井は部屋の形で別に渡している）。
+	virtual bool GetReflectionProxy(
+		DirectX::SimpleMath::Vector3& minimum, DirectX::SimpleMath::Vector3& maximum, DirectX::SimpleMath::Color& color) const
+	{
+		(void)minimum;
+		(void)maximum;
+		(void)color;
+		return false;
+	}
 	// 監視カメラなど、プレイヤー以外の視点で描くワールドに含めるかどうか。
 	virtual bool DrawsInAuxiliaryView() const { return true; }
 	// 描画の前にGPUで計算する物（水たまりの波）は、ここでCompute Shaderを実行している。

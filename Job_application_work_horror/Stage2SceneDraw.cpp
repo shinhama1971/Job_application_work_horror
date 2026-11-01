@@ -117,6 +117,9 @@ void Stage2Scene::Draw(Camera* camera)
                 requiredAnomaly == Stage2Anomaly::Handprint ? m_HandprintAnomaly.GetLatestPosition() :
                 requiredAnomaly == Stage2Anomaly::Mirror
                     ? Vector3(MirrorAnomaly::SurfaceX, MirrorAnomaly::CenterY, MirrorAnomaly::CenterZ) :
+                requiredAnomaly == Stage2Anomaly::Puddle
+                    ? Vector3(PuddleReflectionAnomaly::PuddleCenterX, PuddleReflectionAnomaly::FloorY,
+                        PuddleReflectionAnomaly::PuddleCenterZ) :
                 GetKnockListenPoint();
         }
         else if (confirmationPending)
@@ -239,6 +242,7 @@ Stage2ObjectiveInput Stage2Scene::MakeObjectiveInput(bool confirmationPending) c
     input.portraitStaring = m_PortraitAnomaly.IsStaring();
     input.handprintFollowing = m_HandprintAnomaly.IsFollowing();
     input.mirrorWaitingForTurn = m_MirrorAnomaly.IsWaitingForTurn();
+    input.puddleWaitingForLookUp = m_PuddleAnomaly.IsWaitingForLookUp();
     input.hiding = m_Objects.player != nullptr && m_Objects.player->IsHiding();
     input.hidingNotice = m_Notices.hiding > 0.0f;
     input.knockListening = m_KnockingAnomaly.IsListening();
@@ -274,6 +278,7 @@ Stage2ObjectiveInput Stage2Scene::MakeObjectiveInput(bool confirmationPending) c
     input.portraitNotice = m_PortraitAnomaly.GetNoticeTimer() > 0.0f;
     input.handprintNotice = m_HandprintAnomaly.GetNoticeTimer() > 0.0f;
     input.mirrorNotice = m_MirrorAnomaly.GetNoticeTimer() > 0.0f;
+    input.puddleNotice = m_PuddleAnomaly.GetNoticeTimer() > 0.0f;
     input.knockNotice = m_KnockingAnomaly.GetNoticeTimer() > 0.0f;
     input.unseenNotice = m_UnseenPresence.GetNoticeTimer() > 0.0f;
     input.loopNotice = m_Notices.loop > 0.0f;

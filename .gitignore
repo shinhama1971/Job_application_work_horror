@@ -405,3 +405,7 @@ FodyWeavers.xsd
 # 実行時に生成・更新されるファイル（セーブデータ、ImGuiのレイアウト）
 Job_application_work_horror/save/
 Job_application_work_horror/imgui_debug_layout.ini
+
+# シェーダーのコンパイル結果（ビルド時と初回起動時に作られる）
+*.cso
+shader-compile-errors.txt

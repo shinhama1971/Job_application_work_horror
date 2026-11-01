@@ -164,8 +164,12 @@ namespace
     constexpr float LowBatteryEndTime = 77.0f;
     // 偽の扉の場面の前に、偽の扉の異変を出している
     constexpr float FalseDoorRequestTime = 77.5f;
+    // 見えない影の場面の前に、見えない影の異変を出している（姿は見えず、照明の下を通ると影だけが落ちる）
+    constexpr float UnseenAnomalyRequestTime = 83.0f;
+    // 水たまりの場面の前に、水たまりの異変を出している（水面にだけ、水たまりの向こうの人影が映る）
+    constexpr float PuddleAnomalyRequestTime = 94.0f;
     // 最後の停電と追跡を始める時刻
-    constexpr float FinalSequenceRequestTime = 83.0f;
+    constexpr float FinalSequenceRequestTime = 100.5f;
     const std::vector<Keyframe> Stage2Tour =
     {
         { 0.0f, Vector3(0.0f, FloorY, -125.0f), 0.0f, 0.0f, nullptr, false },
@@ -213,13 +217,30 @@ namespace
         { 80.0f, Vector3(4.0f, FloorY, 46.0f), YawToward(4.0f, 46.0f, -39.3f, 70.0f), -0.08f, nullptr, false },
         { 81.5f, Vector3(4.0f, FloorY, 46.0f), YawToward(4.0f, 46.0f, -39.3f, 70.0f), -0.08f, L"20_2面_偽の扉", false },
         { 82.5f, Vector3(4.0f, FloorY, 46.0f), YawToward(4.0f, 46.0f, -39.3f, 70.0f), -0.08f, nullptr, false },
+        // 見えない影の異変：廊下の奥から姿の見えない影が歩いてくる。姿は映らないが、吊るした裸電球と天井の照明の下を通ると、
+        // 床と壁に人の形の影だけが落ちる（奥の裸電球の手前に立ち、影が電球の下を通って近づくのを、捕まる前まで見ている）
+        { 83.6f, Vector3(0.0f, FloorY, 32.0f), 0.0f, -0.10f, nullptr, false },
+        { 90.6f, Vector3(0.0f, FloorY, 32.0f), 0.0f, -0.10f, L"20e_2面_見えない影が落とす影", false },
+        { 91.6f, Vector3(0.0f, FloorY, 32.0f), 0.0f, -0.16f, L"20f_2面_近づいてくる影だけの人影", false },
+        { 92.0f, Vector3(0.0f, FloorY, 32.0f), 0.0f, -0.16f, nullptr, false },
+        { 92.6f, Vector3(-30.0f, FloorY, 32.0f), Pi, -0.10f, nullptr, false },
+        // 中央の水たまりの手前で足元をのぞくと、水面にだけ、向こう側に立つ人影が逆さまに映る（のぞき続けると一歩ずつ近づく）。
+        // 顔を上げると、そこには誰もいない
+        // （水たまりを踏んで波を立てないよう、左の壁際を回って手前へ出ている）
+        { 94.3f, Vector3(-30.0f, FloorY, -18.0f), Pi * 0.5f, -0.10f, nullptr, false },
+        { 94.7f, Vector3(9.0f, FloorY, -18.0f), 0.0f, -0.10f, nullptr, false },
+        { 95.3f, Vector3(9.0f, FloorY, -18.0f), 0.0f, -0.95f, nullptr, false },
+        { 96.4f, Vector3(9.0f, FloorY, -18.0f), 0.0f, -0.95f, L"20b_2面_水たまりに映る人影", false },
+        { 98.4f, Vector3(9.0f, FloorY, -18.0f), 0.0f, -0.95f, L"20c_2面_近づいてくる水面の人影", false },
+        { 98.8f, Vector3(9.0f, FloorY, -18.0f), 0.0f, -0.05f, nullptr, false },
+        { 99.6f, Vector3(9.0f, FloorY, -18.0f), 0.0f, -0.05f, L"20d_2面_顔を上げると誰もいない", false },
         // 最後の停電：肖像画が目を見開き、振り返って床を見ると、照明を消しながら濡れた足跡を残して影が迫ってくる
         // （影の胸を視線の中心に入れると崩れて消えるため、影の通り道を視界の端に入れて、斜め後ろの床を見ている）
-        { 83.0f, Vector3(0.0f, FloorY, -8.0f), YawToward(0.0f, -8.0f, 38.9f, -25.0f), -0.06f, nullptr, false },
-        { 84.0f, Vector3(0.0f, FloorY, -8.0f), YawToward(0.0f, -8.0f, 38.9f, -25.0f), -0.06f, L"21_2面_停電で目を開く肖像画", false },
-        { 84.5f, Vector3(25.0f, FloorY, -8.0f), YawToward(25.0f, -8.0f, -30.0f, -40.0f), -0.50f, nullptr, false },
-        { 85.0f, Vector3(25.0f, FloorY, -8.0f), YawToward(25.0f, -8.0f, -30.0f, -40.0f), -0.50f, L"22_2面_最後の追跡", false },
-        { 85.5f, Vector3(25.0f, FloorY, -8.0f), YawToward(25.0f, -8.0f, -30.0f, -40.0f), -0.50f, nullptr, false },
+        { 100.5f, Vector3(0.0f, FloorY, -8.0f), YawToward(0.0f, -8.0f, 38.9f, -25.0f), -0.06f, nullptr, false },
+        { 101.5f, Vector3(0.0f, FloorY, -8.0f), YawToward(0.0f, -8.0f, 38.9f, -25.0f), -0.06f, L"21_2面_停電で目を開く肖像画", false },
+        { 102.0f, Vector3(25.0f, FloorY, -8.0f), YawToward(25.0f, -8.0f, -30.0f, -40.0f), -0.50f, nullptr, false },
+        { 102.5f, Vector3(25.0f, FloorY, -8.0f), YawToward(25.0f, -8.0f, -30.0f, -40.0f), -0.50f, L"22_2面_最後の追跡", false },
+        { 103.0f, Vector3(25.0f, FloorY, -8.0f), YawToward(25.0f, -8.0f, -30.0f, -40.0f), -0.50f, nullptr, false },
     };
 
     // 角度の補間。差を-π〜πに直してから補間し、遠回りの方向へ回らないようにしている
@@ -309,6 +330,8 @@ namespace
     bool g_PortraitAnomalyRequested = false;
     // 2面の道順で、偽の扉の異変を出したか
     bool g_FalseDoorRequested = false;
+    bool g_PuddleAnomalyRequested = false;
+    bool g_UnseenAnomalyRequested = false;
     // 2面の道順で、最後の停電を始めたか
     bool g_FinalSequenceRequested = false;
     bool g_Recording = false;   // 1面・2面を見て回っている間だけ動画に書き出している
@@ -453,6 +476,10 @@ namespace
     std::chrono::steady_clock::time_point g_LastFrameTime;
     bool g_HasLastFrameTime = false;
     double g_LastPresentMs = 0.0;
+    // 計測モードで垂直同期を待つか（--vsync）
+    bool g_BenchmarkVsync = false;
+    // 計測モードで、水たまりの人影と見えない影を、どの地点でもカメラの前に置いて測るか（--figures）
+    bool g_BenchmarkFigures = false;
     std::string g_AdapterName;
 
     // 平均値を求めている
@@ -481,6 +508,22 @@ namespace
         const size_t index = (std::min)(values.size() - 1,
             static_cast<size_t>(ratio * static_cast<double>(values.size() - 1) + 0.5));
         return values[index];
+    }
+
+    // 標準偏差を求めている（フレーム時間のばらつき。大きいほどFPSが上下して見える）
+    double StandardDeviation(const std::vector<double>& values)
+    {
+        if (values.size() < 2)
+        {
+            return 0.0;
+        }
+        const double average = Average(values);
+        double sum = 0.0;
+        for (double value : values)
+        {
+            sum += (value - average) * (value - average);
+        }
+        return std::sqrt(sum / static_cast<double>(values.size() - 1));
     }
 
     // ある描画段階のGPU時間の平均を求めている（一度も取れていなければ0）
@@ -526,7 +569,9 @@ namespace
         text << "処理の重さの計測結果（1・2面・ライトOFFとONの比較）\n";
         text << "画面: " << Application::GetWindowWidth() << "x" << Application::GetWindowHeight()
              << "  描画解像度: " << Application::GetWidth() << "x" << Application::GetHeight()
-             << "  垂直同期: なし  エフェクト設定: " << (game->GetEffectLevel() + 1)
+             << "  垂直同期: " << (g_BenchmarkVsync ? "あり" : "なし")
+             << "  人影: " << (g_BenchmarkFigures ? "あり（水たまりの人影と見えない影をカメラの前に置く）" : "なし")
+             << "  エフェクト設定: " << (game->GetEffectLevel() + 1)
              << "  GPU: " << g_AdapterName << "\n";
         text << "各条件 " << BenchmarkMeasureFrames << " フレームの平均（ms）。"
                 "1%遅は遅い方から1%のフレーム時間で、かくつきの目安です。\n\n";
@@ -561,6 +606,8 @@ namespace
             const double onFrame = Average(result.On.FrameMs);
             row("フレーム", offFrame, onFrame);
             row("1%遅", Percentile(result.Off.FrameMs, 0.99), Percentile(result.On.FrameMs, 0.99));
+            row("最大", Percentile(result.Off.FrameMs, 1.0), Percentile(result.On.FrameMs, 1.0));
+            row("ばらつき", StandardDeviation(result.Off.FrameMs), StandardDeviation(result.On.FrameMs));
             row("CPU", Average(result.Off.CpuMs), Average(result.On.CpuMs));
             for (const auto& [label, pass] : passes)
             {
@@ -652,6 +699,17 @@ namespace
         player->AddBattery(100.0f);    // 電池切れの点滅で結果が揺れないよう、電池を満タンに保っている
         camera->SetCameraDirection(spot.Yaw);
         camera->SetCameraPitch(spot.Pitch);
+        // --figures のときは、水たまりの人影を正面26先に、見えない影を正面34先の少し右に置き、どちらも見え方1で描かせている
+        if (g_BenchmarkFigures)
+        {
+            const Vector3 forward(std::sin(spot.Yaw), 0.0f, std::cos(spot.Yaw));
+            const Vector3 right(forward.z, 0.0f, -forward.x);
+            Vector3 puddleFoot = spot.Position + forward * 26.0f;
+            Vector3 unseenFoot = spot.Position + forward * 34.0f + right * 8.0f;
+            puddleFoot.y = -100.0f;
+            unseenFoot.y = -100.0f;
+            Renderer::SetFigureOverride(true, puddleFoot, unseenFoot);
+        }
 
         // OFFとONの両方を測り終えたら、次の地点へ進んでいる
         if (++g_BenchmarkFrame >= phaseLength * 2)
@@ -668,6 +726,8 @@ namespace Tools::CaptureMode
     int g_EffectOverride = -1;
     int g_ViewOverride = -1;
     int GetEffectLevelOverride() { return g_EffectOverride; }
+    int g_ReflectionOverride = -1;
+    int GetReflectionMethodOverride() { return g_ReflectionOverride; }
 
     void ConfigureFromCommandLine()
     {
@@ -701,6 +761,13 @@ namespace Tools::CaptureMode
                 if (option == L"--effect-level" && value.size() == 1 && value[0] >= L'1' && value[0] <= L'3')
                     g_EffectOverride = static_cast<int>(value[0] - L'1');
                 if (option == L"--debug-view" && value == L"10") g_ViewOverride = 10;
+                if (option == L"--reflection" && value.size() == 1 && value[0] >= L'0' && value[0] <= L'4')
+                    g_ReflectionOverride = static_cast<int>(value[0] - L'0');
+            }
+            for (int i = 1; i < argumentCount; ++i)
+            {
+                if (std::wstring(arguments[i]) == L"--vsync") g_BenchmarkVsync = g_Benchmark;
+                if (std::wstring(arguments[i]) == L"--figures") g_BenchmarkFigures = g_Benchmark;
             }
         }
         LocalFree(arguments);
@@ -716,6 +783,11 @@ namespace Tools::CaptureMode
     bool IsBenchmark()
     {
         return g_Benchmark;
+    }
+
+    bool UsesBenchmarkVsync()
+    {
+        return g_BenchmarkVsync;
     }
 
     // Presentにかかった時間を記録している（CPU時間を求めるのに使っている）
@@ -785,6 +857,8 @@ namespace Tools::CaptureMode
             g_SecondLoopRequested = false;
             g_PortraitAnomalyRequested = false;
             g_FalseDoorRequested = false;
+            g_PuddleAnomalyRequested = false;
+            g_UnseenAnomalyRequested = false;
             g_FinalSequenceRequested = false;
             Log(std::string("start tour: ") + SceneLabel(scene));
         }
@@ -873,6 +947,26 @@ namespace Tools::CaptureMode
             {
                 currentScene->RequestDebugAction(SceneDebugAction::ShowFalseDoorAnomaly);
                 Log("show false door anomaly");
+            }
+        }
+        // 2面: 見えない影の場面の前に、見えない影の異変を出している
+        if (scene == SceneName::Stage2 && !g_UnseenAnomalyRequested && g_TourTime >= UnseenAnomalyRequestTime)
+        {
+            g_UnseenAnomalyRequested = true;
+            if (Scene* currentScene = game->GetScene())
+            {
+                currentScene->RequestDebugAction(SceneDebugAction::ShowUnseenAnomaly);
+                Log("show unseen anomaly");
+            }
+        }
+        // 2面: 水たまりの場面の前に、水たまりの異変を出している
+        if (scene == SceneName::Stage2 && !g_PuddleAnomalyRequested && g_TourTime >= PuddleAnomalyRequestTime)
+        {
+            g_PuddleAnomalyRequested = true;
+            if (Scene* currentScene = game->GetScene())
+            {
+                currentScene->RequestDebugAction(SceneDebugAction::ShowPuddleAnomaly);
+                Log("show puddle anomaly");
             }
         }
         // 2面: 最後の停電と追跡を始めている

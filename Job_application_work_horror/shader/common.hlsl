@@ -53,7 +53,7 @@ struct LIGHT
     float4 SpotParams;
 };
 
-// デバッグ表示の番号、2面の壁の湿り気の強さ、壁の古さ（b7）
+// デバッグ表示の番号、2面の壁の湿り気の強さ、壁の古さ、周回の深さ（b7）
 cbuffer DebugViewBuffer : register(b7)
 {
     int DebugViewMode;
@@ -62,6 +62,9 @@ cbuffer DebugViewBuffer : register(b7)
     // 2面は異変として手形や傷を出すため、決まった跡は描かない（0）。
     float WallWeathering;
     float HorrorMarksStrength;
+    // 2面の周回の深さ（0〜1。Renderer::SetLoopDepth）。周回が進むほど、色調が赤黒く沈み、霧が濃くなる（horrorGrade.hlsli）
+    float LoopDepth;
+    float3 LoopDepthPadding;
 };
 
 // 懐中電灯と環境光の定数バッファ（b3）

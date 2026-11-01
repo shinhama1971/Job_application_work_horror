@@ -38,6 +38,8 @@ enum class SceneDebugAction
     OpenStage1EndDoor,
     // 2面：見えない影の異変の周回にしている（手で試すときに使っている）
     ShowUnseenAnomaly,
+    // 2面：水たまりの異変の周回にしている（手で試すときと、自動撮影で水面に映る人影を写すときに使っている）
+    ShowPuddleAnomaly,
     // 撮影用：通常プレイでは呼ばず、4周目の開始部屋を再現する。
     ShowHauntedStartDoor
 };

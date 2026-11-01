@@ -143,8 +143,9 @@
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
     <PostBuildEvent>
-      <Command>xcopy /Y /Q "$(ProjectDir)external\assimp\lib\assimp-vc143-mtd.dll" "$(OutDir)"</Command>
-      <Message>Assimp DLLを実行ファイルの出力先へコピー</Message>
+      <Command>xcopy /Y /Q "$(ProjectDir)external\assimp\lib\assimp-vc143-mtd.dll" "$(OutDir)"
+"$(TargetPath)" --compile-shaders "$(ProjectDir)shader"</Command>
+      <Message>Assimp DLLを実行ファイルの出力先へコピーし、シェーダーを.csoへ事前コンパイル</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -173,8 +174,9 @@
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
     <PostBuildEvent>
-      <Command>xcopy /Y /Q "$(ProjectDir)external\assimp\lib\assimp-vc143-mt.dll" "$(OutDir)"</Command>
-      <Message>Assimp DLLを実行ファイルの出力先へコピー</Message>
+      <Command>xcopy /Y /Q "$(ProjectDir)external\assimp\lib\assimp-vc143-mt.dll" "$(OutDir)"
+"$(TargetPath)" --compile-shaders "$(ProjectDir)shader"</Command>
+      <Message>Assimp DLLを実行ファイルの出力先へコピーし、シェーダーを.csoへ事前コンパイル</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -360,6 +362,7 @@
     <ClInclude Include="PortraitAnomaly.h" />
     <ClInclude Include="HandprintAnomaly.h" />
     <ClInclude Include="MirrorAnomaly.h" />
+    <ClInclude Include="PuddleReflectionAnomaly.h" />
     <ClInclude Include="FootprintFollower.h" />
     <ClInclude Include="BreathHold.h" />
     <ClInclude Include="RadioStatic.h" />
@@ -427,6 +430,7 @@
     <ClInclude Include="shader\flashlightLighting.hlsli" />
     <ClInclude Include="shader\pbrLighting.hlsli" />
     <ClInclude Include="shader\pointShadow.hlsli" />
+    <ClInclude Include="shader\figureShadow.hlsli" />
     <ClInclude Include="shader\screenAmbientOcclusion.hlsli" />
     <ClInclude Include="shader\roomOcclusion.hlsli" />
     <ClInclude Include="shader\waterCaustics.hlsli" />

@@ -84,7 +84,7 @@ float ValueNoise(float2 value)
 #include "wetFootprints.hlsli"
 
 // ----------------------------------------------------------------------------
-// 水面の反射の方式の比較（ReflectionParams.x：0 平面反射、1 キューブマップ、2 SSR）。ゲームの普段の方式は平面反射。
+// 水面の反射の方式（ReflectionParams.x：0 平面反射、1 キューブマップ、2 SSR、3 レイ反射）。ゲームの普段の方式はレイ反射。
 // ----------------------------------------------------------------------------
 // キューブマップ：反射の向きで、カメラの位置から撮った6方向の画像を読む。
 // 撮った位置からの景色なので軽いが、撮った位置から離れた所や近くの物では、映る位置がずれる。
@@ -99,7 +99,8 @@ float3 SampleProbeReflection(float3 worldPosition, float3 worldNormal)
 // SSR：反射の光線をビュー空間で少しずつ（だんだん大きな歩幅で）進め、画面の深度より奥へ入った所を「ぶつかった」とし、
 // その画素の色を前のフレームの画面から読む。画面に映っていない物は映らない。
 // 返り値の xyz は色、w はぶつかった度合い（画面の端と、遠くまで進んだ所では0へ近づけている）。
-float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal)
+// stepCount は進める回数、stepGrowth は1回ごとに歩幅を広げる割合（レイ反射では、遠くは部屋の形で補うので少なくしている）。
+float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int stepCount = 40, float stepGrowth = 1.12f)
 {
     uint width = 0;
     uint height = 0;
@@ -110,10 +111,9 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal)
     // 深度バッファの値からビュー空間の z を戻すための、射影行列の値（右手系：z = -[3][2] / (深度 + [2][2])）
     const float depthScale = CausticProjection[2][2];
     const float depthOffset = CausticProjection[3][2];
-    const int StepCount = 40;
     float distance = 1.5f;
     [loop]
-    for (int step = 0; step < StepCount; ++step)
+    for (int step = 0; step < stepCount; ++step)
     {
         const float3 rayPosition = viewPosition + rayDirection * distance;
         const float4 clip = mul(float4(rayPosition, 1.0f), CausticProjection);
@@ -134,10 +134,10 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal)
         if (behind > 0.0f && behind < 3.0f + distance * 0.06f)
         {
             const float2 edge = min(uv, 1.0f - uv);
-            const float fade = saturate(min(edge.x, edge.y) * 12.0f) * (1.0f - float(step) / float(StepCount));
+            const float fade = saturate(min(edge.x, edge.y) * 12.0f) * (1.0f - float(step) / float(stepCount));
             return float4(g_SsrScene.SampleLevel(g_SamplerState, uv, 0.0f).rgb, fade);
         }
-        distance *= 1.12f;
+        distance *= stepGrowth;
     }
     return 0.0f;
 }
@@ -223,6 +223,242 @@ FloorAgeing GetFloorAgeing(float3 worldPosition, float amount)
 // ホラー向けの色調と、遠くの闇の色（litTexturePSと共通。horrorGrade.hlsli）
 #include "horrorGrade.hlsli"
 #include "horrorMist.hlsli"
+#include "figureShadow.hlsli"
+
+// ----------------------------------------------------------------------------
+// レイ反射（ReflectionParams.x = 3。ゲームの普段の方式）。景色をもう一度描かずに、反射の光線を床のシェーダーの中で飛ばしている。
+// ・画面に映っている物（扉・ロッカー・小物・懐中電灯で照らした壁）は SSR（TraceScreenSpaceReflection）で拾っている。
+// ・画面の外の物は、部屋の形（roomOcclusion.hlsli の b11 にある、壁を上から見た長方形と天井の高さ）との交差で求めている。
+//   真上の天井の照明のように、床を見ているときに画面の外にある物も、正しい位置に映る（SSRだけでは映らなかった）。
+// ・当たった天井と壁は、点光源と懐中電灯で簡単に照らし、照明の器具そのものは、光線が光源のそばを通った分だけ光らせている。
+// ----------------------------------------------------------------------------
+// 部屋の形の、壁と天井の色（照らす前の色）と、光線を追う一番遠い距離
+static const float3 RoomReflectionWallAlbedo = float3(0.20f, 0.20f, 0.18f);
+static const float3 RoomReflectionCeilingAlbedo = float3(0.13f, 0.13f, 0.12f);
+static const float RoomReflectionMaxDistance = 600.0f;
+
+// 光線が当たる一番近い天井・壁・小物までの距離と、当たった面の法線と色（照らす前の色）を求めている
+// （どこにも当たらなければ RoomReflectionMaxDistance）
+float IntersectRoom(float3 origin, float3 direction, out float3 hitNormal, out float3 hitAlbedo)
+{
+    float nearest = RoomReflectionMaxDistance;
+    hitNormal = float3(0.0f, -1.0f, 0.0f);
+    hitAlbedo = RoomReflectionCeilingAlbedo;
+    if (direction.y > 0.0001f)
+    {
+        nearest = min(nearest, (OcclusionCeilingY - origin.y) / direction.y);
+    }
+    // 壁は床から天井までの箱として、上から見た長方形と光線を交差させている（スラブ法）。0で割らないよう向きを丸めている
+    const float2 safeDirection = float2(
+        abs(direction.x) > 1e-5f ? direction.x : 1e-5f,
+        abs(direction.z) > 1e-5f ? direction.z : 1e-5f);
+    const float2 inverseDirection = 1.0f / safeDirection;
+    const uint boxCount = min(OcclusionBoxCount, MaxOcclusionBoxes);
+    [loop]
+    for (uint i = 0; i < boxCount; ++i)
+    {
+        const float4 box = OcclusionBoxes[i];
+        const float2 slabNear = (box.xy - box.zw - origin.xz) * inverseDirection;
+        const float2 slabFar = (box.xy + box.zw - origin.xz) * inverseDirection;
+        const float2 entry = min(slabNear, slabFar);
+        const float2 leave = max(slabNear, slabFar);
+        const float enter = max(entry.x, entry.y);
+        const float exit = min(leave.x, leave.y);
+        if (enter > 0.05f && enter <= exit && enter < nearest)
+        {
+            nearest = enter;
+            hitNormal = entry.x > entry.y
+                ? float3(-sign(safeDirection.x), 0.0f, 0.0f)
+                : float3(0.0f, 0.0f, -sign(safeDirection.y));
+            hitAlbedo = RoomReflectionWallAlbedo;
+        }
+    }
+    // 小物（棚・ロッカー・柱など）は、カメラの近くから選んだ箱（ReflectionProps）と、3方向のスラブ法で交差させている。
+    // 色は小物の色を少し暗くして使い、画面の外にある小物も、水面の正しい位置に正しい色で映るようにしている
+    const float3 safeDirection3 = float3(safeDirection.x, max(direction.y, 1e-5f), safeDirection.y);
+    const float3 inverseDirection3 = 1.0f / safeDirection3;
+    const uint propCount = min(uint(ReflectionParams.z + 0.5f), (uint)MAX_REFLECTION_PROPS);
+    [loop]
+    for (uint prop = 0; prop < propCount; ++prop)
+    {
+        const float3 slabNear = (ReflectionProps[prop * 3].xyz - origin) * inverseDirection3;
+        const float3 slabFar = (ReflectionProps[prop * 3 + 1].xyz - origin) * inverseDirection3;
+        const float3 entry = min(slabNear, slabFar);
+        const float3 leave = max(slabNear, slabFar);
+        const float enter = max(max(entry.x, entry.y), entry.z);
+        const float exit = min(min(leave.x, leave.y), leave.z);
+        if (enter > 0.05f && enter <= exit && enter < nearest)
+        {
+            nearest = enter;
+            hitNormal = entry.x >= entry.y && entry.x >= entry.z ? float3(-sign(safeDirection3.x), 0.0f, 0.0f)
+                : (entry.y >= entry.z ? float3(0.0f, -1.0f, 0.0f) : float3(0.0f, 0.0f, -sign(safeDirection3.z)));
+            hitAlbedo = ReflectionProps[prop * 3 + 2].rgb * 0.55f;
+        }
+    }
+    return nearest;
+}
+
+// 部屋の形に光線を飛ばし、当たった天井・壁の色と、途中で光線がそばを通った照明の光を返している。
+// roughness は水面の荒さ（0〜1）で、荒いほど照明の映り込みをにじませている
+float3 TraceRoomReflection(float3 origin, float3 direction, float roughness)
+{
+    float3 hitNormal = float3(0.0f, -1.0f, 0.0f);
+    float3 albedo = RoomReflectionCeilingAlbedo;
+    const float hitDistance = OcclusionBoxCount > 0 || ReflectionParams.z > 0.5f
+        ? IntersectRoom(origin, direction, hitNormal, albedo)
+        : RoomReflectionMaxDistance;
+    const bool hit = hitDistance < RoomReflectionMaxDistance;
+    const float3 hitPosition = origin + direction * hitDistance;
+
+    float3 lighting = GetHemisphereAmbient(hitNormal);
+    float3 glow = 0.0f;
+    const float glowRadius = 6.0f * (1.0f + roughness * 1.5f);
+    // 器具の光を調べる、光線からの距離の上限（にじみの裾がほぼ0になる所）の二乗
+    const float glowReach2 = (glowRadius * 12.0f) * (glowRadius * 12.0f);
+    [loop]
+    for (uint i = 0; i < PointLightCount; ++i)
+    {
+        const ENVIRONMENT_POINT_LIGHT pointLight = g_PointLights[i];
+        // 光線からも当たった面からも遠い光源は、二乗の距離だけで先に飛ばしている（照明の多い1面で、重い計算を減らすため）
+        const float3 toLight = pointLight.PositionRange.xyz - origin;
+        const float along = dot(toLight, direction);
+        const float miss2 = dot(toLight, toLight) - along * along;
+        const bool nearRay = along > 0.0f && along < hitDistance + 4.0f && miss2 < glowReach2;
+        const float3 offset = pointLight.PositionRange.xyz - hitPosition;
+        const float lightDistance2 = dot(offset, offset);
+        const float range = max(pointLight.PositionRange.w, 0.001f);
+        const bool lightsHit = hit && lightDistance2 < range * range;
+        [branch]
+        if (nearRay || lightsHit)
+        {
+            const float3 lightColor = pointLight.ColorIntensity.rgb * pointLight.ColorIntensity.a;
+            // 照明の器具：光線が光源に一番近づく所の離れ具合で光らせている（当たった面より奥の光源は隠れている）
+            if (nearRay)
+            {
+                const float miss = sqrt(max(miss2, 0.0f));
+                glow += lightColor * (exp(-miss2 / (glowRadius * glowRadius)) * 0.85f +
+                    exp(-miss / (glowRadius * 3.0f)) * 0.03f);
+            }
+            // 当たった面を、この光源で照らしている（床の点光源と同じ減衰）
+            if (lightsHit)
+            {
+                const float lightDistance = sqrt(lightDistance2);
+                float attenuation = saturate(1.0f - lightDistance / range);
+                attenuation *= attenuation;
+                const float lambert = saturate(dot(hitNormal, offset / max(lightDistance, 0.001f)));
+                lighting += lightColor * attenuation * (0.20f + lambert * 0.80f);
+            }
+        }
+    }
+
+    float3 color = 0.0f;
+    if (hit)
+    {
+        // 懐中電灯で照らされた壁や天井も映している（懐中電灯は目の位置にあるので、目から当たった点への向きで円錐を調べている）
+        if (Light.Enable && Light.FlashlightEnabled)
+        {
+            const float3 viewPosition = mul(float4(hitPosition, 1.0f), CausticView).xyz;
+            const float viewDistance = length(viewPosition);
+            const float3 pixelDirection = viewPosition / max(viewDistance, 0.001f);
+            const float normalizedDistance = saturate(viewDistance / max(Light.Range, 0.001f));
+            const float rangeFade = saturate(1.0f - normalizedDistance * normalizedDistance);
+            const float3 toEye = normalize(GetMistEyePosition() - hitPosition);
+            lighting += Light.Diffuse.rgb * GetFlashlightTint(pixelDirection) * Light.Intensity *
+                GetFlashlightBeamProfile(pixelDirection) * rangeFade * rangeFade *
+                (0.25f + saturate(dot(hitNormal, toEye)) * 0.75f);
+        }
+        color = albedo * lighting;
+    }
+    // 光線が進んだ距離の分だけ、霧の闇に沈めている（どこにも当たらなければ闇の色）
+    const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb, LoopDepth);
+    const float fog = hit ? GetHorrorDistanceFog(hitDistance, LoopDepth) : 1.0f;
+    color = lerp(color, fogColor, fog) + glow * (1.0f - fog * 0.6f);
+    return ApplyFilmicHorrorGrade(color, LoopDepth);
+}
+
+// 光線（originから単位ベクトルdirectionの向き）と線分a-bが一番近づくときの離れ具合を返している。rayDistanceはそのときの光線上の距離
+float RaySegmentDistance(float3 origin, float3 direction, float3 a, float3 b, out float rayDistance)
+{
+    const float3 segment = b - a;
+    const float3 offset = origin - a;
+    const float segmentLength2 = dot(segment, segment);
+    const float along = dot(direction, segment);
+    const float rayOffset = dot(direction, offset);
+    const float segmentOffset = dot(segment, offset);
+    // 線分の上の一番近い点（0〜1）を求め、そこから光線の上の一番近い点を求め直している（光線と線分が平行なときは端を使う）
+    const float segmentT = segmentLength2 > 1e-4f
+        ? saturate((segmentOffset - along * rayOffset) / max(segmentLength2 - along * along, 1e-4f))
+        : 0.0f;
+    rayDistance = max(along * segmentT - rayOffset, 0.0f);
+    return length(origin + direction * rayDistance - (a + segment * segmentT));
+}
+
+// 2面の「水たまり」の異変の人影（PuddleFigure。xyz = 足もと、w = 見え方）が、反射の光線をどれだけ遮るか（0〜1）を返している。
+// 人影は脚・胴・頭・両腕のカプセルで表し、光線がカプセルの芯に一番近づく距離から、輪郭のぼけた影の濃さを求めている。
+// 両腕は、目から見た左右（目へ向く向きと直角な水平の向き）に垂らしている。
+// 物として置いていないので、画面にも鏡にも映らず、レイ反射の水面にだけ映る（PuddleReflectionAnomaly.h）
+float TracePuddleFigure(float3 origin, float3 direction)
+{
+    [branch]
+    if (PuddleFigure.w <= 0.001f)
+    {
+        return 0.0f;
+    }
+    const float3 foot = PuddleFigure.xyz;
+    // 人影を囲む球（中心は胸の高さ、半径28）のそばを通らない光線は、点と光線の距離だけで先に飛ばしている
+    const float3 toCenter = foot + float3(0.0f, 19.0f, 0.0f) - origin;
+    const float alongCenter = max(dot(toCenter, direction), 0.0f);
+    const float3 missCenter = toCenter - direction * alongCenter;
+    [branch]
+    if (dot(missCenter, missCenter) > 28.0f * 28.0f)
+    {
+        return 0.0f;
+    }
+    float rayDistance;
+    // 脚（細め）・胴（肩幅）・頭（足もとから36の高さ。PuddleReflectionAnomaly::FigureHeadHeight と合わせている）
+    const float legs = RaySegmentDistance(origin, direction, foot + float3(0.0f, 1.0f, 0.0f), foot + float3(0.0f, 17.0f, 0.0f), rayDistance);
+    float coverage = rayDistance > 0.5f ? smoothstep(4.4f, 2.6f, legs) : 0.0f;
+    const float torso = RaySegmentDistance(origin, direction, foot + float3(0.0f, 19.0f, 0.0f), foot + float3(0.0f, 28.0f, 0.0f), rayDistance);
+    coverage = max(coverage, rayDistance > 0.5f ? smoothstep(6.2f, 4.4f, torso) : 0.0f);
+    const float head = RaySegmentDistance(origin, direction, foot + float3(0.0f, 35.5f, 0.0f), foot + float3(0.0f, 36.5f, 0.0f), rayDistance);
+    coverage = max(coverage, rayDistance > 0.5f ? smoothstep(4.6f, 3.2f, head) : 0.0f);
+    const float2 toEye = GetMistEyePosition().xz - foot.xz;
+    const float2 side = float2(-toEye.y, toEye.x) / max(length(toEye), 0.001f);
+    [unroll]
+    for (int arm = 0; arm < 2; ++arm)
+    {
+        const float3 offset = float3(side.x, 0.0f, side.y) * (arm == 0 ? 6.6f : -6.6f);
+        const float reach = RaySegmentDistance(origin, direction,
+            foot + offset * 1.08f + float3(0.0f, 12.0f, 0.0f), foot + offset + float3(0.0f, 28.0f, 0.0f), rayDistance);
+        coverage = max(coverage, rayDistance > 0.5f ? smoothstep(2.9f, 1.6f, reach) : 0.0f);
+    }
+    return coverage * saturate(PuddleFigure.w);
+}
+
+// レイ反射の本体：水面で反射した光線を、まず画面の中（SSR）でたどり、外れた所を部屋の形との交差で埋めている。
+// SSRは深度プリパスの深度と前のフレームの画面を使うため、それが用意されているとき（ReflectionParams.y）だけ使っている。
+// figure は「水たまり」の異変の人影が光線を遮った度合い（0〜1）で、床の色そのものも沈めるのに使っている
+float3 TraceRayReflection(float3 worldPosition, float3 worldNormal, float roughness, out float figure)
+{
+    float3 direction = reflect(normalize(worldPosition - GetMistEyePosition()), normalize(worldNormal));
+    // 波の法線で光線が床へ潜らないよう、少しだけ上へ向けている
+    direction = normalize(float3(direction.x, max(direction.y, 0.02f), direction.z));
+    float3 color = TraceRoomReflection(worldPosition + float3(0.0f, 0.05f, 0.0f), direction, roughness);
+    [branch]
+    if (ReflectionParams.y > 0.5f)
+    {
+        const float4 screen = TraceScreenSpaceReflection(worldPosition, worldNormal, 20, 1.22f);
+        color = lerp(color, screen.rgb, screen.w);
+    }
+    // 人影は画面に描いていないため、SSRで拾った物より手前に立っているものとして、最後に重ねている（ほぼ黒い影）。
+    // 波の傾きをそのまま使うと人の形が崩れて読めないため、人影に当てる光線だけ、水面の揺れを3割に抑えている
+    const float3 calmNormal = normalize(lerp(float3(0.0f, 1.0f, 0.0f), normalize(worldNormal), 0.3f));
+    float3 figureDirection = reflect(normalize(worldPosition - GetMistEyePosition()), calmNormal);
+    figureDirection = normalize(float3(figureDirection.x, max(figureDirection.y, 0.02f), figureDirection.z));
+    figure = TracePuddleFigure(worldPosition + float3(0.0f, 0.05f, 0.0f), figureDirection);
+    color = lerp(color, GetHorrorFogColor(Light.Ambient.rgb, LoopDepth) * 0.12f, figure);
+    return color;
+}
 
 // 2次元の値から、0〜1の乱数を2つ作っている
 float2 Hash22(float2 value)
@@ -442,6 +678,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
         pointAttenuation *= pointAttenuation;
         // 揺れる裸電球の光は、電球との間に物があれば届かない（床に落ちる、揺れる影。pointShadow.hlsli）
         pointAttenuation *= GetPointLightShadow(input.worldPos, input.worldNormal, pointLight.PositionRange.xyz);
+        // 見えない影の異変では、姿の見えない人影が、この光源の光を遮って床に影だけを落とす（figureShadow.hlsli）
+        pointAttenuation *= GetUnseenFigureShadow(input.worldPos, pointLight.PositionRange.xyz);
 
         const float pointLambert = saturate(dot(
             detailWorldNormal, directionToPointLight));
@@ -512,7 +750,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
             const float lambert = saturate(dot(normal, directionToLight));
             const float softenedLambert = 0.25f + lambert * 0.75f;
 
-            const float shadow = GetFlashlightShadow(input.shadowPos);
+            const float shadow = GetFlashlightShadow(input.shadowPos) * GetUnseenFigureFlashlightShadow(input.worldPos);
             const float flashlightAmount = Light.Intensity
                 * beamProfile * naturalAttenuation * lensPattern * shadow * flashlightOcclusion;
 
@@ -616,12 +854,24 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 反射の方式の比較：キューブマップとSSRは、ここで色と映る度合いを求めている（平面反射は下で反射の画像を読む）
     const int reflectionMode = int(ReflectionParams.x + 0.5f);
     float4 alternateReflection = 0.0f;
+    // 「水たまり」の異変の人影が、反射の光線を遮った度合い（レイ反射のときだけ求めている）
+    float puddleFigure = 0.0f;
     [branch]
     if (reflectionMode != 0 && puddle > 0.001f)
     {
-        alternateReflection = reflectionMode == 1
-            ? float4(SampleProbeReflection(input.worldPos, detailWorldNormal), 1.0f)
-            : TraceScreenSpaceReflection(input.worldPos, detailWorldNormal);
+        if (reflectionMode == 1)
+        {
+            alternateReflection = float4(SampleProbeReflection(input.worldPos, detailWorldNormal), 1.0f);
+        }
+        else if (reflectionMode == 2)
+        {
+            alternateReflection = TraceScreenSpaceReflection(input.worldPos, detailWorldNormal);
+        }
+        else
+        {
+            alternateReflection = float4(
+                TraceRayReflection(input.worldPos, detailWorldNormal, waterRoughness, puddleFigure), 1.0f);
+        }
     }
     const float methodInside = reflectionMode == 0 ? reflectionInside : alternateReflection.w;
     const float reflectionStrength = saturate(
@@ -650,11 +900,13 @@ float4 main(in LIT_PS_IN input) : SV_Target
         color.rgb,
         reflectedScene * reflectionGain + float3(0.023f, 0.032f, 0.037f),
         reflectionStrength);
+    // 真上から見ると反射は弱い（フレネル）ため、人影が映る所は床の色ごと沈め、水面の黒い人の形として見えるようにしている
+    color.rgb *= 1.0f - puddleFigure * saturate(puddle * 1.4f) * 0.82f;
 
     // 高さの違う霧を重ね、近くの見やすさを保ちながら、遠くの輪郭を分けている。
     // 部屋全体を一様に白くせず、床の近くに霧を集めている。
-    const float distanceFog =
-        smoothstep(110.0f, 390.0f, distanceFromCamera) * 0.72f;
+    // 2面の周回が進むほど、霧が近くから濃くなる（LoopDepth。horrorGrade.hlsli）
+    const float distanceFog = GetHorrorDistanceFog(distanceFromCamera, LoopDepth);
     const float heightFromFloor = max(input.worldPos.y + 100.0f, 0.0f);
     const float heightDensity = exp(-heightFromFloor * 0.055f);
     const float nearSuppression =
@@ -662,16 +914,16 @@ float4 main(in LIT_PS_IN input) : SV_Target
     const float fogVariation = 0.78f +
         saturate(FastValueNoise(input.worldPos.xz * 0.018f + 21.0f)) * 0.22f;
     const float heightFog =
-        heightDensity * nearSuppression * fogVariation * 0.22f;
+        heightDensity * nearSuppression * fogVariation * 0.22f * GetHorrorHeightFogScale(LoopDepth);
     const float fogFactor = saturate(distanceFog + heightFog);
     // 遠くは灰色のもやではなく、闇に溶けていく
-    const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb);
+    const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb, LoopDepth);
     color.rgb = lerp(color.rgb, fogColor, fogFactor);
     // 床の近くに溜まって流れる霧（懐中電灯の円錐の中だけ白く浮かぶ。horrorMist.hlsli）
     color.rgb = ApplyHorrorMist(color.rgb, input.worldPos, input.viewPos, lighting);
     // 天井の照明や非常灯から下へ落ちる光の筋（霧に散った光。horrorMist.hlsli）
     color.rgb += GetLightShafts(input.worldPos, pointLightListOffset, pointLightCount, input.pos.xy);
-    color.rgb = ApplyFilmicHorrorGrade(color.rgb);
+    color.rgb = ApplyFilmicHorrorGrade(color.rgb, LoopDepth);
 
     // デバッグ表示：1=法線、2=懐中電灯の影、3=照明だけ、4=水たまりの濃さ、5=反射の画像、7=タイルごとの光源の数（6は壁用なので黒）
     if (DebugViewMode == 1)

@@ -11,6 +11,9 @@
 #ifndef WATER_CAUSTICS_INCLUDED
 #define WATER_CAUSTICS_INCLUDED
 
+// レイ反射で水面に映す小物の箱の最大数（Renderer.h の WATER_CAUSTICS_BUFFER::MaxReflectionProps と同じ）
+#define MAX_REFLECTION_PROPS 16
+
 // Renderer.hのWATER_CAUSTICS_BUFFERと同じ並び（b12）。Groundが毎フレーム設定している
 cbuffer WaterCausticsBuffer : register(b12)
 {
@@ -27,10 +30,17 @@ cbuffer WaterCausticsBuffer : register(b12)
     float4 CausticRipple;
     // 水面の反射の比較（SSR）で使う、プレイヤーの視点の射影行列
     matrix CausticProjection;
-    // 水面の反射の方式（x = 0 平面反射（普段）、1 キューブマップ、2 SSR）。「反射なし」は床の反射の強さを0にして表している
+    // 水面の反射の方式（x = 0 平面反射、1 キューブマップ、2 SSR、3 レイ反射（普段））。「反射なし」は床の反射の強さを0にして表している。
+    // y = SSRの深度と前のフレームの画面が用意されているか（1なら、レイ反射でもSSRを使う）、z = レイ反射で映す小物の箱の数
     float4 ReflectionParams;
     // 2面の「血の手形」の異変で壁に浮かべる手形（x = 壁の表面のx、y = 高さ、z = 奥行き、w = 見え方0〜1。0なら描かない）
     float4 WallHandprints[4];
+    // 2面の「水たまり」の異変で水面にだけ映す人影（xyz = 足もとの位置、w = 見え方0〜1。0なら描かない）
+    float4 PuddleFigure;
+    // 2面の「見えない影」の異変で、影だけを落とす人影（xyz = 足もとの位置、w = 見え方0〜1。0なら影を付けない。figureShadow.hlsli）
+    float4 UnseenFigure;
+    // レイ反射で水面に映す小物の箱（[i*3] = 最小の角、[i*3+1] = 最大の角、[i*3+2] = 色）。数は ReflectionParams.z
+    float4 ReflectionProps[MAX_REFLECTION_PROPS * 3];
 }
 
 // 水たまりの波のシミュレーションの高さ（t9。WaterRippleSimulationが毎フレーム計算している）。x = 今の高さ、y = 1つ前の高さ

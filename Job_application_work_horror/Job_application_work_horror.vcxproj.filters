@@ -350,6 +350,9 @@
     <ClInclude Include="shader\pointShadow.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="shader\figureShadow.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="shader\screenAmbientOcclusion.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -444,6 +447,9 @@
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
     <ClInclude Include="MirrorAnomaly.h">
+      <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="PuddleReflectionAnomaly.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
     <ClInclude Include="FootprintFollower.h">

@@ -28,8 +28,12 @@ namespace Tools::CaptureMode
     bool IsActive();
     // --benchmark で起動したとき true になる（IsActive も true になる）。
     bool IsBenchmark();
+    // --benchmark に --vsync を付けたとき true（垂直同期を待って、実際に遊ぶときのフレーム時間のばらつきを測る）
+    bool UsesBenchmarkVsync();
     // 撮影・計測時だけ設定を上書きする（保存しない）。未指定は-1。
     int GetEffectLevelOverride();
+    // --reflection <0〜4> で水面の反射の方式を上書きする（方式どうしを計測で比べるため）。未指定は-1。
+    int GetReflectionMethodOverride();
     // --capture-features は固定条件で4周目のドアと見えない影を撮る。通常プレイには影響しない。
 
     // 撮影中のウィンドウと動画の大きさ（720p）。

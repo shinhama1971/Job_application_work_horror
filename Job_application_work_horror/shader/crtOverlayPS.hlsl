@@ -28,7 +28,9 @@ cbuffer TimeBuffer : register(b0)
     float filmGradeStrength;
     float lensDirtStrength;
     float signalInterference;
-    float2 postProcessPadding;
+    // コマ落ち（1なら、写し取りを止めた前のフレームの画面を全面に出す）と、そのときの縦のずれ
+    float frameHold;
+    float frameHoldOffset;
 };
 
 // 描いた画面（t0）とサンプラー（s0）
@@ -97,6 +99,18 @@ float2 GetLensDropRefraction(
 // 重ねる層の色と透明度を返している（アルファブレンドで画面に重なる）
 float4 main(PS_IN input) : SV_TARGET
 {
+    // コマ落ち：影が近くラジオの雑音が強いとき、一瞬だけ映像が止まる。止まった画面は縦に少しずれ、
+    // ずれの継ぎ目に黒い帯が走り、色が少し抜ける（古いビデオの同期が外れたように見せている）
+    [branch]
+    if (frameHold > 0.5f)
+    {
+        const float heldY = frac(input.uv.y + frameHoldOffset);
+        float3 held = SceneTexture.SampleLevel(LinearSampler, float2(input.uv.x, heldY), 0.0f).rgb;
+        const float seam = smoothstep(0.0f, 0.018f, min(heldY, 1.0f - heldY));
+        const float scanline = 0.86f + 0.14f * step(0.5f, frac(input.uv.y * 240.0f));
+        held = lerp(dot(held, float3(0.2126f, 0.7152f, 0.0722f)).xxx, held, 0.65f);
+        return float4(held * scanline * lerp(0.08f, 1.0f, seam), 1.0f);
+    }
     const float2 center = float2(0.5f, 0.5f);
     float2 centered = input.uv - center;
     // ノイズと周辺減光の強さ：驚かせる演出・緊張・信号の乱れで強めている

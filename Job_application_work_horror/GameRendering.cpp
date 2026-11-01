@@ -14,7 +14,9 @@
 #include "HangingBulb.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <vector>
 
 namespace
 {
@@ -125,14 +127,70 @@ namespace Core
 
         // 水面の光の揺らぎ（壁のピクセルシェーダー）で使う、プレイヤーの視点のビュー行列を渡している。
         // 懐中電灯はこの視点から照らしているため、反射を描くときも同じ行列を使う。
-        // 技術デモ（F2）の水面の反射の方式（0=なし、1=平面反射（普段）、2=キューブマップ、3=SSR）も、ここで床のシェーダーへ渡している。
+        // 水面の反射の方式（0=なし、1=平面反射、2=キューブマップ、3=SSR、4=レイ反射（普段）。技術デモ F2 で切り替える）も、ここで床のシェーダーへ渡している。
+        // SSRとレイ反射は、深度プリパスの深度と前のフレームの画面を使う（レイ反射は、使えないときは部屋の形との交差だけで映す）
         const int reflectionMethod = Tools::TechDemo::GetReflectionMethod();
+        const bool usesScreenSpaceRays =
+            (reflectionMethod == 3 || reflectionMethod == 4) && Tools::TechDemo::UsesDepthPrepass();
         {
             DirectX::SimpleMath::Matrix mainView;
             DirectX::SimpleMath::Matrix mainProjection;
             m_Instance->m_Camera.GetMainMatrices(mainView, mainProjection);
             Renderer::SetWaterCausticsView(mainView);
-            Renderer::SetReflectionMode(reflectionMethod >= 2 ? reflectionMethod - 1 : 0, mainProjection);
+            Renderer::SetReflectionMode(
+                reflectionMethod >= 2 ? reflectionMethod - 1 : 0, mainProjection, usesScreenSpaceRays);
+        }
+        // レイ反射のときは、画面の外の小物（棚・ロッカー・柱）も水面に映すため、カメラに近い小物の箱を選んで床のシェーダーへ渡している
+        {
+            struct ReflectionPropCandidate
+            {
+                float DistanceSquared;
+                DirectX::SimpleMath::Vector4 Box[3];
+            };
+            std::vector<ReflectionPropCandidate> candidates;
+            if (reflectionMethod == 4)
+            {
+                const DirectX::SimpleMath::Vector3 eye = m_Instance->m_Camera.GetPosition();
+                for (const auto& object : m_Instance->m_ObjectManager.GetAllObjects())
+                {
+                    DirectX::SimpleMath::Vector3 minimum;
+                    DirectX::SimpleMath::Vector3 maximum;
+                    DirectX::SimpleMath::Color color;
+                    if (object->IsDestroy() || !object->GetReflectionProxy(minimum, maximum, color))
+                    {
+                        continue;
+                    }
+                    // 箱までの水平の距離で比べている（120より遠い物は、水面ではほとんど霧に沈むので映さない）
+                    const float dx = (std::max)({ minimum.x - eye.x, 0.0f, eye.x - maximum.x });
+                    const float dz = (std::max)({ minimum.z - eye.z, 0.0f, eye.z - maximum.z });
+                    const float distanceSquared = dx * dx + dz * dz;
+                    if (distanceSquared > 120.0f * 120.0f)
+                    {
+                        continue;
+                    }
+                    candidates.push_back({ distanceSquared, {
+                        DirectX::SimpleMath::Vector4(minimum.x, minimum.y, minimum.z, 0.0f),
+                        DirectX::SimpleMath::Vector4(maximum.x, maximum.y, maximum.z, 0.0f),
+                        DirectX::SimpleMath::Vector4(color.x, color.y, color.z, 1.0f) } });
+                }
+                const std::size_t keep = (std::min)(candidates.size(),
+                    static_cast<std::size_t>(WATER_CAUSTICS_BUFFER::MaxReflectionProps));
+                std::partial_sort(candidates.begin(), candidates.begin() + keep, candidates.end(),
+                    [](const ReflectionPropCandidate& left, const ReflectionPropCandidate& right)
+                    {
+                        return left.DistanceSquared < right.DistanceSquared;
+                    });
+                candidates.resize(keep);
+            }
+            std::array<DirectX::SimpleMath::Vector4, WATER_CAUSTICS_BUFFER::MaxReflectionProps * 3> props{};
+            for (std::size_t index = 0; index < candidates.size(); ++index)
+            {
+                for (int corner = 0; corner < 3; ++corner)
+                {
+                    props[index * 3 + corner] = candidates[index].Box[corner];
+                }
+            }
+            Renderer::SetReflectionProps(props.data(), static_cast<int>(candidates.size()));
         }
 
         // 描画の前にGPUで計算する物（水たまりの波のCompute Shader）を実行している。
@@ -573,10 +631,9 @@ namespace Core
         {
             m_Instance->m_TiledLighting.BindAllLights();
         }
-        // 技術デモでSSRを選んでいるときは、深度プリパスの深度を写し取り、前のフレームの画面と一緒に床のシェーダーへ渡している。
+        // SSRとレイ反射のときは、深度プリパスの深度を写し取り、前のフレームの画面と一緒に床のシェーダーへ渡している。
         // （反射の光線をたどる計算は、本描画の床のピクセルシェーダーで行う）
-        const bool useScreenSpaceReflection =
-            hasWetFloor && reflectionMethod == 3 && useDepthPrepass;
+        const bool useScreenSpaceReflection = hasWetFloor && usesScreenSpaceRays;
         if (useScreenSpaceReflection)
         {
             m_Instance->m_ScreenSpaceReflection.Prepare(

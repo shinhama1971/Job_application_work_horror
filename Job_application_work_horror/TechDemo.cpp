@@ -10,6 +10,7 @@
 #include "Hud.h"
 #include "PostProcess.h"
 #include "Renderer.h"
+#include "CaptureMode.h"
 #include "input.h"
 
 #include <array>
@@ -42,7 +43,7 @@ namespace
     struct TopicInfo
     {
         const char* Name;
-        std::array<const char*, 4> Variants;
+        std::array<const char*, 5> Variants;
         int VariantCount;
         int DefaultVariant;
         std::array<const char*, 2> Description;
@@ -60,9 +61,9 @@ namespace
           { "先に深度だけを描き、奥に隠れた画素の",
             "重いライティングの計算を省いている" } },
         { "水面の反射",
-          { "なし", "平面反射", "キューブマップ", "SSR" }, 4, 1,
-          { "平面反射：上下を反転したカメラでもう一度描く（正確・重い）",
-            "キューブマップは位置がずれ、SSRは画面の外が映らない" } },
+          { "なし", "平面反射", "キューブマップ", "SSR", "レイ反射" }, 5, 4,
+          { "レイ反射（普段）：SSRで画面の中を、部屋の形との交差で画面の外を映す",
+            "平面反射は反転カメラで描き直す（重い）、キューブマップは位置がずれる" } },
         { "懐中電灯の影",
           { "影なし", "硬い影", "PCSS（柔らかい影）" }, 3, 2,
           { "遮る物から離れた所ほど影の縁をぼかしている",
@@ -249,6 +250,12 @@ namespace Tools::TechDemo
 
     int GetReflectionMethod()
     {
+        // 計測モードで方式を指定したとき（--reflection）は、技術デモを開いていなければそれを使っている
+        const int reflectionOverride = Tools::CaptureMode::GetReflectionMethodOverride();
+        if (!g_Active && reflectionOverride >= 0)
+        {
+            return reflectionOverride;
+        }
         return GetVariant(Topic::PlanarReflection);
     }
 

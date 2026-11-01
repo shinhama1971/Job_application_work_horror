@@ -39,9 +39,9 @@ namespace Graphics
             float filmGradeStrength;
             float lensDirtStrength;
             float signalInterference;
-            // 詰め物
-            float postProcessPadding1;
-            float postProcessPadding2;
+            // コマ落ち（1なら前のフレームの画面を全面に出す）と、そのときの縦のずれ（画面の高さに対する割合）
+            float frameHold;
+            float frameHoldOffset;
         };
 
         // 四角形の頂点・インデックスとGPUのバッファ
@@ -84,6 +84,8 @@ namespace Graphics
             float corridorTension,
             float filmGradeStrength,
             float lensDirtStrength,
-            float signalInterference);
+            float signalInterference,
+            float frameHold = 0.0f,
+            float frameHoldOffset = 0.0f);
     };
 }

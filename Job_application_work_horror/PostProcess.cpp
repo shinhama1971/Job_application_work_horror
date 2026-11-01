@@ -8,6 +8,7 @@
 #include "Renderer.h"
 #include "Application.h"
 #include "utility.h"
+#include "CaptureMode.h"
 
 #include <algorithm>
 #include <cmath>
@@ -41,6 +42,8 @@ namespace Effect
         m_SignalInterference = 0.0f;
         m_TargetSignalInterference = 0.0f;
         m_PresenceStatic = 0.0f;
+        m_FrameHoldTimer = 0.0f;
+        m_FrameHoldCooldown = 1.0f;
 
         m_RenderTexture.Init(
             Application::GetWidth(),
@@ -159,6 +162,29 @@ namespace Effect
         m_SignalInterference +=
             (m_TargetSignalInterference - m_SignalInterference) * response(0.085f);
 
+        // コマ落ち：影が近く、ラジオの雑音が強いほど、短い間隔で映像が一瞬（0.05〜0.1秒）止まる。
+        // ポーズメニューの「演出の強さ」を下げると起きにくくなり、0なら起きない。自動撮影と計測では、画像と数字がぶれないよう起こさない
+        const float frameHoldStrength = Tools::CaptureMode::IsActive() ? 0.0f : m_PresenceStatic * m_UserEffectScale;
+        if (m_FrameHoldTimer > 0.0f)
+        {
+            m_FrameHoldTimer = (std::max)(0.0f, m_FrameHoldTimer - deltaTime);
+        }
+        else if (frameHoldStrength > 0.22f)
+        {
+            m_FrameHoldCooldown -= deltaTime;
+            if (m_FrameHoldCooldown <= 0.0f)
+            {
+                const float rate = (std::min)(1.0f, (frameHoldStrength - 0.22f) / 0.23f);
+                m_FrameHoldTimer = 0.05f + 0.05f * rate;
+                m_FrameHoldOffset = (NextFrameHoldRandom() - 0.5f) * 0.10f * rate;
+                m_FrameHoldCooldown = (3.2f - 2.2f * rate) * (0.6f + NextFrameHoldRandom() * 0.8f);
+            }
+        }
+        else
+        {
+            m_FrameHoldCooldown = (std::max)(m_FrameHoldCooldown, 0.8f);
+        }
+
         // ブルームの一時的な強まり：残り時間の2乗で弱めている（始めは急に、終わりはゆっくり戻る）
         if (m_BloomPulseTimer > 0.0f && m_BloomPulseDuration > 0.0f)
         {
@@ -246,11 +272,23 @@ namespace Effect
         // 描画先に設定している資源は安全に写せないため、描画先から外している。
         context->OMSetRenderTargets(0, nullptr, nullptr);
 
-        Microsoft::WRL::ComPtr<ID3D11Resource> backBufferResource;
-        Renderer::GetBackBufferRTV()->GetResource(backBufferResource.GetAddressOf());
-        context->CopyResource(m_RenderTexture.GetTexture(), backBufferResource.Get());
+        // コマ落ちの間は写し取らず、前のフレームの画面を残している（Draw がそれを画面全体に出す）
+        if (m_FrameHoldTimer <= 0.0f)
+        {
+            Microsoft::WRL::ComPtr<ID3D11Resource> backBufferResource;
+            Renderer::GetBackBufferRTV()->GetResource(backBufferResource.GetAddressOf());
+            context->CopyResource(m_RenderTexture.GetTexture(), backBufferResource.Get());
+        }
 
         Renderer::SetBackBufferRenderTarget();
+    }
+
+    float PostProcess::NextFrameHoldRandom()
+    {
+        m_FrameHoldRandom ^= m_FrameHoldRandom << 13;
+        m_FrameHoldRandom ^= m_FrameHoldRandom >> 17;
+        m_FrameHoldRandom ^= m_FrameHoldRandom << 5;
+        return static_cast<float>(m_FrameHoldRandom & 0xFFFFFFu) / static_cast<float>(0xFFFFFF);
     }
 
     // UAVとSRVを同時に設定しないようにしながら、明るい部分の抽出と、2方向のぼかしを順番に実行している。
@@ -410,6 +448,8 @@ namespace Effect
             (std::clamp)(m_CorridorTension * effectScale, 0.0f, 1.0f),
             (std::clamp)(m_FilmGradeStrength * effectScale, 0.0f, 1.0f),
             (std::clamp)(m_LensDirtStrength * effectScale, 0.0f, 1.0f),
-            (std::clamp)((std::max)(m_SignalInterference, m_PresenceStatic) * effectScale, 0.0f, 1.0f));
+            (std::clamp)((std::max)(m_SignalInterference, m_PresenceStatic) * effectScale, 0.0f, 1.0f),
+            m_FrameHoldTimer > 0.0f ? 1.0f : 0.0f,
+            m_FrameHoldOffset);
     }
 }

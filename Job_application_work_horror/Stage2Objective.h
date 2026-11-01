@@ -63,6 +63,7 @@ struct Stage2ObjectiveInput
     bool portraitStaring = false;       // 肖像画を見つめている途中
     bool handprintFollowing = false;    // 血の手形を照らして、次の手形をたどっている途中
     bool mirrorWaitingForTurn = false;  // 鏡に映った人影を見た（あとは振り返るだけ）
+    bool puddleWaitingForLookUp = false; // 水面に映った人影を見た（あとは顔を上げるだけ）
     bool knockListening = false;        // ノックの出どころの壁の前で、耳を澄ませている途中
     bool unseenNear = false;            // 見えない影がすぐそばまで来ている（動かずにやり過ごす）
 
@@ -103,6 +104,7 @@ struct Stage2ObjectiveInput
     bool portraitNotice = false;
     bool handprintNotice = false;
     bool mirrorNotice = false;
+    bool puddleNotice = false;
     bool knockNotice = false;
     bool unseenNotice = false;
     bool loopNotice = false;

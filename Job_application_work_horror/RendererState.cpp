@@ -6,6 +6,8 @@
 #include "Renderer.h"
 #include "Application.h"
 
+#include <algorithm>
+
 using namespace DirectX::SimpleMath;
 
 //--------------------------------------------------------------------------------------
@@ -32,6 +34,18 @@ void Renderer::SetWallWeathering(float weathering, float horrorMarks)
 {
 	m_DebugView.WallWeathering = weathering < 0.0f ? 0.0f : (weathering > 1.0f ? 1.0f : weathering);
 	m_DebugView.HorrorMarksStrength = horrorMarks < 0.0f ? 0.0f : (horrorMarks > 1.0f ? 1.0f : horrorMarks);
+	UploadDebugViewBuffer();
+}
+
+// 周回の深さを0〜1に収めて設定している（変わらなければ送り直さない）
+void Renderer::SetLoopDepth(float depth)
+{
+	const float clamped = depth < 0.0f ? 0.0f : (depth > 1.0f ? 1.0f : depth);
+	if (clamped == m_DebugView.LoopDepth)
+	{
+		return;
+	}
+	m_DebugView.LoopDepth = clamped;
 	UploadDebugViewBuffer();
 }
 
@@ -110,14 +124,16 @@ void Renderer::SetWaterRipples(ID3D11ShaderResourceView* heightTexture,
 }
 
 // 水面の反射の方式と、SSRで使う射影行列をb12へ設定している
-void Renderer::SetReflectionMode(int mode, const Matrix& projection)
+void Renderer::SetReflectionMode(int mode, const Matrix& projection, bool screenSpaceAvailable)
 {
 	if (!m_pWaterCausticsBuffer)
 	{
 		return;
 	}
 	m_WaterCaustics.Projection = projection.Transpose();
-	m_WaterCaustics.Reflection = Vector4(static_cast<float>(mode), 0.0f, 0.0f, 0.0f);
+	// z（小物の箱の数）は SetReflectionProps が決めるため、そのまま残している
+	m_WaterCaustics.Reflection.x = static_cast<float>(mode);
+	m_WaterCaustics.Reflection.y = screenSpaceAvailable ? 1.0f : 0.0f;
 	m_pDeviceContext->UpdateSubresource(
 		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
@@ -135,6 +151,67 @@ void Renderer::SetWallHandprints(const Vector4* handprints, int count)
 	{
 		m_WaterCaustics.Handprints[index] = (handprints != nullptr && index < count) ? handprints[index] : Vector4::Zero;
 	}
+	m_pDeviceContext->UpdateSubresource(
+		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
+	m_pDeviceContext->PSSetConstantBuffers(
+		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+}
+
+// 2面の「水たまり」の異変の人影をb12へ設定している（レイ反射で、反射の光線と人影の形を交差させる）
+void Renderer::SetPuddleFigure(const Vector3& footPosition, float visibility)
+{
+	if (!m_pWaterCausticsBuffer)
+	{
+		return;
+	}
+	m_WaterCaustics.PuddleFigure = m_FigureOverride
+		? Vector4(m_PuddleFigureOverride.x, m_PuddleFigureOverride.y, m_PuddleFigureOverride.z, 1.0f)
+		: Vector4(footPosition.x, footPosition.y, footPosition.z, visibility);
+	m_pDeviceContext->UpdateSubresource(
+		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
+	m_pDeviceContext->PSSetConstantBuffers(
+		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+}
+
+// 2面の「見えない影」の異変の人影をb12へ設定している（壁と床のシェーダーで、光がその形に遮られるかを調べる）
+void Renderer::SetUnseenFigure(const Vector3& footPosition, float visibility)
+{
+	if (!m_pWaterCausticsBuffer)
+	{
+		return;
+	}
+	m_WaterCaustics.UnseenFigure = m_FigureOverride
+		? Vector4(m_UnseenFigureOverride.x, m_UnseenFigureOverride.y, m_UnseenFigureOverride.z, 1.0f)
+		: Vector4(footPosition.x, footPosition.y, footPosition.z, visibility);
+	m_pDeviceContext->UpdateSubresource(
+		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
+	m_pDeviceContext->PSSetConstantBuffers(
+		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+}
+
+// 計測モード用に、2つの人影を指定した位置へ置き続けている（解除したときは、次に場面が設定するまで消している）
+void Renderer::SetFigureOverride(bool enabled, const Vector3& puddleFoot, const Vector3& unseenFoot)
+{
+	m_FigureOverride = enabled;
+	m_PuddleFigureOverride = puddleFoot;
+	m_UnseenFigureOverride = unseenFoot;
+	SetPuddleFigure(Vector3::Zero, 0.0f);
+	SetUnseenFigure(Vector3::Zero, 0.0f);
+}
+
+// レイ反射で水面に映す小物の箱をb12へ設定している（数は Reflection.z に入れている）
+void Renderer::SetReflectionProps(const Vector4* props, int count)
+{
+	if (!m_pWaterCausticsBuffer)
+	{
+		return;
+	}
+	const int clamped = props == nullptr ? 0 : (std::clamp)(count, 0, WATER_CAUSTICS_BUFFER::MaxReflectionProps);
+	for (int index = 0; index < clamped * 3; ++index)
+	{
+		m_WaterCaustics.ReflectionProps[index] = props[index];
+	}
+	m_WaterCaustics.Reflection.z = static_cast<float>(clamped);
 	m_pDeviceContext->UpdateSubresource(
 		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(

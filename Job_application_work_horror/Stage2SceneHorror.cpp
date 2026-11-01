@@ -814,6 +814,76 @@ void Stage2Scene::UpdateMirrorAnomaly(const Player& player, float deltaTime)
     }
 }
 
+// 水たまりを見つける周回（Stage2AnomalyPlanが決める）だけ判定している。
+// 中央の水たまりを足元からのぞくと、向こう側に黒い人影が立っているのが水面にだけ映る（床のシェーダーのレイ反射で描いている）。
+// のぞき続けると水を踏みながら近づいて来る。顔を上げて人影が立っていた方を見ると、そこには誰もいない。それで見つけたことになる。
+void Stage2Scene::UpdatePuddleAnomaly(const Player& player, float deltaTime)
+{
+    const bool active = m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Puddle);
+    Core::Game* game = Core::Game::GetInstance();
+    const Camera* camera = game->GetCamera();
+    const Ground* ground = m_Objects.ground;
+    const auto isInsidePuddle = [ground](const Vector3& position)
+    {
+        return ground != nullptr && ground->IsInsidePuddle(position);
+    };
+    const PuddleReflectionAnomaly::Event puddleEvent = m_PuddleAnomaly.Update(
+        deltaTime, active, camera->GetPosition(), camera->GetForward(), player.GetPosition(), isInsidePuddle);
+
+    // 人影の足もとの位置と見え方を、床のシェーダー（レイ反射）へ渡している。見え方が0なら描かない
+    const Vector3 figurePosition = m_PuddleAnomaly.GetFigurePosition();
+    Renderer::SetPuddleFigure(figurePosition, m_PuddleAnomaly.GetVisibility());
+
+    if (puddleEvent == PuddleReflectionAnomaly::Event::Seen)
+    {
+        // 水面の人影に気づいた：水たまりの向こうから、かすかな息づかいが聞こえ、心拍がひとつ跳ねる
+        game->PlayAudioCueAt(SOUND_CUE_BREATH, figurePosition + Vector3(0.0f, 36.0f, 0.0f), 0.78f, 0.40f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.16f, 0.30f);
+        Input::SetVibration(3, 0.10f);
+    }
+    else if (puddleEvent == PuddleReflectionAnomaly::Event::Step)
+    {
+        // 水面をのぞき続けている：人影が水を踏んで一歩近づく（足もとから波紋が広がり、ぺたりと水音が鳴る）
+        if (m_Objects.ground != nullptr)
+        {
+            m_Objects.ground->AddRippleImpulse(figurePosition, 1.6f, -1.3f);
+        }
+        game->PlayAudioCueAt(SOUND_CUE_WATER_STEP, figurePosition, 0.70f, 0.75f);
+        Input::SetVibration(1, 0.05f);
+    }
+    else if (puddleEvent == PuddleReflectionAnomaly::Event::Caught)
+    {
+        // すぐそばまで来られた：照明が揺れて驚かされ、人影はまた水たまりの向こうに立ち直す
+        game->PlayAudioCue(SOUND_CUE_SCARE, 1.0f, 0.75f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.55f, 0.45f);
+        KickHangingBulbs(0.45f);
+        CeilingLight* puddleLight = m_Objects.Light(Stage2NearestLight(PuddleReflectionAnomaly::PuddleCenterZ));
+        if (puddleLight != nullptr)
+        {
+            puddleLight->TriggerEventFlicker(0.90f, 0.60f);
+        }
+        Input::SetVibration(8, 0.22f);
+    }
+    else if (puddleEvent == PuddleReflectionAnomaly::Event::Found)
+    {
+        // 顔を上げると誰もいない：立っていた所の水面だけが揺れていて、奥の確認スイッチが押せるようになる
+        m_Notices.loop = 2.8f;
+        if (m_Objects.ground != nullptr)
+        {
+            m_Objects.ground->AddRippleImpulse(figurePosition, 2.2f, -1.6f);
+        }
+        KickHangingBulbs(0.55f);
+        CeilingLight* puddleLight = m_Objects.Light(Stage2NearestLight(PuddleReflectionAnomaly::PuddleCenterZ));
+        if (puddleLight != nullptr)
+        {
+            puddleLight->TriggerEventFlicker(0.80f, 0.70f);
+        }
+        game->PlayAudioCueAt(SOUND_CUE_WATER_STEP, figurePosition, 0.62f, 0.85f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.32f, 0.42f);
+        Input::SetVibration(6, 0.16f);
+    }
+}
+
 // 肖像画を見つける周回（Stage2AnomalyPlanが決める）だけ判定している。
 // 懐中電灯で照らしたまま見つめ続けると、絵の中の閉じていた目がかすかに開きかけ、やがて見開く。
 // 途中で目を離すと、目は閉じて最初からやり直しにしている。
@@ -1024,6 +1094,16 @@ void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
             m_UnseenLastStep = position;
         }
     }
+    // 姿の見えない影の「影だけ」を、壁と床に落としている（天井の照明・揺れる裸電球・懐中電灯の光を、人の形で遮る。
+    // shader/figureShadow.hlsli）。捕まえた直後に奥へ戻る瞬間移動が目立たないよう、そのフレームは消し、0.4秒で上げ下げしている
+    const bool shadowShown = enabled && m_UnseenPresence.IsActive() && result == UnseenPresenceAnomaly::Result::None;
+    m_UnseenShadowVisibility = result == UnseenPresenceAnomaly::Result::Caught ? 0.0f
+        : shadowShown ? (std::min)(1.0f, m_UnseenShadowVisibility + deltaTime / 0.4f)
+        : (std::max)(0.0f, m_UnseenShadowVisibility - deltaTime / 0.4f);
+    Vector3 shadowFoot = m_UnseenPresence.GetPosition();
+    shadowFoot.y = PuddleReflectionAnomaly::FloorY;
+    Renderer::SetUnseenFigure(shadowFoot, m_UnseenShadowVisibility);
+
     Core::Game* game = Core::Game::GetInstance();
     if (result == UnseenPresenceAnomaly::Result::Caught)
     {

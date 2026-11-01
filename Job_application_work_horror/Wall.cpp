@@ -191,6 +191,31 @@ Matrix Wall::MakeWorldMatrix() const
     return scale * rotation * translation;
 }
 
+// レイ反射で水面に映す小物の箱を返している。回した箱は、それを囲む軸に沿った箱にしている
+bool Wall::GetReflectionProxy(Vector3& minimum, Vector3& maximum, Color& color) const
+{
+    if (!m_Visible || m_Dissolve > 0.0f || m_IsMirror ||
+        m_SurfaceMaterial.WeatheringSurface || m_SurfaceMaterial.Diffuse.w < 0.999f)
+    {
+        return false;
+    }
+    const Matrix rotation = Matrix::CreateFromYawPitchRoll(m_Rotation.y, m_Rotation.x, m_Rotation.z);
+    const Vector3 half(std::abs(m_Scale.x) * 0.5f, std::abs(m_Scale.y) * 0.5f, std::abs(m_Scale.z) * 0.5f);
+    const Vector3 extent(
+        std::abs(rotation._11) * half.x + std::abs(rotation._21) * half.y + std::abs(rotation._31) * half.z,
+        std::abs(rotation._12) * half.x + std::abs(rotation._22) * half.y + std::abs(rotation._32) * half.z,
+        std::abs(rotation._13) * half.x + std::abs(rotation._23) * half.y + std::abs(rotation._33) * half.z);
+    // 低い物（床の縁取り・板）と、床や天井のような大きな板は映さない（部屋の形と重なり、ちらつくため）
+    if (extent.y < 3.0f || extent.x > 40.0f || extent.z > 40.0f || (std::max)(extent.x, extent.z) < 0.8f)
+    {
+        return false;
+    }
+    minimum = m_Position - extent;
+    maximum = m_Position + extent;
+    color = m_SurfaceMaterial.Diffuse;
+    return true;
+}
+
 // 箱を描いている（非表示なら何もしない）
 void Wall::Draw(Camera* cam)
 {

@@ -12,6 +12,7 @@
 #include	<string>
 #include	<vector>
 #include	<d3dcompiler.h>
+#include	<filesystem>
 #include	<locale.h>
 #include	<wrl/client.h>
 
@@ -80,9 +81,12 @@ struct DEBUG_VIEW_BUFFER
     // 壁の古さに混ぜるホラーの跡（血の手形・引っかき傷・血の垂れ跡）の濃さ（0〜1）。
     // 2面は異変として手形や傷を出すため、決まった跡は描かない（0）。
     float HorrorMarksStrength;
+    // 2面の周回の深さ（0〜1）。周回が進むほど、廊下の色調が赤黒く沈み、霧が濃くなる（shader/horrorGrade.hlsli）
+    float LoopDepth;
+    float LoopDepthPadding[3];
 };
 
-static_assert(sizeof(DEBUG_VIEW_BUFFER) == 16, "Debug view buffer must be 16 bytes");
+static_assert(sizeof(DEBUG_VIEW_BUFFER) == 32, "Debug view buffer must be 32 bytes");
 
 // 部屋の角の暗がり（shader/roomOcclusion.hlsli の RoomOcclusionBuffer、b11）と同じ並びにしている。
 struct ROOM_OCCLUSION_BUFFER
@@ -115,13 +119,21 @@ struct WATER_CAUSTICS_BUFFER
     DirectX::SimpleMath::Vector4 Ripple;
     // 水面の反射の比較（SSR）で使う、プレイヤーの視点の射影行列（転置済み）
     DirectX::SimpleMath::Matrix Projection;
-    // 水面の反射の方式（x = 0 平面反射（普段）、1 キューブマップ、2 SSR）。「反射なし」は床の反射の強さを0にして表している
+    // 水面の反射の方式（x = 0 平面反射、1 キューブマップ、2 SSR、3 レイ反射（普段））。「反射なし」は床の反射の強さを0にして表している。
+    // y = SSRの深度と前のフレームの画面が用意されているか
     DirectX::SimpleMath::Vector4 Reflection;
     // 2面の「血の手形」の異変で壁に浮かべる手形（x = 壁の表面のx、y = 高さ、z = 奥行き、w = 見え方0〜1。0なら描かない）
     DirectX::SimpleMath::Vector4 Handprints[4];
+    // 2面の「水たまり」の異変で水面にだけ映す人影（xyz = 足もとの位置、w = 見え方0〜1。0なら描かない）
+    DirectX::SimpleMath::Vector4 PuddleFigure;
+    // 2面の「見えない影」の異変で、影だけを落とす人影（xyz = 足もとの位置、w = 見え方0〜1。0なら影を付けない。shader/figureShadow.hlsli）
+    DirectX::SimpleMath::Vector4 UnseenFigure;
+    // レイ反射で水面に映す小物の箱の最大数と、その箱（[i*3] = 最小の角、[i*3+1] = 最大の角、[i*3+2] = 色）。数は Reflection.z
+    static constexpr int MaxReflectionProps = 16;
+    DirectX::SimpleMath::Vector4 ReflectionProps[MaxReflectionProps * 3];
 };
 
-static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 256, "Water caustics buffer must match HLSL layout");
+static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 1056, "Water caustics buffer must match HLSL layout");
 
 // サブセット（モデルの中で、同じマテリアルで描く部分）
 struct SUBSET{
@@ -193,6 +205,10 @@ private:
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pRoomOcclusionBuffer;
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pWaterCausticsBuffer;
 	static WATER_CAUSTICS_BUFFER m_WaterCaustics;
+	// 計測モード（--figures）で、水たまりの人影と見えない影を決めた位置に置き続けるか、その足もとの位置
+	static bool m_FigureOverride;
+	static DirectX::SimpleMath::Vector3 m_PuddleFigureOverride;
+	static DirectX::SimpleMath::Vector3 m_UnseenFigureOverride;
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pMaterialBuffer;
 	static LIGHT m_Light;
 	static bool m_LightEnable;
@@ -244,12 +260,15 @@ public:
 	static ID3D11Device* GetDevice( void ){ return m_pDevice.Get(); }
 	static ID3D11DeviceContext* GetDeviceContext( void ){ return m_pDeviceContext.Get(); }
 
-	// 同じ名前の.csoがあればそれを読み、なければ.hlslを実行時にコンパイルしている。
+	// 新しい.csoがあればそれを読み、なければ（または古ければ）.hlslを実行時にコンパイルして.csoに保存している。
 	static HRESULT CompileShader(
 		const char* szFileName,
 		LPCSTR szEntryPoint,
 		LPCSTR szShaderModel,
 		std::vector<unsigned char>& shaderObject);
+	// フォルダの中のシェーダー（名前の最後が VS・PS・CS の.hlsl）を、まとめて.csoへコンパイルしている（ビルド時に使う）。
+	// 失敗したシェーダーがあればfalseを返し、errorsにコンパイラーのエラーを入れている
+	static bool PrecompileShaders(const std::filesystem::path& folder, std::string& errors);
 	// 頂点シェーダー（と入力レイアウト）、ピクセルシェーダーを作っている
 	static HRESULT CreateVertexShader(ID3D11VertexShader** ppVertexShader, ID3D11InputLayout** ppVertexLayout, D3D11_INPUT_ELEMENT_DESC* pLayout, unsigned int numElements, const char* szFileName);
 	static HRESULT CreatePixelShader(ID3D11PixelShader** PixelShader, const char* FileName);
@@ -274,6 +293,8 @@ public:
 	// 壁の古さ（0〜1）と、それに混ぜるホラーの跡（血の手形・引っかき傷・血の垂れ跡）の濃さ（0〜1）を設定している。
 	// 古さが0なら前と同じ見た目のまま。
 	static void SetWallWeathering(float weathering, float horrorMarks = 1.0f);
+	// 2面の周回の深さ（0〜1）を設定している。0ならこれまでと同じ色調と霧
+	static void SetLoopDepth(float depth);
 	// 部屋の角の暗がりに使う壁の形と、床・天井の高さを設定している。boxCount が0なら暗がりを付けない。
 	static void SetRoomOcclusion(
 		const DirectX::SimpleMath::Vector4* boxes, unsigned int boxCount,
@@ -286,10 +307,21 @@ public:
 	// 水たまりの波のシミュレーションの高さのテクスチャ（t9）と、その範囲・強さを、床と壁のシェーダーへ渡している。strengthが0なら使わない。
 	static void SetWaterRipples(ID3D11ShaderResourceView* heightTexture,
 		const DirectX::SimpleMath::Vector2& origin, float worldSize, float strength);
-	// 水面の反射の方式（0 平面反射、1 キューブマップ、2 SSR）と、SSRで使うプレイヤーの視点の射影行列を、床のシェーダーへ渡している
-	static void SetReflectionMode(int mode, const DirectX::SimpleMath::Matrix& projection);
+	// 水面の反射の方式（0 平面反射、1 キューブマップ、2 SSR、3 レイ反射）と、SSRで使うプレイヤーの視点の射影行列を、床のシェーダーへ渡している。
+	// screenSpaceAvailable は、このフレームでSSRの深度と前のフレームの画面を用意するか（レイ反射が画面の中の物を拾うのに使う）
+	static void SetReflectionMode(int mode, const DirectX::SimpleMath::Matrix& projection,
+		bool screenSpaceAvailable = false);
 	// 2面の「血の手形」の異変で壁に浮かべる手形（最大4つ。x = 壁の表面のx、y = 高さ、z = 奥行き、w = 見え方）を、壁のシェーダーへ渡している。countが0なら描かない
 	static void SetWallHandprints(const DirectX::SimpleMath::Vector4* handprints, int count);
+	// 2面の「水たまり」の異変で、水面にだけ映す人影の足もとの位置と見え方（0〜1。0なら描かない）を、床のシェーダーへ渡している
+	static void SetPuddleFigure(const DirectX::SimpleMath::Vector3& footPosition, float visibility);
+	// 2面の「見えない影」の異変で、影だけを落とす人影の足もとの位置と見え方（0〜1。0なら影を付けない）を、壁と床のシェーダーへ渡している
+	static void SetUnseenFigure(const DirectX::SimpleMath::Vector3& footPosition, float visibility);
+	// 計測モード（--figures）用：異変の進行に関係なく、2つの人影を指定した位置に見え方1で置き続けている（人影の描画の重さを測るため）
+	static void SetFigureOverride(bool enabled,
+		const DirectX::SimpleMath::Vector3& puddleFoot, const DirectX::SimpleMath::Vector3& unseenFoot);
+	// レイ反射で水面に映す小物の箱（props は1個につき 最小の角・最大の角・色 の3つ。最大 MaxReflectionProps 個）を、床のシェーダーへ渡している
+	static void SetReflectionProps(const DirectX::SimpleMath::Vector4* props, int count);
 	// 壁の鏡に映す景色を描いている最中かを設定・取得している（Game::Drawが鏡の描画の前後で切り替えている）
 	static void SetDrawingWallMirror(bool drawing) { m_DrawingWallMirror = drawing; }
 	static bool IsDrawingWallMirror() { return m_DrawingWallMirror; }

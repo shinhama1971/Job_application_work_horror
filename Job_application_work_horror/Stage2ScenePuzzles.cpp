@@ -362,6 +362,9 @@ void Stage2Scene::AdvanceLoop(Player& player)
     m_PortraitAnomaly.ResetProgressForLoop();
     m_HandprintAnomaly.ResetProgressForLoop();
     m_MirrorAnomaly.ResetProgressForLoop();
+    m_PuddleAnomaly.ResetProgressForLoop();
+    // 水たまりの異変は、2周目に出たときほど大胆に出る（すぐ近くに立ち、速く近づく）
+    m_PuddleAnomaly.SetBoldness(m_LoopCount >= 2 ? 1.0f : 0.0f);
     m_FootprintFollowerUsedThisLoop = false;
     // 周回が切り替わった瞬間、吊るした裸電球が大きく揺れる（同じ廊下に戻ってきた合図）
     KickHangingBulbs(0.5f);

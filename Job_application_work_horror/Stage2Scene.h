@@ -16,6 +16,7 @@
 #include "PortraitAnomaly.h"
 #include "HandprintAnomaly.h"
 #include "MirrorAnomaly.h"
+#include "PuddleReflectionAnomaly.h"
 #include "FootprintFollower.h"
 #include "BreathHold.h"
 #include "RadioStatic.h"
@@ -87,6 +88,8 @@ private:
     void UpdateHandprintAnomaly(const Player& player, float deltaTime);
     // 鏡の異変：鏡をのぞくとすぐ後ろに人影が映り、振り返ると誰もいない（見つけたことになる）
     void UpdateMirrorAnomaly(const Player& player, float deltaTime);
+    // 水たまりの異変：足元の水たまりをのぞくと向こう側の人影が水面にだけ映り、顔を上げると誰もいない（見つけたことになる）
+    void UpdatePuddleAnomaly(const Player& player, float deltaTime);
     // 吊るした裸電球を揺さぶっている（異変や物音の演出に合わせて）
     void KickHangingBulbs(float strength);
     // 息を止めるボタン（Space か RB）を押しているか
@@ -142,6 +145,7 @@ private:
     PortraitAnomaly m_PortraitAnomaly;
     HandprintAnomaly m_HandprintAnomaly;
     MirrorAnomaly m_MirrorAnomaly;
+    PuddleReflectionAnomaly m_PuddleAnomaly;
     FootprintFollower m_FootprintFollower;
     // ロッカーに隠れている間の、息を止める操作
     BreathHold m_BreathHold;
@@ -166,6 +170,8 @@ private:
     bool m_UnseenHasStep = false;
     int m_UnseenWetSteps = 0;
     float m_UnseenFootSide = 1.0f;
+    // 見えない影が壁と床に落とす影の見え方（0〜1。現れるときと消えるときに滑らかに変えている）
+    float m_UnseenShadowVisibility = 0.0f;
     ScratchAnomaly m_ScratchAnomaly;
     ObservedScareSequence m_ObservedScareSequence;
     CaughtSequence m_CaughtSequence;
@@ -183,6 +189,8 @@ private:
     // timerが負なら実行していない、0以上なら対応する演出が進んでいる途中。
     // 何周目か（0〜3）
     int m_LoopCount = 0;
+    // 色調と霧に渡す周回の深さ（0〜1）。周回が進むと、何周目かの割合へゆっくり近づけている
+    float m_LoopDepth = 0.0f;
     // ロッカーに隠れて影に見失わせてから、影が去るまでの残り秒数（負なら見失わせていない）。
     float m_HiddenStalkerTimer = -1.0f;
     // 周回をすぐに続けて進めないための待ち時間

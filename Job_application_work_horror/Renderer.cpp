@@ -85,11 +85,14 @@ Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pProjectionBuffer;
 // ライト（b3）・デバッグ表示（b7）・部屋の角の暗がり（b11）・マテリアル（b4）の定数バッファと、今のライト
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pLightBuffer;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pDebugViewBuffer;
-DEBUG_VIEW_BUFFER Renderer::m_DebugView{ 0, 1.0f, 0.0f, 0.0f };
+DEBUG_VIEW_BUFFER Renderer::m_DebugView{ 0, 1.0f, 0.0f, 0.0f, 0.0f, {} };
 bool Renderer::m_DrawingWallMirror = false;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pRoomOcclusionBuffer;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pWaterCausticsBuffer;
 WATER_CAUSTICS_BUFFER Renderer::m_WaterCaustics{};
+bool Renderer::m_FigureOverride = false;
+Vector3 Renderer::m_PuddleFigureOverride;
+Vector3 Renderer::m_UnseenFigureOverride;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pMaterialBuffer;
 LIGHT Renderer::m_Light{};
 bool Renderer::m_LightEnable = true;
@@ -114,7 +117,10 @@ HRESULT Renderer::Init()
 
 	// デバイスとスワップチェーンの設定
 	DXGI_SWAP_CHAIN_DESC swapChainDesc{};
-	swapChainDesc.BufferCount = 1; // バックバッファの数は1（表示中の画面と合わせてダブルバッファ）
+	// フリップ方式（FLIP_DISCARD）でバックバッファを2枚使っている。描いた画面を写さずに表示へ切り替えるため、
+	// 垂直同期のときのフレームの間隔がそろう（BitBlt方式では、内蔵GPUの画面に単体GPUで描くノートPCで、30fps前後に落ちたり上下したりしていた）
+	swapChainDesc.BufferCount = 2;
+	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	swapChainDesc.BufferDesc.Width = Application::GetWidth(); // バッファの幅を描画解像度に合わせている
 	swapChainDesc.BufferDesc.Height = Application::GetHeight(); // バッファの高さを描画解像度に合わせている
 	swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // 1画素を赤・緑・青・透明度の各8ビットにしている
@@ -170,6 +176,17 @@ HRESULT Renderer::Init()
             hr = createDevice(nullptr, 0);
         }
 #endif
+    }
+    // フリップ方式を使えない古いWindows（8.1以前）では、これまでのBitBlt方式（バックバッファ1枚）で作り直している
+    if (FAILED(hr))
+    {
+        swapChainDesc.BufferCount = 1;
+        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+        hr = createDevice(adapter.Get(), 0);
+        if (FAILED(hr) && adapter != nullptr)
+        {
+            hr = createDevice(nullptr, 0);
+        }
     }
     if (FAILED(hr)) return hr;
 
@@ -527,11 +544,11 @@ void Renderer::DrawEnd()
 	}
 
 	// ダブルバッファを入れ替えて画面を更新している（普段は垂直同期を待っている）。
-	// 計測モード（--benchmark）は垂直同期を待たず、本来の処理時間を測れるようにしている。
+	// 計測モード（--benchmark）は垂直同期を待たず、本来の処理時間を測れるようにしている（--vsync を付けたときは待つ）。
 	if (Tools::CaptureMode::IsBenchmark())
 	{
 		const auto presentStart = std::chrono::steady_clock::now();
-		m_pSwapChain->Present(0, 0);
+		m_pSwapChain->Present(Tools::CaptureMode::UsesBenchmarkVsync() ? 1 : 0, 0);
 		Tools::CaptureMode::OnPresentTimed(std::chrono::duration<double, std::milli>(
 			std::chrono::steady_clock::now() - presentStart).count());
 		return;

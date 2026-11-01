@@ -413,6 +413,12 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
                 scene->RequestDebugAction(
                     SceneDebugAction::ShowUnseenAnomaly);
             }
+            ImGui::SameLine();
+            if (ImGui::Button("水たまりの異変を出す"))
+            {
+                scene->RequestDebugAction(
+                    SceneDebugAction::ShowPuddleAnomaly);
+            }
             ImGui::TextDisabled(
                 "操作は次のゲーム更新開始時に安全に実行されます。");
             ImGui::Separator();

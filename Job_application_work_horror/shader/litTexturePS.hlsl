@@ -404,6 +404,7 @@ float GetWallTrickle(float3 worldPosition, float3 worldNormal, float damp)
 // ホラー向けの色調と、遠くの闇の色（wetFloorPSと共通。horrorGrade.hlsli）
 #include "horrorGrade.hlsli"
 #include "horrorMist.hlsli"
+#include "figureShadow.hlsli"
 
 
 // 画素の色を計算している：元の色 → 汚れと古さ → 環境光・天井灯・懐中電灯 → 濡れた光沢 → 自己発光 → 霧 → 色調
@@ -591,7 +592,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
             * pointLight.ColorIntensity.a
             * pointAttenuation
             * fixtureDistribution
-            * GetPointLightShadow(input.worldPos, input.worldNormal, pointLight.PositionRange.xyz);
+            * GetPointLightShadow(input.worldPos, input.worldNormal, pointLight.PositionRange.xyz)
+            * GetUnseenFigureShadow(input.worldPos, pointLight.PositionRange.xyz);
         lighting += pointRadiance * softPointLambert;
 
         // 鏡面反射は、懐中電灯と同じビュー空間で計算している（光の向きだけをビュー空間へ回している）
@@ -659,6 +661,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
                 * naturalAttenuation
                 * lensPattern
                 * GetFlashlightShadow(input.shadowPos)
+                * GetUnseenFigureFlashlightShadow(input.worldPos)
                 * flashlightOcclusion;
             lighting += flashlightRadiance * softenedLambert;
             // 懐中電灯は目のすぐそばにあるので、金属や濡れた面を正面から照らすと、光の芯がはっきり映る
@@ -685,8 +688,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
     // 高さの違う霧を重ね、近くの見やすさを保ちながら、遠くの輪郭を分けている。
     // 部屋全体を一様に白くせず、床の近くに霧を集めている。
-    const float distanceFog =
-        smoothstep(110.0f, 390.0f, distanceFromCamera) * 0.72f;
+    // 2面の周回が進むほど、霧が近くから濃くなる（LoopDepth。horrorGrade.hlsli）
+    const float distanceFog = GetHorrorDistanceFog(distanceFromCamera, LoopDepth);
     const float heightFromFloor = max(input.worldPos.y + 100.0f, 0.0f);
     const float heightDensity = exp(-heightFromFloor * 0.055f);
     const float nearSuppression =
@@ -694,16 +697,16 @@ float4 main(in LIT_PS_IN input) : SV_Target
     const float fogVariation = 0.78f +
         FastValueNoise(input.worldPos.xz * 0.018f + 21.0f) * 0.22f;
     const float heightFog =
-        heightDensity * nearSuppression * fogVariation * 0.22f;
+        heightDensity * nearSuppression * fogVariation * 0.22f * GetHorrorHeightFogScale(LoopDepth);
     const float fogFactor = saturate(distanceFog + heightFog);
     // 遠くは灰色のもやではなく、闇に溶けていく
-    const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb);
+    const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb, LoopDepth);
     color.rgb = lerp(color.rgb, fogColor, fogFactor);
     // 床の近くに溜まって流れる霧（懐中電灯の円錐の中だけ白く浮かぶ。horrorMist.hlsli）
     color.rgb = ApplyHorrorMist(color.rgb, input.worldPos, input.viewPos, lighting);
     // 天井の照明や非常灯から下へ落ちる光の筋（霧に散った光。horrorMist.hlsli）
     color.rgb += GetLightShafts(input.worldPos, pointLightListOffset, pointLightCount, input.pos.xy);
-    color.rgb = ApplyFilmicHorrorGrade(color.rgb);
+    color.rgb = ApplyFilmicHorrorGrade(color.rgb, LoopDepth);
 
     // デバッグ表示：1=法線、2=懐中電灯の影、3=照明だけ、6=壁の湿り気、7=タイルごとの光源の数。4・5は床（水たまり・反射）用の表示なので、壁は黒にしている
     if (DebugViewMode == 1)

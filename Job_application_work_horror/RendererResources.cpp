@@ -7,10 +7,67 @@
 #include "Application.h"
 
 #include <filesystem>
+#include <fstream>
+#include <string>
+#include <unordered_map>
 
 using namespace DirectX::SimpleMath;
 
-// シェーダーを読み込んでいる。コンパイル済みの.csoがあればそれを使い、無ければ.hlslをコンパイルしている。
+namespace
+{
+	// ビルド時の事前コンパイル（--compile-shaders）の間は、エラーを画面に出さずにためている（ビルドを止めないため）
+	bool g_CollectShaderErrors = false;
+	std::string g_ShaderErrors;
+
+	// シェーダーのフォルダの .hlsl と .hlsli のうち、一番新しい更新時刻を返している（フォルダごとに1回だけ調べる）。
+	// どれか1つでも .cso より新しければ、その .cso は古い（include したファイルの変更も含めて、確実に作り直す）。
+	std::filesystem::file_time_type GetNewestShaderSourceTime(const std::filesystem::path& folder)
+	{
+		static std::unordered_map<std::wstring, std::filesystem::file_time_type> newestTimes;
+		const std::wstring key = folder.wstring();
+		const auto found = newestTimes.find(key);
+		if (found != newestTimes.end())
+		{
+			return found->second;
+		}
+		std::filesystem::file_time_type newest{};
+		std::error_code error;
+		for (const auto& entry : std::filesystem::directory_iterator(folder, error))
+		{
+			const std::filesystem::path extension = entry.path().extension();
+			if (extension == ".hlsl" || extension == ".hlsli")
+			{
+				const auto time = entry.last_write_time(error);
+				if (!error && time > newest)
+				{
+					newest = time;
+				}
+			}
+		}
+		newestTimes.emplace(key, newest);
+		return newest;
+	}
+
+	// .cso があり、シェーダーのフォルダのどのファイルよりも新しければ使える
+	bool IsCompiledShaderUpToDate(const std::filesystem::path& csoPath, const std::filesystem::path& sourcePath)
+	{
+		std::error_code error;
+		const auto compiledTime = std::filesystem::last_write_time(csoPath, error);
+		if (error)
+		{
+			return false;
+		}
+		std::filesystem::path folder = sourcePath.parent_path();
+		if (folder.empty())
+		{
+			folder = ".";
+		}
+		return compiledTime >= GetNewestShaderSourceTime(folder);
+	}
+}
+
+// シェーダーを読み込んでいる。新しいコンパイル済みの.csoがあればそれを使い、無いか古ければ.hlslをコンパイルして、.csoとして保存している。
+// 重いシェーダーのコンパイルは1つ数秒かかるため、2回目からの起動（とビルド時に作った.cso）では、ゲームを始めるまでの待ち時間がほとんどなくなる。
 HRESULT Renderer::CompileShader(
 	const char* szFileName,
 	LPCSTR szEntryPoint,
@@ -23,9 +80,11 @@ HRESULT Renderer::CompileShader(
 	std::filesystem::path csoPath(szFileName);
 	csoPath.replace_extension(".cso");
 
-	// csoファイルがあれば開いている
-	FILE* fp;
-	int ret = fopen_s(&fp, csoPath.string().c_str(), "rb");
+	// 新しいcsoファイルがあれば開いている
+	FILE* fp = nullptr;
+	const int ret = IsCompiledShaderUpToDate(csoPath, std::filesystem::path(szFileName))
+		? fopen_s(&fp, csoPath.string().c_str(), "rb")
+		: -1;
 	if (ret == 0)
 	{
 		// ファイルの大きさを取得している
@@ -50,7 +109,7 @@ HRESULT Renderer::CompileShader(
 			return E_FAIL;
 		}
 	}
-	// csoファイルが無ければ、hlslファイルをコンパイルしている
+	// csoファイルが無いか古ければ、hlslファイルをコンパイルしている
 	else
 	{
 		HRESULT hr = S_OK;
@@ -88,7 +147,15 @@ HRESULT Renderer::CompileShader(
 		if (FAILED(hr))
 		{
 			if (pErrorBlob != nullptr) {
-				MessageBoxA(NULL, static_cast<const char*>(pErrorBlob->GetBufferPointer()), "Error", MB_OK);
+				if (g_CollectShaderErrors)
+				{
+					g_ShaderErrors += static_cast<const char*>(pErrorBlob->GetBufferPointer());
+					g_ShaderErrors += "\n";
+				}
+				else
+				{
+					MessageBoxA(NULL, static_cast<const char*>(pErrorBlob->GetBufferPointer()), "Error", MB_OK);
+				}
 			}
 			return E_FAIL;
 		}
@@ -99,9 +166,75 @@ HRESULT Renderer::CompileShader(
 			shaderObject.data(),
 			pBlob->GetBufferPointer(),
 			shaderObject.size());
+
+		// 次の起動ではコンパイルせずに読めるよう、.csoとして保存している（書けなくても、そのまま続ける）
+		std::ofstream compiledFile(csoPath, std::ios::binary | std::ios::trunc);
+		if (compiledFile)
+		{
+			compiledFile.write(reinterpret_cast<const char*>(shaderObject.data()),
+				static_cast<std::streamsize>(shaderObject.size()));
+		}
 	}
 
 	return S_OK;
+}
+
+// フォルダの中のシェーダーを、名前の最後（VS・PS・CS）か頭（PS_）からシェーダーモデルを決めて、まとめてコンパイルしている。
+// common.hlsl のように、どれにも当てはまらないファイルは include 用なので飛ばしている
+bool Renderer::PrecompileShaders(const std::filesystem::path& folder, std::string& errors)
+{
+	g_CollectShaderErrors = true;
+	g_ShaderErrors.clear();
+	bool succeeded = true;
+	int compiledCount = 0;
+	std::error_code error;
+	for (const auto& entry : std::filesystem::directory_iterator(folder, error))
+	{
+		if (entry.path().extension() != ".hlsl")
+		{
+			continue;
+		}
+		const std::string name = entry.path().stem().string();
+		const auto endsWith = [&name](const char* suffix)
+		{
+			const size_t length = strlen(suffix);
+			return name.size() > length && name.compare(name.size() - length, length, suffix) == 0;
+		};
+		const char* shaderModel = nullptr;
+		if (endsWith("VS")) { shaderModel = "vs_5_0"; }
+		else if (endsWith("PS") || name.rfind("PS_", 0) == 0) { shaderModel = "ps_5_0"; }
+		else if (endsWith("CS")) { shaderModel = "cs_5_0"; }
+		if (shaderModel == nullptr)
+		{
+			continue;
+		}
+
+		std::vector<unsigned char> shaderObject;
+		if (FAILED(CompileShader(entry.path().string().c_str(), "main", shaderModel, shaderObject)))
+		{
+			g_ShaderErrors += "コンパイルに失敗: " + entry.path().filename().string() + "\n";
+			succeeded = false;
+		}
+		else
+		{
+			++compiledCount;
+		}
+	}
+	if (error)
+	{
+		g_ShaderErrors += "シェーダーのフォルダを開けません: " + folder.string() + "\n";
+		succeeded = false;
+	}
+	else if (compiledCount == 0 && succeeded)
+	{
+		g_ShaderErrors += "コンパイルするシェーダーが見つかりません: " + folder.string() + "\n";
+		succeeded = false;
+	}
+
+	errors = g_ShaderErrors;
+	g_CollectShaderErrors = false;
+	g_ShaderErrors.clear();
+	return succeeded;
 }
 
 //--------------------------------------------------------------------------------------

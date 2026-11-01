@@ -94,8 +94,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
         inkColor * smoothstep(0.55f, 1.0f, received) * 0.12f;
 
     // 壁と同じ距離の霧をかけ、文字だけが浮いて見えないようにしている。
-    const float distanceFog = smoothstep(110.0f, 390.0f, distanceFromCamera) * 0.72f;
-    const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb);
+    const float distanceFog = GetHorrorDistanceFog(distanceFromCamera, LoopDepth);
+    const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb, LoopDepth);
     color = lerp(color, fogColor, distanceFog);
 
     return float4(color, alpha);
