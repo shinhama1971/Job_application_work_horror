@@ -419,6 +419,11 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
                 scene->RequestDebugAction(
                     SceneDebugAction::ShowPuddleAnomaly);
             }
+            if (ImGui::Button("西棟の天井の人影を出す（1面）"))
+            {
+                scene->RequestDebugAction(
+                    SceneDebugAction::ShowCeilingReflection);
+            }
             ImGui::TextDisabled(
                 "操作は次のゲーム更新開始時に安全に実行されます。");
             ImGui::Separator();

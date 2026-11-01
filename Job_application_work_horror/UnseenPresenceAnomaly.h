@@ -9,6 +9,8 @@
 // ・すぐそばまで近づかれると捕まる（周回はそのままで入口へ戻る）。雑音が強くなったら、壁際に寄って動かずに待つか、
 //   ロッカーに隠れてやり過ごす。捕まらずにすれ違えば、見つけたことになる。
 // ・影は廊下の真ん中を歩くが、プレイヤーが動いていると、足音に引き寄せられるように横へ寄ってくる。
+// ・姿は見えないが、照明の下では影だけが落ち、懐中電灯で照らすと霧の中に人の形が浮かぶ（shader/figureShadow.hlsli）。
+//   ただし照らすと気づかれ、数秒の間、プレイヤーの方へ速く向かって来る（照らせば見えるが危ない、という駆け引き）。
 // ============================================================================
 
 #pragma once
@@ -30,6 +32,9 @@ public:
     static constexpr float NearZ = -135.0f;
     // 周回が始まってから歩き出すまでの秒数
     static constexpr float StartDelay = 4.0f;
+    // 懐中電灯で照らされて気づいた後、プレイヤーへ向かって来る秒数と、そのときの歩く速さの倍率
+    static constexpr float AlertSeconds = 3.0f;
+    static constexpr float AlertSpeedScale = 1.8f;
     // 1フレームの結果（何も起きない・捕まえた・すれ違った）
     enum class Result
     {
@@ -51,6 +56,9 @@ private:
     float m_SideWhenClose = 0.0f;
     bool m_Found = false;
     float m_NoticeTimer = 0.0f;
+    // 懐中電灯で照らされて気づいている残り秒数と、このフレームで新しく気づいたか
+    float m_AlertTimer = 0.0f;
+    bool m_NoticedThisFrame = false;
 
     // 廊下の奥から歩き直させている
     void Restart() noexcept
@@ -61,6 +69,7 @@ private:
         m_StartTimer = StartDelay;
         m_CameClose = false;
         m_SideWhenClose = 0.0f;
+        m_AlertTimer = 0.0f;
     }
 
 public:
@@ -84,13 +93,16 @@ public:
 
     // 1フレーム進めている。enabled はこの周回の異変がこれかどうか。
     // 捕まえた・すれ違ったフレームだけ、その結果を返している。
+    // lit は、懐中電灯の光がこの影に当たっているか（照らされると気づいて、しばらくプレイヤーへ速く向かって来る）
     Result Update(
         float deltaTime,
         const DirectX::SimpleMath::Vector3& playerPosition,
         bool playerMoving,
         bool playerHiding,
-        bool enabled) noexcept
+        bool enabled,
+        bool lit = false) noexcept
     {
+        m_NoticedThisFrame = false;
         if (!enabled || m_Found)
         {
             m_Active = false;
@@ -105,8 +117,24 @@ public:
         m_Active = true;
         m_Time += deltaTime;
 
+        // 懐中電灯で照らされると気づき、しばらくはプレイヤーの方へ速く歩いて来る（隠れている間は見失う）
+        if (lit && !playerHiding)
+        {
+            m_NoticedThisFrame = m_AlertTimer <= 0.0f;
+            m_AlertTimer = AlertSeconds;
+        }
+        else
+        {
+            m_AlertTimer = (std::max)(0.0f, m_AlertTimer - deltaTime);
+        }
+        const bool alerted = m_AlertTimer > 0.0f && !playerHiding;
+        if (alerted)
+        {
+            m_Direction = playerPosition.z >= m_Z ? 1.0f : -1.0f;
+        }
+
         // 廊下を往復して歩いている（端まで来たら折り返す）
-        m_Z += m_Direction * WalkSpeed * deltaTime;
+        m_Z += m_Direction * WalkSpeed * (alerted ? AlertSpeedScale : 1.0f) * deltaTime;
         if (m_Z < NearZ)
         {
             m_Z = NearZ;
@@ -121,8 +149,8 @@ public:
         // 横の動き：ゆっくりふらつき、近くでプレイヤーが動いていると、足音の方へ寄ってくる（止まっていれば、ほとんど寄らない）
         const float wander = std::sin(m_Time * 0.55f) * 6.0f;
         const float alongDistance = std::abs(playerPosition.z - m_Z);
-        const float pullRate = alongDistance < 60.0f ? (playerMoving ? 7.0f : 1.2f) : 0.0f;
-        const float targetX = alongDistance < 60.0f ? playerPosition.x : wander;
+        const float pullRate = alerted ? 9.0f : (alongDistance < 60.0f ? (playerMoving ? 7.0f : 1.2f) : 0.0f);
+        const float targetX = alerted || alongDistance < 60.0f ? playerPosition.x : wander;
         const float maximumStep = (pullRate > 0.0f ? pullRate : 3.0f) * deltaTime;
         m_X += (std::clamp)(targetX - m_X, -maximumStep, maximumStep);
         m_X = (std::clamp)(m_X, -30.0f, 30.0f);
@@ -190,6 +218,9 @@ public:
         return m_Active && GetHorizontalDistance(playerPosition) < PassingDistance * 1.6f;
     }
     bool IsActive() const noexcept { return m_Active; }
+    // 懐中電灯で照らされて、このフレームで新しく気づいたか／気づいてプレイヤーへ向かっている途中か
+    bool WasNoticedThisFrame() const noexcept { return m_NoticedThisFrame; }
+    bool IsAlerted() const noexcept { return m_Active && m_AlertTimer > 0.0f; }
     bool WasFound() const noexcept { return m_Found; }
     float GetNoticeTimer() const noexcept { return m_NoticeTimer; }
 };

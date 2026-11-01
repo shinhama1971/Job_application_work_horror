@@ -1058,8 +1058,17 @@ void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
 {
     const bool enabled = m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Unseen) &&
         !m_FinalSequence.IsSequenceActive();
+    // 懐中電灯の光が、見えない影の胸のあたりに当たっているか（光の円錐の中心付近で、75より近い）
+    bool lit = false;
+    if (enabled && m_UnseenPresence.IsActive() && player.IsFlashlightOn())
+    {
+        const Camera* camera = Core::Game::GetInstance()->GetCamera();
+        const Vector3 toChest = m_UnseenPresence.GetPosition() + Vector3(0.0f, 24.0f, 0.0f) - camera->GetPosition();
+        const float distance = toChest.Length();
+        lit = distance > 0.001f && distance < 75.0f && camera->GetForward().Dot(toChest / distance) > 0.95f;
+    }
     const UnseenPresenceAnomaly::Result result = m_UnseenPresence.Update(
-        deltaTime, player.GetPosition(), player.IsMovingHorizontally(), player.IsHiding(), enabled);
+        deltaTime, player.GetPosition(), player.IsMovingHorizontally(), player.IsHiding(), enabled, lit);
 
     // 無効化・捕獲・周回切替時の瞬間移動は歩行距離に数えない。
     Ground* ground = m_Objects.ground;
@@ -1105,6 +1114,14 @@ void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
     Renderer::SetUnseenFigure(shadowFoot, m_UnseenShadowVisibility);
 
     Core::Game* game = Core::Game::GetInstance();
+    if (m_UnseenPresence.WasNoticedThisFrame())
+    {
+        // 照らして気づかれた：影のいる所から短い息づかいが聞こえ、吊るした裸電球が揺れ、心拍が跳ねる
+        game->PlayAudioCueAt(SOUND_CUE_BREATH, m_UnseenPresence.GetPosition() + Vector3(0.0f, 36.0f, 0.0f), 0.70f, 0.55f);
+        KickHangingBulbs(0.35f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.22f, 0.30f);
+        Input::SetVibration(3, 0.10f);
+    }
     if (result == UnseenPresenceAnomaly::Result::Caught)
     {
         // 捕まった：足音の影に捕まったときと同じく、周回はそのままで入口へ戻している

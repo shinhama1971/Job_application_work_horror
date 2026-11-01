@@ -6,6 +6,7 @@
 // ・遮る所から画素までが遠いほど影の縁をぼかし（半影）、電球の下を通ると、床と壁に人の形の影だけが動いて見える。
 // ・異変の周回でないとき（UnseenFigure.w = 0）は、計算を丸ごと飛ばしている。
 // waterCaustics.hlsli（b12 の UnseenFigure・CausticView）と horrorMist.hlsli（GetMistEyePosition）の後に読み込んでいる。
+// 光の筋の Compute Shader（lightShaftsCS.hlsl）では、自分の定数バッファの UnseenFigure と GetMistEyePosition を用意して読み込んでいる。
 // ============================================================================
 #ifndef FIGURE_SHADOW_INCLUDED
 #define FIGURE_SHADOW_INCLUDED
@@ -46,37 +47,38 @@ float GetCapsuleOcclusion(float3 pixel, float3 light, float3 a, float3 b, float 
 {
     float along;
     const float distance = SegmentSegmentDistance(pixel, light, a, b, along);
-    const float penumbra = 0.8f + along * length(light - pixel) * 0.07f;
+    const float penumbra = 0.5f + along * length(light - pixel) * 0.045f;
     // 画素のすぐそば（自分の足もとの面）では遮らないようにしている
     return smoothstep(radius + penumbra, radius - penumbra * 0.5f, distance) * smoothstep(0.0f, 0.03f, along);
 }
 
 // 見えない影の人影が、lightPosition から worldPosition へ届く光をどれだけ通すか（0〜1）を返している。
-// 完全な黒にはせず、9割まで遮っている（まわりの照り返しが残るため）
+// 影で位置を読めるよう、ほぼ真っ黒（97%）まで遮っている（まわりの照り返しは環境光として残る）
 float GetUnseenFigureShadow(float3 worldPosition, float3 lightPosition)
 {
+    // 光の筋の Compute Shader では光源のループの中で何度も呼ぶため、途中で返さず、戻り値を1か所にまとめている
+    float visibility = 1.0f;
     [branch]
-    if (UnseenFigure.w <= 0.001f)
+    if (UnseenFigure.w > 0.001f)
     {
-        return 1.0f;
+        const float3 foot = UnseenFigure.xyz;
+        // 人影を囲む球（中心は胸の高さ、半径27）に、画素から光源への線分が届かない組み合わせは、点と線分の距離だけで先に飛ばしている
+        // （ほとんどの画素と光源はここで終わるため、重いカプセルの計算をしない）
+        const float3 center = foot + float3(0.0f, 19.0f, 0.0f);
+        const float3 toLight = lightPosition - worldPosition;
+        const float along = saturate(dot(center - worldPosition, toLight) / max(dot(toLight, toLight), 1e-4f));
+        const float3 closest = worldPosition + toLight * along - center;
+        [branch]
+        if (dot(closest, closest) <= 27.0f * 27.0f)
+        {
+            const float body = GetCapsuleOcclusion(worldPosition, lightPosition,
+                foot + float3(0.0f, 4.0f, 0.0f), foot + float3(0.0f, 29.0f, 0.0f), 5.4f);
+            const float head = GetCapsuleOcclusion(worldPosition, lightPosition,
+                foot + float3(0.0f, 35.5f, 0.0f), foot + float3(0.0f, 36.5f, 0.0f), 3.8f);
+            visibility = 1.0f - max(body, head) * 0.97f * saturate(UnseenFigure.w);
+        }
     }
-    const float3 foot = UnseenFigure.xyz;
-    // 人影を囲む球（中心は胸の高さ、半径27）に、画素から光源への線分が届かない組み合わせは、点と線分の距離だけで先に飛ばしている
-    // （ほとんどの画素と光源はここで終わるため、重いカプセルの計算をしない）
-    const float3 center = foot + float3(0.0f, 19.0f, 0.0f);
-    const float3 toLight = lightPosition - worldPosition;
-    const float along = saturate(dot(center - worldPosition, toLight) / max(dot(toLight, toLight), 1e-4f));
-    const float3 closest = worldPosition + toLight * along - center;
-    [branch]
-    if (dot(closest, closest) > 27.0f * 27.0f)
-    {
-        return 1.0f;
-    }
-    const float body = GetCapsuleOcclusion(worldPosition, lightPosition,
-        foot + float3(0.0f, 4.0f, 0.0f), foot + float3(0.0f, 29.0f, 0.0f), 5.4f);
-    const float head = GetCapsuleOcclusion(worldPosition, lightPosition,
-        foot + float3(0.0f, 35.5f, 0.0f), foot + float3(0.0f, 36.5f, 0.0f), 3.8f);
-    return 1.0f - max(body, head) * 0.9f * saturate(UnseenFigure.w);
+    return visibility;
 }
 
 // 懐中電灯（目の位置から照らしている）の光を、見えない影の人影が遮った残りの割合を返している

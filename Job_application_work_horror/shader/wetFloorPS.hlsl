@@ -397,16 +397,20 @@ float RaySegmentDistance(float3 origin, float3 direction, float3 a, float3 b, ou
 // 人影は脚・胴・頭・両腕のカプセルで表し、光線がカプセルの芯に一番近づく距離から、輪郭のぼけた影の濃さを求めている。
 // 両腕は、目から見た左右（目へ向く向きと直角な水平の向き）に垂らしている。
 // 物として置いていないので、画面にも鏡にも映らず、レイ反射の水面にだけ映る（PuddleReflectionAnomaly.h）
+// PuddleFigure.w が負のときは、1面の西棟の天井に逆さまに張り付いた人影（足もとが天井で、頭が下）として、同じ形を上下逆に描いている
 float TracePuddleFigure(float3 origin, float3 direction)
 {
+    const float visibility = abs(PuddleFigure.w);
     [branch]
-    if (PuddleFigure.w <= 0.001f)
+    if (visibility <= 0.001f)
     {
         return 0.0f;
     }
     const float3 foot = PuddleFigure.xyz;
+    // 足もとから頭への向き（床に立つ人影は上、天井に張り付いた人影は下）
+    const float3 up = float3(0.0f, PuddleFigure.w < 0.0f ? -1.0f : 1.0f, 0.0f);
     // 人影を囲む球（中心は胸の高さ、半径28）のそばを通らない光線は、点と光線の距離だけで先に飛ばしている
-    const float3 toCenter = foot + float3(0.0f, 19.0f, 0.0f) - origin;
+    const float3 toCenter = foot + up * 19.0f - origin;
     const float alongCenter = max(dot(toCenter, direction), 0.0f);
     const float3 missCenter = toCenter - direction * alongCenter;
     [branch]
@@ -416,11 +420,11 @@ float TracePuddleFigure(float3 origin, float3 direction)
     }
     float rayDistance;
     // 脚（細め）・胴（肩幅）・頭（足もとから36の高さ。PuddleReflectionAnomaly::FigureHeadHeight と合わせている）
-    const float legs = RaySegmentDistance(origin, direction, foot + float3(0.0f, 1.0f, 0.0f), foot + float3(0.0f, 17.0f, 0.0f), rayDistance);
+    const float legs = RaySegmentDistance(origin, direction, foot + up * 1.0f, foot + up * 17.0f, rayDistance);
     float coverage = rayDistance > 0.5f ? smoothstep(4.4f, 2.6f, legs) : 0.0f;
-    const float torso = RaySegmentDistance(origin, direction, foot + float3(0.0f, 19.0f, 0.0f), foot + float3(0.0f, 28.0f, 0.0f), rayDistance);
+    const float torso = RaySegmentDistance(origin, direction, foot + up * 19.0f, foot + up * 28.0f, rayDistance);
     coverage = max(coverage, rayDistance > 0.5f ? smoothstep(6.2f, 4.4f, torso) : 0.0f);
-    const float head = RaySegmentDistance(origin, direction, foot + float3(0.0f, 35.5f, 0.0f), foot + float3(0.0f, 36.5f, 0.0f), rayDistance);
+    const float head = RaySegmentDistance(origin, direction, foot + up * 35.5f, foot + up * 36.5f, rayDistance);
     coverage = max(coverage, rayDistance > 0.5f ? smoothstep(4.6f, 3.2f, head) : 0.0f);
     const float2 toEye = GetMistEyePosition().xz - foot.xz;
     const float2 side = float2(-toEye.y, toEye.x) / max(length(toEye), 0.001f);
@@ -429,10 +433,10 @@ float TracePuddleFigure(float3 origin, float3 direction)
     {
         const float3 offset = float3(side.x, 0.0f, side.y) * (arm == 0 ? 6.6f : -6.6f);
         const float reach = RaySegmentDistance(origin, direction,
-            foot + offset * 1.08f + float3(0.0f, 12.0f, 0.0f), foot + offset + float3(0.0f, 28.0f, 0.0f), rayDistance);
+            foot + offset * 1.08f + up * 12.0f, foot + offset + up * 28.0f, rayDistance);
         coverage = max(coverage, rayDistance > 0.5f ? smoothstep(2.9f, 1.6f, reach) : 0.0f);
     }
-    return coverage * saturate(PuddleFigure.w);
+    return coverage * saturate(visibility);
 }
 
 // レイ反射の本体：水面で反射した光線を、まず画面の中（SSR）でたどり、外れた所を部屋の形との交差で埋めている。

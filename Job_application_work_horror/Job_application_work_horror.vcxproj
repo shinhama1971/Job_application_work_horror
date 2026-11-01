@@ -392,6 +392,7 @@
     <ClInclude Include="Stage1LightStalker.h" />
     <ClInclude Include="Stage1SafeLights.h" />
     <ClInclude Include="Stage1WestWing.h" />
+    <ClInclude Include="CeilingReflectionScare.h" />
     <ClInclude Include="KeyItem.h" />
     <ClInclude Include="Locker.h" />
     <ClInclude Include="CaptureMode.h" />

@@ -35,7 +35,7 @@ cbuffer WaterCausticsBuffer : register(b12)
     float4 ReflectionParams;
     // 2面の「血の手形」の異変で壁に浮かべる手形（x = 壁の表面のx、y = 高さ、z = 奥行き、w = 見え方0〜1。0なら描かない）
     float4 WallHandprints[4];
-    // 2面の「水たまり」の異変で水面にだけ映す人影（xyz = 足もとの位置、w = 見え方0〜1。0なら描かない）
+    // 水面にだけ映す人影（xyz = 足もとの位置、w = 見え方0〜1。0なら描かない。負なら天井に逆さまに張り付いた人影（1面の西棟））
     float4 PuddleFigure;
     // 2面の「見えない影」の異変で、影だけを落とす人影（xyz = 足もとの位置、w = 見え方0〜1。0なら影を付けない。figureShadow.hlsli）
     float4 UnseenFigure;

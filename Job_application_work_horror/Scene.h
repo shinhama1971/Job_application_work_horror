@@ -40,6 +40,8 @@ enum class SceneDebugAction
     ShowUnseenAnomaly,
     // 2面：水たまりの異変の周回にしている（手で試すときと、自動撮影で水面に映る人影を写すときに使っている）
     ShowPuddleAnomaly,
+    // 1面：西棟の水面にだけ映る天井の人影を、すぐに出している（手で試すときと、自動撮影で写すときに使っている）
+    ShowCeilingReflection,
     // 撮影用：通常プレイでは呼ばず、4周目の開始部屋を再現する。
     ShowHauntedStartDoor
 };

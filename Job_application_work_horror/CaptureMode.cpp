@@ -95,6 +95,12 @@ namespace
         { 55.0f, Vector3(-292.0f, FloorY, -66.0f), Pi, -0.62f, nullptr, false },
         { 57.0f, Vector3(-292.0f, FloorY, -67.0f), Pi, -0.62f, L"05b2_1面_西棟の排水バルブ", false },
         { 58.5f, Vector3(-295.0f, FloorY, -70.0f), 0.0f, -0.08f, nullptr, false },
+        // 水の中を奥へ進みながら足元の水面をのぞくと、水面にだけ、少し先の天井に逆さまに張り付いた人影が映る。見上げると何もいない
+        { 59.6f, Vector3(-298.0f, FloorY, 20.0f), 0.0f, -0.08f, nullptr, false },
+        { 60.2f, Vector3(-298.0f, FloorY, 20.0f), 0.0f, -1.00f, nullptr, false },
+        { 61.4f, Vector3(-298.0f, FloorY, 20.0f), 0.0f, -1.00f, L"05b3_1面_西棟の水面に映る天井の人影", false },
+        { 61.9f, Vector3(-298.0f, FloorY, 20.0f), 0.0f, 0.35f, nullptr, false },
+        { 62.6f, Vector3(-298.0f, FloorY, 20.0f), 0.0f, 0.35f, L"05b4_1面_見上げると何もいない", false },
         { 64.0f, Vector3(-300.0f, FloorY, 150.0f), 0.0f, -0.08f, nullptr, false },
         { 67.0f, Vector3(-300.0f, FloorY, 195.0f), YawToward(-300.0f, 195.0f, -345.0f, 235.0f), -0.12f, nullptr, false },
         { 72.5f, Vector3(-262.0f, FloorY, 196.0f), YawToward(-262.0f, 196.0f, -320.0f, 240.0f), -0.30f, nullptr, false },
@@ -153,6 +159,8 @@ namespace
     // 1面で、この時刻の間だけ懐中電灯を消している（消したときの暗さを写すため）
     constexpr float Stage1FlashlightOffStart = 28.5f;
     constexpr float Stage1FlashlightOffEnd = 29.4f;
+    // 1面の西棟で、この時刻に天井の人影を出している（水面にだけ映る、天井に逆さまに張り付いた人影を写すため）
+    constexpr float CeilingReflectionRequestTime = 59.0f;
     // 1面の最後で、この時刻に突き当たりの最後のドアを開けている（開けた瞬間に開始地点の奥のドアへつながる様子を写すため）
     constexpr float Stage1EndDoorOpenTime = 119.0f;
     // 濡れた足跡の場面の前に、2周目へ進めている（誰かの足跡は2周目から出る）
@@ -218,11 +226,11 @@ namespace
         { 81.5f, Vector3(4.0f, FloorY, 46.0f), YawToward(4.0f, 46.0f, -39.3f, 70.0f), -0.08f, L"20_2面_偽の扉", false },
         { 82.5f, Vector3(4.0f, FloorY, 46.0f), YawToward(4.0f, 46.0f, -39.3f, 70.0f), -0.08f, nullptr, false },
         // 見えない影の異変：廊下の奥から姿の見えない影が歩いてくる。姿は映らないが、吊るした裸電球と天井の照明の下を通ると、
-        // 床と壁に人の形の影だけが落ちる（奥の裸電球の手前に立ち、影が電球の下を通って近づくのを、捕まる前まで見ている）
-        { 83.6f, Vector3(0.0f, FloorY, 32.0f), 0.0f, -0.10f, nullptr, false },
-        { 90.6f, Vector3(0.0f, FloorY, 32.0f), 0.0f, -0.10f, L"20e_2面_見えない影が落とす影", false },
-        { 91.6f, Vector3(0.0f, FloorY, 32.0f), 0.0f, -0.16f, L"20f_2面_近づいてくる影だけの人影", false },
-        { 92.0f, Vector3(0.0f, FloorY, 32.0f), 0.0f, -0.16f, nullptr, false },
+        // 床と壁に人の形の影だけが落ちる（奥の裸電球の手前に立ち、影が電球の下を通って近づくのを、捕まる前まで見ている。懐中電灯で照らすと気づかれて速く寄ってくるので、少し左を向いて照らさないようにしている）
+        { 83.6f, Vector3(0.0f, FloorY, 32.0f), -0.35f, -0.10f, nullptr, false },
+        { 90.6f, Vector3(0.0f, FloorY, 32.0f), -0.35f, -0.10f, L"20e_2面_見えない影が落とす影", false },
+        { 91.6f, Vector3(0.0f, FloorY, 32.0f), -0.35f, -0.16f, L"20f_2面_近づいてくる影だけの人影", false },
+        { 92.0f, Vector3(0.0f, FloorY, 32.0f), -0.35f, -0.16f, nullptr, false },
         { 92.6f, Vector3(-30.0f, FloorY, 32.0f), Pi, -0.10f, nullptr, false },
         // 中央の水たまりの手前で足元をのぞくと、水面にだけ、向こう側に立つ人影が逆さまに映る（のぞき続けると一歩ずつ近づく）。
         // 顔を上げると、そこには誰もいない
@@ -331,6 +339,7 @@ namespace
     // 2面の道順で、偽の扉の異変を出したか
     bool g_FalseDoorRequested = false;
     bool g_PuddleAnomalyRequested = false;
+    bool g_CeilingReflectionRequested = false;
     bool g_UnseenAnomalyRequested = false;
     // 2面の道順で、最後の停電を始めたか
     bool g_FinalSequenceRequested = false;
@@ -858,6 +867,7 @@ namespace Tools::CaptureMode
             g_PortraitAnomalyRequested = false;
             g_FalseDoorRequested = false;
             g_PuddleAnomalyRequested = false;
+            g_CeilingReflectionRequested = false;
             g_UnseenAnomalyRequested = false;
             g_FinalSequenceRequested = false;
             Log(std::string("start tour: ") + SceneLabel(scene));
@@ -898,6 +908,16 @@ namespace Tools::CaptureMode
                 current->RequestDebugAction(scene == SceneName::Stage
                     ? SceneDebugAction::ShowHauntedStartDoor : SceneDebugAction::ShowUnseenAnomaly);
             Log("feature setup");
+        }
+        // 1面: 西棟の水の中で、天井の人影を出している（水面をのぞいたときだけ映る）
+        if (scene == SceneName::Stage && !g_CeilingReflectionRequested && g_TourTime >= CeilingReflectionRequestTime)
+        {
+            g_CeilingReflectionRequested = true;
+            if (Scene* currentScene = game->GetScene())
+            {
+                currentScene->RequestDebugAction(SceneDebugAction::ShowCeilingReflection);
+                Log("show ceiling reflection");
+            }
         }
         // 1面: 最後に、突き当たりの最後のドアを開けている（開けた瞬間に、開始地点の奥のドアの裏側へ移る）
         if (scene == SceneName::Stage && !g_EndDoorOpenRequested && g_TourTime >= Stage1EndDoorOpenTime)

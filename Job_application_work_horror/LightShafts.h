@@ -12,7 +12,8 @@ namespace Effect {
 class LightShafts final {
     using Matrix=DirectX::SimpleMath::Matrix;
     using Vector4=DirectX::SimpleMath::Vector4;
-    struct Parameters { Matrix inverse; Vector4 eyeTime; Vector4 viewport; UINT count; float padding[3]; };
+    // figure は見えない影の人影（xyz = 足もと、w = 見え方）。光の筋の中にも、人の形の影を落とすために渡している
+    struct Parameters { Matrix inverse; Vector4 eyeTime; Vector4 viewport; UINT count; float padding[3]; Vector4 figure; };
     Microsoft::WRL::ComPtr<ID3D11Texture2D> texture;
     Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> uav;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv, lightSRV;
@@ -49,6 +50,7 @@ public:
         Parameters p{};p.inverse=(view*projection).Invert().Transpose();
         const auto eye=view.Invert().Translation();p.eyeTime=Vector4(eye.x,eye.y,eye.z,time);
         p.viewport=Vector4(viewport.Width,viewport.Height,viewport.TopLeftX,viewport.TopLeftY);p.count=count;
+        p.figure=Renderer::GetUnseenFigure();
         c->UpdateSubresource(parameters.Get(),0,nullptr,&p,0,0);
         ID3D11RenderTargetView* target=Renderer::GetBackBufferRTV();c->OMSetRenderTargets(1,&target,nullptr);
         ID3D11Buffer* cb=parameters.Get();c->CSSetConstantBuffers(0,1,&cb);

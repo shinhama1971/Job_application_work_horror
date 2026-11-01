@@ -124,7 +124,7 @@ struct WATER_CAUSTICS_BUFFER
     DirectX::SimpleMath::Vector4 Reflection;
     // 2面の「血の手形」の異変で壁に浮かべる手形（x = 壁の表面のx、y = 高さ、z = 奥行き、w = 見え方0〜1。0なら描かない）
     DirectX::SimpleMath::Vector4 Handprints[4];
-    // 2面の「水たまり」の異変で水面にだけ映す人影（xyz = 足もとの位置、w = 見え方0〜1。0なら描かない）
+    // 水面にだけ映す人影（xyz = 足もとの位置、w = 見え方0〜1。0なら描かない。負なら天井に逆さまに張り付いた人影）
     DirectX::SimpleMath::Vector4 PuddleFigure;
     // 2面の「見えない影」の異変で、影だけを落とす人影（xyz = 足もとの位置、w = 見え方0〜1。0なら影を付けない。shader/figureShadow.hlsli）
     DirectX::SimpleMath::Vector4 UnseenFigure;
@@ -313,10 +313,13 @@ public:
 		bool screenSpaceAvailable = false);
 	// 2面の「血の手形」の異変で壁に浮かべる手形（最大4つ。x = 壁の表面のx、y = 高さ、z = 奥行き、w = 見え方）を、壁のシェーダーへ渡している。countが0なら描かない
 	static void SetWallHandprints(const DirectX::SimpleMath::Vector4* handprints, int count);
-	// 2面の「水たまり」の異変で、水面にだけ映す人影の足もとの位置と見え方（0〜1。0なら描かない）を、床のシェーダーへ渡している
-	static void SetPuddleFigure(const DirectX::SimpleMath::Vector3& footPosition, float visibility);
+	// 水面にだけ映す人影の足もとの位置と見え方（0〜1。0なら描かない）を、床のシェーダーへ渡している。
+	// 2面の「水たまり」の異変は床に立つ人影、hanging が true なら1面の西棟の天井に逆さまに張り付いた人影（足もとが天井）
+	static void SetPuddleFigure(const DirectX::SimpleMath::Vector3& footPosition, float visibility, bool hanging = false);
 	// 2面の「見えない影」の異変で、影だけを落とす人影の足もとの位置と見え方（0〜1。0なら影を付けない）を、壁と床のシェーダーへ渡している
 	static void SetUnseenFigure(const DirectX::SimpleMath::Vector3& footPosition, float visibility);
+	// 今の見えない影の人影（xyz = 足もと、w = 見え方）。光の筋の Compute Shader にも同じ人影の影を落とすために渡している
+	static DirectX::SimpleMath::Vector4 GetUnseenFigure() { return m_WaterCaustics.UnseenFigure; }
 	// 計測モード（--figures）用：異変の進行に関係なく、2つの人影を指定した位置に見え方1で置き続けている（人影の描画の重さを測るため）
 	static void SetFigureOverride(bool enabled,
 		const DirectX::SimpleMath::Vector3& puddleFoot, const DirectX::SimpleMath::Vector3& unseenFoot);

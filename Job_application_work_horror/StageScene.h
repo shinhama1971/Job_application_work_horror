@@ -20,6 +20,7 @@
 #include "RadioStatic.h"
 #include "PropLayoutEditor.h"
 #include "FootprintFollower.h"
+#include "CeilingReflectionScare.h"
 
 #include <array>
 #include <cstddef>
@@ -59,6 +60,8 @@ private:
     void UpdateWallWritings(class Player& player);
     // 誰かの濡れた足跡：西棟の水から初めて乾いた床へ出ると、同じ水から裸足の足跡が一歩ずつ後をついて来る（1回だけ）
     void UpdateFootprintFollower(class Player& player);
+    // 西棟の水面にだけ映る、天井に逆さまに張り付いた人影（見上げると何もいない。1回だけ）
+    void UpdateCeilingReflection(const class Player& player, float deltaTime);
     // 今の危険度（0〜1）を返している。一番近くに出ている影までの距離と、隠し部屋に閉じ込められているかから求めている。
     float ComputeThreatRate(const class Player& player) const;
     // 危険度に合わせて、自分の心拍音と呼吸音を鳴らしている。
@@ -109,6 +112,8 @@ private:
     Stage1HiddenRoomEvent m_HiddenRoom;
     // 西棟（浸水した機械室）。鍵を拾って扉を開け、排水バルブで水を抜き、奥で3本目のヒューズを取る必須の区画。
     Stage1WestWing m_WestWing;
+    // 西棟の水面にだけ映る、天井の人影の演出
+    CeilingReflectionScare m_CeilingScare;
     // 光の安全地帯（暖かい灯りの下）。落ち着きの度合いと、休んでいる間の電池の回復を管理している。
     Stage1SafeLights m_SafeLights;
     // 小物の配置のファイルを読み直したときの知らせと、その残り秒数（Debug版の F5）

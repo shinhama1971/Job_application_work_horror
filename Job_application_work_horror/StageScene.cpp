@@ -11,6 +11,7 @@
 
 #include "Player.h"
 #include "Wall.h"
+#include "Ground.h"
 #include "Item.h"
 #include "Door.h"
 #include "FuseBox.h"
@@ -83,6 +84,8 @@ void StageScene::Init()
     m_KeypadDoor.Init(m_Objects.keypad);
     m_HiddenRoom.Init(m_Objects.hiddenRoom);
     m_WestWing.Init(m_Objects.westWing);
+    m_CeilingScare.Reset();
+    Renderer::SetPuddleFigure(Vector3::Zero, 0.0f);
     m_SafeLights.Init(m_Objects.safeZones);
     // 照らすと止まる影の判定と押し戻しに使う壁と扉を、一度だけ集めている（毎フレーム全Objectを調べないため）
     m_ArchiveStalker = Stage1LightStalker{};
@@ -257,6 +260,11 @@ void StageScene::UpdateRouteLights()
 // 自動撮影から、最後のドアを調べたのと同じように開けている（開けた瞬間の周回の切り替えは、次のUpdateで普段どおり行われる）
 void StageScene::RequestDebugAction(SceneDebugAction action)
 {
+    if (action == SceneDebugAction::ShowCeilingReflection)
+    {
+        m_CeilingScare.ForceArm();
+        return;
+    }
     if (action == SceneDebugAction::ShowHauntedStartDoor && m_Objects.startDoor != nullptr)
     {
         m_CorridorLoopCount = 4;
@@ -270,6 +278,46 @@ void StageScene::RequestDebugAction(SceneDebugAction action)
         endDoor != nullptr && player != nullptr && endDoor->IsInteractionEnabled())
     {
         endDoor->Interact(*player);
+    }
+}
+
+// 西棟に入ってしばらくすると、少し先の天井に黒い人影が逆さまに張り付く。目では見えず、足元の水面をのぞいたときだけ
+// 水面に映る（床のシェーダーのレイ反射で、逆さまのカプセルとして描いている）。見た後に見上げると何もおらず、
+// その真下の水面に滴が落ちて波紋が広がる。1回のプレイで一度だけ。
+void StageScene::UpdateCeilingReflection(const Player& player, float deltaTime)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    const Camera* camera = game->GetCamera();
+    Ground* ground = m_Objects.westWing.ground;
+    const auto isInWater = [ground](const Vector3& position)
+    {
+        return ground != nullptr && ground->IsInsidePuddle(position);
+    };
+    const CeilingReflectionScare::Event scareEvent = m_CeilingScare.Update(
+        deltaTime, Stage1WestWing::IsInside(player.GetPosition()), camera->GetPosition(), camera->GetForward(),
+        Vector2(Stage1WestWing::MinX, Stage1WestWing::MinZ), Vector2(Stage1WestWing::MaxX, Stage1WestWing::MaxZ),
+        isInWater);
+    const Vector3 position = m_CeilingScare.GetPosition();
+    Renderer::SetPuddleFigure(position, m_CeilingScare.GetVisibility(), true);
+
+    if (scareEvent == CeilingReflectionScare::Event::Seen)
+    {
+        // 水面の人影に気づいた：真上から、かすかな息づかいが降ってくる
+        game->PlayAudioCueAt(SOUND_CUE_BREATH, position - Vector3(0.0f, CeilingReflectionScare::HeadDrop, 0.0f), 0.74f, 0.42f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.16f, 0.30f);
+        Input::SetVibration(3, 0.10f);
+    }
+    else if (scareEvent == CeilingReflectionScare::Event::Vanished)
+    {
+        // 見上げると何もいない：人影がいた真下の水面に滴が落ち、波紋が広がる
+        const Vector3 below(position.x, CeilingReflectionScare::WaterY, position.z);
+        if (ground != nullptr)
+        {
+            ground->AddRippleImpulse(below, 2.0f, -1.5f);
+        }
+        game->PlayAudioCueAt(SOUND_CUE_WATER_STEP, below, 1.35f, 0.70f);
+        game->GetPostProcess()->TriggerHorrorPulse(0.26f, 0.36f);
+        Input::SetVibration(5, 0.14f);
     }
 }
 
@@ -408,6 +456,7 @@ void StageScene::Update()
         game->PlayAudioCueAt(
             cue.Label, cue.Position, cue.Pitch, cue.Volume, cue.MinimumOcclusion);
     }
+    UpdateCeilingReflection(*player, deltaTime);
     UpdateRouteLights();
     UpdateTensionPulse(*player, deltaTime);
 
@@ -566,6 +615,7 @@ void StageScene::Uninit()
     // ほかの面の壁は前の見た目に戻している（シーンを切り替えるときは、古いSceneの破棄が先に行われる）。
     Renderer::SetWallWeathering(0.0f);
     Renderer::SetRoomOcclusion(nullptr, 0, 0.0f, 0.0f, 0.0f);
+    Renderer::SetPuddleFigure(Vector3::Zero, 0.0f);
     Core::Game::GetInstance()->GetPostProcess()->SetAtmosphere(0.18f, 0.55f);
     Core::Game::GetInstance()->GetPostProcess()->SetExposure(1.0f);
     Core::Game::GetInstance()->GetPostProcess()->SetCorridorTension(0.0f);

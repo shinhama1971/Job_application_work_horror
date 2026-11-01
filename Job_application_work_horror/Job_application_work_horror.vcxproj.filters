@@ -713,6 +713,9 @@
     <ClInclude Include="Stage1WestWing.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
+    <ClInclude Include="CeilingReflectionScare.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
     <ClInclude Include="KeyItem.h">
       <Filter>ソース ファイル\Gameplay</Filter>
     </ClInclude>

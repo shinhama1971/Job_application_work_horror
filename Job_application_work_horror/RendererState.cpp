@@ -158,8 +158,13 @@ void Renderer::SetWallHandprints(const Vector4* handprints, int count)
 }
 
 // 2面の「水たまり」の異変の人影をb12へ設定している（レイ反射で、反射の光線と人影の形を交差させる）
-void Renderer::SetPuddleFigure(const Vector3& footPosition, float visibility)
+void Renderer::SetPuddleFigure(const Vector3& footPosition, float visibility, bool hanging)
 {
+	// 天井に逆さまに張り付いた人影は、見え方を負にして床のシェーダーへ知らせている
+	if (hanging)
+	{
+		visibility = -visibility;
+	}
 	if (!m_pWaterCausticsBuffer)
 	{
 		return;
