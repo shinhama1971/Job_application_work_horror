@@ -832,7 +832,20 @@ void Stage2Scene::UpdatePuddleAnomaly(const Player& player, float deltaTime)
 
     // 人影の足もとの位置と見え方を、床のシェーダー（レイ反射）へ渡している。見え方が0なら描かない
     const Vector3 figurePosition = m_PuddleAnomaly.GetFigurePosition();
-    Renderer::SetPuddleFigure(figurePosition, m_PuddleAnomaly.GetVisibility());
+    // 最後の追跡では、迫ってくる影も水面に映している。影を直接見ると罰があるが、水面に映った影なら見ても罰はなく、
+    // 振り返って足元の水たまりをのぞけば、追っ手がどこまで来ているかを確かめられる。
+    // 影は物としても描いているが、画面の外にある上半身まで水面に映るよう、レイ反射の人影としても重ねている
+    const ShadowMan* pursuer = m_Objects.shadow;
+    if (m_FinalSequence.IsPursuitActive() && pursuer != nullptr && pursuer->IsActive())
+    {
+        const Vector3 pursuerPosition = pursuer->GetPosition();
+        Renderer::SetPuddleFigure(
+            Vector3(pursuerPosition.x, PuddleReflectionAnomaly::FloorY, pursuerPosition.z), 1.0f);
+    }
+    else
+    {
+        Renderer::SetPuddleFigure(figurePosition, m_PuddleAnomaly.GetVisibility());
+    }
 
     if (puddleEvent == PuddleReflectionAnomaly::Event::Seen)
     {
@@ -1092,6 +1105,13 @@ void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
         if (direction.LengthSquared() >= 7.0f * 7.0f)
         {
             const float yaw = std::atan2(direction.x, direction.z);
+            // 水たまりの中を歩くと、姿は見えないまま、足もとから波紋が広がり、ぴちゃりと水音が鳴る
+            // （遠くからでも「あの水たまりを今通った」と分かる手がかり）
+            if (ground->IsInsidePuddle(position))
+            {
+                ground->AddRippleImpulse(Vector3(position.x, -100.0f, position.z), 1.6f, -1.3f);
+                Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_WATER_STEP, position, 0.72f, 0.60f);
+            }
             if (m_UnseenWetSteps > 0)
             {
                 const Vector2 right(std::cos(yaw), -std::sin(yaw));

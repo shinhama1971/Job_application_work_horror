@@ -52,6 +52,22 @@ cbuffer ShadowBuffer : register(b8)
     float4 ShadowParameters;
 };
 
+// 水面の光の揺らぎの定数バッファ（b12。shader/waterCaustics.hlsli と同じ並びの、見えない影の人影まで）。
+// 本描画で設定したまま残っているものを、プレイヤーの視点のビュー行列と見えない影の人影の位置のために読んでいる
+cbuffer WaterCausticsBuffer : register(b12)
+{
+    matrix CausticView;
+    float4 CausticFloodRect;
+    float4 CausticParameters;
+    float4 CausticRipple;
+    matrix CausticProjection;
+    float4 ReflectionParams;
+    float4 WallHandprints[4];
+    float4 PuddleFigure;
+    // 見えない影の人影（xyz = 足もと、w = 見え方。0なら光の帯に影を付けない）
+    float4 UnseenFigure;
+};
+
 // 懐中電灯から見た深度（シャドウマップ、t5）とサンプラー
 Texture2D<float> FlashlightDepth : register(t5);
 SamplerState LinearSampler : register(s0);
@@ -79,6 +95,32 @@ float ValueNoise(float2 value)
         Hash(cell + float2(1.0f, 1.0f)),
         local.x);
     return lerp(bottom, top, local.y);
+}
+
+// 見えない影の人影が、この画素の光の帯をどこで遮るか。遮る度合い（0〜1）を返し、遮る所までの距離を distance に返している。
+// 懐中電灯は目のすぐそばにあるので、目から見た人影の形が、そのまま光の帯の中の影の形になる（人影の先の霧には光が届かない）。
+// 人影は胴から頭までのカプセル1本で表し、ビュー空間で、画素の視線とカプセルの芯が一番近づく距離から求めている
+float GetUnseenFigureBeamOcclusion(float3 viewDirection, out float distance)
+{
+    distance = 0.0f;
+    float occlusion = 0.0f;
+    [branch]
+    if (UnseenFigure.w > 0.001f)
+    {
+        const float3 bottom = mul(float4(UnseenFigure.xyz + float3(0.0f, 4.0f, 0.0f), 1.0f), CausticView).xyz;
+        const float3 top = mul(float4(UnseenFigure.xyz + float3(0.0f, 36.0f, 0.0f), 1.0f), CausticView).xyz;
+        // 視線（目からviewDirectionの向き）と線分 bottom-top の一番近い点を求めている
+        const float3 segment = top - bottom;
+        const float segmentLength2 = max(dot(segment, segment), 1e-4f);
+        const float along = dot(viewDirection, segment);
+        const float rayOffset = dot(viewDirection, -bottom);
+        const float segmentOffset = dot(segment, -bottom);
+        const float segmentT = saturate((segmentOffset - along * rayOffset) / max(segmentLength2 - along * along, 1e-4f));
+        distance = max(along * segmentT - rayOffset, 0.0f);
+        const float miss = length(viewDirection * distance - (bottom + segment * segmentT));
+        occlusion = distance > 1.0f ? smoothstep(6.6f, 4.2f, miss) * saturate(UnseenFigure.w) : 0.0f;
+    }
+    return occlusion;
 }
 
 // シャドウマップの深度（0〜1）を、実際の距離に戻している
@@ -130,8 +172,21 @@ float4 main(PS_IN input) : SV_Target
     const float radial = saturate(1.0f - length(shadowNdc));
     const float softBeam = radial * radial * (3.0f - 2.0f * radial);
     // 平方根で変化させ、壁の近くの短い光線も見せつつ、長い廊下では散乱した光を多くためている。
-    const float visibleLength = sqrt(saturate(
+    float visibleLength = sqrt(saturate(
         (occluderDistance - 2.0f) / 120.0f));
+    // 見えない影の人影が光の帯の中に立つと、その先の霧には光が届かず、帯の中に人の形の暗い切れ目ができる
+    // （目には見えないが、照らすと形が浮かぶ。照らされた影は気づいて寄ってくる。UnseenPresenceAnomaly.h）
+    float figureDistance;
+    const float3 viewDirection = normalize(float3(
+        screenNdc.x * screenAspect * mainTanHalfFov, screenNdc.y * mainTanHalfFov, 1.0f));
+    const float figureOcclusion = GetUnseenFigureBeamOcclusion(viewDirection, figureDistance);
+    [branch]
+    if (figureOcclusion > 0.0f && figureDistance < occluderDistance)
+    {
+        // 人影までの短い区間の霧だけが光り、その先は暗い（人影の手前の霧も少し薄くして、輪郭をはっきりさせている）
+        const float lengthToFigure = sqrt(saturate((figureDistance - 2.0f) / 120.0f)) * 0.55f;
+        visibleLength = lerp(visibleLength, lengthToFigure, figureOcclusion);
+    }
     // 画面の下の方（床）では薄くしている
     const float floorFade = 1.0f - smoothstep(0.62f, 0.98f, input.uv.y);
 

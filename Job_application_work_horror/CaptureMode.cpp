@@ -249,6 +249,10 @@ namespace
         { 102.0f, Vector3(25.0f, FloorY, -8.0f), YawToward(25.0f, -8.0f, -30.0f, -40.0f), -0.50f, nullptr, false },
         { 102.5f, Vector3(25.0f, FloorY, -8.0f), YawToward(25.0f, -8.0f, -30.0f, -40.0f), -0.50f, L"22_2面_最後の追跡", false },
         { 103.0f, Vector3(25.0f, FloorY, -8.0f), YawToward(25.0f, -8.0f, -30.0f, -40.0f), -0.50f, nullptr, false },
+        // 中央の水たまりの奥側へ走り抜け、振り返って足元の水面をのぞく。追っ手を直接見ずに、水面に映った影で位置を確かめている
+        { 103.6f, Vector3(9.0f, FloorY, 36.0f), Pi, -0.90f, nullptr, false },
+        { 104.4f, Vector3(9.0f, FloorY, 36.0f), Pi, -0.90f, L"22b_2面_水面に映る追っ手", false },
+        { 104.8f, Vector3(9.0f, FloorY, 36.0f), Pi, -0.90f, nullptr, false },
     };
 
     // 角度の補間。差を-π〜πに直してから補間し、遠回りの方向へ回らないようにしている

@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-01",
+  "method": "実機自動撮影（--capture）と技術デモの自動撮影（--screenshots）。コピー後のバイト一致を確認。画像の明るさ・色は未加工。",
+  "images": [
+    {
+      "source": "capture/20b_2面_水たまりに映る人影.png",
+      "target": "docs/images/game_07_puddle_reflection_20261101.png",
+      "role": "水たまりの異変（2周目の出方）。水面にだけ映る人影",
+      "view": "通常表示",
+      "sha256": "bed5172c99acde51ad820e9c32e1834b51590bdba80a96ed10d6f4afc4932e7c"
+    },
+    {
+      "source": "capture/05b3_1面_西棟の水面に映る天井の人影.png",
+      "target": "docs/images/game_08_ceiling_reflection_20261101.png",
+      "role": "西棟の水面にだけ映る、天井の逆さまの人影",
+      "view": "通常表示",
+      "sha256": "4931b8a51667d0344f9b615c47f34010c427ffe7b2d51ecff0a43c16b0832a79"
+    },
+    {
+      "source": "GraphicsTechDemo screenshots/33_見えない人影の影_あり.png",
+      "target": "docs/images/tech_07_figure_shadow_20261101.png",
+      "role": "技術デモ：見えない人影の影（床と光の筋の霧）",
+      "view": "技術デモ（パネル表示あり）",
+      "sha256": "8f2985542d6d5e23391f8de9b3796ec8a38bf95451215bb076d67831b0ea6708"
+    }
+  ]
+}

@@ -281,7 +281,7 @@ std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
     // 最後のイベント（影を見た罰・走って逃げる・出口が開いた）
     else if (in.finalGazePenalty)
     {
-        objective = "それを見てはいけない";
+        objective = "それを見てはいけない 足元の水面なら確かめられる";
     }
     else if (in.finalSequenceActive && !in.finalDoorReady)
     {
