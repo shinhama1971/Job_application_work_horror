@@ -194,9 +194,12 @@ namespace Stage2Layout
         Wall* pipeLeft = createWall("Stage2PipeLeft", Vector3(-34.0f, -53.0f, -10.0f),
             Vector3(3.0f, 3.0f, 282.0f), trimColor, false);
         pipeLeft->SetCastsShadow(false);
+        // 見た目は、継ぎ目のフランジと吊り金具のある配管（Mayaで作ったモデル）
+        pipeLeft->SetVisualModel("pipe_run");
         Wall* pipeRight = createWall("Stage2PipeRight", Vector3(34.0f, -53.0f, -10.0f),
             Vector3(3.0f, 3.0f, 282.0f), trimColor, false);
         pipeRight->SetCastsShadow(false);
+        pipeRight->SetVisualModel("pipe_run");
 
         // 残された記録の端末の上に付けた、緑に光る目印
         Wall* evidenceMarker1 = createWall(
@@ -305,6 +308,11 @@ namespace Stage2Layout
         {
             piece->SetCastsShadow(false);
         }
+        // 時計の枠の見た目は、鏡や肖像画と同じ溝の入った額縁の棒（Mayaで作ったモデル）
+        for (Wall* frame : { clockFrameTop, clockFrameBottom, clockFrameNear, clockFrameFar })
+        {
+            frame->SetVisualModel("frame_rail");
+        }
         clockFace->SetClockSurface();
         // 文字盤はガラスで覆われているので、なめらかな面の映り込みにしている（PBR）
         clockFace->SetSurfaceFinish(0.0f, 0.12f);
@@ -393,6 +401,8 @@ namespace Stage2Layout
         doorIndicator->SetAppearance(
             Color(0.24f, 0.012f, 0.008f, 1.0f),
             Color(0.18f, 0.001f, 0.0f, 1.0f), 24.0f);
+        // 見た目は、光る表示面を金属の枠で囲んだ表示灯（Mayaで作ったモデル。光るのは表示面だけ）
+        doorIndicator->SetVisualModel("door_indicator");
 
         // 偽の扉（板・枠・取っ手）。異変の周回だけ表示している。板は、本物の扉と見分けがつかないよう、
         // 羽目板・木目・剥げた塗装・部屋番号の札・鍵穴をシェーダー（doorPS）で描いている

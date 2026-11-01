@@ -92,6 +92,12 @@ namespace
             // 卓上ライト（緑の琺瑯の笠と、下から見える光る電球・笠の裏）、腕、台
             { "desk_lamp_shade", "assets/model/props/wall_desk_lamp_shade.fbx", Vector3(5.0f, 3.0f, 5.0f), false,
                 { HousingPart, { "Shade", Color(0.10f, 0.16f, 0.12f, 1.0f), false }, LensPart } },
+            // 天井沿いの長い配管（継ぎ目のフランジと吊り金具。長い向きへ回す）
+            { "pipe_run", "assets/model/props/wall_pipe_run.fbx", Vector3(300.0f, 3.0f, 3.0f), true, { MainPart } },
+            // 扉の上の表示灯（光る表示面を金属の枠で囲む）と、電球を吊るすコード
+            { "door_indicator", "assets/model/props/wall_door_indicator.fbx", Vector3(10.0f, 5.0f, 1.0f), true,
+                { HousingPart, LensPart } },
+            { "hanging_cord", "assets/model/props/wall_hanging_cord.fbx", Vector3(0.4f, 2.5f, 0.4f), false, { MainPart } },
             { "desk_lamp_arm", "assets/model/props/wall_desk_lamp_arm.fbx", Vector3(0.8f, 9.0f, 0.8f), false, { MainPart } },
             { "desk_lamp_base", "assets/model/props/wall_desk_lamp_base.fbx", Vector3(4.0f, 1.0f, 4.0f), false,
                 { MainPart, HousingPart } },

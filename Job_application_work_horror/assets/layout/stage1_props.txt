@@ -7,7 +7,7 @@
 #
 #   model を付けると、見た目だけを Maya で作ったモデル（tools/maya/build_wall_props.py）にする。当たり判定・影・水面に映す箱は箱のまま。
 #   モデルは箱の大きさに合わせて伸び、長い物（shelf_long・shelf_short・beam・pipe_pole）は箱の一番長い向きへ回る。
-#   名前の一覧は Wall.cpp（shelf_long shelf_short desk_top desk_leg crate debris beam pipe_pole cabinet service_box pump tank drain column warning_lamp safe_bulb desk_lamp_shade desk_lamp_arm desk_lamp_base）
+#   名前の一覧は Wall.cpp（shelf_long shelf_short desk_top desk_leg crate debris beam pipe_pole cabinet service_box pump tank drain column warning_lamp safe_bulb desk_lamp_shade desk_lamp_arm desk_lamp_base pipe_run door_indicator hanging_cord）
 #
 #   PBRの仕上げ：metal は金属（色が映り込みの色。磨いた鉄で0.55前後、錆びて黒ずむほど低い）、rough は金属でない物。
 #   metal の後ろの金属らしさ（省くと1）は、汚れや酸化の膜で覆われた分だけ下げている（暗い場所でも形が分かるよう、拡散反射を少し残す）。
@@ -45,12 +45,12 @@ prop PropCeilingSouthWestHall  -250  -47   -256   264 3 156   ceilingPanel none 
 prop PropCeilingStartPassage   0     -47   -230   44 3 104      ceilingPanel none 4 0 noshadow weathering
 
 # --- 壁際と天井近くを走る配管（Stage1AmbientSounds が、この線に沿って配管の音を鳴らしている）
-prop PropPipeLeft            -205   -55   60    3 3 450       darkMetal none 22 0
-prop PropPipeRight           205    -55   60    3 3 450       darkMetal none 22 0
-prop PropPipeCrossDoor       -115   -52.5 37    175 2.5 2.5   darkMetal none 22 0
-prop PropPipeCrossDoorRight  115    -52.5 37    175 2.5 2.5   darkMetal none 22 0
-prop PropPipeCrossHall       -132.5 -52.5 177   175 2.5 2.5   darkMetal none 22 0
-prop PropPipeCrossHallRight  132.5  -52.5 177   175 2.5 2.5   darkMetal none 22 0
+prop PropPipeLeft            -205   -55   60    3 3 450       darkMetal none 22 0 model pipe_run
+prop PropPipeRight           205    -55   60    3 3 450       darkMetal none 22 0 model pipe_run
+prop PropPipeCrossDoor       -115   -52.5 37    175 2.5 2.5   darkMetal none 22 0 model pipe_run
+prop PropPipeCrossDoorRight  115    -52.5 37    175 2.5 2.5   darkMetal none 22 0 model pipe_run
+prop PropPipeCrossHall       -132.5 -52.5 177   175 2.5 2.5   darkMetal none 22 0 model pipe_run
+prop PropPipeCrossHallRight  132.5  -52.5 177   175 2.5 2.5   darkMetal none 22 0 model pipe_run
 
 # --- 幅木（西側は、西棟の扉 z=-35〜-5 の前で途切れさせている）
 prop PropBaseboardLeft       -217.2 -96.5 -105  1.5 6 140   trimColor none 5 0
@@ -112,7 +112,7 @@ prop PropWestWingDeskLeg4  -312 -88.5 -68   2 23 2     deskWood none 8 1 model d
 prop PropWestWingCrate     -345 -93   -15   14 14 14   debrisColor none 6 1 model crate
 
 # --- 光の安全地帯の暖かい電球（停電しても消えない電池式の作業灯）。休む範囲は Stage1Layout.cpp の safeZones
-prop PropSafeLightHubCord    -198 -49.5 12     0.4 2.5 0.4   darkMetal none 4 0
+prop PropSafeLightHubCord    -198 -49.5 12     0.4 2.5 0.4   darkMetal none 4 0 model hanging_cord
 prop PropSafeLightHubBulb    -198 -52.3 12     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 85 3.2 model safe_bulb
 prop PropSafeLightDeskBase   -334 -74.5 -306   4 1 4         darkMetal none 12 0 model desk_lamp_base
 prop PropSafeLightDeskArm    -334 -70   -306   0.8 9 0.8     darkMetal none 12 0 model desk_lamp_arm

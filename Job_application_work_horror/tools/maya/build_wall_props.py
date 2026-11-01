@@ -382,6 +382,54 @@ def build_desk_lamp_base():
     finish('wall_desk_lamp_base', soft_angle=40.0, occlusion_distance=0.8)
 
 
+# ----------------------------------------------------------------------------
+# 天井沿いの長い配管 300 × 3 × 3（長い向きが x。約30ごとの継ぎ目のフランジと、約60ごとに天井から吊る金具）
+# ----------------------------------------------------------------------------
+def build_pipe_run():
+    begin()
+    cylinder('Main', 1.15, 300.0, rotate=(0.0, 0.0, 90.0), sides=16)
+    for k in range(11):
+        x = -150.0 + 15.0 + k * 27.0
+        cylinder('Main', 1.5, 0.7, (x, 0.0, 0.0), rotate=(0.0, 0.0, 90.0), sides=16, bevel=0.1)
+    for k in range(5):
+        x = -120.0 + k * 60.0
+        torus('Main', 1.25, 0.18, (x + 6.0, 0.0, 0.0), rotate=(0.0, 0.0, 90.0), sides=16, rings=6)
+        box('Main', (0.3, 4.6, 0.3), (x + 6.0, 3.6, 0.0))
+        box('Main', (1.6, 0.3, 1.6), (x + 6.0, 5.8, 0.0), bevel=0.05)
+    finish('wall_pipe_run', soft_angle=40.0, occlusion_distance=2.0)
+
+
+# ----------------------------------------------------------------------------
+# 扉の上の表示灯 10 × 5 × 1（光る表示面を金属の枠で囲み、上に壁へ留める金具。前後の両面とも同じ形）
+# ----------------------------------------------------------------------------
+def build_door_indicator():
+    begin()
+    box('Housing', (10.0, 5.0, 0.4), bevel=0.1)
+    box('Lens', (8.6, 3.4, 0.8), (0.0, -0.2, 0.0), bevel=0.15, segments=2)
+    for y in (-2.25, 1.85):
+        box('Housing', (10.0, 0.5, 1.0), (0.0, y, 0.0), bevel=0.1)
+    for x in (-4.65, 4.65):
+        box('Housing', (0.7, 4.6, 1.0), (x, -0.1, 0.0), bevel=0.1)
+    for x in (-3.0, 3.0):
+        box('Housing', (0.6, 0.9, 0.6), (x, 2.55, 0.0), bevel=0.08)
+    for x in (-4.65, 4.65):
+        for y in (-2.25, 1.85):
+            cylinder('Housing', 0.15, 1.1, (x, y, 0.0), rotate=(90.0, 0.0, 0.0), sides=8)
+    finish('wall_door_indicator', soft_angle=35.0, occlusion_distance=1.0)
+
+
+# ----------------------------------------------------------------------------
+# 電球を吊るすコード 0.4 × 2.5 × 0.4（布で巻いたコードと、天井の金具）
+# ----------------------------------------------------------------------------
+def build_hanging_cord():
+    begin()
+    cylinder('Main', 0.11, 2.3, (0.0, -0.1, 0.0), sides=8)
+    for k in range(6):
+        torus('Main', 0.11, 0.025, (0.0, -1.0 + k * 0.36, 0.0), sides=8, rings=4)
+    cylinder('Main', 0.55, 0.3, (0.0, 1.1, 0.0), sides=16, bevel=0.08)
+    finish('wall_hanging_cord', soft_angle=60.0, occlusion_distance=None)
+
+
 if __name__ == '__main__':
     try:
         build_shelf('wall_shelf_long', 90.0, 6.0, 3)
@@ -405,5 +453,8 @@ if __name__ == '__main__':
         build_desk_lamp_shade()
         build_desk_lamp_arm()
         build_desk_lamp_base()
+        build_pipe_run()
+        build_door_indicator()
+        build_hanging_cord()
     finally:
         maya.standalone.uninitialize()

@@ -325,6 +325,8 @@ namespace Stage1Layout
         Wall* doorIndicator = createStageProp("PropDoorIndicator", Vector3(58.0f, -68.0f, 177.4f),
             Vector3(10.0f, 5.0f, 1.0f), Color(0.26f, 0.025f, 0.018f, 1.0f),
             Color(0.30f, 0.005f, 0.002f, 1.0f), 28.0f, false);
+        // 見た目は、光る表示面を金属の枠で囲んだ表示灯（Mayaで作ったモデル。光るのは表示面だけ）
+        doorIndicator->SetVisualModel("door_indicator");
 
         // ループ廊下で、周回によって現れる赤い目印（最初は隠している）
         const auto createLoopMarker = [&createStageProp, &noEmission](
