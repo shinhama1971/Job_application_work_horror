@@ -6,92 +6,25 @@
 #include "Game.h"
 #include "Application.h"
 #include "CeilingLight.h"
+#include "PropModel.h"
 
-#include <array>
 #include <cmath>
 
 using namespace DirectX::SimpleMath;
 
-// 照明器具の形（本体の箱と、下に付いた発光パネルの箱）を頂点で組み立て、マテリアルを作っている。
+// 照明器具の形（本体と縁・格子のルーバー、下に付いた発光パネル）をMayaで作ったモデルから読み込み、マテリアルを作っている。
 void CeilingLight::Init()
 {
-    m_Vertices.reserve(48);
-    m_Indices.reserve(144);
-
-    // 四角形の面を1枚追加している。表と裏の両方から見えるよう、三角形を両面分（12個のインデックス）入れている
-    const auto addFace = [this](
-        const std::array<Vector3, 4>& positions,
-        const Vector3& normal,
-        const Color& color)
-    {
-        const unsigned int base = static_cast<unsigned int>(m_Vertices.size());
-        const std::array<Vector2, 4> uvs =
+    // モデルは 22 × 0.56 × 10 の標準の大きさなので、その拡大率で割って読み込んでいる（器具ごとの大きさは m_Scale で変わる）。
+    // 描くときにマテリアルを変えるため、本体のインデックス数を覚えている
+    const std::vector<PropModel::IndexRange> ranges = PropModel::Append(
+        "assets/model/props/ceiling_light.fbx",
         {
-            Vector2(0.0f, 1.0f), Vector2(0.0f, 0.0f),
-            Vector2(1.0f, 1.0f), Vector2(1.0f, 0.0f)
-        };
-
-        for (size_t index = 0; index < positions.size(); ++index)
-        {
-            VERTEX_3D vertex{};
-            vertex.position = positions[index];
-            vertex.normal = normal;
-            vertex.color = color;
-            vertex.uv = uvs[index];
-            m_Vertices.push_back(vertex);
-        }
-
-        const unsigned int indices[] =
-        {
-            base + 0, base + 1, base + 2,
-            base + 2, base + 1, base + 3,
-            base + 2, base + 1, base + 0,
-            base + 3, base + 1, base + 2
-        };
-        m_Indices.insert(m_Indices.end(), indices, indices + 12);
-    };
-
-    // 中心と半分の大きさを指定して、6面の箱を追加している
-    const auto addBox = [&addFace](
-        const Vector3& center,
-        const Vector3& half,
-        const Color& color)
-    {
-        const float left = center.x - half.x;
-        const float right = center.x + half.x;
-        const float bottom = center.y - half.y;
-        const float top = center.y + half.y;
-        const float back = center.z - half.z;
-        const float front = center.z + half.z;
-
-        addFace({ Vector3(left, bottom, front), Vector3(left, top, front),
-                  Vector3(right, bottom, front), Vector3(right, top, front) },
-                Vector3(0.0f, 0.0f, 1.0f), color);
-        addFace({ Vector3(right, bottom, back), Vector3(right, top, back),
-                  Vector3(left, bottom, back), Vector3(left, top, back) },
-                Vector3(0.0f, 0.0f, -1.0f), color);
-        addFace({ Vector3(right, bottom, front), Vector3(right, top, front),
-                  Vector3(right, bottom, back), Vector3(right, top, back) },
-                Vector3(1.0f, 0.0f, 0.0f), color);
-        addFace({ Vector3(left, bottom, back), Vector3(left, top, back),
-                  Vector3(left, bottom, front), Vector3(left, top, front) },
-                Vector3(-1.0f, 0.0f, 0.0f), color);
-        addFace({ Vector3(left, top, front), Vector3(left, top, back),
-                  Vector3(right, top, front), Vector3(right, top, back) },
-                Vector3(0.0f, 1.0f, 0.0f), color);
-        addFace({ Vector3(left, bottom, back), Vector3(left, bottom, front),
-                  Vector3(right, bottom, back), Vector3(right, bottom, front) },
-                Vector3(0.0f, -1.0f, 0.0f), color);
-    };
-
-    // 本体の箱。描くときにマテリアルを変えるため、ここまでのインデックス数を覚えている
-    addBox(Vector3::Zero, Vector3(0.50f, 0.14f, 0.50f),
-           Color(0.16f, 0.17f, 0.16f, 1.0f));
-    m_BodyIndexCount = m_Indices.size();
-
-    // 本体の下に付いた発光パネル
-    addBox(Vector3(0.0f, -0.18f, 0.0f), Vector3(0.40f, 0.055f, 0.34f),
-           Color(0.72f, 0.70f, 0.62f, 1.0f));
+            { "Body", Color(0.16f, 0.17f, 0.16f, 1.0f) },
+            { "Panel", Color(0.72f, 0.70f, 0.62f, 1.0f) },
+        },
+        Vector3(22.0f, 2.0f, 10.0f), m_Vertices, m_Indices);
+    m_BodyIndexCount = ranges[0].Count;
 
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);

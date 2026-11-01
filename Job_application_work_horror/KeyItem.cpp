@@ -1,70 +1,27 @@
 ﻿// ============================================================================
 // ファイルの役割: 1面に落ちている鍵（隠し部屋の扉の鍵・西棟の扉の鍵）の見た目と、拾ったときの処理を管理している。
-// 主な技術: Interactableインターフェース、箱を組み合わせた形をコードで生成、時間で回る・浮く動き
+// 主な技術: Interactableインターフェース、Mayaで作ったモデル（PropModel）、時間で回る・浮く動き
 // ============================================================================
 
 #include "KeyItem.h"
 #include "Application.h"
 #include "Game.h"
 #include "Input.h"
+#include "PropModel.h"
 
-#include <array>
 #include <cmath>
 
 using namespace DirectX::SimpleMath;
 
-// 古い真鍮の鍵の形を、箱の組み合わせで作っている（持ち手の輪・軸・歯）。
+// 古い真鍮の鍵の形（持ち手の輪・軸の飾りの輪・軸・歯）を、Mayaで作ったモデルから読み込んでいる。
+// 色はマテリアルで付けるため、頂点の色は白（× 環境遮蔽）にしている。モデルは長さ約9.4の実際の大きさなので、拡大率4で割っている
 void KeyItem::BuildGeometry()
 {
     m_Vertices.clear();
     m_Indices.clear();
-
-    const Color white(1.0f, 1.0f, 1.0f, 1.0f);
-    // 中心と半分の大きさを指定して、6面の箱を追加している
-    const auto addBox = [this, &white](const Vector3& center, const Vector3& half)
-    {
-        const std::array<Vector3, 6> normals =
-        {
-            Vector3(1.0f, 0.0f, 0.0f), Vector3(-1.0f, 0.0f, 0.0f),
-            Vector3(0.0f, 1.0f, 0.0f), Vector3(0.0f, -1.0f, 0.0f),
-            Vector3(0.0f, 0.0f, 1.0f), Vector3(0.0f, 0.0f, -1.0f)
-        };
-        for (const Vector3& normal : normals)
-        {
-            // 面の2本の辺の向きを、法線と直交する軸から作っている。
-            const Vector3 axisU = std::abs(normal.y) > 0.5f
-                ? Vector3(1.0f, 0.0f, 0.0f)
-                : Vector3(0.0f, 1.0f, 0.0f);
-            const Vector3 axisV = normal.Cross(axisU);
-            const Vector3 faceCenter = center + normal * Vector3(half.x, half.y, half.z);
-            const Vector3 u = axisU * Vector3(half.x, half.y, half.z);
-            const Vector3 v = axisV * Vector3(half.x, half.y, half.z);
-
-            const unsigned int base = static_cast<unsigned int>(m_Vertices.size());
-            m_Vertices.push_back({ faceCenter - u - v, normal, white, Vector2(0.0f, 1.0f) });
-            m_Vertices.push_back({ faceCenter - u + v, normal, white, Vector2(0.0f, 0.0f) });
-            m_Vertices.push_back({ faceCenter + u - v, normal, white, Vector2(1.0f, 1.0f) });
-            m_Vertices.push_back({ faceCenter + u + v, normal, white, Vector2(1.0f, 0.0f) });
-            // 表と裏の両方の順番を持たせ、向きに関係なく表示している（Wallと同じ方針）。
-            const unsigned int faceIndices[] =
-            {
-                base, base + 1, base + 2, base + 2, base + 1, base + 3,
-                base + 2, base + 1, base, base + 3, base + 1, base + 2
-            };
-            m_Indices.insert(m_Indices.end(), faceIndices, faceIndices + 12);
-        }
-    };
-
-    // 持ち手の輪（4本の棒で作った四角い輪）
-    addBox(Vector3(-0.95f, 0.30f, 0.0f), Vector3(0.30f, 0.06f, 0.06f));
-    addBox(Vector3(-0.95f, -0.30f, 0.0f), Vector3(0.30f, 0.06f, 0.06f));
-    addBox(Vector3(-1.25f, 0.0f, 0.0f), Vector3(0.06f, 0.30f, 0.06f));
-    addBox(Vector3(-0.65f, 0.0f, 0.0f), Vector3(0.06f, 0.30f, 0.06f));
-    // 軸
-    addBox(Vector3(0.25f, 0.0f, 0.0f), Vector3(0.85f, 0.06f, 0.06f));
-    // 歯（長さの違う2本）
-    addBox(Vector3(0.80f, -0.17f, 0.0f), Vector3(0.07f, 0.12f, 0.05f));
-    addBox(Vector3(1.02f, -0.13f, 0.0f), Vector3(0.07f, 0.08f, 0.05f));
+    PropModel::Append("assets/model/props/key.fbx",
+        { { "Key", Color(1.0f, 1.0f, 1.0f, 1.0f) } },
+        Vector3(4.0f, 4.0f, 4.0f), m_Vertices, m_Indices);
 }
 
 void KeyItem::Init()

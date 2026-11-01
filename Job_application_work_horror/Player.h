@@ -12,6 +12,7 @@
 #include "Material.h"
 #include "FlashlightSystem.h"
 #include "PlayerMovement.h"
+#include "FirstPersonHands.h"
 
 // プレイヤー。足元の位置を持ち、毎フレーム入力から移動し、目の高さにカメラを置いて懐中電灯の光を作っている。
 class Player : public Object
@@ -39,6 +40,8 @@ private:
     FlashlightSystem m_Flashlight;
     // 壁や床が近いほど1に近づく値（近いときに光を弱めて白飛びを防ぐのに使っている）
     float m_FlashlightNearSurfaceBlend = 0.0f;
+    // このフレームでスイッチを押したか（手の小さな押す動きに使っている）
+    bool m_FlashlightToggledThisFrame = false;
 
     // ===== ライティングの調整値 =====
     // 点灯しているときの色。Diffuseは照らす光、Ambientは最低限残す環境光。
@@ -64,6 +67,9 @@ private:
     std::vector<std::unique_ptr<Material>> m_Materials;
     std::vector<SUBSET> m_subsets;
     std::vector<std::unique_ptr<Texture>> m_Textures;
+
+    // ===== 一人称で見える、懐中電灯を持った右手（Mayaで作ったモデル） =====
+    FirstPersonHands m_Hands;
 
     // ===== カメラと操作の状態 =====
     bool m_IsFPS = true;                    // trueなら一人称視点

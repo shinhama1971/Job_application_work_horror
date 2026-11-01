@@ -1,6 +1,6 @@
 // ============================================================================
 // ファイルの役割: 懐中電灯の電池を回復するアイテムの形・見た目・取ったときの演出を管理している。
-// 主な技術: Interactableインターフェース、円柱の頂点をコードで生成、マテリアルの使い分け、時間で回る・浮く動き
+// 主な技術: Interactableインターフェース、Mayaで作ったモデル（PropModel）、マテリアルの使い分け、時間で回る・浮く動き
 // ============================================================================
 
 #include "BatteryItem.h"
@@ -8,115 +8,29 @@
 #include "Game.h"
 #include "Input.h"
 #include "Player.h"
+#include "PropModel.h"
 
 #include <cmath>
 
 using namespace DirectX::SimpleMath;
 
-// 電池の形（本体の円柱・両端の金属の帯・プラス極の突起・残量を示す緑の帯）を頂点で組み立てている。
-// モデルファイルを使わず、円柱を重ねて作っている。
+// 電池の形（本体の円柱・両端の金属のふた・プラス極の突起・残量を示す緑の帯）を、Mayaで作ったモデルから読み込んでいる。
+// 色はマテリアルで付けるため、頂点の色は白（× 環境遮蔽）にしている。モデルは高さ約6の実際の大きさなので、拡大率4.2で割っている
 void BatteryItem::BuildGeometry()
 {
     m_Vertices.clear();
     m_Indices.clear();
-
-    // 中心の高さ・半分の高さ・半径を指定して、側面と上下のふたを持つ円柱を1つ追加している。
-    const auto addCylinder = [this](
-        float centerY,
-        float halfHeight,
-        float radius,
-        const Color& color)
-    {
-        // 円周を20分割している（小さいアイテムなので、これで十分丸く見える）
-        constexpr unsigned int segments = 20;
-        constexpr float circle = 6.28318530718f;
-        const unsigned int sideBase = static_cast<unsigned int>(m_Vertices.size());
-
-        // 側面：分割した角度ごとに、下の頂点と上の頂点を1組ずつ置いている（法線は外向き）
-        for (unsigned int segment = 0; segment <= segments; ++segment)
-        {
-            const float angle = circle * static_cast<float>(segment) /
-                static_cast<float>(segments);
-            const float x = std::cos(angle) * radius;
-            const float z = std::sin(angle) * radius;
-            const Vector3 normal(std::cos(angle), 0.0f, std::sin(angle));
-            const float u = static_cast<float>(segment) /
-                static_cast<float>(segments);
-
-            m_Vertices.push_back({ Vector3(x, centerY - halfHeight, z), normal,
-                color, Vector2(u, 1.0f) });
-            m_Vertices.push_back({ Vector3(x, centerY + halfHeight, z), normal,
-                color, Vector2(u, 0.0f) });
-        }
-
-        // 側面：隣り合う2組の頂点で四角形（三角形2つ）を作っている
-        for (unsigned int segment = 0; segment < segments; ++segment)
-        {
-            const unsigned int base = sideBase + segment * 2;
-            const unsigned int sideIndices[] =
-            {
-                base, base + 1, base + 2,
-                base + 2, base + 1, base + 3
-            };
-            m_Indices.insert(m_Indices.end(), sideIndices, sideIndices + 6);
-        }
-
-        // 上下のふたの中心の頂点
-        const unsigned int bottomCenter = static_cast<unsigned int>(m_Vertices.size());
-        m_Vertices.push_back({ Vector3(0.0f, centerY - halfHeight, 0.0f),
-            Vector3(0.0f, -1.0f, 0.0f), color, Vector2(0.5f, 0.5f) });
-        const unsigned int topCenter = static_cast<unsigned int>(m_Vertices.size());
-        m_Vertices.push_back({ Vector3(0.0f, centerY + halfHeight, 0.0f),
-            Vector3(0.0f, 1.0f, 0.0f), color, Vector2(0.5f, 0.5f) });
-
-        // ふたの縁の頂点。法線を上下に向けるため、側面とは別に頂点を置いている（角が丸く見えないように）
-        const unsigned int capBase = static_cast<unsigned int>(m_Vertices.size());
-        for (unsigned int segment = 0; segment <= segments; ++segment)
-        {
-            const float angle = circle * static_cast<float>(segment) /
-                static_cast<float>(segments);
-            const float x = std::cos(angle) * radius;
-            const float z = std::sin(angle) * radius;
-            const Vector2 uv(x / (radius * 2.0f) + 0.5f,
-                z / (radius * 2.0f) + 0.5f);
-            m_Vertices.push_back({ Vector3(x, centerY - halfHeight, z),
-                Vector3(0.0f, -1.0f, 0.0f), color, uv });
-            m_Vertices.push_back({ Vector3(x, centerY + halfHeight, z),
-                Vector3(0.0f, 1.0f, 0.0f), color, uv });
-        }
-
-        // ふた：中心と縁の2頂点で扇形の三角形を作っている。上と下で頂点の順番を逆にし、どちらも外側を向く面にしている
-        for (unsigned int segment = 0; segment < segments; ++segment)
-        {
-            const unsigned int rim = capBase + segment * 2;
-            const unsigned int capIndices[] =
-            {
-                bottomCenter, rim + 2, rim,
-                topCenter, rim + 1, rim + 3
-            };
-            m_Indices.insert(m_Indices.end(), capIndices, capIndices + 6);
-        }
-    };
-
-    // 色はマテリアルで付けるため、頂点の色は白にしている
     const Color white(1.0f, 1.0f, 1.0f, 1.0f);
-    // 本体（電池の筒）
-    addCylinder(0.0f, 0.56f, 0.235f, white);
-    m_BodyIndexCount = static_cast<unsigned int>(m_Indices.size());
-
-    // 両端の金属の帯と、プラス極の突起。描くときにマテリアルを変えるため、インデックスの範囲を覚えている
-    m_MetalIndexStart = m_BodyIndexCount;
-    addCylinder(-0.60f, 0.045f, 0.245f, white);
-    addCylinder(0.60f, 0.045f, 0.245f, white);
-    addCylinder(0.685f, 0.040f, 0.115f, white);
-    m_MetalIndexCount = static_cast<unsigned int>(m_Indices.size()) -
-        m_MetalIndexStart;
-
-    // 残量を示す緑の帯（少し外側に出して、本体の上に重ねている）
-    m_ChargeIndexStart = static_cast<unsigned int>(m_Indices.size());
-    addCylinder(0.24f, 0.075f, 0.246f, white);
-    m_ChargeIndexCount = static_cast<unsigned int>(m_Indices.size()) -
-        m_ChargeIndexStart;
+    const std::vector<PropModel::IndexRange> ranges = PropModel::Append(
+        "assets/model/props/battery.fbx",
+        { { "Body", white }, { "Metal", white }, { "Charge", white } },
+        Vector3(4.2f, 4.2f, 4.2f), m_Vertices, m_Indices);
+    // 描くときにマテリアルを変えるため、部位ごとのインデックスの範囲を覚えている
+    m_BodyIndexCount = ranges[0].Count;
+    m_MetalIndexStart = ranges[1].Start;
+    m_MetalIndexCount = ranges[1].Count;
+    m_ChargeIndexStart = ranges[2].Start;
+    m_ChargeIndexCount = ranges[2].Count;
 }
 
 // 頂点バッファ・シェーダー・3種類のマテリアルを作っている

@@ -13,6 +13,7 @@
 #include "Door.h"
 #include "CeilingLight.h"
 #include "Ground.h"
+#include "FirstPersonHands.h"
 
 #include <algorithm>
 #include <cmath>
@@ -72,6 +73,7 @@ void Player::Init()
     m_FootstepIndex = 0;
     m_SurfaceNoisePulse = 0.0f;
     m_WetSurfaceOverride = false;
+    m_Hands.Init();
 }
 
 // 入力・移動・当たり判定・カメラ・懐中電灯・電池の消費を、1フレーム分更新している。
@@ -84,6 +86,11 @@ void Player::Update()
     if (!m_CanControl)
     {
         m_Movement.StopControl();
+        // 操作できない演出の間は、手を下げて画面の外へ出している
+        FirstPersonHands::FrameInput handInput;
+        handInput.DeltaTime = Application::GetDeltaTime();
+        handInput.Lowered = true;
+        m_Hands.Update(handInput);
         return;
     }
 
@@ -224,6 +231,7 @@ void Player::Update()
        
         if (m_Flashlight.Toggle())
         {
+            m_FlashlightToggledThisFrame = true;
             Core::Game::GetInstance()->PlayAudioCue(
                 SOUND_CUE_FLASHLIGHT,
                 m_Flashlight.IsOn() ? 1.08f : 0.94f);
@@ -387,6 +395,21 @@ void Player::Update()
 
     Renderer::SetLight(light);
 
+    // 手に持った懐中電灯：レンズの光と、前の面で跳ね返って手を照らす光（面が近いほど強い。何もなくても床から少し返る）
+    FirstPersonHands::FrameInput handInput;
+    handInput.DeltaTime = deltaTime;
+    handInput.LensGlow = renderFlashlight ? lightOutput * flashlightState.powerBlend : 0.0f;
+    handInput.BatteryWeakness = batteryWeakness;
+    handInput.BatteryStress = batteryStress;
+    handInput.VoltageDrop = flashlightState.voltageDropStarted;
+    handInput.NearSurface = m_FlashlightNearSurfaceBlend;
+    if (renderFlashlight)
+    {
+        const float surfaceRatio = closestSurfaceDistance / 16.0f;
+        const float bounce = light.Intensity * (0.04f + 0.30f / (1.0f + surfaceRatio * surfaceRatio));
+        handInput.Bounce = Vector3(light.Diffuse.x, light.Diffuse.y, light.Diffuse.z) * bounce;
+    }
+
 	// カメラの位置と向きを更新している（歩くときの頭の揺れを含む）
     m_Movement.UpdateHeadBob(deltaTime);
 
@@ -433,6 +456,17 @@ void Player::Update()
     }
 
 
+    // 手の揺れ：視点の向き・頭の揺れ・走り・スイッチ。ロッカーの中では手を下げている
+    handInput.Yaw = yaw;
+    handInput.Pitch = cam->GetCameraPitch();
+    handInput.HeadBobVertical = m_Movement.GetHeadBobOffset();
+    handInput.HeadBobSide = m_Movement.GetHeadBobSideOffset();
+    handInput.Sprinting = m_Movement.IsSprinting() && m_Movement.IsMovingHorizontally();
+    handInput.Toggled = m_FlashlightToggledThisFrame;
+    handInput.Lowered = m_IsHiding || !m_IsFPS;
+    m_Hands.Update(handInput);
+    m_FlashlightToggledThisFrame = false;
+
     // 電池を回復するデバッグ用のキー入力（Bキー）。Release版では遊びに影響しないよう無効にしている
 #ifdef _DEBUG
     if (Input::GetKeyTrigger(VK_B))
@@ -442,13 +476,21 @@ void Player::Update()
 #endif
 }
 
-// 一人称のときは体を見せず、デバッグ用の三人称のときだけメッシュを描いている。
+// 一人称のときは懐中電灯を持った右手だけを、デバッグ用の三人称のときはメッシュを描いている。
 void Player::Draw(Camera* cam)
 {
     cam->SetCamera();
 
-    // 一人称では自分の体を描かない。三人称はデバッグ用の表示。
-    if (m_IsFPS) return;
+    // 一人称では体を描かず、懐中電灯を持った右手だけを描いている（プレイヤーの視点の本描画のときだけ。監視映像には映さない）。
+    // 三人称はデバッグ用の表示。
+    if (m_IsFPS)
+    {
+        if (cam == Core::Game::GetInstance()->GetCamera())
+        {
+            m_Hands.Draw(*cam);
+        }
+        return;
+    }
 
     Matrix r = Matrix::CreateFromYawPitchRoll(
         m_Rotation.y,
@@ -477,9 +519,11 @@ void Player::Draw(Camera* cam)
     }
 }
 
-// 解放するものはない（メッシュとマテリアルはメンバーの破棄で解放される）
+// 手のモデルの参照を手放している（プレイヤーのメッシュとマテリアルはメンバーの破棄で解放される）
 void Player::Uninit()
-{}
+{
+    m_Hands.Uninit();
+}
 
 // ヨーから水平の向きの単位ベクトルを作り、移動と調べる操作で共有している。
 DirectX::SimpleMath::Vector3 Player::GetForward() const

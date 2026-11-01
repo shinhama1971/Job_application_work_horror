@@ -10,6 +10,7 @@
 #include "Game.h"
 #include "Input.h"
 #include "Player.h"
+#include "PropModel.h"
 
 #include <algorithm>
 #include <array>
@@ -17,7 +18,7 @@
 
 using namespace DirectX::SimpleMath;
 
-// 扉の形（扉板・上下の飾り板・取っ手・足元の漏れ光）を箱の組み合わせで作り、マテリアルを用意している。
+// 扉の形（扉板・鏡板・縁の飾り・取っ手・足元の漏れ光）をMayaで作ったモデルから読み込み、マテリアルを用意している。
 void Door::Init()
 {
     m_Vertices.clear();
@@ -25,92 +26,22 @@ void Door::Init()
     m_Vertices.reserve(96);
     m_Indices.reserve(288);
 
-    // 四角形の面を1枚追加している。表と裏の両方から見えるよう、三角形を両面分（12個のインデックス）入れている
-    const auto addFace = [this](
-        const std::array<Vector3, 4>& positions,
-        const Vector3& normal,
-        const Color& color)
-    {
-        const unsigned int base = static_cast<unsigned int>(m_Vertices.size());
-        const std::array<Vector2, 4> uvs =
+    // 扉の表と裏の鏡板・縁の飾り・レバーの取っ手（tools/maya/build_props.py）。
+    // モデルは幅30・高さ50・厚さ4の実際の大きさなので、標準の拡大率で割って読み込んでいる。
+    // 蝶番をローカル座標の左端に置くため、取っ手は扉板の反対側（右端寄り）に付いている。
+    const std::vector<PropModel::IndexRange> ranges = PropModel::Append(
+        "assets/model/props/door.fbx",
         {
-            Vector2(0.0f, 1.0f), Vector2(0.0f, 0.0f),
-            Vector2(1.0f, 1.0f), Vector2(1.0f, 0.0f)
-        };
-
-        for (size_t i = 0; i < positions.size(); ++i)
-        {
-            VERTEX_3D vertex{};
-            vertex.position = positions[i];
-            vertex.normal = normal;
-            vertex.color = color;
-            vertex.uv = uvs[i];
-            m_Vertices.push_back(vertex);
-        }
-
-        const unsigned int faceIndices[] =
-        {
-            base + 0, base + 1, base + 2,
-            base + 2, base + 1, base + 3,
-            base + 2, base + 1, base + 0,
-            base + 3, base + 1, base + 2
-        };
-        m_Indices.insert(m_Indices.end(), faceIndices, faceIndices + 12);
-    };
-
-    // 中心と半分の大きさを指定して、6面の箱を追加している
-    const auto addBox = [&addFace](
-        const Vector3& center,
-        const Vector3& half,
-        const Color& color)
-    {
-        const float left = center.x - half.x;
-        const float right = center.x + half.x;
-        const float bottom = center.y - half.y;
-        const float top = center.y + half.y;
-        const float back = center.z - half.z;
-        const float front = center.z + half.z;
-
-        addFace({ Vector3(left, bottom, front), Vector3(left, top, front),
-                  Vector3(right, bottom, front), Vector3(right, top, front) },
-                Vector3(0.0f, 0.0f, 1.0f), color);
-        addFace({ Vector3(right, bottom, back), Vector3(right, top, back),
-                  Vector3(left, bottom, back), Vector3(left, top, back) },
-                Vector3(0.0f, 0.0f, -1.0f), color);
-        addFace({ Vector3(right, bottom, front), Vector3(right, top, front),
-                  Vector3(right, bottom, back), Vector3(right, top, back) },
-                Vector3(1.0f, 0.0f, 0.0f), color);
-        addFace({ Vector3(left, bottom, back), Vector3(left, top, back),
-                  Vector3(left, bottom, front), Vector3(left, top, front) },
-                Vector3(-1.0f, 0.0f, 0.0f), color);
-        addFace({ Vector3(left, top, front), Vector3(left, top, back),
-                  Vector3(right, top, front), Vector3(right, top, back) },
-                Vector3(0.0f, 1.0f, 0.0f), color);
-        addFace({ Vector3(left, bottom, back), Vector3(left, bottom, front),
-                  Vector3(right, bottom, back), Vector3(right, bottom, front) },
-                Vector3(0.0f, -1.0f, 0.0f), color);
-    };
-
-    // 扉板（茶色）
-    addBox(Vector3::Zero, Vector3(0.5f, 0.5f, 0.5f),
-           Color(0.30f, 0.13f, 0.07f, 1.0f));
-    // 扉板の手前側に付けた、上下2枚の飾り板（濃い茶色）
-    addBox(Vector3(0.0f, 0.22f, -0.54f), Vector3(0.35f, 0.17f, 0.035f),
-           Color(0.16f, 0.055f, 0.025f, 1.0f));
-    addBox(Vector3(0.0f, -0.22f, -0.54f), Vector3(0.35f, 0.17f, 0.035f),
-           Color(0.16f, 0.055f, 0.025f, 1.0f));
-    // ここまでが木の部分。取っ手は金属のマテリアルで描くので、インデックスの位置を覚えている
-    m_HandleIndexStart = m_Indices.size();
-    // 蝶番をローカル座標の左端に置くため、取っ手は扉板の反対側（右端寄り）に付けている。
-    addBox(Vector3(0.28f, 0.0f, -0.64f), Vector3(0.055f, 0.075f, 0.11f),
-           Color(0.72f, 0.48f, 0.12f, 1.0f));
-
-    // ここまでが扉本体。足元の漏れ光は別のマテリアルで描くので、インデックス数を区切っている
-    m_DoorIndexCount = m_Indices.size();
-    // 影を落とさない別のメッシュで、扉の下の隙間から漏れる奥の部屋の光を表している。
-    addBox(Vector3(0.0f, -0.505f, -0.61f),
-           Vector3(0.48f, 0.018f, 0.045f),
-           Color(1.0f, 0.72f, 0.42f, 1.0f));
+            { "Wood", Color(0.30f, 0.13f, 0.07f, 1.0f) },
+            { "Panel", Color(0.16f, 0.055f, 0.025f, 1.0f) },
+            { "Handle", Color(0.72f, 0.48f, 0.12f, 1.0f) },
+            { "Leak", Color(1.0f, 0.72f, 0.42f, 1.0f) },
+        },
+        Vector3(30.0f, 50.0f, 4.0f), m_Vertices, m_Indices);
+    // 取っ手は金属のマテリアルで、足元の漏れ光は別のマテリアルで描くので、インデックスの位置を覚えている。
+    // 漏れ光は、扉の下の隙間から漏れる奥の部屋の光で、影を落とさない
+    m_HandleIndexStart = ranges[2].Start;
+    m_DoorIndexCount = ranges[3].Start;
 
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);

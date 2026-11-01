@@ -8,6 +8,7 @@
 #include "ShadowMan.h"
 #include "Player.h"
 #include "input.h"
+#include "PropModel.h"
 
 #include <algorithm>
 #include <array>
@@ -15,7 +16,7 @@
 
 using namespace DirectX::SimpleMath;
 
-// 状態を初期化し、箱を組み合わせて人の形（両足・胴・両腕・頭）を作っている
+// 状態を初期化し、Mayaで作った人の形のモデルを読み込んでいる
 void ShadowMan::Init()
 {
 	m_Age = 0.0f;
@@ -31,81 +32,11 @@ void ShadowMan::Init()
 	m_ChaseStopDistance = 28.0f;
 	m_ChaseStepDistance = 0.0f;
 
-    m_Vertices.reserve(144);
-    m_Indices.reserve(432);
-
-    // ほとんど黒に近い色
-    const Color shadowColor(0.025f, 0.03f, 0.027f, 1.0f);
-
-    // 四角形の面を1枚追加している。表と裏の両方から見えるよう、三角形を両面分（12個のインデックス）入れている
-    const auto addFace = [this, &shadowColor](
-        const std::array<Vector3, 4>& positions,
-        const Vector3& normal)
-    {
-        const unsigned int base = static_cast<unsigned int>(m_Vertices.size());
-        const std::array<Vector2, 4> uvs =
-        {
-            Vector2(0.0f, 1.0f), Vector2(0.0f, 0.0f),
-            Vector2(1.0f, 1.0f), Vector2(1.0f, 0.0f)
-        };
-
-        for (size_t index = 0; index < positions.size(); ++index)
-        {
-            VERTEX_3D vertex{};
-            vertex.position = positions[index];
-            vertex.normal = normal;
-            vertex.color = shadowColor;
-            vertex.uv = uvs[index];
-            m_Vertices.push_back(vertex);
-        }
-
-        const unsigned int indices[] =
-        {
-            base + 0, base + 1, base + 2,
-            base + 2, base + 1, base + 3,
-            base + 2, base + 1, base + 0,
-            base + 3, base + 1, base + 2
-        };
-        m_Indices.insert(m_Indices.end(), indices, indices + 12);
-    };
-
-    // 中心と半分の大きさを指定して、6面の箱を追加している
-    const auto addBox = [&addFace](const Vector3& center, const Vector3& half)
-    {
-        const float left = center.x - half.x;
-        const float right = center.x + half.x;
-        const float bottom = center.y - half.y;
-        const float top = center.y + half.y;
-        const float back = center.z - half.z;
-        const float front = center.z + half.z;
-
-        addFace({ Vector3(left, bottom, front), Vector3(left, top, front),
-                  Vector3(right, bottom, front), Vector3(right, top, front) },
-                Vector3(0.0f, 0.0f, 1.0f));
-        addFace({ Vector3(right, bottom, back), Vector3(right, top, back),
-                  Vector3(left, bottom, back), Vector3(left, top, back) },
-                Vector3(0.0f, 0.0f, -1.0f));
-        addFace({ Vector3(right, bottom, front), Vector3(right, top, front),
-                  Vector3(right, bottom, back), Vector3(right, top, back) },
-                Vector3(1.0f, 0.0f, 0.0f));
-        addFace({ Vector3(left, bottom, back), Vector3(left, top, back),
-                  Vector3(left, bottom, front), Vector3(left, top, front) },
-                Vector3(-1.0f, 0.0f, 0.0f));
-        addFace({ Vector3(left, top, front), Vector3(left, top, back),
-                  Vector3(right, top, front), Vector3(right, top, back) },
-                Vector3(0.0f, 1.0f, 0.0f));
-        addFace({ Vector3(left, bottom, back), Vector3(left, bottom, front),
-                  Vector3(right, bottom, back), Vector3(right, bottom, front) },
-                Vector3(0.0f, -1.0f, 0.0f));
-    };
-
-    // 両足・胴・両腕・頭
-    addBox(Vector3(-0.18f, 0.45f, 0.0f), Vector3(0.12f, 0.45f, 0.12f));
-    addBox(Vector3(0.18f, 0.45f, 0.0f), Vector3(0.12f, 0.45f, 0.12f));
-    addBox(Vector3(0.0f, 1.25f, 0.0f), Vector3(0.36f, 0.42f, 0.16f));
-    addBox(Vector3(-0.48f, 1.24f, 0.0f), Vector3(0.10f, 0.45f, 0.10f));
-    addBox(Vector3(0.48f, 1.24f, 0.0f), Vector3(0.10f, 0.45f, 0.10f));
-    addBox(Vector3(0.0f, 1.86f, 0.0f), Vector3(0.22f, 0.22f, 0.20f));
+    // 細長い手足と、前へ傾いた頭の人の形（tools/maya/build_props.py）。ほとんど黒に近い色にしている。
+    // モデルは身長約31の実際の大きさなので、ワールド行列で掛ける拡大率（下の m_Scale）で割って読み込んでいる
+    PropModel::Append("assets/model/props/shadow_man.fbx",
+        { { "Body", Color(0.025f, 0.03f, 0.027f, 1.0f) } },
+        Vector3(8.0f, 16.0f, 8.0f), m_Vertices, m_Indices);
 
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);

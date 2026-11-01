@@ -1,22 +1,19 @@
 ﻿// ============================================================================
 // ファイルの役割: 中に隠れられるロッカーの扉（見た目と「隠れる」操作）を管理している。
-// 主な技術: Interactableインターフェース、箱を組み合わせた形をコードで生成、使えるかどうかの切り替え
+// 主な技術: Interactableインターフェース、Mayaで作ったモデル（PropModel）、使えるかどうかの切り替え
 // ============================================================================
 
 #include "Locker.h"
 #include "Game.h"
 #include "Player.h"
+#include "PropModel.h"
 
-#include <array>
 #include <cmath>
 
 using namespace DirectX::SimpleMath;
 
 namespace
 {
-    // 扉の幅と高さ
-    constexpr float DoorWidth = 15.0f;
-    constexpr float DoorHeight = 44.0f;
     // 隠れる位置は扉のすぐ前にしている（扉は隠れている間は描かないので、視界をさえぎらない）。
     // ロッカーの本体（Wall）の中に視点を入れると、本体の面に視界をふさがれるためである。
     constexpr float HideOffset = 2.5f;
@@ -24,68 +21,22 @@ namespace
     constexpr float ExitOffset = 12.0f;
 }
 
-// 扉の板・枠・取っ手と、目の高さの横長のすき間（ルーバー）を、箱の組み合わせで作っている。
-// ローカル座標では扉の面は x=0、正面は +X 向きにしている。
+// 扉の板・枠・取っ手と、目の高さの通気口の羽根を、Mayaで作ったモデル（tools/maya/build_props.py）から読み込んでいる。
+// ローカル座標では扉の面は x=0、正面は +X 向きにしている（幅15・高さ44）。
 void Locker::BuildGeometry()
 {
     m_Vertices.clear();
     m_Indices.clear();
 
-    // 中心と半分の大きさを指定して、6面の箱を追加している（表と裏の両方の順番を持たせている）
-    const auto addBox = [this](const Vector3& center, const Vector3& half, const Color& color)
-    {
-        const std::array<Vector3, 6> normals =
-        {
-            Vector3(1.0f, 0.0f, 0.0f), Vector3(-1.0f, 0.0f, 0.0f),
-            Vector3(0.0f, 1.0f, 0.0f), Vector3(0.0f, -1.0f, 0.0f),
-            Vector3(0.0f, 0.0f, 1.0f), Vector3(0.0f, 0.0f, -1.0f)
-        };
-        for (const Vector3& normal : normals)
-        {
-            const Vector3 axisU = std::abs(normal.y) > 0.5f
-                ? Vector3(1.0f, 0.0f, 0.0f)
-                : Vector3(0.0f, 1.0f, 0.0f);
-            const Vector3 axisV = normal.Cross(axisU);
-            const Vector3 faceCenter = center + normal * half;
-            const Vector3 u = axisU * half;
-            const Vector3 v = axisV * half;
-
-            const unsigned int base = static_cast<unsigned int>(m_Vertices.size());
-            m_Vertices.push_back({ faceCenter - u - v, normal, color, Vector2(0.0f, 1.0f) });
-            m_Vertices.push_back({ faceCenter - u + v, normal, color, Vector2(0.0f, 0.0f) });
-            m_Vertices.push_back({ faceCenter + u - v, normal, color, Vector2(1.0f, 1.0f) });
-            m_Vertices.push_back({ faceCenter + u + v, normal, color, Vector2(1.0f, 0.0f) });
-            const unsigned int faceIndices[] =
-            {
-                base, base + 1, base + 2, base + 2, base + 1, base + 3,
-                base + 2, base + 1, base, base + 3, base + 1, base + 2
-            };
-            m_Indices.insert(m_Indices.end(), faceIndices, faceIndices + 12);
-        }
-    };
-
     // 扉の板・枠・すき間・取っ手の色（くすんだ緑がかった灰色の金属）
-    const Color panel(0.24f, 0.28f, 0.26f, 1.0f);
-    const Color frame(0.13f, 0.15f, 0.14f, 1.0f);
-    const Color slit(0.015f, 0.018f, 0.016f, 1.0f);
-    const Color handle(0.42f, 0.42f, 0.38f, 1.0f);
-    const float halfWidth = DoorWidth * 0.5f;
-    const float halfHeight = DoorHeight * 0.5f;
-
-    // 扉の板と、周りの枠
-    addBox(Vector3(0.20f, 0.0f, 0.0f), Vector3(0.20f, halfHeight, halfWidth), panel);
-    addBox(Vector3(0.45f, halfHeight - 0.6f, 0.0f), Vector3(0.12f, 0.6f, halfWidth), frame);
-    addBox(Vector3(0.45f, -halfHeight + 0.6f, 0.0f), Vector3(0.12f, 0.6f, halfWidth), frame);
-    addBox(Vector3(0.45f, 0.0f, halfWidth - 0.6f), Vector3(0.12f, halfHeight, 0.6f), frame);
-    addBox(Vector3(0.45f, 0.0f, -halfWidth + 0.6f), Vector3(0.12f, halfHeight, 0.6f), frame);
-    // 目の高さの横長のすき間（ここから外をのぞく）
-    for (int index = 0; index < 4; ++index)
-    {
-        const float y = 16.0f - static_cast<float>(index) * 1.8f;
-        addBox(Vector3(0.42f, y, 0.0f), Vector3(0.05f, 0.35f, halfWidth - 2.2f), slit);
-    }
-    // 取っ手
-    addBox(Vector3(0.75f, 0.0f, halfWidth - 2.2f), Vector3(0.35f, 2.2f, 0.35f), handle);
+    PropModel::Append("assets/model/props/locker_door.fbx",
+        {
+            { "Panel", Color(0.24f, 0.28f, 0.26f, 1.0f) },
+            { "Frame", Color(0.13f, 0.15f, 0.14f, 1.0f) },
+            { "Slit", Color(0.015f, 0.018f, 0.016f, 1.0f) },
+            { "Handle", Color(0.42f, 0.42f, 0.38f, 1.0f) },
+        },
+        Vector3::One, m_Vertices, m_Indices);
 }
 
 void Locker::Init()

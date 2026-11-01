@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "DrainValve.h"
+#include "PropModel.h"
 
 #include <algorithm>
 #include <array>
@@ -18,103 +19,28 @@ namespace
     constexpr float WheelTurnSpeed = 2.6f;
 }
 
-// 台座と配管（動かない部品）を先に、ハンドル（回る部品）を後に頂点で組み立てている。
-// 座標の単位は世界と同じで、壁の表面がz=0、部屋の側が-zになっている。
+// 台座と配管（動かない部品）を先に、ハンドル（回る部品）を後に、Mayaで作ったモデルから読み込んでいる。
+// 座標の単位は世界と同じで、壁の表面がz=0、部屋の側が-zになっている。ハンドルは原点を中心に作ってあり、描くときにずらして回している。
 void DrainValve::BuildGeometry()
 {
     m_Vertices.clear();
     m_Indices.clear();
 
-    // 四角形の面を1枚追加している。表と裏の両方から見えるよう、三角形を両面分（12個のインデックス）入れている
-    const auto addFace = [this](
-        const std::array<Vector3, 4>& positions,
-        const Vector3& normal,
-        const Color& color)
-    {
-        const unsigned int base = static_cast<unsigned int>(m_Vertices.size());
-        const std::array<Vector2, 4> uvs =
-        {
-            Vector2(0.0f, 1.0f), Vector2(0.0f, 0.0f),
-            Vector2(1.0f, 1.0f), Vector2(1.0f, 0.0f)
-        };
-
-        for (size_t index = 0; index < positions.size(); ++index)
-        {
-            VERTEX_3D vertex{};
-            vertex.position = positions[index];
-            vertex.normal = normal;
-            vertex.color = color;
-            vertex.uv = uvs[index];
-            m_Vertices.push_back(vertex);
-        }
-
-        const unsigned int indices[] =
-        {
-            base + 0, base + 1, base + 2,
-            base + 2, base + 1, base + 3,
-            base + 2, base + 1, base + 0,
-            base + 3, base + 1, base + 2
-        };
-        m_Indices.insert(m_Indices.end(), indices, indices + 12);
-    };
-
-    // 中心・半分の大きさ・z軸まわりの角度を指定して、6面の箱を追加している（ハンドルの輪を斜めの箱で作るため）
-    const auto addBox = [&addFace](
-        const Vector3& center,
-        const Vector3& half,
-        float angleZ,
-        const Color& color)
-    {
-        const Matrix rotation = Matrix::CreateRotationZ(angleZ);
-        // 箱の角を、符号(-1か1)の組で指定して求めている
-        const auto corner = [&](float signX, float signY, float signZ)
-        {
-            return Vector3::Transform(
-                Vector3(half.x * signX, half.y * signY, half.z * signZ), rotation) + center;
-        };
-        const auto normal = [&](const Vector3& direction)
-        {
-            return Vector3::TransformNormal(direction, rotation);
-        };
-
-        addFace({ corner(-1, -1, 1), corner(-1, 1, 1), corner(1, -1, 1), corner(1, 1, 1) },
-                normal(Vector3(0.0f, 0.0f, 1.0f)), color);
-        addFace({ corner(1, -1, -1), corner(1, 1, -1), corner(-1, -1, -1), corner(-1, 1, -1) },
-                normal(Vector3(0.0f, 0.0f, -1.0f)), color);
-        addFace({ corner(1, -1, 1), corner(1, 1, 1), corner(1, -1, -1), corner(1, 1, -1) },
-                normal(Vector3(1.0f, 0.0f, 0.0f)), color);
-        addFace({ corner(-1, -1, -1), corner(-1, 1, -1), corner(-1, -1, 1), corner(-1, 1, 1) },
-                normal(Vector3(-1.0f, 0.0f, 0.0f)), color);
-        addFace({ corner(-1, 1, 1), corner(-1, 1, -1), corner(1, 1, 1), corner(1, 1, -1) },
-                normal(Vector3(0.0f, 1.0f, 0.0f)), color);
-        addFace({ corner(-1, -1, -1), corner(-1, -1, 1), corner(1, -1, -1), corner(1, -1, 1) },
-                normal(Vector3(0.0f, -1.0f, 0.0f)), color);
-    };
-
     const Color darkMetal(0.10f, 0.115f, 0.11f, 1.0f);
     const Color pipeMetal(0.16f, 0.18f, 0.17f, 1.0f);
     const Color wheelPaint(0.42f, 0.07f, 0.05f, 1.0f);
-
-    // 動かない部品：壁の台座、手前へ出る短い配管、床から天井まで壁を伝う配管
-    addBox(Vector3(0.0f, 0.0f, -0.4f), Vector3(4.5f, 4.5f, 0.4f), 0.0f, darkMetal);
-    addBox(Vector3(0.0f, 0.0f, -2.8f), Vector3(1.4f, 1.4f, 2.0f), 0.0f, pipeMetal);
-    addBox(Vector3(0.0f, 19.0f, -1.6f), Vector3(1.2f, 19.0f, 1.2f), 0.0f, pipeMetal);
-    addBox(Vector3(0.0f, -6.0f, -1.6f), Vector3(1.2f, 6.0f, 1.2f), 0.0f, pipeMetal);
-    m_FixedIndexCount = static_cast<unsigned int>(m_Indices.size());
-
-    // 回る部品：輪（10本の短い箱）、十字の握り、中心の軸、輪に付いた取っ手
-    constexpr int RimSegments = 10;
-    constexpr float RimRadius = 4.2f;
-    for (int segment = 0; segment < RimSegments; ++segment)
-    {
-        const float angle = DirectX::XM_2PI * static_cast<float>(segment) / RimSegments;
-        addBox(Vector3(std::cos(angle) * RimRadius, std::sin(angle) * RimRadius, 0.0f),
-            Vector3(0.42f, 1.45f, 0.42f), angle, wheelPaint);
-    }
-    addBox(Vector3::Zero, Vector3(RimRadius, 0.32f, 0.28f), DirectX::XM_PIDIV4, wheelPaint);
-    addBox(Vector3::Zero, Vector3(RimRadius, 0.32f, 0.28f), -DirectX::XM_PIDIV4, wheelPaint);
-    addBox(Vector3::Zero, Vector3(0.9f, 0.9f, 0.6f), 0.0f, darkMetal);
-    addBox(Vector3(0.0f, RimRadius, -0.9f), Vector3(0.35f, 0.35f, 0.9f), 0.0f, darkMetal);
+    const std::vector<PropModel::IndexRange> ranges = PropModel::Append(
+        "assets/model/props/drain_valve.fbx",
+        {
+            // 動かない部品：壁の台座、継ぎ目のフランジ、手前へ出る短い配管、床から天井まで壁を伝う配管
+            { "Base", darkMetal },
+            { "Pipe", pipeMetal },
+            // 回る部品：輪・4本のスポーク、中心の軸、輪に付いた取っ手
+            { "Wheel", wheelPaint },
+            { "Hub", darkMetal },
+        },
+        Vector3::One, m_Vertices, m_Indices);
+    m_FixedIndexCount = ranges[2].Start;
 }
 
 Matrix DrainValve::MakeWorldMatrix() const

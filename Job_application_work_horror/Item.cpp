@@ -1,6 +1,6 @@
 // ============================================================================
 // ファイルの役割: ヒューズ（1面で集めるアイテム）の形、浮かぶ動き、拾ったときの処理を管理している。
-// 主な技術: 箱を組み合わせた形をコードで生成、ゆっくり脈打つ大きさ、調べる操作、時間で回る・浮く動き
+// 主な技術: Mayaで作ったモデル（PropModel）、ゆっくり脈打つ大きさ、調べる操作、時間で回る・浮く動き
 // ============================================================================
 
 #include "Item.h"
@@ -9,94 +9,25 @@
 #include "Input.h"
 #include "Player.h"
 #include "ShadowMan.h"
+#include "PropModel.h"
 
-#include <array>
 #include <cmath>
 
 using namespace DirectX::SimpleMath;
 
-// ヒューズの形を箱の組み合わせで作っている
+// ヒューズの形（緑がかったガラスの筒・上下の金具・手前に透けて見えるオレンジのフィラメント）を、Mayaで作ったモデルから読み込んでいる。
+// モデルは高さ約7の実際の大きさなので、拡大率5で割っている
 void Item::BuildGeometry()
 {
     m_Vertices.clear();
     m_Indices.clear();
-
-    // 四角形の面を1枚追加している。表と裏の両方から見えるよう、三角形を両面分（12個のインデックス）入れている
-    const auto addFace = [this](
-        const std::array<Vector3, 4>& positions,
-        const Vector3& normal,
-        const Color& color)
-    {
-        const unsigned int base = static_cast<unsigned int>(m_Vertices.size());
-        const std::array<Vector2, 4> uvs =
+    PropModel::Append("assets/model/props/fuse.fbx",
         {
-            Vector2(0.0f, 1.0f), Vector2(0.0f, 0.0f),
-            Vector2(1.0f, 1.0f), Vector2(1.0f, 0.0f)
-        };
-        for (size_t index = 0; index < positions.size(); ++index)
-        {
-            VERTEX_3D vertex{};
-            vertex.position = positions[index];
-            vertex.normal = normal;
-            vertex.color = color;
-            vertex.uv = uvs[index];
-            m_Vertices.push_back(vertex);
-        }
-
-        const unsigned int indices[] =
-        {
-            base + 0, base + 1, base + 2,
-            base + 2, base + 1, base + 3,
-            base + 2, base + 1, base + 0,
-            base + 3, base + 1, base + 2
-        };
-        m_Indices.insert(m_Indices.end(), indices, indices + 12);
-    };
-
-    // 中心と半分の大きさを指定して、6面の箱を追加している
-    const auto addBox = [&addFace](
-        const Vector3& center,
-        const Vector3& half,
-        const Color& color)
-    {
-        const float left = center.x - half.x;
-        const float right = center.x + half.x;
-        const float bottom = center.y - half.y;
-        const float top = center.y + half.y;
-        const float back = center.z - half.z;
-        const float front = center.z + half.z;
-
-        addFace({ Vector3(left, bottom, front), Vector3(left, top, front),
-                  Vector3(right, bottom, front), Vector3(right, top, front) },
-                Vector3(0.0f, 0.0f, 1.0f), color);
-        addFace({ Vector3(right, bottom, back), Vector3(right, top, back),
-                  Vector3(left, bottom, back), Vector3(left, top, back) },
-                Vector3(0.0f, 0.0f, -1.0f), color);
-        addFace({ Vector3(right, bottom, front), Vector3(right, top, front),
-                  Vector3(right, bottom, back), Vector3(right, top, back) },
-                Vector3(1.0f, 0.0f, 0.0f), color);
-        addFace({ Vector3(left, bottom, back), Vector3(left, top, back),
-                  Vector3(left, bottom, front), Vector3(left, top, front) },
-                Vector3(-1.0f, 0.0f, 0.0f), color);
-        addFace({ Vector3(left, top, front), Vector3(left, top, back),
-                  Vector3(right, top, front), Vector3(right, top, back) },
-                Vector3(0.0f, 1.0f, 0.0f), color);
-        addFace({ Vector3(left, bottom, back), Vector3(left, bottom, front),
-                  Vector3(right, bottom, back), Vector3(right, bottom, front) },
-                Vector3(0.0f, -1.0f, 0.0f), color);
-    };
-
-    // 緑がかったガラスの筒、上下の金具、手前に見えるオレンジのフィラメント
-    const Color glass(0.34f, 0.46f, 0.38f, 1.0f);
-    const Color metal(0.62f, 0.58f, 0.42f, 1.0f);
-    const Color filament(1.0f, 0.48f, 0.10f, 1.0f);
-    addBox(Vector3::Zero, Vector3(0.22f, 0.46f, 0.22f), glass);
-    addBox(Vector3(0.0f, 0.58f, 0.0f),
-        Vector3(0.30f, 0.12f, 0.30f), metal);
-    addBox(Vector3(0.0f, -0.58f, 0.0f),
-        Vector3(0.30f, 0.12f, 0.30f), metal);
-    addBox(Vector3(0.0f, 0.0f, -0.25f),
-        Vector3(0.045f, 0.34f, 0.035f), filament);
+            { "Glass", Color(0.34f, 0.46f, 0.38f, 1.0f) },
+            { "Metal", Color(0.62f, 0.58f, 0.42f, 1.0f) },
+            { "Filament", Color(1.0f, 0.48f, 0.10f, 1.0f) },
+        },
+        Vector3(5.0f, 5.0f, 5.0f), m_Vertices, m_Indices);
 }
 
 // 形とバッファ、シェーダー、マテリアルを作っている。わずかに自ら光らせ、暗い部屋でも見つけやすくしている

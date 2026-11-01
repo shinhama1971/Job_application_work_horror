@@ -123,6 +123,9 @@
     <ClCompile Include="ExitTrigger.cpp">
       <Filter>ソース ファイル\Warld</Filter>
     </ClCompile>
+    <ClCompile Include="FirstPersonHands.cpp">
+      <Filter>ソース ファイル\Gameplay</Filter>
+    </ClCompile>
     <ClCompile Include="Player.cpp">
       <Filter>ソース ファイル\Gameplay</Filter>
     </ClCompile>
@@ -327,6 +330,9 @@
     <ClCompile Include="PipeProp.cpp">
       <Filter>ソース ファイル\Warld</Filter>
     </ClCompile>
+    <ClCompile Include="PropModel.cpp">
+      <Filter>ソース ファイルRendering</Filter>
+    </ClCompile>
     <ClCompile Include="utility.cpp">
       <Filter>ソース ファイル\Core</Filter>
     </ClCompile>
@@ -348,6 +354,9 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="shader\figureShadow.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\viewModel.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="shader\rayReflection.hlsli">
@@ -552,6 +561,9 @@
       <Filter>ソース ファイル\Warld</Filter>
     </ClInclude>
     <ClInclude Include="FlashlightSystem.h">
+      <Filter>ソース ファイル\Gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="FirstPersonHands.h">
       <Filter>ソース ファイル\Gameplay</Filter>
     </ClInclude>
     <ClInclude Include="Player.h">
@@ -773,6 +785,9 @@
     <ClInclude Include="PipeProp.h">
       <Filter>ソース ファイル\Warld</Filter>
     </ClInclude>
+    <ClInclude Include="PropModel.h">
+      <Filter>ソース ファイルRendering</Filter>
+    </ClInclude>
     <ClInclude Include="utility.h">
       <Filter>ソース ファイル\Core</Filter>
     </ClInclude>
@@ -785,6 +800,18 @@
       <Filter>リソース ファイル</Filter>
     </FxCompile>
     <FxCompile Include="shader\signalPanelPS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\viewModelVS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\viewModelPS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\viewModelSkinPS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\viewModelClothPS.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>
     <FxCompile Include="shader\mirrorPS.hlsl">

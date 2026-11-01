@@ -161,6 +161,7 @@ Application
 
 - `PlayerMovement`: 移動、重力、Sprint、Stamina、HeadBob
 - `FlashlightSystem`: ON/OFF、電池消費、低残量通知、フリッカー、点灯補間
+- `FirstPersonHands`: 一人称で画面の右下に映る、懐中電灯を持った右手のモデル。視点の回転に遅れて付いてくる揺れ（ばね）、歩き・走り・息・スイッチ・電池の揺れ、ロッカーの中では手を下げる。プレイヤーの視点の本描画のときだけ描く（監視映像には映さない）
 
 衝突はステージの `Wall` / `Door` に依存するため `Player` に残しています。
 ライトの色・範囲・壁接近時の減光も描画結果へ直結するため、`Player` が適用します。
@@ -268,6 +269,8 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 | 水たまりの反射 | GPU（PS） | `wetFloorPS.hlsl` の `TraceRayReflection`、`rayReflection.hlsli`（SSRと、部屋の形・小物の箱とのスラブ法の交差） | 反転したカメラで景色を描き直さず、床の画素ごとに反射の光線を1本飛ばす |
 | 壁の鏡（2面） | GPU（PS） | `mirrorPS.hlsl`（`rayReflection.hlsli` を床と共通で使う）、`GameRendering.cpp`（カメラに近い小物の箱16個を b12 で渡す） | 鏡の画素ごとに反射の光線を飛ばす。床と違い下向きの光線が多いため、床の高さとの交差も見ている |
 | 鏡に映る自分の姿・鏡の異変の人影（2面） | CPU・GPU（PS） | `MirrorSelf`（1秒60回の姿勢の記録から遅らせた姿勢と手足の振りを b12 で渡す）、`MirrorAnomaly`、`mirrorPS.hlsl`（体は17本のカプセルと光線の交差、人影は光線とカプセルの芯の距離） | 一人称で体がなく、異変の人影も物として置かないため、鏡のシェーダーの中だけに形を出している |
+| 一人称の手と懐中電灯 | CPU・GPU（VS・PS） | `FirstPersonHands`（揺れの計算、b9 に手元だけの射影行列と、前の壁で跳ね返る懐中電灯の光）、`shader/viewModel*.hlsl*`（肌・布・金属） | ビューポートの深度の範囲を 0〜0.02 にして描き、壁にめり込まないようにしている（本描画は near=1 なので、それより手前に壁は来ない） |
+| 小物と人影のモデル | CPU（読み込み時） | `PropModel`（FBXの部位をマテリアルの名前で選び、頂点カラーの環境遮蔽 × 部位の色を頂点の色にして、各クラスの頂点の配列へ足す） | モデルは実際の大きさで作り、各クラスが掛ける拡大率で位置と法線を割っている。描き方は箱で組んでいたときと同じ |
 | 濡れた足跡 | CPU・GPU（PS） | `WetFootprints`（輪のバッファ・乾き）、`Ground`（b10へ渡す）、`shader/wetFootprints.hlsli`、`FootprintFollower`（2面の誰かの足跡） | 足跡ごとに近くの画素だけ形を計算し、遠い画素は距離で省いている |
 | 崩れて現れる・消える | GPU（PS） | `Wall::DissolveIn` / `DissolveOut`、`litTexturePS.hlsl`（clip と焦げた縁） | マテリアルの詰め物を崩れ具合に使い、定数バッファを増やしていない |
 | 水たまりの反射の比較（技術デモF2） | GPU | `ReflectionProbe`（キューブマップ128x128を1フレームに1面）、`ScreenSpaceReflection`（深度の写し取り）、`wetFloorPS.hlsl`（キューブマップを反射の向きで読む・SSRの光線をたどる） | レイ反射と、重さと正確さの違いを見比べるため。普段はレイ反射 |

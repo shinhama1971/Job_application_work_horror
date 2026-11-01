@@ -8,108 +8,40 @@
 #include "Input.h"
 #include "Player.h"
 #include "ScreenDustOverlay.h"
+#include "PropModel.h"
 
 #include <array>
 
 using namespace DirectX::SimpleMath;
 
-// 箱の形（本体・前面のふた・ヒューズ3本・状態を示すランプ・レバー）を頂点で組み立てている。
+// 本体・前面のふた・ヒューズ3本・状態を示すランプ・レバーを、Mayaで作ったモデルから読み込んでいる。
 // 電力が戻ったかどうかでヒューズとランプの色が変わるので、状態が変わるたびに作り直している。
 void FuseBox::BuildGeometry()
 {
     m_Vertices.clear();
     m_Indices.clear();
 
-    // 四角形の面を1枚追加している。表と裏の両方から見えるよう、三角形を両面分（12個のインデックス）入れている
-    const auto addFace = [this](
-        const std::array<Vector3, 4>& positions,
-        const Vector3& normal,
-        const Color& color)
-    {
-        const unsigned int base = static_cast<unsigned int>(m_Vertices.size());
-        const std::array<Vector2, 4> uvs =
-        {
-            Vector2(0.0f, 1.0f), Vector2(0.0f, 0.0f),
-            Vector2(1.0f, 1.0f), Vector2(1.0f, 0.0f)
-        };
-
-        for (size_t index = 0; index < positions.size(); ++index)
-        {
-            VERTEX_3D vertex{};
-            vertex.position = positions[index];
-            vertex.normal = normal;
-            vertex.color = color;
-            vertex.uv = uvs[index];
-            m_Vertices.push_back(vertex);
-        }
-
-        const unsigned int indices[] =
-        {
-            base + 0, base + 1, base + 2,
-            base + 2, base + 1, base + 3,
-            base + 2, base + 1, base + 0,
-            base + 3, base + 1, base + 2
-        };
-        m_Indices.insert(m_Indices.end(), indices, indices + 12);
-    };
-
-    // 中心と半分の大きさを指定して、6面の箱を追加している
-    const auto addBox = [&addFace](
-        const Vector3& center,
-        const Vector3& half,
-        const Color& color)
-    {
-        const float left = center.x - half.x;
-        const float right = center.x + half.x;
-        const float bottom = center.y - half.y;
-        const float top = center.y + half.y;
-        const float back = center.z - half.z;
-        const float front = center.z + half.z;
-
-        addFace({ Vector3(left, bottom, front), Vector3(left, top, front),
-                  Vector3(right, bottom, front), Vector3(right, top, front) },
-                Vector3(0.0f, 0.0f, 1.0f), color);
-        addFace({ Vector3(right, bottom, back), Vector3(right, top, back),
-                  Vector3(left, bottom, back), Vector3(left, top, back) },
-                Vector3(0.0f, 0.0f, -1.0f), color);
-        addFace({ Vector3(right, bottom, front), Vector3(right, top, front),
-                  Vector3(right, bottom, back), Vector3(right, top, back) },
-                Vector3(1.0f, 0.0f, 0.0f), color);
-        addFace({ Vector3(left, bottom, back), Vector3(left, top, back),
-                  Vector3(left, bottom, front), Vector3(left, top, front) },
-                Vector3(-1.0f, 0.0f, 0.0f), color);
-        addFace({ Vector3(left, top, front), Vector3(left, top, back),
-                  Vector3(right, top, front), Vector3(right, top, back) },
-                Vector3(0.0f, 1.0f, 0.0f), color);
-        addFace({ Vector3(left, bottom, back), Vector3(left, bottom, front),
-                  Vector3(right, bottom, back), Vector3(right, bottom, front) },
-                Vector3(0.0f, -1.0f, 0.0f), color);
-    };
-
-    // 本体の箱と、前面のふた
-    addBox(Vector3::Zero, Vector3(0.50f, 0.50f, 0.20f),
-           Color(0.16f, 0.18f, 0.17f, 1.0f));
-    addBox(Vector3(0.0f, 0.0f, -0.23f), Vector3(0.42f, 0.42f, 0.045f),
-           Color(0.035f, 0.045f, 0.04f, 1.0f));
-
-    // ヒューズ3本：電力が戻ると明るい緑がかった色になる
+    // ヒューズ：電力が戻ると明るい緑がかった色になる
     const Color fuseColor = m_IsPowered
         ? Color(0.68f, 0.82f, 0.64f, 1.0f)
         : Color(0.11f, 0.13f, 0.12f, 1.0f);
-    addBox(Vector3(-0.25f, -0.06f, -0.30f), Vector3(0.075f, 0.25f, 0.04f), fuseColor);
-    addBox(Vector3(0.0f, -0.06f, -0.30f), Vector3(0.075f, 0.25f, 0.04f), fuseColor);
-    addBox(Vector3(0.25f, -0.06f, -0.30f), Vector3(0.075f, 0.25f, 0.04f), fuseColor);
-
     // ランプ：停電中は赤、電力が戻ると緑
     const Color indicatorColor = m_IsPowered
         ? Color(0.12f, 1.0f, 0.24f, 1.0f)
         : Color(0.85f, 0.04f, 0.025f, 1.0f);
-    addBox(Vector3(0.0f, 0.33f, -0.31f), Vector3(0.12f, 0.055f, 0.045f),
-           indicatorColor);
-
-    // 横のレバー（真鍮色）
-    addBox(Vector3(0.46f, 0.0f, -0.30f), Vector3(0.025f, 0.16f, 0.04f),
-           Color(0.52f, 0.39f, 0.12f, 1.0f));
+    // モデルは幅12・高さ18・奥行き1.6の実際の大きさなので、標準の拡大率で割って読み込んでいる（tools/maya/build_props.py）。
+    // 色が変わっても頂点の数は同じなので、作り直した後は頂点バッファの中身だけを入れ替えている
+    PropModel::Append("assets/model/props/fuse_box.fbx",
+        {
+            { "Body", Color(0.16f, 0.18f, 0.17f, 1.0f) },
+            { "Cover", Color(0.035f, 0.045f, 0.04f, 1.0f) },
+            { "Holder", Color(0.30f, 0.29f, 0.26f, 1.0f) },
+            { "Fuse", fuseColor },
+            { "Lamp", indicatorColor },
+            // 横のレバーとヒューズの金具（真鍮色）
+            { "Lever", Color(0.52f, 0.39f, 0.12f, 1.0f) },
+        },
+        Vector3(12.0f, 18.0f, 4.0f), m_Vertices, m_Indices);
 }
 
 // 形とバッファ、シェーダー、マテリアルを作っている。色は頂点の色を使っている

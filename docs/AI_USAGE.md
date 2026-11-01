@@ -104,6 +104,8 @@
 | 見えない影の影を照明の下の光の筋（霧）にも落とし、影を濃く・縁を鋭くした。懐中電灯で照らすと見えない影が気づいて速く寄ってくる遊びを追加。1面の西棟に、水面にだけ映る天井の逆さまの人影（見上げると何もいない）を追加。技術デモに「見えない人影の影」の項目を追加。光の筋の重さを測って軽くした | `shader/lightShaftsCS.hlsl`, `shader/figureShadow.hlsli`, `shader/wetFloorPS.hlsl`, `shader/waterCaustics.hlsli`, `LightShafts.h`, `Renderer.*`, `RendererState.cpp`, `UnseenPresenceAnomaly.h`, `CeilingReflectionScare.h`, `StageScene.*`, `Stage2SceneHorror.cpp`, `Scene.h`, `DebugUI.cpp`, `CaptureMode.cpp`, GraphicsTechDemo の `src/App.*`・`README.md` | 提案・実装・撮影と計測での確認（Claude Code） | 提案の採用（候補をまとめて制作するよう指示） |
 | 懐中電灯の光の帯に、見えない影の人の形の切れ目を追加。見えない影が水たまりを通ると波紋と水音。最後の追跡の影を水面にも映し、水面なら見ても罰がないようにした。READMEに11月1日の画像3枚と撮影記録を追加 | `shader/volumetricFlashlightPS.hlsl`, `Stage2SceneHorror.cpp`, `Stage2Objective.cpp`, `CaptureMode.cpp`, `README.md`, `docs/images/*_20261101.*` | 提案・実装・撮影での確認・画像の選定（Claude Code） | 提案の採用（候補をまとめて制作するよう指示） |
 | 反転したカメラで景色を描き直す平面反射をコードごと外し、2面の壁の鏡を水たまりと同じレイ反射に変更。鏡に映る自分の体と鏡の異変の人影を、鏡のシェーダーの中でカプセルと光線の交差で描くようにした。計測モードに鏡の前の地点を追加し、外す前と後を測った | `shader/rayReflection.hlsli`, `shader/mirrorPS.hlsl`, `shader/wetFloorPS.hlsl`, `shader/litTextureVS.hlsl`, `shader/waterCaustics.hlsli`, `MirrorSelf.*`, `Renderer.*`, `RendererState.cpp`, `GameRendering.cpp`, `Game.*`, `Object.h`, `Wall.h`, `Ground.h`, `ShadowMan.*`, `Stage2*.cpp`, `TechDemo.*`, `DebugUI.*`, `CaptureMode.*`, GraphicsTechDemo の `src/App.*`・`README.md` | 実装・撮影と計測での確認（Claude Code） | 反転カメラを使わない方針の決定、鏡をレイ反射で描く案と比較用の平面反射も消す案の選択 |
+| 一人称の「懐中電灯を持った右手」を追加。Mayaのスクリプトで手と袖（距離関数を Surface Nets で面にした形）と懐中電灯（回転体）を作ってFBXに書き出し、手元だけの射影行列・深度の範囲を手前に寄せる描画・肌と布と金属のシェーダー・視点の揺れの遅れ・歩き・走り・スイッチの動きを付けた | `tools/maya/build_flashlight_hand.py`, `assets/model/flashlight_hand/*`, `FirstPersonHands.*`, `Player.*`, `shader/viewModel*.hlsl*` | モデルを作るスクリプト・描画・動きの実装と撮影での確認（Claude Code） | モデルに変える方針の決定（時間がかかってもよい）、手と懐中電灯から始める順番の承認 |
+| コードで箱や円柱を組んでいた人影・ロッカー・扉・配電盤・鍵・ヒューズ・電池・天井の照明・裸電球・排水バルブを、Mayaのスクリプトで作ったモデル（面取り・部位ごとのマテリアル・頂点カラーの環境遮蔽）に差し替えた。読み込みは `PropModel` にまとめ、各クラスの描き方（範囲ごとのマテリアル・影・深度プリパス）は変えていない | `tools/maya/build_props.py`, `assets/model/props/*.fbx`, `PropModel.*`, `ShadowMan.cpp`, `Locker.cpp`, `Door.cpp`, `FuseBox.cpp`, `KeyItem.cpp`, `Item.cpp`, `BatteryItem.cpp`, `CeilingLight.cpp`, `HangingBulb.cpp`, `DrainValve.cpp` | モデルを作るスクリプト・差し替え・撮影での確認（Claude Code） | まとめて差し替える指示 |
 
 ### 設計の整理・品質改善
 
@@ -143,6 +145,7 @@
 | `assets/Audio/pipe_knock.wav`（配管を叩く音） | `tools/generate-pipe-knock.ps1` で数式から合成 | 合成スクリプトをAIが作成（画像・音声の生成AIは不使用） |
 | `assets/texture/writing_*.png`（壁の文字） | `tools/generate-wall-writings.ps1` でフォント（HG行書体）から描画し、垂れ・かすれを加工 | 生成スクリプトをAIが作成（画像生成AIは不使用） |
 | `assets/Audio` のその他の効果音・環境音 | 【作者が記入・確認する欄】入手元（自作・フリー素材サイト名・ライセンス） | 【作者が記入・確認する欄】 |
+| `assets/model/flashlight_hand`・`assets/model/props`（手と懐中電灯、人影・ロッカー・扉などの小物） | `tools/maya/build_flashlight_hand.py`・`tools/maya/build_props.py` を Maya 2025 の `mayapy` で実行して作成 | モデルを作るスクリプトをAIが作成（画像・3Dの生成AIは不使用） |
 | `assets/model`（配管・ゴルフボールなど） | 【作者が記入・確認する欄】入手元とライセンス | 【作者が記入・確認する欄】 |
 
 ## 自分で作った部分【作者が記入・確認する欄】

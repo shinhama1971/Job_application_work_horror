@@ -1,6 +1,6 @@
 // ============================================================================
 // ファイルの役割: 天井から吊るした、揺れる裸電球。説明は HangingBulb.h を参照。
-// 主な技術: 減衰する2方向の振り子、すきま風の揺れ、揺さぶり、電球の位置の点光源、円柱と球のメッシュ
+// 主な技術: 減衰する2方向の振り子、すきま風の揺れ、揺さぶり、電球の位置の点光源、コードの円柱と、Mayaで作ったソケットと電球のモデル
 // ============================================================================
 
 #include "HangingBulb.h"
@@ -8,6 +8,7 @@
 #include "Application.h"
 #include "Camera.h"
 #include "Renderer.h"
+#include "PropModel.h"
 
 #include <algorithm>
 #include <cmath>
@@ -24,9 +25,8 @@ namespace
     constexpr float LightRange = 95.0f;
     constexpr float LightIntensity = 1.6f;
     const Color BulbColor(1.0f, 0.68f, 0.38f, 1.0f);
-    // 円柱と球の分割数
+    // コードの円柱の分割数
     constexpr int Segments = 10;
-    constexpr int Rings = 6;
 
     // 三角形を1つ足している（表と裏の両方の順番を入れている）
     void AddTriangle(std::vector<VERTEX_3D>& vertices, std::vector<unsigned int>& indices,
@@ -67,31 +67,6 @@ namespace
                 Vector3(0.0f, -1.0f, 0.0f), Vector3(0.0f, -1.0f, 0.0f), Vector3(0.0f, -1.0f, 0.0f));
         }
     }
-
-    // 球（中心center、半径radius、縦に少し長くした電球の形）を足している
-    void AddBulb(std::vector<VERTEX_3D>& vertices, std::vector<unsigned int>& indices, const Vector3& center, float radius)
-    {
-        const auto pointAt = [&center, radius](int ring, int segment, Vector3& normal)
-        {
-            const float latitude = -DirectX::XM_PIDIV2 + DirectX::XM_PI * static_cast<float>(ring) / Rings;
-            const float longitude = DirectX::XM_2PI * static_cast<float>(segment) / Segments;
-            normal = Vector3(std::cos(latitude) * std::cos(longitude), std::sin(latitude), std::cos(latitude) * std::sin(longitude));
-            return center + Vector3(normal.x * radius, normal.y * radius * 1.25f, normal.z * radius);
-        };
-        for (int ring = 0; ring < Rings; ++ring)
-        {
-            for (int segment = 0; segment < Segments; ++segment)
-            {
-                Vector3 n00, n01, n10, n11;
-                const Vector3 p00 = pointAt(ring, segment, n00);
-                const Vector3 p01 = pointAt(ring, segment + 1, n01);
-                const Vector3 p10 = pointAt(ring + 1, segment, n10);
-                const Vector3 p11 = pointAt(ring + 1, segment + 1, n11);
-                AddTriangle(vertices, indices, p00, p10, p01, n00, n10, n01);
-                AddTriangle(vertices, indices, p01, p10, p11, n01, n10, n11);
-            }
-        }
-    }
 }
 
 void HangingBulb::Init()
@@ -101,9 +76,17 @@ void HangingBulb::Init()
     // 付け根（原点）から下へ、コード・ソケットの順に作り、その後ろに電球を作っている（電球だけ光らせるため）
     m_Vertices.reserve(512);
     AddVerticalCylinder(m_Vertices, m_Indices, 0.0f, -m_CordLength, 0.08f);
-    AddVerticalCylinder(m_Vertices, m_Indices, -m_CordLength, -m_CordLength - 1.1f, 0.42f);
-    m_CordIndexCount = static_cast<unsigned int>(m_Indices.size());
-    AddBulb(m_Vertices, m_Indices, Vector3(0.0f, -m_CordLength - 1.1f - BulbRadius, 0.0f), BulbRadius);
+    // ソケットと電球は、Mayaで作ったモデル（上端が原点。tools/maya/build_props.py）を、コードの長さだけ下へずらしている
+    const size_t modelStart = m_Vertices.size();
+    const std::vector<PropModel::IndexRange> ranges = PropModel::Append(
+        "assets/model/props/hanging_bulb.fbx",
+        { { "Socket", Color(1.0f, 1.0f, 1.0f, 1.0f) }, { "Bulb", Color(1.0f, 1.0f, 1.0f, 1.0f) } },
+        Vector3::One, m_Vertices, m_Indices);
+    for (size_t index = modelStart; index < m_Vertices.size(); ++index)
+    {
+        m_Vertices[index].position.y -= m_CordLength;
+    }
+    m_CordIndexCount = ranges[1].Start;
 
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
