@@ -757,7 +757,7 @@ void Stage2Scene::UpdateHandprintAnomaly(const Player& player, float deltaTime)
 }
 
 // 鏡を見つける周回（Stage2AnomalyPlanが決める）だけ判定している。
-// 左の壁の鏡をのぞくと、すぐ後ろに黒い人影が映っている（人影は鏡に映す景色を描くときだけ描かれる）。
+// 左の壁の鏡をのぞくと、すぐ後ろに黒い人影が映っている（人影は物として置かず、鏡のシェーダーが鏡の中にだけ描く）。
 // 鏡で見た後に振り返り、人影が立っていた所を見ると、そこには誰もいない。それで見つけたことになる。
 void Stage2Scene::UpdateMirrorAnomaly(const Player& player, float deltaTime)
 {
@@ -773,21 +773,13 @@ void Stage2Scene::UpdateMirrorAnomaly(const Player& player, float deltaTime)
         m_Objects.mirrorSelf->SetDelaySeconds(active && !m_MirrorAnomaly.WasFound() ? 0.45f : 0.0f);
     }
 
-    // 鏡の中の人影を、異変の周回で、まだ見つけていない間だけ表示している
-    ShadowMan* figure = m_Objects.mirrorFigure;
-    if (figure != nullptr)
-    {
-        const bool showFigure = active && m_MirrorAnomaly.IsFigureVisible();
-        if (showFigure != figure->IsActive())
-        {
-            figure->SetActive(showFigure);
-        }
-        if (showFigure)
-        {
-            const Vector3 position = m_MirrorAnomaly.GetFigurePosition();
-            figure->SetPosition(position.x, position.y, position.z);
-        }
-    }
+    // 鏡の中の人影を、異変の周回で、まだ見つけていない間だけ映している（0.35秒で現れ、見つけたら0.5秒で消える）。
+    // 人影は物として置かず、位置と見え方を鏡のシェーダーへ渡し、鏡で反射した光線の上にだけ黒い人の形を重ねている
+    const bool showFigure = active && m_MirrorAnomaly.IsFigureVisible();
+    m_MirrorFigureVisibility = showFigure
+        ? (std::min)(1.0f, m_MirrorFigureVisibility + deltaTime / 0.35f)
+        : (std::max)(0.0f, m_MirrorFigureVisibility - deltaTime / 0.5f);
+    Renderer::SetMirrorFigure(m_MirrorAnomaly.GetFigurePosition(), m_MirrorFigureVisibility);
 
     if (mirrorEvent == MirrorAnomaly::Event::Seen)
     {

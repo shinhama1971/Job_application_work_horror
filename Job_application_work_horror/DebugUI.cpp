@@ -31,8 +31,6 @@ namespace
     unsigned int g_ShadowDrawn = 0;
     unsigned int g_ShadowCulled = 0;
     unsigned int g_ReflectionDrawn = 0;
-    unsigned int g_ReflectionCulled = 0;
-    bool g_ReflectionSkipped = false;
 #if defined(ENABLE_IMGUI)
     // 初期化済みか、画面を開いているか、調整中にゲームを止めるか
     bool g_Initialized = false;
@@ -64,51 +62,6 @@ namespace
     int g_FrameTimeOffset = 0;
     // シェーダーのデバッグ表示の番号（0は通常の画面）
     int g_DebugViewMode = 0;
-    // 反射の更新頻度を自動で調整するか、選んだ頻度、今使っている間隔、FPSが低い・回復した状態の継続秒数
-    bool g_AdaptiveReflectionQuality = true;
-    int g_ReflectionPresetIndex = 0;
-    int g_ActiveReflectionInterval = 1;
-    float g_LowFpsTimer = 0.0f;
-    float g_RecoveryFpsTimer = 0.0f;
-
-    // FPSに合わせて水面の反射を描き直す間隔を自動で変えている。
-    // 52fps未満が1.5秒続いたら間隔を1つ広げ（最大4フレームに1回）、58fps以上が4秒続いたら1つ戻している。
-    void UpdateAdaptiveReflectionQuality()
-    {
-        const int requestedInterval = g_ReflectionPresetIndex + 1;
-        if (!g_AdaptiveReflectionQuality)
-        {
-            g_ActiveReflectionInterval = requestedInterval;
-            g_LowFpsTimer = 0.0f;
-            g_RecoveryFpsTimer = 0.0f;
-            return;
-        }
-
-        const float deltaTime = ImGui::GetIO().DeltaTime;
-        const float fps = ImGui::GetIO().Framerate;
-        g_ActiveReflectionInterval = g_ActiveReflectionInterval < requestedInterval
-            ? requestedInterval
-            : g_ActiveReflectionInterval;
-
-        g_LowFpsTimer = fps > 1.0f && fps < 52.0f
-            ? g_LowFpsTimer + deltaTime
-            : 0.0f;
-        g_RecoveryFpsTimer = fps >= 58.0f
-            ? g_RecoveryFpsTimer + deltaTime
-            : 0.0f;
-
-        if (g_LowFpsTimer >= 1.5f && g_ActiveReflectionInterval < 4)
-        {
-            ++g_ActiveReflectionInterval;
-            g_LowFpsTimer = 0.0f;
-        }
-        else if (g_RecoveryFpsTimer >= 4.0f &&
-            g_ActiveReflectionInterval > requestedInterval)
-        {
-            --g_ActiveReflectionInterval;
-            g_RecoveryFpsTimer = 0.0f;
-        }
-    }
 #endif
 }
 
@@ -199,7 +152,6 @@ void Debug::UI::BeginFrame()
 void Debug::UI::ApplyTuning(Effect::PostProcess& postProcess)
 {
 #if defined(ENABLE_IMGUI)
-    UpdateAdaptiveReflectionQuality();
     Renderer::SetDebugViewMode(
         g_DebugViewMode, g_WallDampStrength);
     postProcess.SetAutoExposureEnabled(g_AutoExposure);
@@ -302,8 +254,6 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
                 drawGpuTiming(
                     "Water ripples", gpuTimer->GetTiming(GpuPass::WaterRipples));
                 drawGpuTiming(
-                    "Wall mirror", gpuTimer->GetTiming(GpuPass::Mirror));
-                drawGpuTiming(
                     "Environment probe", gpuTimer->GetTiming(GpuPass::EnvironmentProbe));
                 drawGpuTiming(
                     "Bulb shadow", gpuTimer->GetTiming(GpuPass::BulbShadow));
@@ -339,18 +289,8 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             static_cast<unsigned long long>(modelCacheStats.CacheMisses));
         ImGui::Text("Assimp loads through cache: %llu",
             static_cast<unsigned long long>(modelCacheStats.AssimpLoads));
-        // 水面の反射：画面に水たまりが無ければ描くのを省いている
-        if (g_ReflectionSkipped)
-        {
-            ImGui::TextColored(
-                ImVec4(0.38f, 0.90f, 0.48f, 1.0f),
-                "Reflection: skipped (no puddle in view)");
-        }
-        else
-        {
-            ImGui::Text("Reflection objects: %u drawn / %u culled",
-                g_ReflectionDrawn, g_ReflectionCulled);
-        }
+        // 水面の反射のキューブマップ（技術デモで選んだときだけ）に描いた物の数
+        ImGui::Text("Reflection probe objects: %u drawn", g_ReflectionDrawn);
         ImGui::Separator();
 
         // 2面の進行の確認と、イベントをすぐ再生するボタン（2面の間だけ表示している）
@@ -430,31 +370,15 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         }
 
         // 番号はシェーダーのDebugViewModeと対応している（8のフルブライトはcommon.hlslのDEBUG_VIEW_FULLBRIGHT）。
-        const char* debugViews[] = { "Final", "World normals", "Flashlight shadow", "Lighting only", "Puddle mask", "Planar reflection", "Wall damp mask", "Light tiles (lights per 16x16 tile)", "Fullbright (照明・影・霧なしで全体を明るく)", "PBR material (R=metallic G=roughness B=wet)", "Ambient occlusion (SSAO)" };
+        const char* debugViews[] = { "Final", "World normals", "Flashlight shadow", "Lighting only", "Puddle mask", "Floor reflection", "Wall damp mask", "Light tiles (lights per 16x16 tile)", "Fullbright (照明・影・霧なしで全体を明るく)", "PBR material (R=metallic G=roughness B=wet)", "Ambient occlusion (SSAO)" };
         ImGui::Combo("Shader debug view", &g_DebugViewMode,
             debugViews, IM_ARRAYSIZE(debugViews));
-        // 水面の反射を描き直す頻度（何フレームに1回か）
-        const char* reflectionRates[] =
-        {
-            "60 Hz - every frame",
-            "30 Hz - balanced",
-            "20 Hz - performance",
-            "15 Hz - low"
-        };
-        ImGui::Combo("Reflection update", &g_ReflectionPresetIndex,
-            reflectionRates, IM_ARRAYSIZE(reflectionRates));
-        ImGui::Checkbox(
-            "Adaptive reflection quality", &g_AdaptiveReflectionQuality);
-        ImGui::Text("Active reflection: %d Hz (every %d frame%s)",
-            60 / g_ActiveReflectionInterval, g_ActiveReflectionInterval,
-            g_ActiveReflectionInterval == 1 ? "" : "s");
 
         // 画面効果の値をまとめて切り替えるプリセット：見やすさ重視・雰囲気重視・怖さ重視・軽さ重視
         ImGui::TextUnformatted("Visual presets");
         if (ImGui::Button("Readable gameplay", ImVec2(196.0f, 0.0f)))
         {
             g_OverridePostProcess = true;
-            g_ReflectionPresetIndex = 1;
             g_EnableBloom = true;
             g_EnableNoise = true;
             g_EnableVolumetricLight = false;
@@ -474,7 +398,6 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         if (ImGui::Button("Moody corridor", ImVec2(196.0f, 0.0f)))
         {
             g_OverridePostProcess = true;
-            g_ReflectionPresetIndex = 1;
             g_EnableBloom = true;
             g_EnableNoise = true;
             g_EnableVolumetricLight = true;
@@ -493,7 +416,6 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         if (ImGui::Button("Scare showcase", ImVec2(196.0f, 0.0f)))
         {
             g_OverridePostProcess = true;
-            g_ReflectionPresetIndex = 0;
             g_EnableBloom = true;
             g_EnableNoise = true;
             g_EnableVolumetricLight = true;
@@ -513,7 +435,6 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         if (ImGui::Button("Performance", ImVec2(196.0f, 0.0f)))
         {
             g_OverridePostProcess = true;
-            g_ReflectionPresetIndex = 3;
             g_EnableBloom = false;
             g_EnableNoise = true;
             g_EnableVolumetricLight = false;
@@ -622,18 +543,6 @@ bool Debug::UI::ShouldPauseGameplay()
 #endif
 }
 
-// 水面の反射を何フレームに1回描き直すかを返している
-unsigned int Debug::UI::GetReflectionUpdateInterval()
-{
-#if defined(ENABLE_IMGUI)
-    return static_cast<unsigned int>(g_ActiveReflectionInterval);
-#else
-    // Releaseは毎フレーム描き直す。反射は縦横半分の解像度で描き、反射に映る物だけに絞っているので、移動中は滑らかさを優先している。
-    // 止まっているときに描き直す回数を減らす処理はGameRendering側で行っている。
-    return 1u;
-#endif
-}
-
 // タイルの深度の範囲で光源を絞るかを返している（Releaseは常に絞る）
 bool Debug::UI::IsTileDepthBoundsEnabled()
 {
@@ -650,15 +559,11 @@ void Debug::UI::SetCullingStats(
     unsigned int mainCulled,
     unsigned int shadowDrawn,
     unsigned int shadowCulled,
-    unsigned int reflectionDrawn,
-    unsigned int reflectionCulled,
-    bool reflectionSkipped)
+    unsigned int reflectionDrawn)
 {
     g_MainDrawn = mainDrawn;
     g_MainCulled = mainCulled;
     g_ShadowDrawn = shadowDrawn;
     g_ShadowCulled = shadowCulled;
     g_ReflectionDrawn = reflectionDrawn;
-    g_ReflectionCulled = reflectionCulled;
-    g_ReflectionSkipped = reflectionSkipped;
 }

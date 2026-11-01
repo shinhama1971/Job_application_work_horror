@@ -60,7 +60,7 @@ public:
     bool WritesDepthPrepass() const override { return true; }
     void DrawDepthPrepass(Camera* camera) override;
     bool UsesCameraCulling() const override { return true; }
-    bool ContributesToPlanarReflection() const override { return true; }
+    bool ContributesToReflection() const override { return true; }
     void Uninit() override;
 
     // 閉じている間だけ調べる対象になっている

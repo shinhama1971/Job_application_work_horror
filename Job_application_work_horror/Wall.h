@@ -46,9 +46,8 @@ private:
     // 絵を計算で描く面（肖像画・時計）か、その絵へ渡す値（肖像画は目の状態、時計は針の角度）
     bool m_HasSurfaceParams = false;
     DirectX::SimpleMath::Color m_SurfaceParams = DirectX::SimpleMath::Color(0.0f, 0.0f, 0.0f, 0.0f);
-    // 壁の鏡の面か、映す側の向き
+    // 壁の鏡の面か（鏡は自分の色ではなく、鏡で反射した光線の先を映す。水面に映す小物の箱にもしない）
     bool m_IsMirror = false;
-    DirectX::SimpleMath::Vector3 m_MirrorFacing = DirectX::SimpleMath::Vector3(1.0f, 0.0f, 0.0f);
 
     // 本描画・影・深度プリパスで共通のワールド行列（同じ計算にし、深度プリパスと本描画の深度を一致させている）
     DirectX::SimpleMath::Matrix MakeWorldMatrix() const;
@@ -69,7 +68,7 @@ public:
     }
     void DrawDepthPrepass(Camera* cam) override;
     bool UsesCameraCulling() const override { return true; }
-    bool ContributesToPlanarReflection() const override { return true; }
+    bool ContributesToReflection() const override { return true; }
     // 床に置いた棚・ロッカー・柱などの小物だけ、レイ反射で水面に映す箱を返している（建物の壁・天井・床板・鏡・半透明の物は除く）
     bool GetReflectionProxy(
         DirectX::SimpleMath::Vector3& minimum, DirectX::SimpleMath::Vector3& maximum, DirectX::SimpleMath::Color& color) const override;
@@ -136,29 +135,12 @@ public:
     // シェーダーには、これらの面では使っていないマテリアルの環境の色（Ambient）に入れて渡している
     void SetSurfaceParams(const DirectX::SimpleMath::Color& params);
 
-    // 壁の鏡（2面）の面にしている。facingは鏡が映す側の向き（壁から廊下へ向かう単位ベクトル）。
-    // 映る景色は Game::Draw が鏡の面で反転したカメラから描き、鏡のピクセルシェーダー（mirrorPS）がそれを読んでいる。
-    void SetMirrorSurface(const DirectX::SimpleMath::Vector3& facing)
+    // 壁の鏡（2面）の面にしている。映る景色は、鏡のピクセルシェーダー（mirrorPS）が、面の向きで反射した光線を
+    // 部屋の形・小物の箱・画面の中（SSR）へ飛ばして求めている（景色をもう一度描かない）。
+    void SetMirrorSurface()
     {
         m_IsMirror = true;
-        m_MirrorFacing = facing;
-        m_MirrorFacing.Normalize();
         m_Shader.Create("shader/litTextureVS.hlsl", "shader/mirrorPS.hlsl");
-    }
-    // 鏡の面（箱の、映す側の面）の上の点と向きを返している
-    bool GetMirrorPlane(DirectX::SimpleMath::Vector3& point, DirectX::SimpleMath::Vector3& normal) const override
-    {
-        if (!m_IsMirror || !m_Visible)
-        {
-            return false;
-        }
-        const float halfThickness = 0.5f * (
-            std::abs(m_Scale.x * m_MirrorFacing.x) +
-            std::abs(m_Scale.y * m_MirrorFacing.y) +
-            std::abs(m_Scale.z * m_MirrorFacing.z));
-        point = m_Position + m_MirrorFacing * halfThickness;
-        normal = m_MirrorFacing;
-        return true;
     }
 
     // 当たり判定の有無、影の有無を切り替えている

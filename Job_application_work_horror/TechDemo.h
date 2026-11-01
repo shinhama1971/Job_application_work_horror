@@ -37,8 +37,7 @@ namespace Tools::TechDemo
     bool UsesTiledLighting();
     // 本描画の前に、深度プリパスを描くか
     bool UsesDepthPrepass();
-    // 水面の反射の方式（0=反射なし、1=平面反射（普段）、2=キューブマップ、3=SSR）
-    // 水面の反射の方式（0 なし、1 平面反射、2 キューブマップ、3 SSR、4 レイ反射（普段））
+    // 水面の反射の方式（0 なし、1 キューブマップ、2 SSR、3 レイ反射（普段））
     int GetReflectionMethod();
     // 懐中電灯の影の方式（0=影なし、1=硬い影、2=PCSSの柔らかい影）
     int GetShadowMode();

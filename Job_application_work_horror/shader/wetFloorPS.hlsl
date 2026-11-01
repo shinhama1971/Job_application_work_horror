@@ -10,12 +10,8 @@ SamplerState g_SamplerState : register(s0);
 #include "flashlightShadow.hlsli"
 #include "pointShadow.hlsli"
 
-// 水面の反射の画像（PlanarReflectionが描いたもの、t6）
-Texture2D g_PlanarReflection : register(t6);
-// 反射の方式の比較で使う画像：キューブマップ（t7、ReflectionProbe）、SSRの前のフレームの画面（t4）と深度（t8、ScreenSpaceReflection）
+// 反射の方式の比較で使うキューブマップ（t7、ReflectionProbe）。SSRの画面と深度（t4・t8）は rayReflection.hlsli で読んでいる
 TextureCube g_ReflectionProbe : register(t7);
-Texture2D g_SsrScene : register(t4);
-Texture2D<float> g_SsrDepth : register(t8);
 
 // Ground.cppのWetFloorBufferと同じ並び（b10）。経過時間、波紋の強さ、反射の強さ、詰め物
 // 濡れた足跡の最大数（WetFootprints::MaxCount と同じ）
@@ -50,7 +46,6 @@ struct LIT_PS_IN
     float3 worldPos : TEXCOORD4;
     float3 worldNormal : TEXCOORD5;
     float4 shadowPos : TEXCOORD6;
-    float4 reflectionPos : TEXCOORD7;
 };
 
 
@@ -84,7 +79,8 @@ float ValueNoise(float2 value)
 #include "wetFootprints.hlsli"
 
 // ----------------------------------------------------------------------------
-// 水面の反射の方式（ReflectionParams.x：0 平面反射、1 キューブマップ、2 SSR、3 レイ反射）。ゲームの普段の方式はレイ反射。
+// 水面の反射の方式（ReflectionParams.x：0 反射なし、1 キューブマップ、2 SSR、3 レイ反射）。ゲームの普段の方式はレイ反射。
+// SSRとレイ反射の本体（TraceScreenSpaceReflection・TraceRoomReflection）は、壁の鏡と共通の rayReflection.hlsli にある。
 // ----------------------------------------------------------------------------
 // キューブマップ：反射の向きで、カメラの位置から撮った6方向の画像を読む。
 // 撮った位置からの景色なので軽いが、撮った位置から離れた所や近くの物では、映る位置がずれる。
@@ -95,53 +91,6 @@ float3 SampleProbeReflection(float3 worldPosition, float3 worldNormal)
     // キューブマップの面は左手系、このゲームの座標は右手系なので、z を反転して読んでいる（ReflectionProbe.cpp）
     return g_ReflectionProbe.SampleLevel(g_SamplerState, float3(reflected.x, reflected.y, -reflected.z), 0.0f).rgb;
 }
-
-// SSR：反射の光線をビュー空間で少しずつ（だんだん大きな歩幅で）進め、画面の深度より奥へ入った所を「ぶつかった」とし、
-// その画素の色を前のフレームの画面から読む。画面に映っていない物は映らない。
-// 返り値の xyz は色、w はぶつかった度合い（画面の端と、遠くまで進んだ所では0へ近づけている）。
-// stepCount は進める回数、stepGrowth は1回ごとに歩幅を広げる割合（レイ反射では、遠くは部屋の形で補うので少なくしている）。
-float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int stepCount = 40, float stepGrowth = 1.12f)
-{
-    uint width = 0;
-    uint height = 0;
-    g_SsrDepth.GetDimensions(width, height);
-    const float3 viewPosition = mul(float4(worldPosition, 1.0f), CausticView).xyz;
-    const float3 viewNormal = normalize(mul(float4(worldNormal, 0.0f), CausticView).xyz);
-    const float3 rayDirection = reflect(normalize(viewPosition), viewNormal);
-    // 深度バッファの値からビュー空間の z を戻すための、射影行列の値（右手系：z = -[3][2] / (深度 + [2][2])）
-    const float depthScale = CausticProjection[2][2];
-    const float depthOffset = CausticProjection[3][2];
-    float distance = 1.5f;
-    [loop]
-    for (int step = 0; step < stepCount; ++step)
-    {
-        const float3 rayPosition = viewPosition + rayDirection * distance;
-        const float4 clip = mul(float4(rayPosition, 1.0f), CausticProjection);
-        if (clip.w <= 0.001f)
-        {
-            break;
-        }
-        const float2 ndc = clip.xy / clip.w;
-        const float2 uv = float2(ndc.x * 0.5f + 0.5f, -ndc.y * 0.5f + 0.5f);
-        if (any(uv < 0.0f) || any(uv > 1.0f))
-        {
-            break;
-        }
-        const float sceneDepth = g_SsrDepth.Load(int3(uv * float2(width, height), 0));
-        const float sceneViewZ = -depthOffset / (sceneDepth + depthScale);
-        // 光線が面より奥に入り、その差が面の厚みとみなせる範囲なら、ぶつかったとしている
-        const float behind = sceneViewZ - rayPosition.z;
-        if (behind > 0.0f && behind < 3.0f + distance * 0.06f)
-        {
-            const float2 edge = min(uv, 1.0f - uv);
-            const float fade = saturate(min(edge.x, edge.y) * 12.0f) * (1.0f - float(step) / float(stepCount));
-            return float4(g_SsrScene.SampleLevel(g_SamplerState, uv, 0.0f).rgb, fade);
-        }
-        distance *= stepGrowth;
-    }
-    return 0.0f;
-}
-
 
 // ----------------------------------------------------------------------------
 // 床の古さ（1面と2面）。壁の古さと同じ WallWeathering で有効になり、0の面では何もしない。
@@ -224,157 +173,7 @@ FloorAgeing GetFloorAgeing(float3 worldPosition, float amount)
 #include "horrorGrade.hlsli"
 #include "horrorMist.hlsli"
 #include "figureShadow.hlsli"
-
-// ----------------------------------------------------------------------------
-// レイ反射（ReflectionParams.x = 3。ゲームの普段の方式）。景色をもう一度描かずに、反射の光線を床のシェーダーの中で飛ばしている。
-// ・画面に映っている物（扉・ロッカー・小物・懐中電灯で照らした壁）は SSR（TraceScreenSpaceReflection）で拾っている。
-// ・画面の外の物は、部屋の形（roomOcclusion.hlsli の b11 にある、壁を上から見た長方形と天井の高さ）との交差で求めている。
-//   真上の天井の照明のように、床を見ているときに画面の外にある物も、正しい位置に映る（SSRだけでは映らなかった）。
-// ・当たった天井と壁は、点光源と懐中電灯で簡単に照らし、照明の器具そのものは、光線が光源のそばを通った分だけ光らせている。
-// ----------------------------------------------------------------------------
-// 部屋の形の、壁と天井の色（照らす前の色）と、光線を追う一番遠い距離
-static const float3 RoomReflectionWallAlbedo = float3(0.20f, 0.20f, 0.18f);
-static const float3 RoomReflectionCeilingAlbedo = float3(0.13f, 0.13f, 0.12f);
-static const float RoomReflectionMaxDistance = 600.0f;
-
-// 光線が当たる一番近い天井・壁・小物までの距離と、当たった面の法線と色（照らす前の色）を求めている
-// （どこにも当たらなければ RoomReflectionMaxDistance）
-float IntersectRoom(float3 origin, float3 direction, out float3 hitNormal, out float3 hitAlbedo)
-{
-    float nearest = RoomReflectionMaxDistance;
-    hitNormal = float3(0.0f, -1.0f, 0.0f);
-    hitAlbedo = RoomReflectionCeilingAlbedo;
-    if (direction.y > 0.0001f)
-    {
-        nearest = min(nearest, (OcclusionCeilingY - origin.y) / direction.y);
-    }
-    // 壁は床から天井までの箱として、上から見た長方形と光線を交差させている（スラブ法）。0で割らないよう向きを丸めている
-    const float2 safeDirection = float2(
-        abs(direction.x) > 1e-5f ? direction.x : 1e-5f,
-        abs(direction.z) > 1e-5f ? direction.z : 1e-5f);
-    const float2 inverseDirection = 1.0f / safeDirection;
-    const uint boxCount = min(OcclusionBoxCount, MaxOcclusionBoxes);
-    [loop]
-    for (uint i = 0; i < boxCount; ++i)
-    {
-        const float4 box = OcclusionBoxes[i];
-        const float2 slabNear = (box.xy - box.zw - origin.xz) * inverseDirection;
-        const float2 slabFar = (box.xy + box.zw - origin.xz) * inverseDirection;
-        const float2 entry = min(slabNear, slabFar);
-        const float2 leave = max(slabNear, slabFar);
-        const float enter = max(entry.x, entry.y);
-        const float exit = min(leave.x, leave.y);
-        if (enter > 0.05f && enter <= exit && enter < nearest)
-        {
-            nearest = enter;
-            hitNormal = entry.x > entry.y
-                ? float3(-sign(safeDirection.x), 0.0f, 0.0f)
-                : float3(0.0f, 0.0f, -sign(safeDirection.y));
-            hitAlbedo = RoomReflectionWallAlbedo;
-        }
-    }
-    // 小物（棚・ロッカー・柱など）は、カメラの近くから選んだ箱（ReflectionProps）と、3方向のスラブ法で交差させている。
-    // 色は小物の色を少し暗くして使い、画面の外にある小物も、水面の正しい位置に正しい色で映るようにしている
-    const float3 safeDirection3 = float3(safeDirection.x, max(direction.y, 1e-5f), safeDirection.y);
-    const float3 inverseDirection3 = 1.0f / safeDirection3;
-    const uint propCount = min(uint(ReflectionParams.z + 0.5f), (uint)MAX_REFLECTION_PROPS);
-    [loop]
-    for (uint prop = 0; prop < propCount; ++prop)
-    {
-        const float3 slabNear = (ReflectionProps[prop * 3].xyz - origin) * inverseDirection3;
-        const float3 slabFar = (ReflectionProps[prop * 3 + 1].xyz - origin) * inverseDirection3;
-        const float3 entry = min(slabNear, slabFar);
-        const float3 leave = max(slabNear, slabFar);
-        const float enter = max(max(entry.x, entry.y), entry.z);
-        const float exit = min(min(leave.x, leave.y), leave.z);
-        if (enter > 0.05f && enter <= exit && enter < nearest)
-        {
-            nearest = enter;
-            hitNormal = entry.x >= entry.y && entry.x >= entry.z ? float3(-sign(safeDirection3.x), 0.0f, 0.0f)
-                : (entry.y >= entry.z ? float3(0.0f, -1.0f, 0.0f) : float3(0.0f, 0.0f, -sign(safeDirection3.z)));
-            hitAlbedo = ReflectionProps[prop * 3 + 2].rgb * 0.55f;
-        }
-    }
-    return nearest;
-}
-
-// 部屋の形に光線を飛ばし、当たった天井・壁の色と、途中で光線がそばを通った照明の光を返している。
-// roughness は水面の荒さ（0〜1）で、荒いほど照明の映り込みをにじませている
-float3 TraceRoomReflection(float3 origin, float3 direction, float roughness)
-{
-    float3 hitNormal = float3(0.0f, -1.0f, 0.0f);
-    float3 albedo = RoomReflectionCeilingAlbedo;
-    const float hitDistance = OcclusionBoxCount > 0 || ReflectionParams.z > 0.5f
-        ? IntersectRoom(origin, direction, hitNormal, albedo)
-        : RoomReflectionMaxDistance;
-    const bool hit = hitDistance < RoomReflectionMaxDistance;
-    const float3 hitPosition = origin + direction * hitDistance;
-
-    float3 lighting = GetHemisphereAmbient(hitNormal);
-    float3 glow = 0.0f;
-    const float glowRadius = 6.0f * (1.0f + roughness * 1.5f);
-    // 器具の光を調べる、光線からの距離の上限（にじみの裾がほぼ0になる所）の二乗
-    const float glowReach2 = (glowRadius * 12.0f) * (glowRadius * 12.0f);
-    [loop]
-    for (uint i = 0; i < PointLightCount; ++i)
-    {
-        const ENVIRONMENT_POINT_LIGHT pointLight = g_PointLights[i];
-        // 光線からも当たった面からも遠い光源は、二乗の距離だけで先に飛ばしている（照明の多い1面で、重い計算を減らすため）
-        const float3 toLight = pointLight.PositionRange.xyz - origin;
-        const float along = dot(toLight, direction);
-        const float miss2 = dot(toLight, toLight) - along * along;
-        const bool nearRay = along > 0.0f && along < hitDistance + 4.0f && miss2 < glowReach2;
-        const float3 offset = pointLight.PositionRange.xyz - hitPosition;
-        const float lightDistance2 = dot(offset, offset);
-        const float range = max(pointLight.PositionRange.w, 0.001f);
-        const bool lightsHit = hit && lightDistance2 < range * range;
-        [branch]
-        if (nearRay || lightsHit)
-        {
-            const float3 lightColor = pointLight.ColorIntensity.rgb * pointLight.ColorIntensity.a;
-            // 照明の器具：光線が光源に一番近づく所の離れ具合で光らせている（当たった面より奥の光源は隠れている）
-            if (nearRay)
-            {
-                const float miss = sqrt(max(miss2, 0.0f));
-                glow += lightColor * (exp(-miss2 / (glowRadius * glowRadius)) * 0.85f +
-                    exp(-miss / (glowRadius * 3.0f)) * 0.03f);
-            }
-            // 当たった面を、この光源で照らしている（床の点光源と同じ減衰）
-            if (lightsHit)
-            {
-                const float lightDistance = sqrt(lightDistance2);
-                float attenuation = saturate(1.0f - lightDistance / range);
-                attenuation *= attenuation;
-                const float lambert = saturate(dot(hitNormal, offset / max(lightDistance, 0.001f)));
-                lighting += lightColor * attenuation * (0.20f + lambert * 0.80f);
-            }
-        }
-    }
-
-    float3 color = 0.0f;
-    if (hit)
-    {
-        // 懐中電灯で照らされた壁や天井も映している（懐中電灯は目の位置にあるので、目から当たった点への向きで円錐を調べている）
-        if (Light.Enable && Light.FlashlightEnabled)
-        {
-            const float3 viewPosition = mul(float4(hitPosition, 1.0f), CausticView).xyz;
-            const float viewDistance = length(viewPosition);
-            const float3 pixelDirection = viewPosition / max(viewDistance, 0.001f);
-            const float normalizedDistance = saturate(viewDistance / max(Light.Range, 0.001f));
-            const float rangeFade = saturate(1.0f - normalizedDistance * normalizedDistance);
-            const float3 toEye = normalize(GetMistEyePosition() - hitPosition);
-            lighting += Light.Diffuse.rgb * GetFlashlightTint(pixelDirection) * Light.Intensity *
-                GetFlashlightBeamProfile(pixelDirection) * rangeFade * rangeFade *
-                (0.25f + saturate(dot(hitNormal, toEye)) * 0.75f);
-        }
-        color = albedo * lighting;
-    }
-    // 光線が進んだ距離の分だけ、霧の闇に沈めている（どこにも当たらなければ闇の色）
-    const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb, LoopDepth);
-    const float fog = hit ? GetHorrorDistanceFog(hitDistance, LoopDepth) : 1.0f;
-    color = lerp(color, fogColor, fog) + glow * (1.0f - fog * 0.6f);
-    return ApplyFilmicHorrorGrade(color, LoopDepth);
-}
+#include "rayReflection.hlsli"
 
 // 光線（originから単位ベクトルdirectionの向き）と線分a-bが一番近づくときの離れ具合を返している。rayDistanceはそのときの光線上の距離
 float RaySegmentDistance(float3 origin, float3 direction, float3 a, float3 b, out float rayDistance)
@@ -447,7 +246,8 @@ float3 TraceRayReflection(float3 worldPosition, float3 worldNormal, float roughn
     float3 direction = reflect(normalize(worldPosition - GetMistEyePosition()), normalize(worldNormal));
     // 波の法線で光線が床へ潜らないよう、少しだけ上へ向けている
     direction = normalize(float3(direction.x, max(direction.y, 0.02f), direction.z));
-    float3 color = TraceRoomReflection(worldPosition + float3(0.0f, 0.05f, 0.0f), direction, roughness);
+    float roomDistance;
+    float3 color = TraceRoomReflection(worldPosition + float3(0.0f, 0.05f, 0.0f), direction, roughness, roomDistance);
     [branch]
     if (ReflectionParams.y > 0.5f)
     {
@@ -812,32 +612,6 @@ float4 main(in LIT_PS_IN input) : SV_Target
     color.rgb += specularLighting;
     color.rgb += Material.Emission.rgb;
 
-    // ワールド座標を反転したカメラの画像へ投影し、平面反射の参照する位置を求めている。
-    // （反射は実際の景色を映し、法線は水の小さな揺らぎだけを足している）
-    const float reflectionW = max(input.reflectionPos.w, 0.0001f);
-    const float3 reflectionNdc =
-        input.reflectionPos.xyz / reflectionW;
-    float2 reflectionUV = float2(
-        reflectionNdc.x * 0.5f + 0.5f,
-        -reflectionNdc.y * 0.5f + 0.5f);
-    const float reflectionInside =
-        step(0.0f, reflectionUV.x) *
-        step(reflectionUV.x, 1.0f) *
-        step(0.0f, reflectionUV.y) *
-        step(reflectionUV.y, 1.0f) *
-        step(0.0f, reflectionNdc.z) *
-        step(reflectionNdc.z, 1.0f) *
-        step(0.0001f, input.reflectionPos.w);
-
-    // 波の法線で、反射を参照する位置を少しずらしている
-    const float2 waterDistortion =
-        detailWorldNormal.xz *
-        (0.0045f + abs(ripplePattern) * 0.0022f) *
-        puddle * RippleStrength;
-    // 足音や水滴の波が通ると、映った景色が輪の形に大きく波打つ
-    const float2 rippleDistortion = float2(rippleWave.y, -rippleWave.z) * 0.040f;
-    reflectionUV = saturate(reflectionUV + waterDistortion + rippleDistortion);
-
     // 水面のむら：浮いた埃や油膜を、ゆっくり流れる2つのノイズで表している。
     // filmは水面の荒さ（反射のぼけ）に、grimeは映り込みの強さに使い、場所ごとに映り方が変わるようにしている。
     const float2 filmFlow = float2(WetTime * 0.006f, -WetTime * 0.004f);
@@ -855,7 +629,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 最小値を低く保ち、水たまりが黒い板に戻るのを防いでいる。
     // 汚れた所（grimeが低い所）は、映り込みを最大で4割弱めている。
     const float viewAngleReflection = sqrt(saturate(fresnel));
-    // 反射の方式の比較：キューブマップとSSRは、ここで色と映る度合いを求めている（平面反射は下で反射の画像を読む）
+    // 反射の方式の比較：キューブマップ・SSR・レイ反射の色と映る度合いを、ここで求めている（反射なしのときは映さない）
     const int reflectionMode = int(ReflectionParams.x + 0.5f);
     float4 alternateReflection = 0.0f;
     // 「水たまり」の異変の人影が、反射の光線を遮った度合い（レイ反射のときだけ求めている）
@@ -877,27 +651,15 @@ float4 main(in LIT_PS_IN input) : SV_Target
                 TraceRayReflection(input.worldPos, detailWorldNormal, waterRoughness, puddleFigure), 1.0f);
         }
     }
-    const float methodInside = reflectionMode == 0 ? reflectionInside : alternateReflection.w;
     const float reflectionStrength = saturate(
-        puddle * methodInside *
+        puddle * alternateReflection.w *
         lerp(0.24f, 0.98f, viewAngleReflection) * ReflectionStrength *
         lerp(0.60f, 1.0f, smoothstep(0.25f, 0.75f, grime)));
     float3 reflectedScene = 0.0f;
     [branch]
-    if (reflectionStrength > 0.001f && reflectionMode != 0)
+    if (reflectionStrength > 0.001f)
     {
         reflectedScene = alternateReflection.rgb;
-    }
-    else if (reflectionStrength > 0.001f)
-    {
-        // 濡れた床に映る照明は、見る人の方へ縦に伸びて見える。荒いほど、反射の画像を縦長の範囲で読んで平均している。
-        const float2 streak = float2(0.0012f, 0.011f) * waterRoughness;
-        reflectedScene =
-            g_PlanarReflection.Sample(g_SamplerState, reflectionUV).rgb * 0.28f +
-            g_PlanarReflection.Sample(g_SamplerState, saturate(reflectionUV + streak * 0.45f)).rgb * 0.20f +
-            g_PlanarReflection.Sample(g_SamplerState, saturate(reflectionUV - streak * 0.45f)).rgb * 0.20f +
-            g_PlanarReflection.Sample(g_SamplerState, saturate(reflectionUV + streak)).rgb * 0.16f +
-            g_PlanarReflection.Sample(g_SamplerState, saturate(reflectionUV - streak)).rgb * 0.16f;
     }
     const float reflectionGain = 1.10f + rippleHighlight * 0.08f;
     color.rgb = lerp(

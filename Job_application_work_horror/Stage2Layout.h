@@ -65,9 +65,8 @@ struct Stage2Objects
     ShadowMan* shadow = nullptr;
     ShadowMan* noiseShadow = nullptr;
     ShadowMan* presence = nullptr;      // 背後の気配
-    // 左の壁の鏡（どの周回にもある）と、鏡の異変の周回だけ鏡の中に映る人影
+    // 左の壁の鏡（どの周回にもある。鏡の異変の人影は、物として置かず鏡のシェーダーが描く）
     Wall* mirror = nullptr;
-    ShadowMan* mirrorFigure = nullptr;
     // 鏡にだけ映る自分の姿
     MirrorSelf* mirrorSelf = nullptr;
     // 濡れた床（水たまり・濡れた足跡）

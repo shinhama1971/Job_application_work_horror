@@ -40,7 +40,7 @@ public:
     void Update() override;
     void Draw(Camera* camera) override;
     bool UsesCameraCulling() const override { return true; }
-    bool ContributesToPlanarReflection() const override { return true; }
+    bool ContributesToReflection() const override { return true; }
     void Uninit() override;
 
     // 電力を入れる前で、スイッチなら押せる状態のときだけ調べる対象になっている

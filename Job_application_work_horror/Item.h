@@ -37,7 +37,7 @@ public:
     void Update() override;
     void Draw(Camera* cam) override;
     bool UsesCameraCulling() const override { return true; }
-    bool ContributesToPlanarReflection() const override { return true; }
+    bool ContributesToReflection() const override { return true; }
     void Uninit() override;
 
     // 拾われていない有効なヒューズだけが、調べる対象になっている

@@ -119,7 +119,7 @@ struct WATER_CAUSTICS_BUFFER
     DirectX::SimpleMath::Vector4 Ripple;
     // 水面の反射の比較（SSR）で使う、プレイヤーの視点の射影行列（転置済み）
     DirectX::SimpleMath::Matrix Projection;
-    // 水面の反射の方式（x = 0 平面反射、1 キューブマップ、2 SSR、3 レイ反射（普段））。「反射なし」は床の反射の強さを0にして表している。
+    // 水面の反射の方式（x = 0 反射なし、1 キューブマップ、2 SSR、3 レイ反射（普段））。「反射なし」は床の反射の強さも0にしている。
     // y = SSRの深度と前のフレームの画面が用意されているか
     DirectX::SimpleMath::Vector4 Reflection;
     // 2面の「血の手形」の異変で壁に浮かべる手形（x = 壁の表面のx、y = 高さ、z = 奥行き、w = 見え方0〜1。0なら描かない）
@@ -131,9 +131,16 @@ struct WATER_CAUSTICS_BUFFER
     // レイ反射で水面に映す小物の箱の最大数と、その箱（[i*3] = 最小の角、[i*3+1] = 最大の角、[i*3+2] = 色）。数は Reflection.z
     static constexpr int MaxReflectionProps = 16;
     DirectX::SimpleMath::Vector4 ReflectionProps[MaxReflectionProps * 3];
+    // 2面の壁の鏡に映す自分の体（xyz = 足もとの位置、w = 映すなら1）、向き（xy = 右の向きのx・z、zw = 前の向きのx・z）、
+    // 動き（x = 歩く手足の振り -1〜1）。shader/mirrorPS.hlsl が光線とカプセルで交差させている（MirrorSelf）
+    DirectX::SimpleMath::Vector4 MirrorSelf;
+    DirectX::SimpleMath::Vector4 MirrorSelfBasis;
+    DirectX::SimpleMath::Vector4 MirrorSelfMotion;
+    // 鏡の異変の、鏡にだけ映る黒い人影（xyz = 足もとの位置、w = 見え方0〜1。0なら描かない）
+    DirectX::SimpleMath::Vector4 MirrorFigure;
 };
 
-static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 1056, "Water caustics buffer must match HLSL layout");
+static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 1120, "Water caustics buffer must match HLSL layout");
 
 // サブセット（モデルの中で、同じマテリアルで描く部分）
 struct SUBSET{
@@ -197,8 +204,6 @@ private:
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pDebugViewBuffer;
 	// デバッグ表示と壁の古さは同じ定数バッファにあるため、片方だけ変えるときのために中身を覚えている。
 	static DEBUG_VIEW_BUFFER m_DebugView;
-	// 壁の鏡に映す景色を描いている最中か（鏡の中にだけ現れる物が、この間だけ自分を描く）
-	static bool m_DrawingWallMirror;
 	// 覚えている中身を定数バッファへ送っている
 	static void UploadDebugViewBuffer();
 	// 部屋の角の暗がりとマテリアルの定数バッファ、今のライト、ライトの計算をするか
@@ -307,7 +312,7 @@ public:
 	// 水たまりの波のシミュレーションの高さのテクスチャ（t9）と、その範囲・強さを、床と壁のシェーダーへ渡している。strengthが0なら使わない。
 	static void SetWaterRipples(ID3D11ShaderResourceView* heightTexture,
 		const DirectX::SimpleMath::Vector2& origin, float worldSize, float strength);
-	// 水面の反射の方式（0 平面反射、1 キューブマップ、2 SSR、3 レイ反射）と、SSRで使うプレイヤーの視点の射影行列を、床のシェーダーへ渡している。
+	// 水面の反射の方式（0 反射なし、1 キューブマップ、2 SSR、3 レイ反射）と、SSRで使うプレイヤーの視点の射影行列を、床と鏡のシェーダーへ渡している。
 	// screenSpaceAvailable は、このフレームでSSRの深度と前のフレームの画面を用意するか（レイ反射が画面の中の物を拾うのに使う）
 	static void SetReflectionMode(int mode, const DirectX::SimpleMath::Matrix& projection,
 		bool screenSpaceAvailable = false);
@@ -325,9 +330,11 @@ public:
 		const DirectX::SimpleMath::Vector3& puddleFoot, const DirectX::SimpleMath::Vector3& unseenFoot);
 	// レイ反射で水面に映す小物の箱（props は1個につき 最小の角・最大の角・色 の3つ。最大 MaxReflectionProps 個）を、床のシェーダーへ渡している
 	static void SetReflectionProps(const DirectX::SimpleMath::Vector4* props, int count);
-	// 壁の鏡に映す景色を描いている最中かを設定・取得している（Game::Drawが鏡の描画の前後で切り替えている）
-	static void SetDrawingWallMirror(bool drawing) { m_DrawingWallMirror = drawing; }
-	static bool IsDrawingWallMirror() { return m_DrawingWallMirror; }
+	// 2面の壁の鏡に映す自分の体（足もとの位置・右と前の向き・歩く手足の振り -1〜1・映すか）を、鏡のシェーダーへ渡している（MirrorSelf）
+	static void SetMirrorSelf(const DirectX::SimpleMath::Vector3& footPosition, const DirectX::SimpleMath::Vector3& right,
+		const DirectX::SimpleMath::Vector3& forward, float swing, bool visible);
+	// 鏡の異変の、鏡にだけ映る黒い人影の足もとの位置と見え方（0〜1。0なら描かない）を、鏡のシェーダーへ渡している
+	static void SetMirrorFigure(const DirectX::SimpleMath::Vector3& footPosition, float visibility);
 	// ライトの計算をするかを切り替える・返している
 	static void SetLightEnable(bool Enable);
 	static bool GetLightEnable();

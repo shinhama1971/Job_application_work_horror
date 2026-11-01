@@ -30,7 +30,7 @@ cbuffer WaterCausticsBuffer : register(b12)
     float4 CausticRipple;
     // 水面の反射の比較（SSR）で使う、プレイヤーの視点の射影行列
     matrix CausticProjection;
-    // 水面の反射の方式（x = 0 平面反射、1 キューブマップ、2 SSR、3 レイ反射（普段））。「反射なし」は床の反射の強さを0にして表している。
+    // 水面の反射の方式（x = 0 反射なし、1 キューブマップ、2 SSR、3 レイ反射（普段））。「反射なし」は床の反射の強さも0にしている。
     // y = SSRの深度と前のフレームの画面が用意されているか（1なら、レイ反射でもSSRを使う）、z = レイ反射で映す小物の箱の数
     float4 ReflectionParams;
     // 2面の「血の手形」の異変で壁に浮かべる手形（x = 壁の表面のx、y = 高さ、z = 奥行き、w = 見え方0〜1。0なら描かない）
@@ -41,6 +41,14 @@ cbuffer WaterCausticsBuffer : register(b12)
     float4 UnseenFigure;
     // レイ反射で水面に映す小物の箱（[i*3] = 最小の角、[i*3+1] = 最大の角、[i*3+2] = 色）。数は ReflectionParams.z
     float4 ReflectionProps[MAX_REFLECTION_PROPS * 3];
+    // 2面の壁の鏡に映す自分の体（xyz = 足もとの位置、w = 映すか（1なら映す）。mirrorPS が光線とカプセルで交差させる。MirrorSelf）
+    float4 MirrorSelf;
+    // 鏡に映す自分の体の向き（xy = 右の向きのx・z、zw = 前の向きのx・z）
+    float4 MirrorSelfBasis;
+    // 鏡に映す自分の体の動き（x = 歩く手足の振り（-1〜1）、yzw = 詰め物）
+    float4 MirrorSelfMotion;
+    // 鏡の異変の、鏡にだけ映る黒い人影（xyz = 足もとの位置、w = 見え方0〜1。0なら描かない。MirrorAnomaly）
+    float4 MirrorFigure;
 }
 
 // 水たまりの波のシミュレーションの高さ（t9。WaterRippleSimulationが毎フレーム計算している）。x = 今の高さ、y = 1つ前の高さ

@@ -111,8 +111,6 @@ public:
 	// その位置が水たまり（または水に浸かった範囲）の中かを返している
 	bool IsInsidePuddle(
 		const DirectX::SimpleMath::Vector3& position) const;
-	// 水面が画面の外なら、重い平面反射の描画を丸ごと省けるようにしている。
-	bool IsAnyPuddleVisible(const Camera& camera) const;
 	// x・z の範囲を、床一面が水に浸かった場所にしている（1面の西棟）。描画・足音・波紋のすべてに反映される。
 	void SetFloodRegion(
 		const DirectX::SimpleMath::Vector2& minimum,
@@ -137,13 +135,6 @@ public:
 	bool ConsumeWaterExit(DirectX::SimpleMath::Vector2& exitPoint) { return m_Footprints.ConsumeWaterExit(exitPoint); }
 	// 水たまりを決まった場所に置き直している（2面の廊下）。足音・波紋・水滴・シェーダーの表のすべてに反映される。
 	void SetPuddleLayout(const WaterEffectSystem::PuddleLayout& layout);
-	// 壁の鏡（2面）には、床も映している（水たまりの反射は床そのものなので、床は映さない）
-	bool ContributesToWallMirror() const override { return true; }
-	// 水面が画面に映っているときだけ、反射を描くようにしている
-	bool IsPlanarReflectionSurfaceVisible(const Camera& camera) const override
-	{
-		return IsAnyPuddleVisible(camera);
-	}
 	// 頂点をワールド座標に変換したものを返している
 	std::vector<VERTEX_3D>GetVertices();
 };

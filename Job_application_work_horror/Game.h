@@ -18,7 +18,6 @@
 #include "Object.h"
 #include"PostProcess.h"
 #include "ShadowMap.h"
-#include "PlanarReflection.h"
 #include "ReflectionProbe.h"
 #include "PointShadowMap.h"
 #include "AmbientOcclusion.h"
@@ -60,9 +59,6 @@ namespace Core
         Camera m_Camera;
         Effect::PostProcess m_PostProcess;
         Effect::ShadowMap m_ShadowMap;
-        Effect::PlanarReflection m_PlanarReflection;
-        // 2面の壁の鏡に映す景色（鏡の面で反転したカメラから描き、鏡のシェーダーが t13 で読む）
-        Effect::PlanarReflection m_WallMirror;
         // 水面の反射の方式の比較（技術デモF2）で使う、キューブマップとSSR
         Effect::ReflectionProbe m_ReflectionProbe;
         // PBRの金属や濡れた面に映す景色（環境マップ）。カメラの位置から1フレームに1面ずつ撮り直し、t14 で読ませている
@@ -92,14 +88,8 @@ namespace Core
         GameState m_State;
         GameSettings m_Settings;
         SceneName m_CurrentScene = SceneName::Title;
-        // 水面の反射と影を何フレーム目に描き直すかの数え方
-        unsigned int m_ReflectionFrameIndex = 0;
+        // 影を何フレーム目に描き直すかの数え方
         unsigned int m_ShadowFrameIndex = 0;
-		// 前フレームで水面が見えていたか、反射を最後に描いたときのカメラの位置と向き（止まっている間は描き直しを減らすため）
-		bool m_WasReflectionVisible = false;
-        DirectX::SimpleMath::Vector3 m_LastReflectionCameraPosition{};
-        DirectX::SimpleMath::Vector3 m_LastReflectionCameraForward{ 0.0f, 0.0f, 1.0f };
-        bool m_HasReflectionCameraPose = false;
         // ポーズメニュー
         PauseMenu m_PauseMenu;
 

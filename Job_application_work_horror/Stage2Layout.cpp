@@ -309,12 +309,12 @@ namespace Stage2Layout
         clockFace->SetClockHands(clockHourAngle, clockMinuteAngle);
 
         // 左の壁の古い鏡（どの周回にもある）。鏡の面は廊下の側（+x）を向き、MirrorAnomaly の面の位置・大きさと合わせている。
-        // 映る景色は Game::Draw が鏡の面で反転したカメラから描き、鏡のシェーダー（mirrorPS）が読んでいる。
+        // 映る景色は、鏡のシェーダー（mirrorPS）が、鏡で反射した光線を部屋の形・小物の箱・画面の中（SSR）へ飛ばして求めている。
         Wall* mirror = createWall(
             "Stage2Mirror", Vector3(MirrorAnomaly::SurfaceX - 0.3f, MirrorAnomaly::CenterY, MirrorAnomaly::CenterZ),
             Vector3(0.6f, MirrorAnomaly::HalfHeight * 2.0f, MirrorAnomaly::HalfWidth * 2.0f),
             Color(0.5f, 0.5f, 0.5f, 1.0f), false);
-        mirror->SetMirrorSurface(Vector3(1.0f, 0.0f, 0.0f));
+        mirror->SetMirrorSurface();
         mirror->SetCastsShadow(false);
         // 鏡の枠（黒ずんだ木の4本）。鏡の面より少し手前へ出し、剥げた縁を半分隠している
         const Color mirrorFrameColor(0.065f, 0.048f, 0.034f, 1.0f);
@@ -342,16 +342,9 @@ namespace Stage2Layout
             piece->SetSurfaceFinish(0.0f, 0.48f);
             piece->SetCastsShadow(false);
         }
-        // 鏡の中にだけ映る人影（鏡の異変の周回だけ表示する）。位置は MirrorAnomaly が決め、プレイヤーの方を向くだけにしている
-        ShadowMan* mirrorFigure = builder.Create<ShadowMan>("Stage2MirrorFigure");
-        mirrorFigure->SetExternallyControlled(true);
-        mirrorFigure->SetMirrorOnly(true);
-        mirrorFigure->SetScale(Vector3(MirrorAnomaly::FigureScaleXZ, MirrorAnomaly::FigureScaleY, MirrorAnomaly::FigureScaleXZ));
-        mirrorFigure->SetActive(false);
-        // 鏡にだけ映る自分の姿（一人称で体がないため、鏡を描く間だけ体を描いている）
+        // 鏡にだけ映る自分の姿（一人称で体がないため、位置と向きを鏡のシェーダーへ渡し、鏡の中にだけ体を描いている）
         objects.mirrorSelf = builder.Create<MirrorSelf>("Stage2MirrorSelf");
         objects.mirror = mirror;
-        objects.mirrorFigure = mirrorFigure;
 
         // 周回によって現れる赤い印（最初は隠している）
         Wall* loopMark = createWall("Stage2LoopMark", Vector3(-39.4f, -68.0f, 52.0f),

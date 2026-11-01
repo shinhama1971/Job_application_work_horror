@@ -50,19 +50,10 @@ public:
 	// 描画への参加の可否は、型で判定するのではなく、各Object自身が宣言している。
 	// trueなら視錐台の外にあるとき描画を省いている（HUDや全画面の効果はfalseのまま）。
 	virtual bool UsesCameraCulling() const { return false; }
-	// trueなら水たまりの平面反射に映る。
-	virtual bool ContributesToPlanarReflection() const { return false; }
-	// trueなら壁の鏡（2面）に映る。水たまりに映る物に加えて、床（Ground）も映る。
-	virtual bool ContributesToWallMirror() const { return ContributesToPlanarReflection(); }
-	// 壁の鏡の面なら、面の上の点と、映す側の向き（法線）を返してtrueにしている（Game::Drawが鏡の描画に使っている）。
-	virtual bool GetMirrorPlane(DirectX::SimpleMath::Vector3& point, DirectX::SimpleMath::Vector3& normal) const
-	{
-		(void)point;
-		(void)normal;
-		return false;
-	}
+	// trueなら、カメラの位置から撮るキューブマップ（水たまりの反射の比較と、PBRの環境マップ）に映る。
+	virtual bool ContributesToReflection() const { return false; }
 	// レイ反射（水たまり）で、画面の外にあっても水面に映す小物なら、その物を囲む箱（ワールドの最小・最大の角）と色を返してtrueにしている。
-	// GameRendering がカメラに近い物から MaxReflectionProps 個を選び、床のシェーダーへ渡している（建物の壁と天井は部屋の形で別に渡している）。
+	// GameRendering がカメラに近い物から MaxReflectionProps 個を選び、床と壁の鏡のシェーダーへ渡している（建物の壁と天井は部屋の形で別に渡している）。
 	virtual bool GetReflectionProxy(
 		DirectX::SimpleMath::Vector3& minimum, DirectX::SimpleMath::Vector3& maximum, DirectX::SimpleMath::Color& color) const
 	{
@@ -81,12 +72,6 @@ public:
 	virtual void CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const
 	{
 		(void)lights;
-	}
-	// 反射面（水たまり）を持つObjectが、今画面に映っているかを返している。
-	// どれもfalseのフレームは、反射用の描画を丸ごと省いている。
-	virtual bool IsPlanarReflectionSurfaceVisible(const Camera&) const
-	{
-		return false;
 	}
 	// 解放する直前に一度だけ呼ばれる。
 	virtual void Uninit() = 0;

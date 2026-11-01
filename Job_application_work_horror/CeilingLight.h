@@ -66,7 +66,7 @@ public:
     void Update() override;
     void Draw(Camera* camera) override;
     bool UsesCameraCulling() const override { return true; }
-    bool ContributesToPlanarReflection() const override { return true; }
+    bool ContributesToReflection() const override { return true; }
     void Uninit() override;
 
     // 今の明るさ（0〜1程度）を返している

@@ -145,6 +145,8 @@ private:
     PortraitAnomaly m_PortraitAnomaly;
     HandprintAnomaly m_HandprintAnomaly;
     MirrorAnomaly m_MirrorAnomaly;
+    // 鏡の中にだけ映る人影の見え方（0〜1。現れるときと見つけて消えるときに滑らかに変えている。鏡のシェーダーへ渡す）
+    float m_MirrorFigureVisibility = 0.0f;
     PuddleReflectionAnomaly m_PuddleAnomaly;
     FootprintFollower m_FootprintFollower;
     // ロッカーに隠れている間の、息を止める操作

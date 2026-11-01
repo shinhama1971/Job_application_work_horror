@@ -288,11 +288,6 @@ void ShadowMan::Draw(Camera* camera)
     {
         return;
     }
-    // 鏡の中にだけ映る影は、鏡に映す景色を描いているときだけ描いている
-    if (m_MirrorOnly && !Renderer::IsDrawingWallMirror())
-    {
-        return;
-    }
 
     camera->SetCamera();
 

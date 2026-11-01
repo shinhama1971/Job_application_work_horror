@@ -82,7 +82,7 @@ namespace
         const float radius = bounds.Radius;
         const DirectX::SimpleMath::Vector3 offset =
             bounds.Center - camera.GetPosition();
-        // 縦横半分の解像度の反射では見分けにくい遠くの物は省いている。大きな物だけは半径の分を
+        // キューブマップの反射と環境マップでは見分けにくい遠くの物は省いている。大きな物だけは半径の分を
         // 判定の距離に足し、背景になる壁が欠けないようにしている。
         const float reflectionRange = 230.0f + radius;
         return offset.x * offset.x + offset.y * offset.y + offset.z * offset.z <=
@@ -127,20 +127,20 @@ namespace Core
 
         // 水面の光の揺らぎ（壁のピクセルシェーダー）で使う、プレイヤーの視点のビュー行列を渡している。
         // 懐中電灯はこの視点から照らしているため、反射を描くときも同じ行列を使う。
-        // 水面の反射の方式（0=なし、1=平面反射、2=キューブマップ、3=SSR、4=レイ反射（普段）。技術デモ F2 で切り替える）も、ここで床のシェーダーへ渡している。
-        // SSRとレイ反射は、深度プリパスの深度と前のフレームの画面を使う（レイ反射は、使えないときは部屋の形との交差だけで映す）
+        // 水面の反射の方式（0=なし、1=キューブマップ、2=SSR、3=レイ反射（普段）。技術デモ F2 で切り替える）も、ここで床のシェーダーへ渡している。
+        // SSRとレイ反射は、深度プリパスの深度と前のフレームの画面を使う（レイ反射は、使えないときは部屋の形との交差だけで映す）。
+        // 2面の壁の鏡は、方式に関係なく、いつもレイ反射で映している（mirrorPS）
         const int reflectionMethod = Tools::TechDemo::GetReflectionMethod();
-        const bool usesScreenSpaceRays =
-            (reflectionMethod == 3 || reflectionMethod == 4) && Tools::TechDemo::UsesDepthPrepass();
+        const bool usesScreenSpaceRays = reflectionMethod >= 2 && Tools::TechDemo::UsesDepthPrepass();
         {
             DirectX::SimpleMath::Matrix mainView;
             DirectX::SimpleMath::Matrix mainProjection;
             m_Instance->m_Camera.GetMainMatrices(mainView, mainProjection);
             Renderer::SetWaterCausticsView(mainView);
-            Renderer::SetReflectionMode(
-                reflectionMethod >= 2 ? reflectionMethod - 1 : 0, mainProjection, usesScreenSpaceRays);
+            Renderer::SetReflectionMode(reflectionMethod, mainProjection, usesScreenSpaceRays);
         }
-        // レイ反射のときは、画面の外の小物（棚・ロッカー・柱）も水面に映すため、カメラに近い小物の箱を選んで床のシェーダーへ渡している
+        // 画面の外の小物（棚・ロッカー・柱・2面の廊下の壁）も、水面のレイ反射と壁の鏡に映すため、
+        // カメラに近い小物の箱を選んで床と鏡のシェーダーへ渡している
         {
             struct ReflectionPropCandidate
             {
@@ -148,7 +148,6 @@ namespace Core
                 DirectX::SimpleMath::Vector4 Box[3];
             };
             std::vector<ReflectionPropCandidate> candidates;
-            if (reflectionMethod == 4)
             {
                 const DirectX::SimpleMath::Vector3 eye = m_Instance->m_Camera.GetPosition();
                 for (const auto& object : m_Instance->m_ObjectManager.GetAllObjects())
@@ -222,8 +221,6 @@ namespace Core
         unsigned int shadowDrawn = 0;
         unsigned int shadowCulled = 0;
         unsigned int reflectionDrawn = 0;
-        unsigned int reflectionCulled = 0;
-        bool reflectionSkipped = false;
         // 影を描き直す間隔：エフェクト設定が高なら毎フレーム、中なら2フレーム、低なら3フレームに1回
         const unsigned int shadowInterval =
             m_Instance->m_Settings.GetEffectLevel() >= 2
@@ -318,64 +315,18 @@ namespace Core
             }
         }
 
-        // 壁の鏡（2面）：鏡が画面に映り、カメラが鏡の表側にいるときだけ、鏡の面で反転したカメラから景色を描いている。
-        // 鏡の面より奥（鏡の付いた壁など）は描かない。鏡の中にだけ映る物（鏡の異変の影）は、この間だけ自分を描く。
-        // 水たまりの反射より先に描き、床の反射の行列（頂点シェーダーのb9）は、床の反射の側で設定し直している。
-        {
-            DirectX::SimpleMath::Vector3 mirrorPoint;
-            DirectX::SimpleMath::Vector3 mirrorNormal;
-            const Object* mirror = nullptr;
-            for (const auto& object : m_Instance->m_ObjectManager.GetAllObjects())
-            {
-                if (!object->IsDestroy() && object->GetMirrorPlane(mirrorPoint, mirrorNormal))
-                {
-                    mirror = object.get();
-                    break;
-                }
-            }
-            const bool drawMirror = mirror != nullptr &&
-                (m_Instance->m_Camera.GetPosition() - mirrorPoint).Dot(mirrorNormal) > 0.5f &&
-                IsVisibleToCamera(*mirror, m_Instance->m_Camera, true);
-            if (drawMirror)
-            {
-                m_Instance->m_GpuTimer.BeginPass(GpuPass::Mirror, context);
-                // 反射の画像は縦横半分の解像度で、画面のタイルとは合わないため、全部の光源を画素ごとに計算させている
-                m_Instance->m_TiledLighting.BindAllLights();
-                Renderer::SetDrawingWallMirror(true);
-                m_Instance->m_WallMirror.BeginPlane(m_Instance->m_Camera, mirrorPoint, mirrorNormal);
-                for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
-                {
-                    if (o->IsDestroy() || !o->ContributesToWallMirror() ||
-                        !IsNearEnoughForReflection(*o, m_Instance->m_Camera) ||
-                        (o->GetPosition() - mirrorPoint).Dot(mirrorNormal) < 0.6f)
-                    {
-                        continue;
-                    }
-                    ++reflectionDrawn;
-                    o->Draw(&m_Instance->m_Camera);
-                }
-                m_Instance->m_WallMirror.End(m_Instance->m_Camera);
-                Renderer::SetDrawingWallMirror(false);
-                m_Instance->m_GpuTimer.EndPass(GpuPass::Mirror, context);
-            }
-            else
-            {
-                m_Instance->m_GpuTimer.SkipPass(GpuPass::Mirror);
-            }
-        }
-
-        // 水面の反射は、濡れた床（Ground）のある1面と2面だけ。水たまりが画面に映っているかを先に調べている
-        // 技術デモで「水面の反射なし」を選んでいるときは、反射を描かない（床も反射を混ぜない。Ground::Draw）
-        // 技術デモでキューブマップを選んでいる間は、カメラの位置から6方向のうち1面だけを毎フレーム撮り直している
-        // （最初の1フレームだけは6面とも撮る）。平面反射のように景色をもう一度まるごと描かないので軽い。
+        // 水面の反射で、景色を描いて作る物は、技術デモでキューブマップを選んでいる間だけ（濡れた床のある1面と2面）。
+        // カメラの位置から6方向のうち1面だけを毎フレーム撮り直している（最初の1フレームだけは6面とも撮る）。
+        // ふだんのレイ反射とSSRは、本描画の床のシェーダーで光線を飛ばすので、ここでは何も描かない。
+        // 技術デモで「水面の反射なし」を選んでいるときは、床も反射を混ぜない（Ground::Draw）
         const bool hasWetFloor =
             m_Instance->m_CurrentScene == SceneName::Stage ||
             m_Instance->m_CurrentScene == SceneName::Stage2;
-        if (reflectionMethod != 2)
+        if (reflectionMethod != 1)
         {
             m_Instance->m_ReflectionProbe.Invalidate();
         }
-        if (hasWetFloor && reflectionMethod == 2)
+        if (hasWetFloor && reflectionMethod == 1)
         {
             m_Instance->m_GpuTimer.BeginPass(GpuPass::Reflection, context);
             const int faceCount = m_Instance->m_ReflectionProbe.HasAllFaces() ? 1 : 6;
@@ -385,7 +336,7 @@ namespace Core
                     m_Instance->m_Camera, m_Instance->m_Camera.GetPosition());
                 for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
                 {
-                    if (o->IsDestroy() || !o->ContributesToPlanarReflection() ||
+                    if (o->IsDestroy() || !o->ContributesToReflection() ||
                         !IsNearEnoughForReflection(*o, m_Instance->m_Camera))
                     {
                         continue;
@@ -396,109 +347,10 @@ namespace Core
                 m_Instance->m_ReflectionProbe.EndFace(m_Instance->m_Camera);
             }
             m_Instance->m_GpuTimer.EndPass(GpuPass::Reflection, context);
-            m_Instance->m_WasReflectionVisible = false;
-            m_Instance->m_HasReflectionCameraPose = false;
-        }
-        else if (hasWetFloor && reflectionMethod == 1)
-        {
-            bool reflectionVisible = false;
-            for (const auto& object :
-                m_Instance->m_ObjectManager.GetAllObjects())
-            {
-                if (!object->IsDestroy() &&
-                    object->IsPlanarReflectionSurfaceVisible(
-                        m_Instance->m_Camera))
-                {
-                    reflectionVisible = true;
-                    break;
-                }
-            }
-
-            // 移動中は反射カメラも動くため毎フレーム描き直している。止まっている間は反射像を
-            // 使い回し、扉や照明の変化を拾うためだけに、間隔をあけて描き直している。
-            const DirectX::SimpleMath::Vector3 reflectionCameraPosition =
-                m_Instance->m_Camera.GetPosition();
-            const DirectX::SimpleMath::Vector3 reflectionCameraForward =
-                m_Instance->m_Camera.GetForward();
-            const DirectX::SimpleMath::Vector3 reflectionPositionDelta =
-                reflectionCameraPosition -
-                m_Instance->m_LastReflectionCameraPosition;
-            const bool reflectionCameraMoved =
-                !m_Instance->m_HasReflectionCameraPose ||
-                reflectionPositionDelta.LengthSquared() > 0.03f * 0.03f ||
-                reflectionCameraForward.Dot(
-                    m_Instance->m_LastReflectionCameraForward) < 0.99998f;
-            const unsigned int minimumReflectionInterval =
-                m_Instance->m_Settings.GetEffectLevel() == 0 ? 2u : 1u;
-            const unsigned int movingReflectionInterval = (std::max)(
-                Debug::UI::GetReflectionUpdateInterval(),
-                minimumReflectionInterval);
-            const unsigned int idleReflectionInterval =
-                m_Instance->m_Settings.GetEffectLevel() >= 2
-                    ? 3u
-                    : (m_Instance->m_Settings.GetEffectLevel() == 1 ? 6u : 8u);
-            const unsigned int reflectionInterval = reflectionCameraMoved
-                ? movingReflectionInterval
-                : (std::max)(movingReflectionInterval, idleReflectionInterval);
-            // 水面が画面に入った最初のフレームはすぐに描き直し、古い反射を見せないようにしている。
-            const bool updateReflection = reflectionVisible &&
-                (!m_Instance->m_WasReflectionVisible ||
-                    (m_Instance->m_ReflectionFrameIndex++ %
-                        reflectionInterval) == 0u);
-            if (updateReflection)
-            {
-                m_Instance->m_GpuTimer.BeginPass(
-                    GpuPass::Reflection, context);
-                // 床の高さ（-99.5）を鏡の面にして、上下を反転したカメラで描いている
-                m_Instance->m_PlanarReflection.Begin(
-                    m_Instance->m_Camera,
-                    -99.5f);
-
-                for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
-                {
-                    if (o->IsDestroy() ||
-                        !o->ContributesToPlanarReflection())
-                    {
-                        continue;
-                    }
-
-                    // 反射カメラは上下が反転するため、左右・前後・距離だけを判定している。
-                    // これで上下方向の判定ミスを避けつつ、廊下の後ろ側の物を大きく減らしている。
-                    if (!IsVisibleToCamera(*o, m_Instance->m_Camera, false) ||
-                        !IsNearEnoughForReflection(*o, m_Instance->m_Camera))
-                    {
-                        ++reflectionCulled;
-                        continue;
-                    }
-
-                    ++reflectionDrawn;
-                    o->Draw(&m_Instance->m_Camera);
-                }
-
-                m_Instance->m_PlanarReflection.End(
-                    m_Instance->m_Camera);
-                m_Instance->m_GpuTimer.EndPass(
-                    GpuPass::Reflection, context);
-                m_Instance->m_LastReflectionCameraPosition =
-                    reflectionCameraPosition;
-                m_Instance->m_LastReflectionCameraForward =
-                    reflectionCameraForward;
-                m_Instance->m_HasReflectionCameraPose = true;
-            }
-            // 描き直さないフレームは、前の反射像を使っている（水面が見えていなければ省いたことを記録している）
-            else
-            {
-                m_Instance->m_GpuTimer.SkipPass(GpuPass::Reflection);
-                m_Instance->m_PlanarReflection.Bind();
-                reflectionSkipped = !reflectionVisible;
-            }
-            m_Instance->m_WasReflectionVisible = reflectionVisible;
         }
         else
         {
             m_Instance->m_GpuTimer.SkipPass(GpuPass::Reflection);
-            m_Instance->m_WasReflectionVisible = false;
-            m_Instance->m_HasReflectionCameraPose = false;
         }
 
         // PBRの環境マップ：金属や濡れた面に映す景色を、カメラの位置から1フレームに1面ずつ撮り直している（最初だけ6面）。
@@ -537,7 +389,7 @@ namespace Core
                 Renderer::SetLight(faceLight);
                 for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
                 {
-                    if (o->IsDestroy() || !o->ContributesToPlanarReflection() ||
+                    if (o->IsDestroy() || !o->ContributesToReflection() ||
                         !IsNearEnoughForReflection(*o, m_Instance->m_Camera))
                     {
                         continue;
@@ -666,9 +518,7 @@ namespace Core
             mainCulled,
             shadowDrawn,
             shadowCulled,
-            reflectionDrawn,
-            reflectionCulled,
-            reflectionSkipped);
+            reflectionDrawn);
 
         // 描き終えた画面を取り込み、露出・ブルーム・光の筋・ノイズなどの画面効果を重ねている
         m_Instance->m_GpuTimer.BeginPass(GpuPass::PostProcess, context);

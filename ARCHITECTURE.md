@@ -20,7 +20,7 @@ Application
       ├─ Camera
       ├─ PostProcess
       ├─ ShadowMap
-      ├─ PlanarReflection
+      ├─ ReflectionProbe / ScreenSpaceReflection
       └─ Sound
 ```
 
@@ -169,7 +169,7 @@ Application
 
 - `WaterEffectSystem`: 水たまり判定、落下水滴、着水波紋、足音波紋。水たまりの置き方（`PuddleLayout`）は、1面は床全体のマス目に乱数で置き、2面はマス目を41ずらして廊下の決まった3か所に置く（シェーダーへの表 b13 にずらし量も渡す）
 
-`Ground` には床メッシュ、Material、濡れ床Shader、平面反射との接続を残しています。
+`Ground` には床メッシュ、Material、濡れ床Shader（水面の反射の光線は、このシェーダーの中で飛ばす）を残しています。
 
 ## 更新と描画の流れ
 
@@ -184,7 +184,7 @@ Game::Update
 Game::Draw
   0. 全Objectから点光源を収集してGPUへ転送
   1. ShadowMap更新
-  2. 必要な場合のみPlanarReflection更新
+  2. 技術デモでキューブマップを選んだときだけReflectionProbe更新（普段のレイ反射は本描画のシェーダーの中で計算）
   3. 監視映像などSceneの補助カメラ描画
   4. 深度プリパス（不透明な壁・床・扉の深度だけ）→ タイル別ライトリスト作成（Compute Shader）→ ワールドObject描画
   5. PostProcess（ブルーム → 自動露出の測光 → 露出・画面効果の合成）
@@ -265,12 +265,12 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 | 影 | GPU | `ShadowMap`（1024x1024、手元の位置から作る。`FlashlightRig.h`）、`flashlightShadow.hlsli`（PCSS：遮る物の探索8か所と比較9か所） | 深度の描画と比較は画素ごとの処理 |
 | 壁・床・天井の古さ、凹凸、部屋の角の暗がり | GPU（PS） | `GetWallAgeing`、`GetFloorAgeing`、`surfaceDetail.hlsli`、`roomOcclusion.hlsli` | 画像素材を読まずにワールド座標から計算する（メモリ帯域の代わりに計算量を使う） |
 | 壁のホラーらしい跡（血の手形・引っかき傷・血の垂れ跡） | GPU（PS） | `horrorMarks.hlsli`（`litTexturePS` の壁の古さから呼ぶ） | 壁に沿ったマス目ごとの乱数で置き場所と種類を決め、距離関数で形を作る。画像素材を読まない |
-| 水たまりの反射 | GPU | `PlanarReflection`（縦横半分の解像度）、`wetFloorPS.hlsl`（水面の荒さのむらに合わせて縦に伸ばしてぼかす） | 上下を反転したカメラで別に描画 |
-| 壁の鏡（2面） | GPU | `PlanarReflection::BeginPlane`（任意の面で反転したカメラ。鏡はテクスチャ t13・行列はピクセルシェーダーのb9）、`mirrorPS.hlsl`、`GameRendering.cpp`（鏡が見えるときだけ、水たまりの反射より先に描く） | 定数バッファの b0〜b13 はすべて使われているため、床が頂点シェーダー側でだけ使うb9のピクセルシェーダー側に、鏡の行列を置いている |
-| 鏡に映る自分の姿（2面） | CPU・GPU | `MirrorSelf`（箱を組み合わせた体を、鏡を描く間だけ描く。1秒60回の姿勢の記録から遅らせた姿勢を選ぶ） | 一人称で体がないため、鏡にだけ体を出している |
+| 水たまりの反射 | GPU（PS） | `wetFloorPS.hlsl` の `TraceRayReflection`、`rayReflection.hlsli`（SSRと、部屋の形・小物の箱とのスラブ法の交差） | 反転したカメラで景色を描き直さず、床の画素ごとに反射の光線を1本飛ばす |
+| 壁の鏡（2面） | GPU（PS） | `mirrorPS.hlsl`（`rayReflection.hlsli` を床と共通で使う）、`GameRendering.cpp`（カメラに近い小物の箱16個を b12 で渡す） | 鏡の画素ごとに反射の光線を飛ばす。床と違い下向きの光線が多いため、床の高さとの交差も見ている |
+| 鏡に映る自分の姿・鏡の異変の人影（2面） | CPU・GPU（PS） | `MirrorSelf`（1秒60回の姿勢の記録から遅らせた姿勢と手足の振りを b12 で渡す）、`MirrorAnomaly`、`mirrorPS.hlsl`（体は17本のカプセルと光線の交差、人影は光線とカプセルの芯の距離） | 一人称で体がなく、異変の人影も物として置かないため、鏡のシェーダーの中だけに形を出している |
 | 濡れた足跡 | CPU・GPU（PS） | `WetFootprints`（輪のバッファ・乾き）、`Ground`（b10へ渡す）、`shader/wetFootprints.hlsli`、`FootprintFollower`（2面の誰かの足跡） | 足跡ごとに近くの画素だけ形を計算し、遠い画素は距離で省いている |
 | 崩れて現れる・消える | GPU（PS） | `Wall::DissolveIn` / `DissolveOut`、`litTexturePS.hlsl`（clip と焦げた縁） | マテリアルの詰め物を崩れ具合に使い、定数バッファを増やしていない |
-| 水たまりの反射の比較（技術デモF2） | GPU | `ReflectionProbe`（キューブマップ128x128を1フレームに1面）、`ScreenSpaceReflection`（深度の写し取り）、`wetFloorPS.hlsl`（キューブマップを反射の向きで読む・SSRの光線をたどる） | 平面反射と、重さと正確さの違いを見比べるため。普段は平面反射 |
+| 水たまりの反射の比較（技術デモF2） | GPU | `ReflectionProbe`（キューブマップ128x128を1フレームに1面）、`ScreenSpaceReflection`（深度の写し取り）、`wetFloorPS.hlsl`（キューブマップを反射の向きで読む・SSRの光線をたどる） | レイ反射と、重さと正確さの違いを見比べるため。普段はレイ反射 |
 | 西棟の水面の光の揺らぎ（コースティクス） | GPU（PS） | `waterCaustics.hlsli`（`litTexturePS` から呼ぶ） | 壁・天井の画素ごとに、水面で折り返した点と懐中電灯の配光から求める |
 | 水たまりの波のシミュレーション | GPU（CS） | `WaterRippleSimulation`、`waterRippleCS.hlsl`（256x256マス、ピンポン、1秒に60歩）。床は `wetFloorPS`、壁は `waterCaustics.hlsli` が高さを読む | 全マスが同じ式で隣のマスだけを読むので、GPUで並列に計算できる。結果のテクスチャはCPUへ読み戻さない。描画の最初（`Object::RunGpuSimulation`）で実行し、GPU時間は約0.012ms |
 | ブルーム | GPU（CS） | `bloomExtractCS` → `bloomBlurHorizontalCS` → `bloomBlurVerticalCS` | ぼかしに使う画素を `groupshared` に一度読み込み、グループ内で使い回してテクスチャの読み込みを減らす |

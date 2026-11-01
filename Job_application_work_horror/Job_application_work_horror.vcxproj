@@ -238,7 +238,6 @@
     <ClCompile Include="ObjectManager.cpp" />
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="Player.cpp" />
-    <ClCompile Include="PlanarReflection.cpp" />
     <ClCompile Include="ReflectionProbe.cpp" />
     <ClCompile Include="ScreenSpaceReflection.cpp" />
     <ClCompile Include="PostProcess.cpp" />
@@ -341,7 +340,6 @@
     <ClInclude Include="Object.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="PlayerMovement.h" />
-    <ClInclude Include="PlanarReflection.h" />
     <ClInclude Include="ReflectionProbe.h" />
     <ClInclude Include="ScreenSpaceReflection.h" />
     <ClInclude Include="PostProcess.h" />
@@ -432,6 +430,7 @@
     <ClInclude Include="shader\pbrLighting.hlsli" />
     <ClInclude Include="shader\pointShadow.hlsli" />
     <ClInclude Include="shader\figureShadow.hlsli" />
+    <ClInclude Include="shader\rayReflection.hlsli" />
     <ClInclude Include="shader\screenAmbientOcclusion.hlsli" />
     <ClInclude Include="shader\roomOcclusion.hlsli" />
     <ClInclude Include="shader\waterCaustics.hlsli" />

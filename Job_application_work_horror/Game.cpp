@@ -78,8 +78,6 @@ namespace Core
 
         // カメラ・水面の反射・影・画面効果・タイルベースライティングを作り、設定を反映してからタイトルを始めている
         m_Instance->m_Camera.Init();
-        m_Instance->m_PlanarReflection.Init();
-        m_Instance->m_WallMirror.Init(13, 9, true);
         m_Instance->m_ReflectionProbe.Init();
         m_Instance->m_EnvironmentProbe.Init(14, true);
         m_Instance->m_EnvironmentProbe.SetClearColor(DirectX::SimpleMath::Color(0.012f, 0.013f, 0.014f, 1.0f));
@@ -216,8 +214,6 @@ namespace Core
         m_Instance->m_TiledLighting.Uninit();
         m_Instance->m_PostProcess.Uninit();
         m_Instance->m_ShadowMap.Uninit();
-        m_Instance->m_PlanarReflection.Uninit();
-        m_Instance->m_WallMirror.Uninit();
         m_Instance->m_ReflectionProbe.Uninit();
         m_Instance->m_EnvironmentProbe.Uninit();
         m_Instance->m_PointShadowMap.Uninit();
@@ -360,10 +356,7 @@ namespace Core
         m_ListenerMuffle = 0.0f;
         ApplyAudioVolume(false);
         m_Scene.reset();
-        m_ReflectionFrameIndex = 0;
         m_ShadowFrameIndex = 0;
-		m_WasReflectionVisible = false;
-        m_HasReflectionCameraPose = false;
         // 前の画面の明るさに慣れたままにならないよう、自動露出は新しいシーンの最初の画面にすぐ合わせている。
         m_PostProcess.ResetAutoExposure();
         // 前の場所で鳴っていた位置付きの音（足音・扉など）を持ち越さないよう止めている。

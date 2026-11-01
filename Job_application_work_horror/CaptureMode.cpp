@@ -452,10 +452,12 @@ namespace
         { "左の倉庫", Vector3(-150.0f, FloorY, -110.0f), 0.0f, -0.26f },
         { "暗証番号の扉", Vector3(12.0f, FloorY, 112.0f), Pi * 0.5f, -0.05f },
         { "ループ廊下", Vector3(0.0f, FloorY, 185.0f), 0.0f, 0.0f },
-        // 床一面が水に浸かった西棟。水面の反射（平面反射）が画面の広い範囲に出る場所。
+        // 床一面が水に浸かった西棟。水面の反射（レイ反射）が画面の広い範囲に出る場所。
         { "西棟（浸水した広間）", Vector3(-233.0f, FloorY, -21.0f), YawToward(-233.0f, -21.0f, -330.0f, 140.0f), -0.16f },
         { "2面（裸電球の下）", Vector3(12.0f, FloorY, -25.0f), 0.0f, 0.04f, SceneName::Stage2 },
         { "2面（廊下の奥）", Vector3(-12.0f, FloorY, 60.0f), Pi, -0.10f, SceneName::Stage2 },
+        // 左の壁の古い鏡を正面から見る所。鏡は、鏡で反射した光線をシェーダーの中で飛ばして映している（自分の体も映る）
+        { "2面（壁の鏡の前）", Vector3(0.0f, FloorY, 37.0f), -Pi * 0.5f, -0.06f, SceneName::Stage2 },
     };
 
     // 各段階のフレーム数。切り替えた直後はGPU時間の結果が数フレーム遅れて届くため、最初の45フレームは捨てている。
@@ -599,7 +601,6 @@ namespace
             { "ブルーム", GpuPass::Bloom },
             { "画面効果", GpuPass::PostProcess },
             { "水たまりの波", GpuPass::WaterRipples },
-            { "壁の鏡", GpuPass::Mirror },
             { "環境マップ", GpuPass::EnvironmentProbe },
             { "電球の影", GpuPass::BulbShadow },
             { "環境遮蔽", GpuPass::AmbientOcclusion },
@@ -774,7 +775,7 @@ namespace Tools::CaptureMode
                 if (option == L"--effect-level" && value.size() == 1 && value[0] >= L'1' && value[0] <= L'3')
                     g_EffectOverride = static_cast<int>(value[0] - L'1');
                 if (option == L"--debug-view" && value == L"10") g_ViewOverride = 10;
-                if (option == L"--reflection" && value.size() == 1 && value[0] >= L'0' && value[0] <= L'4')
+                if (option == L"--reflection" && value.size() == 1 && value[0] >= L'0' && value[0] <= L'3')
                     g_ReflectionOverride = static_cast<int>(value[0] - L'0');
             }
             for (int i = 1; i < argumentCount; ++i)

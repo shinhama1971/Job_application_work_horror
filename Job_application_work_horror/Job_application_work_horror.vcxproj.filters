@@ -93,9 +93,6 @@
     <ClCompile Include="PointShadowMap.cpp">
       <Filter>ソース ファイル\Rendering</Filter>
     </ClCompile>
-    <ClCompile Include="PlanarReflection.cpp">
-      <Filter>ソース ファイル\Rendering</Filter>
-    </ClCompile>
     <ClCompile Include="ReflectionProbe.cpp">
       <Filter>ソース ファイル\Rendering</Filter>
     </ClCompile>
@@ -353,6 +350,9 @@
     <ClInclude Include="shader\figureShadow.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="shader\rayReflection.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
     <ClInclude Include="shader\screenAmbientOcclusion.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -513,9 +513,6 @@
       <Filter>ソース ファイル\Rendering</Filter>
     </ClInclude>
     <ClInclude Include="PointShadowMap.h">
-      <Filter>ソース ファイル\Rendering</Filter>
-    </ClInclude>
-    <ClInclude Include="PlanarReflection.h">
       <Filter>ソース ファイル\Rendering</Filter>
     </ClInclude>
     <ClInclude Include="ReflectionProbe.h">

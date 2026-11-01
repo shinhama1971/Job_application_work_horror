@@ -26,7 +26,7 @@ namespace
     {
         TiledLighting,
         DepthPrepass,
-        PlanarReflection,
+        WaterReflection,
         FlashlightShadow,
         AutoExposure,
         WaterCaustics,
@@ -43,7 +43,7 @@ namespace
     struct TopicInfo
     {
         const char* Name;
-        std::array<const char*, 5> Variants;
+        std::array<const char*, 4> Variants;
         int VariantCount;
         int DefaultVariant;
         std::array<const char*, 2> Description;
@@ -61,9 +61,9 @@ namespace
           { "先に深度だけを描き、奥に隠れた画素の",
             "重いライティングの計算を省いている" } },
         { "水面の反射",
-          { "なし", "平面反射", "キューブマップ", "SSR", "レイ反射" }, 5, 4,
+          { "なし", "キューブマップ", "SSR", "レイ反射" }, 4, 3,
           { "レイ反射（普段）：SSRで画面の中を、部屋の形との交差で画面の外を映す",
-            "平面反射は反転カメラで描き直す（重い）、キューブマップは位置がずれる" } },
+            "キューブマップは位置がずれ、SSRは画面の外が映らない" } },
         { "懐中電灯の影",
           { "影なし", "硬い影", "PCSS（柔らかい影）" }, 3, 2,
           { "遮る物から離れた所ほど影の縁をぼかしている",
@@ -256,7 +256,7 @@ namespace Tools::TechDemo
         {
             return reflectionOverride;
         }
-        return GetVariant(Topic::PlanarReflection);
+        return GetVariant(Topic::WaterReflection);
     }
 
     int GetShadowMode()

@@ -51,7 +51,7 @@ public:
     void Draw(Camera* camera) override;
     void Uninit() override;
     bool UsesCameraCulling() const override { return true; }
-    bool ContributesToPlanarReflection() const override { return true; }
+    bool ContributesToReflection() const override { return true; }
     void CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const override;
     // 電球の中心のワールド座標（揺れを含む）。揺れる電球の影を描く位置にも使っている
     DirectX::SimpleMath::Vector3 GetBulbPosition() const;

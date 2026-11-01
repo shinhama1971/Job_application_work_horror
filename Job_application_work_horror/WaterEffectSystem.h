@@ -150,8 +150,6 @@ public:
     // その位置が水たまりか、水に浸かった範囲の中か
     bool IsInsidePuddle(
         const DirectX::SimpleMath::Vector3& position) const;
-    // 水面が画面に映っているか
-    bool IsAnyPuddleVisible(const Camera& camera) const;
     // x・z の範囲（minimum〜maximum）を、床一面が水に浸かった場所にしている。
     void SetFloodRegion(
         const DirectX::SimpleMath::Vector2& minimum,

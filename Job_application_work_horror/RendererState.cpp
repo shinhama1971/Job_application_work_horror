@@ -194,6 +194,36 @@ void Renderer::SetUnseenFigure(const Vector3& footPosition, float visibility)
 		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
 }
 
+// 2面の壁の鏡に映す自分の体をb12へ設定している（鏡のシェーダーが、光線と体のカプセルを交差させる）
+void Renderer::SetMirrorSelf(const Vector3& footPosition, const Vector3& right, const Vector3& forward, float swing, bool visible)
+{
+	if (!m_pWaterCausticsBuffer)
+	{
+		return;
+	}
+	m_WaterCaustics.MirrorSelf = Vector4(footPosition.x, footPosition.y, footPosition.z, visible ? 1.0f : 0.0f);
+	m_WaterCaustics.MirrorSelfBasis = Vector4(right.x, right.z, forward.x, forward.z);
+	m_WaterCaustics.MirrorSelfMotion = Vector4(swing, 0.0f, 0.0f, 0.0f);
+	m_pDeviceContext->UpdateSubresource(
+		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
+	m_pDeviceContext->PSSetConstantBuffers(
+		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+}
+
+// 鏡の異変の、鏡にだけ映る人影をb12へ設定している（鏡のシェーダーが、反射の光線と人影の形を交差させる）
+void Renderer::SetMirrorFigure(const Vector3& footPosition, float visibility)
+{
+	if (!m_pWaterCausticsBuffer)
+	{
+		return;
+	}
+	m_WaterCaustics.MirrorFigure = Vector4(footPosition.x, footPosition.y, footPosition.z, visibility);
+	m_pDeviceContext->UpdateSubresource(
+		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
+	m_pDeviceContext->PSSetConstantBuffers(
+		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+}
+
 // 計測モード用に、2つの人影を指定した位置へ置き続けている（解除したときは、次に場面が設定するまで消している）
 void Renderer::SetFigureOverride(bool enabled, const Vector3& puddleFoot, const Vector3& unseenFoot)
 {

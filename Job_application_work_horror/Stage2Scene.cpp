@@ -116,6 +116,8 @@ void Stage2Scene::Init()
     m_PortraitAnomaly.Reset();
     m_HandprintAnomaly.Reset();
     m_MirrorAnomaly.Reset();
+    m_MirrorFigureVisibility = 0.0f;
+    Renderer::SetMirrorFigure(Vector3::Zero, 0.0f);
     m_PuddleAnomaly.Reset();
     Renderer::SetPuddleFigure(Vector3::Zero, 0.0f);
     m_FootprintFollower.Reset();
@@ -646,6 +648,7 @@ void Stage2Scene::Uninit()
     Renderer::SetWallHandprints(nullptr, 0);
     Renderer::SetPuddleFigure(DirectX::SimpleMath::Vector3::Zero, 0.0f);
     Renderer::SetUnseenFigure(DirectX::SimpleMath::Vector3::Zero, 0.0f);
+    Renderer::SetMirrorFigure(DirectX::SimpleMath::Vector3::Zero, 0.0f);
     Renderer::SetWallWeathering(0.0f);
     Renderer::SetLoopDepth(0.0f);
     Renderer::SetRoomOcclusion(nullptr, 0, 0.0f, 0.0f, 0.0f);

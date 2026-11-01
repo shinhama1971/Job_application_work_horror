@@ -32,7 +32,7 @@ namespace Tools::CaptureMode
     bool UsesBenchmarkVsync();
     // 撮影・計測時だけ設定を上書きする（保存しない）。未指定は-1。
     int GetEffectLevelOverride();
-    // --reflection <0〜4> で水面の反射の方式を上書きする（方式どうしを計測で比べるため）。未指定は-1。
+    // --reflection <0〜3> で水面の反射の方式（0 なし・1 キューブマップ・2 SSR・3 レイ反射）を上書きする（方式どうしを計測で比べるため）。未指定は-1。
     int GetReflectionMethodOverride();
     // --capture-features は固定条件で4周目のドアと見えない影を撮る。通常プレイには影響しない。
 
