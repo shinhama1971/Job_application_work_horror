@@ -46,6 +46,8 @@ struct PropDescription
     bool Weathering = false;
     float GlowRange = 0.0f;
     float GlowStrength = 0.0f;
+    // 見た目に使うモデルの名前（空なら箱。Wall::SetVisualModel）
+    std::string Model;
     // PBRの仕上げ（色の名前から決まる）
     PropSurfaceFinish Finish;
     // 色の名前（保存するときに書き戻す）と、ファイルの何行目にあったか（0は、まだファイルにない）

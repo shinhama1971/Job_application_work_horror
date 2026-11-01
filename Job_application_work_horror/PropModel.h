@@ -36,12 +36,14 @@ namespace PropModel
 
     // モデルの指定した部位を、指定した順に配列の後ろへ足し、部位ごとのインデックスの範囲を返している。
     // 頂点の色 = 部位の色 × モデルの頂点カラー（環境遮蔽）。nominalScale はそのクラスがワールド行列で掛ける拡大率。
+    // orientation はモデルを先に回す行列（箱の一番長い向きへ、モデルの長い向きを合わせるときに使う。nominalScale は回した後の向きで書く）。
     std::vector<IndexRange> Append(
         const std::string& path,
         const std::vector<Part>& parts,
         const DirectX::SimpleMath::Vector3& nominalScale,
         std::vector<VERTEX_3D>& vertices,
-        std::vector<unsigned int>& indices);
+        std::vector<unsigned int>& indices,
+        const DirectX::SimpleMath::Matrix& orientation = DirectX::SimpleMath::Matrix::Identity);
 
     // 範囲を1つにまとめている（続けて足した部位を、同じマテリアルで1回で描くとき）
     IndexRange Merge(const IndexRange& first, const IndexRange& last);

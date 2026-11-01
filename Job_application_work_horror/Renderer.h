@@ -138,9 +138,13 @@ struct WATER_CAUSTICS_BUFFER
     DirectX::SimpleMath::Vector4 MirrorSelfMotion;
     // 鏡の異変の、鏡にだけ映る黒い人影（xyz = 足もとの位置、w = 見え方0〜1。0なら描かない）
     DirectX::SimpleMath::Vector4 MirrorFigure;
+    // プレイヤーの体が照明の光を遮って落とす影（xyz = 足もとの位置、w = 影を落とすなら1）と、
+    // 向きと動き（xy = 前の向きのx・z、z = 歩く手足の振り -1〜1）。shader/figureShadow.hlsli がカプセルで影を求めている（Player）
+    DirectX::SimpleMath::Vector4 PlayerBody;
+    DirectX::SimpleMath::Vector4 PlayerBodyPose;
 };
 
-static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 1120, "Water caustics buffer must match HLSL layout");
+static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 1152, "Water caustics buffer must match HLSL layout");
 
 // サブセット（モデルの中で、同じマテリアルで描く部分）
 struct SUBSET{
@@ -335,6 +339,9 @@ public:
 		const DirectX::SimpleMath::Vector3& forward, float swing, bool visible);
 	// 鏡の異変の、鏡にだけ映る黒い人影の足もとの位置と見え方（0〜1。0なら描かない）を、鏡のシェーダーへ渡している
 	static void SetMirrorFigure(const DirectX::SimpleMath::Vector3& footPosition, float visibility);
+	// プレイヤーの体の位置・向き・手足の振りをb12へ設定している（壁と床のシェーダーが、体が照明を遮る影を付ける）
+	static void SetPlayerBody(const DirectX::SimpleMath::Vector3& footPosition, const DirectX::SimpleMath::Vector3& forward,
+		float swing, bool castsShadow);
 	// ライトの計算をするかを切り替える・返している
 	static void SetLightEnable(bool Enable);
 	static bool GetLightEnable();

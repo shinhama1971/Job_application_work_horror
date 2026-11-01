@@ -301,6 +301,8 @@ namespace Stage1Layout
             lamp->SetCollisionEnabled(false);
             lamp->SetCastsShadow(false);
             lamp->SetGlowLight(45.0f, 1.8f);
+            // 見た目は、光るレンズを金属の枠と格子で囲んだ警告灯（Mayaで作ったモデル。色が変わるとレンズの色も変わる）
+            lamp->SetVisualModel("warning_lamp");
             return std::pair<DrainValve*, Wall*>(valve, lamp);
         };
         const auto southValve = createDrainValve("Stage1WestWingValveSouth", "PropWestWingValveLampSouth",

@@ -11,6 +11,8 @@ StructuredBuffer<ENVIRONMENT_POINT_LIGHT> Lights : register(t1);
 RWTexture2D<float4> Output : register(u0);
 float3 GetMistEyePosition() { return EyeTime.xyz; }
 // 見えない影の人影が光を遮る割合（床や壁の影と同じ計算。霧の中の光の筋にも、人の形の暗い切れ目ができる）
+// プレイヤーの体の影は、霧の中の光の筋には付けない（体の値はこの定数バッファにないため）
+#define FIGURE_SHADOW_WITHOUT_PLAYER_BODY
 #include "figureShadow.hlsli"
 #define CausticTime EyeTime.w
 ENVIRONMENT_POINT_LIGHT GetPixelLight(uint offset, uint i) { return Lights[i]; }

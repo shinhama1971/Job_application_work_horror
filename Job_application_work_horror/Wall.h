@@ -1,6 +1,7 @@
 // ============================================================================
 // ファイルの役割: 箱の形をした壁（と、同じ形を使う棚・配管・目印などの小物）の形・色・当たり判定・影の有無を管理している。
-// 主な技術: コードで作る箱のメッシュ、AABBの当たり判定、一番近い面への押し戻し、拡大・回転・移動の行列
+// 主な技術: コードで作る箱のメッシュ、AABBの当たり判定、一番近い面への押し戻し、拡大・回転・移動の行列、
+//           見た目だけをMayaで作ったモデルにする小物（SetVisualModel。当たり判定・影の有無・水面に映す箱は箱のまま）
 // ============================================================================
 
 #pragma once
@@ -13,6 +14,7 @@
 #include "Material.h"
 
 #include <cmath>
+#include <string>
 
 class Camera;
 
@@ -48,6 +50,19 @@ private:
     DirectX::SimpleMath::Color m_SurfaceParams = DirectX::SimpleMath::Color(0.0f, 0.0f, 0.0f, 0.0f);
     // 壁の鏡の面か（鏡は自分の色ではなく、鏡で反射した光線の先を映す。水面に映す小物の箱にもしない）
     bool m_IsMirror = false;
+
+    // 見た目に使うモデルの名前（空なら箱）と、箱の頂点（モデルをやめたときに戻すため）
+    std::string m_VisualModel;
+    std::vector<VERTEX_3D> m_BoxVertices;
+    std::vector<unsigned int> m_BoxIndices;
+    // モデルの光る部位（レンズ・電球）が始まるインデックス。ここより前（枠・笠・台）は光る色を付けないマテリアルで描いている。
+    // 箱と、光る部位のないモデルは0（全体に光る色を付ける）
+    unsigned int m_GlowIndexStart = 0;
+    std::unique_ptr<Material> m_UnlitPartMaterial;
+    // 見た目の頂点（箱かモデル）を作り直し、GPUのバッファへ送っている
+    void RebuildVisualModel();
+    // マテリアルをGPUへ送っている（モデルのときは、色を頂点の色で付けるため、マテリアルの色を白にしている）
+    void UploadMaterial();
 
     // 本描画・影・深度プリパスで共通のワールド行列（同じ計算にし、深度プリパスと本描画の深度を一致させている）
     DirectX::SimpleMath::Matrix MakeWorldMatrix() const;
@@ -142,6 +157,14 @@ public:
         m_IsMirror = true;
         m_Shader.Create("shader/litTextureVS.hlsl", "shader/mirrorPS.hlsl");
     }
+
+    // 見た目を、Mayaで作ったモデル（tools/maya/build_wall_props.py）にしている。空の名前なら箱に戻している。
+    // モデルは箱の大きさに合わせて伸ばし、長い物（棚・梁・額縁の棒）は箱の一番長い向きへ回している。
+    // 当たり判定・影の有無・水面に映す箱は、これまでどおり箱の大きさのまま。大きさを変えた後に呼んでいる
+    void SetVisualModel(const std::string& name);
+    const std::string& GetVisualModel() const { return m_VisualModel; }
+    // 配置ファイルに書ける、モデルの名前か
+    static bool IsKnownVisualModel(const std::string& name);
 
     // 当たり判定の有無、影の有無を切り替えている
     void SetCollisionEnabled(bool enabled)

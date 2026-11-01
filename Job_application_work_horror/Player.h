@@ -42,6 +42,9 @@ private:
     float m_FlashlightNearSurfaceBlend = 0.0f;
     // このフレームでスイッチを押したか（手の小さな押す動きに使っている）
     bool m_FlashlightToggledThisFrame = false;
+    // 体の影の、歩く手足の振りの位相と大きさ（0〜1）
+    float m_BodyWalkPhase = 0.0f;
+    float m_BodyWalkAmount = 0.0f;
 
     // ===== ライティングの調整値 =====
     // 点灯しているときの色。Diffuseは照らす光、Ambientは最低限残す環境光。

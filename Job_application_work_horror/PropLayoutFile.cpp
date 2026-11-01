@@ -177,7 +177,7 @@ namespace PropLayoutFile
                 prop.Collision = collision != 0;
                 prop.Line = lineNumber;
 
-                // 後ろに付ける指定（影なし・壁の古さ・光る範囲）
+                // 後ろに付ける指定（影なし・壁の古さ・光る範囲・見た目のモデル）
                 std::string option;
                 while (line >> option)
                 {
@@ -194,6 +194,13 @@ namespace PropLayoutFile
                         if (!(line >> prop.GlowRange >> prop.GlowStrength))
                         {
                             return fail(lineNumber, "glow の後に 範囲 強さ が必要");
+                        }
+                    }
+                    else if (option == "model")
+                    {
+                        if (!(line >> prop.Model) || !Wall::IsKnownVisualModel(prop.Model))
+                        {
+                            return fail(lineNumber, "model の後に、Wall.cpp の一覧にあるモデルの名前が必要: " + prop.Model);
                         }
                     }
                     else
@@ -228,6 +235,8 @@ namespace PropLayoutFile
         wall.SetCastsShadow(description.CastsShadow);
         wall.SetWeatheringSurface(description.Weathering);
         wall.SetGlowLight(description.GlowRange, description.GlowStrength);
+        // 見た目のモデルは、大きさと色を決めた後で作っている（箱の一番長い向きと、配置の色を使うため）
+        wall.SetVisualModel(description.Model);
         wall.SetVisible(true);
     }
 
@@ -315,6 +324,10 @@ namespace PropLayoutFile
         if (description.GlowRange > 0.0f)
         {
             text += " glow " + FormatNumber(description.GlowRange) + " " + FormatNumber(description.GlowStrength);
+        }
+        if (!description.Model.empty())
+        {
+            text += " model " + description.Model;
         }
         return text;
     }

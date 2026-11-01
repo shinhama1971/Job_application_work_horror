@@ -467,6 +467,15 @@ void Player::Update()
     m_Hands.Update(handInput);
     m_FlashlightToggledThisFrame = false;
 
+    // 体の影：足もとの位置・向き・歩く手足の振りを、壁と床のシェーダーへ渡している（figureShadow.hlsli）。
+    // 一歩は約12なので、24進むと手足の振りが1往復する。ロッカーの中と三人称では影を落とさない
+    const Vector3 velocity = m_Movement.GetVelocity();
+    const float walkSpeed = std::sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
+    const float walkRate = (std::min)(walkSpeed / m_Movement.GetMaximumHorizontalSpeed(), 1.0f);
+    m_BodyWalkPhase += walkSpeed * deltaTime * (DirectX::XM_2PI / 24.0f);
+    m_BodyWalkAmount += (walkRate - m_BodyWalkAmount) * (1.0f - std::exp(-deltaTime * 8.0f));
+    Renderer::SetPlayerBody(m_Position, forward, std::sin(m_BodyWalkPhase) * m_BodyWalkAmount, m_IsFPS && !m_IsHiding);
+
     // 電池を回復するデバッグ用のキー入力（Bキー）。Release版では遊びに影響しないよう無効にしている
 #ifdef _DEBUG
     if (Input::GetKeyTrigger(VK_B))
@@ -519,10 +528,11 @@ void Player::Draw(Camera* cam)
     }
 }
 
-// 手のモデルの参照を手放している（プレイヤーのメッシュとマテリアルはメンバーの破棄で解放される）
+// 手のモデルの参照を手放し、体の影を消している（プレイヤーのメッシュとマテリアルはメンバーの破棄で解放される）
 void Player::Uninit()
 {
     m_Hands.Uninit();
+    Renderer::SetPlayerBody(Vector3::Zero, Vector3(0.0f, 0.0f, 1.0f), 0.0f, false);
 }
 
 // ヨーから水平の向きの単位ベクトルを作り、移動と調べる操作で共有している。

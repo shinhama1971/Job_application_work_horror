@@ -483,7 +483,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
         // 揺れる裸電球の光は、電球との間に物があれば届かない（床に落ちる、揺れる影。pointShadow.hlsli）
         pointAttenuation *= GetPointLightShadow(input.worldPos, input.worldNormal, pointLight.PositionRange.xyz);
         // 見えない影の異変では、姿の見えない人影が、この光源の光を遮って床に影だけを落とす（figureShadow.hlsli）
-        pointAttenuation *= GetUnseenFigureShadow(input.worldPos, pointLight.PositionRange.xyz);
+        pointAttenuation *= GetUnseenFigureShadow(input.worldPos, pointLight.PositionRange.xyz) *
+            GetPlayerBodyShadow(input.worldPos, pointLight.PositionRange.xyz);
 
         const float pointLambert = saturate(dot(
             detailWorldNormal, directionToPointLight));

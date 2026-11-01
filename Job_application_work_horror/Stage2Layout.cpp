@@ -275,6 +275,8 @@ namespace Stage2Layout
             piece->SetAppearance(portraitFrameColor, Color(0.0f, 0.0f, 0.0f, 1.0f), 26.0f);
             piece->SetSurfaceFinish(0.75f, 0.45f);
             piece->SetCastsShadow(false);
+            // 見た目は、溝の入った金の額縁の棒（Mayaで作ったモデル）
+            piece->SetVisualModel("frame_rail");
         }
 
         // 時計（文字盤と枠）。文字盤・目盛り・ローマ数字・針・ガラスは、文字盤のシェーダー（clockPS）で描いている
@@ -341,6 +343,8 @@ namespace Stage2Layout
             // 古いニスの木の枠（PBR：金属でなく、少し艶のある粗さ）
             piece->SetSurfaceFinish(0.0f, 0.48f);
             piece->SetCastsShadow(false);
+            // 見た目は、溝の入った木の額縁の棒（Mayaで作ったモデル。当たり判定はない）
+            piece->SetVisualModel("frame_rail");
         }
         // 鏡にだけ映る自分の姿（一人称で体がないため、位置と向きを鏡のシェーダーへ渡し、鏡の中にだけ体を描いている）
         objects.mirrorSelf = builder.Create<MirrorSelf>("Stage2MirrorSelf");
@@ -409,6 +413,10 @@ namespace Stage2Layout
             "Stage2FalseDoorHandle", Vector3(-38.3f, -76.0f, 62.0f),
             Vector3(2.0f, 5.0f, 2.0f),
             Color(0.16f, 0.09f, 0.025f, 1.0f), false);
+        // 偽の扉の枠の見た目は、額縁と同じ溝の入った棒（Mayaで作ったモデル）
+        falseDoorFrameNear->SetVisualModel("frame_rail");
+        falseDoorFrameFar->SetVisualModel("frame_rail");
+        falseDoorFrameTop->SetVisualModel("frame_rail");
         falseDoorPanel->SetDoorSurface();
         falseDoorPanel->SetSurfaceParams(Color(-1.0f, 0.0f, 0.0f, 0.0f));
         // 取っ手は、くすんだ真鍮の金属にしている（PBR。色は真鍮の映り込みの色）。板は本物の扉と同じ木の粗さ
@@ -547,8 +555,9 @@ namespace Stage2Layout
             float z)
         {
             // wallSideXは壁側の符号（左の壁は-1、右の壁は+1）。扉は廊下の中央を向いている。
+            // 本体の見た目は、上の通気口・脚・継ぎ目のあるロッカー（Mayaで作ったモデル。当たり判定は箱のまま）
             createWall(bodyName, Vector3(wallSideX * 35.0f, -77.0f, z),
-                Vector3(10.0f, 44.0f, 16.0f), lockerColor, true);
+                Vector3(10.0f, 44.0f, 16.0f), lockerColor, true)->SetVisualModel("locker_body");
             Locker* locker = builder.Create<Locker>(name);
             locker->Place(Vector3(wallSideX * 29.95f, -77.0f, z),
                 wallSideX < 0.0f ? DirectX::XM_PIDIV2 : -DirectX::XM_PIDIV2);

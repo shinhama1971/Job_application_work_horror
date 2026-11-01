@@ -49,6 +49,10 @@ cbuffer WaterCausticsBuffer : register(b12)
     float4 MirrorSelfMotion;
     // 鏡の異変の、鏡にだけ映る黒い人影（xyz = 足もとの位置、w = 見え方0〜1。0なら描かない。MirrorAnomaly）
     float4 MirrorFigure;
+    // プレイヤーの体が照明を遮って落とす影（xyz = 足もとの位置、w = 影を落とすなら1。figureShadow.hlsli の GetPlayerBodyShadow）
+    float4 PlayerBody;
+    // プレイヤーの体の向きと動き（xy = 前の向きのx・z、z = 歩く手足の振り（-1〜1）、w = 詰め物）
+    float4 PlayerBodyPose;
 }
 
 // 水たまりの波のシミュレーションの高さ（t9。WaterRippleSimulationが毎フレーム計算している）。x = 今の高さ、y = 1つ前の高さ

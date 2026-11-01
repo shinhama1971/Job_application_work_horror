@@ -47,7 +47,8 @@ namespace PropModel
         const std::vector<Part>& parts,
         const Vector3& nominalScale,
         std::vector<VERTEX_3D>& vertices,
-        std::vector<unsigned int>& indices)
+        std::vector<unsigned int>& indices,
+        const Matrix& orientation)
     {
         const LoadedModel& model = LoadModel(path);
         std::vector<IndexRange> ranges;
@@ -66,8 +67,8 @@ namespace PropModel
                 for (unsigned int index = 0; index < subset.VertexNum; ++index)
                 {
                     VERTEX_3D vertex = model.Vertices[subset.VertexBase + index];
-                    vertex.position = vertex.position / nominalScale;
-                    vertex.normal = vertex.normal / nominalScale;
+                    vertex.position = Vector3::Transform(vertex.position, orientation) / nominalScale;
+                    vertex.normal = Vector3::TransformNormal(vertex.normal, orientation) / nominalScale;
                     vertex.normal.Normalize();
                     // 頂点カラーは環境遮蔽（灰色）なので、部位の色に掛けている
                     vertex.color = Color(

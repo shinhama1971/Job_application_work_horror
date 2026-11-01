@@ -159,6 +159,9 @@ namespace
     // 1面で、この時刻の間だけ懐中電灯を消している（消したときの暗さを写すため）
     constexpr float Stage1FlashlightOffStart = 28.5f;
     constexpr float Stage1FlashlightOffEnd = 29.4f;
+    // 2面で、この時刻の間だけ懐中電灯を消している（電球の光だけで、床に落ちる自分の体の影を写すため）
+    constexpr float Stage2FlashlightOffStart = 9.6f;
+    constexpr float Stage2FlashlightOffEnd = 11.3f;
     // 1面の西棟で、この時刻に天井の人影を出している（水面にだけ映る、天井に逆さまに張り付いた人影を写すため）
     constexpr float CeilingReflectionRequestTime = 59.0f;
     // 1面の最後で、この時刻に突き当たりの最後のドアを開けている（開けた瞬間に開始地点の奥のドアへつながる様子を写すため）
@@ -185,6 +188,9 @@ namespace
         // 天井から吊るした裸電球の下へ近づき、電球の光が作る影（ロッカーや人の影が、揺れに合わせて床と壁の上を動く）を写している
         { 8.0f, Vector3(-8.0f, FloorY, -38.0f), YawToward(-8.0f, -38.0f, 10.0f, 30.0f), -0.30f, nullptr, false },
         { 9.0f, Vector3(-8.0f, FloorY, -37.0f), YawToward(-8.0f, -37.0f, 10.0f, 30.0f), -0.30f, L"06b_2面_揺れる電球の影", false },
+        // 電球を背にして足元を見ると、電球の光を遮る自分の体の影が床に伸びている（figureShadow.hlsli の GetPlayerBodyShadow）
+        { 9.6f, Vector3(0.0f, FloorY, -6.0f), Pi, -1.00f, nullptr, false },
+        { 11.0f, Vector3(0.0f, FloorY, -6.0f), Pi, -1.00f, L"06c_2面_電球を背に伸びる自分の影", false },
         { 12.0f, Vector3(0.0f, FloorY, -25.0f), -Pi * 0.5f, -0.10f, L"07_2面_時計", false },
         { 15.5f, Vector3(0.0f, FloorY, -25.0f), Pi * 0.5f, -0.10f, L"08_2面_肖像画", false },
         { 19.5f, Vector3(14.0f, FloorY, 40.0f), Pi * 0.5f, -0.12f, L"09_2面_ロッカー", false },
@@ -1055,7 +1061,9 @@ namespace Tools::CaptureMode
             player->AddBattery(-75.0f);
         }
         player->SetFlashlightOn(!(scene == SceneName::Stage &&
-            g_TourTime >= Stage1FlashlightOffStart && g_TourTime < Stage1FlashlightOffEnd));
+            g_TourTime >= Stage1FlashlightOffStart && g_TourTime < Stage1FlashlightOffEnd) &&
+            !(scene == SceneName::Stage2 && !g_Benchmark &&
+            g_TourTime >= Stage2FlashlightOffStart && g_TourTime < Stage2FlashlightOffEnd));
         if (g_FeatureTour && scene == SceneName::Stage)
             player->SetFlashlightOn((g_TourTime >= 10.0f && g_TourTime < 13.0f) || g_TourTime >= 21.0f);
         // ドア検証の20秒まではFullbrightで形を見せる。通常表示の資料画像には使わない。

@@ -224,6 +224,21 @@ void Renderer::SetMirrorFigure(const Vector3& footPosition, float visibility)
 		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
 }
 
+// プレイヤーの体の位置・向き・手足の振りをb12へ設定している（figureShadow.hlsli の GetPlayerBodyShadow が使う）
+void Renderer::SetPlayerBody(const Vector3& footPosition, const Vector3& forward, float swing, bool castsShadow)
+{
+	if (!m_pWaterCausticsBuffer)
+	{
+		return;
+	}
+	m_WaterCaustics.PlayerBody = Vector4(footPosition.x, footPosition.y, footPosition.z, castsShadow ? 1.0f : 0.0f);
+	m_WaterCaustics.PlayerBodyPose = Vector4(forward.x, forward.z, swing, 0.0f);
+	m_pDeviceContext->UpdateSubresource(
+		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
+	m_pDeviceContext->PSSetConstantBuffers(
+		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+}
+
 // 計測モード用に、2つの人影を指定した位置へ置き続けている（解除したときは、次に場面が設定するまで消している）
 void Renderer::SetFigureOverride(bool enabled, const Vector3& puddleFoot, const Vector3& unseenFoot)
 {

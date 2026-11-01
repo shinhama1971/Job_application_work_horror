@@ -593,7 +593,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
             * pointAttenuation
             * fixtureDistribution
             * GetPointLightShadow(input.worldPos, input.worldNormal, pointLight.PositionRange.xyz)
-            * GetUnseenFigureShadow(input.worldPos, pointLight.PositionRange.xyz);
+            * GetUnseenFigureShadow(input.worldPos, pointLight.PositionRange.xyz)
+            * GetPlayerBodyShadow(input.worldPos, pointLight.PositionRange.xyz);
         lighting += pointRadiance * softPointLambert;
 
         // 鏡面反射は、懐中電灯と同じビュー空間で計算している（光の向きだけをビュー空間へ回している）
