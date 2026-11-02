@@ -13,10 +13,14 @@ $ErrorActionPreference = 'Stop'
 
 $projectDirectory = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $repositoryRoot = Split-Path $projectDirectory -Parent
-$executable = Join-Path $projectDirectory 'x64\Release\Job_application_work_horror.exe'
-if (-not (Test-Path $executable))
+# ソリューションからビルドするとリポジトリ直下の x64\Release に、プロジェクト単体ではプロジェクトの下にできるため、両方を探します。
+$executable = @(
+    (Join-Path $repositoryRoot 'x64\Release\Job_application_work_horror.exe'),
+    (Join-Path $projectDirectory 'x64\Release\Job_application_work_horror.exe')
+) | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $executable)
 {
-    throw "Release版の実行ファイルがありません。先にReleaseでビルドしてください: $executable"
+    throw "Release版の実行ファイルがありません。先にReleaseでビルドしてください: $repositoryRoot\x64\Release"
 }
 
 $outputDirectory = Join-Path (Split-Path $repositoryRoot -Parent) ('daily_report\' + (Get-Date -Format 'yyyy-MM-dd'))
