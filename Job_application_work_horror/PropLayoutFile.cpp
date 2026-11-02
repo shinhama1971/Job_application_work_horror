@@ -7,6 +7,7 @@
 
 #include "SceneLayoutBuilder.h"
 #include "Wall.h"
+#include "utility.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -150,6 +151,50 @@ namespace PropLayoutFile
                     }
                 }
             }
+            else if (command == "place")
+            {
+                // place 名前 x y z [yaw 度] [size 幅 高さ 奥行き]
+                PropPlacement placement;
+                if (!(line >> placement.Name >> placement.Position.x >> placement.Position.y >> placement.Position.z))
+                {
+                    return fail(lineNumber, "place の値が足りない（名前 位置3つ）");
+                }
+                std::string option;
+                while (line >> option)
+                {
+                    if (option == "yaw")
+                    {
+                        float degrees = 0.0f;
+                        if (!(line >> degrees))
+                        {
+                            return fail(lineNumber, "yaw の後に向き（度）が必要");
+                        }
+                        placement.Yaw = DirectX::XMConvertToRadians(degrees);
+                        placement.HasYaw = true;
+                    }
+                    else if (option == "size")
+                    {
+                        if (!(line >> placement.Size.x >> placement.Size.y >> placement.Size.z))
+                        {
+                            return fail(lineNumber, "size の後に 幅 高さ 奥行き が必要");
+                        }
+                        placement.HasSize = true;
+                    }
+                    else
+                    {
+                        return fail(lineNumber, "place の知らない指定: " + option);
+                    }
+                }
+                for (const PropPlacement& existing : layout.Placements)
+                {
+                    if (existing.Name == placement.Name)
+                    {
+                        return fail(lineNumber, "同じ名前の place が2回ある: " + placement.Name);
+                    }
+                }
+                placement.Line = lineNumber;
+                layout.Placements.push_back(placement);
+            }
             else if (command == "prop")
             {
                 PropDescription prop;
@@ -242,6 +287,17 @@ namespace PropLayoutFile
         // 見た目のモデルは、大きさと色を決めた後で作っている（箱の一番長い向きと、配置の色を使うため）
         wall.SetVisualModel(description.Model);
         wall.SetVisible(true);
+    }
+
+    const PropPlacement& GetPlacement(const PropLayout& layout, const std::string& name)
+    {
+        const auto found = std::find_if(layout.Placements.begin(), layout.Placements.end(),
+            [&name](const PropPlacement& placement) { return placement.Name == name; });
+        if (found == layout.Placements.end())
+        {
+            utility::ReportFatalError("配置のファイルに place " + name + " がありません。");
+        }
+        return *found;
     }
 
     std::vector<DirectX::SimpleMath::Vector4> CollectRoomFootprints(const PropLayout& layout)

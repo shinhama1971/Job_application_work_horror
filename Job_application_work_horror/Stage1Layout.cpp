@@ -44,30 +44,37 @@ namespace Stage1Layout
         StageObjects objects;
         SceneLayoutBuilder builder(game, objects.objectNames);
 
+        // 建物の壁と柱・小物（prop 行）と、下で作る扉・照明・電池・端末などの置き場所（place 行）は、
+        // テキストファイル（assets/layout/stage1_props.txt）から読んでいる（PropLayoutFile）。
+        // ビルドし直さずに配置を直せ、Debug版ではゲームを動かしたまま F5 で小物を読み直せる（StageScene）。
+        const PropLayout propLayout = PropLayoutFile::Load(PropLayoutPath);
+        if (!propLayout.IsValid())
+        {
+            utility::ReportFatalError("1面の配置を読めませんでした（" + std::to_string(propLayout.ErrorLine) +
+                "行目）: " + propLayout.Error);
+        }
+        const auto at = [&propLayout](const char* name) -> const PropPlacement&
+        {
+            return PropLayoutFile::GetPlacement(propLayout, name);
+        };
+
         // プレイヤー（開始地点は南の区画の中央）
         Player* player = builder.Create<Player>("Player");
-        player->SetPosition(Vector3(0.0f, -99.0f, -120.0f));
+        PropLayoutFile::ApplyPlacement(*player, at("Player"));
 
         // 外部のFBXの配管モデル（背景の飾り）。進行や当たり判定には参加させていない。
         PipeProp* pipe = builder.Create<PipeProp>("PipeProp");
-        pipe->SetPosition(Vector3(22.0f, -87.54f, -105.0f));
-        pipe->SetRotation(Vector3(0.0f, 0.45f, 0.0f));
-        pipe->SetScale(Vector3(8.0f, 8.0f, 8.0f));
+        PropLayoutFile::ApplyPlacement(*pipe, at("PipeProp"));
 
         PipeProp* pipe2 = builder.Create<PipeProp>("PipeProp2");
-        pipe2->SetPosition(Vector3(-22.0f, -87.54f, -105.0f));
-        pipe2->SetRotation(Vector3(0.0f, -0.45f, 0.0f));
-        pipe2->SetScale(Vector3(8.0f, 8.0f, 8.0f));
+        PropLayoutFile::ApplyPlacement(*pipe2, at("PipeProp2"));
 
         PipeProp* pipe3 = builder.Create<PipeProp>("PipeProp3");
-        pipe3->SetPosition(Vector3(0.0f, -87.54f, -155.0f));
-        pipe3->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
-        pipe3->SetScale(Vector3(8.0f, 8.0f, 8.0f));
+        PropLayoutFile::ApplyPlacement(*pipe3, at("PipeProp3"));
 
         // 床（建物全体を覆う1000x1000の濡れた床）
         Ground* ground = builder.Create<Ground>("Ground");
-        ground->SetPosition(0.0f, -100.0f, 0.0f);
-        ground->SetScale(20.0f, 1.0f, 20.0f);
+        PropLayoutFile::ApplyPlacement(*ground, at("Ground"));
         // 西棟は床一面が水に浸かっている（水たまりと同じ反射・波紋を、範囲全体に出している）。
         ground->SetFloodRegion(
             Vector2(Stage1WestWing::MinX, Stage1WestWing::MinZ),
@@ -102,15 +109,7 @@ namespace Stage1Layout
 
         const Color noEmission(0.0f, 0.0f, 0.0f, 1.0f);
 
-        // 建物の壁と柱・天井の板・配管・幅木・棚・机・崩れた資材・木箱・色の付いた警告灯・暖かい電球など、進行のコードが使わない物は、
-        // テキストファイル（assets/layout/stage1_props.txt）から読んで置いている（PropLayoutFile）。
-        // ビルドし直さずに配置を直せ、Debug版ではゲームを動かしたまま F5 で読み直せる（StageScene）。
-        const PropLayout propLayout = PropLayoutFile::Load(PropLayoutPath);
-        if (!propLayout.IsValid())
-        {
-            utility::ReportFatalError("1面の小物の配置を読めませんでした（" + std::to_string(propLayout.ErrorLine) +
-                "行目）: " + propLayout.Error);
-        }
+        // 建物の壁と柱・天井の板・配管・幅木・棚・机・崩れた資材・木箱・色の付いた警告灯・暖かい電球など、進行のコードが使わない物（prop 行）
         objects.layoutProps = PropLayoutFile::Spawn(builder, propLayout);
         // 部屋の角の暗がりの計算用に、room を付けた建物の壁を上から見た長方形を記録している
         objects.wallFootprints = PropLayoutFile::CollectRoomFootprints(propLayout);
@@ -179,43 +178,35 @@ namespace Stage1Layout
             createLoopMarker("PropLoopMarker3", Vector3(36.0f, -67.0f, 37.4f)) };
         // 天井照明の見た目で、施設に電気が来ているかを直接伝えている（非常灯は停電中も赤く光る）。
         CeilingLight* light1 = builder.Create<CeilingLight>("CeilingLight1");
-        light1->SetPosition(0.0f, -50.5f, -140.0f);
-        light1->SetScale(24.0f, 2.0f, 11.0f);
+        PropLayoutFile::ApplyPlacement(*light1, at("CeilingLight1"));
         light1->SetEmergencyLight(true, 0.0f);
 
         CeilingLight* light2 = builder.Create<CeilingLight>("CeilingLight2");
-        light2->SetPosition(-150.0f, -50.5f, -140.0f);
-        light2->SetScale(22.0f, 2.0f, 10.0f);
+        PropLayoutFile::ApplyPlacement(*light2, at("CeilingLight2"));
         light2->SetEmergencyLight(false, 0.8f);
 
         CeilingLight* light3 = builder.Create<CeilingLight>("CeilingLight3");
-        light3->SetPosition(150.0f, -50.5f, -140.0f);
-        light3->SetScale(22.0f, 2.0f, 10.0f);
+        PropLayoutFile::ApplyPlacement(*light3, at("CeilingLight3"));
         light3->SetEmergencyLight(true, 1.7f);
 
         CeilingLight* light4 = builder.Create<CeilingLight>("CeilingLight4");
-        light4->SetPosition(0.0f, -50.5f, -10.0f);
-        light4->SetScale(26.0f, 2.0f, 11.0f);
+        PropLayoutFile::ApplyPlacement(*light4, at("CeilingLight4"));
         light4->SetEmergencyLight(true, 2.4f);
 
         CeilingLight* light5 = builder.Create<CeilingLight>("CeilingLight5");
-        light5->SetPosition(0.0f, -50.5f, 105.0f);
-        light5->SetScale(18.0f, 2.0f, 8.0f);
+        PropLayoutFile::ApplyPlacement(*light5, at("CeilingLight5"));
         light5->SetEmergencyLight(false, 3.1f);
 
         CeilingLight* light6 = builder.Create<CeilingLight>("CeilingLight6");
-        light6->SetPosition(-130.0f, -50.5f, 120.0f);
-        light6->SetScale(24.0f, 2.0f, 11.0f);
+        PropLayoutFile::ApplyPlacement(*light6, at("CeilingLight6"));
         light6->SetEmergencyLight(true, 3.8f);
 
         CeilingLight* light7 = builder.Create<CeilingLight>("CeilingLight7");
-        light7->SetPosition(120.0f, -50.5f, 270.0f);
-        light7->SetScale(30.0f, 2.0f, 13.0f);
+        PropLayoutFile::ApplyPlacement(*light7, at("CeilingLight7"));
         light7->SetEmergencyLight(false, 4.5f);
 
         CeilingLight* light8 = builder.Create<CeilingLight>("CeilingLight8");
-        light8->SetPosition(0.0f, -50.5f, 215.0f);
-        light8->SetScale(20.0f, 2.0f, 8.0f);
+        PropLayoutFile::ApplyPlacement(*light8, at("CeilingLight8"));
         light8->SetEmergencyLight(true, 6.2f);
 
         // ヒューズ。どの部屋にあるかは固定し（目的表示と演出の流れを保つため）、
@@ -281,8 +272,7 @@ namespace Stage1Layout
 
         // 西棟の扉（西側の外壁の z=-35〜-5）。鍵を拾うまで開かない。
         Door* westWingDoor = builder.Create<Door>("Stage1WestWingDoor");
-        westWingDoor->SetPosition(-220.0f, -74.0f, -20.0f);
-        westWingDoor->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
+        PropLayoutFile::ApplyPlacement(*westWingDoor, at("Stage1WestWingDoor"));
         westWingDoor->SetLocked(true);
 
         objects.westWing.door = westWingDoor;
@@ -292,56 +282,50 @@ namespace Stage1Layout
 
         // 寄り道のごほうびの電池（西棟の広間・崩れた資材置き場）。
         BatteryItem* westWingBattery = builder.Create<BatteryItem>("Stage1WestWingBattery");
-        westWingBattery->SetPosition(-355.0f, -95.0f, 40.0f);
+        PropLayoutFile::ApplyPlacement(*westWingBattery, at("Stage1WestWingBattery"));
         BatteryItem* debrisBattery = builder.Create<BatteryItem>("Stage1DebrisRoomBattery");
-        debrisBattery->SetPosition(-120.0f, -95.0f, 300.0f);
+        PropLayoutFile::ApplyPlacement(*debrisBattery, at("Stage1DebrisRoomBattery"));
         // 南西の広間の奥（棚の一角の木箱の陰）にも、寄り道のごほうびの電池を置いている。
         BatteryItem* southWestHallBattery = builder.Create<BatteryItem>("Stage1SouthWestHallBattery");
-        southWestHallBattery->SetPosition(-348.0f, -95.0f, -222.0f);
+        PropLayoutFile::ApplyPlacement(*southWestHallBattery, at("Stage1SouthWestHallBattery"));
 
         // 南西の広間の天井の照明（停電中は1つだけ赤い非常灯がともり、電力が戻ると両方が点く）
         CeilingLight* southWestHallLight1 = builder.Create<CeilingLight>("Stage1SouthWestHallLight1");
-        southWestHallLight1->SetPosition(-290.0f, -50.5f, -256.0f);
-        southWestHallLight1->SetScale(24.0f, 2.0f, 11.0f);
+        PropLayoutFile::ApplyPlacement(*southWestHallLight1, at("Stage1SouthWestHallLight1"));
         southWestHallLight1->SetEmergencyLight(false, 5.0f);
         CeilingLight* southWestHallLight2 = builder.Create<CeilingLight>("Stage1SouthWestHallLight2");
-        southWestHallLight2->SetPosition(-180.0f, -50.5f, -256.0f);
-        southWestHallLight2->SetScale(24.0f, 2.0f, 11.0f);
+        PropLayoutFile::ApplyPlacement(*southWestHallLight2, at("Stage1SouthWestHallLight2"));
         southWestHallLight2->SetEmergencyLight(true, 5.7f);
 
         // 西棟の天井の照明（停電中は入口側の1つだけが赤い非常灯。奥とポンプ室は懐中電灯とバルブのランプが頼り）
         CeilingLight* westWingLight1 = builder.Create<CeilingLight>("Stage1WestWingLight1");
-        westWingLight1->SetPosition(-300.0f, -50.5f, -40.0f);
-        westWingLight1->SetScale(24.0f, 2.0f, 11.0f);
+        PropLayoutFile::ApplyPlacement(*westWingLight1, at("Stage1WestWingLight1"));
         westWingLight1->SetEmergencyLight(true, 2.9f);
         CeilingLight* westWingLight2 = builder.Create<CeilingLight>("Stage1WestWingLight2");
-        westWingLight2->SetPosition(-300.0f, -50.5f, 100.0f);
-        westWingLight2->SetScale(24.0f, 2.0f, 11.0f);
+        PropLayoutFile::ApplyPlacement(*westWingLight2, at("Stage1WestWingLight2"));
         westWingLight2->SetEmergencyLight(false, 3.4f);
         CeilingLight* westWingLight3 = builder.Create<CeilingLight>("Stage1WestWingLight3");
-        westWingLight3->SetPosition(-300.0f, -50.5f, 220.0f);
-        westWingLight3->SetScale(20.0f, 2.0f, 9.0f);
+        PropLayoutFile::ApplyPlacement(*westWingLight3, at("Stage1WestWingLight3"));
         westWingLight3->SetEmergencyLight(false, 4.1f);
 
         // 中央の扉（ループ廊下へ続く）と、主電源の配電盤
         Door* door = builder.Create<Door>("Door");
-        door->SetPosition(0.0f, -74.0f, 40.0f);
+        PropLayoutFile::ApplyPlacement(*door, at("Door"));
         FuseBox* fuseBox = builder.Create<FuseBox>("FuseBox");
-        fuseBox->SetPosition(-180.0f, -90.0f, 35.0f);
+        PropLayoutFile::ApplyPlacement(*fuseBox, at("FuseBox"));
 
         // 出口の送電盤（主電源が戻った後に操作する）
         FuseBox* exitPowerPanel =
             builder.Create<FuseBox>("ExitPowerPanel");
         exitPowerPanel->SetExitControl(true);
-        exitPowerPanel->SetPosition(145.0f, -90.0f, 270.0f);
+        PropLayoutFile::ApplyPlacement(*exitPowerPanel, at("ExitPowerPanel"));
 
         // 非常用充電器（懐中電灯の電池を回復できる）
         FuseBox* emergencyCharger =
             builder.Create<FuseBox>("Stage1EmergencyCharger");
         emergencyCharger->SetManualControl("非常用充電器を使う");
         emergencyCharger->SetManualInteractionAllowed(true);
-        emergencyCharger->SetPosition(-205.0f, -90.0f, -112.0f);
-        emergencyCharger->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
+        PropLayoutFile::ApplyPlacement(*emergencyCharger, at("Stage1EmergencyCharger"));
 
         // 任意で探索するごほうびは、最短の道筋から外して置いている。
         // 素早く脱出するか、全部探索するかを選ばせるためである。
@@ -349,8 +333,7 @@ namespace Stage1Layout
             builder.Create<FuseBox>("Stage1EvidenceTerminal");
         evidenceTerminal->SetManualControl("監視カメラを確認する");
         evidenceTerminal->SetManualInteractionAllowed(true);
-        evidenceTerminal->SetPosition(205.0f, -90.0f, -42.0f);
-        evidenceTerminal->SetRotation(Vector3(0.0f, -DirectX::XM_PIDIV2, 0.0f));
+        PropLayoutFile::ApplyPlacement(*evidenceTerminal, at("Stage1EvidenceTerminal"));
         // 監視カメラの端末の上に付けた、緑に光る目印
         Wall* evidenceMarker = createStageProp(
             "Stage1EvidenceMarker",
@@ -481,15 +464,13 @@ namespace Stage1Layout
 
         // 暗証番号の扉（任意で探索）。中央の扉の先の細い廊下の東の壁にあり、ループ廊下へ向かうたびに目に入る。
         Door* keypadDoor = builder.Create<Door>("Stage1KeypadDoor");
-        keypadDoor->SetPosition(45.0f, -74.0f, 110.0f);
-        keypadDoor->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
+        PropLayoutFile::ApplyPlacement(*keypadDoor, at("Stage1KeypadDoor"));
         keypadDoor->SetLocked(true);
 
         FuseBox* keypadPanel = builder.Create<FuseBox>("Stage1KeypadPanel");
         keypadPanel->SetManualControl("暗証番号を入力する");
         keypadPanel->SetManualInteractionAllowed(true);
-        keypadPanel->SetPosition(41.5f, -80.0f, 135.0f);
-        keypadPanel->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
+        PropLayoutFile::ApplyPlacement(*keypadPanel, at("Stage1KeypadPanel"));
 
         // 番号の手がかり。「ひとつめ」などの文字の右に、その桁の数字を書いている。
         // 数字の画像は、番号を決めるStage1KeypadDoor::Initで差し替えている。
@@ -525,21 +506,20 @@ namespace Stage1Layout
 
         // 扉の先の部屋: 予備の電池と、入った者を迎える文字を置いている。
         BatteryItem* hiddenBattery = builder.Create<BatteryItem>("Stage1KeypadRoomBattery");
-        hiddenBattery->SetPosition(140.0f, -95.0f, 110.0f);
+        PropLayoutFile::ApplyPlacement(*hiddenBattery, at("Stage1KeypadRoomBattery"));
         createWriting("Stage1KeypadRoomWriting", "assets/texture/writing_watched.png", "",
             Vector3(218.0f, -70.0f, 70.0f), Vector3(-1.0f, 0.0f, 0.0f), 64.0f);
 
         // 閉じ込めイベント（Stage1HiddenRoomEvent）で使う、鍵・記録端末・影。
         // 鍵は閉じ込めた瞬間に、部屋の隅の候補からランダムな位置へ置いている。
         KeyItem* hiddenRoomKey = builder.Create<KeyItem>("Stage1HiddenRoomKey");
-        hiddenRoomKey->SetPosition(140.0f, -95.0f, 60.0f);
+        PropLayoutFile::ApplyPlacement(*hiddenRoomKey, at("Stage1HiddenRoomKey"));
         hiddenRoomKey->SetActive(false);
 
         FuseBox* hiddenRoomRecord = builder.Create<FuseBox>("Stage1HiddenRoomRecord");
         hiddenRoomRecord->SetManualControl("記録を読む");
         hiddenRoomRecord->SetManualInteractionAllowed(true);
-        hiddenRoomRecord->SetPosition(213.0f, -82.0f, 150.0f);
-        hiddenRoomRecord->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
+        PropLayoutFile::ApplyPlacement(*hiddenRoomRecord, at("Stage1HiddenRoomRecord"));
 
         ShadowMan* hiddenRoomShadow = builder.Create<ShadowMan>("Stage1HiddenRoomShadow");
         hiddenRoomShadow->SetDeactivateOnExpire(true);
@@ -564,7 +544,7 @@ namespace Stage1Layout
 
         // 電池（書類保管室）
         BatteryItem* battery = builder.Create<BatteryItem>("BatteryItem");
-        battery->SetPosition(-130.0f, -95.0f, 120.0f);
+        PropLayoutFile::ApplyPlacement(*battery, at("BatteryItem"));
 
         // 驚かせる瞬間に重ねる画面のノイズ
         ScreenDustOverlay* crt =
@@ -576,7 +556,7 @@ namespace Stage1Layout
         // 電力が戻った後、中央の廊下へ入ると、奥に影が現れる驚かせる演出
         ScareTrigger* corridorScare =
             builder.Create<ScareTrigger>("ScareTrigger_Corridor");
-        corridorScare->SetPosition(Vector3(0.0f, -90.0f, 65.0f));
+        PropLayoutFile::ApplyPlacement(*corridorScare, at("ScareTrigger_Corridor"));
         corridorScare->SetSize(Vector3(70.0f, 30.0f, 32.0f));
         corridorScare->SetShadowPosition(Vector3(0.0f, -99.0f, 150.0f));
         corridorScare->SetRequiresPower(true);
@@ -584,7 +564,7 @@ namespace Stage1Layout
         // 演出用の人影。どれも最初は隠しておき、StageSceneの演出で出している（時間切れで破棄せずに隠す）
         ShadowMan* exitOmen =
             builder.Create<ShadowMan>("Stage1ExitOmen");
-        exitOmen->SetPosition(92.0f, -99.0f, 278.0f);
+        PropLayoutFile::ApplyPlacement(*exitOmen, at("Stage1ExitOmen"));
         exitOmen->SetDeactivateOnExpire(true);
         exitOmen->SetActive(false);
 

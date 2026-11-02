@@ -5,6 +5,7 @@
 #   color 名前 r g b [metal 粗さ [金属らしさ]] [rough 粗さ]
 
 #   prop 名前 x y z 幅 高さ 奥行き 色 光る色 光沢 当たり判定(0/1) [noshadow] [weathering] [room] [glow 範囲 強さ] [model モデルの名前]
+#   place 名前 x y z [yaw 度] [size 幅 高さ 奥行き]   （進行のコードが作る物の置き場所。ファイルの最後にまとめている）
 #
 #   room を付けた壁は、部屋の角の暗がり（roomOcclusion.hlsli）と水面・鏡のレイ反射が「部屋の形」として使う（32枚まで）。
 #   建物の壁・柱も、ここに書いている（weathering でパネルの継ぎ目・ひび・水の跡・カビを描く）。
@@ -171,3 +172,42 @@ prop PropSafeLightDeskShade  -332 -65   -304   5 3 5         warmBulbBody warmBu
 # --- 脱出のホールの入口の柱
 prop PropExitColumnLeft   -52 -80 179   10 38 10   darkMetal none 8 1 model column
 prop PropExitColumnRight  52  -80 179   10 38 10   darkMetal none 8 1 model column
+
+# --- 進行のコードが作る物の置き場所（place 名前 x y z [yaw 度] [size 幅 高さ 奥行き]）
+# 物の種類と動き（鍵がかかっているか、非常灯か、最初は隠すか）は Stage1Layout.cpp が決め、置き場所だけをここから読んでいる。
+# yaw は真上から見て +Z を0度とした向き、size は大きさ（照明は器具の幅・厚さ・奥行き、扉・配管は拡大率）。
+place Player                         0 -99 -120
+place PipeProp                       22 -87.54 -105 yaw 25.7831 size 8 8 8
+place PipeProp2                      -22 -87.54 -105 yaw -25.7831 size 8 8 8
+place PipeProp3                      0 -87.54 -155 yaw 90 size 8 8 8
+place Ground                         0 -100 0 size 20 1 20
+place CeilingLight1                  0 -50.5 -140 size 24 2 11
+place CeilingLight2                  -150 -50.5 -140 size 22 2 10
+place CeilingLight3                  150 -50.5 -140 size 22 2 10
+place CeilingLight4                  0 -50.5 -10 size 26 2 11
+place CeilingLight5                  0 -50.5 105 size 18 2 8
+place CeilingLight6                  -130 -50.5 120 size 24 2 11
+place CeilingLight7                  120 -50.5 270 size 30 2 13
+place CeilingLight8                  0 -50.5 215 size 20 2 8
+place Stage1WestWingDoor             -220 -74 -20 yaw 90
+place Stage1WestWingBattery          -355 -95 40
+place Stage1DebrisRoomBattery        -120 -95 300
+place Stage1SouthWestHallBattery     -348 -95 -222
+place Stage1SouthWestHallLight1      -290 -50.5 -256 size 24 2 11
+place Stage1SouthWestHallLight2      -180 -50.5 -256 size 24 2 11
+place Stage1WestWingLight1           -300 -50.5 -40 size 24 2 11
+place Stage1WestWingLight2           -300 -50.5 100 size 24 2 11
+place Stage1WestWingLight3           -300 -50.5 220 size 20 2 9
+place Door                           0 -74 40
+place FuseBox                        -180 -90 35
+place ExitPowerPanel                 145 -90 270
+place Stage1EmergencyCharger         -205 -90 -112 yaw 90
+place Stage1EvidenceTerminal         205 -90 -42 yaw -90
+place Stage1KeypadDoor               45 -74 110 yaw 90
+place Stage1KeypadPanel              41.5 -80 135 yaw 90
+place Stage1KeypadRoomBattery        140 -95 110
+place Stage1HiddenRoomKey            140 -95 60
+place Stage1HiddenRoomRecord         213 -82 150 yaw 90
+place BatteryItem                    -130 -95 120
+place ScareTrigger_Corridor          0 -90 65
+place Stage1ExitOmen                 92 -99 278

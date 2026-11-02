@@ -58,10 +58,27 @@ struct PropDescription
     int Line = 0;
 };
 
+// 進行のコードが作る物（扉・照明・電池・端末など）の位置・向き・大きさ（place 行）。
+// 物の種類や動き（鍵がかかっているか、非常灯か）はコードが決め、置き場所だけをファイルから読んでいる
+struct PropPlacement
+{
+    std::string Name;
+    DirectX::SimpleMath::Vector3 Position;
+    // 水平の向き（ラジアン。ファイルには度で書く）と、書いてあったか
+    float Yaw = 0.0f;
+    bool HasYaw = false;
+    // 大きさ（size。書いてなければ、その物の決まった大きさのまま）
+    DirectX::SimpleMath::Vector3 Size = DirectX::SimpleMath::Vector3::One;
+    bool HasSize = false;
+    int Line = 0;
+};
+
 // 読み込んだ結果（読めなかったときは、Errorに理由、ErrorLineに行番号が入る）
 struct PropLayout
 {
     std::vector<PropDescription> Props;
+    // place 行（ファイルの順）
+    std::vector<PropPlacement> Placements;
     // color で付けた名前と色（ファイルの順。先頭は光らないことを表す none）
     std::vector<std::pair<std::string, DirectX::SimpleMath::Color>> Colors;
     // 色の名前ごとのPBRの仕上げ（metal・rough を付けた色だけ）
@@ -77,6 +94,41 @@ namespace PropLayoutFile
     PropLayout Load(const std::string& path);
     // 作った小物（名前とWall）。読み直すときは、同じ名前の物を置き直している
     using SpawnedProps = std::vector<std::pair<std::string, Wall*>>;
+    // place 行の置き場所を、名前で返している（ファイルに書いていない名前なら、理由を出して終了している）
+    const PropPlacement& GetPlacement(const PropLayout& layout, const std::string& name);
+
+    // 置き場所を物に当てはめている。扉・壁・電池・照明は float 3つの SetPosition を持ち、その中で動きの基準（開く前の位置、
+    // 浮く動きの中心の高さ）も覚えるので、あればそちらを呼んでいる
+    template<typename T>
+    void ApplyPlacement(T& object, const PropPlacement& placement)
+    {
+        const DirectX::SimpleMath::Vector3& position = placement.Position;
+        if constexpr (requires { object.SetPosition(0.0f, 0.0f, 0.0f); })
+        {
+            object.SetPosition(position.x, position.y, position.z);
+        }
+        else
+        {
+            object.SetPosition(position);
+        }
+        if (placement.HasYaw)
+        {
+            object.SetRotation(DirectX::SimpleMath::Vector3(0.0f, placement.Yaw, 0.0f));
+        }
+        if (placement.HasSize)
+        {
+            const DirectX::SimpleMath::Vector3& size = placement.Size;
+            if constexpr (requires { object.SetScale(0.0f, 0.0f, 0.0f); })
+            {
+                object.SetScale(size.x, size.y, size.z);
+            }
+            else
+            {
+                object.SetScale(size);
+            }
+        }
+    }
+
     // room を付けた壁を上から見た長方形（x,y = 中心のx・z、z,w = 幅と奥行きの半分）を、ファイルの順に返している
     std::vector<DirectX::SimpleMath::Vector4> CollectRoomFootprints(const PropLayout& layout);
     // 小物を作り（builderで名前を記録する）、作った小物を返している

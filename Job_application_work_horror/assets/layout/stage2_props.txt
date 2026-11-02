@@ -4,6 +4,7 @@
 #
 #   color 名前 r g b [metal 粗さ [金属らしさ]] [rough 粗さ]
 #   prop 名前 x y z 幅 高さ 奥行き 色 光る色 光沢 当たり判定(0/1) [noshadow] [weathering] [room] [glow 範囲 強さ] [model モデルの名前]
+#   place 名前 x y z [yaw 度] [size 幅 高さ 奥行き]   （進行のコードが作る物の置き場所。ファイルの最後にまとめている）
 #
 # 座標の単位は全ステージ共通（床の高さは y=-100）。2面は、まっすぐな廊下（x=-40〜40、z=-160〜140）が繰り返す。
 # ============================================================================
@@ -28,3 +29,22 @@ prop Stage2TrimLeft          -39.4 -96 -10  1 6 292    stage2Trim none 7 0
 prop Stage2TrimRight          39.4 -96 -10  1 6 292    stage2Trim none 7 0
 prop Stage2PipeLeft          -34 -53 -10    3 3 282    stage2Trim none 7 0 noshadow model pipe_run
 prop Stage2PipeRight          34 -53 -10    3 3 282    stage2Trim none 7 0 noshadow model pipe_run
+
+# --- 進行のコードが作る物の置き場所（place 名前 x y z [yaw 度] [size 幅 高さ 奥行き]）
+# 物の種類と動き（鍵がかかっているか、非常灯か、最初は隠すか）は Stage2Layout.cpp が決め、置き場所だけをここから読んでいる。
+# yaw は真上から見て +Z を0度とした向き、size は大きさ（照明は器具の幅・厚さ・奥行き、扉・配管は拡大率）。
+place Player                         0 -99 -125
+place Stage2Shadow                   0 -99 62
+place Stage2NoiseShadow              0 -99 -145
+place Stage2ConfirmationPanel        35.5 -90 112 yaw -90
+place Stage2EmergencyCharger         -35.5 -90 -106 yaw 90
+place Stage2EvidenceTerminal1        35.5 -90 -76 yaw -90
+place Stage2EvidenceTerminal2        -35.5 -90 108 yaw 90
+place Stage2Ground                   0 -100 0 size 20 1 20
+place Stage2Battery                  35 -82.5 -45
+place Stage2Light1                   0 -50.5 -112 size 18 2 8
+place Stage2Light2                   0 -50.5 -38 size 18 2 8
+place Stage2Light3                   0 -50.5 38 size 18 2 8
+place CeilingLight4                  0 -50.5 112 size 18 2 8
+place Stage2Door                     0 -74 140
+place Stage2Exit                     0 -80 153
