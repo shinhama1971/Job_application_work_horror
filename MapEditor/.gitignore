@@ -1,0 +1,19 @@
+# Unity が作り直せるファイル（読み込みのキャッシュ・一時ファイル・ログ・個人の設定・IDEのプロジェクト）
+/Library/
+/Temp/
+/Obj/
+/Build/
+/Builds/
+/Logs/
+/UserSettings/
+/MemoryCaptures/
+*.csproj
+*.sln
+.vs/
+.vscode/
+
+# リポジトリ全体の .gitignore（Visual Studio 用）が除外している物のうち、Unity に必要な物を入れ直している
+# （.meta はアセットの識別番号、Packages はこのプロジェクトが使うパッケージの一覧）
+!*.meta
+!/Packages/manifest.json
+!/Packages/packages-lock.json
