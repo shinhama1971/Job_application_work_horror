@@ -40,6 +40,14 @@ namespace MapLayout.Editor
                     failed = true;
                     Debug.LogError($"MAPLAYOUT DIFF {fileName}: 書き出したファイルが元と違う（{FirstDifference(original, written)}）");
                 }
+                // ゲームの自動撮影と同じ視点（目の高さは床から40、縦の画角60度）から見た画像。ゲームの画面と見比べる
+                foreach (var view in Views)
+                {
+                    if (view.File == fileName)
+                    {
+                        RenderView(root, view.Position, view.YawToward, view.Pitch, Path.Combine(outputDirectory, "view_" + view.Name + ".png"));
+                    }
+                }
                 RenderTopView(root, Path.Combine(outputDirectory, "topview_" + Path.GetFileNameWithoutExtension(fileName) + ".png"));
             }
 
@@ -91,6 +99,59 @@ namespace MapLayout.Editor
             }
             Debug.Log("MAPLAYOUT EDIT 変わった行:\n" + changed);
             EditorApplication.Exit(failed ? 1 : 0);
+        }
+
+        // ゲームの CaptureMode と同じ視点（足もとの位置・見る先の x と z・上下の向き（ラジアン、負で下））
+        struct View
+        {
+            public string File;
+            public string Name;
+            public Vector3 Position;
+            public Vector2 YawToward;
+            public float Pitch;
+        }
+
+        static readonly View[] Views =
+        {
+            new View { File = "stage1_props.txt", Name = "05d_archive", Position = new Vector3(-62.0f, -99.0f, 115.0f), YawToward = new Vector2(-200.0f, 118.0f), Pitch = -0.12f },
+            new View { File = "stage1_props.txt", Name = "05h_southwest_hall", Position = new Vector3(-160.0f, -99.0f, -196.0f), YawToward = new Vector2(-300.0f, -270.0f), Pitch = -0.14f },
+            new View { File = "stage2_props.txt", Name = "06_stage2_corridor", Position = new Vector3(0.0f, -99.0f, -118.0f), YawToward = new Vector2(0.0f, 0.0f), Pitch = 0.0f },
+        };
+
+        static void RenderView(MapLayoutRoot root, Vector3 foot, Vector2 target, float pitch, string path)
+        {
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+            RenderSettings.ambientLight = new Color(0.55f, 0.55f, 0.58f);
+            foreach (var sceneLight in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+            {
+                sceneLight.shadows = LightShadows.None;
+            }
+            var cameraObject = new GameObject("撮影用のカメラ");
+            var camera = cameraObject.AddComponent<Camera>();
+            camera.fieldOfView = 60.0f;
+            camera.nearClipPlane = 1.0f;
+            camera.farClipPlane = 1000.0f;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.05f, 0.05f, 0.06f);
+            var eye = foot + new Vector3(0.0f, 40.0f, 0.0f);
+            var yaw = Mathf.Atan2(target.x - foot.x, target.y - foot.z) * Mathf.Rad2Deg;
+            camera.transform.SetPositionAndRotation(eye, Quaternion.Euler(-pitch * Mathf.Rad2Deg, yaw, 0.0f));
+
+            const int width = 1280;
+            const int height = 720;
+            var renderTarget = new RenderTexture(width, height, 24);
+            camera.targetTexture = renderTarget;
+            camera.aspect = (float)width / height;
+            camera.Render();
+            RenderTexture.active = renderTarget;
+            var image = new Texture2D(width, height, TextureFormat.RGB24, false);
+            image.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+            image.Apply();
+            File.WriteAllBytes(path, image.EncodeToPNG());
+            RenderTexture.active = null;
+            camera.targetTexture = null;
+            UnityEngine.Object.DestroyImmediate(renderTarget);
+            UnityEngine.Object.DestroyImmediate(cameraObject);
         }
 
         static string CountItems(MapLayoutRoot root)

@@ -14,6 +14,8 @@ namespace MapLayout
         Spot,   // 候補の場所（spot 行。位置だけ）
     }
 
+    // モデルの部品（子）をクリックしても、この印の付いた物が選ばれるようにしている（動かす単位をそろえるため）
+    [SelectionBase]
     public sealed class MapLayoutItem : MonoBehaviour
     {
         // 行の種類と、読み込んだときのファイルの行番号（0から）と、名前（spot は組の名前）

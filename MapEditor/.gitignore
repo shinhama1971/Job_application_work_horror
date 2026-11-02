@@ -17,3 +17,6 @@
 !*.meta
 !/Packages/manifest.json
 !/Packages/packages-lock.json
+# ゲームの assets/model から、読み込むたびに写しているモデル（元はゲームの側にあるので、ここには入れない）
+/Assets/GameModels/
+/Assets/GameModels.meta

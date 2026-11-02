@@ -27,6 +27,8 @@ namespace MapLayout.Editor
 
         static readonly Color PlaceColor = new Color(0.75f, 0.25f, 0.95f);
         static readonly Color SpotColor = new Color(1.0f, 0.85f, 0.15f);
+        static readonly Color SizedPlaceColor = new Color(0.42f, 0.38f, 0.50f);
+        static readonly Color GroundColor = new Color(0.20f, 0.20f, 0.21f);
 
         [MenuItem("Map Layout/1面を読み込む")]
         static void ImportStage1() => Import(Path.Combine(LayoutDirectory, "stage1_props.txt"));
@@ -50,6 +52,8 @@ namespace MapLayout.Editor
         public static MapLayoutRoot Import(string path)
         {
             var document = MapLayoutDocument.Load(path);
+            // ゲームと同じモデルで表示するため、ゲームの FBX を写している（変わった物だけ）
+            GameModelCatalog.SyncModels();
             var rootObject = new GameObject("MapLayout " + Path.GetFileNameWithoutExtension(path));
             var root = rootObject.AddComponent<MapLayoutRoot>();
             root.FilePath = path;
@@ -123,9 +127,78 @@ namespace MapLayout.Editor
             var emissionName = line.Tokens[9].Text;
             document.Colors.TryGetValue(colorName, out var color);
             document.Colors.TryGetValue(emissionName, out var emission);
-            box.GetComponent<MeshRenderer>().sharedMaterial =
-                GetMaterial(materials, colorName + "/" + emissionName, color, emission);
+            var surface = GetMaterial(materials, colorName + "/" + emissionName, color, emission);
+            box.GetComponent<MeshRenderer>().sharedMaterial = surface;
             AddItem(box, MapLayoutKind.Prop, index, name);
+
+            // model の指定があれば、箱の代わりにゲームと同じモデルを、ゲームと同じ伸ばし方・回し方で表示している（Wall::RebuildVisualModel）
+            var modelIndex = line.IndexOf("model", 12);
+            if (modelIndex >= 0 && GameModelCatalog.WallModels.TryGetValue(line.Tokens[modelIndex + 1].Text, out var model))
+            {
+                var size = box.transform.localScale;
+                var orientation = Quaternion.identity;
+                var nominal = model.Size;
+                if (model.FollowsLongestAxis)
+                {
+                    var absolute = new Vector3(Mathf.Abs(size.x), Mathf.Abs(size.y), Mathf.Abs(size.z));
+                    if (absolute.z > absolute.x && absolute.z >= absolute.y)
+                    {
+                        // モデルの x を z へ
+                        orientation = Quaternion.Euler(0.0f, -90.0f, 0.0f);
+                        nominal = new Vector3(model.Size.z, model.Size.y, model.Size.x);
+                    }
+                    else if (absolute.y > absolute.x && absolute.y > absolute.z)
+                    {
+                        // モデルの x を y へ
+                        orientation = Quaternion.Euler(0.0f, 0.0f, 90.0f);
+                        nominal = new Vector3(model.Size.y, model.Size.x, model.Size.z);
+                    }
+                }
+                if (AttachModel(box.transform, model.AssetPath, new Vector3(1.0f / nominal.x, 1.0f / nominal.y, 1.0f / nominal.z),
+                        orientation, Vector3.zero, surface, materials))
+                {
+                    box.GetComponent<MeshRenderer>().enabled = false;
+                }
+            }
+        }
+
+        // FBX を、大きさをそろえる子（scale）と、向きをそろえる孫（rotation）の下に置いている。
+        // ゲームは「モデルを回す → 標準の大きさで割る → 置いた大きさを掛ける」の順なので、割る分を子の scale にしている。
+        // 部位の色は、ゲームの表の色にし、配置ファイルの色で塗る部位（Main・Lens）は surface にしている
+        static bool AttachModel(Transform parent, string assetPath, Vector3 normalize, Quaternion orientation, Vector3 offset,
+            Material surface, Dictionary<string, Material> materials)
+        {
+            var prefab = GameModelCatalog.LoadModel(assetPath);
+            if (prefab == null)
+            {
+                Debug.LogWarning("モデルを読めませんでした: " + assetPath);
+                return false;
+            }
+            var scaler = new GameObject("モデルの大きさ").transform;
+            scaler.SetParent(parent, false);
+            scaler.localPosition = offset;
+            scaler.localScale = normalize;
+            var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, scaler);
+            instance.transform.localRotation = orientation * GameModelCatalog.AxisCorrection;
+            var partColors = GameModelCatalog.PartColors(assetPath);
+            foreach (var renderer in instance.GetComponentsInChildren<Renderer>())
+            {
+                var shared = renderer.sharedMaterials;
+                for (var slot = 0; slot < shared.Length; ++slot)
+                {
+                    var part = shared[slot] != null ? shared[slot].name : string.Empty;
+                    if (surface != null && (part == "Main" || part == "Lens"))
+                    {
+                        shared[slot] = surface;
+                    }
+                    else if (partColors.TryGetValue(part, out var color))
+                    {
+                        shared[slot] = GetMaterial(materials, "#part/" + assetPath + "/" + part, color, Color.black);
+                    }
+                }
+                renderer.sharedMaterials = shared;
+            }
+            return true;
         }
 
         static void CreatePlace(MapLayoutDocument.Line line, int index, Transform parent, Dictionary<string, Material> materials)
@@ -147,8 +220,11 @@ namespace MapLayout.Editor
                 item.HasSize = true;
                 placeObject.transform.localScale = ReadVector(line, size + 1);
             }
-            // 印（大きさのある物は、その大きさの箱。ない物は小さな箱）と、正面（+Z）の向きを示す細い棒
-            var material = GetMaterial(materials, "#place", PlaceColor, PlaceColor * 0.4f);
+            // 印（大きさのある物は、その大きさの箱。ない物は小さな箱）と、正面（+Z）の向きを示す細い棒。
+            // 大きさのある物（肖像画・時計・目印・傷など、色をコードが決める板）は、目立ちすぎないよう落ち着いた色にしている
+            var material = item.HasSize
+                ? GetMaterial(materials, "#placeSized", SizedPlaceColor, Color.black)
+                : GetMaterial(materials, "#place", PlaceColor, PlaceColor * 0.4f);
             var marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
             marker.name = "印";
             Object.DestroyImmediate(marker.GetComponent<Collider>());
@@ -162,6 +238,30 @@ namespace MapLayout.Editor
             facing.transform.localPosition = new Vector3(0.0f, 0.0f, item.HasSize ? 0.75f : 4.0f);
             facing.transform.localScale = item.HasSize ? new Vector3(0.1f, 0.1f, 0.5f) : new Vector3(0.5f, 0.5f, 5.0f);
             facing.GetComponent<MeshRenderer>().sharedMaterial = material;
+
+            // 床（Ground）は、50×50の板を大きさで伸ばしている（ゲームの床は、置いた大きさの50倍の広さ）。印の代わりに実際の広さで表示している
+            if (GameModelCatalog.PlaceTypes.TryGetValue(name, out var placeType) && placeType == "Ground")
+            {
+                marker.transform.localScale = new Vector3(50.0f, 0.02f, 50.0f);
+                marker.GetComponent<MeshRenderer>().sharedMaterial = GetMaterial(materials, "#ground", GroundColor, Color.black);
+                facing.SetActive(false);
+                return;
+            }
+
+            // 種類の分かる物（扉・照明・電池・配電盤・鍵・ヒューズ・人影・ロッカー・バルブ・裸電球・配管）は、ゲームと同じモデルで表示している。
+            // size の書いてある物は、置いた大きさをモデルの標準の大きさで割った割合で伸ばしている
+            var model = GameModelCatalog.FindPlaceModel(name);
+            if (model != null)
+            {
+                var normalize = item.HasSize
+                    ? new Vector3(1.0f / model.Nominal.x, 1.0f / model.Nominal.y, 1.0f / model.Nominal.z)
+                    : Vector3.one;
+                if (AttachModel(placeObject.transform, model.AssetPath, normalize,
+                        Quaternion.Euler(0.0f, model.ExtraYaw, 0.0f), model.Offset, null, materials))
+                {
+                    marker.SetActive(false);
+                }
+            }
         }
 
         static void CreateSpot(MapLayoutDocument.Line line, int index, Transform parent, Dictionary<string, Material> materials)
