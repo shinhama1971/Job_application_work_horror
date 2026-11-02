@@ -11,7 +11,6 @@
 #include "Renderer.h"
 #include "Wall.h"
 #include "Door.h"
-#include "CeilingLight.h"
 #include "Ground.h"
 #include "FirstPersonHands.h"
 
@@ -19,6 +18,20 @@
 #include <cmath>
 
 using namespace DirectX::SimpleMath;
+
+namespace
+{
+    // ヨーから水平の前と右の単位ベクトルを作っている（移動・頭の横揺れ・三人称の視点・体の影で共有している）
+    Vector3 GetHorizontalForward(float yaw)
+    {
+        return Vector3(sinf(yaw), 0.0f, cosf(yaw));
+    }
+
+    Vector3 GetHorizontalRight(float yaw)
+    {
+        return Vector3(sinf(yaw + 1.5708f), 0.0f, cosf(yaw + 1.5708f));
+    }
+}
 
 // 描画資源とプレイヤーの状態を初期化している。配置する座標はScene側がInitの後に設定している。
 void Player::Init()
@@ -78,6 +91,7 @@ void Player::Init()
 
 // 入力・移動・当たり判定・カメラ・懐中電灯・電池の消費を、1フレーム分更新している。
 // 操作できない間もカメラとライトの状態は崩さないようにし、演出から戻りやすくしている。
+// 処理は段階ごとの関数に分け、ここでは呼ぶ順番だけを決めている（足音は押し戻しの後の位置、手の揺れはカメラを動かした後の向きを使うため、順番を入れ替えない）。
 void Player::Update()
 {
     // Scene::UpdateはObject::Updateより先に呼ばれるため、前フレームの値を
@@ -109,11 +123,33 @@ void Player::Update()
         m_HidingInputTimer = (std::max)(0.0f, m_HidingInputTimer - deltaTime);
     }
 
-    // カメラの水平の向きから、前と右の方向を作っている（WASDと左スティックで移動の向きを決める）
-    float yaw = cam->GetCameraDirection();
+    // カメラの水平の向き（隠れている間の向きの制限を済ませてから読んでいる）
+    const float yaw = cam->GetCameraDirection();
+    // 壁は、当たり判定の押し戻しと、懐中電灯の前の面までの距離の両方で使っている
+    const std::vector<Wall*> walls =
+        Core::Game::GetInstance()->GetObjects<Wall>();
 
-    Vector3 forward(sinf(yaw), 0.0f, cosf(yaw));
-    Vector3 right(sinf(yaw + 1.5708f), 0.0f, cosf(yaw + 1.5708f));
+    const Vector3 positionBeforeMove =
+        UpdateMovementAndCollision(deltaTime, yaw, walls);
+    UpdateFootsteps(deltaTime, positionBeforeMove);
+    UpdateCameraModeShortcuts();
+    const FirstPersonHands::FrameInput flashlightHandInput =
+        UpdateFlashlight(deltaTime, *cam, yaw, walls);
+    UpdateCamera(deltaTime, *cam, yaw);
+    UpdateHands(flashlightHandInput, *cam, yaw);
+    UpdateBodyShadow(deltaTime, yaw);
+    UpdateDebugControls();
+}
+
+// 入力から移動の向きを決めて速度で動かし、壁と扉で押し戻している。足音の判定に使う、動く前の位置を返している。
+Vector3 Player::UpdateMovementAndCollision(
+    float deltaTime,
+    float yaw,
+    const std::vector<Wall*>& walls)
+{
+    // カメラの水平の向きから、前と右の方向を作っている（WASDと左スティックで移動の向きを決める）
+    const Vector3 forward = GetHorizontalForward(yaw);
+    const Vector3 right = GetHorizontalRight(yaw);
 
     Vector3 moveDir = Vector3::Zero;
 
@@ -143,14 +179,12 @@ void Player::Update()
     const Vector3 positionBeforeMove = m_Position;
     m_Position += m_Movement.GetVelocity() * deltaTime;
 
-    if (m_Position.y < -99.0f)
+    if (m_Position.y < MIN_Y_POSITION)
     {
-        m_Position.y = -99.0f;
+        m_Position.y = MIN_Y_POSITION;
         m_Movement.StopVerticalVelocity();
     }
 
-    const std::vector<Wall*> walls =
-        Core::Game::GetInstance()->GetObjects<Wall>();
     const std::vector<Door*> doors =
         Core::Game::GetInstance()->GetObjects<Door>();
 
@@ -173,6 +207,12 @@ void Player::Update()
         m_Position = m_HidePosition;
     }
 
+    return positionBeforeMove;
+}
+
+// 足音を鳴らし、2面の影が聞く足音の大きさを決めている。
+void Player::UpdateFootsteps(float deltaTime, const Vector3& positionBeforeMove)
+{
     // 押し戻しの後に実際に動けた距離を使うため、壁へ押し続けても足音は鳴らない。
     m_FootstepTimer = (std::max)(0.0f, m_FootstepTimer - deltaTime);
     const Vector3 actualMovement(
@@ -205,8 +245,11 @@ void Player::Update()
         m_FootstepTimer = m_Movement.IsSprinting() ? 0.31f : 0.46f;
     }
     m_WetSurfaceOverride = false;
+}
 
 // デバッグ用：一人称と三人称の切り替え（Debug構成で、さらにENABLE_CAMERA_MODE_SHORTCUTSを定義したときだけ）
+void Player::UpdateCameraModeShortcuts()
+{
 #if defined(_DEBUG) && defined(ENABLE_CAMERA_MODE_SHORTCUTS)
     if (Input::GetKeyTrigger(VK_R))
     {
@@ -223,12 +266,66 @@ void Player::Update()
         m_IsFPS = !m_IsFPS;
     }
 #endif
+}
 
+// 懐中電灯のスイッチ・電池・前の面までの距離から、シェーダーへ渡す光を作っている。
+// 手のレンズの光と、前の面で跳ね返って手を照らす光を入れた、手の入力を返している（残りはUpdateHandsで埋める）。
+FirstPersonHands::FrameInput Player::UpdateFlashlight(
+    float deltaTime,
+    const Camera& camera,
+    float yaw,
+    const std::vector<Wall*>& walls)
+{
+    const FlashlightSystem::FrameState flashlightState =
+        UpdateFlashlightSwitchAndBattery(deltaTime);
+
+    // 壁や床が近いときは、懐中電灯の明るさを下げている。
+    // 明るさが一定だと、近くの面が白く飛んで、材質の細かい模様が消えるためである。
+    const float closestSurfaceDistance = flashlightState.visible
+        ? FindClosestSurfaceDistance(camera, yaw, walls)
+        : FLASHLIGHT_SURFACE_PROBE_DISTANCE;
+
+    // 近い面までの距離が12〜54の間で、近いほど光を弱め、照らす距離も短くしている（急に変わらないよう、なめらかに近づけている）
+    const float nearSurfaceTarget = flashlightState.visible
+        ? 1.0f - (std::clamp)(
+            (closestSurfaceDistance - 12.0f) / 42.0f, 0.0f, 1.0f)
+        : 0.0f;
+    const float nearSurfaceResponse = 1.0f - std::pow(
+        1.0f - 0.18f, deltaTime * 60.0f);
+    m_FlashlightNearSurfaceBlend +=
+        (nearSurfaceTarget - m_FlashlightNearSurfaceBlend) *
+        nearSurfaceResponse;
+
+    // 電池の弱り具合（60%を切ると0から増え、空で1）。弱るほど光が暗く・黄色く・短くなり、光の輪のむらがはっきりする
+    const float batteryWeakness = (std::clamp)((60.0f - m_Flashlight.GetBattery()) / 60.0f, 0.0f, 1.0f);
+
+    const LIGHT light = BuildFlashlightLight(flashlightState, batteryWeakness);
+    Renderer::SetLight(light);
+
+    // 手に持った懐中電灯：レンズの光と、前の面で跳ね返って手を照らす光（面が近いほど強い。何もなくても床から少し返る）
+    FirstPersonHands::FrameInput handInput;
+    handInput.DeltaTime = deltaTime;
+    handInput.LensGlow = flashlightState.render ? flashlightState.output * flashlightState.powerBlend : 0.0f;
+    handInput.BatteryWeakness = batteryWeakness;
+    handInput.BatteryStress = flashlightState.batteryStress;
+    handInput.VoltageDrop = flashlightState.voltageDropStarted;
+    handInput.NearSurface = m_FlashlightNearSurfaceBlend;
+    if (flashlightState.render)
+    {
+        const float surfaceRatio = closestSurfaceDistance / 16.0f;
+        const float bounce = light.Intensity * (0.04f + 0.30f / (1.0f + surfaceRatio * surfaceRatio));
+        handInput.Bounce = Vector3(light.Diffuse.x, light.Diffuse.y, light.Diffuse.z) * bounce;
+    }
+    return handInput;
+}
+
+// スイッチの操作と電池の消費を進め、このフレームの光の強さと、一瞬暗くなる状態を返している。
+FlashlightSystem::FrameState Player::UpdateFlashlightSwitchAndBattery(float deltaTime)
+{
     // F（コントローラーはY）で懐中電灯を点けたり消したりしている（隠れている間はできない）
     if (!m_IsHiding && (Input::GetKeyTrigger(VK_F) ||
         Input::GetButtonTrigger(XINPUT_Y)))
     {
-       
         if (m_Flashlight.Toggle())
         {
             m_FlashlightToggledThisFrame = true;
@@ -250,16 +347,13 @@ void Player::Update()
             warningLevel == 2 ? 8 : 4,
             warningLevel == 2 ? 0.18f : 0.09f);
     }
-    // このフレームの光の強さと、一瞬暗くなる状態を受け取っている
+
     const FlashlightSystem::FrameState flashlightState =
         m_Flashlight.UpdateFrameState(deltaTime);
-    const bool visibleLight = flashlightState.visible;
-    const bool renderFlashlight = flashlightState.render;
-    const float lightOutput = flashlightState.output;
-    const float batteryStress = flashlightState.batteryStress;
-
+    // 電圧が落ちて光が一瞬暗くなった瞬間は、電池が弱っているほど強く、画面と振動で知らせている
     if (flashlightState.voltageDropStarted)
     {
+        const float batteryStress = flashlightState.batteryStress;
         Core::Game::GetInstance()->GetPostProcess()->TriggerHorrorPulse(
             0.055f + batteryStress * 0.095f,
             0.14f + batteryStress * 0.08f);
@@ -267,68 +361,67 @@ void Player::Update()
             2 + static_cast<int>(batteryStress * 4.0f),
             0.035f + batteryStress * 0.065f);
     }
-    // 壁や床が近いときは、懐中電灯の明るさを下げている。
-    // 明るさが一定だと、近くの面が白く飛んで、材質の細かい模様が消えるためである。
-    float closestSurfaceDistance = 70.0f;
-    if (visibleLight)
+    return flashlightState;
+}
+
+// 目の位置から視線の方向へ線を伸ばし、最も近い壁か床までの距離を求めている（届かなければ線の長さを返す）。
+float Player::FindClosestSurfaceDistance(
+    const Camera& camera,
+    float yaw,
+    const std::vector<Wall*>& walls) const
+{
+    float closestSurfaceDistance = FLASHLIGHT_SURFACE_PROBE_DISTANCE;
+
+    Vector3 beamOrigin = m_Position;
+    beamOrigin.y += m_CameraHeightOffset;
+    const float cameraPitch = camera.GetCameraPitch();
+    const float pitchCos = cosf(cameraPitch);
+    Vector3 beamDirection(
+        sinf(yaw) * pitchCos,
+        sinf(cameraPitch),
+        cosf(yaw) * pitchCos);
+    beamDirection.Normalize();
+    const Vector3 beamEnd =
+        beamOrigin + beamDirection * closestSurfaceDistance;
+
+    for (const Wall* wall : walls)
     {
-        // 目の位置から視線の方向へ70の線を伸ばし、最も近い壁までの距離を求めている
-        Vector3 beamOrigin = m_Position;
-        beamOrigin.y += m_CameraHeightOffset;
-        const float cameraPitch = cam->GetCameraPitch();
-        const float pitchCos = cosf(cameraPitch);
-        Vector3 beamDirection(
-            sinf(yaw) * pitchCos,
-            sinf(cameraPitch),
-            cosf(yaw) * pitchCos);
-        beamDirection.Normalize();
-        const Vector3 beamEnd =
-            beamOrigin + beamDirection * closestSurfaceDistance;
-
-        for (const Wall* wall : walls)
+        if (wall == nullptr)
         {
-            if (wall == nullptr)
-            {
-                continue;
-            }
-
-            float hitDistance = 0.0f;
-            if (wall->IntersectsInteractionSegment(
-                beamOrigin, beamEnd, hitDistance))
-            {
-                closestSurfaceDistance = (std::min)(
-                    closestSurfaceDistance, hitDistance);
-            }
+            continue;
         }
 
-        // 床はWallとは別に描いているため、下を向いたときは床の高さの平面との距離も計算している。
-        if (beamDirection.y < -0.001f)
+        float hitDistance = 0.0f;
+        if (wall->IntersectsInteractionSegment(
+            beamOrigin, beamEnd, hitDistance))
         {
-            const float floorDistance =
-                (MIN_Y_POSITION - beamOrigin.y) / beamDirection.y;
-            if (floorDistance >= 0.0f)
-            {
-                closestSurfaceDistance = (std::min)(
-                    closestSurfaceDistance, floorDistance);
-            }
+            closestSurfaceDistance = (std::min)(
+                closestSurfaceDistance, hitDistance);
         }
     }
 
-    // 近い面までの距離が12〜54の間で、近いほど光を弱め、照らす距離も短くしている（急に変わらないよう、なめらかに近づけている）
-    const float nearSurfaceTarget = visibleLight
-        ? 1.0f - (std::clamp)(
-            (closestSurfaceDistance - 12.0f) / 42.0f, 0.0f, 1.0f)
-        : 0.0f;
-    const float nearSurfaceResponse = 1.0f - std::pow(
-        1.0f - 0.18f, deltaTime * 60.0f);
-    m_FlashlightNearSurfaceBlend +=
-        (nearSurfaceTarget - m_FlashlightNearSurfaceBlend) *
-        nearSurfaceResponse;
+    // 床はWallとは別に描いているため、下を向いたときは床の高さの平面との距離も計算している。
+    if (beamDirection.y < -0.001f)
+    {
+        const float floorDistance =
+            (MIN_Y_POSITION - beamOrigin.y) / beamDirection.y;
+        if (floorDistance >= 0.0f)
+        {
+            closestSurfaceDistance = (std::min)(
+                closestSurfaceDistance, floorDistance);
+        }
+    }
+    return closestSurfaceDistance;
+}
 
-    // 電池の弱り具合（60%を切ると0から増え、空で1）。弱るほど光が暗く・黄色く・短くなり、光の輪のむらがはっきりする
-    const float batteryWeakness = (std::clamp)((60.0f - m_Flashlight.GetBattery()) / 60.0f, 0.0f, 1.0f);
+// シェーダーへ渡す懐中電灯の光（スポットライト）と、環境光を作っている
+LIGHT Player::BuildFlashlightLight(
+    const FlashlightSystem::FrameState& flashlightState,
+    float batteryWeakness) const
+{
+    const bool renderFlashlight = flashlightState.render;
+    const float batteryStress = flashlightState.batteryStress;
 
-    // シェーダーへ渡す懐中電灯の光（スポットライト）を作っている
     LIGHT light{};
 
     light.Enable = TRUE;
@@ -336,7 +429,7 @@ void Player::Update()
     const float proximityExposure =
         1.0f - m_FlashlightNearSurfaceBlend * 0.42f;
     light.Intensity = renderFlashlight
-        ? 1.50f * lightOutput * proximityExposure *
+        ? 1.50f * flashlightState.output * proximityExposure *
             flashlightState.powerBlend *
             (1.0f - batteryWeakness * 0.30f)
         : 0.0f;
@@ -392,25 +485,12 @@ void Player::Update()
         light.Ambient = Color(light.FlashlightEnabled ? 0.095f : 0.070f, light.FlashlightEnabled ? 0.097f : 0.072f,
             light.FlashlightEnabled ? 0.100f : 0.076f, 1.0f);
     }
+    return light;
+}
 
-    Renderer::SetLight(light);
-
-    // 手に持った懐中電灯：レンズの光と、前の面で跳ね返って手を照らす光（面が近いほど強い。何もなくても床から少し返る）
-    FirstPersonHands::FrameInput handInput;
-    handInput.DeltaTime = deltaTime;
-    handInput.LensGlow = renderFlashlight ? lightOutput * flashlightState.powerBlend : 0.0f;
-    handInput.BatteryWeakness = batteryWeakness;
-    handInput.BatteryStress = batteryStress;
-    handInput.VoltageDrop = flashlightState.voltageDropStarted;
-    handInput.NearSurface = m_FlashlightNearSurfaceBlend;
-    if (renderFlashlight)
-    {
-        const float surfaceRatio = closestSurfaceDistance / 16.0f;
-        const float bounce = light.Intensity * (0.04f + 0.30f / (1.0f + surfaceRatio * surfaceRatio));
-        handInput.Bounce = Vector3(light.Diffuse.x, light.Diffuse.y, light.Diffuse.z) * bounce;
-    }
-
-	// カメラの位置と向きを更新している（歩くときの頭の揺れを含む）
+// カメラの位置と向きを更新している（歩くときの頭の揺れを含む）
+void Player::UpdateCamera(float deltaTime, Camera& camera, float yaw)
+{
     m_Movement.UpdateHeadBob(deltaTime);
 
     Vector3 eyePos = m_Position;
@@ -420,14 +500,11 @@ void Player::Update()
         // 止まっていても遅い揺れを残し、三脚ではなく呼吸している人の視点に感じられるようにしている。
         const float breath = sinf(m_AmbienceTimer * 1.15f) * 0.075f;
         eyePos.y += m_Movement.GetHeadBobOffset() + breath;
-        eyePos += right * m_Movement.GetHeadBobSideOffset();
-    }
+        eyePos += GetHorizontalRight(yaw) * m_Movement.GetHeadBobSideOffset();
 
-    if (m_IsFPS)
-    {
-        cam->SetPosition(eyePos);
+        camera.SetPosition(eyePos);
 
-        float pitch = cam->GetCameraPitch();
+        float pitch = camera.GetCameraPitch();
         float cp = cosf(pitch);
 
         Vector3 lookDir(
@@ -436,7 +513,7 @@ void Player::Update()
             cosf(yaw) * cp
         );
 
-        cam->SetTarget(eyePos + lookDir);
+        camera.SetTarget(eyePos + lookDir);
     }
     else
     {
@@ -445,20 +522,25 @@ void Player::Update()
         float height = 28.0f;
 
         Vector3 camPos = m_Position;
-        camPos -= forward * distance;
+        camPos -= GetHorizontalForward(yaw) * distance;
         camPos.y += height;
 
-        cam->SetPosition(camPos);
+        camera.SetPosition(camPos);
 
         Vector3 target = m_Position;
         target.y += 18.0f;
-        cam->SetTarget(target);
+        camera.SetTarget(target);
     }
+}
 
-
-    // 手の揺れ：視点の向き・頭の揺れ・走り・スイッチ。ロッカーの中では手を下げている
+// 手の揺れ：視点の向き・頭の揺れ・走り・スイッチ。ロッカーの中では手を下げている
+void Player::UpdateHands(
+    FirstPersonHands::FrameInput handInput,
+    const Camera& camera,
+    float yaw)
+{
     handInput.Yaw = yaw;
-    handInput.Pitch = cam->GetCameraPitch();
+    handInput.Pitch = camera.GetCameraPitch();
     handInput.HeadBobVertical = m_Movement.GetHeadBobOffset();
     handInput.HeadBobSide = m_Movement.GetHeadBobSideOffset();
     handInput.Sprinting = m_Movement.IsSprinting() && m_Movement.IsMovingHorizontally();
@@ -466,17 +548,23 @@ void Player::Update()
     handInput.Lowered = m_IsHiding || !m_IsFPS;
     m_Hands.Update(handInput);
     m_FlashlightToggledThisFrame = false;
+}
 
-    // 体の影：足もとの位置・向き・歩く手足の振りを、壁と床のシェーダーへ渡している（figureShadow.hlsli）。
-    // 一歩は約12なので、24進むと手足の振りが1往復する。ロッカーの中と三人称では影を落とさない
+// 体の影：足もとの位置・向き・歩く手足の振りを、壁と床のシェーダーへ渡している（figureShadow.hlsli）。
+// 一歩は約12なので、24進むと手足の振りが1往復する。ロッカーの中と三人称では影を落とさない
+void Player::UpdateBodyShadow(float deltaTime, float yaw)
+{
     const Vector3 velocity = m_Movement.GetVelocity();
     const float walkSpeed = std::sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
     const float walkRate = (std::min)(walkSpeed / m_Movement.GetMaximumHorizontalSpeed(), 1.0f);
     m_BodyWalkPhase += walkSpeed * deltaTime * (DirectX::XM_2PI / 24.0f);
     m_BodyWalkAmount += (walkRate - m_BodyWalkAmount) * (1.0f - std::exp(-deltaTime * 8.0f));
-    Renderer::SetPlayerBody(m_Position, forward, std::sin(m_BodyWalkPhase) * m_BodyWalkAmount, m_IsFPS && !m_IsHiding);
+    Renderer::SetPlayerBody(m_Position, GetHorizontalForward(yaw), std::sin(m_BodyWalkPhase) * m_BodyWalkAmount, m_IsFPS && !m_IsHiding);
+}
 
-    // 電池を回復するデバッグ用のキー入力（Bキー）。Release版では遊びに影響しないよう無効にしている
+// 電池を回復するデバッグ用のキー入力（Bキー）。Release版では遊びに影響しないよう無効にしている
+void Player::UpdateDebugControls()
+{
 #ifdef _DEBUG
     if (Input::GetKeyTrigger(VK_B))
     {
@@ -538,15 +626,8 @@ void Player::Uninit()
 // ヨーから水平の向きの単位ベクトルを作り、移動と調べる操作で共有している。
 DirectX::SimpleMath::Vector3 Player::GetForward() const
 {
-    Camera* cam = Core::Game::GetInstance()->GetCamera();
-
-    float yaw = cam->GetCameraDirection();
-
-    return DirectX::SimpleMath::Vector3(
-        sinf(yaw),
-        0.0f,
-        cosf(yaw)
-    );
+    return GetHorizontalForward(
+        Core::Game::GetInstance()->GetCamera()->GetCameraDirection());
 }
 
 // ロッカーに入っている。懐中電灯は消し、視点を扉の正面へ向けている。

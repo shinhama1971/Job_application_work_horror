@@ -14,6 +14,8 @@
 #include "PlayerMovement.h"
 #include "FirstPersonHands.h"
 
+class Wall;
+
 // プレイヤー。足元の位置を持ち、毎フレーム入力から移動し、目の高さにカメラを置いて懐中電灯の光を作っている。
 class Player : public Object
 {
@@ -38,6 +40,8 @@ private:
     // ===== 懐中電灯と電池 =====
     // 電池の残りがしきい値を下回ると、完全に消える前に不安定な点滅へ移っている。
     FlashlightSystem m_Flashlight;
+    // 目から視線の方向へ、前の壁や床を探す距離（これより遠い面は、光を弱める判定に入れない）
+    static constexpr float FLASHLIGHT_SURFACE_PROBE_DISTANCE = 70.0f;
     // 壁や床が近いほど1に近づく値（近いときに光を弱めて白飛びを防ぐのに使っている）
     float m_FlashlightNearSurfaceBlend = 0.0f;
     // このフレームでスイッチを押したか（手の小さな押す動きに使っている）
@@ -95,6 +99,38 @@ private:
 
     // 隠れている間の見回せる範囲の制限と、外へ出る操作
     void UpdateHiding(Camera& camera, float deltaTime);
+
+    // ===== Updateから順に呼んでいる、1フレームの更新の段階 =====
+    // 移動と壁・扉の押し戻し。足音の判定に使う、動く前の位置を返している
+    DirectX::SimpleMath::Vector3 UpdateMovementAndCollision(
+        float deltaTime,
+        float yaw,
+        const std::vector<Wall*>& walls);
+    void UpdateFootsteps(
+        float deltaTime,
+        const DirectX::SimpleMath::Vector3& positionBeforeMove);
+    void UpdateCameraModeShortcuts();
+    // 懐中電灯の光を作ってRendererへ渡し、手のレンズの光と照り返しを入れた手の入力を返している
+    FirstPersonHands::FrameInput UpdateFlashlight(
+        float deltaTime,
+        const Camera& camera,
+        float yaw,
+        const std::vector<Wall*>& walls);
+    FlashlightSystem::FrameState UpdateFlashlightSwitchAndBattery(float deltaTime);
+    float FindClosestSurfaceDistance(
+        const Camera& camera,
+        float yaw,
+        const std::vector<Wall*>& walls) const;
+    LIGHT BuildFlashlightLight(
+        const FlashlightSystem::FrameState& flashlightState,
+        float batteryWeakness) const;
+    void UpdateCamera(float deltaTime, Camera& camera, float yaw);
+    void UpdateHands(
+        FirstPersonHands::FrameInput handInput,
+        const Camera& camera,
+        float yaw);
+    void UpdateBodyShadow(float deltaTime, float yaw);
+    void UpdateDebugControls();
 public:
     void Init() override;
     void Update() override;
