@@ -1,0 +1,30 @@
+# ============================================================================
+# 2面の建物の配置（PropLayoutFile が読む）。書き方は stage1_props.txt と同じ。
+# 扉・ロッカー・鏡・肖像画・時計・端末など、進行のコードが使う物は Stage2Layout.cpp に残している。
+#
+#   color 名前 r g b [metal 粗さ [金属らしさ]] [rough 粗さ]
+#   prop 名前 x y z 幅 高さ 奥行き 色 光る色 光沢 当たり判定(0/1) [noshadow] [weathering] [room] [glow 範囲 強さ] [model モデルの名前]
+#
+# 座標の単位は全ステージ共通（床の高さは y=-100）。2面は、まっすぐな廊下（x=-40〜40、z=-160〜140）が繰り返す。
+# ============================================================================
+
+# --- 色（壁は1面より少し暖かい色にし、古い住まいの廊下らしくしている）
+color stage2Wall     0.31  0.295 0.265
+color stage2Trim     0.075 0.068 0.06
+color stage2Ceiling  0.06  0.058 0.054
+
+# --- 廊下の左右の壁と、奥の壁、出口の扉の左右の壁（壁の古さを描き、部屋の形として角の暗がりとレイ反射に使う）
+prop Stage2WallLeft          -42 -74 -10    4 50 300   stage2Wall none 4 1 weathering room
+prop Stage2WallRight          42 -74 -10    4 50 300   stage2Wall none 4 1 weathering room
+prop Stage2WallBack           0 -74 -160    88 50 4    stage2Wall none 4 1 weathering room
+prop Stage2WallFrontLeft     -28.5 -74 140  27 50 4    stage2Wall none 4 1 weathering room
+prop Stage2WallFrontRight     28.5 -74 140  27 50 4    stage2Wall none 4 1 weathering room
+
+# --- 天井（天井板・外れた板の穴・雨漏りの染みを描く。影は落とさない）
+prop Stage2Ceiling            0 -47 -10     84 3 300   stage2Ceiling none 4 0 noshadow weathering
+
+# --- 床際の縁取りと、天井近くの配管（継ぎ目のフランジと吊り金具のあるモデル）
+prop Stage2TrimLeft          -39.4 -96 -10  1 6 292    stage2Trim none 7 0
+prop Stage2TrimRight          39.4 -96 -10  1 6 292    stage2Trim none 7 0
+prop Stage2PipeLeft          -34 -53 -10    3 3 282    stage2Trim none 7 0 noshadow model pipe_run
+prop Stage2PipeRight          34 -53 -10    3 3 282    stage2Trim none 7 0 noshadow model pipe_run

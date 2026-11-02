@@ -189,6 +189,10 @@ namespace PropLayoutFile
                     {
                         prop.Weathering = true;
                     }
+                    else if (option == "room")
+                    {
+                        prop.Room = true;
+                    }
                     else if (option == "glow")
                     {
                         if (!(line >> prop.GlowRange >> prop.GlowStrength))
@@ -238,6 +242,20 @@ namespace PropLayoutFile
         // 見た目のモデルは、大きさと色を決めた後で作っている（箱の一番長い向きと、配置の色を使うため）
         wall.SetVisualModel(description.Model);
         wall.SetVisible(true);
+    }
+
+    std::vector<DirectX::SimpleMath::Vector4> CollectRoomFootprints(const PropLayout& layout)
+    {
+        std::vector<DirectX::SimpleMath::Vector4> footprints;
+        for (const PropDescription& description : layout.Props)
+        {
+            if (description.Room)
+            {
+                footprints.emplace_back(description.Position.x, description.Position.z,
+                    description.Scale.x * 0.5f, description.Scale.z * 0.5f);
+            }
+        }
+        return footprints;
     }
 
     SpawnedProps Spawn(SceneLayoutBuilder& builder, const PropLayout& layout)
@@ -320,6 +338,10 @@ namespace PropLayoutFile
         if (description.Weathering)
         {
             text += " weathering";
+        }
+        if (description.Room)
+        {
+            text += " room";
         }
         if (description.GlowRange > 0.0f)
         {

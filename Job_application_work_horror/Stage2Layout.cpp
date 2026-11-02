@@ -21,6 +21,8 @@
 #include "MirrorAnomaly.h"
 #include "MirrorSelf.h"
 #include "HangingBulb.h"
+#include "PropLayoutFile.h"
+#include "utility.h"
 
 #include <SimpleMath.h>
 
@@ -139,28 +141,20 @@ namespace Stage2Layout
             return wall;
         };
 
-        // 壁・縁取り・天井の色。壁は1面より少し暖かい色にし、古い住まいの廊下らしくしている
-        const Color wallColor(0.31f, 0.295f, 0.265f, 1.0f);
+        // 縁取りの色（時計・偽の扉の枠にも使う）
         const Color trimColor(0.075f, 0.068f, 0.06f, 1.0f);
-        const Color ceilingColor(0.06f, 0.058f, 0.054f, 1.0f);
 
-        // 廊下の左右の壁と、奥の壁、出口の扉の左右の壁。
-        // 1面の建物の壁と同じく、パネルの継ぎ目・ひび・水の跡・カビを描き（SetWeatheringSurface）、
-        // 部屋の角の暗がりの計算用に、上から見た長方形を記録している
-        const auto createCorridorWall = [&createWall, &objects, &wallColor](
-            const char* name, const Vector3& position, const Vector3& scale)
+        // 廊下の左右の壁・奥の壁・出口の扉の左右の壁・天井・床際の縁取り・天井近くの配管は、
+        // テキストファイル（assets/layout/stage2_props.txt）から読んで置いている（PropLayoutFile。1面の小物と同じ書き方）。
+        // room を付けた壁は、部屋の角の暗がりの計算用に、上から見た長方形を記録している
+        const PropLayout propLayout = PropLayoutFile::Load(PropLayoutPath);
+        if (!propLayout.IsValid())
         {
-            Wall* wall = createWall(name, position, scale, wallColor, true);
-            wall->SetAppearance(wallColor, Color(0.0f, 0.0f, 0.0f, 1.0f), 4.0f);
-            wall->SetWeatheringSurface(true);
-            objects.wallFootprints.emplace_back(position.x, position.z, scale.x * 0.5f, scale.z * 0.5f);
-            return wall;
-        };
-        createCorridorWall("Stage2WallLeft", Vector3(-42.0f, -74.0f, -10.0f), Vector3(4.0f, 50.0f, 300.0f));
-        createCorridorWall("Stage2WallRight", Vector3(42.0f, -74.0f, -10.0f), Vector3(4.0f, 50.0f, 300.0f));
-        createCorridorWall("Stage2WallBack", Vector3(0.0f, -74.0f, -160.0f), Vector3(88.0f, 50.0f, 4.0f));
-        createCorridorWall("Stage2WallFrontLeft", Vector3(-28.5f, -74.0f, 140.0f), Vector3(27.0f, 50.0f, 4.0f));
-        createCorridorWall("Stage2WallFrontRight", Vector3(28.5f, -74.0f, 140.0f), Vector3(27.0f, 50.0f, 4.0f));
+            utility::ReportFatalError("2面の建物の配置を読めませんでした（" + std::to_string(propLayout.ErrorLine) +
+                "行目）: " + propLayout.Error);
+        }
+        PropLayoutFile::Spawn(builder, propLayout);
+        objects.wallFootprints = PropLayoutFile::CollectRoomFootprints(propLayout);
 
         // 床は1面と同じ濡れた床（Ground）にし、タイルの継ぎ目・汚れ・水たまりの反射と波を描いている。
         // 水たまりは安全な近道と静かな回り道の間に置き、上を通るほど（走るほど）敵へ音が伝わるようにしている
@@ -179,27 +173,6 @@ namespace Stage2Layout
         ground->SetPuddleLayout(puddleLayout);
         objects.ground = ground;
 
-        // 天井（1面と同じく、天井板・外れた板の穴・雨漏りの染みを描いている）、床際の縁取り、天井近くの配管
-        Wall* ceiling = createWall("Stage2Ceiling", Vector3(0.0f, -47.0f, -10.0f),
-            Vector3(84.0f, 3.0f, 300.0f), ceilingColor, false);
-        ceiling->SetAppearance(ceilingColor, Color(0.0f, 0.0f, 0.0f, 1.0f), 4.0f);
-        ceiling->SetWeatheringSurface(true);
-        ceiling->SetCastsShadow(false);
-
-        createWall("Stage2TrimLeft", Vector3(-39.4f, -96.0f, -10.0f),
-            Vector3(1.0f, 6.0f, 292.0f), trimColor, false);
-        createWall("Stage2TrimRight", Vector3(39.4f, -96.0f, -10.0f),
-            Vector3(1.0f, 6.0f, 292.0f), trimColor, false);
-
-        Wall* pipeLeft = createWall("Stage2PipeLeft", Vector3(-34.0f, -53.0f, -10.0f),
-            Vector3(3.0f, 3.0f, 282.0f), trimColor, false);
-        pipeLeft->SetCastsShadow(false);
-        // 見た目は、継ぎ目のフランジと吊り金具のある配管（Mayaで作ったモデル）
-        pipeLeft->SetVisualModel("pipe_run");
-        Wall* pipeRight = createWall("Stage2PipeRight", Vector3(34.0f, -53.0f, -10.0f),
-            Vector3(3.0f, 3.0f, 282.0f), trimColor, false);
-        pipeRight->SetCastsShadow(false);
-        pipeRight->SetVisualModel("pipe_run");
 
         // 残された記録の端末の上に付けた、緑に光る目印
         Wall* evidenceMarker1 = createWall(

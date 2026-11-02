@@ -282,7 +282,7 @@ void StageScene::RequestDebugAction(SceneDebugAction action)
 }
 
 // 西棟に入ってしばらくすると、少し先の天井に黒い人影が逆さまに張り付く。目では見えず、足元の水面をのぞいたときだけ
-// 水面に映る（床のシェーダーのレイ反射で、逆さまのカプセルとして描いている）。見た後に見上げると何もおらず、
+// 水面に映る（床のシェーダーのレイ反射で、逆さまにした人影の距離場として描いている）。見た後に見上げると何もおらず、
 // その真下の水面に滴が落ちて波紋が広がる。1回のプレイで一度だけ。
 void StageScene::UpdateCeilingReflection(const Player& player, float deltaTime)
 {

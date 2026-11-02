@@ -116,6 +116,9 @@ struct Stage2Objects
 
 namespace Stage2Layout
 {
+    // 2面の建物（廊下の壁・天井・縁取り・配管）の配置のファイル（実行ファイルの作業フォルダから見た場所）
+    inline constexpr const char* PropLayoutPath = "assets/layout/stage2_props.txt";
+
     // 2面の廊下を組み立てている。時計の針は、最初の周回の時刻に合わせて置いている。
     Stage2Objects Build(Core::Game& game, float clockHourAngle, float clockMinuteAngle);
 }

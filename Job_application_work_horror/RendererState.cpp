@@ -194,7 +194,7 @@ void Renderer::SetUnseenFigure(const Vector3& footPosition, float visibility)
 		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
 }
 
-// 2面の壁の鏡に映す自分の体をb12へ設定している（鏡のシェーダーが、光線と体のカプセルを交差させる）
+// 2面の壁の鏡に映す自分の体をb12へ設定している（鏡のシェーダーが、光線と体の距離場を交差させる）
 void Renderer::SetMirrorSelf(const Vector3& footPosition, const Vector3& right, const Vector3& forward, float swing, bool visible)
 {
 	if (!m_pWaterCausticsBuffer)

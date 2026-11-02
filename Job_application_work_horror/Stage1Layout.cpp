@@ -78,177 +78,7 @@ namespace Stage1Layout
         ground->AddLeak(Vector2(-150.0f, -45.0f), 5.0f, 140.0f);
         ground->AddLeak(Vector2(-100.0f, -95.0f), 5.0f, 160.0f);
 
-        // 壁（外周の4面と、部屋を区切る壁）
-        Wall* wall1 = builder.Create<Wall>("Wall1");
-        wall1->SetPosition(0.0f, -74.0f, 340.0f);
-        wall1->SetScale(440.0f, 50.0f, 4.0f);
-
-        Wall* wall2 = builder.Create<Wall>("Wall2");
-        wall2->SetPosition(220.0f, -74.0f, 80.0f);
-        wall2->SetScale(4.0f, 50.0f, 520.0f);
-
-        // 南側の外壁は、左の倉庫から南西の広間への入口（x=-175〜-145）の分だけ開けて2枚に分けている。
-        Wall* wall3West = builder.Create<Wall>("Wall3West");
-        wall3West->SetPosition(-197.5f, -74.0f, -180.0f);
-        wall3West->SetScale(45.0f, 50.0f, 4.0f);
-
-        // 開始地点の奥（x=-18〜18）は、ループ廊下から戻ってくるドアの分だけ開けている。
-        Wall* wall3 = builder.Create<Wall>("Wall3");
-        wall3->SetPosition(-81.5f, -74.0f, -180.0f);
-        wall3->SetScale(127.0f, 50.0f, 4.0f);
-
-        Wall* wall3East = builder.Create<Wall>("Wall3East");
-        wall3East->SetPosition(119.0f, -74.0f, -180.0f);
-        wall3East->SetScale(202.0f, 50.0f, 4.0f);
-
-        // 西側の外壁は、西棟の扉（z=-35〜-5）の分だけ開けて2枚に分けている。
-        Wall* wall4 = builder.Create<Wall>("Wall4");
-        wall4->SetPosition(-220.0f, -74.0f, -107.5f);
-        wall4->SetScale(4.0f, 50.0f, 145.0f);
-
-        Wall* wall4North = builder.Create<Wall>("Wall4North");
-        wall4North->SetPosition(-220.0f, -74.0f, 167.5f);
-        wall4North->SetScale(4.0f, 50.0f, 345.0f);
-
-        // 西棟（浸水した機械室）。西側の扉から入る、柱の並ぶ広い部屋（技術デモの部屋と同じ作り）。
-        // 奥（北）は仕切りの壁で区切ったポンプ室で、仕切りの真ん中の切れ目（x=-320〜-280）から入る。
-        const auto createWestWingWall = [&builder](const char* name, const Vector3& position, const Vector3& scale)
-        {
-            Wall* wall = builder.Create<Wall>(name);
-            wall->SetPosition(position.x, position.y, position.z);
-            wall->SetScale(scale.x, scale.y, scale.z);
-            return wall;
-        };
-        Wall* westWingOuter = createWestWingWall("WestWingOuter", Vector3(-380.0f, -74.0f, 80.0f), Vector3(4.0f, 50.0f, 364.0f));
-        Wall* westWingSouth = createWestWingWall("WestWingSouth", Vector3(-300.0f, -74.0f, -100.0f), Vector3(164.0f, 50.0f, 4.0f));
-        Wall* westWingNorth = createWestWingWall("WestWingNorth", Vector3(-300.0f, -74.0f, 260.0f), Vector3(164.0f, 50.0f, 4.0f));
-        Wall* pumpRoomWallWest = createWestWingWall("WestWingPumpRoomWallWest", Vector3(-350.0f, -74.0f, 180.0f), Vector3(60.0f, 50.0f, 4.0f));
-        Wall* pumpRoomWallEast = createWestWingWall("WestWingPumpRoomWallEast", Vector3(-250.0f, -74.0f, 180.0f), Vector3(60.0f, 50.0f, 4.0f));
-        // 2列3行の柱。見通しを少しさえぎり、懐中電灯の影と、水面に映る柱を見せている。
-        std::array<Wall*, 6> westWingColumns{};
-        for (int column = 0; column < 6; ++column)
-        {
-            const std::string name = "WestWingColumn" + std::to_string(column + 1);
-            westWingColumns[static_cast<size_t>(column)] = createWestWingWall(name.c_str(),
-                Vector3(column % 2 == 0 ? -330.0f : -270.0f, -74.0f, 10.0f + static_cast<float>(column / 2) * 60.0f),
-                Vector3(10.0f, 50.0f, 10.0f));
-        }
-
-        // 南西の広間（西棟の南、x=-380〜-120・z=-332〜-180）。左の倉庫の南の入口から入る、柱の並ぶ広い部屋。
-        // 技術デモ（GraphicsTechDemo）の部屋と同じ作りで、柱・棚・机・色の付いた警告灯を置いている。
-        // 北の壁は、建物の南の外壁（x>-220）とつながる西側の分だけを足している。
-        Wall* southWestHallNorth = createWestWingWall("SouthWestHallNorth", Vector3(-300.0f, -74.0f, -180.0f), Vector3(160.0f, 50.0f, 4.0f));
-        Wall* southWestHallWest = createWestWingWall("SouthWestHallWest", Vector3(-380.0f, -74.0f, -256.0f), Vector3(4.0f, 50.0f, 152.0f));
-        Wall* southWestHallSouth = createWestWingWall("SouthWestHallSouth", Vector3(-250.0f, -74.0f, -332.0f), Vector3(264.0f, 50.0f, 4.0f));
-        Wall* southWestHallEast = createWestWingWall("SouthWestHallEast", Vector3(-120.0f, -74.0f, -256.0f), Vector3(4.0f, 50.0f, 152.0f));
-        // 2列2行の柱。見通しを少しさえぎり、懐中電灯の影と、天井の照明の映り込みを見せている。
-        std::array<Wall*, 4> southWestHallColumns{};
-        for (int column = 0; column < 4; ++column)
-        {
-            const std::string name = "SouthWestHallColumn" + std::to_string(column + 1);
-            southWestHallColumns[static_cast<size_t>(column)] = createWestWingWall(name.c_str(),
-                Vector3(column % 2 == 0 ? -290.0f : -210.0f, -74.0f, column < 2 ? -225.0f : -285.0f),
-                Vector3(10.0f, 50.0f, 10.0f));
-        }
-
-        Wall* wall5 = builder.Create<Wall>("Wall5");
-        wall5->SetPosition(-117.5f, -74.0f, 40.0f);
-        wall5->SetScale(205.0f, 50.0f, 4.0f);
-
-        Wall* wall6 = builder.Create<Wall>("Wall6");
-        wall6->SetPosition(117.5f, -74.0f, 40.0f);
-        wall6->SetScale(205.0f, 50.0f, 4.0f);
-
-        // 倉庫の区画を分けつつ、中央に広い通路を残している。
-        Wall* wall7 = builder.Create<Wall>("Wall7");
-        wall7->SetPosition(-135.0f, -74.0f, -70.0f);
-        wall7->SetScale(170.0f, 50.0f, 4.0f);
-
-        Wall* wall8 = builder.Create<Wall>("Wall8");
-        wall8->SetPosition(135.0f, -74.0f, -70.0f);
-        wall8->SetScale(170.0f, 50.0f, 4.0f);
-
-        // 短い壁で、奥の倉庫を探索できる3つの部屋に分けている。
-        Wall* wall9 = builder.Create<Wall>("Wall9");
-        wall9->SetPosition(-90.0f, -74.0f, -140.0f);
-        wall9->SetScale(4.0f, 50.0f, 80.0f);
-
-        Wall* wall10 = builder.Create<Wall>("Wall10");
-        wall10->SetPosition(90.0f, -74.0f, -140.0f);
-        wall10->SetScale(4.0f, 50.0f, 80.0f);
-
-        // 電力の扉の側は、脇の部屋を持つ細い廊下にしている。
-        Wall* wall11 = builder.Create<Wall>("Wall11");
-        wall11->SetPosition(-45.0f, -74.0f, 75.0f);
-        wall11->SetScale(4.0f, 50.0f, 70.0f);
-
-        Wall* wall12 = builder.Create<Wall>("Wall12");
-        wall12->SetPosition(-45.0f, -74.0f, 155.0f);
-        wall12->SetScale(4.0f, 50.0f, 50.0f);
-
-        // 東側の壁は、暗証番号の扉（z=95〜125）の分だけ開けて2枚に分けている。
-        // 扉の先は、それまで入れなかった東側の部屋。
-        Wall* wall13 = builder.Create<Wall>("Wall13");
-        wall13->SetPosition(45.0f, -74.0f, 67.5f);
-        wall13->SetScale(4.0f, 50.0f, 55.0f);
-
-        Wall* wall13North = builder.Create<Wall>("Wall13North");
-        wall13North->SetPosition(45.0f, -74.0f, 152.5f);
-        wall13North->SetScale(4.0f, 50.0f, 55.0f);
-
-        // 脱出のホールを区切り、中央の開口部を廊下へつないでいる。
-        Wall* wall14 = builder.Create<Wall>("Wall14");
-        wall14->SetPosition(-132.5f, -74.0f, 180.0f);
-        wall14->SetScale(175.0f, 50.0f, 4.0f);
-
-        Wall* wall15 = builder.Create<Wall>("Wall15");
-        wall15->SetPosition(132.5f, -74.0f, 180.0f);
-        wall15->SetScale(175.0f, 50.0f, 4.0f);
-
-        // 中央の開口部から、細いL字型のループ廊下を始めている。
-        // 最初は北へ進ませ、死角の先で右へ曲がる作り。
-        Wall* loopWall1 = builder.Create<Wall>("LoopWall1");
-        loopWall1->SetPosition(-45.0f, -74.0f, 227.5f);
-        loopWall1->SetScale(4.0f, 50.0f, 95.0f);
-
-        Wall* loopWall2 = builder.Create<Wall>("LoopWall2");
-        loopWall2->SetPosition(45.0f, -74.0f, 207.5f);
-        loopWall2->SetScale(4.0f, 50.0f, 55.0f);
-
-        // 南側の壁は角から始め、まっすぐな区間の入口を開けている。
-        Wall* loopWall3 = builder.Create<Wall>("LoopWall3");
-        loopWall3->SetPosition(122.5f, -74.0f, 235.0f);
-        loopWall3->SetScale(155.0f, 50.0f, 4.0f);
-
-        // 長い壁で前の見通しをふさぎ、自然に右へ曲がるよう誘っている。
-        Wall* loopWall4 = builder.Create<Wall>("LoopWall4");
-        loopWall4->SetPosition(77.5f, -74.0f, 275.0f);
-        loopWall4->SetScale(245.0f, 50.0f, 4.0f);
-
-        // 建物の壁だけに、パネルの継ぎ目・ひび・水の跡・カビを描いている（棚や配管などの小物には描かない）。
-        for (Wall* structuralWall : {
-            wall1, wall2, wall3West, wall3, wall3East, wall4, wall4North, wall5, wall6, wall7, wall8, wall9, wall10,
-            wall11, wall12, wall13, wall13North, wall14, wall15,
-            loopWall1, loopWall2, loopWall3, loopWall4,
-            westWingOuter, westWingSouth, westWingNorth, pumpRoomWallWest, pumpRoomWallEast,
-            southWestHallNorth, southWestHallWest, southWestHallSouth, southWestHallEast })
-        {
-            structuralWall->SetWeatheringSurface(true);
-            // 部屋の角の暗がりの計算用に、壁を上から見た長方形を記録している
-            const Vector3 position = structuralWall->GetPosition();
-            const Vector3 scale = structuralWall->GetScale();
-            objects.wallFootprints.emplace_back(
-                position.x, position.z, scale.x * 0.5f, scale.z * 0.5f);
-        }
-        // 西棟と南西の広間の柱も建物の一部として古さを描いている。部屋の角の暗がりは壁32枚までなので、柱は含めていない。
-        for (Wall* column : westWingColumns)
-        {
-            column->SetWeatheringSurface(true);
-        }
-        for (Wall* column : southWestHallColumns)
-        {
-            column->SetWeatheringSurface(true);
-        }
+        // 建物の壁（外周・部屋の仕切り・ループ廊下・西棟・南西の広間）と柱は、下の小物のファイルに書いている（room・weathering）
 
 
         // Wallを、色と当たり判定の有無を指定した小物として作る関数（進行のコードが色や表示を変える物だけに使っている。
@@ -272,7 +102,7 @@ namespace Stage1Layout
 
         const Color noEmission(0.0f, 0.0f, 0.0f, 1.0f);
 
-        // 天井の板・配管・幅木・棚・机・崩れた資材・木箱・色の付いた警告灯・暖かい電球など、進行のコードが使わない小物は、
+        // 建物の壁と柱・天井の板・配管・幅木・棚・机・崩れた資材・木箱・色の付いた警告灯・暖かい電球など、進行のコードが使わない物は、
         // テキストファイル（assets/layout/stage1_props.txt）から読んで置いている（PropLayoutFile）。
         // ビルドし直さずに配置を直せ、Debug版ではゲームを動かしたまま F5 で読み直せる（StageScene）。
         const PropLayout propLayout = PropLayoutFile::Load(PropLayoutPath);
@@ -282,6 +112,8 @@ namespace Stage1Layout
                 "行目）: " + propLayout.Error);
         }
         objects.layoutProps = PropLayoutFile::Spawn(builder, propLayout);
+        // 部屋の角の暗がりの計算用に、room を付けた建物の壁を上から見た長方形を記録している
+        objects.wallFootprints = PropLayoutFile::CollectRoomFootprints(propLayout);
 
         // 西棟の排水バルブ（南・西・東の壁に1つずつ）。上のランプは、回す前は赤く、回したら緑に光る（色はStage1WestWingが変える）。
         // バルブの配管は床から天井まで壁を伝い、ランプは配管の横に付けている。

@@ -24,6 +24,7 @@
 #include "LightShafts.h"
 #include "ScreenSpaceReflection.h"
 #include "TiledLighting.h"
+#include "FigureVolumes.h"
 #include "GameState.h"
 #include "GameSettings.h"
 #include "PauseMenu.h"
@@ -65,6 +66,8 @@ namespace Core
         Effect::ReflectionProbe m_EnvironmentProbe;
         // 揺れる裸電球（2面）の影。電球から6方向を撮った「電球からの距離」のキューブマップで、t2 で読ませている
         Effect::PointShadowMap m_PointShadowMap;
+        // 鏡と水たまりにだけ映る人の形の距離場（3Dテクスチャ）
+        Effect::FigureVolumes m_FigureVolumes;
         // 画面空間の環境遮蔽（SSAO）。本描画の直前に深度プリパスの深度から作り、t15 で読ませている
         Effect::AmbientOcclusion m_AmbientOcclusion;
         Effect::LightShafts m_LightShafts;

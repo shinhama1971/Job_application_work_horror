@@ -333,6 +333,9 @@
     <ClCompile Include="PropModel.cpp">
       <Filter>ソース ファイルRendering</Filter>
     </ClCompile>
+    <ClCompile Include="FigureVolumes.cpp">
+      <Filter>ソース ファイルRendering</Filter>
+    </ClCompile>
     <ClCompile Include="utility.cpp">
       <Filter>ソース ファイル\Core</Filter>
     </ClCompile>
@@ -357,6 +360,9 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="shader\viewModel.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\figureVolume.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="shader\rayReflection.hlsli">
@@ -786,6 +792,9 @@
       <Filter>ソース ファイル\Warld</Filter>
     </ClInclude>
     <ClInclude Include="PropModel.h">
+      <Filter>ソース ファイルRendering</Filter>
+    </ClInclude>
+    <ClInclude Include="FigureVolumes.h">
       <Filter>ソース ファイルRendering</Filter>
     </ClInclude>
     <ClInclude Include="utility.h">

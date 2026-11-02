@@ -420,6 +420,8 @@ namespace Core
             m_Instance->m_Scene->RenderOffscreen();
         }
 
+        // 鏡と水たまりのシェーダーが光線を通す、人の形の距離場（t6・t13・s2）
+        m_Instance->m_FigureVolumes.Bind();
         // 本描画：レンダーターゲットを消してから、カメラに映る物だけを描いている
         m_Instance->m_GpuTimer.BeginPass(GpuPass::MainScene, context);
         Renderer::DrawStart();

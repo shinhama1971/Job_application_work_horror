@@ -290,6 +290,7 @@
     <ClCompile Include="TiledLighting.cpp" />
     <ClCompile Include="PipeProp.cpp" />
     <ClCompile Include="PropModel.cpp" />
+    <ClCompile Include="FigureVolumes.cpp" />
     <ClCompile Include="FirstPersonHands.cpp" />
     <ClCompile Include="TitleScene.cpp" />
     <ClCompile Include="utility.cpp" />
@@ -423,6 +424,7 @@
     <ClInclude Include="TiledLighting.h" />
     <ClInclude Include="PipeProp.h" />
     <ClInclude Include="PropModel.h" />
+    <ClInclude Include="FigureVolumes.h" />
     <ClInclude Include="FirstPersonHands.h" />
     <ClInclude Include="TitleScene.h" />
     <ClInclude Include="utility.h" />
@@ -436,6 +438,7 @@
     <ClInclude Include="shader\figureShadow.hlsli" />
     <ClInclude Include="shader\rayReflection.hlsli" />
     <ClInclude Include="shader\viewModel.hlsli" />
+    <ClInclude Include="shader\figureVolume.hlsli" />
     <ClInclude Include="shader\screenAmbientOcclusion.hlsli" />
     <ClInclude Include="shader\roomOcclusion.hlsli" />
     <ClInclude Include="shader\waterCaustics.hlsli" />

@@ -132,7 +132,7 @@ struct WATER_CAUSTICS_BUFFER
     static constexpr int MaxReflectionProps = 16;
     DirectX::SimpleMath::Vector4 ReflectionProps[MaxReflectionProps * 3];
     // 2面の壁の鏡に映す自分の体（xyz = 足もとの位置、w = 映すなら1）、向き（xy = 右の向きのx・z、zw = 前の向きのx・z）、
-    // 動き（x = 歩く手足の振り -1〜1）。shader/mirrorPS.hlsl が光線とカプセルで交差させている（MirrorSelf）
+    // 動き（x = 歩く手足の振り -1〜1）。shader/mirrorPS.hlsl が光線と体の距離場で交差させている（MirrorSelf）
     DirectX::SimpleMath::Vector4 MirrorSelf;
     DirectX::SimpleMath::Vector4 MirrorSelfBasis;
     DirectX::SimpleMath::Vector4 MirrorSelfMotion;

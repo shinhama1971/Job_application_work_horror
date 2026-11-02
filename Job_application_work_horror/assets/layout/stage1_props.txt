@@ -3,7 +3,11 @@
 # 扉・アイテム・バルブなど、進行のコードが使う物は Stage1Layout.cpp に残している。
 #
 #   color 名前 r g b [metal 粗さ [金属らしさ]] [rough 粗さ]
-#   prop 名前 x y z 幅 高さ 奥行き 色 光る色 光沢 当たり判定(0/1) [noshadow] [weathering] [glow 範囲 強さ] [model モデルの名前]
+
+#   prop 名前 x y z 幅 高さ 奥行き 色 光る色 光沢 当たり判定(0/1) [noshadow] [weathering] [room] [glow 範囲 強さ] [model モデルの名前]
+#
+#   room を付けた壁は、部屋の角の暗がり（roomOcclusion.hlsli）と水面・鏡のレイ反射が「部屋の形」として使う（32枚まで）。
+#   建物の壁・柱も、ここに書いている（weathering でパネルの継ぎ目・ひび・水の跡・カビを描く）。
 #
 #   model を付けると、見た目だけを Maya で作ったモデル（tools/maya/build_wall_props.py）にする。当たり判定・影・水面に映す箱は箱のまま。
 #   モデルは箱の大きさに合わせて伸び、長い物（shelf_long・shelf_short・beam・pipe_pole）は箱の一番長い向きへ回る。
@@ -17,6 +21,7 @@
 # ============================================================================
 
 # --- 色
+color concrete      0.34  0.36  0.33              # 建物の壁（打ちっぱなしのコンクリート）
 color darkMetal     0.24  0.25  0.24   metal 0.50 0.75    # 暗い金属（配管・ポンプ・柱）。錆びて黒ずんだ鉄
 color cabinetMetal  0.34  0.36  0.35   metal 0.42 0.80    # 棚の金属。少し磨かれた鋼
 color trimColor     0.075 0.08  0.075  rough 0.70    # 幅木（塗装）
@@ -37,6 +42,51 @@ color lampAmberBody 0.57  0.33  0.06  rough 0.35
 # 光の安全地帯の暖かい電球
 color warmBulb      1.0   0.72  0.40
 color warmBulbBody  0.6   0.432 0.24  rough 0.10
+
+# --- 建物の壁（外周・部屋の仕切り・ループ廊下・西棟・南西の広間）。名前を変えずに位置と大きさだけ直せる
+prop Wall1                     0 -74 340   440 50 4   concrete none 4 1 weathering room
+prop Wall2                     220 -74 80   4 50 520   concrete none 4 1 weathering room
+prop Wall3West                 -197.5 -74 -180   45 50 4   concrete none 4 1 weathering room
+prop Wall3                     -81.5 -74 -180   127 50 4   concrete none 4 1 weathering room
+prop Wall3East                 119 -74 -180   202 50 4   concrete none 4 1 weathering room
+prop Wall4                     -220 -74 -107.5   4 50 145   concrete none 4 1 weathering room
+prop Wall4North                -220 -74 167.5   4 50 345   concrete none 4 1 weathering room
+prop Wall5                     -117.5 -74 40   205 50 4   concrete none 4 1 weathering room
+prop Wall6                     117.5 -74 40   205 50 4   concrete none 4 1 weathering room
+prop Wall7                     -135 -74 -70   170 50 4   concrete none 4 1 weathering room
+prop Wall8                     135 -74 -70   170 50 4   concrete none 4 1 weathering room
+prop Wall9                     -90 -74 -140   4 50 80   concrete none 4 1 weathering room
+prop Wall10                    90 -74 -140   4 50 80   concrete none 4 1 weathering room
+prop Wall11                    -45 -74 75   4 50 70   concrete none 4 1 weathering room
+prop Wall12                    -45 -74 155   4 50 50   concrete none 4 1 weathering room
+prop Wall13                    45 -74 67.5   4 50 55   concrete none 4 1 weathering room
+prop Wall13North               45 -74 152.5   4 50 55   concrete none 4 1 weathering room
+prop Wall14                    -132.5 -74 180   175 50 4   concrete none 4 1 weathering room
+prop Wall15                    132.5 -74 180   175 50 4   concrete none 4 1 weathering room
+prop LoopWall1                 -45 -74 227.5   4 50 95   concrete none 4 1 weathering room
+prop LoopWall2                 45 -74 207.5   4 50 55   concrete none 4 1 weathering room
+prop LoopWall3                 122.5 -74 235   155 50 4   concrete none 4 1 weathering room
+prop LoopWall4                 77.5 -74 275   245 50 4   concrete none 4 1 weathering room
+prop WestWingOuter             -380 -74 80   4 50 364   concrete none 4 1 weathering room
+prop WestWingSouth             -300 -74 -100   164 50 4   concrete none 4 1 weathering room
+prop WestWingNorth             -300 -74 260   164 50 4   concrete none 4 1 weathering room
+prop WestWingPumpRoomWallWest  -350 -74 180   60 50 4   concrete none 4 1 weathering room
+prop WestWingPumpRoomWallEast  -250 -74 180   60 50 4   concrete none 4 1 weathering room
+prop SouthWestHallNorth        -300 -74 -180   160 50 4   concrete none 4 1 weathering room
+prop SouthWestHallWest         -380 -74 -256   4 50 152   concrete none 4 1 weathering room
+prop SouthWestHallSouth        -250 -74 -332   264 50 4   concrete none 4 1 weathering room
+prop SouthWestHallEast         -120 -74 -256   4 50 152   concrete none 4 1 weathering room
+# 西棟と南西の広間の柱（建物の一部として古さを描く。部屋の角の暗がりは32枚までなので含めない）
+prop WestWingColumn1           -330 -74 10   10 50 10   concrete none 4 1 weathering
+prop WestWingColumn2           -270 -74 10   10 50 10   concrete none 4 1 weathering
+prop WestWingColumn3           -330 -74 70   10 50 10   concrete none 4 1 weathering
+prop WestWingColumn4           -270 -74 70   10 50 10   concrete none 4 1 weathering
+prop WestWingColumn5           -330 -74 130   10 50 10   concrete none 4 1 weathering
+prop WestWingColumn6           -270 -74 130   10 50 10   concrete none 4 1 weathering
+prop SouthWestHallColumn1      -290 -74 -225   10 50 10   concrete none 4 1 weathering
+prop SouthWestHallColumn2      -210 -74 -225   10 50 10   concrete none 4 1 weathering
+prop SouthWestHallColumn3      -290 -74 -285   10 50 10   concrete none 4 1 weathering
+prop SouthWestHallColumn4      -210 -74 -285   10 50 10   concrete none 4 1 weathering
 
 # --- 天井（床から53の高さに施設全体を覆う板。影は落とさず、天井板・外れた板の穴・雨漏りの染みを描く）
 prop PropCeilingMain           0     -47   80     436 3 516   ceilingPanel none 4 0 noshadow weathering

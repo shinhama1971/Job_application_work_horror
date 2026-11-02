@@ -44,6 +44,8 @@ struct PropDescription
     bool Collision = false;
     bool CastsShadow = true;
     bool Weathering = false;
+    // 部屋の形として、部屋の角の暗がりとレイ反射に使う壁か（room）
+    bool Room = false;
     float GlowRange = 0.0f;
     float GlowStrength = 0.0f;
     // 見た目に使うモデルの名前（空なら箱。Wall::SetVisualModel）
@@ -75,6 +77,8 @@ namespace PropLayoutFile
     PropLayout Load(const std::string& path);
     // 作った小物（名前とWall）。読み直すときは、同じ名前の物を置き直している
     using SpawnedProps = std::vector<std::pair<std::string, Wall*>>;
+    // room を付けた壁を上から見た長方形（x,y = 中心のx・z、z,w = 幅と奥行きの半分）を、ファイルの順に返している
+    std::vector<DirectX::SimpleMath::Vector4> CollectRoomFootprints(const PropLayout& layout);
     // 小物を作り（builderで名前を記録する）、作った小物を返している
     SpawnedProps Spawn(SceneLayoutBuilder& builder, const PropLayout& layout);
     // ファイルを読み直した結果で、今の小物を置き直している（同じ名前は置き直し、新しい名前は作り、ファイルから消えた物は隠す）
