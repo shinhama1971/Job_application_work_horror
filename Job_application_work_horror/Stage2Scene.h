@@ -40,6 +40,7 @@
 #include <cstddef>
 #include <optional>
 #include <random>
+#include <string>
 
 class Player;
 class ExitTrigger;
@@ -60,6 +61,8 @@ private:
     void SetupPracticalLights();
     // 目的表示の文章を選ぶために、今の状態を集めている（Stage2SceneDraw.cpp）。
     Stage2ObjectiveInput MakeObjectiveInput(bool confirmationPending) const;
+    // 配置のファイルを読み直し、建物と、扉・照明などの置き場所を置き直している（Debug版の F5 と、ファイルが書き換わったとき）
+    void ReloadPropLayout();
 
     // 2面は同じ廊下を周回するたびに異変が追加される。
     // AdvanceLoopが周回の段階を進め、それぞれのUpdate関数が異変と謎解きを更新している。
@@ -132,6 +135,10 @@ private:
 
     // 配置で作った、進行で使うObject
     Stage2Objects m_Objects;
+    // 配置のファイルを読み直した結果の知らせ（目的の欄に、残りの秒数だけ出す）と、ファイルの見張り
+    std::string m_LayoutNotice;
+    float m_LayoutNoticeTimer = 0.0f;
+    PropLayoutFile::FileChangeWatcher m_LayoutWatcher;
 
     // プレイヤーが見ている調べる対象と、画面へ出す案内を分けて管理している。
     InteractionSystem m_InteractionSystem;

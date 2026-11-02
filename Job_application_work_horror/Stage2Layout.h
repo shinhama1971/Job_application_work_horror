@@ -7,6 +7,7 @@
 #pragma once
 
 #include "Stage2SceneConstants.h"
+#include "PropLayoutFile.h"
 
 #include <SimpleMath.h>
 
@@ -101,6 +102,9 @@ struct Stage2Objects
     std::array<Wall*, Stage2ScratchCount> scratches{};
     // 部屋の角の暗がりの計算に使う、廊下の壁を上から見た長方形（中心x・z、半分の幅・奥行き）
     std::vector<DirectX::SimpleMath::Vector4> wallFootprints;
+    // 配置ファイルから作った建物（名前とWall）と、place 行で置いた物の置き直し方（配置ファイルを読み直したときに使う）
+    PropLayoutFile::SpawnedProps layoutProps;
+    PropLayoutFile::PlacementBindings placementBindings;
 
     // 作ったすべてのObjectの名前。Sceneの終了時にこの一覧で破棄している。
     // 名前での破棄は、すでに破棄されたObjectに対しても安全。将来、途中で破棄されるObjectを

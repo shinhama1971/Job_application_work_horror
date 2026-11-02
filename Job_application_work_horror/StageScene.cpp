@@ -128,7 +128,7 @@ void StageScene::SetupPracticalLights()
     }
 }
 
-// 小物の配置のファイルを読み直し、今の小物を置き直している（Debug版の F5）。
+// 配置のファイルを読み直し、今の小物と、扉・照明などの置き場所を置き直している（Debug版の F5 と、ファイルが書き換わったとき）。
 // 書き間違いがあれば置き直さず、何行目が読めなかったかを画面の左上に出している。
 void StageScene::ReloadPropLayout()
 {
@@ -141,8 +141,17 @@ void StageScene::ReloadPropLayout()
     }
     SceneLayoutBuilder builder(*Core::Game::GetInstance(), m_Objects.objectNames);
     PropLayoutFile::Reload(builder, layout, m_Objects.layoutProps);
+    // 扉・照明・電池など place 行で置いた物も置き直し、部屋の形（room の壁）を部屋の角の暗がりへ渡し直している。
+    // プレイヤーの位置と、プレイごとに選ぶヒューズ・鍵の場所（spot）は、遊んでいる途中の状態なので変えない
+    const int placed = PropLayoutFile::ReapplyPlacements(layout, m_Objects.placementBindings);
+    m_Objects.wallFootprints = PropLayoutFile::CollectRoomFootprints(layout);
+    Renderer::SetRoomOcclusion(
+        m_Objects.wallFootprints.data(),
+        static_cast<unsigned int>(m_Objects.wallFootprints.size()),
+        -100.0f, -48.5f, 0.55f);
     m_PropLayoutEditor.SetLayout(layout);
-    m_LayoutNotice = "配置のファイルを読み直した（小物 " + std::to_string(layout.Props.size()) + "個）";
+    m_LayoutNotice = "配置のファイルを読み直した（小物 " + std::to_string(layout.Props.size()) + "個・置き場所 " +
+        std::to_string(placed) + "個）";
     m_LayoutNoticeTimer = 3.0f;
 }
 
@@ -378,9 +387,10 @@ void StageScene::Update()
         0.0f, m_ChargerNoticeTimer - deltaTime);
     m_LayoutNoticeTimer = (std::max)(0.0f, m_LayoutNoticeTimer - deltaTime);
 #if defined(_DEBUG)
-    // Debug版だけ：F5 で小物の配置のファイル（assets/layout/stage1_props.txt）を読み直し、ゲームを動かしたまま置き直している。
+    // Debug版だけ：F5 を押したとき、または配置のファイル（assets/layout/stage1_props.txt）が書き換わったとき
+    // （Unity のマップエディターで書き出したときなど）に読み直し、ゲームを動かしたまま置き直している。
     // 位置を少し直すたびにビルドし直さずに済むようにするため（Release版では効かない）。
-    if (Input::GetKeyTrigger(VK_F5))
+    if (Input::GetKeyTrigger(VK_F5) || m_LayoutWatcher.HasChanged(Stage1Layout::PropLayoutPath, deltaTime))
     {
         ReloadPropLayout();
     }

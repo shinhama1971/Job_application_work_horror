@@ -226,6 +226,7 @@ void Stage2Scene::Draw(Camera* camera)
 Stage2ObjectiveInput Stage2Scene::MakeObjectiveInput(bool confirmationPending) const
 {
     Stage2ObjectiveInput input;
+    input.layoutNotice = m_LayoutNoticeTimer > 0.0f ? std::string_view(m_LayoutNotice) : std::string_view{};
     input.loopCount = m_LoopCount;
     input.progressHintSeconds = m_ProgressHintTimer;
     input.controllerConnected = Input::IsControllerConnected();

@@ -329,6 +329,42 @@ namespace PropLayoutFile
         return found->second;
     }
 
+    int ReapplyPlacements(const PropLayout& layout, const PlacementBindings& bindings)
+    {
+        int applied = 0;
+        for (const auto& [name, apply] : bindings)
+        {
+            const auto found = std::find_if(layout.Placements.begin(), layout.Placements.end(),
+                [&name](const PropPlacement& placement) { return placement.Name == name; });
+            if (found != layout.Placements.end())
+            {
+                apply(*found);
+                ++applied;
+            }
+        }
+        return applied;
+    }
+
+    bool FileChangeWatcher::HasChanged(const std::string& path, float deltaTime)
+    {
+        m_Timer -= deltaTime;
+        if (m_Timer > 0.0f)
+        {
+            return false;
+        }
+        m_Timer = 0.5f;
+        std::error_code error;
+        const auto lastWrite = std::filesystem::last_write_time(path, error);
+        if (error)
+        {
+            return false;
+        }
+        const bool changed = m_HasLastWrite && lastWrite != m_LastWrite;
+        m_LastWrite = lastWrite;
+        m_HasLastWrite = true;
+        return changed;
+    }
+
     std::vector<DirectX::SimpleMath::Vector4> CollectRoomFootprints(const PropLayout& layout)
     {
         std::vector<DirectX::SimpleMath::Vector4> footprints;

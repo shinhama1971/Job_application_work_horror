@@ -43,6 +43,8 @@ struct Stage2Notices
 // 目的表示を選ぶために必要な状態。bool の知らせは「その知らせの残り時間が0より大きい」ことを表している。
 struct Stage2ObjectiveInput
 {
+    // Debug版で配置のファイルを読み直したときの結果（空でなければ、ほかの目的より先に出す）
+    std::string_view layoutNotice;
     // 周回の数
     int loopCount = 0;
     float progressHintSeconds = 0.0f;   // 進行が止まっている時間。15秒・30秒でヒントを出している

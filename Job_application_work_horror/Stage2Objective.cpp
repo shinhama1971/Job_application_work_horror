@@ -74,6 +74,10 @@ namespace
 
 std::string_view SelectStage2Objective(const Stage2ObjectiveInput& in)
 {
+    if (!in.layoutNotice.empty())
+    {
+        return in.layoutNotice;
+    }
     // 周回ごとの普段の目的（扉が閉まっているとき・開いたとき）
     constexpr std::string_view closedLoopObjectives[] =
     {

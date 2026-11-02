@@ -25,6 +25,7 @@
 #include "utility.h"
 
 #include <SimpleMath.h>
+#include <functional>
 
 using namespace DirectX::SimpleMath;
 
@@ -46,6 +47,22 @@ namespace Stage2Layout
         {
             return PropLayoutFile::GetPlacement(propLayout, name);
         };
+        // 置き場所を当てはめ、配置ファイルを読み直したとき（Debug版の F5 と、Unity などで書き出した直後の自動の読み直し）に
+        // 同じ物を置き直せるよう、置き直し方を名前と一緒に覚えている
+        const auto place = [&at, &objects](auto& object, const char* name)
+        {
+            PropLayoutFile::ApplyPlacement(object, at(name));
+            auto* target = &object;
+            objects.placementBindings.emplace_back(name, [target](const PropPlacement& placement)
+            {
+                PropLayoutFile::ApplyPlacement(*target, placement);
+            });
+        };
+        // 置き場所から別の形で置く物（壁の文字・ロッカー・裸電球など）の置き直し方を覚えている
+        const auto bind = [&objects](const char* name, std::function<void(const PropPlacement&)> apply)
+        {
+            objects.placementBindings.emplace_back(name, std::move(apply));
+        };
         SceneLayoutBuilder builder(game, objects.objectNames);
 
         // プレイヤー（廊下の入口側。2面は最後の追跡まで走れない）
@@ -55,13 +72,13 @@ namespace Stage2Layout
 
         // 謎解きと最後の追跡で使う影（最初は隠している）
         ShadowMan* stageShadow = builder.Create<ShadowMan>("Stage2Shadow");
-        PropLayoutFile::ApplyPlacement(*stageShadow, at("Stage2Shadow"));
+        place(*stageShadow, "Stage2Shadow");
         stageShadow->SetDeactivateOnExpire(true);
         stageShadow->SetActive(false);
 
         // 謎解き用の影と分け、足音だけに反応する追跡者を別に管理している。
         ShadowMan* noiseShadow = builder.Create<ShadowMan>("Stage2NoiseShadow");
-        PropLayoutFile::ApplyPlacement(*noiseShadow, at("Stage2NoiseShadow"));
+        place(*noiseShadow, "Stage2NoiseShadow");
         noiseShadow->SetDeactivateOnExpire(true);
         noiseShadow->SetActive(false);
 
@@ -75,27 +92,27 @@ namespace Stage2Layout
             builder.Create<FuseBox>("Stage2ConfirmationPanel");
         confirmationPanel->SetManualControl("異常確認スイッチを押す");
         confirmationPanel->SetManualInteractionAllowed(false);
-        PropLayoutFile::ApplyPlacement(*confirmationPanel, at("Stage2ConfirmationPanel"));
+        place(*confirmationPanel, "Stage2ConfirmationPanel");
 
         // 非常用充電器（入口側の左の壁）
         FuseBox* emergencyCharger =
             builder.Create<FuseBox>("Stage2EmergencyCharger");
         emergencyCharger->SetManualControl("非常用充電器を使う");
         emergencyCharger->SetManualInteractionAllowed(true);
-        PropLayoutFile::ApplyPlacement(*emergencyCharger, at("Stage2EmergencyCharger"));
+        place(*emergencyCharger, "Stage2EmergencyCharger");
 
         // 残された記録の端末（2台）
         FuseBox* evidenceTerminal1 =
             builder.Create<FuseBox>("Stage2EvidenceTerminal1");
         evidenceTerminal1->SetManualControl("残された記録を回収する");
         evidenceTerminal1->SetManualInteractionAllowed(true);
-        PropLayoutFile::ApplyPlacement(*evidenceTerminal1, at("Stage2EvidenceTerminal1"));
+        place(*evidenceTerminal1, "Stage2EvidenceTerminal1");
 
         FuseBox* evidenceTerminal2 =
             builder.Create<FuseBox>("Stage2EvidenceTerminal2");
         evidenceTerminal2->SetManualControl("残された記録を回収する");
         evidenceTerminal2->SetManualInteractionAllowed(true);
-        PropLayoutFile::ApplyPlacement(*evidenceTerminal2, at("Stage2EvidenceTerminal2"));
+        place(*evidenceTerminal2, "Stage2EvidenceTerminal2");
 
         // 信号盤（青・黄・赤）。3周目に、この順番で操作する
         constexpr const char* signalTerminalNames[] =
@@ -116,7 +133,7 @@ namespace Stage2Layout
                 builder.Create<FuseBox>(signalTerminalNames[signalIndex]);
             signalTerminal->SetManualControl(signalPrompts[signalIndex]);
             signalTerminal->SetManualInteractionAllowed(false);
-            PropLayoutFile::ApplyPlacement(*signalTerminal, at(signalTerminalNames[signalIndex]));
+            place(*signalTerminal, signalTerminalNames[signalIndex]);
             objects.signalTerminals[signalIndex] = signalTerminal;
         }
 
@@ -137,10 +154,17 @@ namespace Stage2Layout
         };
 
         // 置き場所（位置と大きさ）を配置のファイルの place 行から読んで、Wall を作る関数
-        const auto createPlacedWall = [&createWall, &at](const char* name, const Color& diffuse, bool collision)
+        const auto createPlacedWall = [&createWall, &at, &bind](const char* name, const Color& diffuse, bool collision)
         {
             const PropPlacement& placement = at(name);
-            return createWall(name, placement.Position, placement.Size, diffuse, collision);
+            Wall* wall = createWall(name, placement.Position, placement.Size, diffuse, collision);
+            bind(name, [wall](const PropPlacement& moved)
+            {
+                wall->SetPosition(moved.Position.x, moved.Position.y, moved.Position.z);
+                wall->SetScale(moved.Size.x, moved.Size.y, moved.Size.z);
+                wall->SetVisualModel(wall->GetVisualModel());
+            });
+            return wall;
         };
 
         // 縁取りの色（時計・偽の扉の枠にも使う）
@@ -148,14 +172,14 @@ namespace Stage2Layout
 
         // 廊下の左右の壁・奥の壁・出口の扉の左右の壁・天井・床際の縁取り・天井近くの配管（prop 行）。
         // room を付けた壁は、部屋の角の暗がりの計算用に、上から見た長方形を記録している
-        PropLayoutFile::Spawn(builder, propLayout);
+        objects.layoutProps = PropLayoutFile::Spawn(builder, propLayout);
         objects.wallFootprints = PropLayoutFile::CollectRoomFootprints(propLayout);
 
         // 床は1面と同じ濡れた床（Ground）にし、タイルの継ぎ目・汚れ・水たまりの反射と波を描いている。
         // 水たまりは安全な近道と静かな回り道の間に置き、上を通るほど（走るほど）敵へ音が伝わるようにしている
         // （足音が水音になるのは、Groundの水たまりの判定を Player が使っているため）。
         Ground* ground = builder.Create<Ground>("Stage2Ground");
-        PropLayoutFile::ApplyPlacement(*ground, at("Stage2Ground"));
+        place(*ground, "Stage2Ground");
         // 水たまりのマス目（82x82）を41ずらし、廊下の中心（x=0）と z=-82・0・82 にマス目の中心が来るようにしている。
         // 形の値（0〜1）で、横のずれ（0なら左へ9、1なら右へ9）と奥行きのずれ・幅を決め、片側に回り道を残している。
         WaterEffectSystem::PuddleLayout puddleLayout;
@@ -379,21 +403,21 @@ namespace Stage2Layout
             false);
         batteryShelf->SetCastsShadow(false);
         BatteryItem* battery = builder.Create<BatteryItem>("Stage2Battery");
-        PropLayoutFile::ApplyPlacement(*battery, at("Stage2Battery"));
+        place(*battery, "Stage2Battery");
         battery->SetActive(false);
 
         // 天井照明（4つ。出口の扉の上の照明は1面と同じ名前"CeilingLight4"にしている）
         CeilingLight* light1 = builder.Create<CeilingLight>("Stage2Light1");
-        PropLayoutFile::ApplyPlacement(*light1, at("Stage2Light1"));
+        place(*light1, "Stage2Light1");
         light1->SetEmergencyLight(false, 0.2f);
         CeilingLight* light2 = builder.Create<CeilingLight>("Stage2Light2");
-        PropLayoutFile::ApplyPlacement(*light2, at("Stage2Light2"));
+        place(*light2, "Stage2Light2");
         light2->SetEmergencyLight(false, 1.4f);
         CeilingLight* light3 = builder.Create<CeilingLight>("Stage2Light3");
-        PropLayoutFile::ApplyPlacement(*light3, at("Stage2Light3"));
+        place(*light3, "Stage2Light3");
         light3->SetEmergencyLight(false, 2.8f);
         CeilingLight* light4 = builder.Create<CeilingLight>("CeilingLight4");
-        PropLayoutFile::ApplyPlacement(*light4, at("CeilingLight4"));
+        place(*light4, "CeilingLight4");
         light4->SetEmergencyLight(false, 4.1f);
         // 廊下の中ほどに、天井から吊るした裸電球を2つ下げている（すきま風でゆっくり揺れ、異変や影が近いときに大きく揺れる）
         // 吊るす付け根の位置は、配置のファイルの place Stage2HangingBulb1・2 から読んでいる
@@ -401,7 +425,9 @@ namespace Stage2Layout
         {
             const char* name = index == 0 ? "Stage2HangingBulb1" : "Stage2HangingBulb2";
             HangingBulb* bulb = builder.Create<HangingBulb>(name);
-            bulb->Place(at(name).Position, 1.3f + static_cast<float>(index) * 2.1f);
+            const float seed = 1.3f + static_cast<float>(index) * 2.1f;
+            bulb->Place(at(name).Position, seed);
+            bind(name, [bulb, seed](const PropPlacement& moved) { bulb->Place(moved.Position, seed); });
             objects.hangingBulbs[index] = bulb;
         }
 
@@ -413,11 +439,11 @@ namespace Stage2Layout
 
         // 出口の扉と、その先の出口（調べるとリザルト画面へ）
         Door* door = builder.Create<Door>("Stage2Door");
-        PropLayoutFile::ApplyPlacement(*door, at("Stage2Door"));
+        place(*door, "Stage2Door");
         door->ResetClosed(0);
 
         ExitTrigger* exit = builder.Create<ExitTrigger>("Stage2Exit");
-        PropLayoutFile::ApplyPlacement(*exit, at("Stage2Exit"));
+        place(*exit, "Stage2Exit");
         exit->SetNextScene(SceneName::Result);
         exit->SetInteractionEnabled(false);
 
@@ -447,13 +473,14 @@ namespace Stage2Layout
         // 時計・偽の扉・肖像画・端末・信号盤・電池と重ならない位置に、左右1つずつ置いている。
         const Color lockerColor(0.16f, 0.19f, 0.17f, 1.0f);
         // 本体（当たり判定のある箱）の位置と大きさ、扉の中心の位置と正面の向きは、配置のファイルの place 行から読んでいる
-        const auto createLocker = [&builder, &createPlacedWall, &lockerColor, &at](const char* name, const char* bodyName)
+        const auto createLocker = [&builder, &createPlacedWall, &lockerColor, &at, &bind](const char* name, const char* bodyName)
         {
             // 本体の見た目は、上の通気口・脚・継ぎ目のあるロッカー（Mayaで作ったモデル。当たり判定は箱のまま）
             createPlacedWall(bodyName, lockerColor, true)->SetVisualModel("locker_body");
             Locker* locker = builder.Create<Locker>(name);
             const PropPlacement& door = at(name);
             locker->Place(door.Position, door.Yaw);
+            bind(name, [locker](const PropPlacement& moved) { locker->Place(moved.Position, moved.Yaw); });
             return locker;
         };
         objects.lockers = {

@@ -18,6 +18,8 @@
 #include <SimpleMath.h>
 
 #include <cmath>
+#include <filesystem>
+#include <functional>
 
 #include <string>
 #include <vector>
@@ -100,6 +102,24 @@ namespace PropLayoutFile
     using SpawnedProps = std::vector<std::pair<std::string, Wall*>>;
     // place 行の置き場所を、名前で返している（ファイルに書いていない名前なら、理由を出して終了している）
     const PropPlacement& GetPlacement(const PropLayout& layout, const std::string& name);
+
+    // 置き場所を置き直す方法（名前と、その名前の place 行を受け取って物を置き直す関数）。配置を作るときに覚えておき、
+    // 配置ファイルを読み直したときに ReapplyPlacements で置き直している
+    using PlacementBindings = std::vector<std::pair<std::string, std::function<void(const PropPlacement&)>>>;
+    // 覚えておいた物を、読み直した place 行で置き直し、置き直した数を返している（ファイルから消えた名前は、そのまま残す）
+    int ReapplyPlacements(const PropLayout& layout, const PlacementBindings& bindings);
+
+    // 配置ファイルが書き換わったかを、0.5秒ごとに更新時刻で調べている（Unity などで書き出した直後に、自動で読み直すため）
+    class FileChangeWatcher
+    {
+    public:
+        bool HasChanged(const std::string& path, float deltaTime);
+
+    private:
+        std::filesystem::file_time_type m_LastWrite{};
+        bool m_HasLastWrite = false;
+        float m_Timer = 0.0f;
+    };
 
     // spot 行の候補の場所を、組の名前で返している（1つもなければ、理由を出して終了している）
     const std::vector<DirectX::SimpleMath::Vector3>& GetSpots(const PropLayout& layout, const std::string& group);

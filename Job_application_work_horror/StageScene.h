@@ -119,6 +119,8 @@ private:
     // 小物の配置のファイルを読み直したときの知らせと、その残り秒数（Debug版の F5）
     std::string m_LayoutNotice;
     float m_LayoutNoticeTimer = 0.0f;
+    // 配置のファイルが書き換わったかを見張っている（Debug版で、書き換わったら自動で読み直す）
+    PropLayoutFile::FileChangeWatcher m_LayoutWatcher;
     // Debug版のデバッグ画面（F1）に出す、小物の配置エディタ（選んで動かし、配置のファイルへ書き戻す）
     PropLayoutEditor m_PropLayoutEditor{ Stage1Layout::PropLayoutPath };
     // 西棟の水から後をついて来る誰かの濡れた足跡と、もう出したか（1回のプレイで1回だけ）

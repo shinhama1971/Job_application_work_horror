@@ -91,6 +91,8 @@ struct StageObjects
     std::vector<Stage1SafeLights::Zone> safeZones;
     // 小物のファイル（assets/layout/stage1_props.txt）から作った小物（名前とWall）。Debug版で F5 を押すと、ファイルを読み直して置き直している
     PropLayoutFile::SpawnedProps layoutProps;
+    // place 行で置いた物の置き直し方（配置ファイルを読み直したときに使う）
+    PropLayoutFile::PlacementBindings placementBindings;
     // ループ廊下へ続く中央の扉、ループ廊下の突き当たりの最後のドア、開始地点の奥のドア、出口（通ると2面へ）
     Door* loopDoor = nullptr;
     Door* exitDoor = nullptr;

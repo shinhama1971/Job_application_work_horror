@@ -15,6 +15,8 @@
 #include "Game.h"
 #include "Input.h"
 #include "Player.h"
+#include "Renderer.h"
+#include "SceneLayoutBuilder.h"
 #include "ShadowMan.h"
 #include "Wall.h"
 
@@ -194,6 +196,29 @@ void Stage2Scene::SetupPracticalLights()
 }
 
 // 周回の数、視線、足音、信号盤パズル、追われる演出を同時に見て、進行を更新している。
+void Stage2Scene::ReloadPropLayout()
+{
+    const PropLayout layout = PropLayoutFile::Load(Stage2Layout::PropLayoutPath);
+    if (!layout.IsValid())
+    {
+        m_LayoutNotice = "配置のファイルの" + std::to_string(layout.ErrorLine) + "行目が読めない " + layout.Error;
+        m_LayoutNoticeTimer = 6.0f;
+        return;
+    }
+    SceneLayoutBuilder builder(*Core::Game::GetInstance(), m_Objects.objectNames);
+    PropLayoutFile::Reload(builder, layout, m_Objects.layoutProps);
+    // プレイヤーの位置は、遊んでいる途中の状態なので変えない
+    const int placed = PropLayoutFile::ReapplyPlacements(layout, m_Objects.placementBindings);
+    m_Objects.wallFootprints = PropLayoutFile::CollectRoomFootprints(layout);
+    Renderer::SetRoomOcclusion(
+        m_Objects.wallFootprints.data(),
+        static_cast<unsigned int>(m_Objects.wallFootprints.size()),
+        -100.0f, -48.5f, 0.55f);
+    m_LayoutNotice = "配置のファイルを読み直した（建物 " + std::to_string(layout.Props.size()) + "個・置き場所 " +
+        std::to_string(placed) + "個）";
+    m_LayoutNoticeTimer = 3.0f;
+}
+
 void Stage2Scene::Update()
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -202,6 +227,16 @@ void Stage2Scene::Update()
     {
         return;
     }
+
+    m_LayoutNoticeTimer = (std::max)(0.0f, m_LayoutNoticeTimer - Application::GetDeltaTime());
+#if defined(_DEBUG)
+    // Debug版だけ：F5 を押したとき、または配置のファイル（assets/layout/stage2_props.txt）が書き換わったとき
+    // （Unity のマップエディターで書き出したときなど）に読み直し、ゲームを動かしたまま置き直している
+    if (Input::GetKeyTrigger(VK_F5) || m_LayoutWatcher.HasChanged(Stage2Layout::PropLayoutPath, Application::GetDeltaTime()))
+    {
+        ReloadPropLayout();
+    }
+#endif
 
     // 周回中は歩くだけにし、最後の追跡が始まったときだけ走れるようにしている。
     // 静かに歩き続ける緊張と、追跡での解放感を分けるためである。

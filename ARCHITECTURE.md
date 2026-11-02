@@ -144,7 +144,10 @@ Application
   Objectを配置に加えても、解放済みのポインタに触れることがありません。
 - 1面の小物（進行のコードが使わない箱）は `PropLayoutFile` がテキストファイル（`assets/layout/stage1_props.txt`）から読み、
   `StageObjects::layoutProps` に名前とWallの組で持ちます。Debug構成では `F5` で読み直し、同じ名前の物は置き直し、
-  新しい名前は作り、ファイルから消えた物は隠します。扉・アイテム・バルブなど進行のコードが使う物はコードに残しています。
+  新しい名前は作り、ファイルから消えた物は隠します。扉・アイテム・バルブなど進行のコードが作る物は、`place` 行を当てはめるときに
+  「この名前の物はこう置き直す」という関数（`PropLayoutFile::PlacementBindings`）を `StageObjects` / `Stage2Objects` に覚えておき、
+  読み直したときに `ReapplyPlacements` で呼び直します。プレイヤーの位置と spot から選んだ場所は、遊んでいる途中の状態なので置き直しません。
+  `PropLayoutFile::FileChangeWatcher` が0.5秒ごとにファイルの更新時刻を調べ、Unity などで書き出されたら F5 と同じく自動で読み直します（1面・2面とも Debug構成だけ）。
 - Debug構成のデバッグ画面（F1）には `PropLayoutEditor` を出しています。クリックした位置から伸ばした光線と小物の箱の
   当たり判定（スラブ法）で選び、ImGuiで値を変えるとすぐWallへ当てはめます。`PropLayoutFile::Save` は書き戻す前に
   ファイルを読み直し、値の変わった行だけを書き換えます（複製した小物は元の行の後ろへ足し、消した小物の行は消します）。
