@@ -108,6 +108,17 @@ namespace Stage1Layout
         };
 
         const Color noEmission(0.0f, 0.0f, 0.0f, 1.0f);
+        // 置き場所（位置と大きさ）を配置のファイルの place 行から読んで、小物を作る関数
+        const auto createPlacedStageProp = [&createStageProp, &at](
+            const char* name,
+            const Color& diffuse,
+            const Color& emission,
+            float shininess,
+            bool collisionEnabled)
+        {
+            const PropPlacement& placement = at(name);
+            return createStageProp(name, placement.Position, placement.Size, diffuse, emission, shininess, collisionEnabled);
+        };
 
         // 建物の壁と柱・天井の板・配管・幅木・棚・机・崩れた資材・木箱・色の付いた警告灯・暖かい電球など、進行のコードが使わない物（prop 行）
         objects.layoutProps = PropLayoutFile::Spawn(builder, propLayout);
@@ -116,18 +127,14 @@ namespace Stage1Layout
 
         // 西棟の排水バルブ（南・西・東の壁に1つずつ）。上のランプは、回す前は赤く、回したら緑に光る（色はStage1WestWingが変える）。
         // バルブの配管は床から天井まで壁を伝い、ランプは配管の横に付けている。
-        const auto createDrainValve = [&builder](
-            const char* valveName, const char* lampName,
-            const Vector3& position, float yaw, const Vector3& lampOffset, const Vector3& lampScale)
+        // バルブの位置と向き、ランプの位置と大きさは、配置のファイルの place 行から読んでいる。
+        const auto createDrainValve = [&builder, &at](const char* valveName, const char* lampName)
         {
             DrainValve* valve = builder.Create<DrainValve>(valveName);
-            valve->SetPosition(position.x, position.y, position.z);
-            valve->SetRotation(Vector3(0.0f, yaw, 0.0f));
+            PropLayoutFile::ApplyPlacement(*valve, at(valveName));
             const Color red(0.90f, 0.08f, 0.05f, 1.0f);
             Wall* lamp = builder.Create<Wall>(lampName);
-            const Vector3 lampPosition = position + lampOffset;
-            lamp->SetPosition(lampPosition.x, lampPosition.y, lampPosition.z);
-            lamp->SetScale(lampScale.x, lampScale.y, lampScale.z);
+            PropLayoutFile::ApplyPlacement(*lamp, at(lampName));
             lamp->SetAppearance(Color(red.R() * 0.6f, red.G() * 0.6f, red.B() * 0.6f, 1.0f), red, 24.0f);
             lamp->SetCollisionEnabled(false);
             lamp->SetCastsShadow(false);
@@ -136,12 +143,9 @@ namespace Stage1Layout
             lamp->SetVisualModel("warning_lamp");
             return std::pair<DrainValve*, Wall*>(valve, lamp);
         };
-        const auto southValve = createDrainValve("Stage1WestWingValveSouth", "PropWestWingValveLampSouth",
-            Vector3(-290.0f, -88.0f, -98.0f), DirectX::XM_PI, Vector3(9.0f, 24.0f, 0.5f), Vector3(10.0f, 4.0f, 1.0f));
-        const auto westValve = createDrainValve("Stage1WestWingValveWest", "PropWestWingValveLampWest",
-            Vector3(-378.0f, -88.0f, 100.0f), -DirectX::XM_PIDIV2, Vector3(0.5f, 24.0f, 9.0f), Vector3(1.0f, 4.0f, 10.0f));
-        const auto eastValve = createDrainValve("Stage1WestWingValveEast", "PropWestWingValveLampEast",
-            Vector3(-222.0f, -88.0f, 150.0f), DirectX::XM_PIDIV2, Vector3(-0.5f, 24.0f, 9.0f), Vector3(1.0f, 4.0f, 10.0f));
+        const auto southValve = createDrainValve("Stage1WestWingValveSouth", "PropWestWingValveLampSouth");
+        const auto westValve = createDrainValve("Stage1WestWingValveWest", "PropWestWingValveLampWest");
+        const auto eastValve = createDrainValve("Stage1WestWingValveEast", "PropWestWingValveLampEast");
         objects.westWing.valves = { southValve.first, westValve.first, eastValve.first };
         objects.westWing.valveLamps = { southValve.second, westValve.second, eastValve.second };
 
@@ -153,19 +157,15 @@ namespace Stage1Layout
         objects.safeZones.push_back({ Vector3(-322.0f, -99.0f, -292.0f), 34.0f });
 
         // 扉の状態を示すランプ（停電中は赤）。色は進行のコードが変えるので、小物のファイルではなくここで作っている
-        Wall* doorIndicator = createStageProp("PropDoorIndicator", Vector3(58.0f, -68.0f, 177.4f),
-            Vector3(10.0f, 5.0f, 1.0f), Color(0.26f, 0.025f, 0.018f, 1.0f),
+        Wall* doorIndicator = createPlacedStageProp("PropDoorIndicator", Color(0.26f, 0.025f, 0.018f, 1.0f),
             Color(0.30f, 0.005f, 0.002f, 1.0f), 28.0f, false);
         // 見た目は、光る表示面を金属の枠で囲んだ表示灯（Mayaで作ったモデル。光るのは表示面だけ）
         doorIndicator->SetVisualModel("door_indicator");
 
         // ループ廊下で、周回によって現れる赤い目印（最初は隠している）
-        const auto createLoopMarker = [&createStageProp, &noEmission](
-            const char* name,
-            const Vector3& position)
+        const auto createLoopMarker = [&createPlacedStageProp, &noEmission](const char* name)
         {
-            Wall* marker = createStageProp(name, position,
-                Vector3(30.0f, 7.0f, 1.0f),
+            Wall* marker = createPlacedStageProp(name,
                 Color(0.22f, 0.012f, 0.008f, 1.0f), noEmission, 20.0f, false);
             marker->SetCastsShadow(false);
             marker->SetVisible(false);
@@ -173,9 +173,9 @@ namespace Stage1Layout
         };
 
         objects.loopMarkers = {
-            createLoopMarker("PropLoopMarker1", Vector3(-82.0f, -67.0f, -177.4f)),
-            createLoopMarker("PropLoopMarker2", Vector3(82.0f, -67.0f, -177.4f)),
-            createLoopMarker("PropLoopMarker3", Vector3(36.0f, -67.0f, 37.4f)) };
+            createLoopMarker("PropLoopMarker1"),
+            createLoopMarker("PropLoopMarker2"),
+            createLoopMarker("PropLoopMarker3") };
         // 天井照明の見た目で、施設に電気が来ているかを直接伝えている（非常灯は停電中も赤く光る）。
         CeilingLight* light1 = builder.Create<CeilingLight>("CeilingLight1");
         PropLayoutFile::ApplyPlacement(*light1, at("CeilingLight1"));
@@ -213,61 +213,31 @@ namespace Stage1Layout
         // 部屋の中のどこに落ちているかを、プレイごとに候補からランダムに選んでいる。
         // 覚えた場所へ走るのではなく、毎回ライトで部屋を探させるためである。
         std::mt19937 fuseRandom{ std::random_device{}() };
-        const auto placeFuse = [&fuseRandom](Item* fuse, const std::array<Vector3, 3>& candidates)
+        // 候補の場所は、配置のファイルの spot 行（1本目 Stage1FirstFuse：開始地点の区画の配管の陰・左奥・右奥、
+        // 2本目 Stage1SecondFuse：左の倉庫。倉庫の演出（StageScene::UpdateStorageScare）が始まる x<-110, z<-108 の範囲の中だけ、
+        // 3本目 Stage1ThirdFuse：西棟の一番奥のポンプ室。西棟の鍵を拾って扉を開け、排水バルブで水を抜くまで現れない）
+        const auto placeAtRandomSpot = [&fuseRandom, &propLayout](auto& object, const char* group)
         {
+            const std::vector<Vector3>& candidates = PropLayoutFile::GetSpots(propLayout, group);
             std::uniform_int_distribution<std::size_t> pick(0, candidates.size() - 1);
-            const Vector3& spot = candidates[pick(fuseRandom)];
-            fuse->SetPosition(spot.x, spot.y, spot.z);
-        };
-        // 1本目: 開始地点の区画（配管の陰・左奥・右奥）
-        const std::array<Vector3, 3> firstFuseSpots =
-        {
-            Vector3(0.0f, -95.0f, -155.0f),
-            Vector3(-62.0f, -95.0f, -168.0f),
-            Vector3(64.0f, -95.0f, -160.0f)
-        };
-        // 2本目: 左の倉庫。倉庫の演出（StageScene::UpdateStorageScare）が始まる
-        // x<-110, z<-108 の範囲の中だけから選んでいる。
-        const std::array<Vector3, 3> secondFuseSpots =
-        {
-            Vector3(-150.0f, -95.0f, -140.0f),
-            Vector3(-196.0f, -95.0f, -160.0f),
-            Vector3(-128.0f, -95.0f, -166.0f)
-        };
-        // 3本目: 西棟の一番奥のポンプ室（ポンプの陰・奥の角・タンク寄り）。
-        // 右の倉庫で西棟の鍵を拾って西側の扉を開け、排水バルブで水を抜くまで現れない（Stage1WestWingが出している）。
-        const std::array<Vector3, 3> thirdFuseSpots =
-        {
-            Vector3(-345.0f, -95.0f, 210.0f),
-            Vector3(-365.0f, -95.0f, 250.0f),
-            Vector3(-245.0f, -95.0f, 240.0f)
+            PropLayoutFile::MoveTo(object, candidates[pick(fuseRandom)]);
         };
 
         Item* item1 = builder.Create<Item>("Item1");
-        placeFuse(item1, firstFuseSpots);
+        placeAtRandomSpot(*item1, "Stage1FirstFuse");
 
         // 2本目と3本目は、進行に合わせて出すので最初は隠している
         Item* item2 = builder.Create<Item>("Item2");
-        placeFuse(item2, secondFuseSpots);
+        placeAtRandomSpot(*item2, "Stage1SecondFuse");
         item2->SetActive(false);
 
         Item* item3 = builder.Create<Item>("Item3");
-        placeFuse(item3, thirdFuseSpots);
+        placeAtRandomSpot(*item3, "Stage1ThirdFuse");
         item3->SetActive(false);
 
-        // 西棟の鍵。右の倉庫（前は3本目のヒューズがあった部屋）のどこかに、2周目のループの後に現れる。
-        const std::array<Vector3, 3> westWingKeySpots =
-        {
-            Vector3(150.0f, -95.0f, -140.0f),
-            Vector3(196.0f, -95.0f, -164.0f),
-            Vector3(122.0f, -95.0f, -98.0f)
-        };
+        // 西棟の鍵。右の倉庫（前は3本目のヒューズがあった部屋）のどこかに、2周目のループの後に現れる（spot Stage1WestWingKey）。
         KeyItem* westWingKey = builder.Create<KeyItem>("Stage1WestWingKey");
-        {
-            std::uniform_int_distribution<std::size_t> pick(0, westWingKeySpots.size() - 1);
-            const Vector3& spot = westWingKeySpots[pick(fuseRandom)];
-            westWingKey->SetPosition(spot.x, spot.y, spot.z);
-        }
+        placeAtRandomSpot(*westWingKey, "Stage1WestWingKey");
         westWingKey->SetActive(false);
 
         // 西棟の扉（西側の外壁の z=-35〜-5）。鍵を拾うまで開かない。
@@ -335,10 +305,8 @@ namespace Stage1Layout
         evidenceTerminal->SetManualInteractionAllowed(true);
         PropLayoutFile::ApplyPlacement(*evidenceTerminal, at("Stage1EvidenceTerminal"));
         // 監視カメラの端末の上に付けた、緑に光る目印
-        Wall* evidenceMarker = createStageProp(
+        Wall* evidenceMarker = createPlacedStageProp(
             "Stage1EvidenceMarker",
-            Vector3(217.2f, -65.0f, -42.0f),
-            Vector3(1.0f, 5.0f, 18.0f),
             Color(0.025f, 0.11f, 0.09f, 1.0f),
             Color(0.02f, 0.24f, 0.16f, 1.0f),
             36.0f,
@@ -415,49 +383,42 @@ namespace Stage1Layout
         startDoorSign->SetCastsShadow(false);
 
         // 懐中電灯で照らしたときだけ浮かぶ壁の文字。進む道筋に沿って、目的の手がかりと不安を置いている。
-        // 位置は壁の表面、向きは壁から通路側へ向かう法線。画像は横長(4:1)。
-        const auto createWriting = [&builder](
+        // 位置は壁の表面、向き（yaw）は壁から通路側へ向かう法線、幅と高さは size の1つ目と2つ目（配置のファイルの place 行）。画像は横長(4:1)。
+        const auto createWriting = [&builder, &at](
             const char* name,
             const char* texture,
-            const char* alternateTexture,
-            const Vector3& surfaceCenter,
-            const Vector3& outwardNormal,
-            float width)
+            const char* alternateTexture)
         {
+            const PropPlacement& placement = at(name);
             FlashlightWriting* writing = builder.Create<FlashlightWriting>(name);
             writing->SetTextures(texture, alternateTexture);
-            writing->Place(surfaceCenter, outwardNormal, width, width * 0.25f);
+            writing->Place(placement.Position, PropLayoutFile::GetFacing(placement), placement.Size.x, placement.Size.y);
             return writing;
         };
         objects.writings[Stage1WallWritings::Warning] = createWriting(
-            "Stage1WritingWarning", "assets/texture/writing_warning.png", "",
-            Vector3(-62.0f, -71.0f, -178.0f), Vector3(0.0f, 0.0f, 1.0f), 56.0f);
+            "Stage1WritingWarning", "assets/texture/writing_warning.png", "");
         objects.writings[Stage1WallWritings::Three] = createWriting(
-            "Stage1WritingThree", "assets/texture/writing_three.png", "",
-            Vector3(-150.0f, -70.0f, -72.0f), Vector3(0.0f, 0.0f, -1.0f), 64.0f);
+            "Stage1WritingThree", "assets/texture/writing_three.png", "");
         objects.writings[Stage1WallWritings::Power] = createWriting(
-            "Stage1WritingPower", "assets/texture/writing_power.png", "",
-            Vector3(-128.0f, -69.0f, 38.0f), Vector3(0.0f, 0.0f, -1.0f), 64.0f);
+            "Stage1WritingPower", "assets/texture/writing_power.png", "");
         // ループ廊下を北へ進むと正面に見える突き当たりの壁。右へ曲がって先へ進み、文字が背中側になると書き換わる
         // （横を見ただけでは変わらない。振り返って見ると「ふりかえったな」になっている）。
         objects.writings[Stage1WallWritings::Turn] = createWriting(
             "Stage1WritingTurn", "assets/texture/writing_turn.png",
-            "assets/texture/writing_turned.png",
-            Vector3(0.0f, -70.0f, 273.0f), Vector3(0.0f, 0.0f, -1.0f), 60.0f);
+            "assets/texture/writing_turned.png");
 
         // ループの周回ごとに、開始地点の部屋に1つずつ浮かぶ文字。最初は隠しておき、StageScene が周回に合わせて浮かばせている。
         // 1周目は奥のドアの右、2周目は東の壁、3周目は西の壁（戻ってくるたびに、部屋の中の文字が増えていく）
-        const struct { const char* Name; const char* Texture; Vector3 Center; Vector3 Normal; float Width; } lapWritingSpots[] =
+        const struct { const char* Name; const char* Texture; } lapWritingSpots[] =
         {
-            { "Stage1WritingLap1", "assets/texture/writing_lap1.png", Vector3(54.0f, -71.0f, -178.0f), Vector3(0.0f, 0.0f, 1.0f), 44.0f },
-            { "Stage1WritingLap2", "assets/texture/writing_lap2.png", Vector3(88.0f, -70.0f, -140.0f), Vector3(-1.0f, 0.0f, 0.0f), 64.0f },
-            { "Stage1WritingLap3", "assets/texture/writing_lap3.png", Vector3(-88.0f, -70.0f, -140.0f), Vector3(1.0f, 0.0f, 0.0f), 60.0f },
+            { "Stage1WritingLap1", "assets/texture/writing_lap1.png" },
+            { "Stage1WritingLap2", "assets/texture/writing_lap2.png" },
+            { "Stage1WritingLap3", "assets/texture/writing_lap3.png" },
         };
         for (std::size_t lap = 0; lap < objects.lapWritings.size(); ++lap)
         {
             FlashlightWriting* writing = createWriting(
-                lapWritingSpots[lap].Name, lapWritingSpots[lap].Texture, "",
-                lapWritingSpots[lap].Center, lapWritingSpots[lap].Normal, lapWritingSpots[lap].Width);
+                lapWritingSpots[lap].Name, lapWritingSpots[lap].Texture, "");
             writing->SetPresenceImmediately(0.0f);
             objects.lapWritings[lap] = writing;
         }
@@ -474,12 +435,13 @@ namespace Stage1Layout
 
         // 番号の手がかり。「ひとつめ」などの文字の右に、その桁の数字を書いている。
         // 数字の画像は、番号を決めるStage1KeypadDoor::Initで差し替えている。
-        const auto createDigitClue = [&builder](
-            int order,
-            const Vector3& surfaceCenter,
-            const Vector3& outwardNormal)
+        // 「ひとつめ」の文字の位置と向きは、配置のファイルの place Stage1KeypadClueLabel1〜4 から読んでいる。
+        const auto createDigitClue = [&builder, &at](int order)
         {
             const std::string number = std::to_string(order);
+            const PropPlacement& placement = at(("Stage1KeypadClueLabel" + number).c_str());
+            const Vector3 surfaceCenter = placement.Position;
+            const Vector3 outwardNormal = PropLayoutFile::GetFacing(placement);
             FlashlightWriting* label = builder.Create<FlashlightWriting>(
                 "Stage1KeypadClueLabel" + number);
             label->SetTextures("assets/texture/writing_order" + number + ".png");
@@ -496,19 +458,18 @@ namespace Stage1Layout
         objects.keypad.door = keypadDoor;
         objects.keypad.digitWritings = {
             // 開始地点の東の壁（右の倉庫との仕切り）
-            createDigitClue(1, Vector3(88.0f, -70.0f, -130.0f), Vector3(-1.0f, 0.0f, 0.0f)),
+            createDigitClue(1),
             // 左の倉庫の西の壁
-            createDigitClue(2, Vector3(-218.0f, -70.0f, -155.0f), Vector3(1.0f, 0.0f, 0.0f)),
+            createDigitClue(2),
             // 中央ホールの南の壁
-            createDigitClue(3, Vector3(120.0f, -70.0f, -68.0f), Vector3(0.0f, 0.0f, 1.0f)),
+            createDigitClue(3),
             // 右の倉庫の東の壁
-            createDigitClue(4, Vector3(218.0f, -70.0f, -135.0f), Vector3(-1.0f, 0.0f, 0.0f)) };
+            createDigitClue(4) };
 
         // 扉の先の部屋: 予備の電池と、入った者を迎える文字を置いている。
         BatteryItem* hiddenBattery = builder.Create<BatteryItem>("Stage1KeypadRoomBattery");
         PropLayoutFile::ApplyPlacement(*hiddenBattery, at("Stage1KeypadRoomBattery"));
-        createWriting("Stage1KeypadRoomWriting", "assets/texture/writing_watched.png", "",
-            Vector3(218.0f, -70.0f, 70.0f), Vector3(-1.0f, 0.0f, 0.0f), 64.0f);
+        createWriting("Stage1KeypadRoomWriting", "assets/texture/writing_watched.png", "");
 
         // 閉じ込めイベント（Stage1HiddenRoomEvent）で使う、鍵・記録端末・影。
         // 鍵は閉じ込めた瞬間に、部屋の隅の候補からランダムな位置へ置いている。

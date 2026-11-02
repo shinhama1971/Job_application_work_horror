@@ -48,3 +48,51 @@ place Stage2Light3                   0 -50.5 38 size 18 2 8
 place CeilingLight4                  0 -50.5 112 size 18 2 8
 place Stage2Door                     0 -74 140
 place Stage2Exit                     0 -80 153
+place Stage2EvidenceMarker1          39.4 -65 -76 size 1 5 18
+place Stage2EvidenceMarker2          -39.4 -65 108 size 1 5 18
+place Stage2Portrait                 39.4 -70 -25 size 1 22 16
+place Stage2ClockFace                -39.3 -70 -25 size 1 20 20
+place Stage2ClockFrameTop            -38.9 -59 -25 size 1.8 2 24
+place Stage2ClockFrameBottom         -38.9 -81 -25 size 1.8 2 24
+place Stage2ClockFrameNear           -38.9 -70 -36 size 1.8 24 2
+place Stage2ClockFrameFar            -38.9 -70 -14 size 1.8 24 2
+place Stage2LoopMark                 -39.4 -68 52 size 1 18 12
+place Stage2DoorIndicator            22 -67 137.4 size 10 5 1
+place Stage2FalseDoorPanel           -39.3 -76 70 size 1.2 40 22
+place Stage2FalseDoorFrameNear       -39 -76 58 size 1.8 44 2
+place Stage2FalseDoorFrameFar        -39 -76 82 size 1.8 44 2
+place Stage2FalseDoorFrameTop        -39 -54 70 size 1.8 2 26
+place Stage2FalseDoorHandle          -38.3 -76 62 size 2 5 2
+place Stage2BatteryShelf             35.8 -87 -45 size 8 2 10
+place Stage2SignalTerminalBlue       35.5 -90 82 yaw -90
+place Stage2SignalTerminalAmber      -35.5 -90 18 yaw 90
+place Stage2SignalTerminalRed        35.5 -90 -108 yaw -90
+place Stage2SignalMarkerBlue         39.4 -72 82 size 1 17 18
+place Stage2SignalMarkerAmber        -39.4 -72 18 size 1 17 18
+place Stage2SignalMarkerRed          39.4 -72 -108 size 1 17 18
+place Stage2PortraitFrameTop         39.1 -58 -25 size 1.8 2 20
+place Stage2PortraitFrameBottom      39.1 -82 -25 size 1.8 2 20
+place Stage2PortraitFrameNear        39.1 -70 -34 size 1.8 26 2
+place Stage2PortraitFrameFar         39.1 -70 -16 size 1.8 26 2
+place Stage2CycleMark1               39.45 -69 -112 size 1 20 2
+place Stage2CycleMark2               39.45 -69 -104 size 1 20 2
+place Stage2CycleMark3               39.45 -69 -96 size 1 20 2
+place Stage2Scratch01                39.45 -71 1 size 1 18 2
+place Stage2Scratch02                39.45 -71 9 size 1 18 2
+place Stage2Scratch03                39.45 -71 5 size 1 2 10
+place Stage2Scratch04                39.45 -71 20 size 1 18 2
+place Stage2Scratch05                39.45 -63 25 size 1 2 10
+place Stage2Scratch06                39.45 -71 25 size 1 2 10
+place Stage2Scratch07                39.45 -79 25 size 1 2 10
+place Stage2Scratch08                39.45 -71 36 size 1 18 2
+place Stage2Scratch09                39.45 -79 41 size 1 2 12
+place Stage2Scratch10                39.45 -71 52 size 1 18 2
+place Stage2Scratch11                39.45 -63 57 size 1 2 10
+place Stage2Scratch12                39.45 -71 57 size 1 2 10
+place Stage2Scratch13                39.45 -67 62 size 1 10 2
+place Stage2HangingBulb1             0 -48.5 0
+place Stage2HangingBulb2             0 -48.5 75
+place Stage2LockerLeftBody           -35 -77 -62 size 10 44 16
+place Stage2LockerLeft               -29.95 -77 -62 yaw 90
+place Stage2LockerRightBody          35 -77 40 size 10 44 16
+place Stage2LockerRight              29.95 -77 40 yaw -90

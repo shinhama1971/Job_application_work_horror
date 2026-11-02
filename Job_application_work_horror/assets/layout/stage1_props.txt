@@ -6,6 +6,7 @@
 
 #   prop 名前 x y z 幅 高さ 奥行き 色 光る色 光沢 当たり判定(0/1) [noshadow] [weathering] [room] [glow 範囲 強さ] [model モデルの名前]
 #   place 名前 x y z [yaw 度] [size 幅 高さ 奥行き]   （進行のコードが作る物の置き場所。ファイルの最後にまとめている）
+#   spot 組の名前 x y z   （候補の場所。同じ組を何行も書き、プレイごとに1つを選ぶ。ヒューズと鍵の落ちている場所）
 #
 #   room を付けた壁は、部屋の角の暗がり（roomOcclusion.hlsli）と水面・鏡のレイ反射が「部屋の形」として使う（32枚まで）。
 #   建物の壁・柱も、ここに書いている（weathering でパネルの継ぎ目・ひび・水の跡・カビを描く）。
@@ -211,3 +212,47 @@ place Stage1HiddenRoomRecord         213 -82 150 yaw 90
 place BatteryItem                    -130 -95 120
 place ScareTrigger_Corridor          0 -90 65
 place Stage1ExitOmen                 92 -99 278
+place PropDoorIndicator              58 -68 177.4 size 10 5 1
+place Stage1EvidenceMarker           217.2 -65 -42 size 1 5 18
+place PropLoopMarker1                -82 -67 -177.4 size 30 7 1
+place PropLoopMarker2                82 -67 -177.4 size 30 7 1
+place PropLoopMarker3                36 -67 37.4 size 30 7 1
+# 西棟の排水バルブ（壁の表面に付けた台座の位置と、部屋へ向く向き）と、上のランプ
+place Stage1WestWingValveSouth       -290 -88 -98 yaw 180
+place PropWestWingValveLampSouth     -281 -64 -97.5 size 10 4 1
+place Stage1WestWingValveWest        -378 -88 100 yaw -90
+place PropWestWingValveLampWest      -377.5 -64 109 size 1 4 10
+place Stage1WestWingValveEast        -222 -88 150 yaw 90
+place PropWestWingValveLampEast      -222.5 -64 159 size 1 4 10
+# 懐中電灯で照らすと浮かぶ壁の文字（位置は壁の表面、yaw は壁から通路側へ向く向き、size の1つ目が幅、2つ目が高さ。画像は横長 4:1）
+place Stage1WritingWarning           -62 -71 -178 yaw 0 size 56 14 0
+place Stage1WritingThree             -150 -70 -72 yaw 180 size 64 16 0
+place Stage1WritingPower             -128 -69 38 yaw 180 size 64 16 0
+place Stage1WritingTurn              0 -70 273 yaw 180 size 60 15 0
+place Stage1WritingLap1              54 -71 -178 yaw 0 size 44 11 0
+place Stage1WritingLap2              88 -70 -140 yaw -90 size 64 16 0
+place Stage1WritingLap3              -88 -70 -140 yaw 90 size 60 15 0
+place Stage1KeypadRoomWriting        218 -70 70 yaw -90 size 64 16 0
+# 暗証番号の手がかり（「ひとつめ」などの文字。数字はその右に30離して置いている）
+place Stage1KeypadClueLabel1         88 -70 -130 yaw -90
+place Stage1KeypadClueLabel2         -218 -70 -155 yaw 90
+place Stage1KeypadClueLabel3         120 -70 -68 yaw 0
+place Stage1KeypadClueLabel4         218 -70 -135 yaw -90
+
+# --- 候補の場所（spot 組の名前 x y z）。プレイごとに、組の中から1つを選んで置いている
+# 1本目のヒューズ：開始地点の区画（配管の陰・左奥・右奥）
+spot Stage1FirstFuse     0 -95 -155
+spot Stage1FirstFuse     -62 -95 -168
+spot Stage1FirstFuse     64 -95 -160
+# 2本目のヒューズ：左の倉庫（倉庫の演出が始まる x<-110, z<-108 の範囲の中だけ）
+spot Stage1SecondFuse    -150 -95 -140
+spot Stage1SecondFuse    -196 -95 -160
+spot Stage1SecondFuse    -128 -95 -166
+# 3本目のヒューズ：西棟の一番奥のポンプ室（ポンプの陰・奥の角・タンク寄り）
+spot Stage1ThirdFuse     -345 -95 210
+spot Stage1ThirdFuse     -365 -95 250
+spot Stage1ThirdFuse     -245 -95 240
+# 西棟の鍵：右の倉庫
+spot Stage1WestWingKey   150 -95 -140
+spot Stage1WestWingKey   196 -95 -164
+spot Stage1WestWingKey   122 -95 -98

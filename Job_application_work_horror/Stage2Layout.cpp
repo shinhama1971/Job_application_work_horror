@@ -110,26 +110,13 @@ namespace Stage2Layout
             "黄色い信号盤を操作する",
             "赤い信号盤を操作する"
         };
-        const Vector3 signalPositions[] =
-        {
-            Vector3(35.5f, -90.0f, 82.0f),
-            Vector3(-35.5f, -90.0f, 18.0f),
-            Vector3(35.5f, -90.0f, -108.0f)
-        };
         for (int signalIndex = 0; signalIndex < 3; ++signalIndex)
         {
             FuseBox* signalTerminal =
                 builder.Create<FuseBox>(signalTerminalNames[signalIndex]);
             signalTerminal->SetManualControl(signalPrompts[signalIndex]);
             signalTerminal->SetManualInteractionAllowed(false);
-            signalTerminal->SetPosition(
-                signalPositions[signalIndex].x,
-                signalPositions[signalIndex].y,
-                signalPositions[signalIndex].z);
-            signalTerminal->SetRotation(Vector3(
-                0.0f,
-                signalIndex == 1 ? DirectX::XM_PIDIV2 : -DirectX::XM_PIDIV2,
-                0.0f));
+            PropLayoutFile::ApplyPlacement(*signalTerminal, at(signalTerminalNames[signalIndex]));
             objects.signalTerminals[signalIndex] = signalTerminal;
         }
 
@@ -147,6 +134,13 @@ namespace Stage2Layout
             wall->SetAppearance(diffuse, Color(0.0f, 0.0f, 0.0f, 1.0f), 7.0f);
             wall->SetCollisionEnabled(collision);
             return wall;
+        };
+
+        // 置き場所（位置と大きさ）を配置のファイルの place 行から読んで、Wall を作る関数
+        const auto createPlacedWall = [&createWall, &at](const char* name, const Color& diffuse, bool collision)
+        {
+            const PropPlacement& placement = at(name);
+            return createWall(name, placement.Position, placement.Size, diffuse, collision);
         };
 
         // 縁取りの色（時計・偽の扉の枠にも使う）
@@ -175,18 +169,12 @@ namespace Stage2Layout
 
 
         // 残された記録の端末の上に付けた、緑に光る目印
-        Wall* evidenceMarker1 = createWall(
-            "Stage2EvidenceMarker1", Vector3(39.4f, -65.0f, -76.0f),
-            Vector3(1.0f, 5.0f, 18.0f),
-            Color(0.025f, 0.11f, 0.09f, 1.0f), false);
+        Wall* evidenceMarker1 = createPlacedWall("Stage2EvidenceMarker1", Color(0.025f, 0.11f, 0.09f, 1.0f), false);
         evidenceMarker1->SetAppearance(
             Color(0.025f, 0.11f, 0.09f, 1.0f),
             Color(0.012f, 0.13f, 0.09f, 1.0f), 36.0f);
         evidenceMarker1->SetCastsShadow(false);
-        Wall* evidenceMarker2 = createWall(
-            "Stage2EvidenceMarker2", Vector3(-39.4f, -65.0f, 108.0f),
-            Vector3(1.0f, 5.0f, 18.0f),
-            Color(0.025f, 0.11f, 0.09f, 1.0f), false);
+        Wall* evidenceMarker2 = createPlacedWall("Stage2EvidenceMarker2", Color(0.025f, 0.11f, 0.09f, 1.0f), false);
         evidenceMarker2->SetAppearance(
             Color(0.025f, 0.11f, 0.09f, 1.0f),
             Color(0.012f, 0.13f, 0.09f, 1.0f), 36.0f);
@@ -213,13 +201,7 @@ namespace Stage2Layout
         };
         for (int signalIndex = 0; signalIndex < 3; ++signalIndex)
         {
-            const bool leftWall = signalIndex == 1;
-            Wall* marker = createWall(
-                signalMarkerNames[signalIndex],
-                Vector3(leftWall ? -39.4f : 39.4f, -72.0f,
-                    signalPositions[signalIndex].z),
-                Vector3(1.0f, 17.0f, 18.0f),
-                signalDiffuse[signalIndex], false);
+            Wall* marker = createPlacedWall(signalMarkerNames[signalIndex], signalDiffuse[signalIndex], false);
             marker->SetAppearance(
                 signalDiffuse[signalIndex], signalEmission[signalIndex], 48.0f);
             marker->SetSignalSurface(true);
@@ -228,8 +210,7 @@ namespace Stage2Layout
         }
 
         // 肖像画と、目が開いたときに出す赤い目（最初は隠している）
-        Wall* portrait = createWall("Stage2Portrait", Vector3(39.4f, -70.0f, -25.0f),
-            Vector3(1.0f, 22.0f, 16.0f), Color(0.075f, 0.058f, 0.044f, 1.0f), false);
+        Wall* portrait = createPlacedWall("Stage2Portrait", Color(0.075f, 0.058f, 0.044f, 1.0f), false);
         // 古い油絵のように、ニスの弱い光沢を返している
         portrait->SetAppearance(Color(0.075f, 0.058f, 0.044f, 1.0f), Color(0.0f, 0.0f, 0.0f, 1.0f), 18.0f);
         // 絵は、古い油絵の人物をシェーダーで描いている（目は閉じていて、異変では絵の中で目が開き、見る人を目で追う）
@@ -238,16 +219,13 @@ namespace Stage2Layout
         // 肖像画の額縁（くすんだ金色の4本）。時計の枠と同じく、壁から少し浮かせている。
         // PBRでは金箔の金属として描くので、色は金の映り込みの色（黒ずんだ分だけ暗く）にし、埃の膜の分だけ金属らしさを下げている
         const Color portraitFrameColor(0.52f, 0.38f, 0.17f, 1.0f);
-        const struct { const char* Name; Vector3 Position; Vector3 Scale; } portraitFrames[] =
+        const char* portraitFrames[] =
         {
-            { "Stage2PortraitFrameTop", Vector3(39.1f, -58.0f, -25.0f), Vector3(1.8f, 2.0f, 20.0f) },
-            { "Stage2PortraitFrameBottom", Vector3(39.1f, -82.0f, -25.0f), Vector3(1.8f, 2.0f, 20.0f) },
-            { "Stage2PortraitFrameNear", Vector3(39.1f, -70.0f, -34.0f), Vector3(1.8f, 26.0f, 2.0f) },
-            { "Stage2PortraitFrameFar", Vector3(39.1f, -70.0f, -16.0f), Vector3(1.8f, 26.0f, 2.0f) },
+            "Stage2PortraitFrameTop", "Stage2PortraitFrameBottom", "Stage2PortraitFrameNear", "Stage2PortraitFrameFar"
         };
-        for (const auto& frame : portraitFrames)
+        for (const char* frame : portraitFrames)
         {
-            Wall* piece = createWall(frame.Name, frame.Position, frame.Scale, portraitFrameColor, false);
+            Wall* piece = createPlacedWall(frame, portraitFrameColor, false);
             piece->SetAppearance(portraitFrameColor, Color(0.0f, 0.0f, 0.0f, 1.0f), 26.0f);
             piece->SetSurfaceFinish(0.75f, 0.45f);
             piece->SetCastsShadow(false);
@@ -256,22 +234,11 @@ namespace Stage2Layout
         }
 
         // 時計（文字盤と枠）。文字盤・目盛り・ローマ数字・針・ガラスは、文字盤のシェーダー（clockPS）で描いている
-        Wall* clockFace = createWall(
-            "Stage2ClockFace", Vector3(-39.3f, -70.0f, -25.0f),
-            Vector3(1.0f, 20.0f, 20.0f),
-            Color(0.095f, 0.086f, 0.070f, 1.0f), false);
-        Wall* clockFrameTop = createWall(
-            "Stage2ClockFrameTop", Vector3(-38.9f, -59.0f, -25.0f),
-            Vector3(1.8f, 2.0f, 24.0f), trimColor, false);
-        Wall* clockFrameBottom = createWall(
-            "Stage2ClockFrameBottom", Vector3(-38.9f, -81.0f, -25.0f),
-            Vector3(1.8f, 2.0f, 24.0f), trimColor, false);
-        Wall* clockFrameNear = createWall(
-            "Stage2ClockFrameNear", Vector3(-38.9f, -70.0f, -36.0f),
-            Vector3(1.8f, 24.0f, 2.0f), trimColor, false);
-        Wall* clockFrameFar = createWall(
-            "Stage2ClockFrameFar", Vector3(-38.9f, -70.0f, -14.0f),
-            Vector3(1.8f, 24.0f, 2.0f), trimColor, false);
+        Wall* clockFace = createPlacedWall("Stage2ClockFace", Color(0.095f, 0.086f, 0.070f, 1.0f), false);
+        Wall* clockFrameTop = createPlacedWall("Stage2ClockFrameTop", trimColor, false);
+        Wall* clockFrameBottom = createPlacedWall("Stage2ClockFrameBottom", trimColor, false);
+        Wall* clockFrameNear = createPlacedWall("Stage2ClockFrameNear", trimColor, false);
+        Wall* clockFrameFar = createPlacedWall("Stage2ClockFrameFar", trimColor, false);
         Wall* clockPieces[] =
         {
             clockFace, clockFrameTop, clockFrameBottom,
@@ -332,8 +299,7 @@ namespace Stage2Layout
         objects.mirror = mirror;
 
         // 周回によって現れる赤い印（最初は隠している）
-        Wall* loopMark = createWall("Stage2LoopMark", Vector3(-39.4f, -68.0f, 52.0f),
-            Vector3(1.0f, 18.0f, 12.0f), Color(0.22f, 0.01f, 0.006f, 1.0f), false);
+        Wall* loopMark = createPlacedWall("Stage2LoopMark", Color(0.22f, 0.01f, 0.006f, 1.0f), false);
         loopMark->SetCastsShadow(false);
         loopMark->SetVisible(false);
 
@@ -350,15 +316,8 @@ namespace Stage2Layout
         };
         for (int markIndex = 0; markIndex < 3; ++markIndex)
         {
-            Wall* cycleMark = createWall(
-                cycleMarkNames[markIndex],
-                Vector3(
-                    39.45f,
-                    -69.0f,
-                    -112.0f + static_cast<float>(markIndex) * 8.0f),
-                Vector3(1.0f, 20.0f, 2.0f),
-                Color(0.18f, 0.004f, 0.002f, 1.0f),
-                false);
+            Wall* cycleMark = createPlacedWall(
+                cycleMarkNames[markIndex], Color(0.18f, 0.004f, 0.002f, 1.0f), false);
             cycleMark->SetRotation(
                 Vector3(cycleMarkRotations[markIndex], 0.0f, 0.0f));
             cycleMark->SetCastsShadow(false);
@@ -367,9 +326,7 @@ namespace Stage2Layout
         }
 
         // 出口の扉の上のランプ（開くまでは赤）
-        Wall* doorIndicator = createWall("Stage2DoorIndicator",
-            Vector3(22.0f, -67.0f, 137.4f), Vector3(10.0f, 5.0f, 1.0f),
-            Color(0.24f, 0.012f, 0.008f, 1.0f), false);
+        Wall* doorIndicator = createPlacedWall("Stage2DoorIndicator", Color(0.24f, 0.012f, 0.008f, 1.0f), false);
         doorIndicator->SetCastsShadow(false);
         doorIndicator->SetAppearance(
             Color(0.24f, 0.012f, 0.008f, 1.0f),
@@ -379,23 +336,11 @@ namespace Stage2Layout
 
         // 偽の扉（板・枠・取っ手）。異変の周回だけ表示している。板は、本物の扉と見分けがつかないよう、
         // 羽目板・木目・剥げた塗装・部屋番号の札・鍵穴をシェーダー（doorPS）で描いている
-        Wall* falseDoorPanel = createWall(
-            "Stage2FalseDoorPanel", Vector3(-39.3f, -76.0f, 70.0f),
-            Vector3(1.2f, 40.0f, 22.0f),
-            Color(0.07f, 0.025f, 0.018f, 1.0f), false);
-        Wall* falseDoorFrameNear = createWall(
-            "Stage2FalseDoorFrameNear", Vector3(-39.0f, -76.0f, 58.0f),
-            Vector3(1.8f, 44.0f, 2.0f), trimColor, false);
-        Wall* falseDoorFrameFar = createWall(
-            "Stage2FalseDoorFrameFar", Vector3(-39.0f, -76.0f, 82.0f),
-            Vector3(1.8f, 44.0f, 2.0f), trimColor, false);
-        Wall* falseDoorFrameTop = createWall(
-            "Stage2FalseDoorFrameTop", Vector3(-39.0f, -54.0f, 70.0f),
-            Vector3(1.8f, 2.0f, 26.0f), trimColor, false);
-        Wall* falseDoorHandle = createWall(
-            "Stage2FalseDoorHandle", Vector3(-38.3f, -76.0f, 62.0f),
-            Vector3(2.0f, 5.0f, 2.0f),
-            Color(0.16f, 0.09f, 0.025f, 1.0f), false);
+        Wall* falseDoorPanel = createPlacedWall("Stage2FalseDoorPanel", Color(0.07f, 0.025f, 0.018f, 1.0f), false);
+        Wall* falseDoorFrameNear = createPlacedWall("Stage2FalseDoorFrameNear", trimColor, false);
+        Wall* falseDoorFrameFar = createPlacedWall("Stage2FalseDoorFrameFar", trimColor, false);
+        Wall* falseDoorFrameTop = createPlacedWall("Stage2FalseDoorFrameTop", trimColor, false);
+        Wall* falseDoorHandle = createPlacedWall("Stage2FalseDoorHandle", Color(0.16f, 0.09f, 0.025f, 1.0f), false);
         // 偽の扉の枠の見た目は、額縁と同じ溝の入った棒（Mayaで作ったモデル）
         falseDoorFrameNear->SetVisualModel("frame_rail");
         falseDoorFrameFar->SetVisualModel("frame_rail");
@@ -418,33 +363,10 @@ namespace Stage2Layout
         }
 
         // 壁の引っかき傷（周回が進むほど増えていく）
-        struct ScratchPiece
-        {
-            Vector3 Position;
-            Vector3 Scale;
-        };
-        const ScratchPiece scratchPieces[] =
-        {
-            { Vector3(39.45f, -71.0f,   1.0f), Vector3(1.0f, 18.0f, 2.0f) },
-            { Vector3(39.45f, -71.0f,   9.0f), Vector3(1.0f, 18.0f, 2.0f) },
-            { Vector3(39.45f, -71.0f,   5.0f), Vector3(1.0f,  2.0f, 10.0f) },
-            { Vector3(39.45f, -71.0f,  20.0f), Vector3(1.0f, 18.0f, 2.0f) },
-            { Vector3(39.45f, -63.0f,  25.0f), Vector3(1.0f,  2.0f, 10.0f) },
-            { Vector3(39.45f, -71.0f,  25.0f), Vector3(1.0f,  2.0f, 10.0f) },
-            { Vector3(39.45f, -79.0f,  25.0f), Vector3(1.0f,  2.0f, 10.0f) },
-            { Vector3(39.45f, -71.0f,  36.0f), Vector3(1.0f, 18.0f, 2.0f) },
-            { Vector3(39.45f, -79.0f,  41.0f), Vector3(1.0f,  2.0f, 12.0f) },
-            { Vector3(39.45f, -71.0f,  52.0f), Vector3(1.0f, 18.0f, 2.0f) },
-            { Vector3(39.45f, -63.0f,  57.0f), Vector3(1.0f,  2.0f, 10.0f) },
-            { Vector3(39.45f, -71.0f,  57.0f), Vector3(1.0f,  2.0f, 10.0f) },
-            { Vector3(39.45f, -67.0f,  62.0f), Vector3(1.0f, 10.0f, 2.0f) }
-        };
         for (int index = 0; index < Stage2ScratchCount; ++index)
         {
-            Wall* scratch = createWall(
+            Wall* scratch = createPlacedWall(
                 Stage2ScratchNames[index],
-                scratchPieces[index].Position,
-                scratchPieces[index].Scale,
                 Color(0.16f, 0.006f, 0.003f, 1.0f),
                 false);
             scratch->SetCastsShadow(false);
@@ -453,11 +375,7 @@ namespace Stage2Layout
         }
 
         // 棚と、その上の電池（進行に合わせて出している）
-        Wall* batteryShelf = createWall(
-            "Stage2BatteryShelf",
-            Vector3(35.8f, -87.0f, -45.0f),
-            Vector3(8.0f, 2.0f, 10.0f),
-            Color(0.07f, 0.055f, 0.045f, 1.0f),
+        Wall* batteryShelf = createPlacedWall("Stage2BatteryShelf", Color(0.07f, 0.055f, 0.045f, 1.0f),
             false);
         batteryShelf->SetCastsShadow(false);
         BatteryItem* battery = builder.Create<BatteryItem>("Stage2Battery");
@@ -478,11 +396,12 @@ namespace Stage2Layout
         PropLayoutFile::ApplyPlacement(*light4, at("CeilingLight4"));
         light4->SetEmergencyLight(false, 4.1f);
         // 廊下の中ほどに、天井から吊るした裸電球を2つ下げている（すきま風でゆっくり揺れ、異変や影が近いときに大きく揺れる）
-        const float bulbZ[] = { 0.0f, 75.0f };
+        // 吊るす付け根の位置は、配置のファイルの place Stage2HangingBulb1・2 から読んでいる
         for (std::size_t index = 0; index < objects.hangingBulbs.size(); ++index)
         {
-            HangingBulb* bulb = builder.Create<HangingBulb>(index == 0 ? "Stage2HangingBulb1" : "Stage2HangingBulb2");
-            bulb->Place(Vector3(0.0f, -48.5f, bulbZ[index]), 1.3f + static_cast<float>(index) * 2.1f);
+            const char* name = index == 0 ? "Stage2HangingBulb1" : "Stage2HangingBulb2";
+            HangingBulb* bulb = builder.Create<HangingBulb>(name);
+            bulb->Place(at(name).Position, 1.3f + static_cast<float>(index) * 2.1f);
             objects.hangingBulbs[index] = bulb;
         }
 
@@ -527,24 +446,19 @@ namespace Stage2Layout
         // 隠れられるロッカー。本体は当たり判定のある箱（Wall）、扉と「隠れる」操作はLockerが担当している。
         // 時計・偽の扉・肖像画・端末・信号盤・電池と重ならない位置に、左右1つずつ置いている。
         const Color lockerColor(0.16f, 0.19f, 0.17f, 1.0f);
-        const auto createLocker = [&builder, &createWall, &lockerColor](
-            const char* name,
-            const char* bodyName,
-            float wallSideX,
-            float z)
+        // 本体（当たり判定のある箱）の位置と大きさ、扉の中心の位置と正面の向きは、配置のファイルの place 行から読んでいる
+        const auto createLocker = [&builder, &createPlacedWall, &lockerColor, &at](const char* name, const char* bodyName)
         {
-            // wallSideXは壁側の符号（左の壁は-1、右の壁は+1）。扉は廊下の中央を向いている。
             // 本体の見た目は、上の通気口・脚・継ぎ目のあるロッカー（Mayaで作ったモデル。当たり判定は箱のまま）
-            createWall(bodyName, Vector3(wallSideX * 35.0f, -77.0f, z),
-                Vector3(10.0f, 44.0f, 16.0f), lockerColor, true)->SetVisualModel("locker_body");
+            createPlacedWall(bodyName, lockerColor, true)->SetVisualModel("locker_body");
             Locker* locker = builder.Create<Locker>(name);
-            locker->Place(Vector3(wallSideX * 29.95f, -77.0f, z),
-                wallSideX < 0.0f ? DirectX::XM_PIDIV2 : -DirectX::XM_PIDIV2);
+            const PropPlacement& door = at(name);
+            locker->Place(door.Position, door.Yaw);
             return locker;
         };
         objects.lockers = {
-            createLocker("Stage2LockerLeft", "Stage2LockerLeftBody", -1.0f, -62.0f),
-            createLocker("Stage2LockerRight", "Stage2LockerRightBody", 1.0f, 40.0f) };
+            createLocker("Stage2LockerLeft", "Stage2LockerLeftBody"),
+            createLocker("Stage2LockerRight", "Stage2LockerRightBody") };
         return objects;
     }
 }

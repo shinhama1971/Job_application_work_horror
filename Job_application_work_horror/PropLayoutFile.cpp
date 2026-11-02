@@ -151,6 +151,24 @@ namespace PropLayoutFile
                     }
                 }
             }
+            else if (command == "spot")
+            {
+                // spot 組の名前 x y z（同じ組の名前を何行も書くと、候補が増える）
+                std::string group;
+                DirectX::SimpleMath::Vector3 position;
+                if (!(line >> group >> position.x >> position.y >> position.z))
+                {
+                    return fail(lineNumber, "spot の後に 組の名前 x y z が必要");
+                }
+                auto existing = std::find_if(layout.Spots.begin(), layout.Spots.end(),
+                    [&group](const auto& spots) { return spots.first == group; });
+                if (existing == layout.Spots.end())
+                {
+                    layout.Spots.emplace_back(group, std::vector<DirectX::SimpleMath::Vector3>{});
+                    existing = layout.Spots.end() - 1;
+                }
+                existing->second.push_back(position);
+            }
             else if (command == "place")
             {
                 // place 名前 x y z [yaw 度] [size 幅 高さ 奥行き]
@@ -298,6 +316,17 @@ namespace PropLayoutFile
             utility::ReportFatalError("配置のファイルに place " + name + " がありません。");
         }
         return *found;
+    }
+
+    const std::vector<DirectX::SimpleMath::Vector3>& GetSpots(const PropLayout& layout, const std::string& group)
+    {
+        const auto found = std::find_if(layout.Spots.begin(), layout.Spots.end(),
+            [&group](const auto& spots) { return spots.first == group; });
+        if (found == layout.Spots.end() || found->second.empty())
+        {
+            utility::ReportFatalError("配置のファイルに spot " + group + " がありません。");
+        }
+        return found->second;
     }
 
     std::vector<DirectX::SimpleMath::Vector4> CollectRoomFootprints(const PropLayout& layout)

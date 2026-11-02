@@ -17,6 +17,8 @@
 
 #include <SimpleMath.h>
 
+#include <cmath>
+
 #include <string>
 #include <vector>
 #include <utility>
@@ -79,6 +81,8 @@ struct PropLayout
     std::vector<PropDescription> Props;
     // place 行（ファイルの順）
     std::vector<PropPlacement> Placements;
+    // spot 行（候補の場所。プレイごとに1つを選ぶ物の置き場所など）を、組の名前ごとにファイルの順で
+    std::vector<std::pair<std::string, std::vector<DirectX::SimpleMath::Vector3>>> Spots;
     // color で付けた名前と色（ファイルの順。先頭は光らないことを表す none）
     std::vector<std::pair<std::string, DirectX::SimpleMath::Color>> Colors;
     // 色の名前ごとのPBRの仕上げ（metal・rough を付けた色だけ）
@@ -97,12 +101,19 @@ namespace PropLayoutFile
     // place 行の置き場所を、名前で返している（ファイルに書いていない名前なら、理由を出して終了している）
     const PropPlacement& GetPlacement(const PropLayout& layout, const std::string& name);
 
-    // 置き場所を物に当てはめている。扉・壁・電池・照明は float 3つの SetPosition を持ち、その中で動きの基準（開く前の位置、
-    // 浮く動きの中心の高さ）も覚えるので、あればそちらを呼んでいる
-    template<typename T>
-    void ApplyPlacement(T& object, const PropPlacement& placement)
+    // spot 行の候補の場所を、組の名前で返している（1つもなければ、理由を出して終了している）
+    const std::vector<DirectX::SimpleMath::Vector3>& GetSpots(const PropLayout& layout, const std::string& group);
+
+    // place の向き（yaw）を、真上から見た水平の向き（+Z が0度）の単位ベクトルにしている（壁の文字の面の向きなど）
+    inline DirectX::SimpleMath::Vector3 GetFacing(const PropPlacement& placement)
     {
-        const DirectX::SimpleMath::Vector3& position = placement.Position;
+        return DirectX::SimpleMath::Vector3(std::sin(placement.Yaw), 0.0f, std::cos(placement.Yaw));
+    }
+
+    // 物を指定した位置へ動かしている（float 3つの SetPosition があれば、そちらで動きの基準も覚えさせる）
+    template<typename T>
+    void MoveTo(T& object, const DirectX::SimpleMath::Vector3& position)
+    {
         if constexpr (requires { object.SetPosition(0.0f, 0.0f, 0.0f); })
         {
             object.SetPosition(position.x, position.y, position.z);
@@ -111,6 +122,14 @@ namespace PropLayoutFile
         {
             object.SetPosition(position);
         }
+    }
+
+    // 置き場所を物に当てはめている。扉・壁・電池・照明は float 3つの SetPosition を持ち、その中で動きの基準（開く前の位置、
+    // 浮く動きの中心の高さ）も覚えるので、あればそちらを呼んでいる
+    template<typename T>
+    void ApplyPlacement(T& object, const PropPlacement& placement)
+    {
+        MoveTo(object, placement.Position);
         if (placement.HasYaw)
         {
             object.SetRotation(DirectX::SimpleMath::Vector3(0.0f, placement.Yaw, 0.0f));
