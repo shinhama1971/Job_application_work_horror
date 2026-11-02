@@ -57,6 +57,7 @@ prop Wall5                     -117.5 -74 40   205 50 4   concrete none 4 1 weat
 prop Wall6                     117.5 -74 40   205 50 4   concrete none 4 1 weathering room
 prop Wall7                     -135 -74 -70   170 50 4   concrete none 4 1 weathering room
 prop Wall8                     135 -74 -70   170 50 4   concrete none 4 1 weathering room
+prop Wall8_1                     135 -74 -24.1   170 50 4   concrete none 4 1 weathering room
 prop Wall9                     -90 -74 -140   4 50 80   concrete none 4 1 weathering room
 prop Wall10                    90 -74 -140   4 50 80   concrete none 4 1 weathering room
 prop Wall11                    -45 -74 75   4 50 70   concrete none 4 1 weathering room
