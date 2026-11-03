@@ -528,12 +528,12 @@ float4 main(in LIT_PS_IN input) : SV_Target
         pbrRoughness = metalWear.roughness;
         metalRustHeight = metalWear.height;
 
-        // 汚れと古さの凹凸で、法線を傾けている（古さが濃いほど強く）
+        // 汚れと古さの凹凸で、法線を傾けている（古さが濃いほど強く。滑らかな材質ほど弱く）
         detailWorldNormal = GetBumpedWorldNormal(
             input.worldPos,
             input.worldNormal,
             ageing.height + paintingRelief + metalRustHeight * 0.6f,
-            0.72f * (1.0f + 0.8f * weathering));
+            0.72f * (1.0f + 0.8f * weathering) * (1.0f - saturate(Material.BumpFlatten)));
     }
     // 鏡面反射・環境の映り込み・懐中電灯の陰影は、凹凸を弱めた法線で計算している（flashlightLighting.hlsli）。
     // 凹凸をそのまま使うと、ニスの扉の面に、映り込んだ景色がまだらに出るため（天井の照明の拡散反射と環境光は凹凸をそのまま使う）

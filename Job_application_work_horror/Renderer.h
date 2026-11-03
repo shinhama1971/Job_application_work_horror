@@ -175,7 +175,10 @@ struct MATERIAL
 	// Roughness は表面の粗さ（0.045〜1）。0 は指定なしで、Shininess（光沢の強さ）から換算している。
 	float Metallic;
 	float Roughness;
-	float PbrPadding[2];
+	// 計算で付ける凹凸（汚れと古さの凹凸）を弱める割合（0 = そのまま、1 = 平ら）。
+	// コンクリート向けの凹凸が、ニスを塗った木の扉のような滑らかな面で、照らすとまだらに見えるのを抑えている
+	float BumpFlatten;
+	float PbrPadding;
 
 
 };

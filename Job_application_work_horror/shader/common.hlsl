@@ -88,7 +88,9 @@ struct MATERIAL
     // PBR（金属・粗さの方式。pbrLighting.hlsli）。金属らしさ0〜1と、粗さ（0は指定なし。光沢の強さから換算する）
     float Metallic;
     float Roughness;
-    float2 PbrPadding;
+    // 計算で付ける凹凸を弱める割合（0 = そのまま、1 = 平ら。ニスを塗った木の扉など、滑らかな面に使っている）
+    float BumpFlatten;
+    float PbrPadding;
 };
 // ----------------------------------------------------------------------------
 // タイルベースライティング

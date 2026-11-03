@@ -126,6 +126,7 @@
 | 未使用のコード・素材の削除、`TestPipe` を `PipeProp` に改名 | 複数 | 修正 |
 | `Player::Update`（約400行）を、移動と当たり判定・足音・懐中電灯・カメラ・手・体の影などの関数に分割（処理の中身と順番は変えず、自動撮影の経過と画面で確認） | `Player.*` | 修正 |
 | ビュー行列の定数バッファ（b1）がピクセルシェーダーに設定されておらず、壁と床の凹凸・懐中電灯の面の向き・鏡面反射・環境の映り込みが計算されていなかった不具合（ARCHITECTURE.md の既知の問題）の修正と、直した後の明るさ・凹凸の強さの調整（計測モードと自動撮影の画面を、直す前と並べて比較） | `Renderer.cpp`, `shader/flashlightLighting.hlsli`, `shader/litTexturePS.hlsl`, `shader/wetFloorPS.hlsl` | 修正 |
+| 上の修正の後も木の扉に残った白っぽいまだらの原因（コンクリート向けの凹凸を木の扉にも付けていた）の切り分けと、マテリアルに凹凸を弱める割合を足して扉だけ弱める修正（`Material::Create` が新しい値を写していなかった漏れも、撮影の差分が0だったことから見つけて修正） | `Renderer.h`, `Material.h`, `Door.cpp`, `shader/common.hlsl`, `shader/litTexturePS.hlsl` | 修正 |
 | README・ARCHITECTURE.md の更新（機能追加・設計変更に合わせた説明の追記） | `README.md`, `ARCHITECTURE.md` | 修正 |
 
 ### ビルド環境

@@ -73,6 +73,7 @@ public:
 		m_Material.TextureEnable = mtrl.TextureEnable;
 		m_Material.Metallic = mtrl.Metallic;
 		m_Material.Roughness = mtrl.Roughness;
+		m_Material.BumpFlatten = mtrl.BumpFlatten;
 
 		Update();
 

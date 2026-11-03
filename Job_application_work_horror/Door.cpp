@@ -55,14 +55,17 @@ void Door::Init()
     material.Shininess = 8.0f;
     material.TextureEnable = FALSE;
     material.Roughness = 0.58f;
+    // ニスを塗った木の面なので、コンクリート向けの凹凸を弱めている（そのままだと、照らすと白っぽいまだらが出た）
+    material.BumpFlatten = 0.8f;
     m_Material->Create(material);
 
     // 取っ手のマテリアル。真鍮の金属で、手で触れて少し磨かれた粗さにしている（頂点の色が映り込みの色になる）。
-    // 手の脂と汚れの膜の分だけ、金属らしさを少し下げている
+    // 手の脂と汚れの膜の分だけ、金属らしさを少し下げている。錆と擦れ傷の凹凸は弱めずに残している
     m_HandleMaterial = std::make_unique<Material>();
     MATERIAL handleMaterial = material;
     handleMaterial.Metallic = 0.85f;
     handleMaterial.Roughness = 0.36f;
+    handleMaterial.BumpFlatten = 0.0f;
     m_HandleMaterial->Create(handleMaterial);
 
     // 漏れ光のマテリアル（光る色はDrawで毎回決め直している）
