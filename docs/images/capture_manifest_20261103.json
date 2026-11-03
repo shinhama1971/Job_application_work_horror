@@ -1,55 +1,55 @@
 {
   "date": "2026-11-03",
-  "method": "実機自動撮影（tools/capture-daily.ps1、--capture、エフェクト設定2）。11月1日のMayaのモデル（一人称の手と懐中電灯、小物）に差し替えた後の画面。コピー後のバイト一致を確認。画像の明るさ・色は未加工。",
+  "method": "実機自動撮影（tools/capture-daily.ps1、--capture、エフェクト設定2）。11月1日のMayaのモデル（一人称の手と懐中電灯、小物）に差し替え、11月3日にピクセルシェーダーへビュー行列が届いていなかった不具合（凹凸・鏡面反射・映り込みが出ていなかった）を直した後の画面。コピー後のバイト一致を確認。画像の明るさ・色は未加工。",
   "images": [
     {
       "source": "capture/01_1面_開始地点_照らすと浮かぶ壁の文字.png",
       "target": "docs/images/game_01_writing_20261103.png",
       "role": "懐中電灯で浮かぶ文字",
       "view": "通常表示",
-      "sha256": "558f5e88428a36c224c7923a8fa04a91520b39d10bac30e12906089f0280a203"
+      "sha256": "3c042170e953f55b848b86015ea19c01ba69a47f44ad0535cbf28a076ccefa1e"
     },
     {
       "source": "capture/05b_1面_西棟の柱の並ぶ浸水した広間.png",
       "target": "docs/images/game_02_west_wing_20261103.png",
       "role": "西棟の浸水した広間",
       "view": "通常表示",
-      "sha256": "7e975ce34254e17909f8bb7b1118102937c0bcd3c8eb9d7c65c9cf56a5ff03cf"
+      "sha256": "c536a5d5f7cafa0f22bf0eaeef59e27570374afa2ce3e151fe7c0293b64ffd66"
     },
     {
       "source": "capture/05l_1面_右の倉庫の壁の血の手形.png",
       "target": "docs/images/game_03_handprint_20261103.png",
       "role": "壁の血の手形",
       "view": "通常表示",
-      "sha256": "2bfdac1839079873492b23dad2e5b7d158dcca08353b10dada54731dcdb6c8dc"
+      "sha256": "8f84c7a6906bbba355ddc7f5fe289da2483af70fe3a9cf3549451a6d36459ed1"
     },
     {
       "source": "capture/05i_1面_光の安全地帯の裸電球.png",
       "target": "docs/images/game_04_safe_light_20261103.png",
       "role": "安全地帯の灯り",
       "view": "通常表示",
-      "sha256": "2a063f373dee1bfa69d6db29c71c01689a33ff7069897c5de56a30f4a8b63fc2"
+      "sha256": "1fd56d62d7d1ffc52327ffbf6fb84b4700bfcb4024859bf99cd132f3b39d5ead"
     },
     {
       "source": "capture/06_2面_ループ廊下.png",
       "target": "docs/images/game_05_stage2_corridor_20261103.png",
       "role": "2面の廊下",
       "view": "通常表示",
-      "sha256": "c4b560879333374e04f70455ca830e1683a1c53f686cf61372ed1acbf2d1f423"
+      "sha256": "438d8420ee91af42a4ea04bee2a0ef95ac9b9c56603af0fbaf7dcb84d3de8a50"
     },
     {
       "source": "capture/05c_1面_西棟のポンプ室と排水口.png",
       "target": "docs/images/tech_01_ripple_wall_light_20261103.png",
       "role": "金属ポンプ（Mayaのモデル）の錆と水面からの光",
       "view": "通常表示",
-      "sha256": "5581e4f86ada4b2740c6927b16ff4a8a92f5156c9e024d6a1f9ba9c3da6cf012"
+      "sha256": "20dead80fc8f2c272f6039bc75ed55c150c194eae52437489b2af9dc0dbccf55"
     },
     {
       "source": "capture/05k_1面_足音の波紋と波打つ反射.png",
       "target": "docs/images/tech_02_ripple_floor_20261103.png",
       "role": "水面の波と反射",
       "view": "通常表示",
-      "sha256": "0c667d717154e7e08b9da20666482b79663981527f9ef42426986e083d0c4c9e"
+      "sha256": "a02f2cafcf63194d7cc1e052b44a1d92feec2f9120f5125143c6d9e35dfca74a"
     }
   ]
 }
