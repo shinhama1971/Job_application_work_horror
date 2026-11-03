@@ -287,7 +287,8 @@ HRESULT Renderer::Init()
 
 	m_pDeviceContext->PSSetSamplers(0, 1, samplerState.GetAddressOf());
 
-	// 行列の定数バッファを作り、頂点シェーダーのb0（ワールド）・b1（ビュー）・b2（射影）に設定している
+	// 行列の定数バッファを作り、頂点シェーダーのb0（ワールド）・b1（ビュー）・b2（射影）に設定している。
+	// ビューはピクセルシェーダーのb1にも設定している（壁と床が、凹凸で傾けた法線や光の向きをビュー空間へ回すのに使う）
 	D3D11_BUFFER_DESC bufferDesc{};
 	bufferDesc.ByteWidth = sizeof(Matrix);
 	bufferDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -304,6 +305,7 @@ HRESULT Renderer::Init()
 	hr = m_pDevice->CreateBuffer(
 		&bufferDesc, NULL, m_pViewBuffer.ReleaseAndGetAddressOf());
 	m_pDeviceContext->VSSetConstantBuffers(1, 1, m_pViewBuffer.GetAddressOf());
+	m_pDeviceContext->PSSetConstantBuffers(1, 1, m_pViewBuffer.GetAddressOf());
 	if (FAILED(hr)) return hr;
 
 	hr = m_pDevice->CreateBuffer(

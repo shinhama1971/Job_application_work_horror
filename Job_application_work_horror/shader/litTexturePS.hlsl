@@ -535,9 +535,17 @@ float4 main(in LIT_PS_IN input) : SV_Target
             ageing.height + paintingRelief + metalRustHeight * 0.6f,
             0.72f * (1.0f + 0.8f * weathering));
     }
-    const float3 detailViewNormal = normalize(mul(
-        float4(detailWorldNormal, 0.0f),
-        View).xyz);
+    // 鏡面反射・環境の映り込み・懐中電灯の陰影は、凹凸を弱めた法線で計算している（flashlightLighting.hlsli）。
+    // 凹凸をそのまま使うと、ニスの扉の面に、映り込んだ景色がまだらに出るため（天井の照明の拡散反射と環境光は凹凸をそのまま使う）
+#if defined(PORTRAIT_SURFACE) || defined(CLOCK_SURFACE) || defined(DOOR_SURFACE)
+    // 計算で描いた絵の面（肖像画・時計・偽の扉）は、筆の跡やひび割れの細かい凹凸が、懐中電灯で1画素ごとのざらつきになるため、
+    // 平らな面の向きを使っている（細かい凹凸は、天井の照明の陰影でだけ見える）
+    const float3 detailViewNormal = normalize(input.viewNormal);
+#else
+    const float3 detailViewNormal = GetFlashlightShadingNormal(
+        input.viewNormal,
+        normalize(mul(float4(detailWorldNormal, 0.0f), View).xyz));
+#endif
 
     // PBRの材質（金属・粗さの方式。pbrLighting.hlsli）。汚れと古さを付けた後の色を元の色にし、濡れた所は粗さを下げている。
     // 拡散反射（lighting）と鏡面反射（specularLighting）を光ごとに分けて足し、最後に材質の色と合わせている。
@@ -653,11 +661,11 @@ float4 main(in LIT_PS_IN input) : SV_Target
             const float3 normal = detailViewNormal;
             const float3 directionToLight = -pixelDirection;
             const float lambert = saturate(dot(normal, directionToLight));
-            // 横から当たる面も真っ暗にならないよう、明るさの下限を設けている
-            const float softenedLambert = 0.25f + lambert * 0.75f;
+            const float softenedLambert = GetFlashlightDiffuseFacing(lambert);
 
             const float3 flashlightRadiance = flashlightColor
                 * Light.Intensity
+                * FLASHLIGHT_RADIANCE_SCALE
                 * beamProfile
                 * naturalAttenuation
                 * lensPattern

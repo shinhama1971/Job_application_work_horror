@@ -14,6 +14,27 @@ float3 GetHemisphereAmbient(float3 worldNormal)
     return Light.Ambient.rgb * tint * lerp(0.90f, 1.06f, skyAmount);
 }
 
+// 懐中電灯の光の強さの調整値と、陰影に使う凹凸の割合。
+// 以前はビュー行列（b1）がピクセルシェーダーに届かず、懐中電灯の当たり方が面の向きによらず一律0.25になり、鏡面反射も0になっていた。
+// 光の強さ（Light.Intensity）はその状態で調整してきたため、面の向きと鏡面反射を正しく計算した上で、
+// 正面から当たる面がそれに近い明るさになるよう、懐中電灯の光（拡散反射と鏡面反射）に係数を掛けている。
+static const float FLASHLIGHT_RADIANCE_SCALE = 0.30f;
+// 懐中電灯は目のすぐそばから正面に当たるので、天井の照明よりも凹凸の陰影が強く出て、壁がまだらに見える。
+// 懐中電灯の陰影だけ、凹凸で傾けた法線を、元の面の向きへこの割合まで戻している（天井の照明は凹凸をそのまま使う）。
+static const float FLASHLIGHT_BUMP_AMOUNT = 0.25f;
+
+// 懐中電灯の陰影に使う、凹凸を弱めた法線（ビュー空間）を返している
+float3 GetFlashlightShadingNormal(float3 viewNormal, float3 detailViewNormal)
+{
+    return normalize(lerp(normalize(viewNormal), detailViewNormal, FLASHLIGHT_BUMP_AMOUNT));
+}
+
+// 懐中電灯の拡散反射の、面の向きによる明るさを返している（横から当たる面も真っ暗にならないよう、下限を設けている）
+float GetFlashlightDiffuseFacing(float lambert)
+{
+    return 0.25f + lambert * 0.75f;
+}
+
 // 懐中電灯の円錐の中での明るさ（内側の円錐で最大、外側の円錐で0）を返している
 float GetFlashlightBeamProfile(float3 pixelDirection)
 {

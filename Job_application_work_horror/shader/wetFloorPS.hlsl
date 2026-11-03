@@ -547,20 +547,25 @@ float4 main(in LIT_PS_IN input) : SV_Target
             const float naturalAttenuation = attenuation *
                 lerp(1.0f, physicalFalloff, 0.32f);
 
-            // 1面は目地・ひび・水の波の凹凸を懐中電灯にも反映している（2面は前と同じく平らな面で計算）。
+            // 床の古さを描く面（1面・2面）は、目地・ひび・水の波の凹凸を懐中電灯にも反映している（古さのない床は平らな面で計算）。
+            // 拡散反射は凹凸を弱めた法線、濡れた所の鏡面反射は凹凸をそのまま使い、波の斜面が光をきらっと返すようにしている
             const float3 normal = WallWeathering > 0.0f
                 ? normalize(mul(float4(detailWorldNormal, 0.0f), View).xyz)
                 : normalize(input.viewNormal);
             const float3 directionToLight = -pixelDirection;
-            const float lambert = saturate(dot(normal, directionToLight));
-            const float softenedLambert = 0.25f + lambert * 0.75f;
+            const float lambert = saturate(dot(
+                GetFlashlightShadingNormal(input.viewNormal, normal), directionToLight));
+            const float softenedLambert = GetFlashlightDiffuseFacing(lambert);
 
             const float shadow = GetFlashlightShadow(input.shadowPos) * GetUnseenFigureFlashlightShadow(input.worldPos);
             const float flashlightAmount = Light.Intensity
                 * beamProfile * naturalAttenuation * lensPattern * shadow * flashlightOcclusion;
 
+            // 面の向きを使う拡散反射と鏡面反射には、懐中電灯の光の強さの調整値を掛けている（flashlightLighting.hlsli）。
+            // 下の水面の弱い反射と波の光は、面の向きを使わずに調整した明るさなので掛けていない
             lighting += flashlightColor
                 * flashlightAmount
+                * FLASHLIGHT_RADIANCE_SCALE
                 * softenedLambert;
 
             // 濡れた面の鏡面反射（水たまりほど鋭く強い）
@@ -570,11 +575,13 @@ float4 main(in LIT_PS_IN input) : SV_Target
                 lerp(18.0f, 92.0f, puddle));
             specularLighting += flashlightColor
                 * flashlightAmount
+                * FLASHLIGHT_RADIANCE_SCALE
                 * wetSpecular
                 * lerp(0.025f, 1.15f, puddle);
             // 濡れた足跡も、懐中電灯の光を細く返す
             specularLighting += flashlightColor
                 * flashlightAmount
+                * FLASHLIGHT_RADIANCE_SCALE
                 * pow(saturate(dot(normal, halfVector)), 48.0f)
                 * 0.55f * footprintWet;
 
