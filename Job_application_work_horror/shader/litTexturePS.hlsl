@@ -528,12 +528,17 @@ float4 main(in LIT_PS_IN input) : SV_Target
         pbrRoughness = metalWear.roughness;
         metalRustHeight = metalWear.height;
 
-        // 汚れと古さの凹凸で、法線を傾けている（古さが濃いほど強く）
+        // 汚れと古さの凹凸で、法線を傾けている（古さが濃いほど強く）。
+        // 扉や家具などの小物は、コンクリートの壁より平らな面なので、凹凸を半分にしている
+        // （懐中電灯で正面から照らすと、壁と同じ強さでは木の扉が叩いた金属のように見えるため）
+        const float bumpStrength = Material.WeatheringSurface
+            ? 0.72f * (1.0f + 0.8f * weathering)
+            : 0.36f;
         detailWorldNormal = GetBumpedWorldNormal(
             input.worldPos,
             input.worldNormal,
             ageing.height + paintingRelief + metalRustHeight * 0.6f,
-            0.72f * (1.0f + 0.8f * weathering));
+            bumpStrength);
     }
     const float3 detailViewNormal = normalize(mul(
         float4(detailWorldNormal, 0.0f),
@@ -653,8 +658,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
             const float3 normal = detailViewNormal;
             const float3 directionToLight = -pixelDirection;
             const float lambert = saturate(dot(normal, directionToLight));
-            // 横から当たる面も真っ暗にならないよう、明るさの下限を設けている
-            const float softenedLambert = 0.25f + lambert * 0.75f;
+            // 横から当たる面も真っ暗にならず、正面の面も明るくなりすぎないよう、幅を抑えている（flashlightLighting.hlsli）
+            const float softenedLambert = GetFlashlightDiffuseResponse(lambert);
 
             const float3 flashlightRadiance = flashlightColor
                 * Light.Intensity

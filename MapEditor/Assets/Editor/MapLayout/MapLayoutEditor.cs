@@ -288,23 +288,33 @@ namespace MapLayout.Editor
         public static void Export(MapLayoutRoot root, string path)
         {
             var document = MapLayoutDocument.Load(root.FilePath);
-            var items = root.GetComponentsInChildren<MapLayoutItem>(true);
+            // コピーの元を先に処理するため、同じ行から作られた物は、読み込んだときの名前のままの物を先に並べている
+            var items = root.GetComponentsInChildren<MapLayoutItem>(true)
+                .OrderBy(item => IsCopy(item) ? 1 : 0).ToArray();
+            var lineIndices = ResolveLines(document, items);
             var usedLines = new HashSet<int>();
             var appended = new List<(int after, MapLayoutDocument.Line line)>();
-            var names = new HashSet<string>(items.Select(item => item.Key));
+            var written = new List<(MapLayoutItem item, MapLayoutDocument.Line line, string newKey)>();
+            // 新しい行の名前は、ファイルにある名前とも重ならないようにしている（ゲームは同じ名前の行があると読めない）
+            var names = new HashSet<string>(document.Lines
+                .Where(line => (line.Command == "prop" || line.Command == "place") && line.Tokens.Count > 1)
+                .Select(line => line.Tokens[1].Text));
 
             foreach (var item in items)
             {
                 var transform = item.transform;
                 var position = transform.position - root.transform.position;
-                if (item.LineIndex < 0 || item.LineIndex >= document.Lines.Count)
+                var lineIndex = lineIndices[item];
+                if (lineIndex < 0)
                 {
+                    Debug.LogWarning("配置ファイルに行が見つからないので書き出していません（読み込み直してください）: " + item.name);
                     continue;
                 }
-                var template = document.Lines[item.LineIndex];
+                var template = document.Lines[lineIndex];
                 // 同じ行から作られた2つ目以降（シーンでコピーした prop）は、元の行をひな形にした新しい行にしている
                 var line = template;
-                if (!usedLines.Add(item.LineIndex))
+                string newKey = null;
+                if (!usedLines.Add(lineIndex))
                 {
                     if (item.Kind != MapLayoutKind.Prop)
                     {
@@ -312,11 +322,12 @@ namespace MapLayout.Editor
                         continue;
                     }
                     line = MapLayoutDocument.Line.Parse(template.Content.TrimEnd());
-                    var name = MakeUniqueName(item.name, names);
-                    names.Add(name);
-                    line.SetToken(1, name);
-                    appended.Add((item.LineIndex, line));
+                    newKey = MakeUniqueName(item.name, names);
+                    names.Add(newKey);
+                    line.SetToken(1, newKey);
+                    appended.Add((lineIndex, line));
                 }
+                written.Add((item, line, newKey));
 
                 line.SetNumber(2, position.x);
                 line.SetNumber(3, position.y);
@@ -339,16 +350,85 @@ namespace MapLayout.Editor
             {
                 document.Lines.Insert(after + 1, line);
             }
-            for (var index = 0; index < document.Lines.Count; ++index)
+            // 足した行で行番号がずれているので、番号ではなく、書き込んだ行そのもので比べている
+            var writtenLines = new HashSet<MapLayoutDocument.Line>(written.Select(entry => entry.line));
+            foreach (var line in document.Lines)
             {
-                var command = document.Lines[index].Command;
-                if ((command == "prop" || command == "place" || command == "spot") && !usedLines.Contains(index) &&
-                    !appended.Any(entry => ReferenceEquals(entry.line, document.Lines[index])))
+                var command = line.Command;
+                if ((command == "prop" || command == "place" || command == "spot") && !writtenLines.Contains(line))
                 {
-                    Debug.LogWarning("シーンにない行は、そのまま残しています: " + document.Lines[index].Text.Trim());
+                    Debug.LogWarning("シーンにない行は、そのまま残しています: " + line.Text.Trim());
                 }
             }
             document.Save(path);
+
+            // 書き出した後の行番号と、コピーに付けた新しい名前を印へ写している。
+            // 読み込み直さずに続けて書き出しても、コピーがもう一度足されず、同じ物を同じ行へ書き込むようにするため
+            if (path == root.FilePath)
+            {
+                foreach (var (item, line, newKey) in written)
+                {
+                    item.LineIndex = document.Lines.IndexOf(line);
+                    if (newKey != null)
+                    {
+                        item.Key = newKey;
+                    }
+                    EditorUtility.SetDirty(item);
+                }
+                if (!Application.isBatchMode)
+                {
+                    EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
+                }
+            }
+        }
+
+        // シーンでコピーした物か（読み込んだ物は、prop と place は行の名前、spot は「組の名前 番号」の名前で作っている）
+        static bool IsCopy(MapLayoutItem item)
+        {
+            return item.Kind == MapLayoutKind.Spot ? item.name.Contains("(") : item.name != item.Key;
+        }
+
+        // 印ごとに、今のファイルの何行目に当たるかを求めている。
+        // 読み込んだときの行番号は、書き出しで行が増えたときや、ゲームの配置エディター・手でファイルを書き換えたときにずれるので、
+        // その行が同じ種類・同じ名前でなければ、名前で探し直している（spot は同じ組の何番目かで探す）
+        static Dictionary<MapLayoutItem, int> ResolveLines(MapLayoutDocument document, IEnumerable<MapLayoutItem> items)
+        {
+            var result = new Dictionary<MapLayoutItem, int>();
+            var spotOrder = new Dictionary<MapLayoutItem, int>();
+            foreach (var group in items.Where(item => item.Kind == MapLayoutKind.Spot).GroupBy(item => item.Key))
+            {
+                var ordered = group.Where(item => !IsCopy(item)).OrderBy(item => item.LineIndex).ToList();
+                for (var order = 0; order < ordered.Count; ++order)
+                {
+                    spotOrder[ordered[order]] = order;
+                }
+            }
+
+            foreach (var item in items)
+            {
+                var command = item.Kind == MapLayoutKind.Prop ? "prop" : item.Kind == MapLayoutKind.Place ? "place" : "spot";
+                bool Matches(int index) =>
+                    index >= 0 && index < document.Lines.Count &&
+                    document.Lines[index].Command == command &&
+                    document.Lines[index].Tokens.Count > 1 && document.Lines[index].Tokens[1].Text == item.Key;
+
+                if (item.Kind == MapLayoutKind.Spot)
+                {
+                    // spot のコピーは書き出さないが、元の行を探しておき、書き出しの方で知らせる
+                    var order = spotOrder.TryGetValue(item, out var value) ? value : 0;
+                    var candidates = Enumerable.Range(0, document.Lines.Count).Where(Matches).ToList();
+                    result[item] = order < candidates.Count ? candidates[order] : -1;
+                }
+                else if (Matches(item.LineIndex))
+                {
+                    result[item] = item.LineIndex;
+                }
+                else
+                {
+                    result[item] = Enumerable.Range(0, document.Lines.Count).Where(Matches).DefaultIfEmpty(-1).First();
+                }
+            }
+            return result;
         }
 
         static void WritePlaceRotationAndSize(MapLayoutDocument.Line line, Transform transform)

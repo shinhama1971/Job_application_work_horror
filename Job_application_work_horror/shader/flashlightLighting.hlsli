@@ -14,6 +14,14 @@ float3 GetHemisphereAmbient(float3 worldNormal)
     return Light.Ambient.rgb * tint * lerp(0.90f, 1.06f, skyAmount);
 }
 
+// 懐中電灯の拡散光の強さを、面と光の角度（lambert）から返している。床と壁で共通。
+// 横から当たる面も真っ暗にならないよう下限を設け、正面から当たる面も明るくなりすぎないよう上限を抑えている
+// （1面の暗さは、面の向きによらず下限の0.25で当たっていたころに合わせて決めたため。凹凸の陰影はこの幅の中で出る）
+float GetFlashlightDiffuseResponse(float lambert)
+{
+    return lerp(0.22f, 0.45f, lambert);
+}
+
 // 懐中電灯の円錐の中での明るさ（内側の円錐で最大、外側の円錐で0）を返している
 float GetFlashlightBeamProfile(float3 pixelDirection)
 {

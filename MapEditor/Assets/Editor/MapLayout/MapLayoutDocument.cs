@@ -139,9 +139,31 @@ namespace MapLayout.Editor
             return builder.ToString();
         }
 
+        // Debug版のゲームはファイルの更新を見張って読み直すので、書きかけのファイルを読まれないよう、
+        // 隣の一時ファイルに書き終えてから差し替えている。ゲームがちょうど読んでいて差し替えられないときは、少し待ってやり直す
         public void Save(string path)
         {
-            File.WriteAllText(path, ToText(), new UTF8Encoding(false));
+            var temporary = path + ".tmp";
+            File.WriteAllText(temporary, ToText(), new UTF8Encoding(false));
+            for (var attempt = 0; ; ++attempt)
+            {
+                try
+                {
+                    if (File.Exists(path))
+                    {
+                        File.Replace(temporary, path, null);
+                    }
+                    else
+                    {
+                        File.Move(temporary, path);
+                    }
+                    return;
+                }
+                catch (IOException) when (attempt < 10)
+                {
+                    System.Threading.Thread.Sleep(50);
+                }
+            }
         }
 
         public static string FormatNumber(float value)

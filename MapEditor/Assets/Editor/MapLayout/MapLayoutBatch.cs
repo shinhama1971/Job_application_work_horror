@@ -7,8 +7,11 @@
 // ============================================================================
 
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 
@@ -98,7 +101,82 @@ namespace MapLayout.Editor
                 changed.AppendLine("  + " + line);
             }
             Debug.Log("MAPLAYOUT EDIT 変わった行:\n" + changed);
+            failed |= !CheckRepeatedExport(outputDirectory);
             EditorApplication.Exit(failed ? 1 : 0);
+        }
+
+        // 読み込み直さずに何度も書き出す、ふだんの使い方を確かめている（写したファイルで行い、ゲームのファイルは変えない）。
+        // 1回目：小物をコピーして書き出す（行が1つ増える）。2回目：別の壁と扉を動かして書き出す。
+        // ゲームの PropLayoutFile と同じ決まり（名前が重ならない・知らない指定がない）で読めて、動かした値が正しい行に入るか
+        static bool CheckRepeatedExport(string outputDirectory)
+        {
+            var path = Path.Combine(outputDirectory, "repeated_stage1_props.txt");
+            File.Copy(Path.Combine(MapLayoutEditor.LayoutDirectory, "stage1_props.txt"), path, true);
+            MapLayoutEditor.NewEmptyScene();
+            var root = MapLayoutEditor.Import(path);
+            MapLayoutItem Find(string key) => root.GetComponentsInChildren<MapLayoutItem>().First(item => item.Key == key);
+
+            var original = Find("Wall8");
+            var copy = UnityEngine.Object.Instantiate(original.gameObject, original.transform.parent);
+            copy.name = original.name + " (copy)";
+            copy.transform.position += new Vector3(0.0f, 0.0f, 40.0f);
+            MapLayoutEditor.Export(root, path);
+
+            Find("Wall9").transform.position += new Vector3(5.0f, 0.0f, 0.0f);
+            Find("Door").transform.rotation = Quaternion.Euler(0.0f, 30.0f, 0.0f);
+            copy.transform.position += new Vector3(1.0f, 0.0f, 0.0f);
+            MapLayoutEditor.Export(root, path);
+
+            var problems = new List<string>();
+            var lines = File.ReadAllLines(path, Encoding.UTF8);
+            var names = new HashSet<string>();
+            string FindLine(string command, string name) =>
+                lines.FirstOrDefault(line => Regex.IsMatch(line, "^\\s*" + command + "\\s+" + Regex.Escape(name) + "\\s"));
+            for (var index = 0; index < lines.Length; ++index)
+            {
+                var tokens = Regex.Matches(lines[index].Split('#')[0], @"\S+").Cast<Match>().Select(match => match.Value).ToArray();
+                if (tokens.Length < 2 || (tokens[0] != "prop" && tokens[0] != "place"))
+                {
+                    continue;
+                }
+                if (!names.Add(tokens[0] + " " + tokens[1]))
+                {
+                    problems.Add($"{index + 1}行目: 同じ名前が2回ある {tokens[1]}");
+                }
+                var allowed = tokens[0] == "prop"
+                    ? new[] { "noshadow", "weathering", "room", "glow", "model" }
+                    : new[] { "yaw", "size" };
+                var options = tokens.Skip(tokens[0] == "prop" ? 12 : 5).Where(token => !float.TryParse(token,
+                    System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _));
+                foreach (var option in options.Where(option => !allowed.Contains(option) && tokens[0] == "place"))
+                {
+                    problems.Add($"{index + 1}行目: place の知らない指定 {option}");
+                }
+                if (tokens[0] == "prop" && tokens.Skip(12).Contains("yaw"))
+                {
+                    problems.Add($"{index + 1}行目: prop に yaw が書かれた");
+                }
+            }
+            string Expect(string command, string name, Func<string[], bool> check, string what)
+            {
+                var line = FindLine(command, name);
+                var tokens = line == null ? null : Regex.Matches(line.Split('#')[0], @"\S+").Cast<Match>().Select(match => match.Value).ToArray();
+                return tokens != null && check(tokens) ? null : $"{name} の {what} が違う: {line}";
+            }
+            problems.Add(Expect("prop", "Wall8_copy", tokens => tokens[2] == "136" && tokens[4] == "-30", "位置（コピーを2回目に動かした値）"));
+            problems.Add(Expect("prop", "Wall8", tokens => tokens[2] == "135" && tokens[4] == "-70", "位置（コピーの元）"));
+            problems.Add(Expect("prop", "Wall9", tokens => tokens[2] == "-85", "位置"));
+            problems.Add(Expect("prop", "Wall10", tokens => tokens[2] == "90", "位置（動かしていない）"));
+            problems.Add(Expect("place", "Door", tokens => tokens.Contains("yaw") && tokens[Array.IndexOf(tokens, "yaw") + 1] == "30", "向き"));
+            problems.RemoveAll(problem => problem == null);
+
+            if (problems.Count == 0)
+            {
+                Debug.Log("MAPLAYOUT REPEAT OK: 読み込み直さずに2回書き出しても、ゲームが読めて、動かした値が正しい行に入っている");
+                return true;
+            }
+            Debug.LogError("MAPLAYOUT REPEAT NG:\n" + string.Join("\n", problems));
+            return false;
         }
 
         // ゲームの CaptureMode と同じ視点（足もとの位置・見る先の x と z・上下の向き（ラジアン、負で下））

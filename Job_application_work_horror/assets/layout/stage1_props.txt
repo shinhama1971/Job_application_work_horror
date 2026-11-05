@@ -131,7 +131,7 @@ prop PropDebrisBeam  -120 -93 250   60 6 6     darkMetal none 18 1 model beam
 
 # --- 西棟の中の機材（ポンプ・タンク・ポンプ室の排水口・西の壁の配管）
 prop PropWestWingPump   -345 -86   235   30 26 26    darkMetal none 20 1 model pump
-prop PropWestWingTank   -240 -82   205   20 34 30    cabinetMetal none 14 1 model tank
+prop PropWestWingTank   -240 -82   208.32   20 34 30    cabinetMetal none 14 1 model tank
 prop PropWestWingDrain  -290 -99.6 228   16 0.8 16   drainGrate none 16 0 noshadow model drain
 prop PropWestWingPipe   -375 -55   80    3 3 350     darkMetal none 22 0 model pipe_pole
 
