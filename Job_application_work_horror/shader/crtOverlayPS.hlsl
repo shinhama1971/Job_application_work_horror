@@ -31,6 +31,10 @@ cbuffer TimeBuffer : register(b0)
     // コマ落ち（1なら、写し取りを止めた前のフレームの画面を全面に出す）と、そのときの縦のずれ
     float frameHold;
     float frameHoldOffset;
+    // 恐怖で視界が狭まる強さ（0〜1）と、心拍の脈（0〜1。鳴った瞬間に1）。PostProcess::SetFearVision
+    float fearVision;
+    float fearBeat;
+    float2 fearPadding;
 };
 
 // 描いた画面（t0）とサンプラー（s0）
@@ -387,6 +391,36 @@ float4 main(PS_IN input) : SV_TARGET
         tensionColor,
         saturate(tensionVeil * 12.0f));
     alpha = saturate(alpha + tensionVeil);
+
+    // 恐怖で視界が狭まる：緊張が高いほど、画面の端から、ぼけて色の抜けた闇が中央へ迫る。心拍が鳴るたびに一瞬さらに迫る。
+    // 端の景色を中心へ向かう向きに5点読んでぼかし、白黒に寄せて暗くした色を、端ほど濃く、今の層の上に重ねている。
+    // 視線の中央（見たい所）は隠さない。緊張していない間は、この全体で同じ分岐で計算を丸ごと省いている
+    [branch]
+    if (fearVision > 0.001f)
+    {
+        const float fear = smoothstep(0.0f, 1.0f, fearVision);
+        const float pulse = fearBeat * fearBeat;
+        // ここより外が狭まる、視界の縁。怖いほど内側へ寄り、心拍で一瞬さらに寄る
+        const float inner = lerp(0.62f, 0.28f, fear) - pulse * 0.06f * fear;
+        const float fearEdge = smoothstep(inner, inner + 0.40f, edgeDistance);
+        float3 blurred = 0.0f;
+        [unroll]
+        for (int tap = 0; tap < 5; ++tap)
+        {
+            const float pull = 0.022f * (float)(tap + 1) * fearEdge * fear;
+            blurred += SceneTexture.SampleLevel(LinearSampler, saturate(input.uv - centered * pull), 0.0f).rgb;
+        }
+        blurred *= 0.2f;
+        const float blurredLuminance = dot(blurred, float3(0.2126f, 0.7152f, 0.0722f));
+        // 色を抜いて少し冷たくし、端ほど暗くしている
+        const float3 fearColor = lerp(blurred, blurredLuminance.xxx * float3(0.80f, 0.86f, 0.92f), 0.78f) *
+            lerp(0.62f, 0.22f, fearEdge);
+        const float fearAlpha = saturate(fearEdge * fear * (0.70f + pulse * 0.25f));
+        const float layeredAlpha = fearAlpha + alpha * (1.0f - fearAlpha);
+        overlayColor = (fearColor * fearAlpha + overlayColor * alpha * (1.0f - fearAlpha)) /
+            max(layeredAlpha, 0.0001f);
+        alpha = layeredAlpha;
+    }
 
     // 映画のような色分け：影の部分は冷たい色に、照明の部分は控えめな暖かいにじみを残している。
     // これも半透明の層として重ねているので、

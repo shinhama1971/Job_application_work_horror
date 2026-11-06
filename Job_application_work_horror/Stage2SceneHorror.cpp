@@ -1323,8 +1323,11 @@ float Stage2Scene::ComputeThreatRate(const Player& player, bool includeMistakes)
 void Stage2Scene::UpdateTensionPulse(const Player& player, float deltaTime)
 {
     // 観察の間違いの回数は含めていない（一度間違えると心拍が鳴りやまなくなるため）。今まさに迫っている危険だけを使っている。
-    PlayTensionPulse(m_TensionPulse.Update(
-        deltaTime, ComputeThreatRate(player, false), player.IsHiding()));
+    const TensionPulse::Output pulse = m_TensionPulse.Update(
+        deltaTime, ComputeThreatRate(player, false), player.IsHiding());
+    PlayTensionPulse(pulse);
+    // 緊張が高いほど、画面の端から視界が狭まり、心拍に合わせて脈打つ（ロッカーの中では、息を殺す緊張でわずかに狭まる）
+    ShowFearVision(m_TensionPulse, pulse);
 
     // 携帯ラジオの雑音：足音で上がる危険度ではなく、実際に近くにいる影（足音の影・最後の追跡の影・背後の気配・見えない影）の近さで鳴らしている
     float presence = 0.0f;

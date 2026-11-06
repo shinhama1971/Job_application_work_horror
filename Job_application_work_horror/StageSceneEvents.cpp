@@ -948,7 +948,10 @@ void StageScene::UpdateTensionPulse(const Player& player, float deltaTime)
 {
     // 1面には隠れる場所がないため、隠れている扱いにはしていない。
     const float threatRate = ComputeThreatRate(player);
-    PlayTensionPulse(m_TensionPulse.Update(deltaTime, threatRate, false));
+    const TensionPulse::Output pulse = m_TensionPulse.Update(deltaTime, threatRate, false);
+    PlayTensionPulse(pulse);
+    // 緊張が高いほど、画面の端から視界が狭まり、心拍に合わせて脈打つ
+    ShowFearVision(m_TensionPulse, pulse);
     // 影が近いほど、携帯ラジオの雑音が大きくなる（監視映像を見ている間は鳴らさない）
     m_RadioStatic.Update(deltaTime, threatRate, !m_Surveillance.IsViewing());
 }

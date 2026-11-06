@@ -173,7 +173,7 @@ Application
 
 - `WaterEffectSystem`: 水たまり判定、落下水滴、着水波紋、足音波紋。水たまりの置き方（`PuddleLayout`）は、1面は床全体のマス目に乱数で置き、2面はマス目を41ずらして廊下の決まった3か所に置く（シェーダーへの表 b13 にずらし量も渡す）
 
-`Ground` には床メッシュ、Material、濡れ床Shader（水面の反射の光線は、このシェーダーの中で飛ばす）を残しています。
+`Ground` には床メッシュ、水たまりのメッシュ（水たまり・雨漏り・浸水した範囲ごとの多角形。画面の外は描かず、遠いほど反射を軽くする）、Material、濡れ床Shader（水面の反射の光線は、このシェーダーの中で飛ばす）を残しています。
 
 ## 更新と描画の流れ
 
@@ -270,6 +270,7 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 | 壁・床・天井の古さ、凹凸、部屋の角の暗がり | GPU（PS） | `GetWallAgeing`、`GetFloorAgeing`、`surfaceDetail.hlsli`、`roomOcclusion.hlsli` | 画像素材を読まずにワールド座標から計算する（メモリ帯域の代わりに計算量を使う） |
 | 壁のホラーらしい跡（血の手形・引っかき傷・血の垂れ跡） | GPU（PS） | `horrorMarks.hlsli`（`litTexturePS` の壁の古さから呼ぶ） | 壁に沿ったマス目ごとの乱数で置き場所と種類を決め、距離関数で形を作る。画像素材を読まない |
 | 水たまりの反射 | GPU（PS） | `wetFloorPS.hlsl` の `TraceRayReflection`、`rayReflection.hlsli`（SSRと、部屋の形・小物の箱とのスラブ法の交差） | 反転したカメラで景色を描き直さず、床の画素ごとに反射の光線を1本飛ばす |
+| 水たまりのメッシュと LOD | CPU・GPU（PS） | `Ground::BuildPuddleSurfaces`（マス目の表から、岸が必ず収まる楕円の多角形を作る）、`Ground::BuildDynamicSurfaces`（雨漏りと浸水した範囲。毎フレーム）、`Ground::DrawWaterSurfaces`、`wetFloorPS.hlsl` の `WaterSurfaceLevel`（b10） | 床の本体は乾いた床（水たまりの計算なし）として描き、メッシュを床の0.05上に描き重ねる。深度プリパスにもメッシュを描くので、下の床の画素は捨てられる。画面の外か（`Camera::IsSphereVisible`）と細かさはメッシュごとに CPU で決め、細かさごとにまとめて描く（b10 の書き換えは細かさの数だけ）。細かさはメッシュの中で一定なので、シェーダーの分岐は画素ごとにばらつかない |
 | 壁の鏡（2面） | GPU（PS） | `mirrorPS.hlsl`（`rayReflection.hlsli` を床と共通で使う）、`GameRendering.cpp`（カメラに近い小物の箱16個を b12 で渡す） | 鏡の画素ごとに反射の光線を飛ばす。床と違い下向きの光線が多いため、床の高さとの交差も見ている |
 | 鏡に映る自分の姿・鏡の異変の人影（2面） | CPU・GPU（PS） | `MirrorSelf`（1秒60回の姿勢の記録から遅らせた姿勢と手足の振りを b12 で渡す）、`MirrorAnomaly`、`mirrorPS.hlsl`、`FigureVolumes`（焼いた距離場の3Dテクスチャ t6・t13・s2）、`shader/figureVolume.hlsli`（体も人影も距離場のスフィアトレーシング。体は関節のまわりに回した空間で読んで手足を振る） | 一人称で体がなく、異変の人影も物として置かないため、鏡のシェーダーの中だけに形を出している |
 | 一人称の手と懐中電灯 | CPU・GPU（VS・PS） | `FirstPersonHands`（揺れの計算、b9 に手元だけの射影行列と、前の壁で跳ね返る懐中電灯の光）、`shader/viewModel*.hlsl*`（肌・布・金属） | ビューポートの深度の範囲を 0〜0.02 にして描き、壁にめり込まないようにしている（本描画は near=1 なので、それより手前に壁は来ない） |

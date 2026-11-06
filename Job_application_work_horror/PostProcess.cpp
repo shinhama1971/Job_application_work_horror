@@ -44,6 +44,10 @@ namespace Effect
         m_PresenceStatic = 0.0f;
         m_FrameHoldTimer = 0.0f;
         m_FrameHoldCooldown = 1.0f;
+        m_FearVision = 0.0f;
+        m_TargetFearVision = 0.0f;
+        m_FearBeat = 0.0f;
+        m_FearVisionHold = 0.0f;
 
         m_RenderTexture.Init(
             Application::GetWidth(),
@@ -161,6 +165,14 @@ namespace Effect
             (m_TargetVolumetricIntensity - m_VolumetricIntensity) * response(0.055f);
         m_SignalInterference +=
             (m_TargetSignalInterference - m_SignalInterference) * response(0.085f);
+        // 恐怖で視界が狭まる：Scene から渡されなくなったら0へ戻す。狭まるのも戻るのも、1秒ほどかけてなめらかにしている
+        m_FearVisionHold -= deltaTime;
+        if (m_FearVisionHold <= 0.0f)
+        {
+            m_TargetFearVision = 0.0f;
+        }
+        m_FearVision += (m_TargetFearVision - m_FearVision) * response(0.05f);
+        m_FearBeat = (std::max)(0.0f, m_FearBeat - deltaTime * 3.2f);
 
         // コマ落ち：影が近く、ラジオの雑音が強いほど、短い間隔で映像が一瞬（0.05〜0.1秒）止まる。
         // ポーズメニューの「演出の強さ」を下げると起きにくくなり、0なら起きない。自動撮影と計測では、画像と数字がぶれないよう起こさない
@@ -450,6 +462,8 @@ namespace Effect
             (std::clamp)(m_LensDirtStrength * effectScale, 0.0f, 1.0f),
             (std::clamp)((std::max)(m_SignalInterference, m_PresenceStatic) * effectScale, 0.0f, 1.0f),
             m_FrameHoldTimer > 0.0f ? 1.0f : 0.0f,
-            m_FrameHoldOffset);
+            m_FrameHoldOffset,
+            (std::clamp)(m_FearVision * effectScale, 0.0f, 1.0f),
+            (std::clamp)(m_FearBeat * effectScale, 0.0f, 1.0f));
     }
 }

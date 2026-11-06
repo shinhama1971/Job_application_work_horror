@@ -333,8 +333,10 @@ void Player::Update()
 
     light.Enable = TRUE;
     light.FlashlightEnabled = renderFlashlight ? TRUE : FALSE;
+    // 近い面で弱める量は最大2割。以前は4割強だったが、壁・小物の懐中電灯の拡散光に上限を付けて（flashlightLighting.hlsli の
+    // GetFlashlightDiffuseResponse）近くの壁が白く飛ばなくなったため、弱めすぎて「壁に近づくと何も見えない」状態になっていた
     const float proximityExposure =
-        1.0f - m_FlashlightNearSurfaceBlend * 0.42f;
+        1.0f - m_FlashlightNearSurfaceBlend * 0.20f;
     light.Intensity = renderFlashlight
         ? 1.50f * lightOutput * proximityExposure *
             flashlightState.powerBlend *
@@ -356,10 +358,11 @@ void Player::Update()
         flashlightDirection.y,
         flashlightDirection.z,
         0.0f);
-    // スポットライトの形：11度の内側は全部の明るさ、26度の外側で消え、その間は1.8乗で暗くしている（照らした輪の外がすぐ闇になる）
+    // スポットライトの形：14度の内側は全部の明るさ、32度の外側で消え、その間は1.8乗で暗くしている（照らした輪の外がすぐ闇になる）。
+    // 審査会で「暗くて見えない」と言われ、11度・26度から広げた（輪の外の闇は残し、照らせる範囲だけを広げている）
     light.SpotParams = Vector4(
-        cosf(DirectX::XMConvertToRadians(11.0f)),
-        cosf(DirectX::XMConvertToRadians(26.0f)),
+        cosf(DirectX::XMConvertToRadians(14.0f)),
+        cosf(DirectX::XMConvertToRadians(32.0f)),
         1.8f,
         batteryWeakness
     );

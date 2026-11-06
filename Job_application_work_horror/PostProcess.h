@@ -64,6 +64,12 @@ namespace Effect
         float m_LensDirtStrength = 0.35f;
         float m_SignalInterference = 0.0f;
         float m_TargetSignalInterference = 0.0f;
+        // 恐怖で視界が狭まる強さ（0〜1）と、心拍に合わせた脈（鳴った瞬間に1になり、約0.3秒で消える）。
+        // Scene が毎フレーム SetFearVision で渡し、渡されなくなったら（タイトルへ戻ったときなど）0へ戻している
+        float m_FearVision = 0.0f;
+        float m_TargetFearVision = 0.0f;
+        float m_FearBeat = 0.0f;
+        float m_FearVisionHold = 0.0f;
         // 携帯ラジオの雑音の強さ（影が近いほど強い）。信号の乱れと同じ画面の乱れを、弱めに重ねている
         float m_PresenceStatic = 0.0f;
         // コマ落ち：雑音が強いとき、ときどき映像が一瞬止まり、縦に少しずれる。止めている残り秒数、次に止めるまでの秒数、
@@ -233,6 +239,17 @@ namespace Effect
         {
             m_TargetSignalInterference =
                 (std::clamp)(strength, 0.0f, 1.0f);
+        }
+
+        // 恐怖で視界が狭まる強さ（0〜1）を設定している。beat は心拍が鳴ったフレームで true（その瞬間、端の闇が一瞬強まる）
+        void SetFearVision(float strength, bool beat)
+        {
+            m_TargetFearVision = (std::clamp)(strength, 0.0f, 1.0f);
+            m_FearVisionHold = 0.25f;
+            if (beat)
+            {
+                m_FearBeat = 1.0f;
+            }
         }
 
         // フィルムノイズが有効か

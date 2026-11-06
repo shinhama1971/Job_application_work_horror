@@ -116,6 +116,20 @@ prop PropCabinetRight  190  -87 -112   28 24 12   cabinetMetal none 14 1 model c
 prop PropCabinetBack   -145 -88 326    36 22 14   cabinetMetal none 14 1 model cabinet
 prop PropServiceBox    205  -82 118    10 30 24   cabinetMetal none 12 1 model service_box
 
+# --- 長く何もなかった壁際の目印（審査会で「壁に近づくと何も見えない」と言われ、壁に寄ったときに形の分かる物を置いた）。
+#     壁の文字・暗証番号の手がかり・ヒューズと鍵の候補の場所・扉の前は避けている
+# 中央ホールの北の壁（z=40 の手前）
+prop PropHallCabinetWest     -62  -88  31    36 22 14   cabinetMetal none 14 1 model cabinet
+prop PropHallCrateEast        95  -93  30    14 14 14   debrisColor none 6 1 model crate
+prop PropHallShelfEast       150  -77  33    30 44 10   shelfColor none 10 1 model shelf_short
+# 中央ホールの南西の壁（z=-70 の奥）
+prop PropHallCrateSouth     -170  -93 -60    14 14 14   debrisColor none 6 1 model crate
+prop PropHallCrateSouth2    -154  -95 -62    10 10 10   debrisColor none 6 1 model crate
+# 左の倉庫・右の倉庫の北の壁（z=-70 の手前）
+prop PropStorageCrateLeft   -115  -93 -80    14 14 14   debrisColor none 6 1 model crate
+prop PropStorageCrateLeftTop -115 -81 -81    10 10 10   debrisColor none 6 1 model crate
+prop PropStorageCrateRight   175  -93 -80    14 14 14   debrisColor none 6 1 model crate
+
 # --- 書類保管室（廊下の西側の部屋）。目線より高い書類棚を互い違いに並べた迷路。入口は x=-45 の壁の z=110〜130
 prop PropArchiveShelf1  -160 -77 70    80 44 6    shelfColor none 10 1 model shelf_long
 prop PropArchiveShelf2  -105 -77 100   90 44 6    shelfColor none 10 1 model shelf_long
@@ -147,6 +161,10 @@ prop PropSouthWestDeskLeg4  -304 -88.5 -290   2 23 2     deskWood none 8 1 model
 prop PropSouthWestPole      -268 -75   -252   3 50 3     darkMetal none 20 1 model pipe_pole
 prop PropSouthWestCrate1    -340 -93   -205   14 14 14   debrisColor none 6 1 model crate
 prop PropSouthWestCrate2    -240 -95   -316   10 10 10   debrisColor none 6 1 model crate
+# 東の壁（x=-120）の、何もなかった壁際の目印（緑の警告灯の光が当たる）
+prop PropSouthWestCrate3    -130 -93   -238   14 14 14   debrisColor none 6 1 model crate
+prop PropSouthWestCrate4    -129 -95   -224   10 10 10   debrisColor none 6 1 model crate
+prop PropSouthWestPole2     -124 -75   -284   3 50 3     darkMetal none 20 1 model pipe_pole
 
 # --- 南西の広間の色の付いた警告灯（暗い中で目立ち、自分の色で周りを照らす点光源になる）
 prop PropSouthWestLampRed    -250   -70 -329.5   10 4 1   lampRedBody lampRed 24 0 noshadow glow 55 2.0 model warning_lamp

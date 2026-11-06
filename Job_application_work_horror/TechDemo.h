@@ -45,6 +45,9 @@ namespace Tools::TechDemo
     float GetWaterCausticsScale();
     // 水たまりの波（足音と水滴の波の式）を計算して映すか
     bool UsesWaterRipples();
+    // 水たまりの描き方（0 = 床全体のシェーダーで計算する前の方式、1 = 水たまりごとのメッシュ（どれも一番細かく）、
+    // 2 = メッシュと、遠いほど軽くする LOD（普段））
+    int GetPuddleMeshMode();
     // 画面空間の環境遮蔽（SSAO）を計算して使うか
     bool UsesAmbientOcclusion();
     // 物理ベースの材質（PBR）で描くか（falseなら拡散反射だけで、環境マップも撮らない）

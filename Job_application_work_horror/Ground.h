@@ -25,11 +25,11 @@ class Ground :public Object
 	// 濡れた床のシェーダーへ渡す値（定数バッファb10）
 	struct WetFloorBuffer
 	{
-		// 経過時間（波紋を動かす）、波紋の強さ、反射の強さ、16バイト単位にそろえる詰め物
+		// 経過時間（波紋を動かす）、波紋の強さ、反射の強さ、今描いている面の水面の細かさ（WaterLevel）
 		float Time;
 		float RippleStrength;
 		float ReflectionStrength;
-		float Padding;
+		float WaterSurfaceLevel;
 		// 床一面が水に浸かった範囲（x・zの最小と最大）。範囲がないときは、最小が最大より大きい値にしている。
 		DirectX::SimpleMath::Vector4 FloodRect;
 		// 濡れた足跡（WetFootprints::Fill）。x = 数、と、1つにつき2つの値（位置と向き、濡れ具合・左右・裸足か）
@@ -77,6 +77,51 @@ class Ground :public Object
 
 	// 本描画と深度プリパスで共通のワールド行列（同じ計算にし、深度を一致させている）
 	DirectX::SimpleMath::Matrix MakeWorldMatrix() const;
+
+	// ---- 水たまりのメッシュ ----
+	// 床の本体は乾いた床として描き、水たまり（マス目1つ）・雨漏り1つ・浸水した範囲を、それぞれの形を覆うメッシュで描き重ねている。
+	// メッシュごとに、画面の外なら描かず、カメラから遠いほど反射の計算を省いている（LOD）。
+	// 水たまりの形そのもの（岸の線）は、今までどおり床のシェーダー（puddleMask.hlsli）で決めている
+	enum class WaterLevel
+	{
+		DryFloor = 0, // 床の本体
+		Far = 1,      // 遠い：反射の光線を飛ばさない
+		Middle = 2,   // 中くらい：部屋の形との交差だけ
+		Near = 3,     // 近い：SSRと部屋の形の交差（これまでと同じ）
+	};
+	// 水たまりのメッシュ1つ（頂点バッファの中の範囲と、画面の外かどうか・遠さを調べる円）
+	struct WaterSurface
+	{
+		DirectX::SimpleMath::Vector2 Center;
+		float Radius = 0.0f;
+		unsigned int VertexStart = 0;
+		unsigned int VertexCount = 0;
+	};
+	// マス目の水たまりのメッシュ（置き方か床の位置・大きさが変わったときだけ作り直す）
+	std::vector<VERTEX_3D> m_PuddleSurfaceVertices;
+	VertexBuffer<VERTEX_3D> m_PuddleSurfaceBuffer;
+	std::vector<WaterSurface> m_PuddleSurfaces;
+	bool m_PuddleSurfacesDirty = true;
+	DirectX::SimpleMath::Vector3 m_PuddleSurfacesPosition;
+	DirectX::SimpleMath::Vector3 m_PuddleSurfacesScale;
+	// 雨漏りと浸水した範囲のメッシュ（広がる・縮むので毎フレーム作り直す）
+	std::vector<VERTEX_3D> m_DynamicSurfaceVertices;
+	VertexBuffer<VERTEX_3D> m_DynamicSurfaceBuffer;
+	std::vector<WaterSurface> m_DynamicSurfaces;
+	unsigned int m_DynamicSurfaceCapacity = 0;
+	// 細かさごとの、このフレームに描いた水たまりのメッシュの数（デバッグ画面に出す）
+	int m_DrawnSurfaceCounts[4] = {};
+
+	// 床と同じ高さ・同じUVの、水平な多角形を足している（中心から扇形に三角形を並べる）
+	void AppendWaterPolygon(std::vector<VERTEX_3D>& vertices, const std::vector<DirectX::SimpleMath::Vector2>& outline) const;
+	void BuildPuddleSurfaces();
+	// 水たまりの置き方か、床の位置・大きさが変わっていたら、マス目の水たまりのメッシュを作り直している
+	void RebuildPuddleSurfacesIfChanged();
+	void BuildDynamicSurfaces();
+	// カメラから見た細かさ（画面の外なら DryFloor を返し、描かない）
+	WaterLevel SelectWaterLevel(const WaterSurface& surface, Camera* cam) const;
+	// 水たまりのメッシュを描いている（depthOnly なら深度プリパス。それ以外は細かさごとに b10 を書き換えて描く）
+	void DrawWaterSurfaces(Camera* cam, bool depthOnly, WetFloorBuffer* wetFloor);
 public:
 	
 
@@ -84,7 +129,10 @@ public:
 	void Init();
 	void Update();
 	void Draw(Camera* cam);
-	// 床は不透明なので、深度プリパスに床の面だけを描いている（水滴・波紋の半透明の板は描かない）
+	// 細かさごとの、このフレームに描いた水たまりのメッシュの数（[1] 遠い、[2] 中くらい、[3] 近い）
+	int GetDrawnWaterSurfaceCount(int level) const { return level >= 0 && level < 4 ? m_DrawnSurfaceCounts[level] : 0; }
+	int GetWaterSurfaceTotal() const { return static_cast<int>(m_PuddleSurfaces.size() + m_DynamicSurfaces.size()); }
+	// 床は不透明なので、深度プリパスに床の面と水たまりのメッシュを描いている（水滴・波紋の半透明の板は描かない）
 	bool WritesDepthPrepass() const override { return true; }
 	void DrawDepthPrepass(Camera* cam) override;
 	// 描画の最初に、水たまりの波をCompute Shaderで進め、床と壁のシェーダーへ渡している

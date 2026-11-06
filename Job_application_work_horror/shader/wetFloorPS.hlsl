@@ -13,7 +13,7 @@ SamplerState g_SamplerState : register(s0);
 // 反射の方式の比較で使うキューブマップ（t7、ReflectionProbe）。SSRの画面と深度（t4・t8）は rayReflection.hlsli で読んでいる
 TextureCube g_ReflectionProbe : register(t7);
 
-// Ground.cppのWetFloorBufferと同じ並び（b10）。経過時間、波紋の強さ、反射の強さ、詰め物
+// Ground.cppのWetFloorBufferと同じ並び（b10）。経過時間、波紋の強さ、反射の強さ、水面の細かさ
 // 濡れた足跡の最大数（WetFootprints::MaxCount と同じ）
 #define FOOTPRINT_COUNT 32
 // 天井の雨漏りの最大数（WaterEffectSystem::MaxLeakCount と同じ）
@@ -23,7 +23,9 @@ cbuffer WetFloorBuffer : register(b10)
     float WetTime;
     float RippleStrength;
     float ReflectionStrength;
-    float WetPadding;
+    // 今描いている面の、水面の細かさ（Ground::DrawWaterSurfaces）。
+    // 0 = 床の本体（乾いた床。水たまり・浸水・雨漏りは計算しない）、1〜3 = 水たまりのメッシュ（カメラから遠いほど小さい。WATER_LEVEL_*）
+    float WaterSurfaceLevel;
     // 床一面が水に浸かった範囲（xy = x・zの最小、zw = x・zの最大）。範囲がないときは、最小が最大より大きい値にしている。
     float4 FloodRect;
     // 濡れた足跡（WetFootprints::Fill）。x = 数。1つにつき2つ（xy = 位置、z = sin(向き)、w = cos(向き)/ x = 濡れ具合、y = 左右、z = 裸足か）
@@ -33,6 +35,12 @@ cbuffer WetFloorBuffer : register(b10)
     float4 LeakInfo;
     float4 Leaks[LEAK_COUNT];
 }
+
+// 水たまりのメッシュの細かさ（Ground::WaterLevel と同じ値）。メッシュ1つの中では一定なので、分岐は画素ごとにばらつかない
+#define WATER_LEVEL_DRY_FLOOR 0
+#define WATER_LEVEL_FAR 1      // 遠い：反射の光線を飛ばさず、霧の色を映す
+#define WATER_LEVEL_MIDDLE 2   // 中くらい：部屋の形との交差だけ（画面の中をたどるSSRは省く）
+#define WATER_LEVEL_NEAR 3     // 近い：SSRと部屋の形の交差の両方（これまでと同じ）
 
 // 頂点シェーダー（litTextureVS）から受け取る値（影と反射の座標も使っている）
 struct LIT_PS_IN
@@ -215,16 +223,25 @@ float TracePuddleFigure(float3 origin, float3 direction)
 
 // レイ反射の本体：水面で反射した光線を、まず画面の中（SSR）でたどり、外れた所を部屋の形との交差で埋めている。
 // SSRは深度プリパスの深度と前のフレームの画面を使うため、それが用意されているとき（ReflectionParams.y）だけ使っている。
-// figure は「水たまり」の異変の人影が光線を遮った度合い（0〜1）で、床の色そのものも沈めるのに使っている
-float3 TraceRayReflection(float3 worldPosition, float3 worldNormal, float roughness, out float figure)
+// figure は「水たまり」の異変の人影が光線を遮った度合い（0〜1）で、床の色そのものも沈めるのに使っている。
+// level は水たまりのメッシュの細かさ（WATER_LEVEL_*）。遠い水たまりほど、映る物が小さく霧に沈むので、計算を省いている
+float3 TraceRayReflection(float3 worldPosition, float3 worldNormal, float roughness, int level, out float figure)
 {
+    figure = 0.0f;
+    // 遠い：光線を飛ばさず、遠くの闇（霧）の色を映している
+    [branch]
+    if (level <= WATER_LEVEL_FAR)
+    {
+        return GetHorrorFogColor(Light.Ambient.rgb, LoopDepth);
+    }
     float3 direction = reflect(normalize(worldPosition - GetMistEyePosition()), normalize(worldNormal));
     // 波の法線で光線が床へ潜らないよう、少しだけ上へ向けている
     direction = normalize(float3(direction.x, max(direction.y, 0.02f), direction.z));
     float roomDistance;
     float3 color = TraceRoomReflection(worldPosition + float3(0.0f, 0.05f, 0.0f), direction, roughness, roomDistance);
+    // 画面の中をたどるSSRは、近い水たまりだけにしている（中くらいの距離では、部屋の形との交差だけ）
     [branch]
-    if (ReflectionParams.y > 0.5f)
+    if (level >= WATER_LEVEL_NEAR && ReflectionParams.y > 0.5f)
     {
         const float4 screen = TraceScreenSpaceReflection(worldPosition, worldNormal, 20, 1.22f);
         color = lerp(color, screen.rgb, screen.w);
@@ -317,45 +334,53 @@ float4 main(in LIT_PS_IN input) : SV_Target
         return GetFullbrightColor(color.rgb, input.viewNormal, input.viewPos);
     }
 
-    // 水たまりの濃さ・岸の線・波の模様を求めている
+    // 水たまりの濃さ・岸の線・波の模様を求めている。
+    // 床の本体（WaterSurfaceLevel が0）は乾いた床として描き、水たまり・浸水・雨漏りは、その形を覆うメッシュ（Ground::DrawWaterSurfaces）が描き重ねる。
+    // メッシュは床より少し上にあり、深度プリパスにも描くので、メッシュの下の床の画素はこの計算まで来ない
+    const int waterLevel = (int)(WaterSurfaceLevel + 0.5f);
     float shore = 0.0f;
     float ripplePattern = 0.0f;
-    float puddle = GetPuddleMask(
-        input.worldPos.xz,
-        WetTime,
-        shore,
-        ripplePattern);
-    // 床一面が水に浸かった範囲（1面の西棟）。範囲の内側は全面を水たまりと同じに扱い、ゆるい波を立てている。
+    float puddle = 0.0f;
+    [branch]
+    if (waterLevel > WATER_LEVEL_DRY_FLOOR)
     {
-        const float2 fromMinimum = input.worldPos.xz - FloodRect.xy;
-        const float2 toMaximum = FloodRect.zw - input.worldPos.xz;
-        const float insideDistance = min(
-            min(fromMinimum.x, fromMinimum.y), min(toMaximum.x, toMaximum.y));
-        const float flood = smoothstep(-0.5f, 1.5f, insideDistance);
-        ripplePattern += sin(input.worldPos.x * 0.21f + input.worldPos.z * 0.13f + WetTime * 0.5f) *
-            0.35f * flood * (1.0f - puddle);
-        puddle = max(puddle, flood);
-    }
-    // 天井の雨漏りの真下にできた小さな水たまり（少しずつ広がる。縁はノイズでゆがめ、落ちてくる水滴の輪が広がる）
-    {
-        const int leakCount = (int)(LeakInfo.x + 0.5f);
-        [loop]
-        for (int leakIndex = 0; leakIndex < leakCount; ++leakIndex)
+        puddle = GetPuddleMask(
+            input.worldPos.xz,
+            WetTime,
+            shore,
+            ripplePattern);
+        // 床一面が水に浸かった範囲（1面の西棟）。範囲の内側は全面を水たまりと同じに扱い、ゆるい波を立てている。
         {
-            const float4 leak = Leaks[leakIndex];
-            const float2 leakOffset = input.worldPos.xz - leak.xy;
-            const float reach = leak.z + 3.0f;
-            if (dot(leakOffset, leakOffset) > reach * reach)
+            const float2 fromMinimum = input.worldPos.xz - FloodRect.xy;
+            const float2 toMaximum = FloodRect.zw - input.worldPos.xz;
+            const float insideDistance = min(
+                min(fromMinimum.x, fromMinimum.y), min(toMaximum.x, toMaximum.y));
+            const float flood = smoothstep(-0.5f, 1.5f, insideDistance);
+            ripplePattern += sin(input.worldPos.x * 0.21f + input.worldPos.z * 0.13f + WetTime * 0.5f) *
+                0.35f * flood * (1.0f - puddle);
+            puddle = max(puddle, flood);
+        }
+        // 天井の雨漏りの真下にできた小さな水たまり（少しずつ広がる。縁はノイズでゆがめ、落ちてくる水滴の輪が広がる）
+        {
+            const int leakCount = (int)(LeakInfo.x + 0.5f);
+            [loop]
+            for (int leakIndex = 0; leakIndex < leakCount; ++leakIndex)
             {
-                continue;
+                const float4 leak = Leaks[leakIndex];
+                const float2 leakOffset = input.worldPos.xz - leak.xy;
+                const float reach = leak.z + 3.0f;
+                if (dot(leakOffset, leakOffset) > reach * reach)
+                {
+                    continue;
+                }
+                const float leakDistance = length(leakOffset);
+                const float edgeNoise = (FastValueNoise(input.worldPos.xz * 0.35f + leak.xy) - 0.5f) * 0.35f;
+                const float normalizedDistance = leakDistance / max(leak.z, 0.01f) + edgeNoise;
+                const float leakPuddle = 1.0f - smoothstep(0.80f, 1.0f, normalizedDistance);
+                shore = max(shore, (1.0f - smoothstep(0.0f, 0.08f, abs(normalizedDistance - 0.97f))) * 0.6f);
+                ripplePattern += sin(leakDistance * 2.2f - WetTime * 2.6f) * 0.30f * leakPuddle * exp(-leakDistance * 0.25f);
+                puddle = max(puddle, leakPuddle);
             }
-            const float leakDistance = length(leakOffset);
-            const float edgeNoise = (FastValueNoise(input.worldPos.xz * 0.35f + leak.xy) - 0.5f) * 0.35f;
-            const float normalizedDistance = leakDistance / max(leak.z, 0.01f) + edgeNoise;
-            const float leakPuddle = 1.0f - smoothstep(0.80f, 1.0f, normalizedDistance);
-            shore = max(shore, (1.0f - smoothstep(0.0f, 0.08f, abs(normalizedDistance - 0.97f))) * 0.6f);
-            ripplePattern += sin(leakDistance * 2.2f - WetTime * 2.6f) * 0.30f * leakPuddle * exp(-leakDistance * 0.25f);
-            puddle = max(puddle, leakPuddle);
         }
     }
     // 上を向いた面（床）だけを水たまりにしている
@@ -624,7 +649,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         else
         {
             alternateReflection = float4(
-                TraceRayReflection(input.worldPos, detailWorldNormal, waterRoughness, puddleFigure), 1.0f);
+                TraceRayReflection(input.worldPos, detailWorldNormal, waterRoughness, waterLevel, puddleFigure), 1.0f);
         }
     }
     const float reflectionStrength = saturate(
@@ -667,7 +692,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     color.rgb += GetLightShafts(input.worldPos, pointLightListOffset, pointLightCount, input.pos.xy);
     color.rgb = ApplyFilmicHorrorGrade(color.rgb, LoopDepth);
 
-    // デバッグ表示：1=法線、2=懐中電灯の影、3=照明だけ、4=水たまりの濃さ、5=反射の画像、7=タイルごとの光源の数（6は壁用なので黒）
+    // デバッグ表示：1=法線、2=懐中電灯の影、3=照明だけ、4=水たまりの濃さとメッシュの細かさ、5=反射の画像、7=タイルごとの光源の数（6は壁用なので黒）
     if (DebugViewMode == 1)
     {
         return float4(detailWorldNormal * 0.5f + 0.5f, 1.0f);
@@ -684,7 +709,13 @@ float4 main(in LIT_PS_IN input) : SV_Target
     }
     if (DebugViewMode == 4)
     {
-        return float4(puddle.xxx, 1.0f);
+        // 水たまりのメッシュを細かさの色（近い=緑、中くらい=黄、遠い=赤）で薄く塗り、水たまりの濃さをその色で重ねている。床の本体は黒
+        const float3 levelColor = waterLevel >= WATER_LEVEL_NEAR ? float3(0.25f, 1.0f, 0.30f)
+            : waterLevel == WATER_LEVEL_MIDDLE ? float3(1.0f, 0.85f, 0.20f)
+            : float3(1.0f, 0.30f, 0.25f);
+        return waterLevel == WATER_LEVEL_DRY_FLOOR
+            ? float4(0.0f, 0.0f, 0.0f, 1.0f)
+            : float4(levelColor * (0.10f + puddle * 0.90f), 1.0f);
     }
     if (DebugViewMode == 5)
     {

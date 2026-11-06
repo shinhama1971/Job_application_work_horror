@@ -31,6 +31,7 @@ namespace
         AutoExposure,
         WaterCaustics,
         WaterRipples,
+        PuddleMesh,
         AmbientOcclusion,
         Pbr,
         LightShafts,
@@ -80,6 +81,10 @@ namespace
           { "なし", "あり", nullptr }, 2, 1,
           { "足音と水滴で立つ波をCompute Shaderの波の式で計算し、",
             "反射を波打たせ、壁に光の輪を映している" } },
+        { "水たまりのメッシュとLOD",
+          { "床全体で計算", "メッシュ（LODなし）", "メッシュ＋LOD", nullptr }, 3, 2,
+          { "水たまりごとのメッシュに分け、画面の外は描かず、遠いほど反射を軽くしている",
+            "（F1の Shader debug view の Puddle mask で、近い=緑・中=黄・遠い=赤）" } },
         { "画面空間の環境遮蔽（SSAO）",
           { "なし", "あり", nullptr }, 2, 1,
           { "深度プリパスの深度から、物の隙間や壁の根元など",
@@ -272,6 +277,11 @@ namespace Tools::TechDemo
     bool UsesWaterRipples()
     {
         return GetVariant(Topic::WaterRipples) == 1;
+    }
+
+    int GetPuddleMeshMode()
+    {
+        return GetVariant(Topic::PuddleMesh);
     }
 
     bool UsesAmbientOcclusion()

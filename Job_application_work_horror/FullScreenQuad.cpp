@@ -108,7 +108,9 @@ namespace Graphics
         float lensDirtStrength,
         float signalInterference,
         float frameHold,
-        float frameHoldOffset)
+        float frameHoldOffset,
+        float fearVision,
+        float fearBeat)
     {
         ID3D11DeviceContext* context =
             Renderer::GetDeviceContext();
@@ -137,6 +139,8 @@ namespace Graphics
         tb.signalInterference = signalInterference;
         tb.frameHold = frameHold;
         tb.frameHoldOffset = frameHoldOffset;
+        tb.fearVision = fearVision;
+        tb.fearBeat = fearBeat;
 
         context->UpdateSubresource(
             m_TimeBuffer.Get(),
@@ -196,7 +200,7 @@ namespace Graphics
         // CRT風の効果は半透明の重ね描きとして合成し、画面全体を黒で塗りつぶさないようにしている。
         if (noiseAmount > 0.0f || horrorPulseStrength > 0.001f ||
             lensMoisture > 0.001f || filmGradeStrength > 0.001f ||
-            signalInterference > 0.001f || frameHold > 0.5f)
+            signalInterference > 0.001f || frameHold > 0.5f || fearVision > 0.001f)
         {
             m_OverlayShader.SetGPU();
             Renderer::SetBlendState(BS_ALPHABLEND);

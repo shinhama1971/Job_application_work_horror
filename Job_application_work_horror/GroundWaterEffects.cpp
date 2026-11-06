@@ -591,6 +591,8 @@ bool Ground::TriggerFootstepRipple(
 void Ground::SetPuddleLayout(const WaterEffectSystem::PuddleLayout& layout)
 {
 	m_WaterEffects.SetPuddleLayout(layout);
+	// 水たまりのメッシュも、新しい置き方で作り直す
+	m_PuddleSurfacesDirty = true;
 	if (m_PuddleCellBuffer)
 	{
 		Renderer::GetDeviceContext()->UpdateSubresource(

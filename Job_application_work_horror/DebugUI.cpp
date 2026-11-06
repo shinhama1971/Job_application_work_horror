@@ -6,6 +6,7 @@
 #include "DebugUI.h"
 
 #include "Game.h"
+#include "Ground.h"
 #include "ModelCache.h"
 #include "PostProcess.h"
 #include "Renderer.h"
@@ -370,9 +371,19 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         }
 
         // 番号はシェーダーのDebugViewModeと対応している（8のフルブライトはcommon.hlslのDEBUG_VIEW_FULLBRIGHT）。
-        const char* debugViews[] = { "Final", "World normals", "Flashlight shadow", "Lighting only", "Puddle mask", "Floor reflection", "Wall damp mask", "Light tiles (lights per 16x16 tile)", "Fullbright (照明・影・霧なしで全体を明るく)", "PBR material (R=metallic G=roughness B=wet)", "Ambient occlusion (SSAO)" };
+        const char* debugViews[] = { "Final", "World normals", "Flashlight shadow", "Lighting only", "Puddle mask + mesh LOD (green=near yellow=middle red=far)", "Floor reflection", "Wall damp mask", "Light tiles (lights per 16x16 tile)", "Fullbright (照明・影・霧なしで全体を明るく)", "PBR material (R=metallic G=roughness B=wet)", "Ambient occlusion (SSAO)" };
         ImGui::Combo("Shader debug view", &g_DebugViewMode,
             debugViews, IM_ARRAYSIZE(debugViews));
+        // 水たまりのメッシュのうち、このフレームに描いた数（細かさごと。画面の外の物は描いていない）
+        if (game != nullptr)
+        {
+            for (Ground* ground : game->GetObjects<Ground>())
+            {
+                ImGui::Text("Puddle meshes: near %d / middle %d / far %d (total %d)",
+                    ground->GetDrawnWaterSurfaceCount(3), ground->GetDrawnWaterSurfaceCount(2),
+                    ground->GetDrawnWaterSurfaceCount(1), ground->GetWaterSurfaceTotal());
+            }
+        }
 
         // 画面効果の値をまとめて切り替えるプリセット：見やすさ重視・雰囲気重視・怖さ重視・軽さ重視
         ImGui::TextUnformatted("Visual presets");
