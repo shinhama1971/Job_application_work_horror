@@ -412,4 +412,6 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 
 `Shader::Create` に入力レイアウトなしの指定を追加しました。既存のメッシュは従来の指定を既定とし、キャッシュキーも区別します。草はメイン視点にだけ描き、影を落とすメッシュや反射用の形状は持ちません。
 
+`grassVS.hlsl` は、ビュー行列の回転の逆（転置）でカメラの前と上の向きをワールドへ戻し、見下ろす量に応じて葉先をカメラの上の向き（水平にした向き）へ倒しています（授業資料 p.23）。LOD の段階（1〜3）と色の表示の有無、曲げの強さは区画ごとの定数バッファ（b9、48バイト）で渡し、技術デモ（`TechDemo::GetGrassLodMode`・`UsesGrassCameraBend`）で切り替えます。
+
 草を植えるとき、当たり判定のある物の足元に加えて、枯れた茂み（`forest_brush`）の枝の内側と、見えている水たまりの水面（`Ground::IsNearVisiblePuddle`。水たまりのメッシュと同じ楕円で、足元の判定 `IsInsidePuddle` より広い）を避けています。森の空は `SkyBackdrop`（`shader/skyBackdropVS.hlsl`・`skyBackdropPS.hlsl`）が、射影行列とビュー行列から画素ごとの視線の向きを戻し、描画の奥の端までの霧を重ねています。最初に作るObjectなので最初に描き、深度の判定（LESS_EQUAL）で手前の物の画素は残ります。

@@ -412,6 +412,10 @@ namespace
         { 16.0f, Vector3(0.0f, FloorY, 215.0f), 0.0f, 0.14f, nullptr, false },
         { 17.0f, Vector3(0.0f, FloorY, 218.0f), 0.0f, 0.14f, L"forest_04_研究所の正面", false },
         { 18.0f, Vector3(0.0f, FloorY, 218.0f), 0.0f, 0.14f, nullptr, false },
+        // 草むらを足元まで見下ろす（草をカメラの上方向へ曲げる処理の確認。授業資料 p.23）
+        { 19.0f, Vector3(-62.0f, FloorY, -205.0f), 0.6f, -1.10f, nullptr, false },
+        { 21.0f, Vector3(-62.0f, FloorY, -205.0f), 0.6f, -1.10f, L"forest_05_草むらを見下ろす", false },
+        { 22.0f, Vector3(-62.0f, FloorY, -205.0f), 0.6f, -1.10f, nullptr, false },
     };
     const std::vector<Keyframe>* GetTour(SceneName scene)
     {

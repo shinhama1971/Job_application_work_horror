@@ -17,10 +17,17 @@ struct GRASS_PS_IN
     float4 shadowPos : TEXCOORD4;
     float3 color : COLOR0;
     float ao : TEXCOORD5;
+    float4 debugColor : TEXCOORD6;
 };
 
 float4 main(GRASS_PS_IN input) : SV_TARGET
 {
+    // 技術デモの「LODを色で表示」：照明を使わず、LOD の色に葉の向きの陰影だけを付けて描いている（暗い森でも色が分かるように）
+    if (input.debugColor.a > 0.5f)
+    {
+        const float facing = abs(dot(normalize(input.viewNormal), normalize(-input.viewPos)));
+        return float4(input.debugColor.rgb * (0.45f + 0.35f * facing + 0.20f * input.ao), 1.0f);
+    }
     const float3 n = normalize(input.worldNormal);
     const float3 viewNormal = normalize(input.viewNormal);
     if (DebugViewMode == DEBUG_VIEW_FULLBRIGHT)

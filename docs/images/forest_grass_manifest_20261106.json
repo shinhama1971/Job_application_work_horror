@@ -8,5 +8,15 @@
     "file": "docs/images/forest_grass_off_20261106.png",
     "source": "同じ撮影を SIGNAL_LOST_DISABLE_FOREST_GRASS=1 で草を止めて撮ったもの（2026年11月7日）",
     "sha256": "5d6b2002aacb0f2b1b49f6243292600e947512a75cae321dcff55c5fe23ef10c"
+  },
+  {
+    "file": "docs/images/forest_grass_camera_bend_20261107.png",
+    "source": "--capture <出力先> --forest の forest_05_草むらを見下ろす.png を上下に並べたもの（上 = カメラの上方向への曲げなし、下 = あり。2026年11月7日）",
+    "sha256": "a7030d73311f9499ccc37a1de1a2b4ddc30c0a52cfad5b541341e148728b4836"
+  },
+  {
+    "file": "docs/images/forest_grass_lod_colors_20261107.png",
+    "source": "--capture <出力先> --forest の forest_01_開始地点.png を、技術デモの「LODを色で表示」で撮ったもの（2026年11月7日）",
+    "sha256": "0e24dbe6ecbe3f17276d82c943e4d62ba3c2705020266285dcc66e625c665371"
   }
 ]

@@ -10,6 +10,7 @@
 #include "Game.h"
 #include "Ground.h"
 #include "Renderer.h"
+#include "TechDemo.h"
 #include "Wall.h"
 #include "utility.h"
 
@@ -45,8 +46,12 @@ namespace
         float FadeStart;              // この距離から、葉が地面へ縮んで消えていく
         Vector3 CameraPosition;
         float FadeEnd;
+        std::uint32_t LodLevel;       // この区画の LOD（1 = 近い、2 = 中くらい、3 = 遠い）
+        std::uint32_t ShowLodColors;  // 1 なら、LOD を色で表示する（技術デモ）
+        float CameraBend;             // カメラの上の向きへ葉を曲げる強さ（授業資料 p.23。0 なら曲げない）
+        float Padding;
     };
-    static_assert(sizeof(DrawParams) == 32, "DrawParams must match HLSL layout");
+    static_assert(sizeof(DrawParams) == 48, "DrawParams must match HLSL layout");
 
     // 植える密度（1平方単位あたりの候補の数。群れの外の候補は捨てるので、実際はこの半分ほど）
     constexpr float CandidateDensity = 0.75f;
@@ -489,6 +494,10 @@ void ForestGrass::Draw(Camera* camera)
     context->RSGetState(previousRasterizer.GetAddressOf());
     context->RSSetState(m_TwoSidedRasterizer.Get());
 
+    // 技術デモ（F2）の「草のLOD」：0 = LODなし（全部の葉を5節で）、1 = LODあり（普段）、2 = LODを色で表示。
+    // 「草をカメラの上方向へ曲げる」：上から見下ろしたとき、葉の面を見せる（授業資料 p.23）
+    const int lodMode = Tools::TechDemo::GetGrassLodMode();
+    const float cameraBend = Tools::TechDemo::UsesGrassCameraBend() ? 1.0f : 0.0f;
     const Vector3 eye = camera->GetPosition();
     for (const Chunk& chunk : m_Chunks)
     {
@@ -501,15 +510,22 @@ void ForestGrass::Draw(Camera* camera)
         // LOD：区画のいちばん近い所までの距離で、描く本数の割合と葉の節の数を決めている
         float fraction = 1.0f;
         std::uint32_t segments = 5;
-        if (nearestDistance > MiddleDistance)
+        std::uint32_t lodLevel = 1;
+        if (lodMode == 0)
+        {
+            // LODなし：遠くまで全部の葉を一番細かく描く（比べるための方式）
+        }
+        else if (nearestDistance > MiddleDistance)
         {
             fraction = 0.22f;
             segments = 1;
+            lodLevel = 3;
         }
         else if (nearestDistance > NearDistance)
         {
             fraction = 1.0f - 0.6f * SmoothStep(NearDistance, MiddleDistance, nearestDistance);
             segments = 3;
+            lodLevel = 2;
         }
         const std::uint32_t count = (std::max)(1u, static_cast<std::uint32_t>(chunk.Count * fraction));
 
@@ -521,6 +537,9 @@ void ForestGrass::Draw(Camera* camera)
         params.FadeStart = FadeStart;
         params.CameraPosition = eye;
         params.FadeEnd = FadeEnd;
+        params.LodLevel = lodLevel;
+        params.ShowLodColors = lodMode == 2 ? 1u : 0u;
+        params.CameraBend = cameraBend;
         context->UpdateSubresource(m_DrawParams.Get(), 0, nullptr, &params, 0, 0);
         // 葉1本 = 1インスタンス。節が n なら、左右の頂点 2n 個と、とがった先の1個の三角形の帯
         context->DrawInstanced(segments * 2 + 1, count, 0, 0);

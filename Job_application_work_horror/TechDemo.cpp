@@ -36,6 +36,8 @@ namespace
         Pbr,
         LightShafts,
         BulbShadow,
+        GrassLod,
+        GrassCameraBend,
         Count
     };
     constexpr int TopicCount = static_cast<int>(Topic::Count);
@@ -101,6 +103,14 @@ namespace
           { "なし", "あり", nullptr }, 2, 1,
           { "2面の吊るした電球から6方向の距離を撮り、",
             "揺れに合わせて動く影を落としている（2面だけ）" } },
+        { "草のLOD（外の森）",
+          { "LODなし（全部5節）", "LODあり", "LODを色で表示", nullptr }, 3, 1,
+          { "40単位の区画ごとに、遠いほど葉の本数と節を減らしている（5節→3節→三角形1枚）",
+            "色の表示：近い=緑・中=黄・遠い=赤。F1で描いた本数と区画数も見られる" } },
+        { "草をカメラの上方向へ曲げる（外の森）",
+          { "なし", "あり", nullptr }, 2, 1,
+          { "見下ろすほど、葉をカメラの上の向きへ倒して葉の面を見せている",
+            "（真上から見たとき、細い線や点に見える破綻を軽くする。授業資料 p.23）" } },
     } };
 
     // 開いているか、選んでいる項目、項目ごとの今の方式
@@ -302,6 +312,16 @@ namespace Tools::TechDemo
     bool UsesBulbShadow()
     {
         return GetVariant(Topic::BulbShadow) == 1;
+    }
+
+    int GetGrassLodMode()
+    {
+        return GetVariant(Topic::GrassLod);
+    }
+
+    bool UsesGrassCameraBend()
+    {
+        return GetVariant(Topic::GrassCameraBend) == 1;
     }
 
     void Draw(const GpuTimer& gpuTimer)
