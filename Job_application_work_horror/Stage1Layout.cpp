@@ -487,7 +487,7 @@ namespace Stage1Layout
         objects.keypad.panel = keypadPanel;
         objects.keypad.door = keypadDoor;
         objects.keypad.digitWritings = {
-            // 開始地点の東の壁（右の倉庫との仕切り）
+            // 右の倉庫の西の壁（開始地点との仕切りの、倉庫の側。開始地点の側には2周目の壁の文字があるため）
             createDigitClue(1),
             // 左の倉庫の西の壁
             createDigitClue(2),

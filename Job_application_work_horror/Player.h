@@ -81,6 +81,13 @@ private:
     bool m_CanControl = true;
     // タイトル画面の後ろで映すときの、入力を読まない状態（SetAttractMode）
     bool m_AttractMode = false;
+    // 懐中電灯の照り返し：光が当たった面から跳ね返って、まわりをぼんやり照らす弱い点光源（位置・届く範囲・色・強さ）。
+    // 位置と強さは、急に跳ばないよう少しずつ近づけている（Update）。CollectPointLights でタイルベースライティングへ渡している
+    DirectX::SimpleMath::Vector3 m_BouncePosition;
+    DirectX::SimpleMath::Vector3 m_BounceColor;
+    float m_BounceRange = 0.0f;
+    float m_BounceIntensity = 0.0f;
+    bool m_HasBouncePosition = false;
     bool m_SprintAllowed = true;
 
     // ===== 隠れ場所（ロッカー） =====
@@ -102,6 +109,8 @@ public:
     void Update() override;
     void Draw(Camera* cam) override;
     void Uninit() override;
+    // 懐中電灯の照り返しの点光源を1つ登録している（懐中電灯が点いていて、光が面に当たっているときだけ）
+    void CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const override;
 
     // カメラの水平方向の向き（上下の傾きを除いた単位ベクトル）を返している。
     DirectX::SimpleMath::Vector3 GetForward() const;

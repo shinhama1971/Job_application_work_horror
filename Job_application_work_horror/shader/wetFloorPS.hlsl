@@ -592,6 +592,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
                 * 0.40f;
         }
     }
+    // 懐中電灯の翼の光：明るい中心の外にも広がる、ぼんやりした弱い光（flashlightLighting.hlsli）
+    lighting += GetFlashlightSpillLight(input.viewPos, normalize(input.viewNormal)) * flashlightOcclusion;
 
     color.rgb *= lighting;
     // 水面の空の映り込み・波の光・水滴の輪・岸の光を足している

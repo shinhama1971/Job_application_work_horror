@@ -676,6 +676,9 @@ float4 main(in LIT_PS_IN input) : SV_Target
         }
     }
 
+    // 懐中電灯の翼の光：明るい中心の外にも広がる、ぼんやりした弱い光（flashlightLighting.hlsli）
+    lighting += GetFlashlightSpillLight(input.viewPos, detailViewNormal) * flashlightOcclusion;
+
     // 浸水した床（西棟）や、波の立った水たまりの水面で跳ね返った懐中電灯の光が、壁や天井にゆらゆら映る（waterCaustics.hlsli）
     lighting += Light.Diffuse.rgb * GetWaterCausticLight(input.worldPos, normalize(input.worldNormal));
 

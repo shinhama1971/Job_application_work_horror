@@ -44,6 +44,8 @@ color lampAmberBody 0.57  0.33  0.06  rough 0.35
 # 光の安全地帯の暖かい電球
 color warmBulb      1.0   0.72  0.40
 color warmBulbBody  0.6   0.432 0.24  rough 0.10
+color doorLamp      1.0   0.80  0.52                 # 部屋の入口の目印の灯り（初めて遊ぶ人が、暗い中で入口の場所を見つけられるように）
+color doorLampBody  0.60  0.48  0.31  rough 0.30
 
 # --- 建物の壁（外周・部屋の仕切り・ループ廊下・西棟・南西の広間）。名前を変えずに位置と大きさだけ直せる
 prop Wall1                     0 -74 340   440 50 4   concrete none 4 1 weathering room
@@ -170,6 +172,20 @@ prop PropSouthWestLampGreen  -122.5 -70 -256     1 4 10   lampGreenBody lampGree
 prop PropSouthWestLampBlue   -377.5 -70 -190     1 4 10   lampBlueBody lampBlue 24 0 noshadow glow 55 2.0 model warning_lamp
 prop PropSouthWestLampAmber  -180   -70 -329.5   10 4 1   lampAmberBody lampAmber 24 0 noshadow glow 55 2.0 model warning_lamp
 
+# --- 部屋の入口の目印の灯り（初めて遊んだ人から「壁が見にくく、入口が分からない」と意見があったため）
+#     壁の切れ目（入口）のすぐ横の壁に、暖かい白の小さな灯りを付けている。灯りは壁を通り抜けて両側を照らすので、
+#     入口の縁（壁の端）が光の中に浮かび、遠くからでも「ここから入れる」と分かる。矢印や文字は出さない。
+prop DoorLampLeftStorage     -90   -64 -72.5    10 4 1   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
+prop DoorLampRightStorage     90   -64 -72.5    10 4 1   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
+prop DoorLampSouthWestNorth -138   -64 -177.5   10 4 1   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
+prop DoorLampSouthWestSouth -138   -64 -182.5   10 4 1   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
+prop DoorLampLoopDoorLeft    -22   -64  37.5    10 4 1   doorLampBody doorLamp 24 0 noshadow glow 55 1.9 model warning_lamp
+prop DoorLampLoopDoorRight    22   -64  37.5    10 4 1   doorLampBody doorLamp 24 0 noshadow glow 55 1.9 model warning_lamp
+prop DoorLampArchive         -42.5 -64  104     1 4 10   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
+prop DoorLampKeypad           42.5 -64  90      1 4 10   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
+prop DoorLampWestWing       -217.5 -64 -40      1 4 10   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
+prop DoorLampPumpRoom       -276   -64  177.5   10 4 1   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
+prop DoorLampLoopCorner      194   -64  237.5   10 4 1   doorLampBody doorLamp 24 0 noshadow glow 55 1.9 model warning_lamp
 # --- 西棟の南西の角：棚・机・木箱の一角
 prop PropWestWingShelf1    -368 -77   -78   10 44 30   shelfColor none 10 1 model shelf_short
 prop PropWestWingShelf2    -368 -77   -40   10 44 30   shelfColor none 10 1 model shelf_short
@@ -247,7 +263,7 @@ place Stage1WritingLap2              88 -70 -140 yaw -90 size 64 16 0
 place Stage1WritingLap3              -88 -70 -140 yaw 90 size 60 15 0
 place Stage1KeypadRoomWriting        218 -70 70 yaw -90 size 64 16 0
 # 暗証番号の手がかり（「ひとつめ」などの文字。数字はその右に30離して置いている）
-place Stage1KeypadClueLabel1         88 -70 -130 yaw -90
+place Stage1KeypadClueLabel1         92 -70 -150 yaw 90
 place Stage1KeypadClueLabel2         -218 -70 -155 yaw 90
 place Stage1KeypadClueLabel3         120 -70 -68 yaw 0
 place Stage1KeypadClueLabel4         218 -70 -135 yaw -90

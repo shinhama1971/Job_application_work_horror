@@ -31,6 +31,39 @@ float GetFlashlightBeamProfile(float3 pixelDirection)
     return shapedCone * lerp(0.82f, 1.08f, smoothstep(0.38f, 1.0f, cone));
 }
 
+// 光の色（下で定義している。翼の光でも使うので、先に宣言している）
+float3 GetFlashlightTint(float3 pixelDirection);
+
+// 懐中電灯の「翼の光（スピル）」の強さ（0〜約0.2）。本物の懐中電灯は、明るい中心（ホットスポット）の外にも、
+// 中心の1〜2割ほどの弱い光が60度あまりまで広がり、照らした所のまわりがぼんやり見える（反射鏡で集めきれなかった光）。
+// 円錐の内側（中心の光）にも少し足され、外側では約66度でなめらかに消える。
+float GetFlashlightSpillProfile(float3 pixelDirection)
+{
+    const float coneDot = dot(pixelDirection, normalize(Light.Direction.xyz));
+    // cos(66度) ≒ 0.41、cos(18度) ≒ 0.95
+    const float spill = smoothstep(0.41f, 0.95f, coneDot);
+    return spill * spill * 0.22f;
+}
+
+// 翼の光で面が受ける光。懐中電灯は目のすぐそばにあるので、目に見えている面には懐中電灯からも光が届く（さえぎる物がない）。
+// そのため影は付けず、レンズの模様も付けない（中心の光ほどはっきりしない、ぼんやりした光）。
+// 壁の文字（flashlightRevealPS）は、これまでどおり中心の光だけで浮かぶ（謎解きを簡単にしないため）
+float3 GetFlashlightSpillLight(float3 viewPosition, float3 viewNormal)
+{
+    const float distanceFromCamera = length(viewPosition);
+    if (!(Light.Enable && Light.FlashlightEnabled) || distanceFromCamera < 0.001f)
+    {
+        return 0.0f;
+    }
+    const float3 pixelDirection = viewPosition / distanceFromCamera;
+    const float spill = GetFlashlightSpillProfile(pixelDirection);
+    const float normalizedDistance = saturate(distanceFromCamera / max(Light.Range, 0.001f));
+    const float rangeFade = saturate(1.0f - normalizedDistance * normalizedDistance);
+    const float lambert = saturate(dot(normalize(viewNormal), -pixelDirection));
+    return Light.Diffuse.rgb * GetFlashlightTint(pixelDirection) * Light.Intensity * spill *
+        rangeFade * rangeFade * GetFlashlightDiffuseResponse(lambert);
+}
+
 // 懐中電灯の光の色：中心は少し青みのある白、縁へ行くほど黄色く暖かくにじむ（安い懐中電灯の光。サイレントヒルの懐中電灯を参考）
 float3 GetFlashlightTint(float3 pixelDirection)
 {

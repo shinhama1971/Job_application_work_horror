@@ -68,7 +68,9 @@ float3 ApplyHorrorMist(float3 color, float3 worldPosition, float3 viewPosition, 
         const float3 pixelDirection = viewPosition / max(length(viewPosition), 0.001f);
         const float beam = GetFlashlightBeamProfile(pixelDirection);
         const float reach = saturate(1.0f - distance / max(Light.Range, 1.0f));
-        mistColor += Light.Diffuse.rgb * GetFlashlightTint(pixelDirection) * Light.Intensity * beam * (0.06f + reach * 0.15f);
+        // 中心の光に加えて、翼の光（GetFlashlightSpillProfile）でも霧がうっすら光り、光の円のまわりがぼんやり明るくかすむ
+        const float spill = GetFlashlightSpillProfile(pixelDirection);
+        mistColor += Light.Diffuse.rgb * GetFlashlightTint(pixelDirection) * Light.Intensity * (beam + spill * 0.8f) * (0.06f + reach * 0.15f);
     }
     return lerp(color, mistColor, mist);
 }

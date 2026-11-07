@@ -274,20 +274,25 @@ void Player::Update()
     // 壁や床が近いときは、懐中電灯の明るさを下げている。
     // 明るさが一定だと、近くの面が白く飛んで、材質の細かい模様が消えるためである。
     float closestSurfaceDistance = 70.0f;
+    // 照り返しの点光源を置く、光が最初に当たる面までの距離（BounceReach より遠ければ、照り返しは出さない）
+    constexpr float BounceReach = 180.0f;
+    float beamHitDistance = BounceReach;
+    Vector3 beamOrigin = m_Position;
+    beamOrigin.y += m_CameraHeightOffset;
+    Vector3 beamDirection = Vector3::UnitZ;
     if (visibleLight)
     {
-        // 目の位置から視線の方向へ70の線を伸ばし、最も近い壁までの距離を求めている
-        Vector3 beamOrigin = m_Position;
-        beamOrigin.y += m_CameraHeightOffset;
+        // 目の位置から視線の方向へ線を伸ばし、最も近い壁までの距離を求めている
+        // （70までは近い面で光を弱めるのに、180までは照り返しの位置に使っている）
         const float cameraPitch = cam->GetCameraPitch();
         const float pitchCos = cosf(cameraPitch);
-        Vector3 beamDirection(
+        beamDirection = Vector3(
             sinf(yaw) * pitchCos,
             sinf(cameraPitch),
             cosf(yaw) * pitchCos);
         beamDirection.Normalize();
         const Vector3 beamEnd =
-            beamOrigin + beamDirection * closestSurfaceDistance;
+            beamOrigin + beamDirection * BounceReach;
 
         for (const Wall* wall : walls)
         {
@@ -300,8 +305,7 @@ void Player::Update()
             if (wall->IntersectsInteractionSegment(
                 beamOrigin, beamEnd, hitDistance))
             {
-                closestSurfaceDistance = (std::min)(
-                    closestSurfaceDistance, hitDistance);
+                beamHitDistance = (std::min)(beamHitDistance, hitDistance);
             }
         }
 
@@ -312,10 +316,10 @@ void Player::Update()
                 (MIN_Y_POSITION - beamOrigin.y) / beamDirection.y;
             if (floorDistance >= 0.0f)
             {
-                closestSurfaceDistance = (std::min)(
-                    closestSurfaceDistance, floorDistance);
+                beamHitDistance = (std::min)(beamHitDistance, floorDistance);
             }
         }
+        closestSurfaceDistance = (std::min)(closestSurfaceDistance, beamHitDistance);
     }
 
     // 近い面までの距離が12〜54の間で、近いほど光を弱め、照らす距離も短くしている（急に変わらないよう、なめらかに近づけている）
@@ -401,6 +405,28 @@ void Player::Update()
     }
 
     Renderer::SetLight(light);
+
+    // 懐中電灯の照り返し：光が最初に当たった面から少し手前に、弱い点光源を置いている。
+    // 本物の懐中電灯は、照らした壁や床で跳ね返った光が部屋全体をぼんやり明るくする（近い面ほど強い）。
+    // 面から10だけ手前に置き、光の筋（horrorMist.hlsli。高さ-58より上の光源だけ）が出ないよう、高さは-59までにしている
+    {
+        float targetIntensity = 0.0f;
+        if (renderFlashlight && beamHitDistance < BounceReach)
+        {
+            const float closeness = 1.0f - beamHitDistance / BounceReach;
+            targetIntensity = light.Intensity * 0.42f * (0.25f + 0.75f * closeness * closeness);
+            Vector3 bouncePosition = beamOrigin + beamDirection * (std::max)(beamHitDistance - 10.0f, 2.0f);
+            bouncePosition.y = (std::min)(bouncePosition.y, -59.0f);
+            const float follow = m_HasBouncePosition ? 1.0f - std::pow(1.0f - 0.25f, deltaTime * 60.0f) : 1.0f;
+            m_BouncePosition += (bouncePosition - m_BouncePosition) * follow;
+            m_HasBouncePosition = true;
+            m_BounceRange = 75.0f + beamHitDistance * 0.45f;
+            // 跳ね返った光は、壁や床の色を少し帯びて暖かくなる
+            m_BounceColor = Vector3(light.Diffuse.x, light.Diffuse.y * 0.94f, light.Diffuse.z * 0.84f);
+        }
+        const float response = 1.0f - std::pow(1.0f - 0.20f, deltaTime * 60.0f);
+        m_BounceIntensity += (targetIntensity - m_BounceIntensity) * response;
+    }
 
     // 手に持った懐中電灯：レンズの光と、前の面で跳ね返って手を照らす光（面が近いほど強い。何もなくても床から少し返る）
     FirstPersonHands::FrameInput handInput;
@@ -493,6 +519,18 @@ void Player::Update()
 }
 
 // 一人称のときは懐中電灯を持った右手だけを、デバッグ用の三人称のときはメッシュを描いている。
+void Player::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const
+{
+    if (m_BounceIntensity < 0.01f || !m_HasBouncePosition)
+    {
+        return;
+    }
+    ENVIRONMENT_POINT_LIGHT bounce{};
+    bounce.PositionRange = Vector4(m_BouncePosition.x, m_BouncePosition.y, m_BouncePosition.z, m_BounceRange);
+    bounce.ColorIntensity = Vector4(m_BounceColor.x, m_BounceColor.y, m_BounceColor.z, m_BounceIntensity);
+    lights.push_back(bounce);
+}
+
 void Player::Draw(Camera* cam)
 {
     cam->SetCamera();

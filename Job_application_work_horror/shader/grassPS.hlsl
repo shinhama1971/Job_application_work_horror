@@ -71,6 +71,8 @@ float4 main(GRASS_PS_IN input) : SV_TARGET
             specular = radiance * pow(saturate(dot(viewNormal, viewDirection)), 32.0f) * 0.035f;
         }
     }
+    // 懐中電灯の翼の光（明るい中心の外にも広がる、ぼんやりした弱い光。葉は両面なので、カメラ側を向けた法線で受けている）
+    lighting += GetFlashlightSpillLight(input.viewPos, viewNormal);
     float3 color = input.color * lighting + specular;
     const float distanceFog = GetHorrorDistanceFog(distanceFromCamera, LoopDepth);
     const float heightDensity = exp(-max(input.worldPos.y + 100.0f, 0.0f) * 0.055f);
