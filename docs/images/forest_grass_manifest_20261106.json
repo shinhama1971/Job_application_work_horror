@@ -1,0 +1,12 @@
+[
+  {
+    "file": "docs/images/forest_grass_on_20261106.png",
+    "source": "--capture <出力先> --forest の forest_02_街灯と水たまり.png（2026年11月7日、草の明るさと水たまり・茂みの除外を直した後）",
+    "sha256": "af03d4851208c943231d0df41cd04a43f300fe01a0269285942a554385851a65"
+  },
+  {
+    "file": "docs/images/forest_grass_off_20261106.png",
+    "source": "同じ撮影を SIGNAL_LOST_DISABLE_FOREST_GRASS=1 で草を止めて撮ったもの（2026年11月7日）",
+    "sha256": "5d6b2002aacb0f2b1b49f6243292600e947512a75cae321dcff55c5fe23ef10c"
+  }
+]

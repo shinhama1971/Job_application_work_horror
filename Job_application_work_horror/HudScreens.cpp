@@ -169,21 +169,23 @@ void Hud::DrawTitle(
     AddText((screenWidth - guidanceWidth) * 0.5f,
         panelY + 310.0f, guidance, guidancePixelSize, controlsColor);
 
-    // 始める面の選択：2つの枠を横に並べ、選んでいる面の枠を明るくし、その下に説明を出している
-    constexpr std::string_view stageNames[] = { "1面  電力の復旧", "2面  ループする廊下" };
+    // 始める面の選択：3つの枠（1面・2面・外の森（試作））を横に並べ、選んでいる面の枠を明るくし、その下に説明を出している
+    constexpr std::string_view stageNames[] = { "1面  電力の復旧", "2面  ループする廊下", "外の森（試作）" };
     constexpr std::string_view stageNotes[] =
     {
         "最初から遊ぶ  クリアの記録が残る",
-        "2面から遊ぶ  クリアしても記録には残らない"
+        "2面から遊ぶ  クリアしても記録には残らない",
+        "森を歩いて研究所まで行く  まだ1面にはつながらない"
     };
-    const int stage = selectedStage == 1 ? 1 : 0;
-    constexpr float stageBoxWidth = 300.0f;
+    constexpr int stageCount = 3;
+    const int stage = (std::clamp)(selectedStage, 0, stageCount - 1);
+    constexpr float stageBoxWidth = 260.0f;
     constexpr float stageBoxHeight = 46.0f;
     constexpr float stageBoxGap = 24.0f;
     constexpr float stageTextPixelSize = 2.4f;
-    const float stageRowX = (screenWidth - (stageBoxWidth * 2.0f + stageBoxGap)) * 0.5f;
+    const float stageRowX = (screenWidth - (stageBoxWidth * stageCount + stageBoxGap * (stageCount - 1))) * 0.5f;
     const float stageRowY = panelY + 340.0f;
-    for (int index = 0; index < 2; ++index)
+    for (int index = 0; index < stageCount; ++index)
     {
         const bool selected = index == stage;
         const float boxX = stageRowX + static_cast<float>(index) * (stageBoxWidth + stageBoxGap);

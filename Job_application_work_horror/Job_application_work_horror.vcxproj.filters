@@ -216,6 +216,12 @@
     <ClCompile Include="Stage2Scene.cpp">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClCompile>
+    <ClCompile Include="ForestScene.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="ForestGrass.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="Stage2Layout.cpp">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClCompile>
@@ -668,6 +674,12 @@
     <ClInclude Include="Stage2Scene.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
+    <ClInclude Include="ForestScene.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="ForestGrass.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
     <ClInclude Include="Stage2Layout.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
@@ -868,5 +880,10 @@
   <ItemGroup>
     <ClInclude Include="LightShafts.h"><Filter>ヘッダー ファイル</Filter></ClInclude>
     <FxCompile Include="shader\lightShaftsCS.hlsl"><Filter>リソース ファイル</Filter></FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shader\grassCS.hlsl"><Filter>リソース ファイル</Filter></None>
+    <None Include="shader\grassVS.hlsl"><Filter>リソース ファイル</Filter></None>
+    <None Include="shader\grassPS.hlsl"><Filter>リソース ファイル</Filter></None>
   </ItemGroup>
 </Project>

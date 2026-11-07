@@ -10,6 +10,7 @@
 #include "Game.h"
 #include "Input.h"
 
+#include <algorithm>
 #include <cmath>
 
 int TitleScene::s_SelectedStage = 0;
@@ -62,12 +63,12 @@ void TitleScene::Update()
     if (Input::GetKeyTrigger(VK_LEFT) || Input::GetKeyTrigger(VK_A) ||
         Input::GetButtonTrigger(XINPUT_LEFT) || stickLeft)
     {
-        s_SelectedStage = 0;
+        s_SelectedStage = (std::max)(0, s_SelectedStage - 1);
     }
     if (Input::GetKeyTrigger(VK_RIGHT) || Input::GetKeyTrigger(VK_D) ||
         Input::GetButtonTrigger(XINPUT_RIGHT) || stickRight)
     {
-        s_SelectedStage = 1;
+        s_SelectedStage = (std::min)(2, s_SelectedStage + 1);
     }
     if (Input::GetKeyTrigger(VK_1))
     {
@@ -76,6 +77,10 @@ void TitleScene::Update()
     if (Input::GetKeyTrigger(VK_2))
     {
         s_SelectedStage = 1;
+    }
+    if (Input::GetKeyTrigger(VK_3))
+    {
+        s_SelectedStage = 2;
     }
     if (s_SelectedStage != previousStage)
     {
@@ -86,8 +91,9 @@ void TitleScene::Update()
         Input::GetButtonTrigger(XINPUT_A) ||
         Input::GetButtonTrigger(XINPUT_START))
     {
-        Core::Game::GetInstance()->RequestSceneChange(
-            s_SelectedStage == 0 ? SceneName::Stage : SceneName::Stage2);
+        // 外の森（試作）は、まだ1面にはつながらない（森の中を歩いて研究所まで行ける。Esc のポーズメニューからタイトルへ戻る）
+        constexpr SceneName stages[] = { SceneName::Stage, SceneName::Stage2, SceneName::Forest };
+        Core::Game::GetInstance()->RequestSceneChange(stages[s_SelectedStage]);
     }
 }
 

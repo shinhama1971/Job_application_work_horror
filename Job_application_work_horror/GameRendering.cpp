@@ -321,7 +321,8 @@ namespace Core
         // 技術デモで「水面の反射なし」を選んでいるときは、床も反射を混ぜない（Ground::Draw）
         const bool hasWetFloor =
             m_Instance->m_CurrentScene == SceneName::Stage ||
-            m_Instance->m_CurrentScene == SceneName::Stage2;
+            m_Instance->m_CurrentScene == SceneName::Stage2 ||
+            m_Instance->m_CurrentScene == SceneName::Forest;
         if (reflectionMethod != 1)
         {
             m_Instance->m_ReflectionProbe.Invalidate();

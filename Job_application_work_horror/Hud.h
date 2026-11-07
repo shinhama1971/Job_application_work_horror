@@ -28,7 +28,7 @@ public:
         int fuseCount,
         std::string_view interactionPrompt,
         std::string_view objectiveText);
-    // タイトル画面を描いている（ベスト記録があれば表示し、selectedStage（0 = 1面、1 = 2面）の面を選んだ形で描いている）
+    // タイトル画面を描いている（ベスト記録があれば表示し、selectedStage（0 = 1面、1 = 2面、2 = 外の森（試作））の面を選んだ形で描いている）
     void DrawTitle(
         float time,
         bool hasClearRecord,

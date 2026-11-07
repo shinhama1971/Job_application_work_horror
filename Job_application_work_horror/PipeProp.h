@@ -2,7 +2,7 @@
 // ファイルの役割: 外部のFBXの配管モデルを配置する、背景用のObject。
 // 主な技術: Assimp（ModelCache経由）、静的メッシュ、ディフューズテクスチャ、シャドウマップ
 // ============================================================================
-
+/*
 #pragma once
 
 #include "Object.h"
@@ -33,4 +33,4 @@ public:
     bool UsesCameraCulling() const override { return true; }
     bool ContributesToReflection() const override { return true; }
     void Uninit() override;
-};
+};*/

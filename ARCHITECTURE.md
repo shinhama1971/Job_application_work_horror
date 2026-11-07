@@ -276,6 +276,7 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 | 一人称の手と懐中電灯 | CPU・GPU（VS・PS） | `FirstPersonHands`（揺れの計算、b9 に手元だけの射影行列と、前の壁で跳ね返る懐中電灯の光）、`shader/viewModel*.hlsl*`（肌・布・金属） | ビューポートの深度の範囲を 0〜0.02 にして描き、壁にめり込まないようにしている（本描画は near=1 なので、それより手前に壁は来ない） |
 | 建物と小物の配置のファイル | CPU（読み込み時） | `PropLayoutFile`（`assets/layout/stage1_props.txt`・`stage2_props.txt`）、`Stage1Layout`・`Stage2Layout` | 建物の壁・柱・天井・配管・小物はファイルに書き（`prop` 行）、`room` を付けた壁を、部屋の角の暗がり（b11）とレイ反射の部屋の形に使う。扉・照明・電池・端末など進行のコードが作る物は、種類と動きをコードが決め、置き場所（位置・向き・大きさ）だけを `place` 行から読む（`PropLayoutFile::ApplyPlacement`）。ヒューズと鍵の候補の場所は `spot` 行。ループの瞬間移動の計算に使う最後のドア・開始地点のドアとその裏の通路と表示、MirrorAnomaly の面に合わせた鏡と枠、監視カメラの表で置く開かずの扉は、計算と結び付いているので C++ に残している |
 | Unity のマップエディター | エディター（C#） | `MapEditor/Assets/Editor/MapLayout`（`MapLayoutDocument` が配置ファイルを行ごとに読み書き、`MapLayoutEditor` がシーンへの読み込みと書き出し、`MapLayoutBatch` が往復の確認）、`MapEditor/Assets/MapLayout`（GameObject と行を結ぶ印） | ゲームは配置ファイルだけを読み、Unity には依存しない。書き出しは変わった数値だけを、ゲームの `FormatNumber` と同じ書き方で書き換える |
+| 外の森（試作） | CPU（読み込み時）・GPU | `ForestScene`（タイトルの3つ目の選択、`--forest`、デバッグ画面のボタンで開く。1面にはまだつながらない）、`assets/layout/forest_props.txt`、`tools/maya/build_forest_props.py`（`forest_*` のモデル。一覧は `Wall.cpp`） | 1面・2面と同じ仕組み（配置ファイル・`Ground`・`Player`・`Wall` の見た目のモデル・Debug版の読み直し）だけで組み、場面だけを足した。木は、見た目のモデルを「標準の大きさ」で割って箱に合わせる仕組みを使い、標準の大きさを幹にして、枝を箱の外へ出している（当たり判定は幹だけ、カリングの球は箱の対角線の半分で枝まで届く） |
 | 箱の小物の見た目のモデル | CPU（読み込み時） | `Wall::SetVisualModel`（モデルの一覧は `Wall.cpp`）、`PropLayoutFile`（配置ファイルの `model` の指定） | 当たり判定・影・深度プリパス・水面に映す箱は箱の大きさのまま。モデルは標準の大きさで割って1×1×1の箱の空間にし、ワールド行列の拡大で置いた箱の大きさに伸ばす。部位の色は頂点の色で付け、マテリアルの色は白にしている。警告灯とライトは、光る部位（レンズ・電球）を後ろに並べ、その前までを光る色のないマテリアルで描き分けている |
 | 自分の体の影 | CPU・GPU（PS） | `Player`（足もとの位置・向き・歩く手足の振りを b12 の PlayerBody へ）、`shader/figureShadow.hlsli` の `GetPlayerBodyShadow`（litTexturePS・wetFloorPS の点光源ごと） | 体は描かず、シャドウマップにも入れない。胴・頭・両脚・両腕のカプセルが、画素から光源への線分を遮るかで影を求めるので、どの照明でも影が落ちる。懐中電灯の光は目の位置から出るので遮らない |
 | 小物と人影のモデル | CPU（読み込み時） | `PropModel`（FBXの部位をマテリアルの名前で選び、頂点カラーの環境遮蔽 × 部位の色を頂点の色にして、各クラスの頂点の配列へ足す） | モデルは実際の大きさで作り、各クラスが掛ける拡大率で位置と法線を割っている。描き方は箱で組んでいたときと同じ |
@@ -400,3 +401,13 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 リファクタリングではゲームの見た目、操作感、シーン進行、演出タイミングを変更していません。
 
 画質設定と半解像度の光の筋については [README](README.md) と [計測表](docs/QUALITY_BENCHMARK_20261031.md) を参照してください。光の筋・SSAOは深度プリパス後、通常の本描画の前に計算し、別視点では画面空間の結果を再利用しません。
+
+## 森の草の流れ
+
+`ForestScene` は配置を読んで木・岩を作った後、`ForestGrass` を作ります。配置を読み直したら `Rebuild()` を予約し、次の `RunGpuSimulation()` で根元を植え直します。根元は不変のStructuredBuffer、葉先・速度はSRV/UAVのStructuredBufferです。CSとVSの読み書きが重ならないよう、それぞれ処理後にスロットを外します。
+
+`grassCS.hlsl` は流れるノイズの風とプレイヤーから離れる力を目標とし、ばね・減衰を半陰的オイラー法の2分割で進めます。`grassVS.hlsl` は曲線の制御点を順にlerpし、位置と接線から葉の帯を作ります。`grassPS.hlsl` は葉の裏にも届く照明、懐中電灯の影、弱い濡れた光沢を加え、既存の霧・色調を適用します。
+
+ユーザー提供の「Compute Shader 実践 Part.9：草レンダリング」を確認しました。p.29〜32の状態バッファ→CSで揺らす→ベジェ曲線→VSで形を作る構成を使い、森固有の配置除外・区画カリング・LODを組み合わせています。資料から変更した点と未実装の発展項目は [対応表](docs/FOREST_GRASS_PART9.md) に記録しています。
+
+`Shader::Create` に入力レイアウトなしの指定を追加しました。既存のメッシュは従来の指定を既定とし、キャッシュキーも区別します。草はメイン視点にだけ描き、影を落とすメッシュや反射用の形状は持ちません。

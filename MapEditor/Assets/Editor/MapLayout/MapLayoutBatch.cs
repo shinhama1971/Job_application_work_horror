@@ -24,7 +24,7 @@ namespace MapLayout.Editor
             var outputDirectory = GetArgument("-outputDir") ?? Path.Combine(Application.dataPath, "..", "Temp");
             Directory.CreateDirectory(outputDirectory);
             var failed = false;
-            foreach (var fileName in new[] { "stage1_props.txt", "stage2_props.txt" })
+            foreach (var fileName in new[] { "stage1_props.txt", "stage2_props.txt", "forest_props.txt" })
             {
                 MapLayoutEditor.NewEmptyScene();
                 var source = Path.Combine(MapLayoutEditor.LayoutDirectory, fileName);
@@ -102,7 +102,45 @@ namespace MapLayout.Editor
             }
             Debug.Log("MAPLAYOUT EDIT 変わった行:\n" + changed);
             failed |= !CheckRepeatedExport(outputDirectory);
+            failed |= !CheckDeletion(outputDirectory);
             EditorApplication.Exit(failed ? 1 : 0);
+        }
+
+        // シーンで消した物が、書き出したファイルからも消えるか（写したファイルで行い、ゲームのファイルは変えない）。
+        // prop と spot は行が消え、place は残り、spot は組の最後の1つが残り、読み込んだ後に足された行は残るか
+        static bool CheckDeletion(string outputDirectory)
+        {
+            var path = Path.Combine(outputDirectory, "deleted_stage1_props.txt");
+            File.Copy(Path.Combine(MapLayoutEditor.LayoutDirectory, "stage1_props.txt"), path, true);
+            MapLayoutEditor.NewEmptyScene();
+            var root = MapLayoutEditor.Import(path);
+            var items = root.GetComponentsInChildren<MapLayoutItem>();
+            int CountLines(string prefix) =>
+                File.ReadAllLines(path, Encoding.UTF8).Count(line => Regex.IsMatch(line, "^\\s*" + Regex.Escape(prefix) + "\\s"));
+            var secondFuseBefore = CountLines("spot Stage1SecondFuse");
+            foreach (var item in items.Where(item => item.Key == "PropCabinetRight" || item.Key == "Door" ||
+                                                     item.Key == "Stage1WestWingKey"))
+            {
+                UnityEngine.Object.DestroyImmediate(item.gameObject);
+            }
+            UnityEngine.Object.DestroyImmediate(items.First(item => item.Key == "Stage1SecondFuse").gameObject);
+            // 読み込んだ後に、ほかの所（ゲームの配置エディターなど）でファイルに足された行
+            File.AppendAllText(path, "\r\nprop ExternalAdded 0 -90 0 4 4 4 concrete none 4 0", new UTF8Encoding(false));
+            MapLayoutEditor.Export(root, path);
+
+            var problems = new List<string>();
+            if (CountLines("prop PropCabinetRight") != 0) problems.Add("消した prop の行が残っている");
+            if (CountLines("place Door") != 1) problems.Add("place の行が消えた");
+            if (CountLines("spot Stage1SecondFuse") != secondFuseBefore - 1) problems.Add("消した spot の行が消えていない");
+            if (CountLines("spot Stage1WestWingKey") != 1) problems.Add("spot の組の最後の1つが残っていない");
+            if (CountLines("prop ExternalAdded") != 1) problems.Add("読み込んだ後に足された行が消えた");
+            if (problems.Count == 0)
+            {
+                Debug.Log("MAPLAYOUT DELETE OK: 消した prop・spot の行は消え、place・組の最後の spot・後から足された行は残った");
+                return true;
+            }
+            Debug.LogError("MAPLAYOUT DELETE NG:\n" + string.Join("\n", problems));
+            return false;
         }
 
         // 読み込み直さずに何度も書き出す、ふだんの使い方を確かめている（写したファイルで行い、ゲームのファイルは変えない）。
@@ -194,6 +232,8 @@ namespace MapLayout.Editor
             new View { File = "stage1_props.txt", Name = "05d_archive", Position = new Vector3(-62.0f, -99.0f, 115.0f), YawToward = new Vector2(-200.0f, 118.0f), Pitch = -0.12f },
             new View { File = "stage1_props.txt", Name = "05h_southwest_hall", Position = new Vector3(-160.0f, -99.0f, -196.0f), YawToward = new Vector2(-300.0f, -270.0f), Pitch = -0.14f },
             new View { File = "stage2_props.txt", Name = "06_stage2_corridor", Position = new Vector3(0.0f, -99.0f, -118.0f), YawToward = new Vector2(0.0f, 0.0f), Pitch = 0.0f },
+            // 外の森（試作）：小道の途中から、森の奥の研究所を見ている
+            new View { File = "forest_props.txt", Name = "forest_path", Position = new Vector3(0.0f, -99.0f, 80.0f), YawToward = new Vector2(0.0f, 300.0f), Pitch = 0.05f },
         };
 
         static void RenderView(MapLayoutRoot root, Vector3 foot, Vector2 target, float pitch, string path)

@@ -11,6 +11,8 @@
 #include "Game.h"
 #include "GpuTimer.h"
 #include "Ground.h"
+#include "ForestGrass.h"
+#include "ForestScene.h"
 #include "Door.h"
 #include "Locker.h"
 #include "Player.h"
@@ -375,6 +377,7 @@ namespace
         case SceneName::Stage: return "Stage1";
         case SceneName::Stage2: return "Stage2";
         case SceneName::Result: return "Result";
+        case SceneName::Forest: return "Forest";
         }
         return "?";
     }
@@ -398,8 +401,21 @@ namespace
         { 32.0f, Vector3(-28,FloorY,-85), 0.15f, -0.55f, L"feature_unseen_3", false },
         { 34.0f, Vector3(-28,FloorY,-85), 0.15f, -0.55f, nullptr, false },
     };
+    // 外の森（試作。--capture と --forest を一緒に付けたとき）：開始地点 → 小道の街灯 → 研究所が見えてくる所 → 研究所の正面
+    const std::vector<Keyframe> ForestTour = {
+        { 0.0f, Vector3(0.0f, FloorY, -400.0f), 0.0f, 0.0f, nullptr, false },
+        { 2.5f, Vector3(0.0f, FloorY, -398.0f), 0.0f, 0.0f, L"forest_01_開始地点", false },
+        { 7.0f, Vector3(-6.0f, FloorY, -100.0f), YawToward(-6.0f, -100.0f, -29.0f, -60.0f), -0.12f, nullptr, false },
+        { 8.0f, Vector3(-6.0f, FloorY, -98.0f), YawToward(-6.0f, -98.0f, -29.0f, -60.0f), -0.12f, L"forest_02_街灯と水たまり", false },
+        { 12.0f, Vector3(0.0f, FloorY, 120.0f), 0.0f, 0.03f, nullptr, false },
+        { 13.0f, Vector3(0.0f, FloorY, 125.0f), 0.0f, 0.03f, L"forest_03_研究所が見えてくる", false },
+        { 16.0f, Vector3(0.0f, FloorY, 215.0f), 0.0f, 0.14f, nullptr, false },
+        { 17.0f, Vector3(0.0f, FloorY, 218.0f), 0.0f, 0.14f, L"forest_04_研究所の正面", false },
+        { 18.0f, Vector3(0.0f, FloorY, 218.0f), 0.0f, 0.14f, nullptr, false },
+    };
     const std::vector<Keyframe>* GetTour(SceneName scene)
     {
+        if (scene == SceneName::Forest) return &ForestTour;
         if (g_FeatureTour && scene == SceneName::Stage) return &FeatureStage1;
         if (g_FeatureTour && scene == SceneName::Stage2) return &FeatureStage2;
         if (scene == SceneName::Stage) return &Stage1Tour;
@@ -450,7 +466,7 @@ namespace
         SceneName Scene = SceneName::Stage;
     };
 
-    const std::vector<BenchmarkSpot> BenchmarkSpots =
+    const std::vector<BenchmarkSpot> StageBenchmarkSpots =
     {
         { "開始地点（壁の文字の前）", Vector3(0.0f, FloorY, -128.0f), Pi, -0.12f },
         { "開始地点から廊下の奥", Vector3(0.0f, FloorY, -110.0f), 0.0f, 0.0f },
@@ -465,6 +481,19 @@ namespace
         // 左の壁の古い鏡を正面から見る所。鏡は、鏡で反射した光線をシェーダーの中で飛ばして映している（自分の体も映る）
         { "2面（壁の鏡の前）", Vector3(0.0f, FloorY, 37.0f), -Pi * 0.5f, -0.06f, SceneName::Stage2 },
     };
+
+    // --forest のときは森の同じ地点を測る。草なしとの比較でも、位置と向きは変えない。
+    const std::vector<BenchmarkSpot>& GetBenchmarkSpots()
+    {
+        static const bool forest = ForestScene::IsRequestedByCommandLine();
+        static const std::vector<BenchmarkSpot> forestSpots =
+        {
+            { "森（開始地点の小道）", Vector3(0.0f, FloorY, -398.0f), 0.0f, -0.20f, SceneName::Forest },
+            { "森（街灯の横の草むら）", Vector3(-6.0f, FloorY, -98.0f), -0.65f, -0.32f, SceneName::Forest },
+            { "森（研究所の手前）", Vector3(0.0f, FloorY, 125.0f), 0.0f, -0.15f, SceneName::Forest },
+        };
+        return forest ? forestSpots : StageBenchmarkSpots;
+    }
 
     // 各段階のフレーム数。切り替えた直後はGPU時間の結果が数フレーム遅れて届くため、最初の45フレームは捨てている。
     constexpr int BenchmarkWarmupFrames = 45;
@@ -587,7 +616,7 @@ namespace
         std::ostringstream text;
         text << std::fixed << std::setprecision(2);
         // 先頭に、画面の大きさ・描画解像度・エフェクト設定・GPUの名前を書いている
-        text << "処理の重さの計測結果（1・2面・ライトOFFとONの比較）\n";
+        text << (ForestScene::IsRequestedByCommandLine() ? "処理の重さの計測結果（森・ライトOFFとONの比較）\n" : "処理の重さの計測結果（1・2面・ライトOFFとONの比較）\n");
         text << "画面: " << Application::GetWindowWidth() << "x" << Application::GetWindowHeight()
              << "  描画解像度: " << Application::GetWidth() << "x" << Application::GetHeight()
              << "  垂直同期: " << (g_BenchmarkVsync ? "あり" : "なし")
@@ -656,8 +685,8 @@ namespace
         g_HasLastFrameTime = true;
 
         // タイトルからの切り替えが終わり、1面が始まるまでは何もしていない
-        const SceneName benchmarkScene = g_BenchmarkSpot < BenchmarkSpots.size()
-            ? BenchmarkSpots[g_BenchmarkSpot].Scene : SceneName::Stage2;
+        const SceneName benchmarkScene = g_BenchmarkSpot < GetBenchmarkSpots().size()
+            ? GetBenchmarkSpots()[g_BenchmarkSpot].Scene : GetBenchmarkSpots().back().Scene;
         if (game->GetCurrentSceneName() != benchmarkScene)
         {
             game->RequestSceneChange(benchmarkScene);
@@ -671,7 +700,7 @@ namespace
         }
 
         // 全地点を測り終えたら結果を書き出し、数フレーム後に終了している
-        if (g_BenchmarkSpot >= BenchmarkSpots.size())
+        if (g_BenchmarkSpot >= GetBenchmarkSpots().size())
         {
             WriteBenchmarkResult();
             Log("benchmark finished");
@@ -682,7 +711,7 @@ namespace
         // 新しい地点に来たら、結果を入れる場所を用意している
         if (g_BenchmarkResults.size() <= g_BenchmarkSpot)
         {
-            g_BenchmarkResults.push_back({ &BenchmarkSpots[g_BenchmarkSpot], {}, {} });
+            g_BenchmarkResults.push_back({ &GetBenchmarkSpots()[g_BenchmarkSpot], {}, {} });
             Log("benchmark spot " + std::to_string(g_BenchmarkSpot));
         }
 
@@ -690,6 +719,13 @@ namespace
         const int phaseLength = BenchmarkWarmupFrames + BenchmarkMeasureFrames;
         const bool lightOn = g_BenchmarkFrame >= phaseLength;
         const int frameInPhase = g_BenchmarkFrame % phaseLength;
+        if (frameInPhase == BenchmarkWarmupFrames)
+        {
+            if (const ForestGrass* grass = game->GetObj<ForestGrass>("ForestGrass"))
+                Log("grass: planted=" + std::to_string(grass->GetBladeCount()) +
+                    " drawn=" + std::to_string(grass->GetDrawnBladeCount()) +
+                    " chunks=" + std::to_string(grass->GetDrawnChunkCount()));
+        }
         // ここで測れるのは直前のフレームの値。条件を切り替えた直後のフレームは捨てる区間に入るようにしている。
         if (frameInPhase >= BenchmarkWarmupFrames && frameMs > 0.0)
         {
@@ -713,7 +749,7 @@ namespace
         }
 
         // 毎フレーム、地点の位置と向きに立たせ直し、ライトの状態を決めている
-        const BenchmarkSpot& spot = BenchmarkSpots[g_BenchmarkSpot];
+        const BenchmarkSpot& spot = GetBenchmarkSpots()[g_BenchmarkSpot];
         player->SetPosition(spot.Position);
         player->SetFlashlightOn(lightOn);
         player->AddBattery(100.0f);    // 電池切れの点滅で結果が揺れないよう、電池を満タンに保っている
@@ -1092,7 +1128,7 @@ namespace Tools::CaptureMode
             {
                 screenName = L"benchmark_screen.png";
             }
-            else if (g_BenchmarkSpot < BenchmarkSpots.size() &&
+            else if (g_BenchmarkSpot < GetBenchmarkSpots().size() &&
                 g_BenchmarkFrame == phaseLength + BenchmarkWarmupFrames / 2)
             {
                 screenName = L"benchmark_spot" + std::to_wstring(g_BenchmarkSpot) + L"_light_on.png";

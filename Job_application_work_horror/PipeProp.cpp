@@ -2,7 +2,7 @@
 // ファイルの役割: Pipe90.fbxを読み込み、本描画・影・反射の各描画で描いている。
 // 主な技術: Assimp（ModelCache経由）、静的メッシュ、ディフューズテクスチャ、シャドウマップ
 // ============================================================================
-
+/*
 #include "PipeProp.h"
 
 #include "Game.h"
@@ -111,3 +111,4 @@ void PipeProp::Uninit()
     m_Materials.clear();
     m_ModelData.reset();
 }
+*/

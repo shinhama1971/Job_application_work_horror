@@ -7,6 +7,7 @@
 
 #include "Game.h"
 #include "Ground.h"
+#include "ForestGrass.h"
 #include "ModelCache.h"
 #include "PostProcess.h"
 #include "Renderer.h"
@@ -294,6 +295,19 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         ImGui::Text("Reflection probe objects: %u drawn", g_ReflectionDrawn);
         ImGui::Separator();
 
+        // 外の森（試作）を開く（タイトルで選ぶか、--forest で起動しても開ける）
+        if (game != nullptr && ImGui::Button("外の森（試作）を開く"))
+        {
+            game->RequestSceneChange(SceneName::Forest);
+        }
+
+        // LODと区画のカリングで、本数がどれだけ減ったかを確認する。
+        if (game != nullptr)
+        {
+            if (const ForestGrass* grass = game->GetObj<ForestGrass>("ForestGrass"))
+                ImGui::Text("森の草: %u 本 / 描画 %u 本 / %u 区画",
+                    grass->GetBladeCount(), grass->GetDrawnBladeCount(), grass->GetDrawnChunkCount());
+        }
         // 2面の進行の確認と、イベントをすぐ再生するボタン（2面の間だけ表示している）
         Scene* scene = game == nullptr ? nullptr : game->GetScene();
         SceneDebugInfo sceneDebugInfo{};

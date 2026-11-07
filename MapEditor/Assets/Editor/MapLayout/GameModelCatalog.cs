@@ -55,7 +55,6 @@ namespace MapLayout.Editor
             // ロッカーの扉の FBX は正面が +X。Locker::Place は、正面の向き（yaw）から90度引いて回している
             { "Locker", new PlaceModel { AssetPath = "props/locker_door.fbx", Nominal = Vector3.one, ExtraYaw = -90.0f } },
             { "HangingBulb", new PlaceModel { AssetPath = "props/hanging_bulb.fbx", Nominal = Vector3.one, Offset = new Vector3(0.0f, -4.0f, 0.0f) } },
-            { "PipeProp", new PlaceModel { AssetPath = "pipe/Pipe90.fbx", Nominal = Vector3.one } },
         };
 
         static Dictionary<string, WallModel> s_WallModels;

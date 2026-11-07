@@ -1,0 +1,187 @@
+# ============================================================================
+# 外の森（試作）の配置（PropLayoutFile が読む。ForestScene）。ゲームを --forest で起動すると、この森を歩ける。
+# タイトルで「外の森（試作）」を選んでも開ける（1面にはまだつながらない）。Debug版では、ゲームを動かしたまま F5 か、ファイルの書き換え（Unity から書き出したときなど）で読み直す。
+#
+#   color 名前 r g b [metal 粗さ [金属らしさ]] [rough 粗さ]
+#   prop 名前 x y z 幅 高さ 奥行き 色 光る色 光沢 当たり判定(0/1) [noshadow] [weathering] [room] [glow 範囲 強さ] [model モデルの名前]
+#   place 名前 x y z [yaw 度] [size 幅 高さ 奥行き]
+#
+#   木のモデル（forest_tree_dead・forest_tree_fork）は、箱を幹の大きさ（太さ7〜10・高さ110〜150）にして置く。
+#   枝は箱の外へ広がるので、当たるのは幹だけ。倒木（forest_fallen_log）は箱の長い向きへ回る。
+#   モデルは tools/maya/build_forest_props.py で作っている。
+#
+# 南（z=-400）の開始位置から、ゆるく蛇行する小道を北へ進むと、森の奥（z=300）に2階建ての研究所がある。
+# 座標の単位は全ステージ共通（地面の高さは y=-100）。
+# ============================================================================
+
+# --- 色
+color bark          0.085 0.075 0.065  rough 0.92    # 枯れ木・倒木の樹皮（雨で濡れて黒ずんでいる）
+color rockColor     0.15  0.15  0.14   rough 0.85    # 苔のない岩
+color concrete      0.34  0.36  0.33                 # 研究所の打ちっぱなしのコンクリート
+color trimColor     0.075 0.08  0.075  rough 0.70    # 階の境目の帯
+color darkMetal     0.24  0.25  0.24   metal 0.50 0.75    # 扉の枠・アンテナ・街灯の柱（錆びて黒ずんだ鉄）
+color doorColor     0.10  0.085 0.07   rough 0.60    # 研究所の扉
+color glass         0.015 0.02  0.022  rough 0.08    # 暗い窓
+color windowLit     0.95  0.70  0.42                 # 明かりのついた窓（2階）
+color signColor     0.42  0.42  0.38   rough 0.70    # 入口の横の銘板
+color warmBulb      1.0   0.72  0.40
+color warmBulbBody  0.6   0.432 0.24   rough 0.10
+color lampRed       0.90  0.08  0.05
+color lampRedBody   0.54  0.048 0.03   rough 0.35
+
+# --- 研究所（2階建て。正面は南向きで、正面の壁の外側は z=298）
+prop LabFront          0   -50  300     220 100 4     concrete none 4 1 weathering
+prop LabSideLeft    -110   -50  360     4 100 124     concrete none 4 1 weathering
+prop LabSideRight    110   -50  360     4 100 124     concrete none 4 1 weathering
+prop LabBack           0   -50  420     220 100 4     concrete none 4 1 weathering
+prop LabRoof           0     1  360     224 4 128     concrete none 4 1
+prop LabParapet        0     6  299     224 6 3       concrete none 4 1
+prop LabFloorBand      0   -52  297.3   222 2 1.5     trimColor none 5 0
+# 入口：扉・枠・ひさし・玄関の灯り・銘板
+prop LabDoor           0   -77  297.4   26 46 1.2     doorColor none 10 1
+prop LabDoorFrameLeft  -14.5 -76 297.2  3 48 2        darkMetal none 20 0
+prop LabDoorFrameRight  14.5 -76 297.2  3 48 2        darkMetal none 20 0
+prop LabDoorFrameTop    0  -52.5 297.2  32 3 2        darkMetal none 20 0
+prop LabCanopy         0   -49  289     46 2.5 18     concrete none 4 1
+prop LabPorchLight     0  -51.6 292     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 90 2.6 model safe_bulb
+prop LabSign         -32   -62  297.6   20 5 0.6      signColor none 8 0
+# 窓（1階・2階）。2階の右から2番目だけ明かりがついている
+prop LabWindow1F1    -80   -72  297.6   22 18 0.6     glass none 60 0
+prop LabWindow1F2    -48   -72  297.6   22 18 0.6     glass none 60 0
+prop LabWindow1F3     48   -72  297.6   22 18 0.6     glass none 60 0
+prop LabWindow1F4     80   -72  297.6   22 18 0.6     glass none 60 0
+prop LabWindow2F1    -80   -26  297.6   22 18 0.6     glass none 60 0
+prop LabWindow2F2    -48   -26  297.6   22 18 0.6     glass none 60 0
+prop LabWindow2F3      0   -26  297.6   22 18 0.6     glass none 60 0
+prop LabWindow2F4     48   -26  297.6   22 18 0.6     windowLit windowLit 10 0 noshadow glow 70 1.4
+prop LabWindow2F5     80   -26  297.6   22 18 0.6     glass none 60 0
+# 屋上のアンテナと、先の赤い灯り
+prop LabAntennaMast   70    36  360     3 66 3        darkMetal none 20 1 model pipe_pole
+prop LabAntennaBar1   70    50  360     24 1.5 1.5    darkMetal none 20 0 model pipe_pole
+prop LabAntennaBar2   70    60  360     16 1.5 1.5    darkMetal none 20 0 model pipe_pole
+prop LabAntennaLamp   70  70.6  360     2.6 3.2 2.6   lampRedBody lampRed 24 0 noshadow glow 60 1.5 model safe_bulb
+# 研究所の手前の門柱
+prop LabGatePostLeft  -45  -81  228     10 38 10      darkMetal none 8 1 model column
+prop LabGatePostRight  44.652  -69.207  228     9.303 61.587 10      darkMetal none 8 1 model column
+prop LabGatePostRight_1  44.652  -69.207  228     9.303 61.587 10      darkMetal none 8 1 model column
+
+# --- 小道の途中の古い街灯（水たまりに映る、森の中でただ1つの灯り）
+prop PathLampPole    -42   -64  -60     3 72 3        darkMetal none 20 1 model pipe_pole
+prop PathLampPole_2    55.3   -64.8  -121.1     3 72 3        darkMetal none 20 1 model pipe_pole
+prop PathLampPole_1    70.2   -64  53.5     3 72 3        darkMetal none 20 1 model pipe_pole
+prop PathLampArm     -35   -29  -60     14 1.5 1.5    darkMetal none 20 0 model pipe_pole
+prop PathLampArm_1     47.95   -29  -120.95     14 1.5 1.5    darkMetal none 20 0 model pipe_pole
+prop PathLampBulb    -29  -31.6 -60     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 110 2.2 model safe_bulb
+prop PathLampBulb_1    41.76  -30.46 -121.5     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 110 2.2 model safe_bulb
+
+# --- 木（小道から離して並べている。小道の中心は x = 28 × sin(z / 115)）
+prop ForestTree1    -167.9  -31.2    14.8   6.9 137.7 6.9   bark none 6 1 model forest_tree_dead
+prop ForestTree2      88.1  -37.9  -107.6   7.4 124.3 7.4   bark none 6 1 model forest_tree_dead
+prop ForestTree3    -281.5  -39.4   140.9   8.8 121.1 8.8   bark none 6 1 model forest_tree_fork
+prop ForestTree4     258.5  -35.8     261   8.4 128.4 8.4   bark none 6 1 model forest_tree_fork
+prop ForestTree5     175.3  -30.2    -285   9.9 139.5 9.9   bark none 6 1 model forest_tree_dead
+prop ForestTree6     179.2  -29.7  -140.4   7.1 140.6 7.1   bark none 6 1 model forest_tree_dead
+prop ForestTree7    -394.6  -32.9   109.1   7.4 134.3 7.4   bark none 6 1 model forest_tree_dead
+prop ForestTree8     -88.2    -42   -88.7   8.8 116 8.8   bark none 6 1 model forest_tree_fork
+prop ForestTree9     405.5  -27.6  -244.3   7.9 144.7 7.9   bark none 6 1 model forest_tree_fork
+prop ForestTree10     92.7  -33.9  -377.1   8.9 132.2 8.9   bark none 6 1 model forest_tree_fork
+prop ForestTree11    285.8  -32.4  -176.3   6.6 135.2 6.6   bark none 6 1 model forest_tree_dead
+prop ForestTree12     51.8  -37.9  -388.9   7 124.3 7   bark none 6 1 model forest_tree_fork
+prop ForestTree13   -356.3  -41.7  -416.6   9.6 116.7 9.6   bark none 6 1 model forest_tree_dead
+prop ForestTree14    -40.1  -39.2    -396   7.8 121.6 7.8   bark none 6 1 model forest_tree_dead
+prop ForestTree15     56.3  -45.5  -148.6   9.9 108.9 9.9   bark none 6 1 model forest_tree_dead
+prop ForestTree16    213.9  -30.2  -211.7   9.4 139.7 9.4   bark none 6 1 model forest_tree_dead
+prop ForestTree17   -385.1  -24.2    46.9   6.6 151.6 6.6   bark none 6 1 model forest_tree_dead
+prop ForestTree18   -222.4  -31.9    -441   7.1 136.1 7.1   bark none 6 1 model forest_tree_fork
+prop ForestTree19    311.6    -35  -145.2   7.1 129.9 7.1   bark none 6 1 model forest_tree_fork
+prop ForestTree20    255.1  -39.6  -467.3   7 120.9 7   bark none 6 1 model forest_tree_dead
+prop ForestTree21   -220.7  -29.7  -137.1   9 140.6 9   bark none 6 1 model forest_tree_dead
+prop ForestTree22    148.2  -32.8  -314.9   9.6 134.4 9.6   bark none 6 1 model forest_tree_dead
+prop ForestTree23   -443  -39.7  -190.1   9 120.6 9   bark none 6 1 model forest_tree_dead
+prop ForestTree24    248.3  -25.9  -188.9   8.7 148.2 8.7   bark none 6 1 model forest_tree_dead
+prop ForestTree25    106.3  -29.5   -48.1   9.7 141 9.7   bark none 6 1 model forest_tree_dead
+prop ForestTree26    249.2  -25.1   212.1   9.7 149.8 9.7   bark none 6 1 model forest_tree_fork
+prop ForestTree27    404.6  -44.8    -3.4   6.6 110.5 6.6   bark none 6 1 model forest_tree_dead
+prop ForestTree28    184.6  -26.1   -36.6   9.4 147.8 9.4   bark none 6 1 model forest_tree_dead
+prop ForestTree29    208.1  -25.7  -392.4   8.6 148.6 8.6   bark none 6 1 model forest_tree_fork
+prop ForestTree30    212.2  -32.1  -461.4   9.4 135.7 9.4   bark none 6 1 model forest_tree_dead
+prop ForestTree31   -219.4  -45.7   124.1   9.6 108.6 9.6   bark none 6 1 model forest_tree_fork
+prop ForestTree32   -335.4  -44.8   130.3   6.6 110.4 6.6   bark none 6 1 model forest_tree_dead
+prop ForestTree33   -362.7    -36    -3.3   9.7 128.1 9.7   bark none 6 1 model forest_tree_dead
+prop ForestTree34    366.7  -27.9   100.2   8.2 144.2 8.2   bark none 6 1 model forest_tree_dead
+prop ForestTree35   -299.5  -27.3    94.7   9.9 145.4 9.9   bark none 6 1 model forest_tree_dead
+prop ForestTree36    -88.8    -29    76.1   8.9 141.9 8.9   bark none 6 1 model forest_tree_dead
+prop ForestTree37    350.2  -27.3  -400.6   7.5 145.5 7.5   bark none 6 1 model forest_tree_dead
+prop ForestTree38    -79.9  -32.1   117.4   7 135.8 7   bark none 6 1 model forest_tree_fork
+prop ForestTree39   -309  -29.9  -372.5   7.6 140.1 7.6   bark none 6 1 model forest_tree_fork
+prop ForestTree40   -176.4  -42.8  -114.5   9 114.5 9   bark none 6 1 model forest_tree_dead
+prop ForestTree41    138.4  -45.6  -232.3   9.5 108.7 9.5   bark none 6 1 model forest_tree_fork
+prop ForestTree42   -319.9  -28.7    -9.9   7.2 142.7 7.2   bark none 6 1 model forest_tree_dead
+prop ForestTree43    341.8  -29.7   152.6   8.6 140.5 8.6   bark none 6 1 model forest_tree_dead
+prop ForestTree44     59.9  -27.3  -253.9   9.2 145.4 9.2   bark none 6 1 model forest_tree_dead
+prop ForestTree45    201.6  -34.8  -334.5   9.9 130.5 9.9   bark none 6 1 model forest_tree_dead
+prop ForestTree46   -221.9  -26.3     240   6.6 147.5 6.6   bark none 6 1 model forest_tree_fork
+prop ForestTree47   -376.8  -36.6  -139.8   6.9 126.9 6.9   bark none 6 1 model forest_tree_dead
+prop ForestTree48    171.7  -44.9  -368.4   7.5 110.1 7.5   bark none 6 1 model forest_tree_dead
+prop ForestTree49   -154.3  -31.9    -202   7.2 136.1 7.2   bark none 6 1 model forest_tree_fork
+prop ForestTree50     -428  -39.5   -46.5   8.3 120.9 8.3   bark none 6 1 model forest_tree_dead
+prop ForestTree51   -284.1  -39.8   227.9   9.2 120.3 9.2   bark none 6 1 model forest_tree_dead
+prop ForestTree52    138.1  -38.6   -25.9   6.9 122.8 6.9   bark none 6 1 model forest_tree_fork
+prop ForestTree53    258.9  -42.5  -416.1   9.1 115 9.1   bark none 6 1 model forest_tree_dead
+prop ForestTree54   -111.3  -27.8    -274   6.6 144.4 6.6   bark none 6 1 model forest_tree_fork
+prop ForestTree55    428.2  -39.4   121.2   7.8 121.3 7.8   bark none 6 1 model forest_tree_dead
+prop ForestTree56     70.4  -27.1   -25.1   8.1 145.8 8.1   bark none 6 1 model forest_tree_dead
+prop ForestTree57     28.1  -39.3  -280.1   7.3 121.3 7.3   bark none 6 1 model forest_tree_fork
+prop ForestTree58     65.6  -36.7    -311   7.4 126.5 7.4   bark none 6 1 model forest_tree_dead
+prop ForestTree59    289.8  -39.6   152.2   6.5 120.9 6.5   bark none 6 1 model forest_tree_fork
+prop ForestTree60   -422.9  -35.5  -449.4   9.1 128.9 9.1   bark none 6 1 model forest_tree_fork
+prop ForestTree61    337.8  -30.9  -117.1   8.7 138.2 8.7   bark none 6 1 model forest_tree_dead
+prop ForestTree62   -121.5  -34.4  -142.8   9.9 131.3 9.9   bark none 6 1 model forest_tree_fork
+prop ForestTree63    388.5  -32.1  -195.8   8.6 135.8 8.6   bark none 6 1 model forest_tree_dead
+prop ForestTree64    253.2  -39.1  -321.7   7 121.8 7   bark none 6 1 model forest_tree_fork
+
+# --- 小道の縁の岩・倒木・枯れた茂み
+prop ForestRock1        39  -98.7  -340.4   8.8 5.6 7.5   rockColor none 6 1 model forest_rock
+prop ForestRock2     -54.2  -96.9  -459.6   14.2 9.2 12.2   rockColor none 6 1 model forest_rock
+prop ForestRock3     -73.7    -96  -166.7   17 10.9 14.6   rockColor none 6 1 model forest_rock
+prop ForestRock4     -69.9  -97.9  -231.7   11.1 7.2 9.5   rockColor none 6 1 model forest_rock
+prop ForestRock5        44  -96.6   -59.6   15.3 9.8 13.1   rockColor none 6 1 model forest_rock
+prop ForestRock6     102.3  -96.5    69.5   15.5 10 13.3   rockColor none 6 1 model forest_rock
+prop ForestRock7     -94.8  -98.4     -47   9.5 6.1 8.2   rockColor none 6 1 model forest_rock
+prop ForestRock8     -34.4  -97.3    47.1   13 8.4 11.2   rockColor none 6 1 model forest_rock
+prop ForestRock9     -52.5  -95.9     6.6   17.4 11.2 14.9   rockColor none 6 1 model forest_rock
+prop ForestRock10    -58.9  -97.8    98.2   11.4 7.3 9.8   rockColor none 6 1 model forest_rock
+prop ForestRock11    -67.8  -95.4    31.8   19.1 12.3 16.4   rockColor none 6 1 model forest_rock
+prop ForestRock12     95.9  -98.5   146.3   9.3 6 7.9   rockColor none 6 1 model forest_rock
+prop ForestRock13    -53.8  -98.3    67.6   10 6.5 8.6   rockColor none 6 1 model forest_rock
+prop ForestRock14     65.3  -96.5  -458.1   15.5 10 13.3   rockColor none 6 1 model forest_rock
+prop ForestLog1      75.9  -96.5   170.2   64.8 7 7   bark none 6 1 model forest_fallen_log
+prop ForestLog2     -74.1  -96.5  -285.6   7 7 45.4   bark none 6 1 model forest_fallen_log
+prop ForestLog3      35.4  -96.5    -0.2   7 7 66.8   bark none 6 1 model forest_fallen_log
+prop ForestLog4      17.3  -96.5  -206.7   51.4 7 7   bark none 6 1 model forest_fallen_log
+prop ForestLog5      82.2  -96.5    -435   46.3 7 7   bark none 6 1 model forest_fallen_log
+prop ForestLog6     -55.1  -96.5   141.3   7 7 62.6   bark none 6 1 model forest_fallen_log
+prop ForestBrush1    -154.5  -95.1  -276.4   16.3 9.8 16.3   bark none 6 0 model forest_brush
+prop ForestBrush2     133.8  -95.2   189.3   16 9.6 16   bark none 6 0 model forest_brush
+prop ForestBrush3     126.5  -93.5  -382.1   21.8 13.1 21.8   bark none 6 0 model forest_brush
+prop ForestBrush4     107.4  -94.6  -194.6   18 10.8 18   bark none 6 0 model forest_brush
+prop ForestBrush5     -46.1  -93.3  -323.1   22.4 13.5 22.4   bark none 6 0 model forest_brush
+prop ForestBrush6      31.3  -92.4  -134.9   25.4 15.2 25.4   bark none 6 0 model forest_brush
+prop ForestBrush7    -150.4  -94.1  -156.2   19.8 11.9 19.8   bark none 6 0 model forest_brush
+prop ForestBrush8      65.8  -93.5   113.4   21.6 12.9 21.6   bark none 6 0 model forest_brush
+prop ForestBrush9     139.7  -94.9      64   17 10.2 17   bark none 6 0 model forest_brush
+prop ForestBrush10    114.7  -94.2  -413.7   19.2 11.5 19.2   bark none 6 0 model forest_brush
+prop ForestBrush11    -83.1  -92.3  -148.2   25.7 15.4 25.7   bark none 6 0 model forest_brush
+prop ForestBrush12      161  -93.1   140.4   23 13.8 23   bark none 6 0 model forest_brush
+prop ForestBrush13     50.9  -91.6  -170.5   28 16.8 28   bark none 6 0 model forest_brush
+prop ForestBrush14    -73.6  -95.1   -59.1   16.4 9.8 16.4   bark none 6 0 model forest_brush
+prop ForestBrush15   -112.6  -93.1  -108.9   23.1 13.8 23.1   bark none 6 0 model forest_brush
+prop ForestBrush16      -30  -93.7      83   20.9 12.5 20.9   bark none 6 0 model forest_brush
+prop ForestBrush17    -73.4  -95.1     146   16.4 9.8 16.4   bark none 6 0 model forest_brush
+prop ForestBrush18   -104.8  -93.2    47.9   22.7 13.6 22.7   bark none 6 0 model forest_brush
+
+# --- 置き場所（ForestScene が作る物）
+place Ground                         0 -100 0 size 40 1 40
+place Player                         0 -99 -400
+
+place ForestGrass                    0 -100 -40 size 760 1 860

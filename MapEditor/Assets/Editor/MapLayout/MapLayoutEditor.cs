@@ -6,7 +6,9 @@
 //   位置と、y 軸まわりの回転（yaw）と、size が書いてある物は大きさ（Scale）を動かせる。
 // ・spot 行（ヒューズと鍵の候補の場所）は、組ごとにまとめた黄色の球にしている。位置を動かせる。
 // ・prop をコピー（Ctrl+D）すると、書き出すときに、元の行をひな形にして新しい行を足している（名前の空白と括弧は _ にする）。
-//   シーンから消した物の行は、間違って消さないよう、ファイルに残している（コンソールに知らせる）。
+//   シーンから消した prop と spot は、書き出すとファイルからも行を消す（spot は組の最後の1つだけは残す）。
+//   place（扉・照明など、ゲームのコードが作る物）は、行が無いとゲームが止まるので消さずに残し、知らせを出す。
+//   読み込んだ後にゲームの配置エディターや手で足された行は、シーンにまだ無いだけなので消さない（MapLayoutRoot.KnownLines で見分ける）。
 // ============================================================================
 
 using System.Collections.Generic;
@@ -35,6 +37,10 @@ namespace MapLayout.Editor
 
         [MenuItem("Map Layout/2面を読み込む")]
         static void ImportStage2() => Import(Path.Combine(LayoutDirectory, "stage2_props.txt"));
+
+        // 外の森（試作）。ゲームを --forest で起動するか、デバッグ画面（F1）のボタンで開ける
+        [MenuItem("Map Layout/森を読み込む")]
+        static void ImportForest() => Import(Path.Combine(LayoutDirectory, "forest_props.txt"));
 
         [MenuItem("Map Layout/配置ファイルへ書き出す")]
         static void ExportAll()
@@ -81,6 +87,7 @@ namespace MapLayout.Editor
                         break;
                 }
             }
+            root.KnownLines = CollectItemLines(document);
             Undo.RegisterCreatedObjectUndo(rootObject, "配置ファイルの読み込み");
             return root;
         }
@@ -350,17 +357,58 @@ namespace MapLayout.Editor
             {
                 document.Lines.Insert(after + 1, line);
             }
-            // 足した行で行番号がずれているので、番号ではなく、書き込んだ行そのもので比べている
+            // シーンで消した物の行を消している。足した行で行番号がずれているので、番号ではなく、書き込んだ行そのもので比べている。
+            // ・prop と spot は、行を消す（ゲームは、読み直すと消えた小物を隠し、次に始めたときは作らない）。
+            //   ただし spot は、同じ組の候補が1つも無くなるとゲームが止まるので、最後の1つは残す。
+            // ・place は、扉・照明・配電盤など、ゲームのコードが作る物の置き場所で、行が無いとゲームが止まるので、消さずに残して知らせる。
+            // ・読み込んだときに無かった行（ゲームの配置エディターや手で後から足された行）は、シーンにまだ無いだけなので残す
             var writtenLines = new HashSet<MapLayoutDocument.Line>(written.Select(entry => entry.line));
+            var knownLines = new HashSet<string>(root.KnownLines);
+            var removedLines = new List<MapLayoutDocument.Line>();
+            var keptPlaces = new List<string>();
             foreach (var line in document.Lines)
             {
                 var command = line.Command;
-                if ((command == "prop" || command == "place" || command == "spot") && !writtenLines.Contains(line))
+                if ((command != "prop" && command != "place" && command != "spot") || writtenLines.Contains(line))
                 {
-                    Debug.LogWarning("シーンにない行は、そのまま残しています: " + line.Text.Trim());
+                    continue;
+                }
+                if (!knownLines.Contains(line.Content.Trim()))
+                {
+                    Debug.LogWarning("読み込んだ後に足された行なので、そのまま残しています（シーンに出すには読み込み直してください）: " + line.Text.Trim());
+                }
+                else if (command == "place")
+                {
+                    keptPlaces.Add(line.Tokens[1].Text);
+                    Debug.LogWarning("place の物はゲームのコードが作るので、消さずに残しています: " + line.Text.Trim());
+                }
+                else
+                {
+                    removedLines.Add(line);
                 }
             }
+            foreach (var group in removedLines.Where(line => line.Command == "spot").GroupBy(line => line.Tokens[1].Text).ToList())
+            {
+                var remaining = document.Lines.Count(line =>
+                    line.Command == "spot" && line.Tokens.Count > 1 && line.Tokens[1].Text == group.Key && !removedLines.Contains(line));
+                if (remaining == 0)
+                {
+                    removedLines.Remove(group.First());
+                    Debug.LogWarning("spot の組 " + group.Key + " の候補が無くなるので、1つ残しています（ゲームが止まるため）");
+                }
+            }
+            foreach (var line in removedLines)
+            {
+                document.Lines.Remove(line);
+                Debug.Log("シーンで消した物の行を消しました: " + line.Text.Trim());
+            }
             document.Save(path);
+            if (keptPlaces.Count > 0 && !Application.isBatchMode)
+            {
+                EditorUtility.DisplayDialog("消せない物があります",
+                    "次の物はゲームのコードが作る物（place 行）なので、配置ファイルから消せません。行は残しました。\n" +
+                    "シーンに戻すには、配置ファイルを読み込み直してください。\n\n" + string.Join("\n", keptPlaces), "OK");
+            }
 
             // 書き出した後の行番号と、コピーに付けた新しい名前を印へ写している。
             // 読み込み直さずに続けて書き出しても、コピーがもう一度足されず、同じ物を同じ行へ書き込むようにするため
@@ -375,11 +423,22 @@ namespace MapLayout.Editor
                     }
                     EditorUtility.SetDirty(item);
                 }
+                root.KnownLines = CollectItemLines(document);
+                EditorUtility.SetDirty(root);
                 if (!Application.isBatchMode)
                 {
                     EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
                 }
             }
+        }
+
+        // ファイルの prop・place・spot の行の中身（前後の空白を除く）の一覧
+        static List<string> CollectItemLines(MapLayoutDocument document)
+        {
+            return document.Lines
+                .Where(line => line.Command == "prop" || line.Command == "place" || line.Command == "spot")
+                .Select(line => line.Content.Trim())
+                .ToList();
         }
 
         // シーンでコピーした物か（読み込んだ物は、prop と place は行の名前、spot は「組の名前 番号」の名前で作っている）

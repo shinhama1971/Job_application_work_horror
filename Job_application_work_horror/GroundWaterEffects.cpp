@@ -605,6 +605,55 @@ bool Ground::IsInsidePuddle(const Vector3& position) const
 	return m_WaterEffects.IsInsidePuddle(position);
 }
 
+// 見えている水面（BuildPuddleSurfaces と同じ楕円）から margin 以内かを返している。
+// 足元の判定（IsInsidePuddle）の楕円は水面より小さいので、草を生やさない場所など、見た目に合わせたいときはこちらを使う。
+// 楕円の中心はマス目の中心から少しずれ、半径もマスの6割ほどあるため、まわりの3×3マスを調べている
+bool Ground::IsNearVisiblePuddle(const Vector3& position, float margin) const
+{
+	const WaterEffectSystem::PuddleCellBufferData& data = m_WaterEffects.GetPuddleCellData();
+	constexpr float cellSize = 82.0f;
+	constexpr float coverRadius = 0.62f * 1.04f;
+	const Vector2 cellPosition = (Vector2(position.x, position.z) + Vector2(data.GridOffset.x, data.GridOffset.y)) / cellSize;
+	const int baseColumn = static_cast<int>(std::floor(cellPosition.x)) - WaterEffectSystem::PuddleCellMin;
+	const int baseRow = static_cast<int>(std::floor(cellPosition.y)) - WaterEffectSystem::PuddleCellMin;
+	for (int row = baseRow - 1; row <= baseRow + 1; ++row)
+	{
+		for (int column = baseColumn - 1; column <= baseColumn + 1; ++column)
+		{
+			if (row < 0 || column < 0 || row >= WaterEffectSystem::PuddleCellCount || column >= WaterEffectSystem::PuddleCellCount)
+			{
+				continue;
+			}
+			const Vector4& cell = data.Cells[static_cast<std::size_t>(row * WaterEffectSystem::PuddleCellCount + column)];
+			if (cell.x < 0.5f)
+			{
+				continue;
+			}
+			const Vector2 randomValue(cell.y, cell.z);
+			const float angle = randomValue.x * DirectX::XM_2PI;
+			const Vector2 axes = Vector2(0.72f + randomValue.x * 0.25f, 0.43f + randomValue.y * 0.20f) * coverRadius;
+			const Vector2 shift = (randomValue - Vector2(0.5f, 0.5f)) * 0.22f;
+			const Vector2 cellCenter(
+				static_cast<float>(WaterEffectSystem::PuddleCellMin + column) + 0.5f,
+				static_cast<float>(WaterEffectSystem::PuddleCellMin + row) + 0.5f);
+			// マス目の単位の位置を、BuildPuddleSurfaces の回転の逆に回して、楕円の軸にそろえている
+			const Vector2 local = cellPosition - (cellCenter + shift);
+			const float cosine = std::cos(angle);
+			const float sine = std::sin(angle);
+			const float alongX = local.x * cosine - local.y * sine;
+			const float alongY = local.x * sine + local.y * cosine;
+			const float marginCells = margin / cellSize;
+			const float nx = alongX / (axes.x + marginCells);
+			const float ny = alongY / (axes.y + marginCells);
+			if (nx * nx + ny * ny <= 1.0f)
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 void WaterEffectSystem::AddLeak(const Vector2& center, float maxRadius, float growSeconds)
 {
 	if (static_cast<int>(m_Leaks.size()) >= MaxLeakCount)

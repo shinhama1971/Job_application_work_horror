@@ -98,6 +98,12 @@ namespace
             { "door_indicator", "assets/model/props/wall_door_indicator.fbx", Vector3(10.0f, 5.0f, 1.0f), true,
                 { HousingPart, LensPart } },
             { "hanging_cord", "assets/model/props/wall_hanging_cord.fbx", Vector3(0.4f, 2.5f, 0.4f), false, { MainPart } },
+            // 外の森（forest_props.txt）：枯れ木2種（標準の大きさは幹の当たり判定の箱。枝はその外へ広がる）、倒木（長い向きへ回す）、岩、枯れた茂み
+            { "forest_tree_dead", "assets/model/props/forest_tree_dead.fbx", Vector3(8.0f, 130.0f, 8.0f), false, { MainPart } },
+            { "forest_tree_fork", "assets/model/props/forest_tree_fork.fbx", Vector3(8.0f, 130.0f, 8.0f), false, { MainPart } },
+            { "forest_fallen_log", "assets/model/props/forest_fallen_log.fbx", Vector3(60.0f, 8.0f, 8.0f), true, { MainPart } },
+            { "forest_rock", "assets/model/props/forest_rock.fbx", Vector3(14.0f, 9.0f, 12.0f), false, { MainPart } },
+            { "forest_brush", "assets/model/props/forest_brush.fbx", Vector3(20.0f, 12.0f, 20.0f), false, { MainPart } },
             { "desk_lamp_arm", "assets/model/props/wall_desk_lamp_arm.fbx", Vector3(0.8f, 9.0f, 0.8f), false, { MainPart } },
             { "desk_lamp_base", "assets/model/props/wall_desk_lamp_base.fbx", Vector3(4.0f, 1.0f, 4.0f), false,
                 { MainPart, HousingPart } },

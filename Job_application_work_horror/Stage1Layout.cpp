@@ -78,17 +78,7 @@ namespace Stage1Layout
         // プレイヤー（開始地点は南の区画の中央）
         Player* player = builder.Create<Player>("Player");
         PropLayoutFile::ApplyPlacement(*player, at("Player"));
-
-        // 外部のFBXの配管モデル（背景の飾り）。進行や当たり判定には参加させていない。
-        PipeProp* pipe = builder.Create<PipeProp>("PipeProp");
-        place(*pipe, "PipeProp");
-
-        PipeProp* pipe2 = builder.Create<PipeProp>("PipeProp2");
-        place(*pipe2, "PipeProp2");
-
-        PipeProp* pipe3 = builder.Create<PipeProp>("PipeProp3");
-        place(*pipe3, "PipeProp3");
-
+       
         // 床（建物全体を覆う1000x1000の濡れた床）
         Ground* ground = builder.Create<Ground>("Ground");
         place(*ground, "Ground");

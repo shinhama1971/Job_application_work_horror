@@ -159,6 +159,9 @@ public:
 	// その位置が水たまり（または水に浸かった範囲）の中かを返している
 	bool IsInsidePuddle(
 		const DirectX::SimpleMath::Vector3& position) const;
+	// 見えている水面（水たまりのメッシュと同じ楕円）から margin 以内かを返している（外の森の草を、水面に生やさないため）
+	bool IsNearVisiblePuddle(
+		const DirectX::SimpleMath::Vector3& position, float margin) const;
 	// x・z の範囲を、床一面が水に浸かった場所にしている（1面の西棟）。描画・足音・波紋のすべてに反映される。
 	void SetFloodRegion(
 		const DirectX::SimpleMath::Vector2& minimum,

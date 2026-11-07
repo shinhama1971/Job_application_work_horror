@@ -117,6 +117,8 @@
 | 壁・床の凹凸が懐中電灯の光に反映されていなかった問題の修正（ビュー行列b1をピクセルシェーダーにも設定）と、それに合わせた調整（壁・小物の懐中電灯の拡散光の幅、扉や家具の凹凸の強さ、法線を作る微分を `ddx_fine` に変更）。計測モードの画像で前後を比べて調整した | `Renderer.cpp`, `shader/litTexturePS.hlsl`, `shader/flashlightLighting.hlsli`, `shader/surfaceDetail.hlsli`, `ARCHITECTURE.md` | 原因の調査・実装・調整（Claude Code） | 修正の指示 |
 | 審査会の指摘への対応（11月5日）。水たまりを、水たまりごとのメッシュに分け、画面の外は描かず、遠いほど反射を軽くした（技術デモ F2 で前の方式と比べられ、F1 のデバッグ表示で細かさを色で見られる）。「暗くて見えない」「壁に近づくと何も見えない」に、懐中電灯の光の輪を広げ、近い壁で弱める量を減らし、長く何もなかった壁際に目印の物を12個置いた | `Ground.*`, `GroundWaterEffects.cpp`, `shader/wetFloorPS.hlsl`, `TechDemo.*`, `DebugUI.cpp`, `Player.cpp`, `assets/layout/stage1_props.txt`, `README.md`, `ARCHITECTURE.md` | 設計・実装・ビルドと撮影・計測での確認（Claude Code） | 対応する指摘の選択と優先順位、指摘の意味の確認（どこが分かりにくかったか） |
 | 審査会の指摘「インパクトが少し弱い」への対応。緊張が高いほど画面の端から視界が狭まり（ぼけ・色抜け・暗さ）、心拍に合わせて脈打つ画面効果を足した（1面・2面共通） | `PostProcess.*`, `FullScreenQuad.*`, `shader/crtOverlayPS.hlsl`, `TensionPulseFeedback.h`, `StageSceneEvents.cpp`, `Stage2SceneHorror.cpp`, `README.md` | 実装・ビルドと撮影での確認（Claude Code） | 案の中から「恐怖で視界が狭まる」を選んだ |
+| 外の森（試作）の場面を作った。Maya のスクリプトで枯れ木・倒木・岩・枯れた茂みのモデル、配置ファイルで小道と研究所と灯り、ゲームに `ForestScene`（タイトルの3つ目の選択、`--forest`、デバッグ画面のボタンで開く）、Unity のマップエディターに「森を読み込む」、自動撮影に森の道順を足した | `ForestScene.*`, `TitleScene.*`, `HudScreens.cpp`, `Game.*`, `GameRendering.cpp`, `CaptureMode.cpp`, `DebugUI.cpp`, `Wall.cpp`, `tools/maya/build_forest_props.py`, `assets/layout/forest_props.txt`, `assets/model/props/forest_*.fbx`, `MapEditor/Assets/Editor/MapLayout/MapLayoutEditor.cs`, `MapLayoutBatch.cs`, vcxproj, `README.md`, `ARCHITECTURE.md` | 設計・実装・ビルドと撮影での確認（Claude Code） | 森の導入の案、建物を研究所にすること、Unity で置けてゲームでも見られる範囲までにすることの決定 |
+| Unity のマップエディターで、シーンから消した物（prop・spot）が配置ファイルからも消えるようにした（place は残して知らせる。読み込んだ後に足された行は消さない）。使われなくなった配管（PipeProp）の置き場所の行を消した。バッチの確認に、消したときの確認を足した | `MapEditor/Assets/Editor/MapLayout/MapLayoutEditor.cs`, `MapLayoutBatch.cs`, `GameModelCatalog.cs`, `MapEditor/Assets/MapLayout/MapLayoutRoot.cs`, `assets/layout/stage1_props.txt`, `README.md` | 原因の調査・実装・バッチでの確認（Claude Code） | 不具合の報告（Unity で消しても消えない）、スタート地点の配管をコードから外した |
 | 当たり判定のある箱（Wall）で置いていた小物の見た目を、Mayaのスクリプトで作ったモデルに差し替えられるようにした（当たり判定・影の有無・水面に映す箱は箱のまま。長い物は箱の一番長い向きへ回す）。1面の書類棚・机・木箱・崩れた資材・梁・キャビネット・配電箱・ポンプ・タンク・排水口・柱・管の柱・天井沿いの配管・扉の上の表示灯・警告灯（排水バルブの上のランプも）・安全地帯の電球とコード・卓上ライトと、2面のロッカーの本体・配管・扉の上の表示灯・鏡と肖像画と時計と偽の扉の額縁を差し替え（警告灯とライトは、光る部位だけを光らせ、枠や笠は光らないマテリアルで描き分ける）。配置ファイルに model の指定を追加 | `tools/maya/build_wall_props.py`, `assets/model/props/wall_*.fbx`, `Wall.*`, `PropModel.*`, `PropLayoutFile.*`, `assets/layout/stage1_props.txt`, `Stage1Layout.cpp`, `Stage2Layout.cpp` | モデルを作るスクリプト・仕組み・差し替え・撮影での確認（Claude Code） | まとめて差し替える指示 |
 
 ### 設計の整理・品質改善
@@ -180,3 +182,9 @@
 - 実際に遊んで動作を確認し、問題があれば修正を依頼した
 - 採用しなかった変更（埃のパーティクルなど）は取り消した
 - 仕組みを説明できるよう、コードを読んで理解した部分（面接で説明できる範囲）
+
+## 森の草の作業（2026年11月6日）
+
+`HANDOFF_GRASS.md` を元にCodex（OpenAI）が続きを担当しました。引き継ぎ時点で `ForestGrass.h/.cpp` と `shader/grassCS.hlsl` は存在していました。その3ファイルの初期作成者は、この作業だけからは判断していません。
+
+今回Codexが追加・修正した範囲は、`grassVS.hlsl`・`grassPS.hlsl`、森への組み込み、入力レイアウトなしのシェーダー作成、プロジェクト登録、草の数のDebugUI表示、森の計測地点と比較用の草の停止、文書です。ビルド・自動撮影・GPU計測で確認しています。続けてユーザー提供ZIP内のPart.9本文と実装図を確認し、採用した考え方・変更した点・未実装の発展項目を docs/FOREST_GRASS_PART9.md に記録しました。

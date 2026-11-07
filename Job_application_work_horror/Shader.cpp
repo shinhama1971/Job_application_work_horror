@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // ファイルの役割: HLSLの読み込み、頂点の入力レイアウト、GPUへのシェーダーの設定を管理している。
 // 主な技術: D3DCompileFromFile（またはコンパイル済みの.cso）、頂点・ピクセルシェーダー、入力レイアウト、エラーの表示
 // ============================================================================
@@ -24,10 +24,10 @@ namespace
 //=======================================
 // シェーダーを作っている
 //=======================================
-void Shader::Create(std::string vs, std::string ps)
+void Shader::Create(std::string vs, std::string ps, bool procedural)
 {
 	// 頂点シェーダーとピクセルシェーダーのファイル名を改行でつないだものをキーにしている
-	const std::string cacheKey = vs + '\n' + ps;
+	const std::string cacheKey = vs + '\n' + ps + (procedural ? "\nprocedural" : "\nmesh");
 	const auto cachedShader = g_ShaderCache.find(cacheKey);
 	if (cachedShader != g_ShaderCache.end())
 	{
@@ -46,7 +46,7 @@ void Shader::Create(std::string vs, std::string ps)
 		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,			0,	D3D11_APPEND_ALIGNED_ELEMENT,   D3D11_INPUT_PER_VERTEX_DATA, 0 }
 	};
 
-	unsigned int numElements = ARRAYSIZE(layout);
+	unsigned int numElements = procedural ? 0u : ARRAYSIZE(layout);
 
 	// 頂点シェーダーと、頂点レイアウトを一緒に作っている
 	HRESULT hr = Renderer::CreateVertexShader(

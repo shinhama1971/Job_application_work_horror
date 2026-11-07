@@ -10,6 +10,7 @@
 #include "TitleScene.h"
 #include "StageScene.h"
 #include "Stage2Scene.h"
+#include "ForestScene.h"
 #include "ResultScene.h"
 #include "Shader.h"
 #include "ModelCache.h"
@@ -93,7 +94,8 @@ namespace Core
         if (Tools::CaptureMode::GetEffectLevelOverride() >= 0)
             m_Instance->m_Settings.SetEffectLevel(Tools::CaptureMode::GetEffectLevelOverride());
         m_Instance->ApplyVisualSettings();
-        m_Instance->ChangeScene(SceneName::Title);
+        // --forest を付けて起動したときは、タイトルの代わりに外の森（試作）から始めている
+        m_Instance->ChangeScene(ForestScene::IsRequestedByCommandLine() ? SceneName::Forest : SceneName::Title);
         return true;
     }
 
@@ -108,7 +110,8 @@ namespace Core
         // 1面・2面の間だけ、Esc・P・STARTでポーズメニューを開け閉めしている（デバッグ画面を開いている間は除く）
         const bool gameplayScene =
             m_Instance->m_CurrentScene == SceneName::Stage ||
-            m_Instance->m_CurrentScene == SceneName::Stage2;
+            m_Instance->m_CurrentScene == SceneName::Stage2 ||
+            m_Instance->m_CurrentScene == SceneName::Forest;
         const bool pausePressed =
             Input::GetKeyTrigger(VK_ESCAPE) ||
             Input::GetKeyTrigger(VK_P) ||
@@ -395,6 +398,10 @@ namespace Core
 
         case SceneName::Result:
             m_Scene = std::make_unique<ResultScene>();
+            break;
+
+        case SceneName::Forest:
+            m_Scene = std::make_unique<ForestScene>();
             break;
         }
 

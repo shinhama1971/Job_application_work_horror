@@ -38,7 +38,9 @@ enum class SceneName
     Title,
     Stage,
     Stage2,
-    Result
+    Result,
+    // 外の森（試作）。タイトルで選ぶか、--forest で起動するか、デバッグ画面のボタンから開く（1面にはまだつながらない）
+    Forest
 };
 
 class Scene;
