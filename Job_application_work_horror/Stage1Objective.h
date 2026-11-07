@@ -64,6 +64,8 @@ struct Stage1ObjectiveInput
     int westWingStep = 0;
     // 回し終えた排水バルブの数（3つのうち）
     int westWingValvesOpened = 0;
+    // 暗証番号の扉が開いているか（3本目のヒューズの、もう1つの手に入れ方。開いていれば、その部屋の奥を目的にする）
+    bool keypadSolved = false;
     // 西棟の、バルブを回している間の進み具合と短い知らせ（空なら出さない）
     std::string_view westWingText;
     // 光の安全地帯に初めて入ったときの知らせ（空なら出さない）

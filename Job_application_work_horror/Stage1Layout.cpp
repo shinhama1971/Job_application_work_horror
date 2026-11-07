@@ -249,6 +249,12 @@ namespace Stage1Layout
         placeAtRandomSpot(*item3, "Stage1ThirdFuse");
         item3->SetActive(false);
 
+        // 3本目のもう1つの手に入れ方：暗証番号の扉の先の部屋の奥（place Stage1KeypadRoomFuse）。3本目を探す段階まで隠している
+        Item* keypadRoomFuse = builder.Create<Item>("Item3Keypad");
+        place(*keypadRoomFuse, "Stage1KeypadRoomFuse");
+        keypadRoomFuse->SetActive(false);
+        objects.keypadRoomFuse = keypadRoomFuse;
+
         // 西棟の鍵。右の倉庫（前は3本目のヒューズがあった部屋）のどこかに、2周目のループの後に現れる（spot Stage1WestWingKey）。
         KeyItem* westWingKey = builder.Create<KeyItem>("Stage1WestWingKey");
         placeAtRandomSpot(*westWingKey, "Stage1WestWingKey");

@@ -79,6 +79,8 @@ private:
     bool m_SpawnAdjusted = false;           // 最初の位置の床への補正が終わったか
     // 操作できるか、走ってよいか
     bool m_CanControl = true;
+    // タイトル画面の後ろで映すときの、入力を読まない状態（SetAttractMode）
+    bool m_AttractMode = false;
     bool m_SprintAllowed = true;
 
     // ===== 隠れ場所（ロッカー） =====
@@ -139,6 +141,13 @@ public:
     bool CanControl() const
     {
         return m_CanControl;
+    }
+
+    // trueの間は、操作の入力（移動・走る・懐中電灯のスイッチ）を読まず、手も下げている。カメラと懐中電灯の光は普段どおり更新する。
+    // タイトル画面の後ろで森を映すとき（TitleScene）に、位置と視点の向きをシーンから動かすために使っている
+    void SetAttractMode(bool enable)
+    {
+        m_AttractMode = enable;
     }
 
     // 走っているか

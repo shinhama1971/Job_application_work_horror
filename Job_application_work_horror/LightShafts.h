@@ -41,6 +41,8 @@ public:
            !shader.Create("shader/lightShaftsCS.hlsl")) utility::ReportFatalError("光の筋の初期化に失敗しました");
     }
     void Unbind() { ID3D11ShaderResourceView* empty=nullptr;Renderer::GetDeviceContext()->PSSetShaderResources(16,1,&empty); }
+    // 光の筋の揺らぎの時間を最初に戻している（シーンを切り替えたとき。前のシーンの長さで、次のシーンの光の筋が変わらないように）
+    void ResetTime() { time = 0.0f; }
     bool Compute(const Matrix& view,const Matrix& projection,const D3D11_VIEWPORT& viewport,
                  const std::vector<ENVIRONMENT_POINT_LIGHT>& source,float dt) {
         Unbind(); if(!enabled)return false;

@@ -221,6 +221,7 @@ place Stage1KeypadPanel              41.5 -73.1 135 yaw 90
 place Stage1KeypadRoomBattery        140 -95 110
 place Stage1HiddenRoomKey            140 -95 60
 place Stage1HiddenRoomRecord         213 -82 150 yaw 90
+place Stage1KeypadRoomFuse           196 -95 150
 place BatteryItem                    -130 -95 120
 place ScareTrigger_Corridor          0 -90 65
 place Stage1ExitOmen                 92 -99 278

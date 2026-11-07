@@ -322,7 +322,8 @@ namespace Core
         const bool hasWetFloor =
             m_Instance->m_CurrentScene == SceneName::Stage ||
             m_Instance->m_CurrentScene == SceneName::Stage2 ||
-            m_Instance->m_CurrentScene == SceneName::Forest;
+            m_Instance->m_CurrentScene == SceneName::Forest ||
+            m_Instance->m_CurrentScene == SceneName::Title;
         if (reflectionMethod != 1)
         {
             m_Instance->m_ReflectionProbe.Invalidate();

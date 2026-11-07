@@ -140,8 +140,17 @@ void StageScene::Draw(Camera* camera)
         }
         else if (fuseCount == 2 && m_CorridorLoopCount >= 2)
         {
-            // 3本目は西棟の奥。鍵 → 西側の扉 → 一番近い排水バルブ → ヒューズの順に指している。
-            guideTarget = m_WestWing.GetGuideTarget();
+            // 3本目：西棟の鍵をまだ拾っていなくて、暗証番号の扉が開いていれば、その部屋の奥のヒューズを指している
+            if (m_WestWing.GetStep() == Stage1WestWing::Step::FindKey && m_KeypadDoor.IsSolved() &&
+                m_Objects.keypadRoomFuse != nullptr && m_Objects.keypadRoomFuse->IsActive())
+            {
+                guideTarget = m_Objects.keypadRoomFuse->GetPosition();
+            }
+            else
+            {
+                // 3本目は西棟の奥。鍵 → 西側の扉 → 一番近い排水バルブ → ヒューズの順に指している。
+                guideTarget = m_WestWing.GetGuideTarget();
+            }
         }
         // ヒューズが3本そろったら、配電盤を指している
         else if (fuseCount >= 3)
@@ -232,6 +241,12 @@ Stage1ObjectiveInput StageScene::MakeObjectiveInput() const
     input.westWingStep = static_cast<int>(m_WestWing.GetStep());
     input.westWingValvesOpened = m_WestWing.GetOpenedValveCount();
     input.westWingText = m_WestWing.GetObjectiveText();
+    input.keypadSolved = m_KeypadDoor.IsSolved();
+    // 暗証番号の部屋で3本目を取った後は、西棟の知らせ（水が引いた、ヒューズを探す など）を出さない
+    if (m_Objects.keypadRoomFuse != nullptr && m_Objects.keypadRoomFuse->IsCollected())
+    {
+        input.westWingText = std::string_view{};
+    }
     input.safeLightText = m_SafeLights.GetNoticeText();
     input.layoutNotice = m_LayoutNoticeTimer > 0.0f ? std::string_view(m_LayoutNotice) : std::string_view{};
     return input;

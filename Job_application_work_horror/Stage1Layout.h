@@ -102,6 +102,9 @@ struct StageObjects
     Item* firstFuse = nullptr;
     Item* secondFuse = nullptr;
     Item* thirdFuse = nullptr;
+    // 3本目のもう1つの手に入れ方：暗証番号の扉の先（閉じ込められる部屋）の奥にあるヒューズ。
+    // 3本目を探す段階になると現れ、西棟のヒューズとどちらか一方を取ればよい（取った方ではない方は消える。StageScene::UpdateThirdFuseRoutes）
+    Item* keypadRoomFuse = nullptr;
     // 天井照明と、監視カメラの異常で使う開かずの扉
     std::array<CeilingLight*, CeilingLightCount> ceilingLights{};
     std::array<Door*, StageSealedDoorCount> sealedDoors{};

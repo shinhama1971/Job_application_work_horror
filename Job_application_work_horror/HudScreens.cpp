@@ -9,6 +9,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <string>
 #include <unordered_map>
 #include <windows.h>
@@ -39,137 +40,102 @@ namespace
     }
 }
 
-// タイトル画面：題名・操作の説明・ベスト記録・始める面の選択・開始と終了の操作を、中央のパネルに並べている
+// タイトル画面：後ろに映す3Dの森（TitleScene）の上に、左側の暗い帯を重ね、題名・面の選択・操作の説明・ベスト記録を縦に並べている。
+// noise（0〜1）が大きいほど、題名の文字が横にずれ、赤と青緑に色がにじみ、横の帯が抜けて、電波が乱れたように見せている
 void Hud::DrawTitle(
     float time,
     bool hasClearRecord,
     float bestClearTimeSeconds,
     int bestCaughtCount,
-    int selectedStage)
+    int selectedStage,
+    float noise)
 {
     m_Vertices.clear();
 
     const float screenWidth = GetCanvasWidth();
     const float screenHeight = GetCanvasHeight();
-    const Color background(0.002f, 0.004f, 0.004f, 1.0f);
-    const Color dimGreen(0.08f, 0.20f, 0.14f, 0.50f);
+    const Color dimGreen(0.08f, 0.20f, 0.14f, 0.55f);
     const Color titleGreen(0.48f, 0.90f, 0.58f, 0.96f);
-    // 「開始」の文字を、ゆっくり明滅させている
+    const Color textColor(0.50f, 0.68f, 0.57f, 0.86f);
+    const Color faintColor(0.36f, 0.50f, 0.42f, 0.72f);
+    // 「開始」の文字と、選んでいる面の縁を、ゆっくり明滅させている
     const float pulse = std::sin(time * 2.1f) * 0.5f + 0.5f;
     const Color promptColor(
         0.58f + pulse * 0.16f,
         0.70f + pulse * 0.18f,
         0.62f + pulse * 0.14f,
         0.62f + pulse * 0.34f);
-
-    // 背景を塗り、7画素ごとに薄い横線（走査線）を引いて、古いモニターのような見た目にしている
-    AddRectangle(0.0f, 0.0f, screenWidth, screenHeight, background);
-
-    for (float y = 0.0f; y < screenHeight; y += 7.0f)
+    noise = (std::clamp)(noise, 0.0f, 1.0f);
+    // 0〜1の乱数（同じ値からは同じ結果）。ノイズのずれ方を、時間の刻みごとに変えるのに使っている
+    const auto hash = [](float value)
     {
-        AddRectangle(
-            0.0f,
-            y,
-            screenWidth,
-            1.0f,
-            Color(0.08f, 0.16f, 0.11f, 0.075f));
+        const float s = std::sin(value * 12.9898f) * 43758.5453f;
+        return s - std::floor(s);
+    };
+    const auto textWidth = [](std::string_view text, float pixelSize)
+    {
+        return static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * 6.0f;
+    };
+
+    // 左側の暗い帯：左端はほぼ黒、右へ行くほど透明にして、後ろの森が右側に見えるようにしている
+    constexpr float bandWidth = 560.0f;
+    constexpr float fadeWidth = 260.0f;
+    AddRectangle(0.0f, 0.0f, bandWidth - fadeWidth, screenHeight, Color(0.0f, 0.004f, 0.003f, 0.80f));
+    constexpr int fadeSteps = 26;
+    for (int step = 0; step < fadeSteps; ++step)
+    {
+        const float t = (static_cast<float>(step) + 0.5f) / static_cast<float>(fadeSteps);
+        AddRectangle(bandWidth - fadeWidth + fadeWidth * static_cast<float>(step) / fadeSteps, 0.0f,
+            fadeWidth / fadeSteps + 0.5f, screenHeight, Color(0.0f, 0.004f, 0.003f, 0.80f * (1.0f - t) * (1.0f - t)));
     }
+    // 画面全体の薄い走査線（古いモニターや監視映像のような見た目）
+    for (float y = 0.0f; y < screenHeight; y += 6.0f)
+    {
+        AddRectangle(0.0f, y, screenWidth, 1.0f, Color(0.0f, 0.0f, 0.0f, 0.10f));
+    }
+    // 左端の緑の線
+    AddRectangle(56.0f, 120.0f, 3.0f, screenHeight - 240.0f, Color(0.30f, 0.62f, 0.40f, 0.70f));
 
-    // 中央のパネル（左端に緑の線、上下に細い線）
-    const float panelWidth = (std::min)(screenWidth * 0.76f, 980.0f);
-    const float panelHeight = 520.0f;
-    const float panelX = (screenWidth - panelWidth) * 0.5f;
-    const float panelY = (screenHeight - panelHeight) * 0.5f;
-    AddRectangle(panelX, panelY, panelWidth, panelHeight,
-        Color(0.008f, 0.016f, 0.013f, 0.96f));
-    AddRectangle(panelX, panelY, 6.0f, panelHeight, titleGreen);
-    AddRectangle(panelX, panelY, panelWidth, 2.0f, dimGreen);
-    AddRectangle(panelX, panelY + panelHeight - 2.0f,
-        panelWidth, 2.0f, dimGreen);
-
+    // --- 題名：通常は静かに表示し、ノイズのときに文字を横へずらし、色をにじませ、横の帯を抜いている
+    constexpr float left = 84.0f;
     constexpr std::string_view title = "通信途絶";
-    constexpr float titlePixelSize = 9.0f;
-    const float titleWidth =
-        static_cast<float>(CountDisplayedCharacters(title)) *
-        titlePixelSize * 6.0f;
-    AddText(
-        (screenWidth - titleWidth) * 0.5f,
-        panelY + 72.0f,
-        title,
-        titlePixelSize,
-        titleGreen);
-
-    constexpr std::string_view subtitle = "終わらない廊下から脱出する";
-    constexpr float subtitlePixelSize = 3.0f;
-    const float subtitleWidth =
-        static_cast<float>(CountDisplayedCharacters(subtitle)) *
-        subtitlePixelSize * 6.0f;
-    AddText((screenWidth - subtitleWidth) * 0.5f,
-        panelY + 148.0f, subtitle, subtitlePixelSize,
-        Color(0.42f, 0.58f, 0.48f, 0.74f));
-
-    // 操作の説明。コントローラーがつながっていれば、コントローラーのボタン名で表示している
-    const bool controller = Input::IsControllerConnected();
-    const std::string_view controls1 = controller
-        ? "左スティック 移動  右スティック 視点  A 調べる"
-        : "WASD 移動  マウス 視点  E 調べる";
-    const std::string_view controls2 = controller
-        ? "左スティック押し込み 走る  Y ライト"
-        : "SHIFT 走る  F ライト";
-    const std::string_view controls3 = controller
-        ? "LB ヒント  START ポーズ"
-        : "H ヒント  ESC または P ポーズ";
-    constexpr float controlsPixelSize = 2.0f;
-    const Color controlsColor(0.48f, 0.66f, 0.55f, 0.82f);
-    const float controls1Width =
-        static_cast<float>(CountDisplayedCharacters(controls1)) *
-        controlsPixelSize * 6.0f;
-    const float controls2Width =
-        static_cast<float>(CountDisplayedCharacters(controls2)) *
-        controlsPixelSize * 6.0f;
-    const float controls3Width =
-        static_cast<float>(CountDisplayedCharacters(controls3)) *
-        controlsPixelSize * 6.0f;
-    AddText((screenWidth - controls1Width) * 0.5f,
-        panelY + 198.0f, controls1, controlsPixelSize, controlsColor);
-    AddText((screenWidth - controls2Width) * 0.5f,
-        panelY + 224.0f, controls2, controlsPixelSize, controlsColor);
-    AddText((screenWidth - controls3Width) * 0.5f,
-        panelY + 250.0f, controls3, controlsPixelSize, controlsColor);
-
-    // クリアの記録があれば、最短タイムと最少の捕まった回数を出している
-    if (hasClearRecord)
+    constexpr float titlePixelSize = 11.0f;
+    constexpr float titleY = 150.0f;
+    const float titleHeight = titlePixelSize * 7.0f;
+    const float noiseStep = std::floor(time * 24.0f);
+    const float jitter = noise > 0.0f ? (hash(noiseStep) - 0.5f) * 28.0f * noise : 0.0f;
+    if (noise > 0.05f)
     {
-        const int bestSeconds = (std::max)(
-            0, static_cast<int>(bestClearTimeSeconds + 0.5f));
-        const std::string recordText =
-            "最短記録 " + std::to_string(bestSeconds / 60) +
-            "分 " + std::to_string(bestSeconds % 60) +
-            "秒   最少捕獲 " +
-            std::to_string((std::max)(bestCaughtCount, 0)) + "回";
-        constexpr float recordPixelSize = 2.0f;
-        const float recordWidth =
-            static_cast<float>(CountDisplayedCharacters(recordText)) *
-            recordPixelSize * 6.0f;
-        AddText(
-            (screenWidth - recordWidth) * 0.5f,
-            panelY + 286.0f,
-            recordText,
-            recordPixelSize,
-            Color(0.72f, 0.78f, 0.48f, 0.88f));
+        // 色のにじみ（赤と青緑を、左右に少しずらして重ねている）
+        const float split = 4.0f + 10.0f * noise;
+        AddText(left + jitter - split, titleY, title, titlePixelSize, Color(0.95f, 0.18f, 0.16f, 0.55f * noise));
+        AddText(left + jitter + split, titleY + 1.0f, title, titlePixelSize, Color(0.18f, 0.85f, 0.90f, 0.45f * noise));
     }
+    // 本体の文字。乱れている間は、ときどき一瞬暗くしている（電波が途切れる）
+    const float dropout = (noise > 0.3f && hash(noiseStep + 5.1f) < 0.35f) ? 0.35f : 1.0f;
+    AddText(left + jitter, titleY, title, titlePixelSize,
+        Color(titleGreen.R(), titleGreen.G(), titleGreen.B(), titleGreen.A() * dropout));
+    if (noise > 0.05f)
+    {
+        // 横の帯が抜ける：題名の上に、背景と同じ暗い横線を数本重ね、その少し横に緑の線の切れ端を置いている
+        const int bars = 2 + static_cast<int>(noise * 5.0f);
+        const float titleWidth = textWidth(title, titlePixelSize);
+        for (int bar = 0; bar < bars; ++bar)
+        {
+            const float seed = noiseStep * 3.1f + static_cast<float>(bar) * 7.7f;
+            const float barY = titleY + hash(seed) * titleHeight;
+            const float barHeight = 2.0f + hash(seed + 1.3f) * 6.0f;
+            AddRectangle(left - 10.0f, barY, titleWidth + 40.0f, barHeight, Color(0.0f, 0.004f, 0.003f, 0.92f));
+            const float shift = (hash(seed + 2.9f) - 0.5f) * 60.0f * noise;
+            AddRectangle(left + shift + hash(seed + 4.4f) * titleWidth * 0.6f, barY, 30.0f + hash(seed + 6.1f) * 90.0f,
+                (std::max)(1.0f, barHeight * 0.5f), Color(0.48f, 0.90f, 0.58f, 0.55f * noise));
+        }
+    }
+    // 英語の題名と、ひとことの説明
+    AddText(left + 4.0f, titleY + titleHeight + 18.0f, "SIGNAL LOST", 3.0f, Color(0.40f, 0.70f, 0.50f, 0.80f));
+    AddText(left + 4.0f, titleY + titleHeight + 54.0f, "終わらない廊下から脱出する", 2.4f, textColor);
 
-    const std::string_view guidance = Input::IsControllerConnected()
-        ? "目的表示に従う  迷ったらLBでヒント"
-        : "目的表示に従う  迷ったらHでヒント";
-    constexpr float guidancePixelSize = 1.7f;
-    const float guidanceWidth =
-        static_cast<float>(CountDisplayedCharacters(guidance)) *
-        guidancePixelSize * 6.0f;
-    AddText((screenWidth - guidanceWidth) * 0.5f,
-        panelY + 310.0f, guidance, guidancePixelSize, controlsColor);
-
-    // 始める面の選択：3つの枠（1面・2面・外の森（試作））を横に並べ、選んでいる面の枠を明るくし、その下に説明を出している
+    // --- 始める面の選択：縦に3つ並べ、選んでいる面の枠を明るくし、その下に説明を出している
     constexpr std::string_view stageNames[] = { "1面  電力の復旧", "2面  ループする廊下", "外の森（試作）" };
     constexpr std::string_view stageNotes[] =
     {
@@ -179,58 +145,79 @@ void Hud::DrawTitle(
     };
     constexpr int stageCount = 3;
     const int stage = (std::clamp)(selectedStage, 0, stageCount - 1);
-    constexpr float stageBoxWidth = 260.0f;
-    constexpr float stageBoxHeight = 46.0f;
-    constexpr float stageBoxGap = 24.0f;
+    constexpr float stageBoxWidth = 340.0f;
+    constexpr float stageBoxHeight = 42.0f;
+    constexpr float stageBoxGap = 12.0f;
     constexpr float stageTextPixelSize = 2.4f;
-    const float stageRowX = (screenWidth - (stageBoxWidth * stageCount + stageBoxGap * (stageCount - 1))) * 0.5f;
-    const float stageRowY = panelY + 340.0f;
+    constexpr float stageTop = 370.0f;
     for (int index = 0; index < stageCount; ++index)
     {
         const bool selected = index == stage;
-        const float boxX = stageRowX + static_cast<float>(index) * (stageBoxWidth + stageBoxGap);
-        AddRectangle(boxX, stageRowY, stageBoxWidth, stageBoxHeight,
-            selected ? Color(0.05f, 0.14f, 0.09f, 0.95f) : Color(0.012f, 0.024f, 0.018f, 0.90f));
-        // 選んでいる枠は、緑の縁取りを明滅させている
-        const Color border = selected ? promptColor : dimGreen;
-        AddRectangle(boxX, stageRowY, stageBoxWidth, 2.0f, border);
-        AddRectangle(boxX, stageRowY + stageBoxHeight - 2.0f, stageBoxWidth, 2.0f, border);
-        AddRectangle(boxX, stageRowY, 2.0f, stageBoxHeight, border);
-        AddRectangle(boxX + stageBoxWidth - 2.0f, stageRowY, 2.0f, stageBoxHeight, border);
-        const std::string_view name = stageNames[index];
-        const float nameWidth =
-            static_cast<float>(CountDisplayedCharacters(name)) * stageTextPixelSize * 6.0f;
-        AddText(boxX + (stageBoxWidth - nameWidth) * 0.5f,
-            stageRowY + (stageBoxHeight - stageTextPixelSize * 7.0f) * 0.5f,
-            name, stageTextPixelSize,
-            selected ? titleGreen : Color(0.34f, 0.46f, 0.38f, 0.70f));
+        const float boxY = stageTop + static_cast<float>(index) * (stageBoxHeight + stageBoxGap);
+        AddRectangle(left, boxY, stageBoxWidth, stageBoxHeight,
+            selected ? Color(0.05f, 0.14f, 0.09f, 0.88f) : Color(0.01f, 0.02f, 0.015f, 0.55f));
+        if (selected)
+        {
+            // 選んでいる面：明滅する縁と、左の太い印
+            AddRectangle(left, boxY, stageBoxWidth, 2.0f, promptColor);
+            AddRectangle(left, boxY + stageBoxHeight - 2.0f, stageBoxWidth, 2.0f, promptColor);
+            AddRectangle(left + stageBoxWidth - 2.0f, boxY, 2.0f, stageBoxHeight, promptColor);
+            AddRectangle(left, boxY, 6.0f, stageBoxHeight, titleGreen);
+        }
+        else
+        {
+            AddRectangle(left, boxY, 2.0f, stageBoxHeight, dimGreen);
+        }
+        AddText(left + 22.0f, boxY + (stageBoxHeight - stageTextPixelSize * 7.0f) * 0.5f,
+            stageNames[index], stageTextPixelSize, selected ? titleGreen : faintColor);
     }
-    const std::string_view stageNote = stageNotes[stage];
-    constexpr float stageNotePixelSize = 1.7f;
-    const float stageNoteWidth =
-        static_cast<float>(CountDisplayedCharacters(stageNote)) * stageNotePixelSize * 6.0f;
-    AddText((screenWidth - stageNoteWidth) * 0.5f,
-        stageRowY + stageBoxHeight + 12.0f, stageNote, stageNotePixelSize, controlsColor);
+    const float afterStages = stageTop + stageCount * (stageBoxHeight + stageBoxGap);
+    AddText(left + 4.0f, afterStages + 4.0f, stageNotes[stage], 1.7f, textColor);
 
-    const std::string_view prompt = Input::IsControllerConnected()
-        ? "左右で面を選ぶ  Aでゲーム開始"
-        : "左右で面を選ぶ  ENTERでゲーム開始";
-    constexpr float promptPixelSize = 3.0f;
-    const float promptWidth =
-        static_cast<float>(CountDisplayedCharacters(prompt)) *
-        promptPixelSize * 6.0f;
-    AddText((screenWidth - promptWidth) * 0.5f,
-        panelY + 430.0f, prompt, promptPixelSize, promptColor);
+    // 開始と終了の操作
+    const bool controller = Input::IsControllerConnected();
+    const std::string_view prompt = controller ? "Aでゲーム開始" : "ENTERでゲーム開始";
+    AddText(left + 4.0f, afterStages + 44.0f, prompt, 3.0f, promptColor);
+    AddText(left + 4.0f, afterStages + 84.0f,
+        controller ? "上下で面を選ぶ  Bでゲーム終了" : "上下で面を選ぶ  Qでゲーム終了", 1.8f, faintColor);
 
-    const std::string_view quitPrompt = Input::IsControllerConnected()
-        ? "Bでゲーム終了"
-        : "Qでゲーム終了";
-    constexpr float quitPixelSize = 2.0f;
-    const float quitWidth =
-        static_cast<float>(CountDisplayedCharacters(quitPrompt)) *
-        quitPixelSize * 6.0f;
-    AddText((screenWidth - quitWidth) * 0.5f,
-        panelY + 474.0f, quitPrompt, quitPixelSize, controlsColor);
+    // クリアの記録があれば、最短タイムと最少の捕まった回数を出している
+    if (hasClearRecord)
+    {
+        const int bestSeconds = (std::max)(0, static_cast<int>(bestClearTimeSeconds + 0.5f));
+        const std::string recordText =
+            "最短記録 " + std::to_string(bestSeconds / 60) + "分 " + std::to_string(bestSeconds % 60) +
+            "秒   最少捕獲 " + std::to_string((std::max)(bestCaughtCount, 0)) + "回";
+        AddText(left + 4.0f, afterStages + 116.0f, recordText, 1.8f, Color(0.72f, 0.78f, 0.48f, 0.88f));
+    }
+
+    // 操作の説明（左下）。コントローラーがつながっていれば、コントローラーのボタン名で表示している
+    const std::string_view controls[] =
+    {
+        controller ? "左スティック 移動  右スティック 視点  A 調べる" : "WASD 移動  マウス 視点  E 調べる",
+        controller ? "左スティック押し込み 走る  Y ライト" : "SHIFT 走る  F ライト",
+        controller ? "LB ヒント  START ポーズ" : "H ヒント  ESC または P ポーズ",
+    };
+    for (int line = 0; line < 3; ++line)
+    {
+        AddText(left + 4.0f, screenHeight - 118.0f + static_cast<float>(line) * 24.0f, controls[line], 1.7f, faintColor);
+    }
+
+    // 右上：監視映像のような受信表示（「受信中」と、明滅する印と、時間）。ノイズのときは「信号なし」にしている
+    const bool lost = noise > 0.45f;
+    const std::string_view status = lost ? "信号なし" : "受信中...";
+    const int clock = static_cast<int>(time);
+    char timeText[16];
+    std::snprintf(timeText, sizeof(timeText), "%02d:%02d:%02d", 2 + clock / 3600, (14 + clock / 60) % 60, (37 + clock) % 60);
+    const float statusX = screenWidth - 250.0f;
+    const bool blink = std::fmod(time, 1.0f) < 0.6f;
+    if (blink || lost)
+    {
+        AddRectangle(statusX, 46.0f, 10.0f, 10.0f, lost ? Color(0.92f, 0.22f, 0.18f, 0.90f) : Color(0.48f, 0.90f, 0.58f, 0.90f));
+    }
+    AddText(statusX + 20.0f, 43.0f, status, 2.0f, lost ? Color(0.92f, 0.40f, 0.32f, 0.90f) : textColor);
+    AddText(statusX + 20.0f, 70.0f, "CH-03", 1.8f, faintColor);
+    AddText(statusX + 100.0f, 70.0f, timeText, 1.8f, faintColor);
 
     Flush();
 }

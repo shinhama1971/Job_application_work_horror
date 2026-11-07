@@ -402,6 +402,16 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 
 画質設定と半解像度の光の筋については [README](README.md) と [計測表](docs/QUALITY_BENCHMARK_20261031.md) を参照してください。光の筋・SSAOは深度プリパス後、通常の本描画の前に計算し、別視点では画面空間の結果を再利用しません。
 
+## 1面の3本目のヒューズの2つの道
+
+3本目のヒューズは、西棟（`Stage1WestWing`）と、暗証番号の扉の先の部屋（`Stage1KeypadDoor`・`Stage1HiddenRoomEvent`）の2か所に置いています。暗証番号の部屋のヒューズ（配置ファイルの `place Stage1KeypadRoomFuse`）は、`StageScene::UpdateThirdFuseRoutes` が、3本目を探す段階（ヒューズ2本・ループのドアを2回通った・電力はまだ）になったときだけ出しています。先に出すと、2本目（左の倉庫）を取る前に2本そろってしまい、ヒューズの数で決めている進行と食い違うためです。どちらか一方を取ったら、もう一方を毎フレーム消しています（西棟が水を抜いた後にヒューズを出しても、次の判定で消える）。目的表示（`Stage1Objective` の `SelectThirdFuseText`）は、西棟の鍵を拾っていれば西棟の手順、暗証番号の扉が開いていればその部屋、どちらもまだなら2つの道を両方示します。
+
+## タイトル画面の後ろの森
+
+`TitleScene` は、森の場面と同じ `ForestScene::ApplyAtmosphere`・`LoadLayout`・`BuildWorld` で森の世界を作り、プレイヤーを入力を読まない状態（`Player::SetAttractMode`）にしています。カメラの位置と向きは、場面の表（始めと終わりの位置・向き・秒数）を smoothstep で補間して毎フレーム決め、場面が変わるときに `ForestEvents` を作り直して、街灯や窓の演出が毎回また起きるようにしています。題名のノイズの強さ（場面の切り替えと、ときどき来る短い乱れ）は、`Hud::DrawTitle` の文字のずれ・色のにじみ・横の帯と、`PostProcess::SetSignalInterference`・`SetPresenceStatic` の両方に使っています。タイトルが終わると、画面効果・視点の操作・画面の乱れを普段に戻します。
+
+タイトルでも本描画の全部の段階（環境マップ・SSAO・光の筋）を動かすようになったため、前のシーンの状態が次のシーンに残らないよう、シーンを切り替えるときに、環境マップの次に撮る面（`ReflectionProbe::Invalidate`）と、光の筋の揺らぎの時間（`LightShafts::ResetTime`）を最初に戻しています。これで、タイトルを変えても1面の自動撮影の画像は前と同じになります（51枚の比較で確認）。
+
 ## 森の入口の演出
 
 `ForestScene::Update` が毎フレーム `ForestEvents::Update` にプレイヤーの足元を渡しています。`ForestEvents` は配置ファイルから作った小物（`PropLayoutFile::SpawnedProps`）を名前で探し、街灯（`PathLampBulb`・`PathLampBulb_1`）・研究所の2階の窓（`LabWindow2F4`）・玄関の灯り（`LabPorchLight`）の明るさを `Wall::SetEmissionScale` で変えています。倍率は `Wall::UploadMaterial` で光る色に、`Wall::CollectPointLights` で点光源の強さに掛けるので、面の光り方と周りの照らし方が一緒に変わります（値が変わったときだけマテリアルを送り直します）。ちらつきは時間だけから決まる式（不安定な時間の中だけ、1秒に14回、途切れるかを乱数で決める）なので、自動撮影では毎回同じ結果になります。窓が消えた瞬間の恐怖の強さを返し、`ForestScene` が `PostProcess::SetFearVision` へ渡しています。

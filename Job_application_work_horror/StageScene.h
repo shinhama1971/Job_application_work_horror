@@ -48,6 +48,11 @@ private:
     void SetupPracticalLights();
     // 進む先の天井照明を1灯だけ、不規則にちかちかさせている
     void UpdateRouteLights();
+    // 3本目のヒューズの2つの手に入れ方（西棟の奥か、暗証番号の扉の先の部屋）を切り替えている。
+    // 3本目を探す段階で暗証番号の部屋のヒューズを出し、どちらか一方を取ったら、もう一方を消している
+    void UpdateThirdFuseRoutes();
+    // 3本目を探す段階か（ヒューズ2本・ループのドアを2回通った・電力はまだ）
+    bool IsThirdFuseStage() const;
     // 小物の配置のファイルを読み直して置き直している（Debug版の F5）
     void ReloadPropLayout();
     // 目的表示の文章を選ぶために、今の状態を集めている（StageSceneDraw.cpp）。

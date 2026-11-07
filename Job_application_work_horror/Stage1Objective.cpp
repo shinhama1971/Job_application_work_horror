@@ -27,6 +27,25 @@ namespace
         }
         return text;
     }
+
+    // 3本目のヒューズを探す段階の文章。西棟の鍵を拾っていれば西棟の文章、暗証番号の扉が開いていればその部屋、
+    // どちらもまだなら、2つの手に入れ方を両方示している（一本道にしないため。StageScene::UpdateThirdFuseRoutes）
+    std::string SelectThirdFuseText(const Stage1ObjectiveInput& in, int variant)
+    {
+        if (in.westWingStep >= 2)
+        {
+            return SelectWestWingText(in.westWingStep, in.westWingValvesOpened, variant);
+        }
+        static const char* const KeypadTexts[3] =
+        {
+            "暗証番号の扉の先、部屋の一番奥でヒューズを探す", "ヒント 閉じ込められた部屋の奥、記録端末の近く", "ヒント 暗証番号の扉の部屋へ戻る"
+        };
+        static const char* const ChoiceTexts[3] =
+        {
+            "3本目 西棟の奥か、暗証番号の扉の先", "ヒント 右の倉庫の鍵で西棟へ、または壁の光る数字で扉を開ける", "ヒント 右側の部屋か、壁の数字を照らす"
+        };
+        return in.keypadSolved ? KeypadTexts[variant] : ChoiceTexts[variant];
+    }
 }
 
 std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
@@ -47,7 +66,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
     {
         objectiveText = in.corridorLoopCount < 2
             ? "もう一度、廊下の突き当たりのドアを開ける"
-            : SelectWestWingText(in.westWingStep, in.westWingValvesOpened, 0);
+            : SelectThirdFuseText(in, 0);
     }
     else
     {
@@ -212,7 +231,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         }
         else if (in.fuseCount == 2)
         {
-            objectiveText = SelectWestWingText(in.westWingStep, in.westWingValvesOpened, 1);
+            objectiveText = SelectThirdFuseText(in, 1);
         }
         else
         {
@@ -248,7 +267,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         }
         else if (in.fuseCount == 2)
         {
-            objectiveText = SelectWestWingText(in.westWingStep, in.westWingValvesOpened, 2);
+            objectiveText = SelectThirdFuseText(in, 2);
         }
         else
         {

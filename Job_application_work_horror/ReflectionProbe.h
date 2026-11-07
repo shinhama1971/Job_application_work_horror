@@ -44,8 +44,13 @@ namespace Effect
         const DirectX::SimpleMath::Matrix& GetFaceView() const { return m_FaceView; }
         // 何も描かれない所（遠くて描くのを省いた所）を塗る色。環境マップでは、闇に溶ける暗い色にしている
         void SetClearColor(const DirectX::SimpleMath::Color& color) { m_ClearColor = color; }
-        // 次にこの方式を選んだとき、6面とも描き直させている
-        void Invalidate() { m_FacesDrawn = 0; }
+        // 次にこの方式を選んだとき、6面とも描き直させている。
+        // 次に撮る面も最初の面に戻している（前のシーンで何面目まで撮ったかで、次のシーンの映り込みが変わらないように）
+        void Invalidate()
+        {
+            m_FacesDrawn = 0;
+            m_NextFace = 0;
+        }
 
     private:
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_Texture;

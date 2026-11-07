@@ -371,6 +371,8 @@ namespace Core
         m_PostProcess.SetPresenceStatic(0.0f);
         // 前の場所の景色を金属に映さないよう、環境マップを次の描画で6面とも撮り直させている
         m_EnvironmentProbe.Invalidate();
+        // 光の筋の揺らぎの時間も最初に戻している（前のシーン（タイトルの後ろの森など）の長さで、次のシーンの見え方が変わらないように）
+        m_LightShafts.ResetTime();
 
         DeleteAllObject();
 

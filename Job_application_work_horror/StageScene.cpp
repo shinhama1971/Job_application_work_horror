@@ -155,6 +155,40 @@ void StageScene::ReloadPropLayout()
     m_LayoutNoticeTimer = 3.0f;
 }
 
+bool StageScene::IsThirdFuseStage() const
+{
+    const Core::Game* game = Core::Game::GetInstance();
+    return game->GetItemCount() == 2 && m_CorridorLoopCount >= 2 && !game->IsPowerRestored();
+}
+
+// 3本目のヒューズは、次の2つのどちらで手に入れてもよい（一本道にしないため）。
+// ・西棟：右の倉庫の鍵 → 西側の扉 → 排水バルブ3つで水を抜く → 奥のポンプ室（Stage1WestWing）
+// ・暗証番号の扉の先：壁の文字から4桁の番号を探す → 扉を開ける → 閉じ込められ、影に追われながら鍵を探す → 部屋の奥
+// 暗証番号の部屋のヒューズは、3本目を探す段階になるまで出さない（先に取れると、2本目の左の倉庫の進行と食い違うため）。
+// 寄り道で先に暗証番号の扉を開けていれば、3本目はその部屋へ取りに行くだけになる（探索のごほうび）。
+// どちらか一方を取ったら、もう一方は消して、4本目として拾えないようにしている。
+void StageScene::UpdateThirdFuseRoutes()
+{
+    Item* westWingFuse = m_Objects.thirdFuse;
+    Item* keypadFuse = m_Objects.keypadRoomFuse;
+    if (westWingFuse == nullptr || keypadFuse == nullptr)
+    {
+        return;
+    }
+    if (keypadFuse->IsCollected())
+    {
+        // 暗証番号の部屋で取った：西棟のヒューズは、水を抜いても出さない
+        westWingFuse->SetActive(false);
+        return;
+    }
+    if (westWingFuse->IsCollected())
+    {
+        keypadFuse->SetActive(false);
+        return;
+    }
+    keypadFuse->SetActive(IsThirdFuseStage());
+}
+
 // 進む先の天井照明を1灯だけ、切れかけの電球のように不規則にちかちかさせている（ほかの照明は落ち着いて点いたまま）。
 // 矢印・明るさ・点灯の順番では道を示さず、「あの電気だけ様子がおかしい」と感じて自分から近づくようにしている。
 // 経路の選択は進行を参照するだけで、鍵・アイテム・扉の状態は変更しない。
@@ -466,6 +500,8 @@ void StageScene::Update()
         game->PlayAudioCueAt(
             cue.Label, cue.Position, cue.Pitch, cue.Volume, cue.MinimumOcclusion);
     }
+    // 西棟がヒューズを出した後に、3本目の手に入れ方を整えている（暗証番号の部屋のヒューズを取っていれば、西棟のヒューズを消す）
+    UpdateThirdFuseRoutes();
     UpdateCeilingReflection(*player, deltaTime);
     UpdateRouteLights();
     UpdateTensionPulse(*player, deltaTime);

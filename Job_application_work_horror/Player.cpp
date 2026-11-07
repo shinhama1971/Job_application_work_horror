@@ -117,21 +117,25 @@ void Player::Update()
 
     Vector3 moveDir = Vector3::Zero;
 
-    if (Input::GetKeyPress(VK_W)) moveDir += forward;
-    if (Input::GetKeyPress(VK_S)) moveDir -= forward;
-    if (Input::GetKeyPress(VK_A)) moveDir -= right;
-    if (Input::GetKeyPress(VK_D)) moveDir += right;
+    // タイトル画面の後ろで映している間（m_AttractMode）は、操作の入力を読まない（タイトルの面の選択の A・D で動かないように）
+    if (!m_AttractMode)
+    {
+        if (Input::GetKeyPress(VK_W)) moveDir += forward;
+        if (Input::GetKeyPress(VK_S)) moveDir -= forward;
+        if (Input::GetKeyPress(VK_A)) moveDir -= right;
+        if (Input::GetKeyPress(VK_D)) moveDir += right;
 
-    const DirectX::XMFLOAT2 leftStick = Input::GetLeftAnalogStick();
-    moveDir += right * leftStick.x;
-    moveDir += forward * leftStick.y;
+        const DirectX::XMFLOAT2 leftStick = Input::GetLeftAnalogStick();
+        moveDir += right * leftStick.x;
+        moveDir += forward * leftStick.y;
+    }
 
     if (m_IsHiding)
     {
         moveDir = Vector3::Zero;
     }
     // Shift（左スティックの押し込み）で走る。走れなくなった瞬間（スタミナ切れ）は振動で知らせている
-    const bool wantsToSprint = !m_IsHiding && m_SprintAllowed &&
+    const bool wantsToSprint = !m_IsHiding && !m_AttractMode && m_SprintAllowed &&
         (Input::GetKeyPress(VK_SHIFT) ||
             Input::GetButtonPress(XINPUT_LEFT_THUMB));
     if (m_Movement.Update(moveDir, wantsToSprint, deltaTime))
@@ -225,7 +229,7 @@ void Player::Update()
 #endif
 
     // F（コントローラーはY）で懐中電灯を点けたり消したりしている（隠れている間はできない）
-    if (!m_IsHiding && (Input::GetKeyTrigger(VK_F) ||
+    if (!m_IsHiding && !m_AttractMode && (Input::GetKeyTrigger(VK_F) ||
         Input::GetButtonTrigger(XINPUT_Y)))
     {
        
@@ -466,7 +470,7 @@ void Player::Update()
     handInput.HeadBobSide = m_Movement.GetHeadBobSideOffset();
     handInput.Sprinting = m_Movement.IsSprinting() && m_Movement.IsMovingHorizontally();
     handInput.Toggled = m_FlashlightToggledThisFrame;
-    handInput.Lowered = m_IsHiding || !m_IsFPS;
+    handInput.Lowered = m_IsHiding || !m_IsFPS || m_AttractMode;
     m_Hands.Update(handInput);
     m_FlashlightToggledThisFrame = false;
 

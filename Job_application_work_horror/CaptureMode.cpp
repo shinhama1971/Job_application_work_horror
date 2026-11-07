@@ -765,6 +765,7 @@ namespace
         player->SetPosition(spot.Position);
         player->SetFlashlightOn(lightOn);
         player->AddBattery(100.0f);    // 電池切れの点滅で結果が揺れないよう、電池を満タンに保っている
+        camera->SetMouseLookEnabled(false);
         camera->SetCameraDirection(spot.Yaw);
         camera->SetCameraPitch(spot.Pitch);
         // --figures のときは、水たまりの人影を正面26先に、見えない影を正面34先の少し右に置き、どちらも見え方1で描かせている
@@ -1117,6 +1118,8 @@ namespace Tools::CaptureMode
         // ドア検証の20秒まではFullbrightで形を見せる。通常表示の資料画像には使わない。
         if (g_FeatureTour && g_ViewOverride < 0)
             Renderer::SetDebugViewMode(scene == SceneName::Stage && g_TourTime < 21.0f ? 8 : 0);
+        // 視点はこの道順だけで決める（タイトル画面が終わるときにマウスの視点操作を戻すので、ここで毎回止めている。矢印キーの視点操作は、前からの道順と同じく止めない）
+        camera->SetMouseLookEnabled(false);
         camera->SetCameraDirection(pose.Yaw);
         camera->SetCameraPitch(pose.Pitch);
     }

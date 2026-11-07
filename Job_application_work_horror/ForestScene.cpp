@@ -40,7 +40,7 @@ bool ForestScene::IsRequestedByCommandLine()
     return requested;
 }
 
-ForestScene::ForestScene()
+void ForestScene::ApplyAtmosphere()
 {
     Core::Game* game = Core::Game::GetInstance();
     // 夜の森：電力の状態は使わない（灯りは配置ファイルの glow の付いた物だけ）。少し暗めにし、照明の下の霧の光の筋を出している
@@ -54,32 +54,68 @@ ForestScene::ForestScene()
     Renderer::SetWallWeathering(0.0f);
     Renderer::SetRoomOcclusion(nullptr, 0, 0.0f, 0.0f, 0.0f);
     Renderer::SetLoopDepth(0.0f);
+}
 
-    const PropLayout layout = PropLayoutFile::Load(PropLayoutPath);
+void ForestScene::RestoreAtmosphere()
+{
+    Core::Game* game = Core::Game::GetInstance();
+    if (game == nullptr)
+    {
+        return;
+    }
+    game->GetPostProcess()->SetAtmosphere(0.18f, 0.55f);
+    game->GetPostProcess()->SetExposure(1.0f);
+    game->GetPostProcess()->SetVolumetricLight(false);
+    game->GetPostProcess()->SetVolumetricIntensity(0.58f);
+}
+
+PropLayout ForestScene::LoadLayout()
+{
+    PropLayout layout = PropLayoutFile::Load(PropLayoutPath);
     if (!layout.IsValid())
     {
         utility::ReportFatalError("森の配置を読めませんでした（" + std::to_string(layout.ErrorLine) + "行目）: " + layout.Error);
     }
-    SceneLayoutBuilder builder(*game, m_ObjectNames);
+    return layout;
+}
 
+ForestScene::World ForestScene::BuildWorld(SceneLayoutBuilder& builder, const PropLayout& layout)
+{
+    World world;
     // 空の霧（地平線の線を消す）。手前に描く物を上書きしないよう、最初に作って最初に描いている
     builder.Create<SkyBackdrop>("ForestSky");
-    m_Player = builder.Create<Player>("Player");
-    PropLayoutFile::ApplyPlacement(*m_Player, PropLayoutFile::GetPlacement(layout, "Player"));
+    world.PlayerObject = builder.Create<Player>("Player");
+    PropLayoutFile::ApplyPlacement(*world.PlayerObject, PropLayoutFile::GetPlacement(layout, "Player"));
 
     // 地面（1面・2面と同じ濡れた床。水たまりは床全体のマス目に乱数で置かれ、雨上がりの森になる）
-    Ground* ground = builder.Create<Ground>("ForestGround");
-    PropLayoutFile::ApplyPlacement(*ground, PropLayoutFile::GetPlacement(layout, "Ground"));
+    world.GroundObject = builder.Create<Ground>("ForestGround");
+    PropLayoutFile::ApplyPlacement(*world.GroundObject, PropLayoutFile::GetPlacement(layout, "Ground"));
+
+    // 木・岩・倒木・茂み・研究所・灯り（prop 行）
+    world.Props = PropLayoutFile::Spawn(builder, layout);
+    // 木や岩を置いた後で草を作り、その足元と小道を避けて植える。
+    world.Grass = builder.Create<ForestGrass>("ForestGrass");
+    PropLayoutFile::ApplyPlacement(*world.Grass, PropLayoutFile::GetPlacement(layout, "ForestGrass"));
+    return world;
+}
+
+ForestScene::ForestScene()
+{
+    Core::Game* game = Core::Game::GetInstance();
+    ApplyAtmosphere();
+    const PropLayout layout = LoadLayout();
+    SceneLayoutBuilder builder(*game, m_ObjectNames);
+    World world = BuildWorld(builder, layout);
+    m_Player = world.PlayerObject;
+    m_Grass = world.Grass;
+    m_LayoutProps = std::move(world.Props);
+
+    // 配置を読み直したときに置き直す物（地面と草の範囲）
+    Ground* ground = world.GroundObject;
     m_PlacementBindings.emplace_back("Ground", [ground](const PropPlacement& placement)
     {
         PropLayoutFile::ApplyPlacement(*ground, placement);
     });
-
-    // 木・岩・倒木・茂み・研究所・灯り（prop 行）
-    m_LayoutProps = PropLayoutFile::Spawn(builder, layout);
-    // 木や岩を置いた後で草を作り、その足元と小道を避けて植える。
-    m_Grass = builder.Create<ForestGrass>("ForestGrass");
-    PropLayoutFile::ApplyPlacement(*m_Grass, PropLayoutFile::GetPlacement(layout, "ForestGrass"));
     m_PlacementBindings.emplace_back("ForestGrass", [this](const PropPlacement& placement)
     {
         PropLayoutFile::ApplyPlacement(*m_Grass, placement);
@@ -101,10 +137,7 @@ ForestScene::~ForestScene()
     {
         return;
     }
-    game->GetPostProcess()->SetAtmosphere(0.18f, 0.55f);
-    game->GetPostProcess()->SetExposure(1.0f);
-    game->GetPostProcess()->SetVolumetricLight(false);
-    game->GetPostProcess()->SetVolumetricIntensity(0.58f);
+    RestoreAtmosphere();
     for (const std::string& name : m_ObjectNames)
     {
         game->DestroyObj(name);
