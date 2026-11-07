@@ -185,6 +185,10 @@
 
 ## 森の草の作業（2026年11月6日）
 
-`HANDOFF_GRASS.md` を元にCodex（OpenAI）が続きを担当しました。引き継ぎ時点で `ForestGrass.h/.cpp` と `shader/grassCS.hlsl` は存在していました。その3ファイルの初期作成者は、この作業だけからは判断していません。
+`HANDOFF_GRASS.md` を元にCodex（OpenAI）が続きを担当しました。引き継ぎ時点で `ForestGrass.h/.cpp` と `shader/grassCS.hlsl` は存在していました。この3ファイルと `HANDOFF_GRASS.md` は、Claude Code（Anthropic）が授業資料Part.9の確認と設計の後に作成しました。
 
 今回Codexが追加・修正した範囲は、`grassVS.hlsl`・`grassPS.hlsl`、森への組み込み、入力レイアウトなしのシェーダー作成、プロジェクト登録、草の数のDebugUI表示、森の計測地点と比較用の草の停止、文書です。ビルド・自動撮影・GPU計測で確認しています。続けてユーザー提供ZIP内のPart.9本文と実装図を確認し、採用した考え方・変更した点・未実装の発展項目を docs/FOREST_GRASS_PART9.md に記録しました。
+
+## 森の草の手直しと空の霧（2026年11月7日）
+
+Claude Code（Anthropic）が、Codexの作業を読んでビルドと自動撮影で確認した後、次を直しました。懐中電灯で照らした草が黒い影に見える問題（葉の色を地面に近い明るさにし、根元の暗さの二重掛けをやめた）、水たまりの水面と枯れた茂みに草が生える問題（`Ground::IsNearVisiblePuddle` を追加）、森の地平線の線（空に霧を重ねる `SkyBackdrop`）、森の右上の「記録 0 / 4」。いずれも草を止めた撮影・直す前の撮影と同じ場面で比べ、地平線は画素の明るさも測って確かめました。

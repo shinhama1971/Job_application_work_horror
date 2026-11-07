@@ -126,6 +126,8 @@ public:
     // 右上の電池の通知と「記録」を、この高さだけ下げて描いている。
     // 2面の状態パネル（DrawStage2Status）が右上にあるとき、重ならないように使っている。
     void SetTopRightOffset(float offset) { m_TopRightOffset = offset; }
+    // 右上の「記録 0 / 4」を出すか（外の森（試作）は記録を置いていないので出さない）
+    void SetEvidenceVisible(bool visible) { m_EvidenceVisible = visible; }
     // 2面の右上に縦に並ぶ「状態パネル（高さ58）」と「危険ゲージ（高さ40）」に、すき間（8ずつ）を足した高さ。
     // 危険ゲージは出たり消えたりするため、出ていないときも場所を空けておき、下の表示が上下に動かないようにしている。
     static constexpr float Stage2StatusReservedHeight = 58.0f + 8.0f + 40.0f + 8.0f;
@@ -170,4 +172,5 @@ private:
     VertexBuffer<VERTEX_3D> m_VertexBuffer;
     std::vector<VERTEX_3D> m_Vertices;
     float m_TopRightOffset = 0.0f;
+    bool m_EvidenceVisible = true;
 };

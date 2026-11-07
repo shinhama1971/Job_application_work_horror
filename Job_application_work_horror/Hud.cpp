@@ -188,10 +188,13 @@ void Hud::Draw(
     const Color evidenceColor = evidenceCount >= Core::GameState::TotalEvidenceCount
         ? Color(0.92f, 0.78f, 0.34f, 0.96f)
         : Color(0.62f, 0.78f, 0.70f, 0.88f);
-    AddRectangle(evidenceX - 14.0f, 74.0f + m_TopRightOffset,
-        evidenceWidth + 28.0f, 34.0f, dark);
-    AddText(evidenceX, 82.0f + m_TopRightOffset,
-        evidenceText, evidencePixelSize, evidenceColor);
+    if (m_EvidenceVisible)
+    {
+        AddRectangle(evidenceX - 14.0f, 74.0f + m_TopRightOffset,
+            evidenceWidth + 28.0f, 34.0f, dark);
+        AddText(evidenceX, 82.0f + m_TopRightOffset,
+            evidenceText, evidencePixelSize, evidenceColor);
+    }
 
     // 視線の位置だけを伝える、小さな十字の照準を画面の中央に描いている。
     const float reticleExtent = hasInteractionTarget ? 11.0f : 9.0f;

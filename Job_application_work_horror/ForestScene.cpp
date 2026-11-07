@@ -5,6 +5,7 @@
 
 #include "ForestScene.h"
 #include "ForestGrass.h"
+#include "SkyBackdrop.h"
 #include "Application.h"
 #include "Game.h"
 #include "Ground.h"
@@ -61,6 +62,8 @@ ForestScene::ForestScene()
     }
     SceneLayoutBuilder builder(*game, m_ObjectNames);
 
+    // 空の霧（地平線の線を消す）。手前に描く物を上書きしないよう、最初に作って最初に描いている
+    builder.Create<SkyBackdrop>("ForestSky");
     m_Player = builder.Create<Player>("Player");
     PropLayoutFile::ApplyPlacement(*m_Player, PropLayoutFile::GetPlacement(layout, "Player"));
 
@@ -85,6 +88,8 @@ ForestScene::ForestScene()
     // カメラの位置を最初から合わせるため、プレイヤーを一度更新している
     m_Player->Update();
     m_Hud.Init();
+    // 森には記録（残された資料）を置いていないので、右上の「記録 0 / 4」は出さない
+    m_Hud.SetEvidenceVisible(false);
     m_Notice = "外の森（試作）  小道を北へ進むと、森の奥に研究所がある";
     m_NoticeTimer = 8.0f;
 }

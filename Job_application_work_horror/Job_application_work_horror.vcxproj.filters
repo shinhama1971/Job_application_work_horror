@@ -222,6 +222,9 @@
     <ClCompile Include="ForestGrass.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="SkyBackdrop.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="Stage2Layout.cpp">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClCompile>
@@ -680,6 +683,9 @@
     <ClInclude Include="ForestGrass.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
+    <ClInclude Include="SkyBackdrop.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
     <ClInclude Include="Stage2Layout.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
@@ -885,5 +891,7 @@
     <None Include="shader\grassCS.hlsl"><Filter>リソース ファイル</Filter></None>
     <None Include="shader\grassVS.hlsl"><Filter>リソース ファイル</Filter></None>
     <None Include="shader\grassPS.hlsl"><Filter>リソース ファイル</Filter></None>
+    <None Include="shader\skyBackdropVS.hlsl"><Filter>リソース ファイル</Filter></None>
+    <None Include="shader\skyBackdropPS.hlsl"><Filter>リソース ファイル</Filter></None>
   </ItemGroup>
 </Project>

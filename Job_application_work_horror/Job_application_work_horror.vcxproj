@@ -280,6 +280,7 @@
     <ClCompile Include="Stage2Scene.cpp" />
     <ClCompile Include="ForestScene.cpp" />
     <ClCompile Include="ForestGrass.cpp" />
+    <ClCompile Include="SkyBackdrop.cpp" />
     <ClCompile Include="Stage2Layout.cpp" />
     <ClCompile Include="Stage2Objective.cpp" />
     <ClCompile Include="Stage2ScenePuzzles.cpp" />
@@ -412,6 +413,7 @@
     <ClInclude Include="Stage2Scene.h" />
     <ClInclude Include="ForestScene.h" />
     <ClInclude Include="ForestGrass.h" />
+    <ClInclude Include="SkyBackdrop.h" />
     <ClInclude Include="Stage2Layout.h" />
     <ClInclude Include="Stage2Objective.h" />
     <ClInclude Include="Stage2AnomalyPlan.h" />
@@ -610,5 +612,7 @@
     <None Include="shader\grassCS.hlsl" />
     <None Include="shader\grassVS.hlsl" />
     <None Include="shader\grassPS.hlsl" />
+    <None Include="shader\skyBackdropVS.hlsl" />
+    <None Include="shader\skyBackdropPS.hlsl" />
   </ItemGroup>
 </Project>
