@@ -44,6 +44,14 @@ public:
 
     // 葉を植え直している（置き場所が変わったときや、配置を読み直して木や岩が動いたとき）
     void Rebuild();
+    // 草むらを通る「見えない何か」の足元・押し倒す半径・強さ（0 なら通っていない）。ForestScene が毎フレーム渡している。
+    // 押し倒された葉は、しばらく倒れたままになり（葉ごとに覚えている）、ゆっくり起き上がるので、通った跡が草むらに残る
+    void SetUnseenWalker(const DirectX::SimpleMath::Vector2& position, float radius, float strength)
+    {
+        m_UnseenPosition = position;
+        m_UnseenRadius = radius;
+        m_UnseenStrength = strength;
+    }
     // デバッグ画面に出す数：植えた本数、前の描画で描いた本数、描いた区画の数
     std::uint32_t GetBladeCount() const { return static_cast<std::uint32_t>(m_BladeCount); }
     std::uint32_t GetDrawnBladeCount() const { return m_DrawnBlades; }
@@ -103,6 +111,10 @@ private:
     // 風を動かす時間と、まだ計算していない経過時間（Update で足し、RunGpuSimulation で使う）
     float m_Time = 0.0f;
     float m_PendingSeconds = 0.0f;
+    // 草むらを通る「見えない何か」（SetUnseenWalker）
+    DirectX::SimpleMath::Vector2 m_UnseenPosition;
+    float m_UnseenRadius = 0.0f;
+    float m_UnseenStrength = 0.0f;
     std::uint32_t m_DrawnBlades = 0;
     std::uint32_t m_DrawnChunks = 0;
 };

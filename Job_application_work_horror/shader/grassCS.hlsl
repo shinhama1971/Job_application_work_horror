@@ -42,13 +42,16 @@ cbuffer GrassSimulationBuffer : register(b0)
     float PlayerRadius;
     float PlayerStrength;
     float2 SimulationPadding;
+    float2 UnseenPosition;  // 草むらを通る「見えない何か」の足元（ForestEvents）
+    float UnseenRadius;
+    float UnseenStrength;   // 0 なら通っていない
 }
 
 StructuredBuffer<GrassBlade> g_Blades : register(t0);
 RWStructuredBuffer<GrassState> g_States : register(u0);
 
 // 何もないときの葉先と、風とプレイヤーの力を足した、この瞬間の目標の葉先（根元からのずれ）を返している
-float3 GetTargetTip(GrassBlade blade)
+float3 GetTargetTip(GrassBlade blade, float flatten, float flattenAngle)
 {
     const float3 leanDirection = float3(-blade.Facing.y, 0.0f, blade.Facing.x);
     float3 target = normalize(float3(0.0f, 1.0f, 0.0f) + leanDirection * blade.Lean);
@@ -71,6 +74,13 @@ float3 GetTargetTip(GrassBlade blade)
         target.y *= 1.0f - push * 0.7f;
     }
 
+    // 「見えない何か」に踏まれた葉：踏まれた向きへ倒れたまま、ゆっくり起き上がる（倒れ具合 flatten は葉ごとに覚えている）
+    if (flatten > 0.0f)
+    {
+        target += float3(cos(flattenAngle), 0.0f, sin(flattenAngle)) * flatten * 3.4f;
+        target.y *= 1.0f - flatten * 0.92f;
+    }
+
     // 長さをそろえ、寝ても地面より少し上に葉先が残るようにしている
     target = normalize(target);
     target.y = max(target.y, 0.12f);
@@ -87,7 +97,22 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     }
     const GrassBlade blade = g_Blades[index];
     GrassState state = g_States[index];
-    const float3 target = GetTargetTip(blade);
+    // 「見えない何か」に踏まれた倒れ具合（Tip.w。0〜1）と、倒れる向き（Velocity.w。xz の角度）。
+    // 踏まれている間は 1 にし、離れたら約5秒で 0 へ戻している（通った跡が草むらに残り、ゆっくり消える）
+    float flatten = max(state.Tip.w - DeltaTime * 0.2f, 0.0f);
+    float flattenAngle = state.Velocity.w;
+    if (UnseenStrength > 0.0f)
+    {
+        const float2 fromWalker = blade.Root.xz - UnseenPosition;
+        const float walkerDistance = length(fromWalker);
+        const float stepOn = UnseenStrength * saturate(1.3f - walkerDistance / max(UnseenRadius, 0.001f));
+        if (stepOn > flatten)
+        {
+            flatten = saturate(stepOn);
+            flattenAngle = atan2(fromWalker.y, fromWalker.x + 0.0001f);
+        }
+    }
+    const float3 target = GetTargetTip(blade, flatten, flattenAngle);
 
     // 1フレームの時間を2歩に分け、硬い葉でも計算が暴れないようにしている（速さを先に更新する、半陰的オイラー法）
     const float stepSeconds = DeltaTime * 0.5f;
@@ -107,7 +132,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     tip.y = max(tip.y, 0.10f);
     tip = normalize(tip) * blade.Height;
 
-    state.Tip = float4(tip, 0.0f);
-    state.Velocity = float4(velocity, 0.0f);
+    state.Tip = float4(tip, flatten);
+    state.Velocity = float4(velocity, flattenAngle);
     g_States[index] = state;
 }

@@ -23,6 +23,11 @@ namespace
     constexpr float WindowDelay = 0.7f;
     // 研究所の玄関の灯りが不安定になり始める所
     constexpr float PorchUnstableZ = 200.0f;
+    // 草むらを通る「見えない何か」：歩き始める所（小道のこの z より北）、プレイヤーの何歩先を横切るか、横切る秒数、足音の間隔
+    constexpr float WalkerTriggerZ = 40.0f;
+    constexpr float WalkerAhead = 60.0f;
+    constexpr float WalkerSeconds = 6.0f;
+    constexpr float WalkerStepInterval = 0.62f;
 
     float Hash(float value)
     {
@@ -154,7 +159,39 @@ float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const
         porch->SetEmissionScale(instability > 0.0f ? Flicker(m_Time, 17.0f, 0.3f + instability * 0.6f) : 1.0f);
     }
 
+    // --- 草むらを通る「見えない何か」：前方の草むらを、左から右へ横切る
+    float walkerFear = 0.0f;
+    if (m_WalkerTime < 0.0f && playerPosition.z > WalkerTriggerZ)
+    {
+        m_WalkerTime = 0.0f;
+        m_NextWalkerStep = 0.0f;
+        // 小道を北へ向いて歩いているので、北（+z）の少し先を、西（-x）から東（+x）へ、少し斜めに横切らせている
+        m_WalkerStart = Vector2(playerPosition.x - 110.0f, playerPosition.z + WalkerAhead - 8.0f);
+        m_WalkerEnd = Vector2(playerPosition.x + 130.0f, playerPosition.z + WalkerAhead + 12.0f);
+    }
+    m_WalkerStrength = 0.0f;
+    if (m_WalkerTime >= 0.0f && m_WalkerTime < WalkerSeconds)
+    {
+        m_WalkerTime += deltaTime;
+        const float progress = std::clamp(m_WalkerTime / WalkerSeconds, 0.0f, 1.0f);
+        // 少し蛇行しながら歩いている（まっすぐだと機械的に見えるため）
+        const Vector2 along = m_WalkerEnd - m_WalkerStart;
+        Vector2 side(-along.y, along.x);
+        side.Normalize();
+        m_WalkerPosition = m_WalkerStart + along * progress + side * (std::sin(progress * 9.0f) * 4.0f);
+        // 歩き始めと終わりは、押す力を弱めている（急に草が倒れ始めないように）
+        m_WalkerStrength = std::clamp(progress * 8.0f, 0.0f, 1.0f) * std::clamp((1.0f - progress) * 8.0f, 0.0f, 1.0f);
+        // 重い足音（足音を低くして使っている）を、その足元から鳴らしている
+        m_NextWalkerStep -= deltaTime;
+        if (m_NextWalkerStep <= 0.0f)
+        {
+            m_NextWalkerStep += WalkerStepInterval;
+            game->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, Vector3(m_WalkerPosition.x, playerPosition.y, m_WalkerPosition.y), 0.62f, 1.0f);
+        }
+        walkerFear = 0.30f * m_WalkerStrength;
+    }
+
     // 恐怖の画面効果は、窓が消えた瞬間に強く出し、3秒ほどで消している
     m_Fear = (std::max)(0.0f, m_Fear - deltaTime / 3.0f);
-    return m_Fear * m_Fear * 0.55f;
+    return (std::max)(m_Fear * m_Fear * 0.55f, walkerFear);
 }

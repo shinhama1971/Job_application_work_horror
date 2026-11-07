@@ -30,6 +30,9 @@ public:
     // 演出の段階（デバッグ表示と確認用）
     int GetLampsTurnedOff() const { return m_LampsTurnedOff; }
     bool IsWindowOff() const { return m_WindowOffTimer >= 0.0f; }
+    // 草むらを通る「見えない何か」の足元（x・z）と、押し倒す強さ（0 なら通っていない）。ForestScene が草（ForestGrass）へ渡している
+    DirectX::SimpleMath::Vector2 GetWalkerPosition() const { return m_WalkerPosition; }
+    float GetWalkerStrength() const { return m_WalkerStrength; }
 
 private:
     // 消えていく街灯1つ分（いつ消え始めたか。まだなら負）
@@ -54,6 +57,13 @@ private:
     // 研究所の窓が消え始めてからの秒数（まだなら負）と、その音を鳴らしたか
     float m_WindowOffTimer = -1.0f;
     bool m_WindowClickPlayed = false;
+    // 草むらを通る「見えない何か」：歩き始めてからの秒数（まだなら負）、歩き始めと終わりの位置、今の足元と強さ、次の足音までの秒数
+    float m_WalkerTime = -1.0f;
+    DirectX::SimpleMath::Vector2 m_WalkerStart;
+    DirectX::SimpleMath::Vector2 m_WalkerEnd;
+    DirectX::SimpleMath::Vector2 m_WalkerPosition;
+    float m_WalkerStrength = 0.0f;
+    float m_NextWalkerStep = 0.0f;
     // 恐怖の画面効果の残り（窓が消えたときに 1 にし、だんだん弱めている）
     float m_Fear = 0.0f;
 };

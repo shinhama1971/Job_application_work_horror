@@ -34,8 +34,11 @@ namespace
         float PlayerRadius;         // 葉を押し分ける半径
         float PlayerStrength;       // 押し分ける強さ（0なら押さない）
         float Padding[2];
+        Vector2 UnseenPosition;     // 草むらを通る「見えない何か」の足元（x・z。ForestEvents）
+        float UnseenRadius;         // 押し倒す半径
+        float UnseenStrength;       // 押し倒す強さ（0なら通っていない）
     };
-    static_assert(sizeof(SimulationParams) == 48, "SimulationParams must match HLSL layout");
+    static_assert(sizeof(SimulationParams) == 64, "SimulationParams must match HLSL layout");
 
     // shader/grassVS.hlsl の GrassDrawBuffer と同じ並び（頂点シェーダーの b9。手の描画も b9 を毎回設定して使っている）
     struct DrawParams
@@ -442,6 +445,9 @@ void ForestGrass::RunGpuSimulation()
     params.PlayerPosition = Vector2(eye.x, eye.z);
     params.PlayerRadius = 9.0f;
     params.PlayerStrength = eye.y - m_Position.y < 80.0f ? 1.0f : 0.0f;
+    params.UnseenPosition = m_UnseenPosition;
+    params.UnseenRadius = m_UnseenRadius;
+    params.UnseenStrength = m_UnseenStrength;
     context->UpdateSubresource(m_SimulationParams.Get(), 0, nullptr, &params, 0, 0);
 
     // 頂点シェーダーが前の描画で読んでいた葉先のバッファを外してから、書き込み先にしている

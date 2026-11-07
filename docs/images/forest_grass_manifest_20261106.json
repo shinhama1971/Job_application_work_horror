@@ -23,5 +23,10 @@
     "file": "docs/images/forest_lab_window_20261107.png",
     "source": "--capture <出力先> --forest の forest_04_研究所の正面.png（上 = 演出を足す前、下 = 足した後で2階の窓の明かりが消えている。2026年11月7日）",
     "sha256": "3480906d6aea51bc99e54529776bec4d1fbcf0c63e8522bfc05da415683b3224"
+  },
+  {
+    "file": "docs/images/forest_unseen_walker_20261107.png",
+    "source": "--capture <出力先> --forest の forest_02d_通った跡が草むらに残る.png の中央を拡大して上下に並べたもの（上 = 見えない何かを止めたとき、下 = 通った後。2026年11月7日）",
+    "sha256": "42f5944ad400e24c5f9f9fc8a2e8f100d5b42fc3df26439c80ee1acab8c95f6d"
   }
 ]

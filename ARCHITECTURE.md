@@ -406,6 +406,8 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 
 `ForestScene::Update` が毎フレーム `ForestEvents::Update` にプレイヤーの足元を渡しています。`ForestEvents` は配置ファイルから作った小物（`PropLayoutFile::SpawnedProps`）を名前で探し、街灯（`PathLampBulb`・`PathLampBulb_1`）・研究所の2階の窓（`LabWindow2F4`）・玄関の灯り（`LabPorchLight`）の明るさを `Wall::SetEmissionScale` で変えています。倍率は `Wall::UploadMaterial` で光る色に、`Wall::CollectPointLights` で点光源の強さに掛けるので、面の光り方と周りの照らし方が一緒に変わります（値が変わったときだけマテリアルを送り直します）。ちらつきは時間だけから決まる式（不安定な時間の中だけ、1秒に14回、途切れるかを乱数で決める）なので、自動撮影では毎回同じ結果になります。窓が消えた瞬間の恐怖の強さを返し、`ForestScene` が `PostProcess::SetFearVision` へ渡しています。
 
+草むらを通る「見えない何か」は、`ForestEvents` が足元の位置と強さを決め、`ForestScene` が `ForestGrass::SetUnseenWalker` で草へ渡しています。`grassCS.hlsl` は、プレイヤーと同じように目標の葉先をずらすほか、踏まれた倒れ具合を `GrassState.Tip.w`、倒れる向きを `GrassState.Velocity.w`（どちらも使っていなかった値）に覚え、毎秒0.2ずつ戻しています。バッファの大きさは変えずに、通った跡を残せます。
+
 ## 森の草の流れ
 
 `ForestScene` は配置を読んで木・岩を作った後、`ForestGrass` を作ります。配置を読み直したら `Rebuild()` を予約し、次の `RunGpuSimulation()` で根元を植え直します。根元は不変のStructuredBuffer、葉先・速度はSRV/UAVのStructuredBufferです。CSとVSの読み書きが重ならないよう、それぞれ処理後にスロットを外します。
