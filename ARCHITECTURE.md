@@ -402,6 +402,10 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 
 画質設定と半解像度の光の筋については [README](README.md) と [計測表](docs/QUALITY_BENCHMARK_20261031.md) を参照してください。光の筋・SSAOは深度プリパス後、通常の本描画の前に計算し、別視点では画面空間の結果を再利用しません。
 
+## 森の入口の演出
+
+`ForestScene::Update` が毎フレーム `ForestEvents::Update` にプレイヤーの足元を渡しています。`ForestEvents` は配置ファイルから作った小物（`PropLayoutFile::SpawnedProps`）を名前で探し、街灯（`PathLampBulb`・`PathLampBulb_1`）・研究所の2階の窓（`LabWindow2F4`）・玄関の灯り（`LabPorchLight`）の明るさを `Wall::SetEmissionScale` で変えています。倍率は `Wall::UploadMaterial` で光る色に、`Wall::CollectPointLights` で点光源の強さに掛けるので、面の光り方と周りの照らし方が一緒に変わります（値が変わったときだけマテリアルを送り直します）。ちらつきは時間だけから決まる式（不安定な時間の中だけ、1秒に14回、途切れるかを乱数で決める）なので、自動撮影では毎回同じ結果になります。窓が消えた瞬間の恐怖の強さを返し、`ForestScene` が `PostProcess::SetFearVision` へ渡しています。
+
 ## 森の草の流れ
 
 `ForestScene` は配置を読んで木・岩を作った後、`ForestGrass` を作ります。配置を読み直したら `Rebuild()` を予約し、次の `RunGpuSimulation()` で根元を植え直します。根元は不変のStructuredBuffer、葉先・速度はSRV/UAVのStructuredBufferです。CSとVSの読み書きが重ならないよう、それぞれ処理後にスロットを外します。

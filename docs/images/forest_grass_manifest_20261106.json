@@ -18,5 +18,10 @@
     "file": "docs/images/forest_grass_lod_colors_20261107.png",
     "source": "--capture <出力先> --forest の forest_01_開始地点.png を、技術デモの「LODを色で表示」で撮ったもの（2026年11月7日）",
     "sha256": "0e24dbe6ecbe3f17276d82c943e4d62ba3c2705020266285dcc66e625c665371"
+  },
+  {
+    "file": "docs/images/forest_lab_window_20261107.png",
+    "source": "--capture <出力先> --forest の forest_04_研究所の正面.png（上 = 演出を足す前、下 = 足した後で2階の窓の明かりが消えている。2026年11月7日）",
+    "sha256": "3480906d6aea51bc99e54529776bec4d1fbcf0c63e8522bfc05da415683b3224"
   }
 ]

@@ -9,6 +9,7 @@
 
 #include "Scene.h"
 #include "Hud.h"
+#include "ForestEvents.h"
 #include "PropLayoutFile.h"
 
 #include <string>
@@ -44,6 +45,9 @@ private:
     Player* m_Player = nullptr;
     ForestGrass* m_Grass = nullptr;
     Hud m_Hud;
+    // 小道の街灯と研究所の灯りの演出と、前のフレームの恐怖の画面効果の強さ（強まった瞬間に心拍の脈を出すため）
+    ForestEvents m_Events;
+    float m_LastFear = 0.0f;
     // 画面上部に出す知らせと、出す残り秒数
     std::string m_Notice;
     float m_NoticeTimer = 0.0f;

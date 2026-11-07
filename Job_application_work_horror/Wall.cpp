@@ -570,6 +570,9 @@ void Wall::UploadMaterial()
         return;
     }
     MATERIAL material = m_SurfaceMaterial;
+    // 光る色に倍率を掛けている（街灯のちらつきなど。SetEmissionScale）
+    material.Emission = Color(m_SurfaceMaterial.Emission.x * m_EmissionScale, m_SurfaceMaterial.Emission.y * m_EmissionScale,
+        m_SurfaceMaterial.Emission.z * m_EmissionScale, m_SurfaceMaterial.Emission.w);
     if (!m_VisualModel.empty())
     {
         material.Diffuse = Color(1.0f, 1.0f, 1.0f, m_SurfaceMaterial.Diffuse.w);
@@ -581,6 +584,18 @@ void Wall::UploadMaterial()
         material.Emission = Color(0.0f, 0.0f, 0.0f, 1.0f);
         m_UnlitPartMaterial->SetMaterial(material);
     }
+}
+
+void Wall::SetEmissionScale(float scale)
+{
+    scale = (std::max)(scale, 0.0f);
+    // 変わったときだけ、マテリアルを送り直している（毎フレーム同じ値なら何もしない）
+    if (scale == m_EmissionScale)
+    {
+        return;
+    }
+    m_EmissionScale = scale;
+    UploadMaterial();
 }
 
 bool Wall::IsKnownVisualModel(const std::string& name)
@@ -694,7 +709,7 @@ void Wall::SetWeatheringSurface(bool enabled)
 // 光る色をそのまま光の色にし、明るさは光る強さに比例させている。
 void Wall::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const
 {
-    if (!m_Visible || m_GlowRange <= 0.0f || m_GlowStrength <= 0.0f)
+    if (!m_Visible || m_GlowRange <= 0.0f || m_GlowStrength <= 0.0f || m_EmissionScale <= 0.001f)
     {
         return;
     }
@@ -711,7 +726,7 @@ void Wall::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) cons
     light.PositionRange = Vector4(m_Position.x, m_Position.y, m_Position.z, m_GlowRange);
     light.ColorIntensity = Vector4(
         emission.R() / peak, emission.G() / peak, emission.B() / peak,
-        peak * m_GlowStrength);
+        peak * m_GlowStrength * m_EmissionScale);
     lights.push_back(light);
 }
 

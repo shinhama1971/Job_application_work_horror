@@ -135,6 +135,13 @@ void ForestScene::Update()
 {
     const float deltaTime = Application::GetDeltaTime();
     m_NoticeTimer = (std::max)(0.0f, m_NoticeTimer - deltaTime);
+    // 街灯のちらつき・後ろの街灯が消える・研究所の窓の明かりが消える（ForestEvents）
+    if (m_Player != nullptr)
+    {
+        const float fear = m_Events.Update(deltaTime, m_Player->GetPosition(), m_LayoutProps);
+        Core::Game::GetInstance()->GetPostProcess()->SetFearVision(fear, fear > m_LastFear + 0.1f);
+        m_LastFear = fear;
+    }
 #if defined(_DEBUG)
     // Debug版だけ：F5 を押したとき、または配置のファイルが書き換わったとき（Unity で書き出したときなど）に読み直している
     if (Input::GetKeyTrigger(VK_F5) || m_LayoutWatcher.HasChanged(PropLayoutPath, deltaTime))

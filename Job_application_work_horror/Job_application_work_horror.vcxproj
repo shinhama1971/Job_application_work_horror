@@ -281,6 +281,7 @@
     <ClCompile Include="ForestScene.cpp" />
     <ClCompile Include="ForestGrass.cpp" />
     <ClCompile Include="SkyBackdrop.cpp" />
+    <ClCompile Include="ForestEvents.cpp" />
     <ClCompile Include="Stage2Layout.cpp" />
     <ClCompile Include="Stage2Objective.cpp" />
     <ClCompile Include="Stage2ScenePuzzles.cpp" />
@@ -414,6 +415,7 @@
     <ClInclude Include="ForestScene.h" />
     <ClInclude Include="ForestGrass.h" />
     <ClInclude Include="SkyBackdrop.h" />
+    <ClInclude Include="ForestEvents.h" />
     <ClInclude Include="Stage2Layout.h" />
     <ClInclude Include="Stage2Objective.h" />
     <ClInclude Include="Stage2AnomalyPlan.h" />

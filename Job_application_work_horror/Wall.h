@@ -39,6 +39,8 @@ private:
     // 自分の光る色で周りを照らす点光源の範囲と強さ（0なら照らさない）
     float m_GlowRange = 0.0f;
     float m_GlowStrength = 0.0f;
+    // 光る色と点光源の強さに掛ける倍率（SetEmissionScale）
+    float m_EmissionScale = 1.0f;
     // 崩れ具合（0 = 元の形、1 = 消えた）と、向かう値、1秒あたりの変化（0なら止まっている）
     float m_Dissolve = 0.0f;
     float m_DissolveTarget = 0.0f;
@@ -189,6 +191,11 @@ public:
         m_GlowRange = range;
         m_GlowStrength = strength;
     }
+
+    // 光る色と、照らす点光源の強さに掛ける倍率（0 = 消えている、1 = 配置ファイルのまま）。
+    // 外の森の街灯のちらつきや、研究所の窓の明かりが消える演出（ForestEvents）で使っている
+    void SetEmissionScale(float scale);
+    float GetEmissionScale() const { return m_EmissionScale; }
 
     // 照らす設定なら、点光源を1つ登録している
     void CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const override;

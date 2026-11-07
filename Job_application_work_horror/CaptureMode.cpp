@@ -401,21 +401,24 @@ namespace
         { 32.0f, Vector3(-28,FloorY,-85), 0.15f, -0.55f, L"feature_unseen_3", false },
         { 34.0f, Vector3(-28,FloorY,-85), 0.15f, -0.55f, nullptr, false },
     };
-    // 外の森（試作。--capture と --forest を一緒に付けたとき）：開始地点 → 小道の街灯 → 研究所が見えてくる所 → 研究所の正面
+    // 外の森（試作。--capture と --forest を一緒に付けたとき）：開始地点 → 小道の街灯 → 振り返って後ろの街灯が消えるのを見る → 研究所が見えてくる所 → 研究所の正面
     const std::vector<Keyframe> ForestTour = {
         { 0.0f, Vector3(0.0f, FloorY, -400.0f), 0.0f, 0.0f, nullptr, false },
         { 2.5f, Vector3(0.0f, FloorY, -398.0f), 0.0f, 0.0f, L"forest_01_開始地点", false },
         { 7.0f, Vector3(-6.0f, FloorY, -100.0f), YawToward(-6.0f, -100.0f, -29.0f, -60.0f), -0.12f, nullptr, false },
         { 8.0f, Vector3(-6.0f, FloorY, -98.0f), YawToward(-6.0f, -98.0f, -29.0f, -60.0f), -0.12f, L"forest_02_街灯と水たまり", false },
-        { 12.0f, Vector3(0.0f, FloorY, 120.0f), 0.0f, 0.03f, nullptr, false },
-        { 13.0f, Vector3(0.0f, FloorY, 125.0f), 0.0f, 0.03f, L"forest_03_研究所が見えてくる", false },
-        { 16.0f, Vector3(0.0f, FloorY, 215.0f), 0.0f, 0.14f, nullptr, false },
-        { 17.0f, Vector3(0.0f, FloorY, 218.0f), 0.0f, 0.14f, L"forest_04_研究所の正面", false },
-        { 18.0f, Vector3(0.0f, FloorY, 218.0f), 0.0f, 0.14f, nullptr, false },
+        // 街灯を通り過ぎて振り返る（後ろの街灯が1つずつ消える演出。ForestEvents）
+        { 10.0f, Vector3(4.0f, FloorY, -15.0f), Pi, -0.05f, nullptr, false },
+        { 13.0f, Vector3(4.0f, FloorY, -15.0f), Pi, -0.05f, L"forest_02b_振り返ると街灯が消えている", false },
+        { 16.0f, Vector3(0.0f, FloorY, 120.0f), 0.0f, 0.03f, nullptr, false },
+        { 17.0f, Vector3(0.0f, FloorY, 125.0f), 0.0f, 0.03f, L"forest_03_研究所が見えてくる", false },
+        { 20.0f, Vector3(0.0f, FloorY, 215.0f), 0.0f, 0.14f, nullptr, false },
+        { 21.0f, Vector3(0.0f, FloorY, 218.0f), 0.0f, 0.14f, L"forest_04_研究所の正面", false },
+        { 22.0f, Vector3(0.0f, FloorY, 218.0f), 0.0f, 0.14f, nullptr, false },
         // 草むらを足元まで見下ろす（草をカメラの上方向へ曲げる処理の確認。授業資料 p.23）
-        { 19.0f, Vector3(-62.0f, FloorY, -205.0f), 0.6f, -1.10f, nullptr, false },
-        { 21.0f, Vector3(-62.0f, FloorY, -205.0f), 0.6f, -1.10f, L"forest_05_草むらを見下ろす", false },
-        { 22.0f, Vector3(-62.0f, FloorY, -205.0f), 0.6f, -1.10f, nullptr, false },
+        { 23.0f, Vector3(-62.0f, FloorY, -205.0f), 0.6f, -1.10f, nullptr, false },
+        { 25.0f, Vector3(-62.0f, FloorY, -205.0f), 0.6f, -1.10f, L"forest_05_草むらを見下ろす", false },
+        { 26.0f, Vector3(-62.0f, FloorY, -205.0f), 0.6f, -1.10f, nullptr, false },
     };
     const std::vector<Keyframe>* GetTour(SceneName scene)
     {

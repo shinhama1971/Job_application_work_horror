@@ -225,6 +225,9 @@
     <ClCompile Include="SkyBackdrop.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="ForestEvents.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="Stage2Layout.cpp">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClCompile>
@@ -684,6 +687,9 @@
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="SkyBackdrop.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="ForestEvents.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="Stage2Layout.h">
