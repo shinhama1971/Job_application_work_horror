@@ -1,10 +1,14 @@
 // ============================================================================
-// ファイルの役割: 外の森（試作）の場面の、作る・更新する・描く・片付ける処理。
+// ファイルの役割: 外の森の場面の、作る・更新する・描く・片付ける処理。
 // ForestScene.hで宣言した処理の中身をここで定義している。
 // ============================================================================
 
 #include "ForestScene.h"
 #include "ForestGrass.h"
+#include "ForestRain.h"
+#include "IntroScene.h"
+#include "LabEntrance.h"
+#include "Wall.h"
 #include "SkyBackdrop.h"
 #include "Application.h"
 #include "Game.h"
@@ -19,6 +23,8 @@
 #include <Windows.h>
 #include <shellapi.h>
 #include <algorithm>
+
+using namespace DirectX::SimpleMath;
 
 bool ForestScene::IsRequestedByCommandLine()
 {
@@ -87,7 +93,7 @@ ForestScene::World ForestScene::BuildWorld(SceneLayoutBuilder& builder, const Pr
     world.PlayerObject = builder.Create<Player>("Player");
     PropLayoutFile::ApplyPlacement(*world.PlayerObject, PropLayoutFile::GetPlacement(layout, "Player"));
 
-    // 地面（1面・2面と同じ濡れた床。水たまりは床全体のマス目に乱数で置かれ、雨上がりの森になる）
+    // 地面（1面・2面と同じ濡れた床。水たまりは床全体のマス目に乱数で置かれ、雨のあとの夜の森になる）
     world.GroundObject = builder.Create<Ground>("ForestGround");
     PropLayoutFile::ApplyPlacement(*world.GroundObject, PropLayoutFile::GetPlacement(layout, "Ground"));
 
@@ -96,6 +102,15 @@ ForestScene::World ForestScene::BuildWorld(SceneLayoutBuilder& builder, const Pr
     // 木や岩を置いた後で草を作り、その足元と小道を避けて植える。
     world.Grass = builder.Create<ForestGrass>("ForestGrass");
     PropLayoutFile::ApplyPlacement(*world.Grass, PropLayoutFile::GetPlacement(layout, "ForestGrass"));
+    // 雨：加算合成で深度を書かないので、ほかの物を全部描いた後に描くよう、最後に作っている。
+    // 水たまりには、同じ雨の輪を波のシミュレーションで広げている
+    // （RainEnabled が false のときは作らない）
+    if constexpr (RainEnabled)
+    {
+        ForestRain* rain = builder.Create<ForestRain>("ForestRain");
+        rain->SetGroundHeight(world.GroundObject->GetPosition().y);
+        world.GroundObject->SetRainIntensity(1.0f);
+    }
     return world;
 }
 
@@ -109,6 +124,18 @@ ForestScene::ForestScene()
     m_Player = world.PlayerObject;
     m_Grass = world.Grass;
     m_LayoutProps = std::move(world.Props);
+
+    // 研究所の玄関：扉（配置ファイルの LabDoor）の手前に、「研究所に入る」と調べられる点を置いている
+    m_Entrance = builder.Create<LabEntrance>("LabEntrance");
+    Vector3 doorPosition(0.0f, -77.0f, 297.4f);
+    for (const auto& [name, wall] : m_LayoutProps)
+    {
+        if (name == "LabDoor" && wall != nullptr)
+        {
+            doorPosition = wall->GetPosition();
+        }
+    }
+    m_Entrance->SetPosition(doorPosition - Vector3(0.0f, 0.0f, 2.0f));
 
     // 配置を読み直したときに置き直す物（地面と草の範囲）
     Ground* ground = world.GroundObject;
@@ -126,8 +153,6 @@ ForestScene::ForestScene()
     m_Hud.Init();
     // 森には記録（残された資料）を置いていないので、右上の「記録 0 / 4」は出さない
     m_Hud.SetEvidenceVisible(false);
-    m_Notice = "外の森（試作）  小道を北へ進むと、森の奥に研究所がある";
-    m_NoticeTimer = 8.0f;
 }
 
 ForestScene::~ForestScene()
@@ -137,7 +162,9 @@ ForestScene::~ForestScene()
     {
         return;
     }
+    m_Radio.Stop();
     RestoreAtmosphere();
+    game->GetPostProcess()->SetSignalInterference(0.0f);
     for (const std::string& name : m_ObjectNames)
     {
         game->DestroyObj(name);
@@ -167,17 +194,47 @@ void ForestScene::ReloadPropLayout()
 void ForestScene::Update()
 {
     const float deltaTime = Application::GetDeltaTime();
+    Core::Game* game = Core::Game::GetInstance();
     m_NoticeTimer = (std::max)(0.0f, m_NoticeTimer - deltaTime);
-    // 街灯のちらつき・後ろの街灯が消える・研究所の窓の明かりが消える・草むらを何かが通る（ForestEvents）
-    if (m_Player != nullptr)
+    if (m_Player == nullptr)
     {
-        const float fear = m_Events.Update(deltaTime, m_Player->GetPosition(), m_LayoutProps);
-        Core::Game::GetInstance()->GetPostProcess()->SetFearVision(fear, fear > m_LastFear + 0.1f);
-        m_LastFear = fear;
-        // 草むらを通る「見えない何か」の足元の草を、草の Compute Shader で押し倒している
-        if (m_Grass != nullptr)
+        return;
+    }
+    // 街灯のちらつき・後ろの街灯が消える・研究所の窓の明かりが消える・草むらを何かが通る（ForestEvents）
+    const float fear = m_Events.Update(deltaTime, m_Player->GetPosition(), m_LayoutProps);
+    game->GetPostProcess()->SetFearVision(fear, fear > m_LastFear + 0.1f);
+    m_LastFear = fear;
+    // 草むらを通る「見えない何か」の足元の草を、草の Compute Shader で押し倒している
+    if (m_Grass != nullptr)
+    {
+        m_Grass->SetUnseenWalker(m_Events.GetWalkerPosition(), 10.0f, m_Events.GetWalkerStrength());
+    }
+
+    // 研究棟からの無線：小道を進むと、受信記録が1行ずつ届き、研究所が見えてくると途絶える。行が届く瞬間に画面も乱れる
+    const float radioNoise = m_EnterTimer < 0.0f ? m_Radio.Update(deltaTime, m_Player->GetPosition()) : 0.0f;
+    game->GetPostProcess()->SetSignalInterference(radioNoise * 0.7f);
+    game->GetPostProcess()->SetPresenceStatic(radioNoise * 0.45f);
+
+    if (m_EnterTimer < 0.0f)
+    {
+        // 視線の先の調べられる物（研究所の玄関）を選び、E（A）で調べている
+        m_InteractionSystem.Update(*m_Player);
+        if (m_Entrance != nullptr && m_Entrance->WasEntered())
         {
-            m_Grass->SetUnseenWalker(m_Events.GetWalkerPosition(), 10.0f, m_Events.GetWalkerStrength());
+            // 玄関を開けて入る：扉の音を鳴らし、暗転してから、目的の画面（IntroScene）を挟んで1面を始める
+            m_EnterTimer = 0.0f;
+            m_Radio.Stop();
+            game->PlayAudioCue(SOUND_CUE_DOOR);
+        }
+    }
+    else
+    {
+        m_EnterTimer += deltaTime;
+        if (m_EnterTimer >= EnterFadeSeconds && !m_SceneChangeRequested)
+        {
+            m_SceneChangeRequested = true;
+            IntroScene::SetStartAtMission(true);
+            game->RequestSceneChange(SceneName::Intro);
         }
     }
 #if defined(_DEBUG)
@@ -196,6 +253,20 @@ void ForestScene::Draw(Camera* camera)
     {
         return;
     }
-    m_Hud.Draw(*m_Player, -1, std::string_view{},
-        m_NoticeTimer > 0.0f ? std::string_view(m_Notice) : std::string_view("外の森（試作）"));
+    // 目的：無線が途絶えるまでは研究所へ向かい、途絶えたら玄関を調べる
+    std::string_view objective = m_Radio.IsSignalLost() ? "研究所の玄関を調べて、中に入る" : "小道を北へ進み、研究所へ向かう";
+    if (m_NoticeTimer > 0.0f)
+    {
+        objective = m_Notice;
+    }
+    m_Hud.Draw(*m_Player, -1, m_EnterTimer < 0.0f ? m_InteractionSystem.GetPrompt() : std::string_view{}, objective);
+    Hud::RadioView radio;
+    m_Radio.FillView(radio);
+    m_Hud.DrawRadio(radio);
+    // 玄関から入るときの暗転
+    if (m_EnterTimer >= 0.0f)
+    {
+        const float fade = (std::min)(1.0f, m_EnterTimer / (EnterFadeSeconds * 0.85f));
+        m_Hud.DrawBlink(fade);
+    }
 }

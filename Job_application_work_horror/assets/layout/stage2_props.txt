@@ -36,10 +36,10 @@ prop Stage2PipeRight          34 -53 -10    3 3 282    stage2Trim none 7 0 nosha
 place Player                         0 -99 -125
 place Stage2Shadow                   0 -99 62
 place Stage2NoiseShadow              0 -99 -145
-place Stage2ConfirmationPanel        35.5 -90 112 yaw -90
+place Stage2ConfirmationPanel        23.22 -79.79 138.44 yaw -0.98
 place Stage2EmergencyCharger         -35.5 -90 -106 yaw 90
 place Stage2EvidenceTerminal1        35.5 -90 -76 yaw -90
-place Stage2EvidenceTerminal2        -35.5 -90 108 yaw 90
+place Stage2EvidenceTerminal2        -39.4 -79.8 108 yaw 90
 place Stage2Ground                   0 -100 0 size 20 1 20
 place Stage2Battery                  35 -82.5 -45
 place Stage2Light1                   0 -50.5 -112 size 18 2 8
@@ -57,7 +57,7 @@ place Stage2ClockFrameBottom         -38.9 -81 -25 size 1.8 2 24
 place Stage2ClockFrameNear           -38.9 -70 -36 size 1.8 24 2
 place Stage2ClockFrameFar            -38.9 -70 -14 size 1.8 24 2
 place Stage2LoopMark                 -39.4 -68 52 size 1 18 12
-place Stage2DoorIndicator            22 -67 137.4 size 10 5 1
+place Stage2DoorIndicator            23.7 -65.7 137.4 size 10 5 1
 place Stage2FalseDoorPanel           -39.3 -76 70 size 1.2 40 22
 place Stage2FalseDoorFrameNear       -39 -76 58 size 1.8 44 2
 place Stage2FalseDoorFrameFar        -39 -76 82 size 1.8 44 2
@@ -92,7 +92,7 @@ place Stage2Scratch12                39.45 -71 57 size 1 2 10
 place Stage2Scratch13                39.45 -67 62 size 1 10 2
 place Stage2HangingBulb1             0 -48.5 0
 place Stage2HangingBulb2             0 -48.5 75
-place Stage2LockerLeftBody           -35 -77 -62 size 10 44 16
+place Stage2LockerLeftBody           -35 -77 -62.1 size 10 44 16
 place Stage2LockerLeft               -29.95 -77 -62 yaw 90
 place Stage2LockerRightBody          35 -77 40 size 10 44 16
 place Stage2LockerRight              29.95 -77 40 yaw -90

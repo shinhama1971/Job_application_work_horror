@@ -228,6 +228,21 @@
     <ClCompile Include="ForestEvents.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="ForestBackdrop.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="IntroScene.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="ForestRain.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="ForestRadio.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="LabEntrance.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="Stage2Layout.cpp">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClCompile>
@@ -692,6 +707,24 @@
     <ClInclude Include="ForestEvents.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
+    <ClInclude Include="ForestBackdrop.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="IntroScene.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="ForestRain.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="ForestRadio.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="LabEntrance.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="StoryText.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
     <ClInclude Include="Stage2Layout.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClInclude>
@@ -899,5 +932,7 @@
     <None Include="shader\grassPS.hlsl"><Filter>リソース ファイル</Filter></None>
     <None Include="shader\skyBackdropVS.hlsl"><Filter>リソース ファイル</Filter></None>
     <None Include="shader\skyBackdropPS.hlsl"><Filter>リソース ファイル</Filter></None>
+    <None Include="shader\rainVS.hlsl"><Filter>リソース ファイル</Filter></None>
+    <None Include="shader\rainPS.hlsl"><Filter>リソース ファイル</Filter></None>
   </ItemGroup>
 </Project>

@@ -74,6 +74,12 @@ class Ground :public Object
 	DirectX::SimpleMath::Vector4 m_RippleFloodRect;
 	// 波を跳ね返す、床に立った物を上から見た長方形（カメラに近い順）
 	std::vector<DirectX::SimpleMath::Vector4> m_RippleObstacles;
+	// 雨の強さ（0 = 降っていない。外の森）と、まだ落としていない雨粒の数（1フレームに足せる数を超えた分は次へ持ち越す）
+	float m_RainIntensity = 0.0f;
+	float m_PendingRainDrops = 0.0f;
+	unsigned int m_RainSeed = 1u;
+	// 雨粒を、カメラのまわりの水たまりへ波のおもりとして落としている
+	void AddRainRipples(float deltaTime);
 
 	// 本描画と深度プリパスで共通のワールド行列（同じ計算にし、深度を一致させている）
 	DirectX::SimpleMath::Matrix MakeWorldMatrix() const;
@@ -156,6 +162,8 @@ public:
 				DirectX::SimpleMath::Vector2(position.x, position.z), radius, strength);
 		}
 	}
+	// 雨の強さ（0〜1）。0より大きいと、カメラのまわりの水たまりに雨粒の輪が広がる（外の森。ForestRain と同じ雨）
+	void SetRainIntensity(float intensity) { m_RainIntensity = intensity; }
 	// その位置が水たまり（または水に浸かった範囲）の中かを返している
 	bool IsInsidePuddle(
 		const DirectX::SimpleMath::Vector3& position) const;

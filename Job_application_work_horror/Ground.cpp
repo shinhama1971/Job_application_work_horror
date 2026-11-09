@@ -419,6 +419,51 @@ void Ground::DrawWaterSurfaces(Camera* cam, bool depthOnly, WetFloorBuffer* wetF
 }
 
 //=======================================
+// 雨：カメラのまわりの地面に雨粒を落とし、水たまりに落ちたものだけを波のおもりにしている。
+// 輪は波の式で広がるので、近くに落ちた輪どうしが重なって干渉し、岸で跳ね返る（作り物の輪の模様ではない）。
+// 1フレームに足せるおもりの数には上限（16）があるので、足音の分を残して12個までにし、残りは次のフレームへ持ち越している
+//=======================================
+void Ground::AddRainRipples(float deltaTime)
+{
+	if (m_RainIntensity <= 0.0f)
+	{
+		m_PendingRainDrops = 0.0f;
+		return;
+	}
+	// 1秒に落とす雨粒の数（水たまりの外に落ちた分は捨てるので、輪になるのは水たまりの広さの割合だけ）
+	constexpr float DropsPerSecond = 1600.0f;
+	constexpr float DropArea = 48.0f;
+	constexpr int MaxRingsPerFrame = 12;
+	m_PendingRainDrops = (std::min)(m_PendingRainDrops + DropsPerSecond * m_RainIntensity * deltaTime, 200.0f);
+	const DirectX::SimpleMath::Vector3 eye = Core::Game::GetInstance()->GetCamera()->GetPosition();
+	auto nextRandom = [this]()
+	{
+		// 簡単な乱数（xorshift）。見た目だけに使うので、決まった並びで十分
+		m_RainSeed ^= m_RainSeed << 13;
+		m_RainSeed ^= m_RainSeed >> 17;
+		m_RainSeed ^= m_RainSeed << 5;
+		return static_cast<float>(m_RainSeed & 0xFFFFu) / 65535.0f;
+	};
+	int rings = 0;
+	while (m_PendingRainDrops >= 1.0f && rings < MaxRingsPerFrame)
+	{
+		m_PendingRainDrops -= 1.0f;
+		const DirectX::SimpleMath::Vector3 drop(
+			eye.x + (nextRandom() * 2.0f - 1.0f) * DropArea,
+			m_Position.y,
+			eye.z + (nextRandom() * 2.0f - 1.0f) * DropArea);
+		if (!m_WaterEffects.IsInsidePuddle(drop))
+		{
+			continue;
+		}
+		// 足音（半径1.4・強さ1.2）より小さく弱い、細かい輪（波のマス目が0.75なので、半径はそれより少し大きくしている）
+		m_RippleSimulation.AddImpulse(DirectX::SimpleMath::Vector2(drop.x, drop.z),
+			0.8f + nextRandom() * 0.3f, -(0.3f + nextRandom() * 0.25f) * m_RainIntensity);
+		++rings;
+	}
+}
+
+//=======================================
 // 更新処理：経過時間を進め、電力が戻ったときの水面の変化と、水滴・波紋を更新している
 //=======================================
 void Ground::Update()
@@ -476,6 +521,7 @@ void Ground::Update()
 		m_RippleSimulation.AddImpulse(
 			DirectX::SimpleMath::Vector2(impulse.x, impulse.y), impulse.z, impulse.w);
 	}
+	AddRainRipples(deltaTime);
 	const DirectX::SimpleMath::Vector3 eye = Core::Game::GetInstance()->GetCamera()->GetPosition();
 	m_PendingRippleSeconds += deltaTime;
 	m_RippleCenter = DirectX::SimpleMath::Vector2(eye.x, eye.z);

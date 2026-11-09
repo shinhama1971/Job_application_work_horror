@@ -136,12 +136,12 @@ void Hud::DrawTitle(
     AddText(left + 4.0f, titleY + titleHeight + 54.0f, "終わらない廊下から脱出する", 2.4f, textColor);
 
     // --- 始める面の選択：縦に3つ並べ、選んでいる面の枠を明るくし、その下に説明を出している
-    constexpr std::string_view stageNames[] = { "1面  電力の復旧", "2面  ループする廊下", "外の森（試作）" };
+    constexpr std::string_view stageNames[] = { "1面  森から研究所へ", "2面  ループする廊下", "1面  森を飛ばして始める" };
     constexpr std::string_view stageNotes[] =
     {
-        "最初から遊ぶ  クリアの記録が残る",
+        "雨の森を歩いて研究所に入る  クリアの記録が残る",
         "2面から遊ぶ  クリアしても記録には残らない",
-        "森を歩いて研究所まで行く  まだ1面にはつながらない"
+        "受信記録を見て、研究所の中から始める"
     };
     constexpr int stageCount = 3;
     const int stage = (std::clamp)(selectedStage, 0, stageCount - 1);
@@ -1195,6 +1195,190 @@ void Hud::DrawTechDemoPanel(
     {
         AddText(panelX + 18.0f, panelY + infoTop + infoLineHeight * static_cast<float>(index),
             infoLines[index], 1.8f, pale);
+    }
+
+    Flush();
+}
+
+// 1面の前の導入：後ろの森を暗く沈め、受信記録（見出しと、1行ずつタイプされる3行）を左寄せで、
+// 「通信途絶」を中央に、最後に目的と操作を中央のパネルに描いている。noise（0〜1）で文字を横にずらし、色をにじませている
+void Hud::DrawIntro(const IntroView& view)
+{
+    m_Vertices.clear();
+
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
+    const float noise = (std::clamp)(view.Noise, 0.0f, 1.0f);
+    const auto hash = [](float value)
+    {
+        const float s = std::sin(value * 12.9898f) * 43758.5453f;
+        return s - std::floor(s);
+    };
+    const auto textWidth = [](std::string_view text, float pixelSize)
+    {
+        return static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * 6.0f;
+    };
+    const float noiseStep = std::floor(view.Time * 24.0f);
+
+    // 後ろの森を暗く沈め（目的の画面ではさらに暗く）、薄い走査線を重ねている
+    const float shade = 0.62f + 0.18f * view.MissionAlpha;
+    AddRectangle(0.0f, 0.0f, screenWidth, screenHeight, Color(0.0f, 0.004f, 0.003f, shade));
+    for (float y = 0.0f; y < screenHeight; y += 6.0f)
+    {
+        AddRectangle(0.0f, y, screenWidth, 1.0f, Color(0.0f, 0.0f, 0.0f, 0.10f));
+    }
+
+    // --- 受信記録：見出し（明滅する受信の印つき）と、タイプされる3行
+    const float left = (std::max)(80.0f, screenWidth * 0.16f);
+    if (view.HeaderAlpha > 0.0f)
+    {
+        const bool blink = std::fmod(view.Time, 1.0f) < 0.6f;
+        if (blink)
+        {
+            AddRectangle(left, 230.0f, 12.0f, 12.0f, Color(0.48f, 0.90f, 0.58f, 0.90f * view.HeaderAlpha));
+        }
+        AddText(left + 22.0f, 222.0f, view.Header, 2.6f, Color(0.40f, 0.70f, 0.50f, 0.85f * view.HeaderAlpha));
+    }
+    if (view.LinesAlpha > 0.0f)
+    {
+        float y = 296.0f;
+        for (std::size_t index = 0; index < view.Lines.size(); ++index)
+        {
+            const std::string& line = view.Lines[index];
+            if (!line.empty())
+            {
+                // 乱れているときは、行ごとに少しずつ横へずらしている
+                const float jitter = noise > 0.1f ? (hash(noiseStep + static_cast<float>(index) * 3.7f) - 0.5f) * 22.0f * noise : 0.0f;
+                if (noise > 0.3f)
+                {
+                    AddText(left + jitter - 4.0f, y, line, 3.6f, Color(0.95f, 0.18f, 0.16f, 0.35f * noise));
+                }
+                AddText(left + jitter, y, line, 3.6f, Color(0.86f, 0.90f, 0.86f, 0.92f * view.LinesAlpha));
+            }
+            y += 66.0f;
+        }
+    }
+    // 「通信途絶」：中央に赤く出し、色のにじみと横の帯で崩している
+    if (view.SignalLostAlpha > 0.0f)
+    {
+        const float size = 5.5f;
+        const float width = textWidth(view.SignalLost, size);
+        const float x = (screenWidth - width) * 0.5f + (hash(noiseStep) - 0.5f) * 30.0f * noise;
+        // 受信記録の4行目（y = 494）の下に出している
+        const float y = 586.0f;
+        AddText(x - 6.0f * noise, y, view.SignalLost, size, Color(0.18f, 0.85f, 0.90f, 0.40f * noise * view.SignalLostAlpha));
+        AddText(x, y, view.SignalLost, size, Color(0.92f, 0.32f, 0.26f, 0.95f * view.SignalLostAlpha));
+        if (noise > 0.2f)
+        {
+            for (int bar = 0; bar < 4; ++bar)
+            {
+                const float seed = noiseStep * 2.3f + static_cast<float>(bar) * 5.1f;
+                AddRectangle(x - 10.0f, y + hash(seed) * size * 7.0f, width + 20.0f, 2.0f + hash(seed + 1.0f) * 4.0f,
+                    Color(0.0f, 0.004f, 0.003f, 0.9f));
+            }
+        }
+    }
+
+    // --- 目的の画面：中央のパネルに、状況・目的・操作・始める操作を並べている
+    if (view.MissionAlpha > 0.0f)
+    {
+        const float alpha = view.MissionAlpha;
+        const float panelWidth = (std::min)(screenWidth - 120.0f, 900.0f);
+        const float panelHeight = 340.0f;
+        const float panelX = (screenWidth - panelWidth) * 0.5f;
+        const float panelY = (screenHeight - panelHeight) * 0.5f - 20.0f;
+        AddRectangle(panelX, panelY, panelWidth, panelHeight, Color(0.008f, 0.016f, 0.013f, 0.90f * alpha));
+        AddRectangle(panelX, panelY, 6.0f, panelHeight, Color(0.48f, 0.90f, 0.58f, 0.96f * alpha));
+
+        const auto centered = [&](std::string_view text, float size, float y, const Color& color)
+        {
+            AddText((screenWidth - textWidth(text, size)) * 0.5f, y, text, size, color);
+        };
+        centered(view.MissionLead, 3.0f, panelY + 44.0f, Color(0.80f, 0.86f, 0.82f, 0.95f * alpha));
+        centered(view.MissionGoal, 3.6f, panelY + 112.0f, Color(0.52f, 0.92f, 0.60f, alpha));
+        const bool controller = Input::IsControllerConnected();
+        centered(controller ? "Y でライト　A で調べる　迷ったら LB でヒント" : "F でライト　E で調べる　迷ったら H でヒント",
+            2.7f, panelY + 186.0f, Color(0.62f, 0.76f, 0.68f, 0.90f * alpha));
+        const float pulse = std::sin(view.Time * 2.1f) * 0.5f + 0.5f;
+        centered(controller ? "A で始める" : "ENTER で始める", 3.0f, panelY + 262.0f,
+            Color(0.58f + pulse * 0.16f, 0.70f + pulse * 0.18f, 0.62f + pulse * 0.14f, (0.62f + pulse * 0.34f) * alpha));
+    }
+    else
+    {
+        // 受信記録の間は、右下に飛ばし方を小さく出している
+        const std::string_view skip = Input::IsControllerConnected() ? "A で飛ばす" : "ENTER で飛ばす";
+        AddText(screenWidth - textWidth(skip, 1.8f) - 60.0f, screenHeight - 70.0f, skip, 1.8f,
+            Color(0.50f, 0.62f, 0.55f, 0.75f));
+    }
+
+    Flush();
+}
+
+// 外の森を歩いている間の無線の字幕：画面の下の中央に、暗い帯と、受信の印つきの見出し、タイプされる1行を出している。
+// 「通信途絶」は帯の上に赤く出す。noise（0〜1）で文字を横にずらし、色をにじませている
+void Hud::DrawRadio(const RadioView& view)
+{
+    if (view.LineAlpha <= 0.0f && view.SignalLostAlpha <= 0.0f)
+    {
+        return;
+    }
+    m_Vertices.clear();
+
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
+    const float noise = (std::clamp)(view.Noise, 0.0f, 1.0f);
+    const auto hash = [](float value)
+    {
+        const float s = std::sin(value * 12.9898f) * 43758.5453f;
+        return s - std::floor(s);
+    };
+    const auto textWidth = [](std::string_view text, float pixelSize)
+    {
+        return static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * 6.0f;
+    };
+    const float noiseStep = std::floor(view.Time * 24.0f);
+    const float jitter = noise > 0.1f ? (hash(noiseStep) - 0.5f) * 22.0f * noise : 0.0f;
+
+    if (view.LineAlpha > 0.0f)
+    {
+        const float alpha = view.LineAlpha;
+        const float panelWidth = (std::min)(screenWidth - 120.0f, 1060.0f);
+        const float panelHeight = 104.0f;
+        const float panelX = (screenWidth - panelWidth) * 0.5f;
+        const float panelY = screenHeight - 250.0f;
+        AddRectangle(panelX, panelY, panelWidth, panelHeight, Color(0.0f, 0.006f, 0.004f, 0.62f * alpha));
+        AddRectangle(panelX, panelY, 4.0f, panelHeight, Color(0.48f, 0.90f, 0.58f, 0.85f * alpha));
+        // 見出し：受信中は印が明滅する
+        if (std::fmod(view.Time, 1.0f) < 0.6f)
+        {
+            AddRectangle(panelX + 24.0f, panelY + 20.0f, 10.0f, 10.0f, Color(0.48f, 0.90f, 0.58f, 0.90f * alpha));
+        }
+        AddText(panelX + 42.0f, panelY + 13.0f, view.Header, 2.2f, Color(0.40f, 0.70f, 0.50f, 0.85f * alpha));
+        const float lineX = panelX + 24.0f + jitter;
+        const float lineY = panelY + 50.0f;
+        if (noise > 0.3f)
+        {
+            AddText(lineX - 4.0f, lineY, view.Line, 3.2f, Color(0.95f, 0.18f, 0.16f, 0.35f * noise * alpha));
+        }
+        AddText(lineX, lineY, view.Line, 3.2f, Color(0.86f, 0.90f, 0.86f, 0.95f * alpha));
+    }
+    if (view.SignalLostAlpha > 0.0f)
+    {
+        const float size = 4.4f;
+        const float width = textWidth(view.SignalLost, size);
+        const float x = (screenWidth - width) * 0.5f + jitter;
+        const float y = screenHeight - 228.0f;
+        AddText(x - 6.0f * noise, y, view.SignalLost, size, Color(0.18f, 0.85f, 0.90f, 0.40f * noise * view.SignalLostAlpha));
+        AddText(x, y, view.SignalLost, size, Color(0.92f, 0.32f, 0.26f, 0.95f * view.SignalLostAlpha));
+        if (noise > 0.2f)
+        {
+            for (int bar = 0; bar < 3; ++bar)
+            {
+                const float seed = noiseStep * 2.3f + static_cast<float>(bar) * 5.1f;
+                AddRectangle(x - 10.0f, y + hash(seed) * size * 7.0f, width + 20.0f, 2.0f + hash(seed + 1.0f) * 3.0f,
+                    Color(0.0f, 0.004f, 0.003f, 0.85f));
+            }
+        }
     }
 
     Flush();

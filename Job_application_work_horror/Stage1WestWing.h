@@ -110,7 +110,7 @@ private:
     // --- 排水バルブと水位
     // 水の手前の端（z）。水は奥（MaxZ）の排水口へ向かって引いていき、MaxZに着くと水がなくなる。
     float m_WaterEdgeZ = MinZ;
-    float m_GurgleTimer = 0.0f;     // 水が引いている間の、排水の音の間隔
+    float m_GurgleTimer = 0.0f;     // 水が引いている間に、排水の音を次に鳴らすまでの秒数
     float m_TurnSoundTimer = 0.0f;  // バルブを回している間の、きしむ音の間隔
     float m_TurningTimer = 0.0f;    // 回しているときの文章を出す残り秒数（手を離しても少しだけ残す）
     float m_TurningProgress = 0.0f; // 最後に回していたバルブの進み具合（0〜1）

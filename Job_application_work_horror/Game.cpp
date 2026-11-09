@@ -11,6 +11,7 @@
 #include "StageScene.h"
 #include "Stage2Scene.h"
 #include "ForestScene.h"
+#include "IntroScene.h"
 #include "ResultScene.h"
 #include "Shader.h"
 #include "ModelCache.h"
@@ -94,7 +95,7 @@ namespace Core
         if (Tools::CaptureMode::GetEffectLevelOverride() >= 0)
             m_Instance->m_Settings.SetEffectLevel(Tools::CaptureMode::GetEffectLevelOverride());
         m_Instance->ApplyVisualSettings();
-        // --forest を付けて起動したときは、タイトルの代わりに外の森（試作）から始めている
+        // --forest を付けて起動したときは、タイトルの代わりに外の森から始めている
         m_Instance->ChangeScene(ForestScene::IsRequestedByCommandLine() ? SceneName::Forest : SceneName::Title);
         return true;
     }
@@ -405,6 +406,10 @@ namespace Core
         case SceneName::Forest:
             m_Scene = std::make_unique<ForestScene>();
             break;
+
+        case SceneName::Intro:
+            m_Scene = std::make_unique<IntroScene>();
+            break;
         }
 
         // 階ごとに違う環境音へ切り替え、タイトルとリザルトでは止めている。
@@ -413,6 +418,22 @@ namespace Core
             m_Sound.Stop(SOUND_CUE_AMBIENCE_STAGE1);
             m_Sound.Stop(SOUND_CUE_AMBIENCE_STAGE2);
             m_Sound.Stop(SOUND_CUE_RADIO_STATIC);
+            m_Sound.Stop(SOUND_CUE_RAIN);
+            // 外の森が映る画面（タイトルの後ろ・導入・外の森）では、雨音をループさせている（ForestRain と同じ雨）
+            const bool forestOnScreen = sName == SceneName::Title || sName == SceneName::Intro || sName == SceneName::Forest;
+            if constexpr (ForestScene::RainEnabled)
+            {
+                if (forestOnScreen)
+                {
+                    m_Sound.Play(SOUND_CUE_RAIN);
+                }
+            }
+            // 導入の受信記録の間は、無線の雑音を小さく鳴らしている（「通信途絶」で IntroScene が止める）。
+            // シーンを作った後にここで前の雑音を止めるので、鳴らし始めもここでしている
+            if (sName == SceneName::Intro)
+            {
+                m_Sound.Play(SOUND_CUE_RADIO_STATIC, 1.0f, 0.35f);
+            }
             if (sName == SceneName::Stage)
             {
                 m_Sound.Play(SOUND_CUE_AMBIENCE_STAGE1);

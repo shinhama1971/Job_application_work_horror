@@ -276,7 +276,7 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 | 一人称の手と懐中電灯 | CPU・GPU（VS・PS） | `FirstPersonHands`（揺れの計算、b9 に手元だけの射影行列と、前の壁で跳ね返る懐中電灯の光）、`shader/viewModel*.hlsl*`（肌・布・金属） | ビューポートの深度の範囲を 0〜0.02 にして描き、壁にめり込まないようにしている（本描画は near=1 なので、それより手前に壁は来ない） |
 | 建物と小物の配置のファイル | CPU（読み込み時） | `PropLayoutFile`（`assets/layout/stage1_props.txt`・`stage2_props.txt`）、`Stage1Layout`・`Stage2Layout` | 建物の壁・柱・天井・配管・小物はファイルに書き（`prop` 行）、`room` を付けた壁を、部屋の角の暗がり（b11）とレイ反射の部屋の形に使う。扉・照明・電池・端末など進行のコードが作る物は、種類と動きをコードが決め、置き場所（位置・向き・大きさ）だけを `place` 行から読む（`PropLayoutFile::ApplyPlacement`）。ヒューズと鍵の候補の場所は `spot` 行。ループの瞬間移動の計算に使う最後のドア・開始地点のドアとその裏の通路と表示、MirrorAnomaly の面に合わせた鏡と枠、監視カメラの表で置く開かずの扉は、計算と結び付いているので C++ に残している |
 | Unity のマップエディター | エディター（C#） | `MapEditor/Assets/Editor/MapLayout`（`MapLayoutDocument` が配置ファイルを行ごとに読み書き、`MapLayoutEditor` がシーンへの読み込みと書き出し、`MapLayoutBatch` が往復の確認）、`MapEditor/Assets/MapLayout`（GameObject と行を結ぶ印） | ゲームは配置ファイルだけを読み、Unity には依存しない。書き出しは変わった数値だけを、ゲームの `FormatNumber` と同じ書き方で書き換える |
-| 外の森（試作） | CPU（読み込み時）・GPU | `ForestScene`（タイトルの3つ目の選択、`--forest`、デバッグ画面のボタンで開く。1面にはまだつながらない）、`assets/layout/forest_props.txt`、`tools/maya/build_forest_props.py`（`forest_*` のモデル。一覧は `Wall.cpp`） | 1面・2面と同じ仕組み（配置ファイル・`Ground`・`Player`・`Wall` の見た目のモデル・Debug版の読み直し）だけで組み、場面だけを足した。木は、見た目のモデルを「標準の大きさ」で割って箱に合わせる仕組みを使い、標準の大きさを幹にして、枝を箱の外へ出している（当たり判定は幹だけ、カリングの球は箱の対角線の半分で枝まで届く） |
+| 外の森 | CPU（読み込み時）・GPU | `ForestScene`（タイトルの1面、`--forest`、デバッグ画面のボタンで開く。研究所の玄関（`LabEntrance`）から1面へ入る）、`assets/layout/forest_props.txt`、`tools/maya/build_forest_props.py`（`forest_*` のモデル。一覧は `Wall.cpp`） | 1面・2面と同じ仕組み（配置ファイル・`Ground`・`Player`・`Wall` の見た目のモデル・Debug版の読み直し）だけで組み、場面だけを足した。木は、見た目のモデルを「標準の大きさ」で割って箱に合わせる仕組みを使い、標準の大きさを幹にして、枝を箱の外へ出している（当たり判定は幹だけ、カリングの球は箱の対角線の半分で枝まで届く） |
 | 箱の小物の見た目のモデル | CPU（読み込み時） | `Wall::SetVisualModel`（モデルの一覧は `Wall.cpp`）、`PropLayoutFile`（配置ファイルの `model` の指定） | 当たり判定・影・深度プリパス・水面に映す箱は箱の大きさのまま。モデルは標準の大きさで割って1×1×1の箱の空間にし、ワールド行列の拡大で置いた箱の大きさに伸ばす。部位の色は頂点の色で付け、マテリアルの色は白にしている。警告灯とライトは、光る部位（レンズ・電球）を後ろに並べ、その前までを光る色のないマテリアルで描き分けている |
 | 自分の体の影 | CPU・GPU（PS） | `Player`（足もとの位置・向き・歩く手足の振りを b12 の PlayerBody へ）、`shader/figureShadow.hlsli` の `GetPlayerBodyShadow`（litTexturePS・wetFloorPS の点光源ごと） | 体は描かず、シャドウマップにも入れない。胴・頭・両脚・両腕のカプセルが、画素から光源への線分を遮るかで影を求めるので、どの照明でも影が落ちる。懐中電灯の光は目の位置から出るので遮らない |
 | 小物と人影のモデル | CPU（読み込み時） | `PropModel`（FBXの部位をマテリアルの名前で選び、頂点カラーの環境遮蔽 × 部位の色を頂点の色にして、各クラスの頂点の配列へ足す） | モデルは実際の大きさで作り、各クラスが掛ける拡大率で位置と法線を割っている。描き方は箱で組んでいたときと同じ |
@@ -411,6 +411,20 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 `TitleScene` は、森の場面と同じ `ForestScene::ApplyAtmosphere`・`LoadLayout`・`BuildWorld` で森の世界を作り、プレイヤーを入力を読まない状態（`Player::SetAttractMode`）にしています。カメラの位置と向きは、場面の表（始めと終わりの位置・向き・秒数）を smoothstep で補間して毎フレーム決め、場面が変わるときに `ForestEvents` を作り直して、街灯や窓の演出が毎回また起きるようにしています。題名のノイズの強さ（場面の切り替えと、ときどき来る短い乱れ）は、`Hud::DrawTitle` の文字のずれ・色のにじみ・横の帯と、`PostProcess::SetSignalInterference`・`SetPresenceStatic` の両方に使っています。タイトルが終わると、画面効果・視点の操作・画面の乱れを普段に戻します。
 
 タイトルでも本描画の全部の段階（環境マップ・SSAO・光の筋）を動かすようになったため、前のシーンの状態が次のシーンに残らないよう、シーンを切り替えるときに、環境マップの次に撮る面（`ReflectionProbe::Invalidate`）と、光の筋の揺らぎの時間（`LightShafts::ResetTime`）を最初に戻しています。これで、タイトルを変えても1面の自動撮影の画像は前と同じになります（51枚の比較で確認）。
+
+## 森から研究所へ
+
+タイトルの1面は `SceneName::Forest` から始まります。`ForestRadio` が、プレイヤーの z が決めた位置を越え、かつ前の行が消えていたら次の行を流します。こうして、走っても行が重なったり飛んだりしないようにしています。文章は `StoryText.h` にまとめ、導入（`IntroScene`）と同じものを使っています。字幕は `Hud::DrawRadio` で、ゲーム中のHUDの後に描いています。研究所の玄関は、扉の見た目と当たり判定を配置ファイルの `LabDoor`（`Wall`）が持ち、その手前に見た目のない調べる対象 `LabEntrance` を置いています。森の場面にも `InteractionSystem` を持たせ、調べられたら `ForestScene` が扉の音と暗転を出します。そのあと `IntroScene::SetStartAtMission(true)` を立てて `SceneName::Intro` へ切り替えます。導入はこの印があると目的の画面から始め、玄関の前で止まったカメラを後ろに映します。1面に入ると `GameState::BeginRun` で記録を始めるので、森で歩いた時間はクリアの時間に含めません。
+
+## 森の雨
+
+`ForestScene::RainEnabled`（今は `false`）が `false` のときは、`BuildWorld` で `ForestRain` を作らず、地面の雨の輪も付けず、`Game::ChangeScene` で雨音も鳴らしません（`if constexpr` で切り替えている）。
+
+`ForestScene::BuildWorld` の最後に `ForestRain` を作っています。加算合成で深度を書かないので、ほかの物を全部描いた後に描く必要があり、物は作った順に描かれるため、最後に作っています。`shader/rainVS.hlsl` は `SV_InstanceID` が雨粒の数より小さければ雨粒の筋、それ以降なら地面のしぶきの四角形を作ります。描かない雨粒（地面より下、屋根の下、目のすぐ前）は、クリップ空間の外の点にして捨てています。屋根は、当たり判定があり、地面から15以上浮いた、上から見て広い `Wall` を2秒ごとに集め直して、最大8個を定数バッファで渡しています。`shader/rainPS.hlsl` は、懐中電灯の円錐（`GetFlashlightBeamProfile`・影の地図）と翼の光、全部の点光源を足しています。雨粒は画面の一部にしかないので、タイルごとのリストではなく点光源の一覧を直接回しています。水たまりの輪は `Ground::AddRainRipples` が、カメラのまわりに落とした雨粒のうち水たまりに入ったものだけを `WaterRippleSimulation::AddImpulse` に渡しています（1フレーム12個まで。足音の分を残している）。雨音は、シーンを作った後に前の環境音を止める `Game::ChangeScene` で鳴らしています。同じ理由で、導入の無線の雑音もここで鳴らすように直しました（`IntroScene` の中で鳴らすと、直後に止められていた）。
+
+## 1面の前の導入
+
+タイトルの後ろの森の作り方とカメラの動きは `ForestBackdrop` にまとめ、`TitleScene`（場面の表を繰り返す）と `IntroScene`（研究所へ近づく1つの場面を1回だけ）の両方で使っています。`ForestBackdrop::Uninit` が、森の画面効果・画面の乱れ・視点の操作を普段に戻します。`IntroScene` は経過時間だけで、見出し → 受信記録の4行 → 「通信途絶」 → 目的の画面、と進めます。受信記録は、UTF-8 の文字の数で区切って1文字ずつ出しています。表示は `Hud::IntroView` に詰めて `Hud::DrawIntro` に渡しています。行の始まりと「通信途絶」の瞬間に電波の乱れを強め、その強さを `PostProcess::SetSignalInterference`・`SetPresenceStatic` と文字のずれの両方に使っています。目的の画面で Enter を押すと `SceneName::Stage` へ切り替えます（押し間違えないよう0.6秒待つ）。
 
 ## 森の入口の演出
 

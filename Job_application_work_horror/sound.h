@@ -19,16 +19,22 @@ typedef enum
 	SOUND_CUE_AMBIENCE_STAGE1 = 0, // 1面でループする低い環境音
 	SOUND_CUE_AMBIENCE_STAGE2,     // 2面の脈打つような不穏な環境音
 	SOUND_CUE_PICKUP,       // ヒューズ・電池・鍵を拾った音
-	SOUND_CUE_DOOR,         // 扉の開け閉め・鍵がかかっている音
+	SOUND_CUE_DOOR,         // 扉の開け閉めのきしむ音（ロッカーの扉にも使っている）
 	SOUND_CUE_POWER,        // 配電盤や信号盤が動き出す音
 	SOUND_CUE_SCARE,        // 人影が現れたときや、捕まったときの衝撃音
-	SOUND_CUE_FOOTSTEP,     // 歩く・走るのに合わせた足音
+	SOUND_CUE_FOOTSTEP,     // 研究所の中（1面・2面）の足音。硬い床を歩く1歩
 	SOUND_CUE_WATER_STEP,   // 水たまり・浸水した床を踏んだときの水音（水の滴る音にも高くして使っている）
 	SOUND_CUE_FLASHLIGHT,   // 懐中電灯のスイッチのクリック音
 	SOUND_CUE_PIPE_KNOCK,   // 配管を叩いたような金属音（tools/generate-pipe-knock.ps1で合成）
 	SOUND_CUE_HEARTBEAT,    // 自分の心拍「ドクン」1回分（tools/generate-heartbeat-breath.ps1で合成）
 	SOUND_CUE_BREATH,       // 自分の呼吸「吐いて吸う」1回分（同上）
 	SOUND_CUE_RADIO_STATIC, // 携帯ラジオの雑音のループ（影が近いほど大きくなる。tools/generate-radio-static.ps1で合成）
+	SOUND_CUE_RAIN,         // 外の森の雨音のループ（木の葉と地面を打つ雨と、ときどき落ちる大きな滴。tools/generate-rain.ps1で合成）
+	SOUND_CUE_DOOR_LOCKED,  // 鍵のかかった扉のドアノブを、がちゃがちゃ回す音
+	SOUND_CUE_WATER_DROP,   // 天井から落ちる1滴の水音
+	SOUND_CUE_DRAIN,        // 1面の西棟で、水が排水口へ引いていく音（約12秒。バルブを1つ回すごとに1回）
+	SOUND_CUE_FOREST_STEP,  // 外の森の、雨で濡れた道を歩く1歩
+	SOUND_CUE_FOREST_RUN,   // 外の森の、雨で濡れた道を走る1歩
 
 	// 音の種類の数
 	SOUND_LABEL_MAX,
@@ -58,16 +64,22 @@ private:
 		{"assets/Audio/horror_ambient.wav", true, 0.28f},
 		{"assets/Audio/stage2_ambient.wav", true, 0.30f},
 		{"assets/Audio/pickup.wav", false, 0.56f},
-		{"assets/Audio/door_creak.wav", false, 0.48f},
+		{"assets/Audio/door_open.wav", false, 0.48f},
 		{"assets/Audio/power_restore.wav", false, 0.62f},
 		{"assets/Audio/scare_impact.wav", false, 0.72f},
-		{"assets/Audio/footstep.wav", false, 0.40f},
+		{"assets/Audio/footstep_asphalt.wav", false, 0.40f},
 		{"assets/Audio/water_step.wav", false, 0.52f},
 		{"assets/Audio/flashlight_click.wav", false, 0.54f},
 		{"assets/Audio/pipe_knock.wav", false, 0.50f},
 		{"assets/Audio/heartbeat.wav", false, 0.70f},
 		{"assets/Audio/breath.wav", false, 0.32f},
 		{"assets/Audio/radio_static.wav", true, 0.34f},
+		{"assets/Audio/rain.wav", true, 0.42f},
+		{"assets/Audio/door_locked.wav", false, 0.50f},
+		{"assets/Audio/water_drop.wav", false, 0.55f},
+		{"assets/Audio/drain.wav", false, 0.60f},
+		{"assets/Audio/forest_step_walk.wav", false, 0.42f},
+		{"assets/Audio/forest_step_run.wav", false, 0.45f},
 	};
 
 	// XAudio2本体はCOMなのでComPtrで管理している。ボイスはCOMではないので、DestroyVoiceで解放している。

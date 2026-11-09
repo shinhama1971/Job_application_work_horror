@@ -223,6 +223,31 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
             Vector2(scale.x * 0.5f + margin, scale.z * 0.5f + margin), std::cos(yaw), std::sin(yaw) });
     }
 
+    // 生やさない所を、上から見た格子（一辺 FootprintCellSize）に振り分けている。
+    // 葉の候補（数十万）ごとに全部の物（百数十）を調べると、Debug版の起動で数秒かかっていたため、
+    // 候補のいるマスに重なる物だけを調べるようにしている（結果は全部を調べたときと同じ）
+    constexpr float FootprintCellSize = 40.0f;
+    const int footprintColumns = (std::max)(1, static_cast<int>(std::ceil(halfX * 2.0f / FootprintCellSize)));
+    const int footprintRows = (std::max)(1, static_cast<int>(std::ceil(halfZ * 2.0f / FootprintCellSize)));
+    std::vector<std::vector<std::uint32_t>> footprintCells(static_cast<std::size_t>(footprintColumns * footprintRows));
+    for (std::size_t index = 0; index < footprints.size(); ++index)
+    {
+        const Footprint& footprint = footprints[index];
+        // 回っている箱も含むよう、箱の対角線の半分を半径にしている
+        const float radius = footprint.HalfSize.Length();
+        const int column0 = std::clamp(static_cast<int>(std::floor((footprint.Center.x - radius - minX) / FootprintCellSize)), 0, footprintColumns - 1);
+        const int column1 = std::clamp(static_cast<int>(std::floor((footprint.Center.x + radius - minX) / FootprintCellSize)), 0, footprintColumns - 1);
+        const int row0 = std::clamp(static_cast<int>(std::floor((footprint.Center.y - radius - minZ) / FootprintCellSize)), 0, footprintRows - 1);
+        const int row1 = std::clamp(static_cast<int>(std::floor((footprint.Center.y + radius - minZ) / FootprintCellSize)), 0, footprintRows - 1);
+        for (int row = row0; row <= row1; ++row)
+        {
+            for (int column = column0; column <= column1; ++column)
+            {
+                footprintCells[static_cast<std::size_t>(row * footprintColumns + column)].push_back(static_cast<std::uint32_t>(index));
+            }
+        }
+    }
+
     // 水たまりの位置は、地面（Ground）が作られたときに決まっている（床のシェーダーと同じ式）
     const Ground* ground = nullptr;
     for (const Ground* candidate : Core::Game::GetInstance()->GetObjects<Ground>())
@@ -261,9 +286,11 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
                 continue;
             }
             bool blocked = false;
-            for (const Footprint& footprint : footprints)
+            const int footprintColumn = std::clamp(static_cast<int>((x - minX) / FootprintCellSize), 0, footprintColumns - 1);
+            const int footprintRow = std::clamp(static_cast<int>((z - minZ) / FootprintCellSize), 0, footprintRows - 1);
+            for (const std::uint32_t index : footprintCells[static_cast<std::size_t>(footprintRow * footprintColumns + footprintColumn)])
             {
-                if (IsInsideFootprint(footprint, x, z))
+                if (IsInsideFootprint(footprints[index], x, z))
                 {
                     blocked = true;
                     break;
@@ -314,8 +341,28 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
     {
         blades.resize(MaxBlades);
     }
-    std::stable_sort(blades.begin(), blades.end(),
-        [&](const Blade& a, const Blade& b) { return chunkOf(a) < chunkOf(b); });
+    // 区画の番号ごとに数えてから置き直す並べ替え（数え上げソート）。同じ区画の中の順番は保たれるので、
+    // std::stable_sort と同じ並びになる。比べながら並べ替えるより速く、Debug版の起動で1秒以上かかっていたのを短くした
+    {
+        const std::size_t chunkCount = static_cast<std::size_t>(chunksX * chunksZ);
+        std::vector<std::uint32_t> chunkIndices(blades.size());
+        std::vector<std::uint32_t> offsets(chunkCount + 1, 0u);
+        for (std::size_t i = 0; i < blades.size(); ++i)
+        {
+            chunkIndices[i] = static_cast<std::uint32_t>(chunkOf(blades[i]));
+            ++offsets[chunkIndices[i] + 1];
+        }
+        for (std::size_t chunk = 0; chunk < chunkCount; ++chunk)
+        {
+            offsets[chunk + 1] += offsets[chunk];
+        }
+        std::vector<Blade> sorted(blades.size());
+        for (std::size_t i = 0; i < blades.size(); ++i)
+        {
+            sorted[offsets[chunkIndices[i]]++] = blades[i];
+        }
+        blades.swap(sorted);
+    }
 
     m_Chunks.clear();
     std::size_t index = 0;

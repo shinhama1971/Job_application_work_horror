@@ -31,48 +31,50 @@ color lampRedBody   0.54  0.048 0.03   rough 0.35
 
 # --- 研究所（2階建て。正面は南向きで、正面の壁の外側は z=298）
 prop LabFront          0   -50  300     220 100 4     concrete none 4 1 weathering
-prop LabSideLeft    -110   -50  360     4 100 124     concrete none 4 1 weathering
+prop LabSideLeft    -110.952   -48.295  360     4.017 103.41 124     concrete none 4 1 weathering
 prop LabSideRight    110   -50  360     4 100 124     concrete none 4 1 weathering
-prop LabBack           0   -50  420     220 100 4     concrete none 4 1 weathering
+prop LabBack           -0.478   -48.295  420     220.946 103.41 4     concrete none 4 1 weathering
 prop LabRoof           0     1  360     224 4 128     concrete none 4 1
 prop LabParapet        0     6  299     224 6 3       concrete none 4 1
-prop LabFloorBand      0   -52  297.3   222 2 1.5     trimColor none 5 0
+prop LabFloorBand      -0.478   -50.363  297.3   222.955 2.068 1.5     trimColor none 5 0
 # 入口：扉・枠・ひさし・玄関の灯り・銘板
-prop LabDoor           0   -77  297.4   26 46 1.2     doorColor none 10 1
-prop LabDoorFrameLeft  -14.5 -76 297.2  3 48 2        darkMetal none 20 0
-prop LabDoorFrameRight  14.5 -76 297.2  3 48 2        darkMetal none 20 0
-prop LabDoorFrameTop    0  -52.5 297.2  32 3 2        darkMetal none 20 0
-prop LabCanopy         0   -49  289     46 2.5 18     concrete none 4 1
+prop LabDoor           -0.478   -76.216  297.4   26.112 47.569 1.2     doorColor none 10 1
+prop LabDoorFrameLeft  -15.041 -75.182 297.2  3.013 49.637 2        darkMetal none 20 0
+prop LabDoorFrameRight  14.084 -75.182 297.2  3.013 49.637 2        darkMetal none 20 0
+prop LabDoorFrameTop    -0.478  -50.88 297.2  32.138 3.102 2        darkMetal none 20 0
+prop LabCanopy         -0.478   -47.261  289     46.198 2.585 18     concrete none 4 1
 prop LabPorchLight     0  -51.6 292     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 90 2.6 model safe_bulb
-prop LabSign         -32   -62  297.6   20 5 0.6      signColor none 8 0
+prop LabSign         -32.616   -60.704  297.6   20.086 5.171 0.6      signColor none 8 0
 # 窓（1階・2階）。2階の右から2番目だけ明かりがついている
-prop LabWindow1F1    -80   -72  297.6   22 18 0.6     glass none 60 0
-prop LabWindow1F2    -48   -72  297.6   22 18 0.6     glass none 60 0
-prop LabWindow1F3     48   -72  297.6   22 18 0.6     glass none 60 0
-prop LabWindow1F4     80   -72  297.6   22 18 0.6     glass none 60 0
-prop LabWindow2F1    -80   -26  297.6   22 18 0.6     glass none 60 0
-prop LabWindow2F2    -48   -26  297.6   22 18 0.6     glass none 60 0
-prop LabWindow2F3      0   -26  297.6   22 18 0.6     glass none 60 0
-prop LabWindow2F4     48   -26  297.6   22 18 0.6     windowLit windowLit 10 0 noshadow glow 70 1.4
-prop LabWindow2F5     80   -26  297.6   22 18 0.6     glass none 60 0
+prop LabWindow1F1    -80.823   -71.045  297.6   22.095 18.614 0.6     glass none 60 0
+prop LabWindow1F2    -48.685   -71.045  297.6   22.095 18.614 0.6     glass none 60 0
+prop LabWindow1F3     47.729   -71.045  297.6   22.095 18.614 0.6     glass none 60 0
+prop LabWindow1F4     79.867   -71.045  297.6   22.095 18.614 0.6     glass none 60 0
+prop LabWindow2F1    -80.823   -23.476  297.6   22.095 18.614 0.6     glass none 60 0
+prop LabWindow2F2    -48.685   -23.476  297.6   22.095 18.614 0.6     glass none 60 0
+prop LabWindow2F3      -0.478   -23.476  297.6   22.095 18.614 0.6     glass none 60 0
+prop LabWindow2F4     47.729   -23.476  297.6   22.095 18.614 0.6     windowLit windowLit 10 0 noshadow glow 70 1.4
+prop LabWindow2F5     79.867   -23.476  297.6   22.095 18.614 0.6     glass none 60 0
 # 屋上のアンテナと、先の赤い灯り
 prop LabAntennaMast   70    36  360     3 66 3        darkMetal none 20 1 model pipe_pole
 prop LabAntennaBar1   70    50  360     24 1.5 1.5    darkMetal none 20 0 model pipe_pole
 prop LabAntennaBar2   70    60  360     16 1.5 1.5    darkMetal none 20 0 model pipe_pole
 prop LabAntennaLamp   70  70.6  360     2.6 3.2 2.6   lampRedBody lampRed 24 0 noshadow glow 60 1.5 model safe_bulb
 # 研究所の手前の門柱
-prop LabGatePostLeft  -45  -81  228     10 38 10      darkMetal none 8 1 model column
-prop LabGatePostRight  44.652  -69.207  228     9.303 61.587 10      darkMetal none 8 1 model column
-prop LabGatePostRight_1  44.652  -69.207  228     9.303 61.587 10      darkMetal none 8 1 model column
+prop LabGatePostLeft  -45.2  -70.6  228     10 62.958 10      darkMetal none 8 1 model column
+prop LabGatePostRight_1  44.652  -72.1  227.5     9.303 61.587 10      darkMetal none 8 1 model column
 
 # --- 小道の途中の古い街灯（水たまりに映る、森の中でただ1つの灯り）
 prop PathLampPole    -42   -64  -60     3 72 3        darkMetal none 20 1 model pipe_pole
 prop PathLampPole_2    55.3   -64.8  -121.1     3 72 3        darkMetal none 20 1 model pipe_pole
 prop PathLampPole_1    70.2   -64  53.5     3 72 3        darkMetal none 20 1 model pipe_pole
+prop PathLampPole_1_1    -40.9   -64  125.1     3 72 3        darkMetal none 20 1 model pipe_pole
 prop PathLampArm     -35   -29  -60     14 1.5 1.5    darkMetal none 20 0 model pipe_pole
-prop PathLampArm_1     47.95   -29  -120.95     14 1.5 1.5    darkMetal none 20 0 model pipe_pole
-prop PathLampBulb    -29  -31.6 -60     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 110 2.2 model safe_bulb
-prop PathLampBulb_1    41.76  -30.46 -121.5     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 110 2.2 model safe_bulb
+prop PathLampArm_1     47.95   -29.87  -121.12     14 1.5 1.5    darkMetal none 20 0 model pipe_pole
+prop PathLampBulb    -29  -30.92 -60     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 110 2.2 model safe_bulb
+prop PathLampBulb_1_2    57.4  -30.72 53.55     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 110 2.2 model safe_bulb
+prop PathLampBulb_2    -28.46  -31.19 124.92     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 110 2.2 model safe_bulb
+prop PathLampBulb_1    41.76  -31.49 -121.13     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 110 2.2 model safe_bulb
 
 # --- 木（小道から離して並べている。小道の中心は x = 28 × sin(z / 115)）
 prop ForestTree1    -167.9  -31.2    14.8   6.9 137.7 6.9   bark none 6 1 model forest_tree_dead
@@ -148,8 +150,8 @@ prop ForestRock4     -69.9  -97.9  -231.7   11.1 7.2 9.5   rockColor none 6 1 mo
 prop ForestRock5        44  -96.6   -59.6   15.3 9.8 13.1   rockColor none 6 1 model forest_rock
 prop ForestRock6     102.3  -96.5    69.5   15.5 10 13.3   rockColor none 6 1 model forest_rock
 prop ForestRock7     -94.8  -98.4     -47   9.5 6.1 8.2   rockColor none 6 1 model forest_rock
-prop ForestRock8     -34.4  -97.3    47.1   13 8.4 11.2   rockColor none 6 1 model forest_rock
-prop ForestRock9     -52.5  -95.9     6.6   17.4 11.2 14.9   rockColor none 6 1 model forest_rock
+prop ForestRock8     -96.1  -97.3    47.1   13 8.4 11.2   rockColor none 6 1 model forest_rock
+prop ForestRock9     -74.2  -95.9     6.6   17.4 11.2 14.9   rockColor none 6 1 model forest_rock
 prop ForestRock10    -58.9  -97.8    98.2   11.4 7.3 9.8   rockColor none 6 1 model forest_rock
 prop ForestRock11    -67.8  -95.4    31.8   19.1 12.3 16.4   rockColor none 6 1 model forest_rock
 prop ForestRock12     95.9  -98.5   146.3   9.3 6 7.9   rockColor none 6 1 model forest_rock
@@ -157,8 +159,8 @@ prop ForestRock13    -53.8  -98.3    67.6   10 6.5 8.6   rockColor none 6 1 mode
 prop ForestRock14     65.3  -96.5  -458.1   15.5 10 13.3   rockColor none 6 1 model forest_rock
 prop ForestLog1      75.9  -96.5   170.2   64.8 7 7   bark none 6 1 model forest_fallen_log
 prop ForestLog2     -74.1  -96.5  -285.6   7 7 45.4   bark none 6 1 model forest_fallen_log
-prop ForestLog3      35.4  -96.5    -0.2   7 7 66.8   bark none 6 1 model forest_fallen_log
-prop ForestLog4      17.3  -96.5  -206.7   51.4 7 7   bark none 6 1 model forest_fallen_log
+prop ForestLog3      54.8  -96.5    -0.2   7 7 66.8   bark none 6 1 model forest_fallen_log
+prop ForestLog4      59.1  -96.5  -206.7   51.4 7 7   bark none 6 1 model forest_fallen_log
 prop ForestLog5      82.2  -96.5    -435   46.3 7 7   bark none 6 1 model forest_fallen_log
 prop ForestLog6     -55.1  -96.5   141.3   7 7 62.6   bark none 6 1 model forest_fallen_log
 prop ForestBrush1    -154.5  -95.1  -276.4   16.3 9.8 16.3   bark none 6 0 model forest_brush

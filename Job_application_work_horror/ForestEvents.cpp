@@ -1,5 +1,5 @@
 // ============================================================================
-// ファイルの役割: 外の森（試作）の灯りの演出（説明は ForestEvents.h を参照）。
+// ファイルの役割: 外の森の灯りの演出（説明は ForestEvents.h を参照）。
 // ============================================================================
 
 #include "ForestEvents.h"
@@ -181,12 +181,12 @@ float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const
         m_WalkerPosition = m_WalkerStart + along * progress + side * (std::sin(progress * 9.0f) * 4.0f);
         // 歩き始めと終わりは、押す力を弱めている（急に草が倒れ始めないように）
         m_WalkerStrength = std::clamp(progress * 8.0f, 0.0f, 1.0f) * std::clamp((1.0f - progress) * 8.0f, 0.0f, 1.0f);
-        // 重い足音（足音を低くして使っている）を、その足元から鳴らしている
+        // 重い足音（濡れた道の足音を低くして使っている）を、その足元から鳴らしている
         m_NextWalkerStep -= deltaTime;
         if (m_NextWalkerStep <= 0.0f)
         {
             m_NextWalkerStep += WalkerStepInterval;
-            game->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, Vector3(m_WalkerPosition.x, playerPosition.y, m_WalkerPosition.y), 0.62f, 1.0f);
+            game->PlayAudioCueAt(SOUND_CUE_FOREST_STEP, Vector3(m_WalkerPosition.x, playerPosition.y, m_WalkerPosition.y), 0.70f, 1.0f);
         }
         walkerFear = 0.30f * m_WalkerStrength;
     }

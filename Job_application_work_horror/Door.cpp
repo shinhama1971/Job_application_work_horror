@@ -159,7 +159,7 @@ void Door::Interact(Player& player)
     // 鍵がかかっている：ガタッという音と小さな揺れ・画面の脈動・振動で、開かないことを伝えている
     if (m_IsLocked)
     {
-        Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_DOOR, m_Position);
+        Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_DOOR_LOCKED, m_Position);
         m_LockedRattleTimer = 0.28f;
         Core::Game::GetInstance()->GetPostProcess()->TriggerHorrorPulse(
             0.10f,

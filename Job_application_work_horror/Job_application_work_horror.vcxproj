@@ -282,6 +282,11 @@
     <ClCompile Include="ForestGrass.cpp" />
     <ClCompile Include="SkyBackdrop.cpp" />
     <ClCompile Include="ForestEvents.cpp" />
+    <ClCompile Include="ForestBackdrop.cpp" />
+    <ClCompile Include="IntroScene.cpp" />
+    <ClCompile Include="ForestRain.cpp" />
+    <ClCompile Include="ForestRadio.cpp" />
+    <ClCompile Include="LabEntrance.cpp" />
     <ClCompile Include="Stage2Layout.cpp" />
     <ClCompile Include="Stage2Objective.cpp" />
     <ClCompile Include="Stage2ScenePuzzles.cpp" />
@@ -416,6 +421,12 @@
     <ClInclude Include="ForestGrass.h" />
     <ClInclude Include="SkyBackdrop.h" />
     <ClInclude Include="ForestEvents.h" />
+    <ClInclude Include="ForestBackdrop.h" />
+    <ClInclude Include="IntroScene.h" />
+    <ClInclude Include="ForestRain.h" />
+    <ClInclude Include="ForestRadio.h" />
+    <ClInclude Include="LabEntrance.h" />
+    <ClInclude Include="StoryText.h" />
     <ClInclude Include="Stage2Layout.h" />
     <ClInclude Include="Stage2Objective.h" />
     <ClInclude Include="Stage2AnomalyPlan.h" />
@@ -616,5 +627,7 @@
     <None Include="shader\grassPS.hlsl" />
     <None Include="shader\skyBackdropVS.hlsl" />
     <None Include="shader\skyBackdropPS.hlsl" />
+    <None Include="shader\rainVS.hlsl" />
+    <None Include="shader\rainPS.hlsl" />
   </ItemGroup>
 </Project>

@@ -301,12 +301,12 @@ void Stage1WestWing::Update(const Player& player, float deltaTime,
         const float angle = RandomRange(0.0f, 6.2831853f);
         const float distance = RandomRange(10.0f, 38.0f);
         AmbientSoundCue drip;
-        drip.Label = SOUND_CUE_WATER_STEP;
+        drip.Label = SOUND_CUE_WATER_DROP;
         drip.Position = Vector3(
             (std::clamp)(position.x + std::cos(angle) * distance, MinX, MaxX),
             -60.0f,
             (std::clamp)(position.z + std::sin(angle) * distance, MinZ, MaxZ));
-        drip.Pitch = RandomRange(1.25f, 1.35f);
+        drip.Pitch = RandomRange(0.92f, 1.08f);
         drip.Volume = RandomRange(0.18f, 0.32f);
         cues.push_back(drip);
     }
@@ -393,18 +393,23 @@ bool Stage1WestWing::UpdateWaterLevel(float deltaTime, std::vector<AmbientSoundC
         m_WaterEdgeZ = (std::min)(target, m_WaterEdgeZ + WaterDrainSpeed * deltaTime);
         ApplyFloodRegion();
 
-        // 引いていく水の端のどこかで、ごぼごぼと低い水音を鳴らしている
+        // 水が引き始めたら、排水口から水が抜けていく音（約12秒）を鳴らしている。1つのバルブで水が引く長さとほぼ同じ
         m_GurgleTimer -= deltaTime;
         if (m_GurgleTimer <= 0.0f)
         {
-            m_GurgleTimer = RandomRange(0.55f, 0.95f);
+            m_GurgleTimer = 12.5f;
             AmbientSoundCue gurgle;
-            gurgle.Label = SOUND_CUE_WATER_STEP;
-            gurgle.Position = Vector3(RandomRange(MinX + 10.0f, MaxX - 10.0f), -99.5f, m_WaterEdgeZ);
-            gurgle.Pitch = RandomRange(0.55f, 0.72f);
-            gurgle.Volume = RandomRange(0.30f, 0.45f);
+            gurgle.Label = SOUND_CUE_DRAIN;
+            gurgle.Position = DrainPosition;
+            gurgle.Pitch = 1.0f;
+            gurgle.Volume = 0.85f;
             cues.push_back(gurgle);
         }
+    }
+    else
+    {
+        // 水が止まったら、次のバルブを回したときにすぐ鳴るよう、間隔を戻している
+        m_GurgleTimer = 0.0f;
     }
     return m_WaterEdgeZ >= MaxZ;
 }

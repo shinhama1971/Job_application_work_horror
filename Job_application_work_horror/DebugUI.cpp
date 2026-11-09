@@ -295,8 +295,8 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         ImGui::Text("Reflection probe objects: %u drawn", g_ReflectionDrawn);
         ImGui::Separator();
 
-        // 外の森（試作）を開く（タイトルで選ぶか、--forest で起動しても開ける）
-        if (game != nullptr && ImGui::Button("外の森（試作）を開く"))
+        // 外の森を開く（タイトルで選ぶか、--forest で起動しても開ける）
+        if (game != nullptr && ImGui::Button("外の森を開く"))
         {
             game->RequestSceneChange(SceneName::Forest);
         }

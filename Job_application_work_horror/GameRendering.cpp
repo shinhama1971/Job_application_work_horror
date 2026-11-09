@@ -323,7 +323,8 @@ namespace Core
             m_Instance->m_CurrentScene == SceneName::Stage ||
             m_Instance->m_CurrentScene == SceneName::Stage2 ||
             m_Instance->m_CurrentScene == SceneName::Forest ||
-            m_Instance->m_CurrentScene == SceneName::Title;
+            m_Instance->m_CurrentScene == SceneName::Title ||
+            m_Instance->m_CurrentScene == SceneName::Intro;
         if (reflectionMethod != 1)
         {
             m_Instance->m_ReflectionProbe.Invalidate();

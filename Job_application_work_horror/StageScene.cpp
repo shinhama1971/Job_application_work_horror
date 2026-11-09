@@ -358,7 +358,7 @@ void StageScene::UpdateCeilingReflection(const Player& player, float deltaTime)
         {
             ground->AddRippleImpulse(below, 2.0f, -1.5f);
         }
-        game->PlayAudioCueAt(SOUND_CUE_WATER_STEP, below, 1.35f, 0.70f);
+        game->PlayAudioCueAt(SOUND_CUE_WATER_DROP, below, 0.95f, 0.80f);
         game->GetPostProcess()->TriggerHorrorPulse(0.26f, 0.36f);
         Input::SetVibration(5, 0.14f);
     }

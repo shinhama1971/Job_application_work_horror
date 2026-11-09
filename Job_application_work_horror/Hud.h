@@ -28,7 +28,7 @@ public:
         int fuseCount,
         std::string_view interactionPrompt,
         std::string_view objectiveText);
-    // タイトル画面を描いている（ベスト記録があれば表示し、selectedStage（0 = 1面、1 = 2面、2 = 外の森（試作））の面を選んだ形で描いている。noise（0〜1）で題名の文字を電波が乱れたように崩している）
+    // タイトル画面を描いている（ベスト記録があれば表示し、selectedStage（0 = 1面（森から）、1 = 2面、2 = 1面（森を飛ばす））の面を選んだ形で描いている。noise（0〜1）で題名の文字を電波が乱れたように崩している）
     void DrawTitle(
         float time,
         bool hasClearRecord,
@@ -36,6 +36,36 @@ public:
         int bestCaughtCount,
         int selectedStage,
         float noise);
+    // 1面の前の導入（IntroScene）で描く内容：受信記録の見出しと、タイプ途中の3行、「通信途絶」、目的の画面、電波の乱れ
+    struct IntroView
+    {
+        float Time = 0.0f;
+        float Noise = 0.0f;
+        std::string_view Header;
+        float HeaderAlpha = 0.0f;
+        std::vector<std::string> Lines;
+        float LinesAlpha = 0.0f;
+        std::string_view SignalLost;
+        float SignalLostAlpha = 0.0f;
+        std::string_view MissionLead;
+        std::string_view MissionGoal;
+        float MissionAlpha = 0.0f;
+    };
+    // 1面の前の導入を、後ろの森の上に描いている（受信記録 → 目的と操作の画面）
+    void DrawIntro(const IntroView& view);
+    // 外の森を歩いている間の無線の字幕（ForestRadio）で描く内容：見出し、タイプ途中の1行、「通信途絶」、電波の乱れ
+    struct RadioView
+    {
+        float Time = 0.0f;
+        float Noise = 0.0f;
+        std::string_view Header;
+        std::string Line;
+        float LineAlpha = 0.0f;
+        std::string_view SignalLost;
+        float SignalLostAlpha = 0.0f;
+    };
+    // 無線の字幕を、画面の下の中央に描いている（何も流していなければ描かない）
+    void DrawRadio(const RadioView& view);
     // リザルト画面を描いている（revealAmountで項目を順に表示している）
     void DrawResult(
         float revealAmount,
@@ -127,7 +157,7 @@ public:
     // 右上の電池の通知と「記録」を、この高さだけ下げて描いている。
     // 2面の状態パネル（DrawStage2Status）が右上にあるとき、重ならないように使っている。
     void SetTopRightOffset(float offset) { m_TopRightOffset = offset; }
-    // 右上の「記録 0 / 4」を出すか（外の森（試作）は記録を置いていないので出さない）
+    // 右上の「記録 0 / 4」を出すか（外の森は記録を置いていないので出さない）
     void SetEvidenceVisible(bool visible) { m_EvidenceVisible = visible; }
     // 2面の右上に縦に並ぶ「状態パネル（高さ58）」と「危険ゲージ（高さ40）」に、すき間（8ずつ）を足した高さ。
     // 危険ゲージは出たり消えたりするため、出ていないときも場所を空けておき、下の表示が上下に動かないようにしている。

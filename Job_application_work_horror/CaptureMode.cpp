@@ -378,6 +378,7 @@ namespace
         case SceneName::Stage2: return "Stage2";
         case SceneName::Result: return "Result";
         case SceneName::Forest: return "Forest";
+        case SceneName::Intro: return "Intro";
         }
         return "?";
     }
@@ -401,7 +402,7 @@ namespace
         { 32.0f, Vector3(-28,FloorY,-85), 0.15f, -0.55f, L"feature_unseen_3", false },
         { 34.0f, Vector3(-28,FloorY,-85), 0.15f, -0.55f, nullptr, false },
     };
-    // 外の森（試作。--capture と --forest を一緒に付けたとき）：開始地点 → 小道の街灯 → 振り返って後ろの街灯が消えるのを見る → 前方の草むらを何かが横切る → 研究所が見えてくる所 → 研究所の正面
+    // 外の森（--capture と --forest を一緒に付けたとき）：開始地点 → 小道の街灯 → 振り返って後ろの街灯が消えるのを見る → 前方の草むらを何かが横切る → 研究所が見えてくる所 → 研究所の正面
     const std::vector<Keyframe> ForestTour = {
         { 0.0f, Vector3(0.0f, FloorY, -400.0f), 0.0f, 0.0f, nullptr, false },
         { 2.5f, Vector3(0.0f, FloorY, -398.0f), 0.0f, 0.0f, L"forest_01_開始地点", false },

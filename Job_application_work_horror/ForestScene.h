@@ -1,7 +1,8 @@
 // ============================================================================
-// ファイルの役割: 外の森（試作）の場面。南の小道から、森の奥に建つ2階建ての研究所まで歩ける。
+// ファイルの役割: 外の森の場面（1面の前）。南の小道から、雨の森を歩いて、森の奥に建つ2階建ての研究所に入る。
 // 主な技術: 配置ファイル（assets/layout/forest_props.txt）から木・岩・研究所・灯りを作る、Debug版の読み直し
-// タイトルで「外の森（試作）」を選んだとき、ゲームを --forest で起動したとき、デバッグ画面（F1）のボタンから開く。1面にはまだつながらない。
+// タイトルで「1面」を選んだとき、ゲームを --forest で起動したとき、デバッグ画面（F1）のボタンから開く。
+// 歩いている間に研究棟からの無線（ForestRadio）が届き、研究所の玄関（LabEntrance）を調べると、目的の画面（IntroScene）を挟んで1面が始まる。
 // 木や研究所の置き場所は、Unity のマップエディター（Map Layout → 森を読み込む）で動かして書き出せる。
 // 森の世界の作り方（BuildWorld）は、タイトル画面の後ろに映す森でも使っている。
 // ============================================================================
@@ -11,6 +12,8 @@
 #include "Scene.h"
 #include "Hud.h"
 #include "ForestEvents.h"
+#include "ForestRadio.h"
+#include "InteractionSystem.h"
 #include "PropLayoutFile.h"
 
 #include <string>
@@ -20,12 +23,16 @@ class Player;
 class ForestGrass;
 class Ground;
 class SceneLayoutBuilder;
+class LabEntrance;
 
 class ForestScene final : public Scene
 {
 public:
     // 森の配置ファイル
     static constexpr const char* PropLayoutPath = "assets/layout/forest_props.txt";
+    // 森に雨を降らせるか（雨粒・地面のしぶき・水たまりの雨の輪・雨音）。false にすると、雨のない夜の森になる。
+    // 雨の仕組み（ForestRain・Ground::AddRainRipples・雨音）はそのまま残しているので、true に戻せばまた降る
+    static constexpr bool RainEnabled = false;
     // ゲームを --forest で起動したか（タイトルの代わりに、森から始める）
     static bool IsRequestedByCommandLine();
 
@@ -49,7 +56,7 @@ public:
     ~ForestScene() override;
 
     void Update() override;
-    // 画面上部に、場面の名前と、配置を読み直したときの知らせを出している
+    // 目的・調べる操作・無線の字幕と、玄関から入るときの暗転を描いている
     void Draw(Camera* camera) override;
 
 private:
@@ -67,6 +74,13 @@ private:
     // 小道の街灯と研究所の灯りの演出と、前のフレームの恐怖の画面効果の強さ（強まった瞬間に心拍の脈を出すため）
     ForestEvents m_Events;
     float m_LastFear = 0.0f;
+    // 研究棟からの無線の字幕、調べる操作、研究所の玄関、玄関から入ってからの秒数（-1 ならまだ入っていない）と暗転の秒数
+    ForestRadio m_Radio;
+    InteractionSystem m_InteractionSystem;
+    LabEntrance* m_Entrance = nullptr;
+    float m_EnterTimer = -1.0f;
+    bool m_SceneChangeRequested = false;
+    static constexpr float EnterFadeSeconds = 1.4f;
     // 画面上部に出す知らせと、出す残り秒数
     std::string m_Notice;
     float m_NoticeTimer = 0.0f;

@@ -198,8 +198,13 @@ void Player::Update()
         const float alternatingPitch = (m_FootstepIndex % 2 == 0)
             ? (m_Movement.IsSprinting() ? 1.08f : 0.97f)
             : (m_Movement.IsSprinting() ? 1.14f : 1.03f);
+        // 外の森では、雨で濡れた道の足音（歩く・走るで別の音）にしている
+        const bool inForest = Core::Game::GetInstance()->GetCurrentSceneName() == SceneName::Forest;
+        const SOUND_LABEL dryStep = inForest
+            ? (m_Movement.IsSprinting() ? SOUND_CUE_FOREST_RUN : SOUND_CUE_FOREST_STEP)
+            : SOUND_CUE_FOOTSTEP;
         Core::Game::GetInstance()->PlayAudioCue(
-            wetStep ? SOUND_CUE_WATER_STEP : SOUND_CUE_FOOTSTEP,
+            wetStep ? SOUND_CUE_WATER_STEP : dryStep,
             wetStep ? alternatingPitch * 0.92f : alternatingPitch);
         // 足音の大きさ：水の中なら大きく、走ればさらに大きい（2面の影が反応する）
         m_SurfaceNoisePulse = wetStep
