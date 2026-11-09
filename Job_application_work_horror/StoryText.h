@@ -10,9 +10,9 @@
 
 namespace StoryText
 {
-    // 受信記録の見出しと、途切れ途切れに届く4行
+    // 受信記録の見出しと、途切れ途切れに届く3行
     inline constexpr const char* TransmissionHeader = "受信記録　——　第3研究棟";
-    inline constexpr const char* TransmissionLines[4] =
+    inline constexpr const char* TransmissionLines[3] =
     {
         "「……こちら第3研究棟を探索中。停電した。外との通信が出来ない。聞こえるならだれか応答をしてくれ。」",
         "「……廊下の様子が、おかしい。どれだけ進んでも同じ場所に戻ってくる」",

@@ -32,7 +32,7 @@ public:
 private:
     // 受信記録の時間の流れ（秒）
     static constexpr float HeaderTime = 0.6f;
-    static constexpr float LineStartTimes[4] = { 2.2f, 8.4f, 13.8f, 18.6f };
+    static constexpr float LineStartTimes[3] = { 2.2f, 8.4f, 13.8f };
     static constexpr float TypingCharactersPerSecond = 14.0f;
     static constexpr float SignalLostTime = 21.4f;
     static constexpr float MissionTime = 24.0f;

@@ -26,7 +26,7 @@ namespace
     using StoryText::MissionGoal;
     using StoryText::Utf8Prefix;
 
-    // 研究棟の正面へ、ゆっくり近づくカメラ（森の研究所。z = 140 を越えると、2階の窓の明かりが消える）
+    // 研究棠の正面へ、ゆっくり近づくカメラ（森の研究所。z = 140 を越えると、2階の窓の明かりが消える）
     const std::vector<ForestBackdrop::Shot> IntroShots =
     {
         { Vector3(0.0f, -99.0f, 95.0f), Vector3(0.0f, -99.0f, 165.0f), 0.0f, 0.0f, 0.03f, 0.07f, 45.0f },
@@ -177,3 +177,30 @@ void IntroScene::Draw(Camera* camera)
     view.MissionAlpha = m_ShowingMission ? Fade(m_MissionTimer, 0.0f, 0.5f) : 0.0f;
     m_Hud.DrawIntro(view);
 }
+
+namespace
+{
+    constexpr const wchar_t* IntroStoryText[] =
+    {
+        L"受信記録を確認。",
+        L"対象地点は森の中。",
+        L"玄関から建物へ入る。",
+        L"通信を終了する。"
+    };
+
+    static_assert(
+        std::size(IntroStoryText) == 4,
+        "StoryText must contain four lines");
+}
+
+static constexpr float LineStartTimes[4] =
+{
+    2.2f,
+    8.4f,
+    13.8f,
+    18.6f
+};
+
+static_assert(
+    std::size(LineStartTimes) == std::size(IntroStoryText),
+    "LineStartTimes must match StoryText");
