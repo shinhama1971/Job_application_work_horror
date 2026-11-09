@@ -113,6 +113,8 @@ struct StageObjects
     std::array<Door*, StageSealedDoorCount> sealedDoors{};
     // 懐中電灯で照らすと浮かぶ壁の文字（並びはStage1WallWritings::Index）
     Stage1WallWritings::Writings writings{};
+    // 配電盤の横の施設案内図。廊下を一周すると図の中の扉だけが消える。
+    FlashlightWriting* facilityMap = nullptr;
     // 突き当たりのドアを通って開始地点へ戻るたびに、開始地点の部屋に1つずつ浮かぶ文字（1周目・2周目・3周目）
     std::array<FlashlightWriting*, 3> lapWritings{};
     // 暗証番号の扉・入力盤・番号の手がかり（任意で探索）

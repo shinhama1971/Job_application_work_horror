@@ -89,6 +89,10 @@ Application
 各クラスは時間・フェーズのみを管理します（監視カメラ巡回の実行役 `StageSurveillanceController` を除く）。照明、振動、PostProcess、Objectへの命令は
 `StageScene` が行うため、演出対象の所有権をシーケンスへ渡しません。
 
+#### 施設案内図
+
+配電盤の横に、`stage1_props.txt` の `place Stage1FacilityMap` で印刷された案内図を置きます。`FlashlightWriting` の板と2枚の画像の切り替えを使い、印刷物だけは通常の照明・霧・深度で描きます。`AdvanceCorridorLoop` が最初の周回で扉の消えた画像に切り替えます。画像は `tools/generate-facility-map.ps1` から作り直せます。
+
 #### 録音と無線
 
 - `VoiceRecorder` は本体・スピーカー・ボタン・ランプを箱のメッシュで描き、ランプと小さな点光源を同じ明るさで変化させます。調べると赤の点滅から緑の点灯へ変わり、`TakePlayRequest` が一度だけ再生要求を返します。
@@ -384,6 +388,8 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
   線分判定で求めます。`Sound` は壁や扉の型を知らず、`std::function` で結果だけを受け取ります
 - 遮蔽された音は音量を下げ、ローパスフィルターで高音を削ってこもらせます。遠い音も少し高音を落とします
 - 追ってくる人影（`ShadowMan`）は、進んだ距離に合わせて自分の足元から足音を鳴らします
+- 雨漏りの `AddLeak` で作る水滴は、雨漏り1か所につき片方の水滴だけ、近くで着水した瞬間にその位置から音を鳴らします。西棟の環境音の水滴も同じ音源を使い、音量は `Stage1WestWing` で調整します。
+- プレイヤーの水音は、波紋と同じ足元の判定と `PlayerMovement::IsSprinting` で、歩き用・走り用の短い音を選びます。`WaterEffectSystem::IsInsidePuddle` は床のシェーダーと同じマス目・向き・岸のゆがみから、水面の濃さが半分以上の場所を水たまりとします。音源は `tools/generate-water-steps.ps1` で、BigSoundBank の実録から一歩ずつ切り出します。人影・見えない足跡は従来の水音を使い、2面の危険度に渡す歩きと走りの強さも従来どおりです。
 
 ## dynamic_castの方針
 

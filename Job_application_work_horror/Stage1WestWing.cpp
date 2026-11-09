@@ -307,7 +307,7 @@ void Stage1WestWing::Update(const Player& player, float deltaTime,
             -60.0f,
             (std::clamp)(position.z + std::sin(angle) * distance, MinZ, MaxZ));
         drip.Pitch = RandomRange(0.92f, 1.08f);
-        drip.Volume = RandomRange(0.18f, 0.32f);
+        drip.Volume = RandomRange(0.38f, 0.52f);
         cues.push_back(drip);
     }
 

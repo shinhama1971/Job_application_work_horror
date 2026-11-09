@@ -229,6 +229,7 @@ place Stage1WestWingLight2           -300 -50.5 100 size 24 2 11
 place Stage1WestWingLight3           -300 -50.5 220 size 20 2 9
 place Door                           0 -74 40
 place FuseBox                        -35.1 -73.4 35
+place Stage1FacilityMap              -69 -68 38 yaw 180 size 37 25 1
 place ExitPowerPanel                 151.99 -66.93 270
 place Stage1EmergencyCharger         -217.5 -90 -103.5 yaw 90
 place Stage1EvidenceTerminal         216.8 -79.5 -42 yaw -90

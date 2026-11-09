@@ -188,30 +188,36 @@ void Player::Update()
         footstepMovementThreshold * footstepMovementThreshold &&
         m_FootstepTimer <= 0.0f)
     {
-        // 足元が水の中なら水音、そうでなければ普通の足音を鳴らし、左右の足で音の高さを少し変えている
+        // 波紋と同じ判定で、足元が水の中なら歩き・走りそれぞれの水音を鳴らす。
+        const bool sprinting = m_Movement.IsSprinting();
         bool wetStep = m_WetSurfaceOverride;
         for (Ground* ground : Core::Game::GetInstance()->GetObjects<Ground>())
         {
             wetStep = ground->TriggerFootstepRipple(
-                m_Position, m_Movement.IsSprinting()) || wetStep;
+                m_Position, sprinting) || wetStep;
         }
         const float alternatingPitch = (m_FootstepIndex % 2 == 0)
-            ? (m_Movement.IsSprinting() ? 1.08f : 0.97f)
-            : (m_Movement.IsSprinting() ? 1.14f : 1.03f);
+            ? (sprinting ? 1.08f : 0.97f)
+            : (sprinting ? 1.14f : 1.03f);
         // 外の森では、雨で濡れた道の足音（歩く・走るで別の音）にしている
         const bool inForest = Core::Game::GetInstance()->GetCurrentSceneName() == SceneName::Forest;
-        const SOUND_LABEL dryStep = inForest
-            ? (m_Movement.IsSprinting() ? SOUND_CUE_FOREST_RUN : SOUND_CUE_FOREST_STEP)
-            : SOUND_CUE_FOOTSTEP;
+        SOUND_LABEL step = SOUND_CUE_FOOTSTEP;
+        if (wetStep)
+        {
+            step = sprinting ? SOUND_CUE_WATER_RUN : SOUND_CUE_WATER_WALK;
+        }
+        else if (inForest)
+        {
+            step = sprinting ? SOUND_CUE_FOREST_RUN : SOUND_CUE_FOREST_STEP;
+        }
         Core::Game::GetInstance()->PlayAudioCue(
-            wetStep ? SOUND_CUE_WATER_STEP : dryStep,
-            wetStep ? alternatingPitch * 0.92f : alternatingPitch);
+            step, wetStep ? alternatingPitch * 0.92f : alternatingPitch);
         // 足音の大きさ：水の中なら大きく、走ればさらに大きい（2面の影が反応する）
         m_SurfaceNoisePulse = wetStep
-            ? (m_Movement.IsSprinting() ? 1.0f : 0.62f)
-            : (m_Movement.IsSprinting() ? 0.32f : 0.0f);
+            ? (sprinting ? 1.0f : 0.62f)
+            : (sprinting ? 0.32f : 0.0f);
         ++m_FootstepIndex;
-        m_FootstepTimer = m_Movement.IsSprinting() ? 0.31f : 0.46f;
+        m_FootstepTimer = sprinting ? 0.31f : 0.46f;
     }
     m_WetSurfaceOverride = false;
 

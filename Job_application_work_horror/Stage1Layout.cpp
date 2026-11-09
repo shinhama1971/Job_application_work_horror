@@ -439,6 +439,11 @@ namespace Stage1Layout
             });
             return writing;
         };
+        objects.facilityMap = createWriting(
+            "Stage1FacilityMap", "assets/texture/stage1_facility_map.png",
+            "assets/texture/stage1_facility_map_loop.png");
+        objects.facilityMap->SetPrintedSurface();
+        objects.facilityMap->SetInkColor(Color(1.0f, 1.0f, 1.0f, 1.0f));
         objects.writings[Stage1WallWritings::Warning] = createWriting(
             "Stage1WritingWarning", "assets/texture/writing_warning.png", "");
         objects.writings[Stage1WallWritings::Three] = createWriting(

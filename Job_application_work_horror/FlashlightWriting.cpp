@@ -63,6 +63,12 @@ void FlashlightWriting::SetTextures(const std::string& primaryPath, const std::s
     m_ShowingAlternate = false;
 }
 
+void FlashlightWriting::SetPrintedSurface()
+{
+    m_PrintedSurface = true;
+    m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+}
+
 // 壁の表面に合わせて、位置・向き・大きさを決めている（法線は水平にそろえている）
 void FlashlightWriting::Place(
     const Vector3& surfaceCenter,
@@ -79,7 +85,7 @@ void FlashlightWriting::Place(
     m_Scale = Vector3(width, height, 1.0f);
 }
 
-// 書き換え後の文字に切り替え、濃さを0から目標まで戻すことで、じわりと現している
+// 書き換え後の画像に切り替える。浮かび上がる文字だけ濃さを0から戻す。
 void FlashlightWriting::ShowAlternate()
 {
     if (!m_HasAlternate || m_ShowingAlternate)
@@ -87,7 +93,10 @@ void FlashlightWriting::ShowAlternate()
         return;
     }
     m_ShowingAlternate = true;
-    m_Presence = 0.0f;
+    if (!m_PrintedSurface)
+    {
+        m_Presence = 0.0f;
+    }
 }
 
 // 濃さを1秒あたり一定の量で、目標の濃さへ近づけている
@@ -117,7 +126,8 @@ void FlashlightWriting::Draw(Camera* cam)
 
     MATERIAL material{};
     material.Diffuse = Color(m_InkColor.R(), m_InkColor.G(), m_InkColor.B(), m_Presence);
-    material.Emission = Color(m_Time, 0.0f, 0.0f, 0.0f);
+    material.Emission = Color(m_PrintedSurface ? 0.0f : m_Time, 0.0f, 0.0f, 0.0f);
+    material.Roughness = 0.85f;
     material.TextureEnable = TRUE;
     m_Material->SetMaterial(material);
 
@@ -133,6 +143,12 @@ void FlashlightWriting::Draw(Camera* cam)
     else
     {
         m_Texture.SetGPU();
+    }
+
+    if (m_PrintedSurface)
+    {
+        context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
+        return;
     }
 
     // 壁の上に重ねる半透明の文字なので、深度は書かずにアルファブレンドで合成している。

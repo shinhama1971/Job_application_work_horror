@@ -13,16 +13,37 @@
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+	// fastNoise.hlsli と同じ式で、足元でも水面の岸のゆがみを求める。
+	float PuddleEdgeNoise(const Vector2& position)
+	{
+		const auto fraction = [](float value) { return value - std::floor(value); };
+		const auto hash = [&fraction](const Vector2& cell)
+		{
+			Vector3 p(fraction(cell.x * 0.1031f), fraction(cell.y * 0.1031f), fraction(cell.x * 0.1031f));
+			const float shift = p.Dot(Vector3(p.y, p.z, p.x) + Vector3(33.33f, 33.33f, 33.33f));
+			p += Vector3(shift, shift, shift);
+			return fraction((p.x + p.y) * p.z);
+		};
+		const Vector2 cell(std::floor(position.x), std::floor(position.y));
+		const Vector2 fractionInCell = position - cell;
+		const float x = fractionInCell.x * fractionInCell.x * (3.0f - 2.0f * fractionInCell.x);
+		const float y = fractionInCell.y * fractionInCell.y * (3.0f - 2.0f * fractionInCell.y);
+		return std::lerp(
+			std::lerp(hash(cell), hash(cell + Vector2(1.0f, 0.0f)), x),
+			std::lerp(hash(cell + Vector2(0.0f, 1.0f)), hash(cell + Vector2(1.0f, 1.0f)), x), y);
+	}
+}
+
 // 水滴と波紋の形・マテリアルを作り、シェーダーと同じ計算で水たまりの位置を求め、水滴を落とす場所を決めている
 void WaterEffectSystem::Init()
 {
 	m_FallingDrops.clear();
 	m_Leaks.clear();
-	m_PuddleCenters.clear();
 	m_DropVertices.clear();
 	m_RippleVertices.clear();
 	m_FallingDrops.reserve(24);
-	m_PuddleCenters.reserve(40);
 	m_FootstepRipples.reserve(8);
 
 	// 先が細い板を十字に組み、どの角度から見ても小さな水滴に見える形にしている。
@@ -119,13 +140,10 @@ void WaterEffectSystem::Init()
 	BuildPuddles(PuddleLayout{});
 }
 
-// 水たまりの表（シェーダーへ渡す）と、足元の判定に使う中心・楕円、水滴を落とす場所を、置き方に合わせて作っている
+// 足元の判定とシェーダーで共有する水たまりの表、水滴を落とす場所を作る。
 void WaterEffectSystem::BuildPuddles(const PuddleLayout& layout)
 {
 	m_FallingDrops.clear();
-	m_PuddleCenters.clear();
-	m_PuddleRadii.clear();
-	m_PuddleAngles.clear();
 	m_PuddleCellData = PuddleCellBufferData{};
 	m_PuddleCellData.GridOffset = Vector4(layout.GridOffset.x, layout.GridOffset.y, 0.0f, 0.0f);
 
@@ -155,18 +173,15 @@ void WaterEffectSystem::BuildPuddles(const PuddleLayout& layout)
 		float DistanceSquared;
 	};
 
-	// 水たまりを1つ足している（中心はシェーダーと同じ式。radiiとangleは足元の判定に使う楕円の半径と向き）
+	// 描画する水滴の候補を1つ足している。中心はシェーダーと同じ式で求める。
 	constexpr float cellSize = 82.0f;
 	std::vector<DropCandidate> candidates;
-	const auto addPuddle = [&](int cellX, int cellZ, const Vector2& randomValue, const Vector2& radii, float angle)
+	const auto addPuddle = [&](int cellX, int cellZ, const Vector2& randomValue)
 	{
 		const Vector2 puddleCenter =
 			(Vector2(static_cast<float>(cellX), static_cast<float>(cellZ)) +
 			 Vector2(0.5f, 0.5f) +
 			 (randomValue - Vector2(0.5f, 0.5f)) * 0.22f) * cellSize - layout.GridOffset;
-		m_PuddleCenters.push_back(puddleCenter);
-		m_PuddleRadii.push_back(radii);
-		m_PuddleAngles.push_back(angle);
 		// 遊ぶ範囲はZの正の方へ少し寄っているため、候補をその中心からの距離順に並べている。
 		// 限られた数の水滴が、マップの端のマスだけで埋まらないようにしている。
 		const Vector2 fromGameplayCenter =
@@ -196,8 +211,7 @@ void WaterEffectSystem::BuildPuddles(const PuddleLayout& layout)
 			}
 		}
 
-		// 床を82x82のマスに分け、乱数がしきい値を超えたマスにだけ水たまりを置いている（上の表と同じ判定）。
-		// 足元の判定は、どの水たまりも横24・縦17の楕円として扱っている
+		// 水滴はプレイヤーが通る範囲の水たまりから選ぶ。
 		for (int cellZ = -4; cellZ <= 4; ++cellZ)
 		{
 			for (int cellX = -4; cellX <= 4; ++cellX)
@@ -212,13 +226,13 @@ void WaterEffectSystem::BuildPuddles(const PuddleLayout& layout)
 				const Vector2 randomValue = hash22(
 					static_cast<float>(cellX),
 					static_cast<float>(cellZ));
-				addPuddle(cellX, cellZ, randomValue, Vector2(24.0f, 17.0f), 0.0f);
+				addPuddle(cellX, cellZ, randomValue);
 			}
 		}
 	}
 	else
 	{
-		// 決まったマス目にだけ水たまりを置いている（2面）。足元の判定は、シェーダーの楕円と同じ半径と向きにしている
+		// 決まったマス目にだけ水たまりを置いている（2面）。
 		for (const Vector4& cell : layout.Cells)
 		{
 			const int cellX = static_cast<int>(cell.x);
@@ -232,9 +246,7 @@ void WaterEffectSystem::BuildPuddles(const PuddleLayout& layout)
 			const Vector2 randomValue(cell.z, cell.w);
 			m_PuddleCellData.Cells[row * PuddleCellCount + column] =
 				Vector4(1.0f, randomValue.x, randomValue.y, 0.0f);
-			// puddleMask.hlsli の楕円（軸の長さ）と、縁の濃さが半分になる距離（0.37）から半径を求めている
-			const Vector2 axes(0.72f + randomValue.x * 0.25f, 0.43f + randomValue.y * 0.20f);
-			addPuddle(cellX, cellZ, randomValue, axes * (0.37f * cellSize), randomValue.x * DirectX::XM_2PI);
+			addPuddle(cellX, cellZ, randomValue);
 		}
 	}
 
@@ -277,6 +289,8 @@ void WaterEffectSystem::BuildPuddles(const PuddleLayout& layout)
 // 水滴を落とし、床に着いたら着水の時間を始め、少し待ってからまた上から落としている
 void WaterEffectSystem::UpdateFallingDrops(float deltaTime)
 {
+	Core::Game* game = Core::Game::GetInstance();
+	const Vector3 listener = game->GetCamera()->GetPosition();
 	for (FallingDrop& drop : m_FallingDrops)
 	{
 		drop.ImpactTimer = (std::max)(0.0f, drop.ImpactTimer - deltaTime);
@@ -301,6 +315,10 @@ void WaterEffectSystem::UpdateFallingDrops(float deltaTime)
 			if (IsInsidePuddle(drop.Position))
 			{
 				m_RippleImpulses.emplace_back(drop.Position.x, drop.Position.z, 0.8f, -0.45f);
+				if (drop.Audible && Vector3::DistanceSquared(listener, drop.Position) <= 115.0f * 115.0f)
+				{
+					game->PlayAudioCueAt(SOUND_CUE_WATER_DROP, drop.Position, 0.94f + drop.Seed * 0.12f, 0.75f);
+				}
 			}
 			drop.ImpactTimer = 0.55f;
 			drop.WaitTimer = 0.65f + drop.Seed * 1.9f;
@@ -315,29 +333,48 @@ bool WaterEffectSystem::IsInsidePuddle(const Vector3& position) const
 	{
 		return true;
 	}
+	const Vector2 world(position.x, position.z);
 	for (const Leak& leak : m_Leaks)
 	{
-		const Vector2 offset(position.x - leak.Center.x, position.z - leak.Center.y);
-		if (offset.Length() <= leak.Radius * 0.85f)
+		const float distance = (world - leak.Center).Length();
+		if (distance <= leak.Radius * 1.075f &&
+			distance / (std::max)(leak.Radius, 0.01f) +
+				(PuddleEdgeNoise(world * 0.35f + leak.Center) - 0.5f) * 0.35f <= 0.90f)
 		{
 			return true;
 		}
 	}
-	for (size_t index = 0; index < m_PuddleCenters.size(); ++index)
+	// puddleMask.hlsli と同じ表、向き、岸のゆがみで、水面の濃さが半分以上の場所を水たまりとする。
+	const Vector2 grid = (world + Vector2(m_PuddleCellData.GridOffset.x, m_PuddleCellData.GridOffset.y)) / 82.0f;
+	const Vector2 cell(std::floor(grid.x), std::floor(grid.y));
+	const int column = static_cast<int>(cell.x) - PuddleCellMin;
+	const int row = static_cast<int>(cell.y) - PuddleCellMin;
+	if (column < 0 || row < 0 || column >= PuddleCellCount || row >= PuddleCellCount)
 	{
-		const float offsetX = position.x - m_PuddleCenters[index].x;
-		const float offsetZ = position.z - m_PuddleCenters[index].y;
-		// 水たまりを、シェーダーと同じ向きに回した楕円として判定している
-		const float cosine = std::cos(m_PuddleAngles[index]);
-		const float sine = std::sin(m_PuddleAngles[index]);
-		const float rotatedX = (offsetX * cosine - offsetZ * sine) / m_PuddleRadii[index].x;
-		const float rotatedZ = (offsetX * sine + offsetZ * cosine) / m_PuddleRadii[index].y;
-		if (rotatedX * rotatedX + rotatedZ * rotatedZ <= 1.0f)
-		{
-			return true;
-		}
+		return false;
 	}
-	return false;
+	const Vector4& entry = m_PuddleCellData.Cells[row * PuddleCellCount + column];
+	if (entry.x < 0.5f)
+	{
+		return false;
+	}
+	const Vector2 local = grid - cell - Vector2(0.5f, 0.5f) - Vector2(entry.y - 0.5f, entry.z - 0.5f) * 0.22f;
+	const float angle = entry.y * DirectX::XM_2PI;
+	const float cosine = std::cos(angle);
+	const float sine = std::sin(angle);
+	const Vector2 rotated(local.x * cosine - local.y * sine, local.x * sine + local.y * cosine);
+	const Vector2 normalized(rotated.x / (0.72f + entry.y * 0.25f), rotated.y / (0.43f + entry.z * 0.20f));
+	const float radius = normalized.Length();
+	// 岸のノイズと波形の振れ幅の上限を使い、岸から離れたところではノイズを計算しない。
+	if (std::abs(radius - 0.37f) > 0.177f)
+	{
+		return radius < 0.37f;
+	}
+	const float polar = std::atan2(rotated.y, rotated.x);
+	const float edgeWarp = (PuddleEdgeNoise(world * 0.052f + cell * 1.73f) - 0.5f) * 0.22f +
+		std::sin(polar * 5.0f + entry.y * 9.0f) * 0.045f +
+		std::sin(polar * 9.0f + entry.z * 13.0f) * 0.022f;
+	return radius + edgeWarp <= 0.37f;
 }
 
 // 足音の波紋を古くし、消える時間を過ぎたものを取り除いている
@@ -366,9 +403,10 @@ bool WaterEffectSystem::TriggerFootstepRipple(
 	const Vector3& playerPosition,
 	bool sprinting)
 {
-	if (m_FootstepRippleCooldown > 0.0f || !IsInsidePuddle(playerPosition))
+	const bool wet = IsInsidePuddle(playerPosition);
+	if (m_FootstepRippleCooldown > 0.0f || !wet)
 	{
-		return IsInsidePuddle(playerPosition);
+		return wet;
 	}
 
 	WaterRipple ripple{};
@@ -568,9 +606,6 @@ void WaterEffectSystem::Draw(Camera* camera)
 void WaterEffectSystem::Uninit()
 {
 	m_FallingDrops.clear();
-	m_PuddleCenters.clear();
-	m_PuddleRadii.clear();
-	m_PuddleAngles.clear();
 	m_DropVertices.clear();
 	m_DropMaterial.reset();
 	m_RippleVertices.clear();
@@ -606,7 +641,7 @@ bool Ground::IsInsidePuddle(const Vector3& position) const
 }
 
 // 見えている水面（BuildPuddleSurfaces と同じ楕円）から margin 以内かを返している。
-// 足元の判定（IsInsidePuddle）の楕円は水面より小さいので、草を生やさない場所など、見た目に合わせたいときはこちらを使う。
+// 岸のノイズまで求める足元の判定と違い、草が水面に重ならないよう、メッシュ全体を覆う楕円を使う。
 // 楕円の中心はマス目の中心から少しずれ、半径もマスの6割ほどあるため、まわりの3×3マスを調べている
 bool Ground::IsNearVisiblePuddle(const Vector3& position, float margin) const
 {
@@ -683,6 +718,7 @@ void WaterEffectSystem::AddLeakDrops(const Leak& leak)
 		drop.Speed = 24.0f + drop.Seed * 6.0f;
 		drop.WaitTimer = 0.3f + index * 0.9f;
 		drop.Active = false;
+		drop.Audible = index == 0;
 		m_FallingDrops.push_back(drop);
 	}
 }

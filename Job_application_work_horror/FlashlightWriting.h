@@ -26,8 +26,11 @@ public:
     void Update() override;
     void Draw(Camera* cam) override;
     void Uninit() override;
-    // 懐中電灯の光で見えるものなので、監視カメラの映像には映していない。
-    bool DrawsInAuxiliaryView() const override { return false; }
+    // 浮かび上がる文字は監視映像に映さない。印刷物は普通の小物と同じように映す。
+    bool DrawsInAuxiliaryView() const override { return m_PrintedSurface; }
+
+    // 板を、周囲の照明や懐中電灯で照らせる印刷物として描く。
+    void SetPrintedSurface();
 
     // 文字の画像を読み込んでいる。alternatePathを指定すると、ShowAlternateで書き換えられるようになる。
     void SetTextures(const std::string& primaryPath, const std::string& alternatePath = "");
@@ -43,7 +46,7 @@ public:
     // 文字のインクの色を決めている
     void SetInkColor(const DirectX::SimpleMath::Color& color) { m_InkColor = color; }
 
-    // 文字を書き換えている。いったん消してから、じわりと現している。
+    // 別の画像に替える。浮かび上がる文字はじわりと現れ、印刷物はその場で切り替わる。
     void ShowAlternate();
     // 書き換えた後の文字を表示しているか
     bool IsShowingAlternate() const { return m_ShowingAlternate; }
@@ -80,6 +83,7 @@ private:
     Texture m_AlternateTexture;
     bool m_HasAlternate = false;
     bool m_ShowingAlternate = false;
+    bool m_PrintedSurface = false;
 
     // 文字が向いている方向、インクの色、今の濃さと目標の濃さ、経過時間（シェーダーで、文字が現れる境目をゆっくり揺らすのに使っている）
     DirectX::SimpleMath::Vector3 m_Normal = DirectX::SimpleMath::Vector3(0.0f, 0.0f, -1.0f);

@@ -28,6 +28,7 @@ private:
         float ImpactTimer = 0.0f;
         float Seed = 0.0f;
         bool Active = true;
+        bool Audible = false; // 雨漏りごとに1つだけ、着水と同時に音を鳴らす。
     };
 
     // 足音の波紋1つ分（位置・できてからの秒数・消えるまでの秒数・最大の半径）
@@ -39,9 +40,8 @@ private:
         float MaxRadius = 3.0f;
     };
 
-    // 水滴、水たまりの中心（x・z）
+    // 描画する水滴
     std::vector<FallingDrop> m_FallingDrops;
-    std::vector<DirectX::SimpleMath::Vector2> m_PuddleCenters;
     // 水滴の形・バッファ・シェーダー・マテリアル
     std::vector<VERTEX_3D> m_DropVertices;
     VertexBuffer<VERTEX_3D> m_DropVertexBuffer;
@@ -96,9 +96,6 @@ private:
     // 水たまりの置き場所はCPUで決め、この表をシェーダーへ渡している。
     // シェーダーで sin を使った乱数を計算すると、GPUの種類で sin の精度が違い、水たまりの場所が変わってしまうためである。
     PuddleCellBufferData m_PuddleCellData{};
-    // 足元の判定に使う水たまりの楕円の半径（x・z）と向き（m_PuddleCentersと同じ順）
-    std::vector<DirectX::SimpleMath::Vector2> m_PuddleRadii;
-    std::vector<float> m_PuddleAngles;
     // 水たまりの表・中心・水滴を、置き方に合わせて作っている
     void BuildPuddles(const PuddleLayout& layout);
 

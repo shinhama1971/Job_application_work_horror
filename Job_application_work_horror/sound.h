@@ -23,7 +23,7 @@ typedef enum
 	SOUND_CUE_POWER,        // 配電盤や信号盤が動き出す音
 	SOUND_CUE_SCARE,        // 人影が現れたときや、捕まったときの衝撃音
 	SOUND_CUE_FOOTSTEP,     // 研究所の中（1面・2面）の足音。硬い床を歩く1歩
-	SOUND_CUE_WATER_STEP,   // 水たまり・浸水した床を踏んだときの水音（水の滴る音にも高くして使っている）
+	SOUND_CUE_WATER_STEP,   // 人影や見えない足跡が水を踏む音
 	SOUND_CUE_FLASHLIGHT,   // 懐中電灯のスイッチのクリック音
 	SOUND_CUE_PIPE_KNOCK,   // 配管を叩いたような金属音（tools/generate-pipe-knock.ps1で合成）
 	SOUND_CUE_HEARTBEAT,    // 自分の心拍「ドクン」1回分（tools/generate-heartbeat-breath.ps1で合成）
@@ -35,6 +35,8 @@ typedef enum
 	SOUND_CUE_DRAIN,        // 1面の西棟で、水が排水口へ引いていく音（約12秒。バルブを1つ回すごとに1回）
 	SOUND_CUE_FOREST_STEP,  // 外の森の、雨で濡れた道を歩く1歩
 	SOUND_CUE_FOREST_RUN,   // 外の森の、雨で濡れた道を走る1歩
+	SOUND_CUE_WATER_WALK,   // プレイヤーが水の中を歩く1歩
+	SOUND_CUE_WATER_RUN,    // プレイヤーが水の中を走る1歩
 
 	// 音の種類の数
 	SOUND_LABEL_MAX,
@@ -76,10 +78,12 @@ private:
 		{"assets/Audio/radio_static.wav", true, 0.34f},
 		{"assets/Audio/rain.wav", true, 0.42f},
 		{"assets/Audio/door_locked.wav", false, 0.50f},
-		{"assets/Audio/water_drop.wav", false, 0.55f},
+		{"assets/Audio/water_drop.wav", false, 0.80f},
 		{"assets/Audio/drain.wav", false, 0.60f},
 		{"assets/Audio/forest_step_walk.wav", false, 0.42f},
 		{"assets/Audio/forest_step_run.wav", false, 0.45f},
+		{"assets/Audio/water_step_walk.wav", false, 0.42f},
+		{"assets/Audio/water_step_run.wav", false, 0.53f},
 	};
 
 	// XAudio2本体はCOMなのでComPtrで管理している。ボイスはCOMではないので、DestroyVoiceで解放している。
