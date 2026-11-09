@@ -64,4 +64,7 @@ namespace AssimpPerse
 	std::vector<std::vector<unsigned int>> GetIndices();
 	std::vector<MATERIAL> GetMaterials();
 	std::vector<std::unique_ptr<Texture>> GetTextures();
+	// モデルに埋め込まれたテクスチャ（ファイルではなくモデルの中の画像）があったか。
+	// 変換済みの形式には画像を入れていないので、あったときは保存しない
+	bool HasEmbeddedTextures();
 }

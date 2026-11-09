@@ -89,9 +89,9 @@ namespace
         { 36.5f, Vector3(12.0f, FloorY, 112.0f), Pi * 0.5f, -0.05f, L"04_1面_暗証番号の扉", false },
         { 41.0f, Vector3(0.0f, FloorY, 185.0f), 0.0f, 0.0f, nullptr, false },
         { 46.5f, Vector3(0.0f, FloorY, 240.0f), 0.0f, -0.10f, L"05_1面_ループ廊下の突き当たり", false },
-        { 50.0f, Vector3(0.0f, FloorY, 245.0f), 0.0f, -0.10f, nullptr, false },
+        { 50.05f, Vector3(0.0f, FloorY, 245.0f), 0.0f, -0.10f, nullptr, false },
         // 西棟（浸水した機械室）。入口の内側へ場面を切り替え、柱の並ぶ広間と排水バルブを写し、仕切りの切れ目から奥のポンプ室へ進んでいる。
-        // 50.0秒と50.05秒の間はほぼ0秒なので、ループ廊下から西棟へ一瞬で移っている（場面の切り替え）
+        // 切り替えの前後を同じ時刻にして、補間で書類保管室を通り、入室の無線が先に流れるのを防いでいる。
         { 50.05f, Vector3(-232.0f, FloorY, -20.0f), YawToward(-232.0f, -20.0f, -330.0f, 140.0f), -0.16f, nullptr, false },
         { 52.5f, Vector3(-233.0f, FloorY, -21.0f), YawToward(-233.0f, -21.0f, -330.0f, 140.0f), -0.16f, L"05b_1面_西棟の柱の並ぶ浸水した広間", false },
         { 55.0f, Vector3(-292.0f, FloorY, -66.0f), Pi, -0.62f, nullptr, false },

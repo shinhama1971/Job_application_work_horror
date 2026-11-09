@@ -27,6 +27,7 @@ namespace AssimpPerse
 	std::vector<SUBSET> g_subsets{};					// サブセット情報（メッシュごとの描画範囲とマテリアル）
 	std::vector<MATERIAL> g_materials{};				// マテリアル（色と使うテクスチャ名）
 	std::vector<std::unique_ptr<Texture>> g_textures;	// ディフューズテクスチャ（マテリアルと同じ添字で並べている）
+	bool g_hasEmbeddedTextures = false;					// モデルに埋め込まれたテクスチャがあったか
 
 	// unique_ptrはコピーできないため、Texture群はまとめてmoveで呼び出し元へ渡している。
 	std::vector<std::unique_ptr<Texture>> GetTextures()
@@ -129,6 +130,7 @@ namespace AssimpPerse
 						if (sts) {
 							g_textures[m] = std::move(texture);
 						}
+						g_hasEmbeddedTextures = true;
 						std::cout << "Embedded" << std::endl;
 
 					}
@@ -187,6 +189,7 @@ namespace AssimpPerse
 		g_subsets.clear();		// サブセット情報
 		g_materials.clear();	// マテリアル
 		g_textures.clear(); 	// ディフューズテクスチャ
+		g_hasEmbeddedTextures = false;
 
 		// 読み込み用のImporter（読み込んだaiSceneの寿命もImporterが持っている）
 		Assimp::Importer importer;
@@ -342,5 +345,11 @@ namespace AssimpPerse
 	std::vector<MATERIAL> GetMaterials()
 	{
 		return g_materials; // マテリアル
+	}
+
+	// モデルに埋め込まれたテクスチャがあったかを返している
+	bool HasEmbeddedTextures()
+	{
+		return g_hasEmbeddedTextures;
 	}
 }

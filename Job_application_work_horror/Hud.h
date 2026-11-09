@@ -53,7 +53,8 @@ public:
     };
     // 1面の前の導入を、後ろの森の上に描いている（受信記録 → 目的と操作の画面）
     void DrawIntro(const IntroView& view);
-    // 外の森を歩いている間の無線の字幕（ForestRadio）で描く内容：見出し、タイプ途中の1行、「通信途絶」、電波の乱れ
+    // 無線の字幕（外の森の ForestRadio、1面の Stage1Transmissions）で描く内容：見出し、タイプ途中の1行、「通信途絶」、電波の乱れ。
+    // Recording が true なら、無線ではなくボイスレコーダーの録音（印を琥珀色にして、点滅させない）
     struct RadioView
     {
         float Time = 0.0f;
@@ -63,8 +64,9 @@ public:
         float LineAlpha = 0.0f;
         std::string_view SignalLost;
         float SignalLostAlpha = 0.0f;
+        bool Recording = false;
     };
-    // 無線の字幕を、画面の下の中央に描いている（何も流していなければ描かない）
+    // 無線と録音の字幕を、画面の下の中央に描いている（何も流していなければ描かない）
     void DrawRadio(const RadioView& view);
     // リザルト画面を描いている（revealAmountで項目を順に表示している）
     void DrawResult(
@@ -76,6 +78,7 @@ public:
         int chargersUsed,
         int evidenceCollected,
         int wallWritingsRead,
+        int recordingsPlayed,
         bool hiddenRoomEscaped,
         std::string_view stage2Anomalies,
         bool newBestTime,

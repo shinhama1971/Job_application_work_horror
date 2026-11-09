@@ -18,6 +18,7 @@
 #include "TensionPulse.h"
 #include "Stage1LightStalker.h"
 #include "RadioStatic.h"
+#include "Stage1Transmissions.h"
 #include "PropLayoutEditor.h"
 #include "FootprintFollower.h"
 #include "CeilingReflectionScare.h"
@@ -63,6 +64,8 @@ private:
     void UpdateAmbientSounds();
     // 懐中電灯で照らすと浮かぶ壁の文字。書き換わった文字を読んだら物音の演出を起こしている。
     void UpdateWallWritings(class Player& player);
+    // ボイスレコーダーを調べたら録音の字幕を流し、1面の途中で届く無線（嘘の指示）を進めている
+    void UpdateTransmissions(const class Player& player, float deltaTime);
     // 誰かの濡れた足跡：西棟の水から初めて乾いた床へ出ると、同じ水から裸足の足跡が一歩ずつ後をついて来る（1回だけ）
     void UpdateFootprintFollower(class Player& player);
     // 西棟の水面にだけ映る、天井に逆さまに張り付いた人影（見上げると何もいない。1回だけ）
@@ -133,6 +136,8 @@ private:
     bool m_FootprintFollowerUsed = false;
     // 影が近いと鳴る携帯ラジオの雑音
     RadioStatic m_RadioStatic;
+    // 画面の下に流す録音と無線の字幕、無線の嘘の進み具合
+    Stage1Transmissions m_Transmissions;
     // 西棟で鳴らす物音（使い回している）
     std::vector<AmbientSoundCue> m_WestWingCues;
     // 書類保管室の「照らすと止まる影」。動きのルールはこのクラス、影の表示・音・電池はSceneが行っている。

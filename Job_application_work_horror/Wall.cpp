@@ -211,6 +211,7 @@ void Wall::Init()
     m_BoxVertices = m_Vertices;
     m_BoxIndices = m_Indices;
     m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+    m_NaturalSurface = NaturalSurface::None;
 
     m_Material = std::make_unique<Material>();
     // 普段の色：くすんだ灰色、光沢は弱い
@@ -577,6 +578,14 @@ void Wall::UploadMaterial()
     {
         material.Diffuse = Color(1.0f, 1.0f, 1.0f, m_SurfaceMaterial.Diffuse.w);
     }
+    // 樹皮の材質（barkPS）は、木目の向きを、使っていない環境の色で受け取っている（箱の回転をワールドへ当てた向き）
+    if (m_NaturalSurface == NaturalSurface::Bark)
+    {
+        Vector3 grain = Vector3::TransformNormal(m_GrainAxis,
+            Matrix::CreateFromYawPitchRoll(m_Rotation.y, m_Rotation.x, m_Rotation.z));
+        grain.Normalize();
+        material.Ambient = Color(grain.x, grain.y, grain.z, 1.0f);
+    }
     m_Material->SetMaterial(material);
     // 光らない部位用：同じ値で、光る色だけを消している
     if (m_UnlitPartMaterial != nullptr)
@@ -610,6 +619,18 @@ void Wall::SetVisualModel(const std::string& name)
         utility::ReportFatalError("Wall に知らないモデルの名前が指定されました: " + name);
     }
     m_VisualModel = name;
+    // 外の森の岩は岩の材質（rockPS。色むら・ひび・苔・鉱物の粒・地面際の湿り）、枯れ木・倒木・茂みは樹皮の材質
+    // （barkPS。木目に沿った溝・剥がれ・苔）で描いている（どちらもPBR）。配置を読み直して変わったときは、シェーダーを替え直している
+    const NaturalSurface surface = name == "forest_rock" ? NaturalSurface::Rock
+        : (name == "forest_tree_dead" || name == "forest_tree_fork" || name == "forest_fallen_log" || name == "forest_brush")
+            ? NaturalSurface::Bark : NaturalSurface::None;
+    if (surface != m_NaturalSurface)
+    {
+        m_NaturalSurface = surface;
+        m_Shader.Create("shader/litTextureVS.hlsl",
+            surface == NaturalSurface::Rock ? "shader/rockPS.hlsl"
+            : surface == NaturalSurface::Bark ? "shader/barkPS.hlsl" : "shader/litTexturePS.hlsl");
+    }
     RebuildVisualModel();
     UploadMaterial();
 }
@@ -653,6 +674,9 @@ void Wall::RebuildVisualModel()
                 nominal = Vector3(model.Size.y, model.Size.x, model.Size.z);
             }
         }
+        // 樹皮の木目の向き：長い向きへ回すモデル（倒木）はモデルの x、それ以外（木・茂み）は上
+        m_GrainAxis = Vector3::TransformNormal(
+            model.FollowsLongestAxis ? Vector3(1.0f, 0.0f, 0.0f) : Vector3(0.0f, 1.0f, 0.0f), orientation);
         // 光らない部位を先に、光る部位を後に並べ、光る部位の始まりを覚えている
         std::vector<PropModel::Part> parts;
         bool hasGlowPart = false;

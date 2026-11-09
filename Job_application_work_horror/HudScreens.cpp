@@ -232,6 +232,7 @@ void Hud::DrawResult(
     int chargersUsed,
     int evidenceCollected,
     int wallWritingsRead,
+    int recordingsPlayed,
     bool hiddenRoomEscaped,
     std::string_view stage2Anomalies,
     bool newBestTime,
@@ -260,8 +261,8 @@ void Hud::DrawResult(
     }
 
     const float panelWidth = (std::min)(screenWidth * 0.72f, 860.0f);
-    // 下段に「今回の発見」（壁の文字・隠し部屋・今回の異変）を並べるため、縦に広げている。
-    const float panelHeight = 680.0f;
+    // 下段に「今回の発見」（壁の文字・録音・隠し部屋・今回の異変）を並べるため、縦に広げている。
+    const float panelHeight = 714.0f;
     const float panelX = (screenWidth - panelWidth) * 0.5f;
     const float panelY = (screenHeight - panelHeight) * 0.5f;
     AddRectangle(panelX, panelY, panelWidth, panelHeight, panel);
@@ -305,6 +306,8 @@ void Hud::DrawResult(
     constexpr int totalWritings = Core::GameState::TotalWallWritingCount;
     const int safeEvidenceCollected = (std::clamp)(evidenceCollected, 0, totalEvidence);
     const int safeWritingsRead = (std::clamp)(wallWritingsRead, 0, totalWritings);
+    constexpr int totalRecordings = Core::GameState::TotalRecordingCount;
+    const int safeRecordingsPlayed = (std::clamp)(recordingsPlayed, 0, totalRecordings);
     const int timePenalty = (std::min)(
         (std::max)(clearSeconds - 360, 0) / 15, 40);
     const int caughtPenalty = (std::min)(safeCaughtCount * 15, 45);
@@ -423,18 +426,23 @@ void Hud::DrawResult(
         "壁の文字 " + std::to_string(safeWritingsRead) + " / " + std::to_string(totalWritings);
     addCenteredStat(panelY + 490.0f, writingText, statPixelSize,
         safeWritingsRead >= totalWritings ? gold : pale);
-    addCenteredStat(panelY + 524.0f,
+    const std::string recordingText =
+        "録音 " + std::to_string(safeRecordingsPlayed) + " / " + std::to_string(totalRecordings);
+    addCenteredStat(panelY + 524.0f, recordingText, statPixelSize,
+        safeRecordingsPlayed >= totalRecordings ? gold : pale);
+    addCenteredStat(panelY + 558.0f,
         hiddenRoomEscaped ? "隠し部屋 脱出した" : "隠し部屋 見つけていない", statPixelSize,
         hiddenRoomEscaped ? gold : pale);
     if (!stage2Anomalies.empty())
     {
-        addCenteredStat(panelY + 558.0f,
+        addCenteredStat(panelY + 592.0f,
             "2階の異変 " + std::string(stage2Anomalies), statPixelSize, pale);
     }
 
     // 達成の一言：全部見つけて一度も失敗しない「完全探索」を最優先にし、次に記録の更新、捕まらなかったことの順で選んでいる
     std::string_view achievement = "";
     if (safeEvidenceCollected >= totalEvidence && safeWritingsRead >= totalWritings &&
+        safeRecordingsPlayed >= totalRecordings &&
         hiddenRoomEscaped && safeCaughtCount == 0 && safePuzzleMistakes == 0)
     {
         achievement = "完全探索で脱出";
@@ -463,7 +471,7 @@ void Hud::DrawResult(
             achievementPixelSize * 6.0f;
         AddText(
             (screenWidth - achievementWidth) * 0.5f,
-            panelY + 598.0f,
+            panelY + 632.0f,
             achievement,
             achievementPixelSize,
             Color(0.92f, 0.78f, 0.34f, 0.96f * reveal));
@@ -478,7 +486,7 @@ void Hud::DrawResult(
         promptPixelSize * 6.0f;
     AddText(
         (screenWidth - promptWidth) * 0.5f,
-        panelY + 638.0f,
+        panelY + 672.0f,
         prompt,
         promptPixelSize,
         pale);
@@ -1314,7 +1322,7 @@ void Hud::DrawIntro(const IntroView& view)
     Flush();
 }
 
-// 外の森を歩いている間の無線の字幕：画面の下の中央に、暗い帯と、受信の印つきの見出し、タイプされる1行を出している。
+// 無線と録音の字幕（外の森の無線、1面の録音と無線）：画面の下の中央に、暗い帯と、受信の印つきの見出し、タイプされる1行を出している。
 // 「通信途絶」は帯の上に赤く出す。noise（0〜1）で文字を横にずらし、色をにじませている
 void Hud::DrawRadio(const RadioView& view)
 {
@@ -1346,14 +1354,17 @@ void Hud::DrawRadio(const RadioView& view)
         const float panelHeight = 104.0f;
         const float panelX = (screenWidth - panelWidth) * 0.5f;
         const float panelY = screenHeight - 250.0f;
+        // 無線は緑、録音は琥珀色の印にしている
+        const Color accent = view.Recording ? Color(0.95f, 0.66f, 0.26f, 1.0f) : Color(0.48f, 0.90f, 0.58f, 1.0f);
+        const Color headerColor = view.Recording ? Color(0.78f, 0.58f, 0.32f, 1.0f) : Color(0.40f, 0.70f, 0.50f, 1.0f);
         AddRectangle(panelX, panelY, panelWidth, panelHeight, Color(0.0f, 0.006f, 0.004f, 0.62f * alpha));
-        AddRectangle(panelX, panelY, 4.0f, panelHeight, Color(0.48f, 0.90f, 0.58f, 0.85f * alpha));
-        // 見出し：受信中は印が明滅する
-        if (std::fmod(view.Time, 1.0f) < 0.6f)
+        AddRectangle(panelX, panelY, 4.0f, panelHeight, Color(accent.x, accent.y, accent.z, 0.85f * alpha));
+        // 見出し：無線の受信中は印が明滅し、録音の再生中は点いたまま
+        if (view.Recording || std::fmod(view.Time, 1.0f) < 0.6f)
         {
-            AddRectangle(panelX + 24.0f, panelY + 20.0f, 10.0f, 10.0f, Color(0.48f, 0.90f, 0.58f, 0.90f * alpha));
+            AddRectangle(panelX + 24.0f, panelY + 20.0f, 10.0f, 10.0f, Color(accent.x, accent.y, accent.z, 0.90f * alpha));
         }
-        AddText(panelX + 42.0f, panelY + 13.0f, view.Header, 2.2f, Color(0.40f, 0.70f, 0.50f, 0.85f * alpha));
+        AddText(panelX + 42.0f, panelY + 13.0f, view.Header, 2.2f, Color(headerColor.x, headerColor.y, headerColor.z, 0.85f * alpha));
         const float lineX = panelX + 24.0f + jitter;
         const float lineY = panelY + 50.0f;
         if (noise > 0.3f)

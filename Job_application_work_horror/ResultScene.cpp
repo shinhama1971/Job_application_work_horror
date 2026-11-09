@@ -92,6 +92,7 @@ void ResultScene::Draw(Camera* camera)
         game->GetChargersUsed(),
         game->GetEvidenceCollected(),
         game->GetWallWritingsRead(),
+        game->GetRecordingsPlayed(),
         game->IsHiddenRoomEscaped(),
         m_Stage2AnomalyText,
         game->IsLastRunBestTime(),

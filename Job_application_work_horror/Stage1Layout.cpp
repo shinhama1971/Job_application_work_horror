@@ -24,6 +24,8 @@
 #include "ScareTrigger.h"
 #include "ScreenDustOverlay.h"
 #include "ShadowMan.h"
+#include "StoryText.h"
+#include "VoiceRecorder.h"
 #include "Wall.h"
 #include "utility.h"
 
@@ -278,6 +280,24 @@ namespace Stage1Layout
         // 南西の広間の奥（棚の一角の木箱の陰）にも、寄り道のごほうびの電池を置いている。
         BatteryItem* southWestHallBattery = builder.Create<BatteryItem>("Stage1SouthWestHallBattery");
         place(*southWestHallBattery, "Stage1SouthWestHallBattery");
+
+        // ボイスレコーダー（研究員たちの録音）。中央ホールの木箱の上・南西の広間の机・西棟の机・書類保管室の奥の机。
+        // 4つ目（調査員の録音）は、1面の途中で届く無線が「予備のヒューズを置いてきた」と嘘をつく机に置いている（Stage1Transmissions）
+        static_assert(StoryText::RecordingCount == Core::GameState::TotalRecordingCount,
+            "録音の数を StoryText と GameState でそろえる");
+        static_assert(std::tuple_size_v<decltype(objects.recorders)> == StoryText::RecordingCount,
+            "置くボイスレコーダーの数を録音の数とそろえる");
+        constexpr const char* recorderNames[] =
+        {
+            "Stage1RecorderHall", "Stage1RecorderSouthWestHall", "Stage1RecorderWestWing", "Stage1RecorderArchive"
+        };
+        for (int i = 0; i < StoryText::RecordingCount; ++i)
+        {
+            VoiceRecorder* recorder = builder.Create<VoiceRecorder>(recorderNames[i]);
+            recorder->SetRecordingIndex(i);
+            place(*recorder, recorderNames[i]);
+            objects.recorders[static_cast<std::size_t>(i)] = recorder;
+        }
 
         // 南西の広間の天井の照明（停電中は1つだけ赤い非常灯がともり、電力が戻ると両方が点く）
         CeilingLight* southWestHallLight1 = builder.Create<CeilingLight>("Stage1SouthWestHallLight1");

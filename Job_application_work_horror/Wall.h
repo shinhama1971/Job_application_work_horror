@@ -55,6 +55,11 @@ private:
 
     // 見た目に使うモデルの名前（空なら箱）と、箱の頂点（モデルをやめたときに戻すため）
     std::string m_VisualModel;
+    // 外の森のモデルを、岩・樹皮の材質のシェーダー（rockPS・barkPS）で描いているか
+    enum class NaturalSurface { None, Rock, Bark };
+    NaturalSurface m_NaturalSurface = NaturalSurface::None;
+    // 樹皮の木目の向き（モデルを箱の向きへ回した後。木と茂みは上、倒木は長い向き）。UploadMaterial がワールドへ回して渡す
+    DirectX::SimpleMath::Vector3 m_GrainAxis = DirectX::SimpleMath::Vector3(0.0f, 1.0f, 0.0f);
     std::vector<VERTEX_3D> m_BoxVertices;
     std::vector<unsigned int> m_BoxIndices;
     // モデルの光る部位（レンズ・電球）が始まるインデックス。ここより前（枠・笠・台）は光る色を付けないマテリアルで描いている。

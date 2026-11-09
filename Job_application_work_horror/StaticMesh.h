@@ -14,7 +14,8 @@
 #include	"ModelBounds.h"
 #include	"renderer.h"
 
-// Meshを継承し、モデルファイルから頂点とインデックスを作るクラス
+// Meshを継承し、モデルファイルから頂点とインデックスを作るクラス。
+// Assimpで読んで変換した結果は cache/model/ に保存し、次からはそれを読んでいる（元のモデルの大きさか更新日時が変わったら読み直す）。
 class StaticMesh : public Mesh {
 public:
 	// モデルを読み込んでいる（texturedirectoryはテクスチャを探すフォルダ）
@@ -44,6 +45,13 @@ public:
 	}
 
 private:
+	// Assimpで読み込み、ゲームで使う形に変換している（変換した結果を保存してよいかを返している）
+	bool LoadWithAssimp(const std::string& filename, const std::string& texturedirectory);
+	// 変換済みの形式（cache/model/）を読み書きしている。読めないとき・元のモデルと合わないときは false
+	bool LoadConverted(const std::string& filename, const std::string& texturedirectory);
+	void SaveConverted(const std::string& filename) const;
+	// 全頂点を囲む箱から、境界（中心・半分の大きさ・境界球の半径）を求めている
+	void UpdateModelBounds();
 
 	std::vector<MATERIAL> m_materials;	    // マテリアルの情報
 	std::vector<std::string> m_texturenames;			// テクスチャの名前

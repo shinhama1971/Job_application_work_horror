@@ -239,6 +239,11 @@ place Stage1HiddenRoomKey            140 -95 60
 place Stage1HiddenRoomRecord         213 -82 150 yaw 90
 place Stage1KeypadRoomFuse           196 -95 150
 place BatteryItem                    -130 -95 120
+# ボイスレコーダー（研究員たちの録音。y は置いた木箱・机の上面、yaw は手前のランプを部屋の入口へ向ける向き）
+place Stage1RecorderHall             95 -86 30 yaw 0
+place Stage1RecorderSouthWestHall    -308 -75 -296 yaw -135
+place Stage1RecorderWestWing         -318 -75 -74 yaw -135
+place Stage1RecorderArchive          -196 -79 157 yaw -45
 place ScareTrigger_Corridor          0 -90 65
 place Stage1ExitOmen                 92 -99 278
 place PropDoorIndicator              65.4 -68 177.4 size 10 5 1

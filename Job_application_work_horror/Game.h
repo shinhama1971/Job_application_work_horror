@@ -376,7 +376,7 @@ namespace Core
         }
 
         // リザルト画面に出す成績と「今回の発見」の記録（異変を解いた数・パズルの失敗・充電器を使った回数・
-        // 残された記録・読んだ壁の文字・隠し部屋から脱出したか・2面で出た異変）
+        // 残された記録・読んだ壁の文字・聞いた録音・隠し部屋から脱出したか・2面で出た異変）
         void RegisterAnomalyHandled() { m_State.RegisterAnomalyHandled(); }
         void RegisterPuzzleMistake() { m_State.RegisterPuzzleMistake(); }
         void RegisterChargerUsed() { m_State.RegisterChargerUsed(); }
@@ -387,6 +387,8 @@ namespace Core
         int GetEvidenceCollected() const { return m_State.GetEvidenceCollected(); }
         void SetWallWritingsRead(int count) { m_State.SetWallWritingsRead(count); }
         int GetWallWritingsRead() const { return m_State.GetWallWritingsRead(); }
+        void RegisterRecordingPlayed() { m_State.RegisterRecordingPlayed(); }
+        int GetRecordingsPlayed() const { return m_State.GetRecordingsPlayed(); }
         void RegisterHiddenRoomEscaped() { m_State.RegisterHiddenRoomEscaped(); }
         bool IsHiddenRoomEscaped() const { return m_State.IsHiddenRoomEscaped(); }
         void SetStage2Anomalies(int first, int second) { m_State.SetStage2Anomalies(first, second); }

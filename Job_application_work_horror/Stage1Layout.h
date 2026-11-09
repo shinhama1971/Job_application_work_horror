@@ -34,6 +34,7 @@ class ExitTrigger;
 class Item;
 class CeilingLight;
 class Ground;
+class VoiceRecorder;
 
 // 進む先を示す天井照明の候補の組（進み具合ごと）。その組の1灯だけが、切れかけの電球のように不規則にちかちかする。
 enum class Stage1RouteLight : std::size_t
@@ -105,6 +106,8 @@ struct StageObjects
     // 3本目のもう1つの手に入れ方：暗証番号の扉の先（閉じ込められる部屋）の奥にあるヒューズ。
     // 3本目を探す段階になると現れ、西棟のヒューズとどちらか一方を取ればよい（取った方ではない方は消える。StageScene::UpdateThirdFuseRoutes）
     Item* keypadRoomFuse = nullptr;
+    // ボイスレコーダー（並びは StoryText::Recordings と同じ。調べると Stage1Transmissions が録音の字幕を流す）
+    std::array<VoiceRecorder*, 4> recorders{};
     // 天井照明と、監視カメラの異常で使う開かずの扉
     std::array<CeilingLight*, CeilingLightCount> ceilingLights{};
     std::array<Door*, StageSealedDoorCount> sealedDoors{};

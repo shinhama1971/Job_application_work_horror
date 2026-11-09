@@ -286,6 +286,8 @@
     <ClCompile Include="IntroScene.cpp" />
     <ClCompile Include="ForestRain.cpp" />
     <ClCompile Include="ForestRadio.cpp" />
+    <ClCompile Include="Stage1Transmissions.cpp" />
+    <ClCompile Include="VoiceRecorder.cpp" />
     <ClCompile Include="LabEntrance.cpp" />
     <ClCompile Include="Stage2Layout.cpp" />
     <ClCompile Include="Stage2Objective.cpp" />
@@ -425,6 +427,8 @@
     <ClInclude Include="IntroScene.h" />
     <ClInclude Include="ForestRain.h" />
     <ClInclude Include="ForestRadio.h" />
+    <ClInclude Include="Stage1Transmissions.h" />
+    <ClInclude Include="VoiceRecorder.h" />
     <ClInclude Include="LabEntrance.h" />
     <ClInclude Include="StoryText.h" />
     <ClInclude Include="Stage2Layout.h" />
@@ -466,6 +470,8 @@
     <ClInclude Include="shader\portraitPainting.hlsli" />
     <ClInclude Include="shader\clockFace.hlsli" />
     <ClInclude Include="shader\doorPainting.hlsli" />
+    <ClInclude Include="shader\rockSurface.hlsli" />
+    <ClInclude Include="shader\barkSurface.hlsli" />
     <ClInclude Include="shader\horrorGrade.hlsli" />
     <ClInclude Include="shader\horrorMist.hlsli" />
     <ClInclude Include="shader\surfaceDetail.hlsli" />
@@ -538,6 +544,18 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\signalPanelPS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\barkPS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\rockPS.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>

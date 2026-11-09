@@ -410,5 +410,8 @@ Job_application_work_horror/imgui_debug_layout.ini
 *.cso
 shader-compile-errors.txt
 
+# モデルを変換した結果（初回起動時に作られる。StaticMesh）
+Job_application_work_horror/cache/
+
 # 計測モード（--benchmark）の出力
 /benchmark/

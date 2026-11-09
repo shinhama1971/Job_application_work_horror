@@ -40,6 +40,10 @@ Application
   頂点バッファ・テクスチャ・バウンディング情報を1つだけ読み込んで共有するためです。
   キャッシュ自身も参照を保持し、終了時に `ModelCache::Clear` でD3Dデバイス破棄前にまとめて解放します。
   Scene・Object の所有は引き続き `std::unique_ptr` による単一所有です。
+- `ModelCache`（1回の実行の中での使い回し）とは別に、`StaticMesh` が Assimp で変換した結果をファイル（`cache/model/*.mesh`）に保存し、
+  次の実行からはそれを読みます。どちらのモデルの読み込み（`ModelCache`・`PropModel`・`Player`）も `StaticMesh::Load` を通るので、呼ぶ側は変えていません。
+  ファイルの先頭に印・版・`VERTEX_3D` と `MATERIAL` の大きさ・元のモデルの大きさと更新日時を書き、1つでも違えば Assimp で読み直します。
+  テクスチャの画像は保存せず、読むたびにファイル名から作り直すので、所有の形（`unique_ptr` で `StaticMesh` から渡す）はこれまでと同じです。
 
 ## Gameから分離した責務
 
@@ -84,6 +88,13 @@ Application
 
 各クラスは時間・フェーズのみを管理します（監視カメラ巡回の実行役 `StageSurveillanceController` を除く）。照明、振動、PostProcess、Objectへの命令は
 `StageScene` が行うため、演出対象の所有権をシーケンスへ渡しません。
+
+#### 録音と無線
+
+- `VoiceRecorder` は本体・スピーカー・ボタン・ランプを箱のメッシュで描き、ランプと小さな点光源を同じ明るさで変化させます。調べると赤の点滅から緑の点灯へ変わり、`TakePlayRequest` が一度だけ再生要求を返します。
+- `Stage1Layout` が録音機4台を作り、配置ファイルの `place` 行を適用して `StageObjects::recorders` に参照を保持します。`StageScene::UpdateTransmissions` が再生要求を受け取り、字幕を予約して `GameState` の再生数を増やします。再生数はリザルトの「今回の発見」と完全探索の判定に使います。
+- `Stage1Transmissions` は `StoryText.h` の録音3行と無線の台詞を同じ列に並べ、1行ずつ表示します。1本目のヒューズを取って14秒経過し、字幕が空くと最初の無線を予約します。続く入室と影の出現は字幕の再生中も判定し、成立した順に予約します。4つ目の録音の後に最後の応答と「通信途絶」を流し、以後の嘘の無線を止めます。
+- `StageScene::Draw` は `Hud::DrawRadio` で字幕を描き、録音の見出しと帯は琥珀色、無線は緑で区別します。携帯ラジオの雑音には、影による危険度と字幕の再生による雑音の強さのうち大きい方を渡します。
 
 #### 監視カメラ巡回
 
@@ -445,3 +456,9 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 `grassVS.hlsl` は、ビュー行列の回転の逆（転置）でカメラの前と上の向きをワールドへ戻し、見下ろす量に応じて葉先をカメラの上の向き（水平にした向き）へ倒しています（授業資料 p.23）。LOD の段階（1〜3）と色の表示の有無、曲げの強さは区画ごとの定数バッファ（b9、48バイト）で渡し、技術デモ（`TechDemo::GetGrassLodMode`・`UsesGrassCameraBend`）で切り替えます。
 
 草を植えるとき、当たり判定のある物の足元に加えて、枯れた茂み（`forest_brush`）の枝の内側と、見えている水たまりの水面（`Ground::IsNearVisiblePuddle`。水たまりのメッシュと同じ楕円で、足元の判定 `IsInsidePuddle` より広い）を避けています。森の空は `SkyBackdrop`（`shader/skyBackdropVS.hlsl`・`skyBackdropPS.hlsl`）が、射影行列とビュー行列から画素ごとの視線の向きを戻し、描画の奥の端までの霧を重ねています。最初に作るObjectなので最初に描き、深度の判定（LESS_EQUAL）で手前の物の画素は残ります。
+
+## 森の岩と樹皮の材質
+
+岩は配置ファイルの `model forest_rock` を付けた `Wall` です。`Wall::SetVisualModel` が岩のモデルのときだけシェーダーを `rockPS.hlsl` に替え（配置を読み直して岩でなくなったら `litTexturePS.hlsl` に戻す。どの材質かは `Wall::NaturalSurface` で覚えている）、`rockPS.hlsl` は `ROCK_SURFACE` を付けて `litTexturePS.hlsl` を読み込みます。`litTexturePS` の「テクスチャがなく光らない面」の分岐の中で、`ROCK_SURFACE` のときは壁の汚れ・古さ・金属の錆の代わりに `GetRockSurface`（`rockSurface.hlsli`）の色・粗さ・濡れ具合・高さを使い、高さは壁と同じ `ApplyHeightToNormal` で法線にしています。照明・影・霧・PBR の計算は壁と共通です。模様はワールドの位置だけから決まるので、岩を動かしても大きさを変えても模様の細かさは変わらず、配置ファイルの色の `rough` がそのまま粗さの元になります。
+
+枯れ木・倒木・枯れた茂み（`forest_tree_dead`・`forest_tree_fork`・`forest_fallen_log`・`forest_brush`）は、同じ仕組みで `barkPS.hlsl`（`BARK_SURFACE`、`barkSurface.hlsli`）に替えています。樹皮の筋は向きが大事なので、`Wall::RebuildVisualModel` がモデルを箱の向きへ回すときに木目の向き（長い向きへ回すモデルはモデルの x、それ以外は上）も同じ行列で回して `m_GrainAxis` に覚え、`Wall::UploadMaterial` が箱の回転を当ててワールドの向きにし、マテリアルの環境の色（`Ambient`。この面では使っていない値）に入れて渡します。シェーダーは木目の向きを y にした座標へ回し、幹の横を向いた2つの投影面で溝と板を求め、面の向きで混ぜます。木目の向きは物ごとに1つなので、斜めに伸びる枝では筋が枝に正確には沿いませんが、枝は細く遠いので目立ちません。

@@ -1,5 +1,5 @@
 // ============================================================================
-// ファイルの役割: 1面の演出（入口・左の倉庫・ループ廊下・照明の連鎖・ヒューズの後の影・電力の復旧・出口・物音・壁の文字・心拍）を担当している。
+// ファイルの役割: 1面の演出（入口・左の倉庫・ループ廊下・照明の連鎖・ヒューズの後の影・電力の復旧・出口・物音・壁の文字・心拍・録音と無線）を担当している。
 // 主な技術: 出来事をきっかけにした処理、有限状態機械、照明・音・画面効果のタイミング合わせ
 // ============================================================================
 
@@ -23,6 +23,7 @@
 #include "FlashlightWriting.h"
 #include "Camera.h"
 #include "TensionPulseFeedback.h"
+#include "VoiceRecorder.h"
 #include <SimpleMath.h>
 #include <algorithm>
 #include <cmath>
@@ -952,8 +953,37 @@ void StageScene::UpdateTensionPulse(const Player& player, float deltaTime)
     PlayTensionPulse(pulse);
     // 緊張が高いほど、画面の端から視界が狭まり、心拍に合わせて脈打つ
     ShowFearVision(m_TensionPulse, pulse);
-    // 影が近いほど、携帯ラジオの雑音が大きくなる（監視映像を見ている間は鳴らさない）
-    m_RadioStatic.Update(deltaTime, threatRate, !m_Surveillance.IsViewing());
+    // 影が近いほど、携帯ラジオの雑音が大きくなる（監視映像を見ている間は鳴らさない）。
+    // 無線が届いている間と録音を流している間も、その強さまでは鳴らしている
+    m_RadioStatic.Update(deltaTime, (std::max)(threatRate, m_Transmissions.GetStaticLevel()), !m_Surveillance.IsViewing());
+}
+
+// ----------------------------------------------------------------------------
+// ボイスレコーダーの録音と、1面の途中で届く無線
+// 字幕の順番と無線の嘘の進み具合は Stage1Transmissions に任せ、ここでは調べられた録音機と今の状態を渡している。
+// ----------------------------------------------------------------------------
+void StageScene::UpdateTransmissions(const Player& player, float deltaTime)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    for (VoiceRecorder* recorder : m_Objects.recorders)
+    {
+        if (recorder != nullptr && recorder->TakePlayRequest())
+        {
+            m_Transmissions.PlayRecording(recorder->GetRecordingIndex());
+            // 聞いた数は、リザルト画面の「録音」に出している
+            game->RegisterRecordingPlayed();
+        }
+    }
+
+    Stage1Transmissions::FrameInput input;
+    input.DeltaTime = deltaTime;
+    input.PlayerPosition = player.GetPosition();
+    input.FuseCount = game->GetItemCount();
+    input.PowerRestored = game->IsPowerRestored();
+    // 閉じ込められている間・照明が次々に明滅する演出の間・監視映像を見ている間は、新しい無線を予約しない
+    input.RadioAllowed = !m_HiddenRoom.IsTrapped() && !m_ScareLightSequence.IsActive() && !m_Surveillance.IsViewing();
+    input.ArchiveStalkerActive = m_ArchiveStalker.IsActive();
+    m_Transmissions.Update(input);
 }
 
 // 点が懐中電灯で照らされているかを返している。

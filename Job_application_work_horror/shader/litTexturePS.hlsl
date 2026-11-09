@@ -29,6 +29,12 @@ SamplerState g_SamplerState : register(s0);
 #if defined(DOOR_SURFACE)
 #include "doorPainting.hlsli"
 #endif
+#if defined(ROCK_SURFACE)
+#include "rockSurface.hlsli"
+#endif
+#if defined(BARK_SURFACE)
+#include "barkSurface.hlsli"
+#endif
 
 // 2面の「血の手形」の異変：Stage2Scene が渡した手形（WallHandprints）を、その壁の面に描き、濃さ（0〜1）を返している。
 // 形は1面の壁の血の跡と同じ式（HorrorHandprint）。見え方（w）で少しずつ浮かぶ。
@@ -492,6 +498,26 @@ float4 main(in LIT_PS_IN input) : SV_Target
     float metalRustHeight = 0.0f;
     if (!Material.TextureEnable && emissionEnergy < 0.001f)
     {
+#if defined(ROCK_SURFACE)
+        // 外の森の岩（rockPS.hlsl）：壁の汚れと古さの代わりに、岩の色むら・ひび・苔・地衣類・鉱物の粒・地面際の湿りを
+        // 色・粗さ・濡れ具合・凹凸として付けている（rockSurface.hlsli）。粗さは配置ファイルの色の rough を元にしている
+        const RockSurface rock = GetRockSurface(input.worldPos, input.worldNormal, color.rgb, pbrRoughness);
+        color.rgb = rock.albedo;
+        pbrRoughness = rock.roughness;
+        wetness = rock.wetness;
+        detailWorldNormal = ApplyHeightToNormal(
+            input.worldPos, normalize(input.worldNormal), rock.height, 0.85f);
+#elif defined(BARK_SURFACE)
+        // 外の森の枯れ木・倒木・茂み（barkPS.hlsl）：木目に沿った縦の溝・横のひび・繊維・剥がれて出た地の木・苔・地衣類・根元の湿りを
+        // 色・粗さ・濡れ具合・凹凸として付けている（barkSurface.hlsli）。木目の向きはマテリアルの環境の色で受け取っている（Wall::UploadMaterial）
+        const BarkSurface bark = GetBarkSurface(
+            input.worldPos, input.worldNormal, Material.Ambuent.xyz, color.rgb, pbrRoughness);
+        color.rgb = bark.albedo;
+        pbrRoughness = bark.roughness;
+        wetness = bark.wetness;
+        detailWorldNormal = ApplyHeightToNormal(
+            input.worldPos, normalize(input.worldNormal), bark.height, 1.10f);
+#else
         grime = GetProceduralGrime(
             input.worldPos,
             input.worldNormal) * WallDampStrength;
@@ -539,6 +565,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
             input.worldNormal,
             ageing.height + paintingRelief + metalRustHeight * 0.6f,
             bumpStrength);
+#endif
     }
     const float3 detailViewNormal = normalize(mul(
         float4(detailWorldNormal, 0.0f),

@@ -15,6 +15,8 @@ namespace Core
         static constexpr int TotalEvidenceCount = 4;
         // 1面の懐中電灯で浮かぶ壁の文字のうち、読んだ数を数える対象の数（Stage1WallWritings::Count）。
         static constexpr int TotalWallWritingCount = 4;
+        // 1面のボイスレコーダーの録音の数（StoryText::RecordingCount と同じ。Stage1Layout.cpp で確かめている）。
+        static constexpr int TotalRecordingCount = 4;
 
     private:
         // 1回のプレイ分の進行の値。面をやり直すとき丸ごと巻き戻せるよう、1つにまとめている。
@@ -29,6 +31,7 @@ namespace Core
             int ChargersUsed = 0;        // 1面・2面で懐中電灯の充電器を使った回数
             int EvidenceCollected = 0;   // 1面・2面で回収した記録の数（TotalEvidenceCount個まで）
             int WallWritingsRead = 0;    // 1面で読んだ壁の文字の数
+            int RecordingsPlayed = 0;    // 1面で聞いたボイスレコーダーの録音の数
             bool HiddenRoomEscaped = false; // 1面の隠し部屋から鍵で脱出したか
             int Stage2FirstAnomaly = 0;  // 2面の1周目・2周目に出た異変（Stage2Anomalyの値）
             // （2周目の異変）
@@ -127,6 +130,7 @@ namespace Core
         {
             m_Run.WallWritingsRead = count > m_Run.WallWritingsRead ? count : m_Run.WallWritingsRead;
         }
+        void RegisterRecordingPlayed() { ++m_Run.RecordingsPlayed; }
         void RegisterHiddenRoomEscaped() { m_Run.HiddenRoomEscaped = true; }
         void SetStage2Anomalies(int first, int second)
         {
@@ -145,6 +149,7 @@ namespace Core
         int GetChargersUsed() const { return m_Run.ChargersUsed; }
         int GetEvidenceCollected() const { return m_Run.EvidenceCollected; }
         int GetWallWritingsRead() const { return m_Run.WallWritingsRead; }
+        int GetRecordingsPlayed() const { return m_Run.RecordingsPlayed; }
         bool IsHiddenRoomEscaped() const { return m_Run.HiddenRoomEscaped; }
         int GetStage2FirstAnomaly() const { return m_Run.Stage2FirstAnomaly; }
         int GetStage2SecondAnomaly() const { return m_Run.Stage2SecondAnomaly; }

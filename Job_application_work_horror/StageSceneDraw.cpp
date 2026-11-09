@@ -108,6 +108,11 @@ void StageScene::Draw(Camera* camera)
         m_InteractionSystem.GetPrompt(),
         game->IsGuideEnabled() ? std::string_view(objectiveText) : std::string_view{});
 
+    // 録音と無線の字幕（目的表示なしの設定でも出す。物語の一部で、操作の説明ではないため）
+    Hud::RadioView radioView;
+    m_Transmissions.FillView(radioView);
+    m_Hud.DrawRadio(radioView);
+
     // 目的地の方向：始まりの4.2秒の後、進み具合に合わせて次に行く場所を指している（普段はループ廊下の突き当たりの最後のドア）
     if (game->IsGuideEnabled() &&
         m_StageVisualTimer >= 4.20f &&

@@ -240,6 +240,12 @@
     <ClCompile Include="ForestRadio.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="Stage1Transmissions.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="VoiceRecorder.cpp">
+      <Filter>ソース ファイル\Gameplay</Filter>
+    </ClCompile>
     <ClCompile Include="LabEntrance.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
@@ -417,6 +423,12 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="shader\doorPainting.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\rockSurface.hlsli">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\barkSurface.hlsli">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="shader\horrorGrade.hlsli">
@@ -719,6 +731,12 @@
     <ClInclude Include="ForestRadio.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
+    <ClInclude Include="Stage1Transmissions.h">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="VoiceRecorder.h">
+      <Filter>ソース ファイル\Gameplay</Filter>
+    </ClInclude>
     <ClInclude Include="LabEntrance.h">
       <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
@@ -890,6 +908,12 @@
       <Filter>リソース ファイル</Filter>
     </FxCompile>
     <FxCompile Include="shader\doorPS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\rockPS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\barkPS.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>
     <FxCompile Include="shader\flashlightRevealPS.hlsl">
