@@ -81,6 +81,8 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;ENABLE_IMGUI;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <!-- .cpp を CPU のコア数だけ並べてコンパイルする（/MP）。ヘッダーを変えたときのビルドが大きく速くなる -->
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>external\imgui;external\imgui\backends;external\directxtk\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -105,6 +107,8 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <!-- .cpp を CPU のコア数だけ並べてコンパイルする（/MP）。ヘッダーを変えたときのビルドが大きく速くなる -->
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>external\imgui;external\imgui\backends;external\directxtk\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -128,6 +132,8 @@
       <PreprocessorDefinitions>_DEBUG;ENABLE_IMGUI;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <!-- .cpp を CPU のコア数だけ並べてコンパイルする（/MP）。ヘッダーを変えたときのビルドが大きく速くなる -->
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>external\assimp\include;external\imgui;external\imgui\backends;external\directxtk\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
@@ -158,6 +164,8 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <!-- .cpp を CPU のコア数だけ並べてコンパイルする（/MP）。ヘッダーを変えたときのビルドが大きく速くなる -->
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>external\assimp\include;external\directxtk\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
@@ -169,6 +177,8 @@
       <AdditionalDependencies>DirectXTK_SimpleMath-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <!-- 同梱したSimpleMathのlibはPDB（約20MB）を含めないため、PDBが見つからない警告LNK4099だけを抑制します -->
       <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
+      <!-- リンク時の最適化（LTCG）を、変わった関数だけ作り直す差分の方式（/LTCG:INCREMENTAL）にしている。できる実行ファイルの速さは同じ -->
+      <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
@@ -472,6 +482,8 @@
     <ClInclude Include="shader\doorPainting.hlsli" />
     <ClInclude Include="shader\rockSurface.hlsli" />
     <ClInclude Include="shader\barkSurface.hlsli" />
+    <ClInclude Include="shader\forestWetness.hlsli" />
+    <ClInclude Include="shader\facadeSurface.hlsli" />
     <ClInclude Include="shader\horrorGrade.hlsli" />
     <ClInclude Include="shader\horrorMist.hlsli" />
     <ClInclude Include="shader\surfaceDetail.hlsli" />
@@ -550,6 +562,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\barkPS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\facadePS.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>

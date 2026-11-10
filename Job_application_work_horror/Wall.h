@@ -56,7 +56,9 @@ private:
     // 見た目に使うモデルの名前（空なら箱）と、箱の頂点（モデルをやめたときに戻すため）
     std::string m_VisualModel;
     // 外の森のモデルを、岩・樹皮の材質のシェーダー（rockPS・barkPS）で描いているか
-    enum class NaturalSurface { None, Rock, Bark };
+    // Facade は、研究所の外壁の材質（facadePS。モデルではなく箱に、配置ファイルの facade で付ける）
+    enum class NaturalSurface { None, Rock, Bark, Facade };
+    bool m_FacadeSurface = false;
     NaturalSurface m_NaturalSurface = NaturalSurface::None;
     // 樹皮の木目の向き（モデルを箱の向きへ回した後。木と茂みは上、倒木は長い向き）。UploadMaterial がワールドへ回して渡す
     DirectX::SimpleMath::Vector3 m_GrainAxis = DirectX::SimpleMath::Vector3(0.0f, 1.0f, 0.0f);
@@ -119,6 +121,8 @@ public:
     // 建物の壁として、壁の古さ（パネルの継ぎ目・ひび・水の跡・カビ）を描くかどうかを決めている。
     // 古さの濃さは面ごとに Renderer::SetWallWeathering で決めている。小物（棚・配管・標識）には使っていない。
     void SetWeatheringSurface(bool enabled);
+    // 研究所の外壁の材質（facadePS）で描く箱にするか。次の SetVisualModel でシェーダーを選ぶ
+    void SetFacadeSurface(bool enabled) { m_FacadeSurface = enabled; }
 
     // 信号盤の目印のように、専用のピクセルシェーダー（signalPanelPS）で模様を描く面にするか
     void SetSignalSurface(bool enabled)

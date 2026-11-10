@@ -229,6 +229,9 @@ namespace Effect
                 (0.0f - m_HorrorPulseStrength) * response(0.18f);
         }
 
+        // レンズのしぶきが付いてからの秒数を進めている（crtOverlayPS.hlsl が、粒の流れ落ちた量と縦の伸びに使う）。
+        // しぶきがない間も数え続けるので、大きくなりすぎないよう60秒で止めている
+        m_LensDropAge = (std::min)(m_LensDropAge + deltaTime, 60.0f);
         // レンズの曇り：なめらかな曲線（smoothstep）で消している
         if (m_LensMoistureTimer > 0.0f && m_LensMoistureDuration > 0.0f)
         {
@@ -273,6 +276,10 @@ namespace Effect
         m_LensMoistureTimer = m_LensMoistureDuration;
         m_LensMoisturePeak = (std::max)(m_LensMoisture, clampedStrength);
         m_LensMoisture = m_LensMoisturePeak;
+        // 新しいしぶき：粒の位置・大きさ・速さを決める乱数の種を進め、流れ落ちる時間を0から数え直している。
+        // 種は黄金比（0.618…）ずつずらしているので、続けてしぶきが付いても、前と似た位置に並ばない
+        m_LensDropSeed = std::fmod(m_LensDropSeed + 0.6180339f, 1.0f);
+        m_LensDropAge = 0.0f;
     }
 
     // 今の作りでは3DのシーンをBackBufferへ描いているため、画面効果の入力として
@@ -464,6 +471,8 @@ namespace Effect
             m_FrameHoldTimer > 0.0f ? 1.0f : 0.0f,
             m_FrameHoldOffset,
             (std::clamp)(m_FearVision * effectScale, 0.0f, 1.0f),
-            (std::clamp)(m_FearBeat * effectScale, 0.0f, 1.0f));
+            (std::clamp)(m_FearBeat * effectScale, 0.0f, 1.0f),
+            m_LensDropSeed,
+            m_LensDropAge);
     }
 }

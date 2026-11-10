@@ -49,6 +49,21 @@ void Renderer::SetLoopDepth(float depth)
 	UploadDebugViewBuffer();
 }
 
+// 外の森の雨で岩・樹皮・研究所の外壁が濡れる強さと、水の筋の時間を設定している。
+// 値は b7（デバッグ表示と壁の古さの定数バッファ）の、使っていなかった詰め物の場所に入れている。
+// 雨の間は時間が毎フレーム変わるので、毎フレーム送っている（同じ値なら送らない）
+void Renderer::SetRainWetness(float wetness, float time)
+{
+	const float clamped = wetness < 0.0f ? 0.0f : (wetness > 1.0f ? 1.0f : wetness);
+	if (clamped == m_DebugView.RainWetness && time == m_DebugView.RainTime)
+	{
+		return;
+	}
+	m_DebugView.RainWetness = clamped;
+	m_DebugView.RainTime = time;
+	UploadDebugViewBuffer();
+}
+
 // 部屋の角の暗がりに使う壁の形（最大32個）と、床・天井の高さ・強さを定数バッファ（b11）へ送っている
 void Renderer::SetRoomOcclusion(
 	const Vector4* boxes, unsigned int boxCount,
@@ -134,6 +149,24 @@ void Renderer::SetReflectionMode(int mode, const Matrix& projection, bool screen
 	// z（小物の箱の数）は SetReflectionProps が決めるため、そのまま残している
 	m_WaterCaustics.Reflection.x = static_cast<float>(mode);
 	m_WaterCaustics.Reflection.y = screenSpaceAvailable ? 1.0f : 0.0f;
+	m_pDeviceContext->UpdateSubresource(
+		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
+	m_pDeviceContext->PSSetConstantBuffers(
+		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+}
+
+// 水たまりのレイ反射で、画面の外の物を環境マップ（t14）から読めるかと、環境マップを撮った位置をb12へ設定している（変わらなければ送り直さない）
+void Renderer::SetReflectionEnvironment(bool available, const Vector3& captureCenter)
+{
+	const float value = available ? 1.0f : 0.0f;
+	const Vector4 center(captureCenter.x, captureCenter.y, captureCenter.z, 0.0f);
+	if (!m_pWaterCausticsBuffer ||
+		(m_WaterCaustics.Reflection.w == value && m_WaterCaustics.ReflectionProbeCenter == center))
+	{
+		return;
+	}
+	m_WaterCaustics.Reflection.w = value;
+	m_WaterCaustics.ReflectionProbeCenter = center;
 	m_pDeviceContext->UpdateSubresource(
 		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(

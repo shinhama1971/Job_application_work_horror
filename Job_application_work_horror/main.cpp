@@ -61,6 +61,26 @@ int PrecompileShadersFromCommandLine()
 	return 1;
 }
 
+// 配布用のフォルダ（tools/make-release.ps1 が作る。exe の隣に assets と shader がある）から起動したときは、
+// exe の場所を作業フォルダにしている。ショートカットやコマンドプロンプトから、別のフォルダを作業フォルダにして起動しても、
+// 素材とシェーダーを読めるようにするため。開発中（exe は x64\Release にあり、隣に assets がない）は何もしない
+static void UseExecutableFolderWhenPackaged()
+{
+	wchar_t modulePath[MAX_PATH * 4] = {};
+	const DWORD length = GetModuleFileNameW(nullptr, modulePath, static_cast<DWORD>(_countof(modulePath)));
+	if (length == 0 || length >= _countof(modulePath))
+	{
+		return;
+	}
+	const std::filesystem::path folder = std::filesystem::path(modulePath).parent_path();
+	std::error_code error;
+	if (std::filesystem::is_directory(folder / "assets", error) &&
+		std::filesystem::is_directory(folder / "shader", error))
+	{
+		std::filesystem::current_path(folder, error);
+	}
+}
+
 //=======================================
 // エントリーポイント
 //=======================================
@@ -77,6 +97,8 @@ int main(void)
 	{
 		return precompileResult;
 	}
+
+	UseExecutableFolderWhenPackaged();
 
 	// アプリケーションを実行している（ウィンドウを閉じるまで戻らない）
 	Application app;

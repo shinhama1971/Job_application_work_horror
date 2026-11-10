@@ -176,6 +176,22 @@ void IntroScene::Draw(Camera* camera)
     view.MissionGoal = MissionGoal;
     view.MissionAlpha = m_ShowingMission ? Fade(m_MissionTimer, 0.0f, 0.5f) : 0.0f;
     m_Hud.DrawIntro(view);
+    // ポーズ中はポーズメニューを重ねている（受信記録の途中でも、ESC でゲームを終えたりタイトルへ戻ったりできるように）
+    Core::Game* game = Core::Game::GetInstance();
+    if (game->IsPaused())
+    {
+        m_Hud.DrawPause(
+            game->GetBrightnessLevel(),
+            game->GetEffectLevel(),
+            game->GetLookSensitivityLevel(),
+            game->GetVolumeLevel(),
+            game->IsGuideEnabled(),
+            game->GetResolutionLevel(),
+            game->GetPauseSettingIndex(),
+            0,
+            game->GetRunTimeSeconds(),
+            game->GetCaughtCount());
+    }
 }
 
 namespace

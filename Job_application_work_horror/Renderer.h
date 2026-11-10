@@ -83,7 +83,10 @@ struct DEBUG_VIEW_BUFFER
     float HorrorMarksStrength;
     // 2面の周回の深さ（0〜1）。周回が進むほど、廊下の色調が赤黒く沈み、霧が濃くなる（shader/horrorGrade.hlsli）
     float LoopDepth;
-    float LoopDepthPadding[3];
+    // 外の森の雨で、岩・樹皮・研究所の外壁が濡れる強さ（0〜1）と、水の筋を流す時間（秒）（shader/forestWetness.hlsli。ForestRain が設定する）
+    float RainWetness;
+    float RainTime;
+    float RainWetnessPadding;
 };
 
 static_assert(sizeof(DEBUG_VIEW_BUFFER) == 32, "Debug view buffer must be 32 bytes");
@@ -142,9 +145,11 @@ struct WATER_CAUSTICS_BUFFER
     // 向きと動き（xy = 前の向きのx・z、z = 歩く手足の振り -1〜1）。shader/figureShadow.hlsli がカプセルで影を求めている（Player）
     DirectX::SimpleMath::Vector4 PlayerBody;
     DirectX::SimpleMath::Vector4 PlayerBodyPose;
+    // 水たまりのレイ反射が読む環境マップを撮った位置（xyz。w = 詰め物）。Reflection.w が1のときだけ使う（rayReflection.hlsli）
+    DirectX::SimpleMath::Vector4 ReflectionProbeCenter;
 };
 
-static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 1152, "Water caustics buffer must match HLSL layout");
+static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 1168, "Water caustics buffer must match HLSL layout");
 
 // サブセット（モデルの中で、同じマテリアルで描く部分）
 struct SUBSET{
@@ -304,6 +309,8 @@ public:
 	static void SetWallWeathering(float weathering, float horrorMarks = 1.0f);
 	// 2面の周回の深さ（0〜1）を設定している。0ならこれまでと同じ色調と霧
 	static void SetLoopDepth(float depth);
+	// 外の森の雨で岩・樹皮・研究所の外壁が濡れる強さ（0〜1）と、水の筋を流す時間（秒）を設定している。0なら濡らさない
+	static void SetRainWetness(float wetness, float time);
 	// 部屋の角の暗がりに使う壁の形と、床・天井の高さを設定している。boxCount が0なら暗がりを付けない。
 	static void SetRoomOcclusion(
 		const DirectX::SimpleMath::Vector4* boxes, unsigned int boxCount,
@@ -318,6 +325,8 @@ public:
 		const DirectX::SimpleMath::Vector2& origin, float worldSize, float strength);
 	// 水面の反射の方式（0 反射なし、1 キューブマップ、2 SSR、3 レイ反射）と、SSRで使うプレイヤーの視点の射影行列を、床と鏡のシェーダーへ渡している。
 	// screenSpaceAvailable は、このフレームでSSRの深度と前のフレームの画面を用意するか（レイ反射が画面の中の物を拾うのに使う）
+	// 水たまりのレイ反射で、画面の外の物を環境マップ（t14）から読めるか（6面とも撮れているとき true）と、環境マップを撮った位置
+	static void SetReflectionEnvironment(bool available, const DirectX::SimpleMath::Vector3& captureCenter);
 	static void SetReflectionMode(int mode, const DirectX::SimpleMath::Matrix& projection,
 		bool screenSpaceAvailable = false);
 	// 2面の「血の手形」の異変で壁に浮かべる手形（最大4つ。x = 壁の表面のx、y = 高さ、z = 奥行き、w = 見え方）を、壁のシェーダーへ渡している。countが0なら描かない

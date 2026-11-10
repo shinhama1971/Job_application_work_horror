@@ -20,9 +20,12 @@ namespace
 	// 水たまりのメッシュを床から浮かせる高さ（約2.5mm）。床と同じ平面だと深度がそろわずちらつくため、わずかに上げている
 	constexpr float WaterSurfaceLift = 0.05f;
 	// 水たまりのメッシュの細かさを変える距離（カメラから、メッシュを囲む円の一番近い所まで）。
-	// 遠くの霧（horrorGrade.hlsli の GetHorrorDistanceFog）は110から濃くなり始めるので、それより先から省いている
-	constexpr float NearWaterDistance = 130.0f;
-	constexpr float MiddleWaterDistance = 280.0f;
+	// NearWaterDistance までは、画面をたどる反射（SSR）と部屋の形への光線の両方で映す（一番きれいで重い）。
+	// MiddleWaterDistance までは、SSR を省き、部屋の形への光線だけで映す。
+	// その先は光線を飛ばさず、遠くの霧の色を映す（遠くの水面に映る物は小さく、霧に沈んで見分けられないため）。
+	// 遠くの霧（horrorGrade.hlsli の GetHorrorDistanceFog）は110から濃くなり始めるので、それより少し先から段を下げている
+	constexpr float NearWaterDistance = 170.0f;
+	constexpr float MiddleWaterDistance = 340.0f;
 	// 水たまり・雨漏りの多角形の辺の数
 	constexpr int PuddleOutlineSegments = 32;
 	constexpr int LeakOutlineSegments = 24;
@@ -430,11 +433,15 @@ void Ground::AddRainRipples(float deltaTime)
 		m_PendingRainDrops = 0.0f;
 		return;
 	}
-	// 1秒に落とす雨粒の数（水たまりの外に落ちた分は捨てるので、輪になるのは水たまりの広さの割合だけ）
-	constexpr float DropsPerSecond = 1600.0f;
-	constexpr float DropArea = 48.0f;
+	// 雨粒を落とす範囲（カメラから縦横にこの距離まで）。波を計算している範囲（WaterRippleSimulation の一辺192）の全体に落とし、
+	// 範囲の端の水たまりにも、近くと同じように雨の輪を出している（端の2は、範囲の外へはみ出したおもりを捨てないための余白）
+	constexpr float DropArea = WaterRippleSimulation::WorldSize * 0.5f - 2.0f;
+	// 1秒に落とす雨粒の数。水たまりの外に落ちた分は捨てるので、輪になるのは水たまりの広さの割合だけになる。
+	// 一辺96の正方形あたり1600粒（強い雨）を基準にし、範囲の面積に比例させて、1平方あたりの輪の数を一定にしている
+	constexpr float DropsPerSecond = 1600.0f * (DropArea / 48.0f) * (DropArea / 48.0f);
 	constexpr int MaxRingsPerFrame = 12;
-	m_PendingRainDrops = (std::min)(m_PendingRainDrops + DropsPerSecond * m_RainIntensity * deltaTime, 200.0f);
+	// まだ落としていない雨粒の数をためている。重いフレームで一度に大量に落とさないよう、上限を400にしている
+	m_PendingRainDrops = (std::min)(m_PendingRainDrops + DropsPerSecond * m_RainIntensity * deltaTime, 400.0f);
 	const DirectX::SimpleMath::Vector3 eye = Core::Game::GetInstance()->GetCamera()->GetPosition();
 	auto nextRandom = [this]()
 	{
@@ -456,9 +463,11 @@ void Ground::AddRainRipples(float deltaTime)
 		{
 			continue;
 		}
-		// 足音（半径1.4・強さ1.2）より小さく弱い、細かい輪（波のマス目が0.75なので、半径はそれより少し大きくしている）
+		// 水たまりに入った雨粒を、波のシミュレーションのおもりとして足している（水面を押し下げ、そこから輪が広がる）。
+		// 足音（半径1.4・強さ1.2）より小さく弱い、細かい輪にしている（波のマス目が0.75なので、半径はそれより少し大きくしている）。
+		// 1粒の強さは雨の強さで変えず、弱い雨は輪の数だけを減らしている（強さまで下げると、少し離れた所の輪が見えなくなるため）
 		m_RippleSimulation.AddImpulse(DirectX::SimpleMath::Vector2(drop.x, drop.z),
-			0.8f + nextRandom() * 0.3f, -(0.3f + nextRandom() * 0.25f) * m_RainIntensity);
+			0.8f + nextRandom() * 0.3f, -(0.3f + nextRandom() * 0.25f));
 		++rings;
 	}
 }

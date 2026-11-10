@@ -109,7 +109,8 @@ ForestScene::World ForestScene::BuildWorld(SceneLayoutBuilder& builder, const Pr
     {
         ForestRain* rain = builder.Create<ForestRain>("ForestRain");
         rain->SetGroundHeight(world.GroundObject->GetPosition().y);
-        world.GroundObject->SetRainIntensity(1.0f);
+        rain->SetIntensity(RainStrength);
+        world.GroundObject->SetRainIntensity(RainStrength);
     }
     return world;
 }
@@ -268,5 +269,21 @@ void ForestScene::Draw(Camera* camera)
     {
         const float fade = (std::min)(1.0f, m_EnterTimer / (EnterFadeSeconds * 0.85f));
         m_Hud.DrawBlink(fade);
+    }
+    // ポーズ中はポーズメニューを重ねている（ESC・P・START で開くのは Game::Update。ここで描かないと、止まっただけに見える）
+    Core::Game* game = Core::Game::GetInstance();
+    if (game->IsPaused())
+    {
+        m_Hud.DrawPause(
+            game->GetBrightnessLevel(),
+            game->GetEffectLevel(),
+            game->GetLookSensitivityLevel(),
+            game->GetVolumeLevel(),
+            game->IsGuideEnabled(),
+            game->GetResolutionLevel(),
+            game->GetPauseSettingIndex(),
+            0,
+            game->GetRunTimeSeconds(),
+            game->GetCaughtCount());
     }
 }

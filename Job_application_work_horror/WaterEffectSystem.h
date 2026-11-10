@@ -57,6 +57,8 @@ private:
     // 次に足音の波紋を作れるまでの秒数、次にレンズの曇りを出せるまでの秒数
     float m_FootstepRippleCooldown = 0.0f;
     float m_LensSplashCooldown = 0.0f;
+    // 雨漏り以外の水滴の着水音を、次に鳴らせるまでの秒数（位置付きの音の枠は16しかないので、続けて鳴らしすぎないようにしている）
+    float m_DropSoundCooldown = 0.0f;
     // 床一面が水に浸かった範囲（1面の西棟）。水たまりと同じく、足音が水音になり、波紋が立つ。
     bool m_HasFloodRegion = false;
     DirectX::SimpleMath::Vector2 m_FloodMin;

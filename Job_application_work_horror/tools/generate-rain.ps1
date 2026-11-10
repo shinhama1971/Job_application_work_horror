@@ -1,12 +1,12 @@
 ﻿# ============================================================================
-# 外の森の雨音（assets/Audio/rain.wav）を合成して書き出します（ループ再生）。
-# 外部素材を使わず計算だけで作るため、ライセンスを気にせず同梱できます。
-# 乱数の種を固定しているので、何度実行しても同じ音になります。
+# 外の森の雨音（assets/Audio/rain.wav）を合成して書き出す（ループ再生）。
+# 外部素材を使わず計算だけで作るため、ライセンスを気にせず同梱できる。
+# 乱数の種を固定しているので、何度実行しても同じ音になる。
 #
-# ・「サー」という雨の面の音：白い雑音を、約500Hz〜6kHzの帯域にし、ゆっくりした風の強弱で揺らしています。
-# ・低い「ゴー」という遠くの雨：白い雑音を約250Hz以下に削った音を、小さく重ねています。
-# ・葉や地面を打つ細かい粒：短く減衰する高い音（2〜6kHz）を、1秒に約90回、ばらばらな時刻に足しています。
-# ・ときどき落ちる大きな滴「ポツ」：低めの音（0.6〜1.5kHz）を、1秒に約2回足しています。
+# ・「サー」という雨の面の音：白い雑音を、約500Hz〜6kHzの帯域にし、ゆっくりした風の強弱で揺らしている。
+# ・低い「ゴー」という遠くの雨：白い雑音を約250Hz以下に削った音を、小さく重ねている。
+# ・葉や地面を打つ細かい粒：短く減衰する高い音（2〜6kHz）を、1秒に約90回、ばらばらな時刻に足している。
+# ・ときどき落ちる大きな滴「ポツ」：低めの音（0.6〜1.5kHz）を、1秒に約2回足している。
 #
 # 使い方（プロジェクトのフォルダで実行）:
 #   powershell -ExecutionPolicy Bypass -File tools/generate-rain.ps1
@@ -44,7 +44,7 @@ for ($i = 0; $i -lt $sampleCount; $i++) {
     $samples[$i] = $highPassed * 1.6 * $gust + $rumble * 2.4
 }
 
-# 短く減衰する音を1つ足しています（frequency の正弦波に、少し雑音を混ぜている）
+# 短く減衰する音を1つ足している（frequency の正弦波に、少し雑音を混ぜている）
 function Add-Drop([int]$start, [double]$frequency, [double]$decaySeconds, [double]$amplitude) {
     $length = [int]($decaySeconds * 5.0 * $sampleRate)
     for ($k = 0; $k -lt $length; $k++) {
@@ -68,7 +68,7 @@ for ($n = 0; $n -lt $largeCount; $n++) {
     Add-Drop ($random.Next($sampleCount)) (600.0 + $random.NextDouble() * 900.0) (0.008 + $random.NextDouble() * 0.012) (0.12 + $random.NextDouble() * 0.15)
 }
 
-# ループしたときにつなぎ目が聞こえないよう、最後の0.5秒と最初の0.5秒を重ねてなめらかにつないでいます
+# ループしたときにつなぎ目が聞こえないよう、最後の0.5秒と最初の0.5秒を重ねてなめらかにつないでいる
 $blend = [int](0.5 * $sampleRate)
 for ($i = 0; $i -lt $blend; $i++) {
     $weight = $i / $blend
@@ -79,7 +79,7 @@ $loopCount = $sampleCount - $blend
 $loopSamples = New-Object double[] $loopCount
 [Array]::Copy($samples, $loopSamples, $loopCount)
 
-# 最大音量を0.7にそろえて16bitへ変換します
+# 最大音量を0.7にそろえて16bitへ変換する
 $peak = 0.0
 foreach ($value in $loopSamples) { $peak = [Math]::Max($peak, [Math]::Abs($value)) }
 $scale = 0.7 / $peak

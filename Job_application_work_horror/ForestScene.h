@@ -32,7 +32,11 @@ public:
     static constexpr const char* PropLayoutPath = "assets/layout/forest_props.txt";
     // 森に雨を降らせるか（雨粒・地面のしぶき・水たまりの雨の輪・雨音）。false にすると、雨のない夜の森になる。
     // 雨の仕組み（ForestRain・Ground::AddRainRipples・雨音）はそのまま残しているので、true に戻せばまた降る
-    static constexpr bool RainEnabled = false;
+    static constexpr bool RainEnabled = true;
+    // 雨の強さ（0〜1。1 は土砂降り）。BuildWorld が ForestRain（雨粒としぶきの数・落ちる速さ）、Ground（水たまりの雨の輪の数）に、
+    // Game::ChangeScene が雨音の大きさに、ForestRain が岩・樹皮・外壁の濡れ具合（Renderer::SetRainWetness）に使っている。
+    // 0.35 は、ライトの中に雨の筋がまばらに見え、足音や物音が雨音に埋もれないくらいの、少し弱い雨
+    static constexpr float RainStrength = 0.35f;
     // ゲームを --forest で起動したか（タイトルの代わりに、森から始める）
     static bool IsRequestedByCommandLine();
 

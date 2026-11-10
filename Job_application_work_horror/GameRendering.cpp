@@ -416,6 +416,11 @@ namespace Core
             m_Instance->m_EnvironmentProbe.Unbind();
             m_Instance->m_GpuTimer.SkipPass(GpuPass::EnvironmentProbe);
         }
+        // 水たまりのレイ反射は、画面の外の物の色を、この環境マップ（本物の景色）から読んでいる。
+        // 撮っていないとき（PBRを止めた技術デモ・最低の画質）は、これまでどおり部屋の形と模様で映す
+        // 撮った位置も渡し、シェーダーはその位置から撮った景色として読む（今の目の位置として読むと、歩くたびに映り込みがずれて跳ねるため）
+        Renderer::SetReflectionEnvironment(usesEnvironment && m_Instance->m_EnvironmentProbe.HasAllFaces(),
+            m_Instance->m_EnvironmentProbe.GetCaptureCenter());
 
         // 監視映像など、Sceneが持つ補助カメラの映像は、本描画の前に描いておいている。
         if (m_Instance->m_Scene)

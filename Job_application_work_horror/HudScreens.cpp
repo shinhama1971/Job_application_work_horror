@@ -1068,9 +1068,13 @@ void Hud::DrawPause(
     addCenteredText(panelY + 34.0f, "ポーズ", 5.0f, green);
     const int runSeconds = (std::max)(
         0, static_cast<int>(runTimeSeconds));
+    // 階の番号が0以下なら、研究所に入る前（外の森・導入）として表示している
+    const std::string place = floorNumber <= 0
+        ? std::string("研究所の外")
+        : std::to_string((std::min)(floorNumber, 2)) + "階";
     const std::string runStatus =
-        "現在 " + std::to_string((std::clamp)(floorNumber, 1, 2)) +
-        "階   経過 " + std::to_string(runSeconds / 60) + "分 " +
+        "現在 " + place +
+        "   経過 " + std::to_string(runSeconds / 60) + "分 " +
         std::to_string(runSeconds % 60) + "秒   捕まった回数 " +
         std::to_string((std::max)(caughtCount, 0));
     addCenteredText(panelY + 78.0f, runStatus, 2.0f, pale);
@@ -1133,7 +1137,7 @@ void Hud::DrawPause(
         addCenteredText(panelY + 392.0f,
             "START ゲームに戻る", 2.5f, pale);
         addCenteredText(panelY + 434.0f,
-            "Y この階をやり直す", 2.5f, pale);
+            floorNumber <= 0 ? "Y この場面をやり直す" : "Y この階をやり直す", 2.5f, pale);
         addCenteredText(panelY + 476.0f,
             "B タイトルへ戻る", 2.5f, pale);
         addCenteredText(panelY + 518.0f,
@@ -1146,7 +1150,7 @@ void Hud::DrawPause(
         addCenteredText(panelY + 392.0f,
             "ESC または P ゲームに戻る", 2.5f, pale);
         addCenteredText(panelY + 434.0f,
-            "R この階をやり直す", 2.5f, pale);
+            floorNumber <= 0 ? "R この場面をやり直す" : "R この階をやり直す", 2.5f, pale);
         addCenteredText(panelY + 476.0f,
             "T タイトルへ戻る", 2.5f, pale);
         addCenteredText(panelY + 518.0f,

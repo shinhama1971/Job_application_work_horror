@@ -291,6 +291,7 @@ void WaterEffectSystem::UpdateFallingDrops(float deltaTime)
 {
 	Core::Game* game = Core::Game::GetInstance();
 	const Vector3 listener = game->GetCamera()->GetPosition();
+	m_DropSoundCooldown = (std::max)(0.0f, m_DropSoundCooldown - deltaTime);
 	for (FallingDrop& drop : m_FallingDrops)
 	{
 		drop.ImpactTimer = (std::max)(0.0f, drop.ImpactTimer - deltaTime);
@@ -315,9 +316,20 @@ void WaterEffectSystem::UpdateFallingDrops(float deltaTime)
 			if (IsInsidePuddle(drop.Position))
 			{
 				m_RippleImpulses.emplace_back(drop.Position.x, drop.Position.z, 0.8f, -0.45f);
-				if (drop.Audible && Vector3::DistanceSquared(listener, drop.Position) <= 115.0f * 115.0f)
+				const float distanceSquared = Vector3::DistanceSquared(listener, drop.Position);
+				if (drop.Audible && distanceSquared <= 115.0f * 115.0f)
 				{
+					// 雨漏りの水滴（雨漏り1か所につき1粒）：毎回、着水と同時に、着水した位置から鳴らしている
 					game->PlayAudioCueAt(SOUND_CUE_WATER_DROP, drop.Position, 0.94f + drop.Seed * 0.12f, 0.75f);
+				}
+				else if (!drop.Audible && m_DropSoundCooldown <= 0.0f && distanceSquared <= 70.0f * 70.0f)
+				{
+					// 水たまりに落ちるほかの水滴（近い水たまりの上から落ちる最大24粒）：距離70以内に落ちたものだけを、
+					// 0.25〜0.5秒の間を空けて鳴らしている。位置付きの音の枠は16しかないので、続けて鳴らしすぎると、
+					// 足音や影の音の枠を奪ってしまうため。
+					// 雨漏りより少し小さく、粒ごとに高さを変えて、同じ音の繰り返しに聞こえないようにしている
+					game->PlayAudioCueAt(SOUND_CUE_WATER_DROP, drop.Position, 0.88f + drop.Seed * 0.30f, 0.55f);
+					m_DropSoundCooldown = 0.25f + drop.Seed * 0.25f;
 				}
 			}
 			drop.ImpactTimer = 0.55f;
@@ -425,15 +437,12 @@ bool WaterEffectSystem::TriggerFootstepRipple(
 	m_RippleImpulses.emplace_back(playerPosition.x, playerPosition.z,
 		sprinting ? 1.7f : 1.4f, sprinting ? -1.7f : -1.2f);
 
-	// 走っているほど強く長く、レンズの曇りを出している（続けて出しすぎないよう間隔を空けている）
-	if (m_LensSplashCooldown <= 0.0f)
+	// 走って水を強く蹴ったときだけ、跳ねた水が画面の下の方に小さく付く（歩いて踏んだ水は目の高さまで届かないので出さない）。
+	// 毎歩では付けず、間隔を空けている。しぶきは crtOverlayPS.hlsl で、毎回違う位置に付き、数秒で流れ落ちて乾く
+	if (sprinting && m_LensSplashCooldown <= 0.0f)
 	{
-		const float moistureStrength = sprinting ? 0.92f : 0.58f;
-		const float moistureDuration = sprinting ? 5.2f : 3.6f;
-		Core::Game::GetInstance()->GetPostProcess()->TriggerLensMoisture(
-			moistureStrength,
-			moistureDuration);
-		m_LensSplashCooldown = sprinting ? 1.15f : 1.75f;
+		Core::Game::GetInstance()->GetPostProcess()->TriggerLensMoisture(0.85f, 2.6f);
+		m_LensSplashCooldown = 2.8f;
 	}
 	return true;
 }

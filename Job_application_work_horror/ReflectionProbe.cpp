@@ -123,9 +123,15 @@ namespace Effect
         viewport.MaxDepth = 1.0f;
         context->RSSetViewports(1, &viewport);
 
+        // 撮る位置は、6面の最初の面を撮るときだけ、渡された位置（カメラの位置）へ移している。
+        // 面ごとに違う位置から撮ると、歩いている間に6面の景色の位置が少しずつずれ、映り込みが跳ねて見えるため
+        if (m_NextFace == 0)
+        {
+            m_CaptureCenter = position;
+        }
         // 撮る位置から面の向きを、画角90度・縦横同じで見ている（6面で全方向をすき間なく覆う）
         const FaceDirection& face = FaceDirections[m_NextFace];
-        m_FaceView = Matrix::CreateLookAt(position, position + face.Forward, face.Up);
+        m_FaceView = Matrix::CreateLookAt(m_CaptureCenter, m_CaptureCenter + face.Forward, face.Up);
         const Matrix projection = Matrix::CreatePerspectiveFieldOfView(
             DirectX::XM_PIDIV2, 1.0f, 0.5f, 600.0f);
         camera.SetOverrideMatrices(m_FaceView, projection);

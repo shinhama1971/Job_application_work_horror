@@ -110,7 +110,9 @@ namespace Graphics
         float frameHold,
         float frameHoldOffset,
         float fearVision,
-        float fearBeat)
+        float fearBeat,
+        float lensDropSeed,
+        float lensDropAge)
     {
         ID3D11DeviceContext* context =
             Renderer::GetDeviceContext();
@@ -141,6 +143,8 @@ namespace Graphics
         tb.frameHoldOffset = frameHoldOffset;
         tb.fearVision = fearVision;
         tb.fearBeat = fearBeat;
+        tb.lensDropSeed = lensDropSeed;
+        tb.lensDropAge = lensDropAge;
 
         context->UpdateSubresource(
             m_TimeBuffer.Get(),

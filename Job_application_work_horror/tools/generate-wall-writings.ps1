@@ -1,11 +1,11 @@
 ﻿# ============================================================================
-# 1面の「懐中電灯で照らすと浮かぶ壁の文字」の画像を生成します。
+# 1面の「懐中電灯で照らすと浮かぶ壁の文字」の画像を生成する。
 # 出力: assets/texture/writing_*.png（1024x256、白い文字をアルファ値に持つRGBA）
 # 実行: powershell -ExecutionPolicy Bypass -File tools/generate-wall-writings.ps1
 #
-# 文字は行書体（HGGyoshotai。無ければ游明朝）で描き、1文字ずつ傾き・大きさ・位置をずらして手書き風にします。
-# さらに垂れた跡とかすれ（ノイズで削る）を加えます。色はシェーダー側で付けるため、
-# 画像はアルファ値（文字の形）だけを使います。乱数の種を固定しているので毎回同じ画像になります。
+# 文字は行書体（HGGyoshotai。無ければ游明朝）で描き、1文字ずつ傾き・大きさ・位置をずらして手書き風にする。
+# さらに垂れた跡とかすれ（ノイズで削る）を加える。色はシェーダー側で付けるため、
+# 画像はアルファ値（文字の形）だけを使う。乱数の種を固定しているので毎回同じ画像になる。
 # ============================================================================
 
 $ErrorActionPreference = 'Stop'
@@ -195,7 +195,7 @@ $outputDirectory = [System.IO.Path]::GetFullPath($outputDirectory)
 #   warning  : 開始地点の近く（最初のヒューズの奥の壁）
 #   three    : 左の倉庫（2本目のヒューズの部屋）
 #   power    : 配電盤の近く
-#   turn     : ループ廊下。読んで目を離すと turned に変わります
+#   turn     : ループ廊下。読んで目を離すと turned に変わる
 $writings = @(
     @{ Name = 'writing_warning'; Text = 'あかりを けすな'; Seed = 1971 },
     @{ Name = 'writing_three';   Text = 'みっつ もどせば でられる'; Seed = 1972 },
@@ -203,7 +203,7 @@ $writings = @(
     @{ Name = 'writing_turn';    Text = 'ふりかえるな'; Seed = 1974 },
     @{ Name = 'writing_turned';  Text = 'ふりかえったな'; Seed = 1975 },
     # 暗証番号の扉（Stage1KeypadDoor）の手がかり。「何桁目か」と数字を別の画像にし、
-    # 番号はプレイごとにランダムに決めて、対応する数字の画像を貼ります。
+    # 番号はプレイごとにランダムに決めて、対応する数字の画像を貼る。
     @{ Name = 'writing_order1'; Text = 'ひとつめ'; Seed = 2001 },
     @{ Name = 'writing_order2'; Text = 'ふたつめ'; Seed = 2002 },
     @{ Name = 'writing_order3'; Text = 'みっつめ'; Seed = 2003 },

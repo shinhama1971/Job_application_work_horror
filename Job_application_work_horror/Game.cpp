@@ -108,11 +108,13 @@ namespace Core
     {
         Input::Update();
 
-        // 1面・2面の間だけ、Esc・P・STARTでポーズメニューを開け閉めしている（デバッグ画面を開いている間は除く）
+        // 1面・2面・外の森・導入の間は、Esc・P・STARTでポーズメニューを開け閉めしている（デバッグ画面を開いている間は除く）。
+        // メニューは各シーンの Draw が描いている（タイトルには終了の項目があり、リザルトからはタイトルへ戻れる）
         const bool gameplayScene =
             m_Instance->m_CurrentScene == SceneName::Stage ||
             m_Instance->m_CurrentScene == SceneName::Stage2 ||
-            m_Instance->m_CurrentScene == SceneName::Forest;
+            m_Instance->m_CurrentScene == SceneName::Forest ||
+            m_Instance->m_CurrentScene == SceneName::Intro;
         const bool pausePressed =
             Input::GetKeyTrigger(VK_ESCAPE) ||
             Input::GetKeyTrigger(VK_P) ||
@@ -425,7 +427,8 @@ namespace Core
             {
                 if (forestOnScreen)
                 {
-                    m_Sound.Play(SOUND_CUE_RAIN);
+                    // 雨音は雨の強さに合わせて小さくしている（強さ1で素材の大きさ、0でも35%は残す。強さ0.35で約6割）
+                    m_Sound.Play(SOUND_CUE_RAIN, 1.0f, 0.35f + 0.65f * ForestScene::RainStrength);
                 }
             }
             // 導入の受信記録の間は、無線の雑音を小さく鳴らしている（「通信途絶」で IntroScene が止める）。

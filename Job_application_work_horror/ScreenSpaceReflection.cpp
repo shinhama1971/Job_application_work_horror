@@ -45,6 +45,44 @@ namespace Effect
     {
         m_DepthView.Reset();
         m_DepthCopy.Reset();
+        m_SceneMipView.Reset();
+        m_SceneMips.Reset();
+    }
+
+    // 前のフレームの画面を写すテクスチャ（縮小画像の段つき）を用意している。
+    // 取り込んだ画面と大きさ・形式が同じなら作り直さず、画面の大きさが変わったときだけ作り直している
+    void ScreenSpaceReflection::EnsureSceneMipTexture(ID3D11Texture2D* source)
+    {
+        D3D11_TEXTURE2D_DESC sourceDesc{};
+        source->GetDesc(&sourceDesc);
+        if (m_SceneMips)
+        {
+            D3D11_TEXTURE2D_DESC currentDesc{};
+            m_SceneMips->GetDesc(&currentDesc);
+            if (currentDesc.Width == sourceDesc.Width && currentDesc.Height == sourceDesc.Height &&
+                currentDesc.Format == sourceDesc.Format)
+            {
+                return;
+            }
+        }
+        // 縮小画像は、GenerateMips で作るため、描画先にもできるテクスチャにしている（0 = 1画素まで全部の段）
+        D3D11_TEXTURE2D_DESC desc = sourceDesc;
+        desc.MipLevels = 0;
+        desc.ArraySize = 1;
+        desc.SampleDesc.Count = 1;
+        desc.SampleDesc.Quality = 0;
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+        desc.CPUAccessFlags = 0;
+        desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
+        ID3D11Device* device = Renderer::GetDevice();
+        if (FAILED(device->CreateTexture2D(&desc, nullptr, m_SceneMips.ReleaseAndGetAddressOf())) ||
+            FAILED(device->CreateShaderResourceView(m_SceneMips.Get(), nullptr, m_SceneMipView.ReleaseAndGetAddressOf())))
+        {
+            // 作れない環境では、縮小画像を使わず、取り込んだ画面をそのまま使う（ぼかしが無くなるだけ）
+            m_SceneMips.Reset();
+            m_SceneMipView.Reset();
+        }
     }
 
     void ScreenSpaceReflection::Prepare(ID3D11ShaderResourceView* previousScene)
@@ -59,9 +97,30 @@ namespace Effect
         context->CopyResource(m_DepthCopy.Get(), depthResource.Get());
         Renderer::SetBackBufferRenderTarget();
 
+        // 前のフレームの画面を、縮小画像を持つテクスチャの一番大きい段へ写し、GenerateMips で半分ずつ縮めた段（1/2・1/4・…）を作っている。
+        // 水たまりのレイ反射は、映る物が水面から離れているほど小さい段を読み、遠くの映り込みをぼかす（rayReflection.hlsli）。
+        // 段を作れなかったときは、取り込んだ画面をそのまま渡す（ぼかしが無くなるだけで、反射は映る）
+        ID3D11ShaderResourceView* sceneView = previousScene;
+        if (previousScene != nullptr)
+        {
+            Microsoft::WRL::ComPtr<ID3D11Resource> sceneResource;
+            previousScene->GetResource(sceneResource.GetAddressOf());
+            Microsoft::WRL::ComPtr<ID3D11Texture2D> sceneTexture;
+            if (SUCCEEDED(sceneResource.As(&sceneTexture)))
+            {
+                EnsureSceneMipTexture(sceneTexture.Get());
+                if (m_SceneMipView)
+                {
+                    context->CopySubresourceRegion(m_SceneMips.Get(), 0, 0, 0, 0, sceneTexture.Get(), 0, nullptr);
+                    context->GenerateMips(m_SceneMipView.Get());
+                    sceneView = m_SceneMipView.Get();
+                }
+            }
+        }
+
         ID3D11ShaderResourceView* depthView = m_DepthView.Get();
         context->PSSetShaderResources(DepthSlot, 1, &depthView);
-        context->PSSetShaderResources(SceneSlot, 1, &previousScene);
+        context->PSSetShaderResources(SceneSlot, 1, &sceneView);
     }
 
     void ScreenSpaceReflection::Unbind()

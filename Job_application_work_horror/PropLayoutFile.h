@@ -50,6 +50,8 @@ struct PropDescription
     bool Weathering = false;
     // 部屋の形として、部屋の角の暗がりとレイ反射に使う壁か（room）
     bool Room = false;
+    // 研究所の外壁の材質（facadePS。型枠の跡・Pコンの穴・雨の黒い垂れ跡・根元の苔）で描く箱か（facade）
+    bool Facade = false;
     float GlowRange = 0.0f;
     float GlowStrength = 0.0f;
     // 見た目に使うモデルの名前（空なら箱。Wall::SetVisualModel）

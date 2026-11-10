@@ -42,6 +42,9 @@ namespace Effect
         void Unbind();
         // 今描いている面のビュー行列（BeginFaceで決めたもの）。懐中電灯の向きを、その面の視点へ回すときに使っている
         const DirectX::SimpleMath::Matrix& GetFaceView() const { return m_FaceView; }
+        // 今の6面を撮っている位置。6面を撮り終えるまでは同じ位置から撮り、6面がそろうたびに、その時のカメラの位置へ移す。
+        // 水たまりのレイ反射は、この位置から撮った景色として読み、映る位置を補正している（rayReflection.hlsli）
+        const DirectX::SimpleMath::Vector3& GetCaptureCenter() const { return m_CaptureCenter; }
         // 何も描かれない所（遠くて描くのを省いた所）を塗る色。環境マップでは、闇に溶ける暗い色にしている
         void SetClearColor(const DirectX::SimpleMath::Color& color) { m_ClearColor = color; }
         // 次にこの方式を選んだとき、6面とも描き直させている。
@@ -65,6 +68,7 @@ namespace Effect
         UINT m_Slot = 7;
         bool m_HasMipChain = false;
         DirectX::SimpleMath::Matrix m_FaceView;
+        DirectX::SimpleMath::Vector3 m_CaptureCenter = DirectX::SimpleMath::Vector3::Zero;
         DirectX::SimpleMath::Color m_ClearColor = DirectX::SimpleMath::Color(0.1f, 0.1f, 0.13f, 1.0f);
     };
 }

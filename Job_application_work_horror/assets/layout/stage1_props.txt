@@ -182,8 +182,9 @@ prop DoorLampSouthWestSouth -138   -64 -182.5   10 4 1   doorLampBody doorLamp 2
 prop DoorLampLoopDoorLeft    -22   -64  37.5    10 4 1   doorLampBody doorLamp 24 0 noshadow glow 55 1.9 model warning_lamp
 prop DoorLampLoopDoorRight    22   -64  37.5    10 4 1   doorLampBody doorLamp 24 0 noshadow glow 55 1.9 model warning_lamp
 prop DoorLampArchive         -42.5 -64  104     1 4 10   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
+prop DoorLampArchive_1         -42.5 -64  136.3     1 4 10   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
 prop DoorLampKeypad           42.5 -64  86.2      1 4 10   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
-prop DoorLampWestWing       -217.5 -64 -40      1 4 10   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
+prop DoorLampWestWing       -217.5 -59.1 -44.2      1 4 10   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
 prop DoorLampPumpRoom       -276   -64  177.5   10 4 1   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
 prop DoorLampLoopCorner      194   -64  237.5   10 4 1   doorLampBody doorLamp 24 0 noshadow glow 55 1.9 model warning_lamp
 # --- 西棟の南西の角：棚・机・木箱の一角
@@ -199,6 +200,7 @@ prop PropWestWingCrate     -345 -93   -15   14 14 14   debrisColor none 6 1 mode
 # --- 光の安全地帯の暖かい電球（停電しても消えない電池式の作業灯）。休む範囲は Stage1Layout.cpp の safeZones
 prop PropSafeLightHubCord    -198 -49.5 12     0.4 2.5 0.4   darkMetal none 4 0 model hanging_cord
 prop PropSafeLightHubBulb    -198 -52.3 12     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 85 3.2 model safe_bulb
+prop PropSafeLightHubBulb_1    -198 -52.3 -51.7     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 85 3.2 model safe_bulb
 prop PropSafeLightDeskBase   -334 -74.5 -306   4 1 4         darkMetal none 12 0 model desk_lamp_base
 prop PropSafeLightDeskArm    -334 -70   -306   0.8 9 0.8     darkMetal none 12 0 model desk_lamp_arm
 prop PropSafeLightDeskShade  -332 -65   -304   5 3 5         warmBulbBody warmBulb 30 0 noshadow glow 85 3.2 model desk_lamp_shade
@@ -230,13 +232,13 @@ place Stage1WestWingLight3           -300 -50.5 220 size 20 2 9
 place Door                           0 -74 40
 place FuseBox                        -35.1 -73.4 35
 place Stage1FacilityMap              -69 -68 38 yaw 180 size 37 25 1
-place ExitPowerPanel                 151.99 -66.93 270
+place ExitPowerPanel                 151.99 -66.93 272.31
 place Stage1EmergencyCharger         -217.5 -90 -103.5 yaw 90
 place Stage1EvidenceTerminal         216.8 -79.5 -42 yaw -90
 place Stage1KeypadDoor               45 -74 110 yaw 90
-place Stage1KeypadPanel              41.5 -73.1 135 yaw 90
+place Stage1KeypadPanel              41.5 -70.77 136.65 yaw 90
 place Stage1KeypadRoomBattery        140 -95 110
-place Stage1HiddenRoomKey            140 -95 60
+place Stage1HiddenRoomKey            207.8 -65.44 109.61
 place Stage1HiddenRoomRecord         213 -82 150 yaw 90
 place Stage1KeypadRoomFuse           196 -95 150
 place BatteryItem                    -130 -95 120
@@ -278,12 +280,12 @@ place Stage1KeypadClueLabel4         218 -70 -135 yaw -90
 # 1本目のヒューズ：開始地点の区画（配管の陰・左奥・右奥）
 spot Stage1FirstFuse     -62 -74.6 27.3
 # 2本目のヒューズ：左の倉庫（倉庫の演出が始まる x<-110, z<-108 の範囲の中だけ）
-spot Stage1SecondFuse    -150 -95 -140
-spot Stage1SecondFuse    -196 -95 -160
-spot Stage1SecondFuse    -128 -95 -166
+spot Stage1SecondFuse    -199.68 -71.37 -131.01
+spot Stage1SecondFuse    -188.75 -71.27 -130.55
+spot Stage1SecondFuse    -181.38 -72.18 -130.96
 # 3本目のヒューズ：西棟の一番奥のポンプ室（ポンプの陰・奥の角・タンク寄り）
 spot Stage1ThirdFuse     -318.02 -95 210
-spot Stage1ThirdFuse     -365 -95 250
+spot Stage1ThirdFuse     -296.16 -95 206.46
 spot Stage1ThirdFuse     -263.8 -95 207.8
 # 西棟の鍵：右の倉庫
 spot Stage1WestWingKey   196 -73.4 -128.3

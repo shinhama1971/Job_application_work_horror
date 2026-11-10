@@ -35,6 +35,12 @@ SamplerState g_SamplerState : register(s0);
 #if defined(BARK_SURFACE)
 #include "barkSurface.hlsli"
 #endif
+#if defined(FACADE_SURFACE)
+#include "facadeSurface.hlsli"
+#endif
+#if defined(ROCK_SURFACE) || defined(BARK_SURFACE) || defined(FACADE_SURFACE)
+#include "forestWetness.hlsli"
+#endif
 
 // 2面の「血の手形」の異変：Stage2Scene が渡した手形（WallHandprints）を、その壁の面に描き、濃さ（0〜1）を返している。
 // 形は1面の壁の血の跡と同じ式（HorrorHandprint）。見え方（w）で少しずつ浮かぶ。
@@ -502,21 +508,38 @@ float4 main(in LIT_PS_IN input) : SV_Target
         // 外の森の岩（rockPS.hlsl）：壁の汚れと古さの代わりに、岩の色むら・ひび・苔・地衣類・鉱物の粒・地面際の湿りを
         // 色・粗さ・濡れ具合・凹凸として付けている（rockSurface.hlsli）。粗さは配置ファイルの色の rough を元にしている
         const RockSurface rock = GetRockSurface(input.worldPos, input.worldNormal, color.rgb, pbrRoughness);
-        color.rgb = rock.albedo;
+        // 雨で濡れた分（暗く・光沢・横の面を流れる水の筋）を足している（forestWetness.hlsli）
+        const ForestWetSurface rockWet = ApplyForestRain(
+            input.worldPos, input.worldNormal, rock.albedo, rock.wetness, rock.height, 0.9f);
+        color.rgb = rockWet.albedo;
         pbrRoughness = rock.roughness;
-        wetness = rock.wetness;
+        wetness = rockWet.wetness;
         detailWorldNormal = ApplyHeightToNormal(
-            input.worldPos, normalize(input.worldNormal), rock.height, 0.85f);
+            input.worldPos, normalize(input.worldNormal), rock.height + rockWet.rivulet * 0.12f, 0.85f);
 #elif defined(BARK_SURFACE)
         // 外の森の枯れ木・倒木・茂み（barkPS.hlsl）：木目に沿った縦の溝・横のひび・繊維・剥がれて出た地の木・苔・地衣類・根元の湿りを
         // 色・粗さ・濡れ具合・凹凸として付けている（barkSurface.hlsli）。木目の向きはマテリアルの環境の色で受け取っている（Wall::UploadMaterial）
         const BarkSurface bark = GetBarkSurface(
             input.worldPos, input.worldNormal, Material.Ambuent.xyz, color.rgb, pbrRoughness);
-        color.rgb = bark.albedo;
+        // 雨で濡れた分を足している（樹皮は溝が細かいので、水の筋の列も細かくしている）
+        const ForestWetSurface barkWet = ApplyForestRain(
+            input.worldPos, input.worldNormal, bark.albedo, bark.wetness, bark.height, 1.6f);
+        color.rgb = barkWet.albedo;
         pbrRoughness = bark.roughness;
-        wetness = bark.wetness;
+        wetness = barkWet.wetness;
         detailWorldNormal = ApplyHeightToNormal(
-            input.worldPos, normalize(input.worldNormal), bark.height, 1.10f);
+            input.worldPos, normalize(input.worldNormal), bark.height + barkWet.rivulet * 0.12f, 1.10f);
+#elif defined(FACADE_SURFACE)
+        // 外の森の研究所の外壁（facadePS.hlsl）：型枠の跡・Pコンの穴・雨だれ・白華・根元の泥と苔・ひびを、
+        // 色・粗さ・濡れ具合・凹凸として付けている（facadeSurface.hlsli）。雨で濡れた分と、壁を流れる水の筋も重ねている
+        const FacadeSurface facade = GetFacadeSurface(input.worldPos, input.worldNormal, color.rgb, pbrRoughness);
+        const ForestWetSurface facadeWet = ApplyForestRain(
+            input.worldPos, input.worldNormal, facade.albedo, facade.wetness, facade.height, 0.7f);
+        color.rgb = facadeWet.albedo;
+        pbrRoughness = facade.roughness;
+        wetness = facadeWet.wetness;
+        detailWorldNormal = ApplyHeightToNormal(
+            input.worldPos, normalize(input.worldNormal), facade.height + facadeWet.rivulet * 0.10f, 0.9f);
 #else
         grime = GetProceduralGrime(
             input.worldPos,

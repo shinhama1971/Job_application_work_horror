@@ -238,17 +238,24 @@ float3 TraceRayReflection(float3 worldPosition, float3 worldNormal, float roughn
     // 波の法線で光線が床へ潜らないよう、少しだけ上へ向けている
     direction = normalize(float3(direction.x, max(direction.y, 0.02f), direction.z));
     float roomDistance;
-    float3 color = TraceRoomReflection(worldPosition + float3(0.0f, 0.05f, 0.0f), direction, roughness, roomDistance);
+    // 画面の外の物は、部屋の形に当たった位置から、環境マップ（本物の景色）の色を読んでいる（rayReflection.hlsli）
+    float3 color = TraceRoomReflection(worldPosition + float3(0.0f, 0.05f, 0.0f), direction, roughness, roomDistance, true);
     // 画面の中をたどるSSRは、近い水たまりだけにしている（中くらいの距離では、部屋の形との交差だけ）
     [branch]
     if (level >= WATER_LEVEL_NEAR && ReflectionParams.y > 0.5f)
     {
-        const float4 screen = TraceScreenSpaceReflection(worldPosition, worldNormal, 20, 1.22f);
+        // 近い水たまりは、画面の中を細かい歩幅で多めにたどっている（32歩、1歩ごとに歩幅を1.14倍）。
+        // 歩幅が粗いと光線が物をすり抜けて外れ、部屋の形の簡単な色で埋めることになり、映り込みが濁るため。
+        // 映る物が水面から離れているほど、前のフレームの画面の縮小画像のぼやけた段を読んでいる（距離60で1段、最大4段）。
+        // 粗い水面（浅い縁や波の強い所）は、最初から少しぼかしている
+        // 水面より1.5以上高い物に当たったときだけ映し、床そのものへの誤った当たりは捨てている（かくかくした映り込みを防ぐ）
+        const float4 screen = TraceScreenSpaceReflection(worldPosition, worldNormal, 32, 1.14f,
+            1.0f / 60.0f, roughness * 1.2f, 1.5f);
         color = lerp(color, screen.rgb, screen.w);
     }
     // 人影は画面に描いていないため、SSRで拾った物より手前に立っているものとして、最後に重ねている（ほぼ黒い影）。
-    // 波の傾きをそのまま使うと人の形が崩れて読めないため、人影に当てる光線だけ、水面の揺れを3割に抑えている
-    const float3 calmNormal = normalize(lerp(float3(0.0f, 1.0f, 0.0f), normalize(worldNormal), 0.3f));
+    // worldNormal は呼ぶ側で、すでに水面の揺れを3割に抑えた向きにしている（人の形が崩れないよう、人影も同じ向きで映す）
+    const float3 calmNormal = normalize(worldNormal);
     float3 figureDirection = reflect(normalize(worldPosition - GetMistEyePosition()), calmNormal);
     figureDirection = normalize(float3(figureDirection.x, max(figureDirection.y, 0.02f), figureDirection.z));
     figure = TracePuddleFigure(worldPosition + float3(0.0f, 0.05f, 0.0f), figureDirection);
@@ -635,6 +642,11 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 反射の方式の比較：キューブマップ・SSR・レイ反射の色と映る度合いを、ここで求めている（反射なしのときは映さない）
     const int reflectionMode = int(ReflectionParams.x + 0.5f);
     float4 alternateReflection = 0.0f;
+    // 反射の光線を飛ばす向きは、穏やかな水面の向き（真上）に、波の傾きを3割だけ足したものにしている。
+    // 細かい波の模様・足音の波・床の凹凸をそのまま使うと、映る景色が細かく乱れて濁って見えるため。
+    // 平らな水面で映した景色を、波の分だけ少し揺らす形になり、映る物の形が崩れずに読める。
+    // 光沢と、波の山が光る輪には、元の波の向き（detailWorldNormal）をそのまま使っている
+    const float3 reflectionNormal = normalize(lerp(float3(0.0f, 1.0f, 0.0f), detailWorldNormal, 0.30f));
     // 「水たまり」の異変の人影が、反射の光線を遮った度合い（レイ反射のときだけ求めている）
     float puddleFigure = 0.0f;
     [branch]
@@ -642,22 +654,25 @@ float4 main(in LIT_PS_IN input) : SV_Target
     {
         if (reflectionMode == 1)
         {
-            alternateReflection = float4(SampleProbeReflection(input.worldPos, detailWorldNormal), 1.0f);
+            alternateReflection = float4(SampleProbeReflection(input.worldPos, reflectionNormal), 1.0f);
         }
         else if (reflectionMode == 2)
         {
-            alternateReflection = TraceScreenSpaceReflection(input.worldPos, detailWorldNormal);
+            alternateReflection = TraceScreenSpaceReflection(input.worldPos, reflectionNormal);
         }
         else
         {
             alternateReflection = float4(
-                TraceRayReflection(input.worldPos, detailWorldNormal, waterRoughness, waterLevel, puddleFigure), 1.0f);
+                TraceRayReflection(input.worldPos, reflectionNormal, waterRoughness, waterLevel, puddleFigure), 1.0f);
         }
     }
+    // 映り込みの強さ：水たまりの濃さ・光線が当たった度合い・見る角度（フレネル）・反射の強さの設定・水面の汚れを掛け合わせている。
+    // 見る角度は、浅い角度でほぼ鏡（98%）、真上から見ても4割は映して、水たまりが床と同じに見えないようにしている。
+    // 浮いた埃や油膜のむら（grime）が多い所は、映り込みを最大2割弱めている
     const float reflectionStrength = saturate(
         puddle * alternateReflection.w *
-        lerp(0.24f, 0.98f, viewAngleReflection) * ReflectionStrength *
-        lerp(0.60f, 1.0f, smoothstep(0.25f, 0.75f, grime)));
+        lerp(0.40f, 0.98f, viewAngleReflection) * ReflectionStrength *
+        lerp(0.80f, 1.0f, smoothstep(0.25f, 0.75f, grime)));
     float3 reflectedScene = 0.0f;
     [branch]
     if (reflectionStrength > 0.001f)
@@ -688,8 +703,11 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 遠くは灰色のもやではなく、闇に溶けていく
     const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb, LoopDepth);
     color.rgb = lerp(color.rgb, fogColor, fogFactor);
-    // 床の近くに溜まって流れる霧（懐中電灯の円錐の中だけ白く浮かぶ。horrorMist.hlsli）
+    // 床の近くに溜まって流れる霧（懐中電灯の円錐の中だけ白く浮かぶ。horrorMist.hlsli）。
+    // 水たまりのよく映る所は、霧を4割弱めている（霧を反射の上から全部かけると、ライトの中で映り込みが白く濁って見えなくなるため）
+    const float3 beforeMist = color.rgb;
     color.rgb = ApplyHorrorMist(color.rgb, input.worldPos, input.viewPos, lighting);
+    color.rgb = lerp(color.rgb, beforeMist, reflectionStrength * 0.40f);
     // 天井の照明や非常灯から下へ落ちる光の筋（霧に散った光。horrorMist.hlsli）
     color.rgb += GetLightShafts(input.worldPos, pointLightListOffset, pointLightCount, input.pos.xy);
     color.rgb = ApplyFilmicHorrorGrade(color.rgb, LoopDepth);

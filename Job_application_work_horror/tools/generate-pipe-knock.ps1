@@ -1,7 +1,7 @@
 ﻿# ============================================================================
-# 金属の配管を叩いたような音（assets/Audio/pipe_knock.wav）を合成して書き出します。
-# 外部素材を使わず計算だけで作るため、ライセンスを気にせず同梱できます。
-# 乱数の種を固定しているので、何度実行しても同じ音になります。
+# 金属の配管を叩いたような音（assets/Audio/pipe_knock.wav）を合成して書き出す。
+# 外部素材を使わず計算だけで作るため、ライセンスを気にせず同梱できる。
+# 乱数の種を固定しているので、何度実行しても同じ音になる。
 #
 # 使い方（プロジェクトのフォルダで実行）:
 #   powershell -ExecutionPolicy Bypass -File tools/generate-pipe-knock.ps1
@@ -16,7 +16,7 @@ $samples = New-Object double[] $sampleCount
 $random = New-Object System.Random 1971
 
 # 金属管の響き。管の固有振動は基音の整数倍にならない（1 : 2.76 : 5.40 : 8.93）ため、
-# この比で重ねると「カーン」という金属らしい音になります。高い音ほど早く消えます。
+# この比で重ねると「カーン」という金属らしい音になる。高い音ほど早く消える。
 $baseFrequency = 212.0
 $modes = @(
     @{ Ratio = 1.00; Amplitude = 0.55; Decay = 1.40 },
@@ -43,12 +43,12 @@ for ($i = 0; $i -lt $sampleCount; $i++) {
         $value += 0.35 * (1.0 - $t / 0.012) * ($random.NextDouble() * 2.0 - 1.0)
     }
 
-    # 立ち上がりの2ミリ秒だけなめらかにし、プツッという音を防ぎます
+    # 立ち上がりの2ミリ秒だけなめらかにし、プツッという音を防ぐ
     $value *= [Math]::Min(1.0, $t / 0.002)
     $samples[$i] = $value
 }
 
-# 廊下で反響したように、遅れた小さな音を重ねます
+# 廊下で反響したように、遅れた小さな音を重ねる
 $echoes = @(
     @{ Delay = 0.090; Gain = 0.26 },
     @{ Delay = 0.175; Gain = 0.12 }
@@ -61,13 +61,13 @@ foreach ($echo in $echoes) {
     }
 }
 
-# 最後の0.3秒で音を消し、ループ時の途切れを防ぎます
+# 最後の0.3秒で音を消し、ループ時の途切れを防ぐ
 $fadeStart = $sampleCount - [int](0.3 * $sampleRate)
 for ($i = $fadeStart; $i -lt $sampleCount; $i++) {
     $samples[$i] *= ($sampleCount - $i) / ($sampleCount - $fadeStart)
 }
 
-# 最大音量を0.8にそろえて16bitへ変換します
+# 最大音量を0.8にそろえて16bitへ変換する
 $peak = 0.0
 foreach ($value in $samples) { $peak = [Math]::Max($peak, [Math]::Abs($value)) }
 $scale = 0.8 / $peak

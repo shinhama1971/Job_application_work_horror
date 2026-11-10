@@ -39,7 +39,7 @@ namespace
         return a.Position == b.Position && a.Scale == b.Scale &&
             a.DiffuseName == b.DiffuseName && a.EmissionName == b.EmissionName &&
             a.Shininess == b.Shininess && a.Collision == b.Collision &&
-            a.CastsShadow == b.CastsShadow && a.Weathering == b.Weathering &&
+            a.CastsShadow == b.CastsShadow && a.Weathering == b.Weathering && a.Facade == b.Facade &&
             a.GlowRange == b.GlowRange && a.GlowStrength == b.GlowStrength;
     }
 
@@ -256,6 +256,11 @@ namespace PropLayoutFile
                     {
                         prop.Room = true;
                     }
+                    else if (option == "facade")
+                    {
+                        // 研究所の外壁の材質（facadePS。型枠の跡・Pコンの穴・雨だれ・根元の苔）で描く箱
+                        prop.Facade = true;
+                    }
                     else if (option == "glow")
                     {
                         if (!(line >> prop.GlowRange >> prop.GlowStrength))
@@ -301,6 +306,8 @@ namespace PropLayoutFile
         wall.SetCollisionEnabled(description.Collision);
         wall.SetCastsShadow(description.CastsShadow);
         wall.SetWeatheringSurface(description.Weathering);
+        // 外壁の材質の印を付けている。どのシェーダーで描くかは次の SetVisualModel が決めるので、その前に付けている
+        wall.SetFacadeSurface(description.Facade);
         wall.SetGlowLight(description.GlowRange, description.GlowStrength);
         // 見た目のモデルは、大きさと色を決めた後で作っている（箱の一番長い向きと、配置の色を使うため）
         wall.SetVisualModel(description.Model);
@@ -463,6 +470,10 @@ namespace PropLayoutFile
         if (description.Room)
         {
             text += " room";
+        }
+        if (description.Facade)
+        {
+            text += " facade";
         }
         if (description.GlowRange > 0.0f)
         {

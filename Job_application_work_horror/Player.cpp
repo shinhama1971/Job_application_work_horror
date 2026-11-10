@@ -64,7 +64,7 @@ void Player::Init()
     }
 
     // 移動・懐中電灯・足音の状態を初期化している
-    m_Position = Vector3(0.0f, -80.0f, 0.0f);
+    m_Position = Vector3(0.0f, -85.0f, 0.0f);
     m_Scale = Vector3(1.0f, 1.0f, 1.0f);
     m_Movement.Initialize();
     m_Flashlight.InitializeRuntimeNotifications();

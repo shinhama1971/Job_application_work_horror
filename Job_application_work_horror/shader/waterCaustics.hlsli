@@ -53,6 +53,8 @@ cbuffer WaterCausticsBuffer : register(b12)
     float4 PlayerBody;
     // プレイヤーの体の向きと動き（xy = 前の向きのx・z、z = 歩く手足の振り（-1〜1）、w = 詰め物）
     float4 PlayerBodyPose;
+    // 水たまりのレイ反射が読む環境マップを撮った位置（xyz。w = 詰め物）。ReflectionParams.w が1のときだけ使う（rayReflection.hlsli）
+    float4 ReflectionProbeCenter;
 }
 
 // 水たまりの波のシミュレーションの高さ（t9。WaterRippleSimulationが毎フレーム計算している）。x = 今の高さ、y = 1つ前の高さ

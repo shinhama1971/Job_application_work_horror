@@ -54,6 +54,9 @@ namespace Effect
         float m_LensMoisturePeak = 0.0f;
         float m_LensMoistureTimer = 0.0f;
         float m_LensMoistureDuration = 0.0f;
+        // レンズのしぶきの乱数の種（付くたびに変え、毎回違う位置に付ける）と、付いてからの秒数
+        float m_LensDropSeed = 0.0f;
+        float m_LensDropAge = 0.0f;
         // ループ廊下の緊張感、光の筋の強さ（今の値と目標）
         float m_CorridorTension = 0.0f;
         float m_TargetCorridorTension = 0.0f;

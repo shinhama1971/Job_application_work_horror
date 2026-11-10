@@ -21,6 +21,7 @@
 #include <d3d11.h>
 #include <wrl/client.h>
 
+#include <algorithm>
 #include <cstdint>
 
 class ForestRain final : public Object
@@ -38,8 +39,8 @@ public:
     // 監視カメラ・水面の反射などの別の視点には描かない
     bool DrawsInAuxiliaryView() const override { return false; }
 
-    // 雨の強さ（0 = 降らない、1 = 強い雨）
-    void SetIntensity(float intensity) { m_Intensity = intensity; }
+    // 雨の強さ（0 = 降らない、1 = 強い雨）。弱い雨ほど、雨粒としぶきの数が減り、少しゆっくり落ちて筋が短くなる
+    void SetIntensity(float intensity) { m_Intensity = (std::clamp)(intensity, 0.0f, 1.0f); }
     float GetIntensity() const { return m_Intensity; }
     // 地面の高さ（これより下の雨粒は描かない。しぶきはこの高さに出す）
     void SetGroundHeight(float groundY) { m_GroundY = groundY; }
@@ -52,6 +53,8 @@ private:
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_TwoSidedRasterizer;
     float m_Time = 0.0f;
     float m_Intensity = 1.0f;
+    // 負荷を比べるために、起動時の環境変数で雨を止めたか（SetIntensity では戻さない）
+    bool m_DisabledByEnvironment = false;
     float m_GroundY = -100.0f;
     // 屋根を集め直すまでの秒数（配置を読み直したときにも合うよう、ときどき集め直している）
     float m_ShelterTimer = 0.0f;

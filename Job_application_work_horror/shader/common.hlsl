@@ -64,7 +64,10 @@ cbuffer DebugViewBuffer : register(b7)
     float HorrorMarksStrength;
     // 2面の周回の深さ（0〜1。Renderer::SetLoopDepth）。周回が進むほど、色調が赤黒く沈み、霧が濃くなる（horrorGrade.hlsli）
     float LoopDepth;
-    float3 LoopDepthPadding;
+    // 外の森の雨で、岩・樹皮・研究所の外壁が濡れる強さ（0〜1）と、水の筋を流す時間（秒）（forestWetness.hlsli。Renderer::SetRainWetness）
+    float RainWetness;
+    float RainTime;
+    float RainWetnessPadding;
 };
 
 // 懐中電灯と環境光の定数バッファ（b3）

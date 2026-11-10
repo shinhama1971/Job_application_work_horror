@@ -7,6 +7,8 @@
 // ・色は前のフレームの画面（画面効果を掛ける前）を使うので、速く動くと少し遅れて見える。
 // ・深度は深度プリパスで描いた物（壁・床・扉）だけ。小物は映らない。
 // ・深度を t8、前のフレームの画面を t4 に設定している。
+// ・前のフレームの画面は、縮小画像（ミップ）を持つ自分のテクスチャへ写してから t4 に設定している。
+//   水たまりのレイ反射は、映る物が水面から離れているほど小さくぼやけた段を読み、本物の水面のように遠くの映り込みをぼかしている。
 // ============================================================================
 
 #pragma once
@@ -27,7 +29,12 @@ namespace Effect
         void Unbind();
 
     private:
+        // 前のフレームの画面を写し、縮小画像を作るテクスチャ（取り込んだ画面と同じ大きさ・形式。必要になったときに作る）
+        void EnsureSceneMipTexture(ID3D11Texture2D* source);
+
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_DepthCopy;
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_DepthView;
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_SceneMips;
+        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_SceneMipView;
     };
 }

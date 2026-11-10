@@ -60,12 +60,16 @@ namespace
     constexpr float CandidateDensity = 0.75f;
     // 区画の一辺の長さ
     constexpr float ChunkSize = 40.0f;
-    // LOD：この距離までは全部の葉を5節で、次の距離までは本数を減らして3節で、その先は1節（三角形1枚）で描いている
-    constexpr float NearDistance = 110.0f;
-    constexpr float MiddleDistance = 220.0f;
-    // この距離から葉が縮み始め、FadeEnd で消える（森の闇と霧で、その先はほとんど見えない）
-    constexpr float FadeStart = 260.0f;
-    constexpr float FadeEnd = 330.0f;
+    // LOD：カメラから区画の一番近い所までの距離で、葉の細かさを3段に分けている。
+    // NearDistance までは全部の葉を5節（曲がりがなめらか）、MiddleDistance までは本数を減らして3節、
+    // その先は1節（三角形1枚）で描く。減らした本数の分は葉の幅を広げ（WidthScale）、遠くから見た草むらの濃さを保っている。
+    // 区画の切り替わりで草が急に変わって見えないよう、本数は距離に合わせてなめらかに減らしている（Draw）
+    constexpr float NearDistance = 140.0f;
+    constexpr float MiddleDistance = 280.0f;
+    // この距離から葉が地面へ縮み始め、FadeEnd で消える（森の闇と霧で、その先はほとんど見えない）。
+    // FadeEnd より遠い区画は、描く処理ごと省いている
+    constexpr float FadeStart = 330.0f;
+    constexpr float FadeEnd = 410.0f;
     // 1スレッドグループの葉の数（grassCS.hlsl の GRASS_GROUP_SIZE と同じ）
     constexpr std::uint32_t GroupSize = 256;
 

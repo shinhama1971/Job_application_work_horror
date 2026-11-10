@@ -621,15 +621,18 @@ void Wall::SetVisualModel(const std::string& name)
     m_VisualModel = name;
     // 外の森の岩は岩の材質（rockPS。色むら・ひび・苔・鉱物の粒・地面際の湿り）、枯れ木・倒木・茂みは樹皮の材質
     // （barkPS。木目に沿った溝・剥がれ・苔）で描いている（どちらもPBR）。配置を読み直して変わったときは、シェーダーを替え直している
+    // 研究所の外壁（モデルのない箱に facade を付けた物）は、外壁の材質（facadePS。型枠の跡・Pコンの穴・雨の黒い垂れ跡・根元の苔）
     const NaturalSurface surface = name == "forest_rock" ? NaturalSurface::Rock
         : (name == "forest_tree_dead" || name == "forest_tree_fork" || name == "forest_fallen_log" || name == "forest_brush")
-            ? NaturalSurface::Bark : NaturalSurface::None;
+            ? NaturalSurface::Bark
+            : (name.empty() && m_FacadeSurface) ? NaturalSurface::Facade : NaturalSurface::None;
     if (surface != m_NaturalSurface)
     {
         m_NaturalSurface = surface;
         m_Shader.Create("shader/litTextureVS.hlsl",
             surface == NaturalSurface::Rock ? "shader/rockPS.hlsl"
-            : surface == NaturalSurface::Bark ? "shader/barkPS.hlsl" : "shader/litTexturePS.hlsl");
+            : surface == NaturalSurface::Bark ? "shader/barkPS.hlsl"
+            : surface == NaturalSurface::Facade ? "shader/facadePS.hlsl" : "shader/litTexturePS.hlsl");
     }
     RebuildVisualModel();
     UploadMaterial();

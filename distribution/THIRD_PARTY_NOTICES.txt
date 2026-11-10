@@ -1,0 +1,50 @@
+﻿============================================================
+  通信途絶 / SIGNAL LOST  使っているライブラリと素材
+============================================================
+
+------------------------------------------------------------
+■ ライブラリ（ライセンスの全文は licenses フォルダ）
+------------------------------------------------------------
+・Assimp 5.2.5（3Dモデルの読み込み）
+    Copyright (c) 2006-2021, assimp team
+    BSD 3-Clause License       licenses/Assimp_LICENSE.txt
+・DirectXTK（SimpleMath のみ）
+    Copyright (c) Microsoft Corporation
+    MIT License                licenses/DirectXTK_LICENSE.txt
+・Dear ImGui（開発用のデバッグ画面。配布版では表示しません）
+    Copyright (c) 2014-2026 Omar Cornut
+    MIT License                licenses/DearImGui_LICENSE.txt
+
+------------------------------------------------------------
+■ 効果音
+------------------------------------------------------------
+・水の中を歩く・走る足音（water_step_walk.wav・water_step_run.wav）
+    Joseph Sardin「Shoes in the Water」（BigSoundBank） CC0
+    https://bigsoundbank.com/shoes-in-the-water-s0690.html
+
+・次の音は、制作者がスクリプトで合成した自作の音です（外部の素材は使っていません）。
+    雨音（rain.wav）、携帯ラジオの雑音（radio_static.wav）、配管を叩く音（pipe_knock.wav）、
+    心拍と呼吸（heartbeat.wav・breath.wav）
+
+・次の音は、配布サイトの素材を加工して使っています。
+  【要確認：それぞれの配布元のサイト名・作者名・利用規約の URL を書く。
+            クレジットの表記が必要なサイトは、指定された書き方にする】
+    研究所の中の足音（footstep_asphalt.wav）   元：アスファルトの上を歩く1.mp3
+    森の足音・歩く（forest_step_walk.wav）    元：雨で濡れた道路を歩く.mp3
+    森の足音・走る（forest_step_run.wav）     元：雨で濡れた道路を走る.mp3
+    扉を開ける（door_open.wav）               元：ドア・きしみ04.mp3
+    鍵のかかった扉（door_locked.wav）         元：ドアノブ（がちゃがちゃ）02.mp3
+    天井からの水滴（water_drop.wav）          元：VSQSE_0670_water_drop_04.mp3
+    西棟の排水（drain.wav）                   元：sei_ge_haisui01.mp3
+
+・次の音は、出どころの記録がリポジトリにありません。
+  【要確認：自作か素材か、素材なら配布元を書く】
+    footstep.wav、door_creak.wav、flashlight_click.wav、pickup.wav、power_restore.wav、
+    scare_impact.wav、horror_ambient.wav、stage2_ambient.wav、water_step.wav
+
+------------------------------------------------------------
+■ 3Dモデル・画像
+------------------------------------------------------------
+・森の木・岩・倒木・茂み、研究所の小物などのモデルは、制作者が Maya で作りました。
+・壁の文字・施設の案内図などの画像は、制作者がスクリプトで作りました。
+【要確認：ほかに外部のモデルや画像（assets/model・assets/texture）を使っていれば、ここに書く】

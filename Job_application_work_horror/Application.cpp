@@ -262,10 +262,11 @@ void Application::MainLoop()
     // ゲーム全体（描画・音・入力・最初のScene）を初期化している。失敗したら原因の候補を表示して終わる。
     if (!Core::Game::Init())
     {
-        MessageBoxA(m_hWnd,
-            "DirectX 11の初期化に失敗しました。\n"
-            "グラフィックドライバーとDirectX 11対応環境を確認してください。",
-            "起動エラー", MB_OK | MB_ICONERROR);
+        // 日本語はワイド文字（MessageBoxW）で出している（MessageBoxA だと、UTF-8 の文字列が Shift_JIS として読まれて化ける）
+        MessageBoxW(m_hWnd,
+            L"DirectX 11の初期化に失敗しました。\n"
+            L"グラフィックドライバーとDirectX 11対応環境を確認してください。",
+            L"起動エラー", MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -346,7 +347,8 @@ LRESULT CALLBACK Application::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
         // 確認ダイアログへフォーカスが移るとWM_ACTIVATE(WA_INACTIVE)が届くため、
         // 表示中はフラグを立てて最小化処理を止めている。
         isMessageBoxShowed = true;
-        int res = MessageBoxA(hWnd, "終了しますか？", "確認", MB_OKCANCEL);
+        // 日本語はワイド文字で出している（MessageBoxA だと文字化けする）
+        int res = MessageBoxW(hWnd, L"終了しますか？", L"確認", MB_OKCANCEL | MB_ICONQUESTION);
         isMessageBoxShowed = false;
         if (res == IDOK) {
             DestroyWindow(hWnd);  // WM_DESTROYが届き、アプリが終了する

@@ -1,10 +1,10 @@
 ﻿# ============================================================================
-# 心拍音（assets/Audio/heartbeat.wav）と呼吸音（assets/Audio/breath.wav）を合成して書き出します。
-# 外部素材を使わず計算だけで作るため、ライセンスを気にせず同梱できます。
-# 乱数の種を固定しているので、何度実行しても同じ音になります。
+# 心拍音（assets/Audio/heartbeat.wav）と呼吸音（assets/Audio/breath.wav）を合成して書き出す。
+# 外部素材を使わず計算だけで作るため、ライセンスを気にせず同梱できる。
+# 乱数の種を固定しているので、何度実行しても同じ音になる。
 #
-# ・心拍音は「ドクン」1回分です。ゲーム側で間隔・音量・高さを変えながら繰り返し鳴らします。
-# ・呼吸音は「吐いて、吸う」1回分です。危険なほど速く・大きく鳴らします。
+# ・心拍音は「ドクン」1回分。ゲーム側で間隔・音量・高さを変えながら繰り返し鳴らす。
+# ・呼吸音は「吐いて、吸う」1回分。危険なほど速く・大きく鳴らす。
 #
 # 使い方（プロジェクトのフォルダで実行）:
 #   powershell -ExecutionPolicy Bypass -File tools/generate-heartbeat-breath.ps1
@@ -14,7 +14,7 @@ $ErrorActionPreference = "Stop"
 $sampleRate = 44100
 
 function Write-MonoWav([double[]]$samples, [string]$fileName, [double]$peakLevel) {
-    # 最大音量をそろえて16bitのモノラルWAVへ変換します
+    # 最大音量をそろえて16bitのモノラルWAVへ変換する
     $peak = 0.0
     foreach ($value in $samples) { $peak = [Math]::Max($peak, [Math]::Abs($value)) }
     $scale = $peakLevel / $peak
@@ -48,7 +48,7 @@ function Write-MonoWav([double[]]$samples, [string]$fileName, [double]$peakLevel
 }
 
 # ---------------------------------------------------------------------------
-# 心拍音: 低く短い「ドッ」と、少し高く弱い「クン」の2つの音でできています。
+# 心拍音: 低く短い「ドッ」と、少し高く弱い「クン」の2つの音でできている。
 # 胸の中で聞こえるように、高い音はほとんど含めません。
 # ---------------------------------------------------------------------------
 $random = New-Object System.Random 1972
@@ -59,8 +59,8 @@ function Add-Thump([double[]]$target, [double]$start, [double]$frequency, [doubl
     $first = [int]($start * $sampleRate)
     for ($i = $first; $i -lt $target.Length; $i++) {
         $t = ($i - $first) / $sampleRate
-        # 打った瞬間から音の高さが3割ほど下がって落ち着くと、柔らかい「ドッ」になります
-        # 高さ f(t) = f * (0.7 + 0.3 * exp(-t / 0.05)) を時間で積分した位相です
+        # 打った瞬間から音の高さが3割ほど下がって落ち着くと、柔らかい「ドッ」になる
+        # 高さ f(t) = f * (0.7 + 0.3 * exp(-t / 0.05)) を時間で積分した位相
         $phase = 2.0 * [Math]::PI * $frequency * (0.7 * $t + 0.015 * (1.0 - [Math]::Exp(-$t / 0.05)))
         $envelope = [Math]::Exp(-$t / $decay) * [Math]::Min(1.0, $t / 0.004)
         $target[$i] += $amplitude * $envelope * [Math]::Sin($phase)
@@ -72,7 +72,7 @@ Add-Thump $heart 0.000 96.0 0.28 0.040   # 「ドッ」の輪郭
 Add-Thump $heart 0.235 64.0 0.68 0.070   # 「クン」
 Add-Thump $heart 0.235 118.0 0.18 0.030
 
-# 体の中を伝わるこもった雑音をわずかに足します（1次のローパスで高い音を除きます）
+# 体の中を伝わるこもった雑音をわずかに足す（1次のローパスで高い音を除く）
 $noise = 0.0
 for ($i = 0; $i -lt $heartCount; $i++) {
     $t = $i / $sampleRate
@@ -81,7 +81,7 @@ for ($i = 0; $i -lt $heartCount; $i++) {
     $heart[$i] += $noise * 0.9 * $burst
 }
 
-# 最後の0.1秒で消します
+# 最後の0.1秒で消す
 $fadeStart = $heartCount - [int](0.1 * $sampleRate)
 for ($i = $fadeStart; $i -lt $heartCount; $i++) {
     $heart[$i] *= ($heartCount - $i) / ($heartCount - $fadeStart)
@@ -89,14 +89,14 @@ for ($i = $fadeStart; $i -lt $heartCount; $i++) {
 Write-MonoWav $heart "heartbeat.wav" 0.85
 
 # ---------------------------------------------------------------------------
-# 呼吸音: 口から漏れる息の雑音を、帯域を絞って「吐く（強め）→吸う（弱め）」の形に整えます。
+# 呼吸音: 口から漏れる息の雑音を、帯域を絞って「吐く（強め）→吸う（弱め）」の形に整える。
 # ---------------------------------------------------------------------------
 $random = New-Object System.Random 1973
 $breathSeconds = 2.1
 $breathCount = [int]($sampleRate * $breathSeconds)
 $breath = New-Object double[] $breathCount
 
-# 2つのローパスの差で、およそ300Hz〜1800Hzの息らしい帯域だけを残します
+# 2つのローパスの差で、およそ300Hz〜1800Hzの息らしい帯域だけを残す
 $lowA = 0.0
 $lowB = 0.0
 for ($i = 0; $i -lt $breathCount; $i++) {
@@ -106,7 +106,7 @@ for ($i = 0; $i -lt $breathCount; $i++) {
     $lowB += ($white - $lowB) * 0.04
     $band = $lowA - $lowB
 
-    # 吐く: 0.05〜0.95秒、吸う: 1.15〜1.95秒。sinの2乗で滑らかに立ち上げて消します
+    # 吐く: 0.05〜0.95秒、吸う: 1.15〜1.95秒。sinの2乗で滑らかに立ち上げて消す
     $exhale = 0.0
     if ($t -ge 0.05 -and $t -le 0.95) {
         $exhale = [Math]::Pow([Math]::Sin([Math]::PI * ($t - 0.05) / 0.90), 2.0)
@@ -116,7 +116,7 @@ for ($i = 0; $i -lt $breathCount; $i++) {
         $inhale = 0.55 * [Math]::Pow([Math]::Sin([Math]::PI * ($t - 1.15) / 0.80), 2.0)
     }
 
-    # 吐く息は少し低く太く、吸う息は細く高くするため、吸うときだけ高い成分を足します
+    # 吐く息は少し低く太く、吸う息は細く高くするため、吸うときだけ高い成分を足す
     $breath[$i] = $band * $exhale + ($band * 0.6 + ($white - $lowA) * 0.25) * $inhale
 }
 Write-MonoWav $breath "breath.wav" 0.7

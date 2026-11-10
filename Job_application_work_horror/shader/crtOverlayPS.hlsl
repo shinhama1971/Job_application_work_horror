@@ -34,7 +34,9 @@ cbuffer TimeBuffer : register(b0)
     // 恐怖で視界が狭まる強さ（0〜1）と、心拍の脈（0〜1。鳴った瞬間に1）。PostProcess::SetFearVision
     float fearVision;
     float fearBeat;
-    float2 fearPadding;
+    // レンズのしぶきの乱数の種（付くたびに変わる）と、付いてからの秒数。PostProcess::TriggerLensMoisture
+    float lensDropSeed;
+    float lensDropAge;
 };
 
 // 描いた画面（t0）とサンプラー（s0）
@@ -51,19 +53,21 @@ float Hash(float2 value)
     return frac((p3.x + p3.y) * p3.z);
 }
 
-// 画面に付いた1粒の水滴の形を返している（x=縁、y=本体、z=光る所）
+// 画面に付いた1粒の水滴の形を返している（x=縁、y=本体、z=光る所）。
+// stretch は、流れ落ちる間に縦へ伸びる量（0 = 丸い粒）。縁の幅は粒の大きさに合わせ、小さな粒が輪に見えないようにしている
 float3 GetLensDrop(
     float2 uv,
     float2 center,
     float radius,
-    float aspect)
+    float aspect,
+    float stretch)
 {
-    const float2 offset = (uv - center) * float2(aspect, 1.0f);
+    const float2 offset = (uv - center) * float2(aspect, 1.0f / (1.0f + stretch));
     const float distanceToCenter = length(offset);
     const float rim = 1.0f - smoothstep(
-        0.004f,
-        0.014f,
-        abs(distanceToCenter - radius));
+        radius * 0.06f,
+        radius * 0.22f,
+        abs(distanceToCenter - radius * 0.86f));
     const float body = 1.0f - smoothstep(
         radius * 0.58f,
         radius * 0.96f,
@@ -81,23 +85,19 @@ float2 GetLensDropRefraction(
     float2 uv,
     float2 center,
     float radius,
-    float aspect)
+    float aspect,
+    float stretch)
 {
     const float2 aspectOffset =
-        (uv - center) * float2(aspect, 1.0f);
+        (uv - center) * float2(aspect, 1.0f / (1.0f + stretch));
     const float distanceToCenter = length(aspectOffset);
     const float body = 1.0f - smoothstep(
-        radius * 0.42f,
+        radius * 0.80f,
         radius * 0.96f,
         distanceToCenter);
-    const float curvedEdge = smoothstep(
-        radius * 0.10f,
-        radius * 0.78f,
-        distanceToCenter) * body;
-    const float2 direction = aspectOffset /
-        max(distanceToCenter, 0.001f);
-    return direction * curvedEdge * radius * 0.24f *
-        float2(1.0f / aspect, 1.0f);
+    // 水滴は小さな凸レンズなので、粒の中には後ろの景色が小さく、上下左右が逆さに映る。
+    // 中心から見た位置を逆向きに0.7倍した所を読むよう、ずらす量を返している（uv + ずれ = 中心 - 0.7 ×（uv - 中心））
+    return -(uv - center) * 1.7f * body;
 }
 
 // 重ねる層の色と透明度を返している（アルファブレンドで画面に重なる）
@@ -238,54 +238,35 @@ float4 main(PS_IN input) : SV_TARGET
     float darkAlpha = saturate(vignette + scanline + darkGrain + rolling);
     float dustAlpha = dust * 0.030f * eventNoise + brightGrain;
 
-    // レンズの水滴は、プレイヤーが水たまりを踏んだ後だけ出る。水滴ごとに
-    // 流れ落ちる速さを変え、模様がスタンプのように見えないようにしている。
-    const float slide0 = frac(0.12f + time * 0.010f);
-    const float slide1 = frac(0.48f + time * 0.006f);
-    const float slide2 = frac(0.76f + time * 0.008f);
+    // レンズのしぶきは、走って水たまりの水を強く蹴ったときだけ、画面の下の方に小さく付く。
+    // 付く位置・大きさ・流れ落ちる速さは、しぶきごとの乱数の種（lensDropSeed）から決めるので、毎回違う。
+    // 粒は付いた所から重さで加速しながら下へ流れ、流れるほど縦に伸び、lensMoisture が0へ戻ると乾いて消える。
     float3 lensDrop = 0.0f;
     float2 lensRefraction = 0.0f;
     const float moisture = saturate(lensMoisture);
-    // レンズの水滴は、ほとんどの時間は出ていない。水しぶきが起きるまで、
-    // 10回の距離の計算を、普段の全画面の処理から外している。
+    // レンズのしぶきは、ほとんどの時間は出ていない。しぶきが付くまで、粒の距離の計算を普段の全画面の処理から外している。
     [branch]
     if (moisture > 0.001f)
     {
-        lensDrop = max(lensDrop, GetLensDrop(
-            input.uv, float2(0.18f, slide0 * 1.18f - 0.09f),
-            0.025f, screenAspect));
-        lensDrop = max(lensDrop, GetLensDrop(
-            input.uv, float2(0.34f, slide2 * 1.14f - 0.07f),
-            0.014f, screenAspect));
-        lensDrop = max(lensDrop, GetLensDrop(
-            input.uv, float2(0.62f, slide1 * 1.20f - 0.10f),
-            0.031f, screenAspect));
-        lensDrop = max(lensDrop, GetLensDrop(
-            input.uv, float2(0.79f, slide0 * 1.12f - 0.06f),
-            0.018f, screenAspect));
-        lensDrop = max(lensDrop, GetLensDrop(
-            input.uv, float2(0.91f, slide2 * 1.17f - 0.08f),
-            0.011f, screenAspect));
-        lensRefraction += GetLensDropRefraction(
-            input.uv, float2(0.18f, slide0 * 1.18f - 0.09f),
-            0.025f, screenAspect);
-        lensRefraction += GetLensDropRefraction(
-            input.uv, float2(0.34f, slide2 * 1.14f - 0.07f),
-            0.014f, screenAspect);
-        lensRefraction += GetLensDropRefraction(
-            input.uv, float2(0.62f, slide1 * 1.20f - 0.10f),
-            0.031f, screenAspect);
-        lensRefraction += GetLensDropRefraction(
-            input.uv, float2(0.79f, slide0 * 1.12f - 0.06f),
-            0.018f, screenAspect);
-        lensRefraction += GetLensDropRefraction(
-            input.uv, float2(0.91f, slide2 * 1.17f - 0.08f),
-            0.011f, screenAspect);
-        // 水滴によるずれは、合計で一定の量までにしている
-        const float refractionMagnitude = length(lensRefraction);
-        if (refractionMagnitude > 0.008f)
+        [unroll]
+        for (int dropIndex = 0; dropIndex < 6; ++dropIndex)
         {
-            lensRefraction *= 0.008f / refractionMagnitude;
+            const float2 seed = float2(lensDropSeed * 977.0f + dropIndex * 13.7f, dropIndex * 5.3f + 1.9f);
+            const float randomX = Hash(seed);
+            const float randomY = Hash(seed + 41.0f);
+            const float randomSize = Hash(seed + 83.0f);
+            const float randomSpeed = Hash(seed + 127.0f);
+            // 画面の下の方（下から4割まで）の、左右に散らばった位置に付く
+            const float2 start = float2(0.06f + randomX * 0.88f, 0.60f + randomY * 0.34f);
+            // 大きい粒ほど重く、早く流れる。小さい粒は、ほとんど止まったまま乾く
+            const float radius = lerp(0.005f, 0.017f, randomSize * randomSize);
+            const float speed = lerp(0.0f, 0.05f, randomSpeed) * smoothstep(0.008f, 0.016f, radius);
+            // 流れた量（最初の速さに、少しずつの加速を足している。2.6秒で、速い粒は画面の高さの約2割流れる）
+            const float fall = speed * lensDropAge + 0.5f * speed * 0.6f * lensDropAge * lensDropAge;
+            const float stretch = saturate(fall * 6.0f) * 0.8f;
+            const float2 dropCenter = start + float2(0.0f, fall);
+            lensDrop = max(lensDrop, GetLensDrop(input.uv, dropCenter, radius, screenAspect, stretch));
+            lensRefraction += GetLensDropRefraction(input.uv, dropCenter, radius, screenAspect, stretch);
         }
     }
     // 水滴が付いている間だけ、ずらした位置の景色を読んでいる
@@ -295,14 +276,14 @@ float4 main(PS_IN input) : SV_TARGET
     {
         refractedScene = SceneTexture.SampleLevel(
             LinearSampler,
-            saturate(input.uv - lensRefraction * moisture),
+            saturate(input.uv + lensRefraction),
             0.0f).rgb;
     }
-    const float dropRefractionAlpha = saturate(
-        (lensDrop.y * 0.085f + lensDrop.x * 0.025f) * moisture);
+    // 粒は、主に後ろの景色を逆さに映して見せる（本体の中は、ずらした景色に置き換える。乾くにつれて薄くなる）。
+    // 縁は白い輪にせず、水の厚みで暗くなる細い線にし、光る所は左上の小さな点だけにしている
+    const float dropRefractionAlpha = saturate(lensDrop.y * 0.85f * moisture);
     const float dropAlpha = saturate(
-        (lensDrop.x * 0.13f + lensDrop.y * 0.025f +
-         lensDrop.z * 0.09f) * moisture);
+        (lensDrop.x * 0.30f + lensDrop.z * 0.30f) * moisture);
 
     // 驚かせる演出では、半透明の同期の乱れ（横の裂け目）を加えている。この層は景色を置き換えないので、
     // テクスチャが無くても画面が真っ黒になることはない。
@@ -367,18 +348,20 @@ float4 main(PS_IN input) : SV_TARGET
         overlayColor,
         chromaticScene,
         saturate(chromaAlpha * 16.0f));
+    // 縁は暗い水の色、光る所だけ明るい色（縁の明るさは混ぜない）
     const float3 waterColor = lerp(
-        float3(0.025f, 0.045f, 0.050f),
-        float3(0.68f, 0.78f, 0.80f),
-        saturate(lensDrop.x * 0.55f + lensDrop.z));
-    overlayColor = lerp(
-        overlayColor,
-        waterColor,
-        saturate(dropAlpha * 6.0f));
+        float3(0.020f, 0.035f, 0.040f),
+        float3(0.62f, 0.70f, 0.72f),
+        saturate(lensDrop.z * 1.4f));
+    // 逆さに映った景色を先に置き、その上に縁の暗い線と光る点を重ねている（逆の順だと、縁が景色で消える）
     overlayColor = lerp(
         overlayColor,
         refractedScene,
         saturate(dropRefractionAlpha * 9.0f));
+    overlayColor = lerp(
+        overlayColor,
+        waterColor,
+        saturate(dropAlpha * 3.0f));
 
     // 廊下の奥ほど、ゆっくり冷たい色で彩度を落としている。ごく控えめで半透明なので、
     // 進むための情報は隠れない。

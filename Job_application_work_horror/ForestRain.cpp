@@ -82,7 +82,7 @@ void ForestRain::Init()
     wchar_t disabled[2]{};
     if (GetEnvironmentVariableW(L"SIGNAL_LOST_DISABLE_FOREST_RAIN", disabled, 2) == 1 && disabled[0] == L'1')
     {
-        m_Intensity = 0.0f;
+        m_DisabledByEnvironment = true;
     }
 }
 
@@ -139,6 +139,10 @@ void ForestRain::Update()
     {
         m_Time -= 3600.0f;
     }
+    // 岩・樹皮・研究所の外壁を濡らす強さと、水の筋を流す時間を、シェーダーへ渡している（shader/forestWetness.hlsli）。
+    // 弱い雨でも、降り続いた森の表面は十分に濡れているので、雨の強さ0で0.5、1で1にしている
+    const bool raining = m_Intensity > 0.0f && !m_DisabledByEnvironment;
+    Renderer::SetRainWetness(raining ? 0.5f + 0.5f * m_Intensity : 0.0f, m_Time);
     m_ShelterTimer -= deltaTime;
     if (m_ShelterTimer <= 0.0f)
     {
@@ -149,10 +153,16 @@ void ForestRain::Update()
 
 void ForestRain::Draw(Camera* camera)
 {
-    if (camera == nullptr || m_Intensity <= 0.0f)
+    if (camera == nullptr || m_Intensity <= 0.0f || m_DisabledByEnvironment)
     {
         return;
     }
+    // 弱い雨は、1粒ずつを薄くするより、粒の数を減らしている（薄くするだけだと、強い雨が遠くにかすんで見えるため）。
+    // 粒は番号順に描くので、前から決まった数だけ描けば、残りの粒の並びは強い雨のときと変わらない
+    const std::uint32_t dropCount = (std::max)(1u, static_cast<std::uint32_t>(static_cast<float>(DropCount) * m_Intensity));
+    const std::uint32_t splashCount = static_cast<std::uint32_t>(static_cast<float>(SplashCount) * m_Intensity);
+    // 小さな雨粒ほど遅く落ちるので、弱い雨は少しゆっくり落とし、筋も短くしている
+    const float speedScale = 0.78f + 0.22f * m_Intensity;
     camera->SetCamera();
     Matrix world = Matrix::Identity;
     Renderer::SetWorldMatrix(&world);
@@ -164,10 +174,10 @@ void ForestRain::Draw(Camera* camera)
     params.BoxSize = BoxSize;
     params.GroundY = m_GroundY;
     params.Wind = Wind;
-    params.FallSpeed = FallSpeed;
-    params.StreakLength = StreakLength;
+    params.FallSpeed = FallSpeed * speedScale;
+    params.StreakLength = StreakLength * speedScale;
     params.StreakWidth = StreakWidth;
-    params.DropCount = DropCount;
+    params.DropCount = dropCount;
     // 距離1あたりの画素の数（遠くの筋を1画素の幅まで広げるのに使う）
     Matrix view;
     Matrix projection;
@@ -176,7 +186,8 @@ void ForestRain::Draw(Camera* camera)
     D3D11_VIEWPORT viewport{};
     context->RSGetViewports(&viewportCount, &viewport);
     params.PixelScale = projection._22 * viewport.Height * 0.5f;
-    params.Intensity = m_Intensity;
+    // 1粒の濃さは少しだけ下げる（数を減らした分で、弱さはほとんど出ている）
+    params.Intensity = 0.6f + 0.4f * m_Intensity;
     params.SplashRadius = SplashRadius;
     params.OccluderCount = static_cast<std::uint32_t>(m_ShelterCount);
     for (int index = 0; index < m_ShelterCount; ++index)
@@ -199,7 +210,7 @@ void ForestRain::Draw(Camera* camera)
     Renderer::SetBlendState(BS_ADDITIVE);
     Renderer::SetDepthEnable(false);
     // 雨粒1つ・しぶき1つ = 4頂点の四角形1枚
-    context->DrawInstanced(4, DropCount + SplashCount, 0, 0);
+    context->DrawInstanced(4, dropCount + splashCount, 0, 0);
     Renderer::SetDepthEnable(true);
     Renderer::SetBlendState(BS_NONE);
     context->RSSetState(previousRasterizer.Get());
@@ -208,6 +219,8 @@ void ForestRain::Draw(Camera* camera)
 
 void ForestRain::Uninit()
 {
+    // 森を出たら、岩・樹皮・外壁を濡らすのをやめている（濡れの強さは b7 の定数バッファに残り続けるため、0に戻している）
+    Renderer::SetRainWetness(0.0f, 0.0f);
     m_DrawParams.Reset();
     m_TwoSidedRasterizer.Reset();
 }

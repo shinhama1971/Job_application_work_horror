@@ -42,11 +42,12 @@ namespace Graphics
             // コマ落ち（1なら前のフレームの画面を全面に出す）と、そのときの縦のずれ（画面の高さに対する割合）
             float frameHold;
             float frameHoldOffset;
-            // 恐怖で視界が狭まる強さ（0〜1）、心拍の脈（0〜1）、16バイト単位にそろえる詰め物
+            // 恐怖で視界が狭まる強さ（0〜1）、心拍の脈（0〜1）、
+            // レンズのしぶきの乱数の種（しぶきごとに付く位置を変える）、しぶきが付いてからの秒数（流れ落ちる量に使う）
             float fearVision;
             float fearBeat;
-            float padding0;
-            float padding1;
+            float lensDropSeed;
+            float lensDropAge;
         };
 
         // 四角形の頂点・インデックスとGPUのバッファ
@@ -93,6 +94,8 @@ namespace Graphics
             float frameHold = 0.0f,
             float frameHoldOffset = 0.0f,
             float fearVision = 0.0f,
-            float fearBeat = 0.0f);
+            float fearBeat = 0.0f,
+            float lensDropSeed = 0.0f,
+            float lensDropAge = 0.0f);
     };
 }

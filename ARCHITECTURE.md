@@ -57,6 +57,8 @@ Application
 `Game` にはゲーム全体の `Update`、`Draw`、Scene切り替え、各システムの呼び出しを残しています。
 ポーズ中は `PauseMenu` が返す結果（設定変更の有無と `Command`）を受け取り、設定のPostProcess・Camera・音量への反映と
 シーン操作だけを `Game` が行います。
+ポーズメニューを開け閉めするのは `Game::Update`（1面・2面・外の森・導入）で、メニューを描くのは各シーンの `Draw`（`Hud::DrawPause`）です。
+新しいシーンでポーズを開けるようにしたときは、そのシーンの `Draw` にも `DrawPause` を足します（足さないと、ゲームが止まっただけに見える。11月10日まで、外の森がそうなっていた）。外の森と導入では階の番号に0を渡し、「現在 研究所の外」「この場面をやり直す」と表示します。
 
 ## Sceneの責務
 
@@ -435,7 +437,11 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 
 ## 森の雨
 
-`ForestScene::RainEnabled`（今は `false`）が `false` のときは、`BuildWorld` で `ForestRain` を作らず、地面の雨の輪も付けず、`Game::ChangeScene` で雨音も鳴らしません（`if constexpr` で切り替えている）。
+`ForestScene::RainEnabled`（今は `true`）が `false` のときは、`BuildWorld` で `ForestRain` を作らず、地面の雨の輪も付けず、`Game::ChangeScene` で雨音も鳴らしません（`if constexpr` で切り替えている）。
+
+雨の強さは `ForestScene::RainStrength`（今は0.35）を、`ForestRain::SetIntensity`・`Ground::SetRainIntensity`・雨音の音量（`0.35 + 0.65 × 強さ` 倍）に渡しています。`ForestRain::Draw` は、雨粒としぶきの数に強さを掛けた数だけ `DrawInstanced` し（雨粒の位置は番号ごとの乱数なので、前から決まった数だけ描いても偏らない）、落ちる速さと筋の長さに `0.78 + 0.22 × 強さ` を掛けています。1粒の濃さ（シェーダーの `Intensity`）は `0.6 + 0.4 × 強さ` にとどめ、弱さは主に粒の数で出しています。水たまりの雨の輪（`Ground::AddRainRipples`）は、波を計算している範囲（`WaterRippleSimulation::WorldSize` の一辺192）全体に雨粒を落とし、範囲の面積に合わせて1秒の粒の数を増やしています（以前はカメラから48までにしか落とさず、外側の水たまりに輪が出なかった）。1粒の輪の強さは雨の強さで変えず、弱い雨は輪の数だけを減らしています。
+
+レンズのしぶきは、`WaterEffectSystem::TriggerFootstepRipple` が走っているときだけ（2.8秒に1回まで）`PostProcess::TriggerLensMoisture` を呼んで付けます。`PostProcess` は付くたびに乱数の種（`m_LensDropSeed`。黄金比ずつ進める）を変え、付いてからの秒数（`m_LensDropAge`）を数え、どちらも画面効果の定数バッファ（b0 の最後の2つ。以前の詰め物の場所）で `crtOverlayPS.hlsl` に渡しています。シェーダーは種から6粒の位置（画面の下から4割まで）・大きさ・速さを決め、秒数から流れた量と縦の伸びを計算し、粒の中は中心から逆向きに0.7倍した位置の景色を読んで、凸レンズのように逆さに映しています。負荷の比較用の `SIGNAL_LOST_DISABLE_FOREST_RAIN=1` は、`SetIntensity` で上書きされないよう別の印（`m_DisabledByEnvironment`）で持っています。
 
 `ForestScene::BuildWorld` の最後に `ForestRain` を作っています。加算合成で深度を書かないので、ほかの物を全部描いた後に描く必要があり、物は作った順に描かれるため、最後に作っています。`shader/rainVS.hlsl` は `SV_InstanceID` が雨粒の数より小さければ雨粒の筋、それ以降なら地面のしぶきの四角形を作ります。描かない雨粒（地面より下、屋根の下、目のすぐ前）は、クリップ空間の外の点にして捨てています。屋根は、当たり判定があり、地面から15以上浮いた、上から見て広い `Wall` を2秒ごとに集め直して、最大8個を定数バッファで渡しています。`shader/rainPS.hlsl` は、懐中電灯の円錐（`GetFlashlightBeamProfile`・影の地図）と翼の光、全部の点光源を足しています。雨粒は画面の一部にしかないので、タイルごとのリストではなく点光源の一覧を直接回しています。水たまりの輪は `Ground::AddRainRipples` が、カメラのまわりに落とした雨粒のうち水たまりに入ったものだけを `WaterRippleSimulation::AddImpulse` に渡しています（1フレーム12個まで。足音の分を残している）。雨音は、シーンを作った後に前の環境音を止める `Game::ChangeScene` で鳴らしています。同じ理由で、導入の無線の雑音もここで鳴らすように直しました（`IntroScene` の中で鳴らすと、直後に止められていた）。
 
@@ -468,3 +474,17 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 岩は配置ファイルの `model forest_rock` を付けた `Wall` です。`Wall::SetVisualModel` が岩のモデルのときだけシェーダーを `rockPS.hlsl` に替え（配置を読み直して岩でなくなったら `litTexturePS.hlsl` に戻す。どの材質かは `Wall::NaturalSurface` で覚えている）、`rockPS.hlsl` は `ROCK_SURFACE` を付けて `litTexturePS.hlsl` を読み込みます。`litTexturePS` の「テクスチャがなく光らない面」の分岐の中で、`ROCK_SURFACE` のときは壁の汚れ・古さ・金属の錆の代わりに `GetRockSurface`（`rockSurface.hlsli`）の色・粗さ・濡れ具合・高さを使い、高さは壁と同じ `ApplyHeightToNormal` で法線にしています。照明・影・霧・PBR の計算は壁と共通です。模様はワールドの位置だけから決まるので、岩を動かしても大きさを変えても模様の細かさは変わらず、配置ファイルの色の `rough` がそのまま粗さの元になります。
 
 枯れ木・倒木・枯れた茂み（`forest_tree_dead`・`forest_tree_fork`・`forest_fallen_log`・`forest_brush`）は、同じ仕組みで `barkPS.hlsl`（`BARK_SURFACE`、`barkSurface.hlsli`）に替えています。樹皮の筋は向きが大事なので、`Wall::RebuildVisualModel` がモデルを箱の向きへ回すときに木目の向き（長い向きへ回すモデルはモデルの x、それ以外は上）も同じ行列で回して `m_GrainAxis` に覚え、`Wall::UploadMaterial` が箱の回転を当ててワールドの向きにし、マテリアルの環境の色（`Ambient`。この面では使っていない値）に入れて渡します。シェーダーは木目の向きを y にした座標へ回し、幹の横を向いた2つの投影面で溝と板を求め、面の向きで混ぜます。木目の向きは物ごとに1つなので、斜めに伸びる枝では筋が枝に正確には沿いませんが、枝は細く遠いので目立ちません。
+
+研究所の外壁（配置ファイルで `facade` を付けた箱）は、`PropLayoutFile` が `Wall::SetFacadeSurface` で印を付け、続く `Wall::SetVisualModel` がモデルのない箱でその印があれば `facadePS.hlsl`（`FACADE_SURFACE`、`facadeSurface.hlsli`）に替えます（岩・樹皮と同じ `NaturalSurface` の仕組みに `Facade` を足した）。外壁の模様は、縦の面では（横の位置, 地面からの高さ）、上を向いた面では（x, z）を座標にして計算し、雨だれは各階の窓の下の水切りの高さ（床から19）と屋上の縁（地面から150）から下へ伸ばしています。
+
+雨で濡れた岩と樹皮は、`litTexturePS.hlsl` が岩・樹皮の材質を受け取った後に `ApplyForestRain`（`shader/forestWetness.hlsli`）を通し、色・濡れ具合と、水の筋の分の高さを足しています（粗さは `MakePbrSurface` が濡れ具合から下げる）。雨の強さと水の筋の時間は、b7（`DEBUG_VIEW_BUFFER`）の使っていなかった詰め物の場所に `RainWetness`・`RainTime` として入れ、`ForestRain::Update` が `Renderer::SetRainWetness` で毎フレーム送り、`ForestRain::Uninit` で0に戻します（森を出たら濡らさない）。濡らす強さは、雨の強さ0で0.5、1で1です（弱い雨でも、降り続いた森の表面は十分濡れているため）。
+
+## シェーダーの事前コンパイルとビルドの速さ
+
+ビルドの後（PostBuildEvent）に、実行ファイルを `--compile-shaders <shaderフォルダ>` で起動し、`Renderer::PrecompileShaders` が .hlsl を .cso へコンパイルします。名前の最後（VS・PS・CS）か頭（PS_）からシェーダーモデルを決め、どれにも当てはまらない物（common.hlsl）は include 用として飛ばします。
+
+.cso が古いかどうかは `GetShaderSourceTime` で決めます。シェーダーのファイルの行の頭の `#include "名前"` をたどり（入れ子も含む。読む側と同じフォルダから探す。`D3DCompileFromFile` の `D3D_COMPILE_STANDARD_FILE_INCLUDE` と同じ）、自分と読んでいるファイルのうち一番新しい更新時刻と .cso の時刻を比べます。調べた結果はファイルごとに覚え、多くのシェーダーが読む .hlsli を何度も読み直さないようにしています。.hlsl がないとき（配布用のフォルダ）は一番古い時刻として扱い、.cso をそのまま使います。ゲームの起動時（`Renderer::CompileShader`）も同じ判定を使うので、ビルドで作り直さなかった .cso を、起動時に古いと判定することはありません。
+
+作り直すシェーダーは、`std::for_each(std::execution::par, …)` で CPU のコアに分けて同時にコンパイルします。1つ分の処理（`CompileShaderFile`）は共有の変数や画面に触らず、エラーの文は1つ分ずつの入れ物に入れ、全部終わってからまとめてビルドの出力と `shader-compile-errors.txt` に出します。
+
+C++ は、プロジェクトの中の `.cpp` を `/MP` で並べてコンパイルし、Release のリンク時の最適化は `/LTCG:INCREMENTAL`（`UseFastLinkTimeCodeGeneration`）にしています。
