@@ -24,6 +24,7 @@ class ForestGrass;
 class Ground;
 class SceneLayoutBuilder;
 class LabEntrance;
+class ForestLightning;
 
 class ForestScene final : public Scene
 {
@@ -66,6 +67,7 @@ public:
 private:
     // 配置のファイルを読み直し、木・岩・研究所などと、地面・開始位置以外の置き場所を置き直している（Debug版の F5 と、ファイルが書き換わったとき）
     void ReloadPropLayout();
+    void UpdateLightning(float deltaTime, const DirectX::SimpleMath::Vector3& forward);
 
     // 作ったObjectの名前（終わるときに、この一覧で破棄する）、配置ファイルから作った物、置き場所の置き直し方、ファイルの見張り
     std::vector<std::string> m_ObjectNames;
@@ -82,6 +84,8 @@ private:
     ForestRadio m_Radio;
     InteractionSystem m_InteractionSystem;
     LabEntrance* m_Entrance = nullptr;
+    ForestLightning* m_Lightning = nullptr;
+    float m_LightningTime = -1.0f;
     float m_EnterTimer = -1.0f;
     bool m_SceneChangeRequested = false;
     static constexpr float EnterFadeSeconds = 1.4f;

@@ -91,7 +91,7 @@ void Renderer::SetRoomOcclusion(
 
 // 水面の光の揺らぎの値を、ピクセルシェーダーのb12へ設定している
 void Renderer::SetWaterCaustics(
-	const Vector4& floodRect, float waterY, float time, float strength)
+	const Vector4& floodRect, float waterY, float time, float strength, const Vector4& drainTrace)
 {
 	if (!m_pWaterCausticsBuffer)
 	{
@@ -101,6 +101,7 @@ void Renderer::SetWaterCaustics(
 	m_WaterCaustics.WaterY = waterY;
 	m_WaterCaustics.Time = time;
 	m_WaterCaustics.Strength = strength;
+	m_WaterCaustics.DrainTrace = drainTrace;
 	m_pDeviceContext->UpdateSubresource(
 		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(

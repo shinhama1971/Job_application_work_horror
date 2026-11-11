@@ -119,7 +119,10 @@ class Ground :public Object
 	int m_DrawnSurfaceCounts[4] = {};
 
 	// 床と同じ高さ・同じUVの、水平な多角形を足している（中心から扇形に三角形を並べる）
-	void AppendWaterPolygon(std::vector<VERTEX_3D>& vertices, const std::vector<DirectX::SimpleMath::Vector2>& outline) const;
+	void AppendWaterPolygon(std::vector<VERTEX_3D>& vertices,
+		const std::vector<DirectX::SimpleMath::Vector2>& outline, float extraHeight = 0.0f) const;
+	// xy は対象の柱の x・z、z は水の手前の端、w は有効時の水面の持ち上げ量。
+	DirectX::SimpleMath::Vector4 m_DrainTrace = DirectX::SimpleMath::Vector4::Zero;
 	void BuildPuddleSurfaces();
 	// 水たまりの置き方か、床の位置・大きさが変わっていたら、マス目の水たまりのメッシュを作り直している
 	void RebuildPuddleSurfacesIfChanged();
@@ -177,6 +180,8 @@ public:
 	{
 		m_WaterEffects.SetFloodRegion(minimum, maximum);
 	}
+	// 西棟の浸水面の高さと、排水後に湿りが残る柱の位置を設定する。
+	void SetDrainTrace(const DirectX::SimpleMath::Vector2& column, float edgeZ, float progress);
 	// 一歩ごとに、濡れた足跡を残すかを決めている（水の中の一歩なら、その後の数歩に濡れた靴の跡を残す）。
 	// プレイヤーの足音（TriggerFootstepRipple）と、自動撮影の歩いた扱いから呼んでいる
 	void RecordFootstep(const DirectX::SimpleMath::Vector3& position)

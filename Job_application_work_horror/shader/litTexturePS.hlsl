@@ -589,6 +589,22 @@ float4 main(in LIT_PS_IN input) : SV_Target
         color.rgb *= 1.0f - trickle * 0.30f;
         wetness = max(wetness, trickle);
 
+        // 水が引いた柱の根元には、元の水位の少し上まで吸い上げた水が残る。
+        const float2 fromDrainColumn = abs(input.worldPos.xz - DrainTrace.xy);
+        const float heightAboveWater = input.worldPos.y - CausticWaterY;
+        [branch]
+        if (DrainTrace.w > 0.0f && Material.WeatheringSurface && abs(input.worldNormal.y) < 0.2f &&
+            max(fromDrainColumn.x, fromDrainColumn.y) < 5.2f && heightAboveWater < 7.5f)
+        {
+            const float exposed = smoothstep(0.0f, 3.0f, DrainTrace.z - input.worldPos.z);
+            const float dampTop = 4.7f + FastValueNoise(input.worldPos.xz * 0.55f) * 1.5f;
+            const float heightFromFloor = heightAboveWater + DrainTrace.w;
+            const float band = exposed * smoothstep(-0.1f, 0.5f, heightFromFloor) *
+                (1.0f - smoothstep(dampTop - 0.9f, dampTop, heightFromFloor));
+            color.rgb *= lerp(1.0f.xxx, float3(0.51f, 0.56f, 0.55f), band);
+            wetness = max(wetness, band * 0.50f);
+        }
+
         // 2面の「血の手形」の異変（その周回だけ、照らすと次の手形が奥に現れる）。濡れた血として光沢も返す
         const float anomalyHandprint = GetAnomalyHandprint(input.worldPos, normalize(input.worldNormal));
         color.rgb *= lerp(1.0f.xxx, float3(0.85f, 0.05f, 0.04f), anomalyHandprint * 0.92f);

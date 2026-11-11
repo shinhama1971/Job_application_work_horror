@@ -420,6 +420,9 @@ void Stage1WestWing::ApplyFloodRegion()
     if (m_Parts.ground != nullptr)
     {
         m_Parts.ground->SetFloodRegion(Vector2(MinX, m_WaterEdgeZ), Vector2(MaxX, MaxZ));
+        // 手前のコンクリート柱（WestWingColumn1）と、その足元に排水の跡を出す。
+        const float progress = (m_WaterEdgeZ - MinZ) / (MaxZ - MinZ);
+        m_Parts.ground->SetDrainTrace(Vector2(-330.0f, 10.0f), m_WaterEdgeZ, progress);
     }
 }
 

@@ -19,6 +19,7 @@ namespace
 {
 	// 水たまりのメッシュを床から浮かせる高さ（約2.5mm）。床と同じ平面だと深度がそろわずちらつくため、わずかに上げている
 	constexpr float WaterSurfaceLift = 0.05f;
+	constexpr float InitialFloodHeight = 1.25f;
 	// 描画グループとデバッグ表示を分ける距離。反射の距離は wetFloorPS が水面の画素ごとに調べる。
 	constexpr float NearWaterDistance = 170.0f;
 	constexpr float MiddleWaterDistance = 340.0f;
@@ -178,7 +179,14 @@ void Ground::Init()
 //=======================================
 // 水たまりのメッシュ
 //=======================================
-void Ground::AppendWaterPolygon(std::vector<VERTEX_3D>& vertices, const std::vector<Vector2>& outline) const
+void Ground::SetDrainTrace(const Vector2& column, float edgeZ, float progress)
+{
+	const float height = WaterSurfaceLift + (InitialFloodHeight - WaterSurfaceLift) * (1.0f - progress);
+	m_DrainTrace = Vector4(column.x, column.y, edgeZ, height);
+}
+
+void Ground::AppendWaterPolygon(std::vector<VERTEX_3D>& vertices,
+	const std::vector<Vector2>& outline, float extraHeight) const
 {
 	Vector2 center = Vector2::Zero;
 	for (const Vector2& point : outline)
@@ -188,10 +196,10 @@ void Ground::AppendWaterPolygon(std::vector<VERTEX_3D>& vertices, const std::vec
 	center /= static_cast<float>(outline.size());
 	// 床の格子と同じUV（床の1マスでテクスチャ1枚。テクスチャは繰り返して読むので、マスをまたいで続いた値にしている）。
 	// 床は回していないので、ワールドの位置から床の格子の位置へは、移動と拡大を戻すだけで求まる
-	const auto makeVertex = [this](const Vector2& point)
+	const auto makeVertex = [this, extraHeight](const Vector2& point)
 	{
 		VERTEX_3D vertex{};
-		vertex.position = Vector3(point.x, m_Position.y + WaterSurfaceLift, point.y);
+		vertex.position = Vector3(point.x, m_Position.y + WaterSurfaceLift + extraHeight, point.y);
 		vertex.normal = Vector3(0.0f, 1.0f, 0.0f);
 		vertex.color = Color(1.0f, 1.0f, 1.0f, 1.0f);
 		vertex.uv = Vector2(
@@ -316,7 +324,8 @@ void Ground::BuildDynamicSurfaces()
 			surface.Center = (minimum + maximum) * 0.5f;
 			surface.Radius = Vector2::Distance(minimum, maximum) * 0.5f;
 			surface.VertexStart = static_cast<unsigned int>(m_DynamicSurfaceVertices.size());
-			AppendWaterPolygon(m_DynamicSurfaceVertices, outline);
+			const float extraHeight = (std::max)(0.0f, m_DrainTrace.w - WaterSurfaceLift);
+			AppendWaterPolygon(m_DynamicSurfaceVertices, outline, extraHeight);
 			surface.VertexCount = static_cast<unsigned int>(m_DynamicSurfaceVertices.size()) - surface.VertexStart;
 			m_DynamicSurfaces.push_back(surface);
 		}
@@ -515,9 +524,10 @@ void Ground::Update()
 		: DirectX::SimpleMath::Vector4(1.0f, 1.0f, 0.0f, 0.0f);
 	Renderer::SetWaterCaustics(
 		floodRect,
-		m_Position.y,
+		m_Position.y + m_DrainTrace.w,
 		m_WetTime,
-		(hasFlood ? 1.0f : 0.0f) * Tools::TechDemo::GetWaterCausticsScale());
+		(hasFlood ? 1.0f : 0.0f) * Tools::TechDemo::GetWaterCausticsScale(),
+		m_DrainTrace);
 
 	// 足音と水滴のおもりを、水たまりの波へ渡している。波を進めるのは描画の最初（RunGpuSimulation）で、
 	// そのための経過時間・計算の中心（カメラ）・浸水した範囲をここで覚えている。

@@ -397,6 +397,22 @@ float4 main(in LIT_PS_IN input) : SV_Target
             }
         }
     }
+    // 柱の脇に残る薄い水と、その周りの水を吸ったコンクリート。水が通り過ぎた画素だけに出す。
+    float drainedDamp = 0.0f;
+    float remainingWater = 0.0f;
+    const float2 fromDrainColumn = input.worldPos.xz - DrainTrace.xy;
+    [branch]
+    if (DrainTrace.w > 0.0f && DrainTrace.z > input.worldPos.z &&
+        abs(fromDrainColumn.x) < 32.0f && abs(fromDrainColumn.y) < 27.0f)
+    {
+        const float exposed = smoothstep(0.0f, 5.0f, DrainTrace.z - input.worldPos.z);
+        const float edgeNoise = (FastValueNoise(input.worldPos.xz * 0.22f) - 0.5f) * 0.28f;
+        const float poolDistance = length((fromDrainColumn - float2(13.0f, -8.0f)) / float2(13.0f, 8.0f)) + edgeNoise;
+        remainingWater = (1.0f - smoothstep(0.55f, 1.0f, poolDistance)) * exposed;
+        puddle = max(puddle, remainingWater * 0.92f);
+        const float dampDistance = length((fromDrainColumn - float2(7.0f, -5.0f)) / float2(23.0f, 18.0f)) + edgeNoise;
+        drainedDamp = (1.0f - smoothstep(0.35f, 1.0f, dampDistance)) * exposed * (1.0f - remainingWater);
+    }
     // 上を向いた面（床）だけを水たまりにしている
     puddle *= smoothstep(0.55f, 0.92f, saturate(input.worldNormal.y));
     shore *= smoothstep(0.55f, 0.92f, saturate(input.worldNormal.y));
@@ -454,7 +470,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
             float3(0.018f, 0.030f, 0.034f) + baseLuminance.xxx * 0.035f,
         0.38f);
     color.rgb = lerp(color.rgb, wetColor, puddle * 0.84f);
-    color.rgb *= 1.0f - shore * 0.035f;
+    color.rgb *= 1.0f - shore * 0.035f - drainedDamp * 0.24f - remainingWater * 0.15f;
     // 濡れた足跡は、水を吸って暗くなっている
     color.rgb = lerp(color.rgb, color.rgb * 0.38f + float3(0.004f, 0.007f, 0.008f), footprintWet * 0.90f);
 
@@ -583,11 +599,11 @@ float4 main(in LIT_PS_IN input) : SV_Target
             const float3 halfVector = normalize(directionToLight + viewDirection);
             const float wetSpecular = pow(
                 saturate(dot(normal, halfVector)),
-                lerp(18.0f, 92.0f, puddle));
+                lerp(18.0f - drainedDamp * 6.0f, 92.0f, puddle));
             specularLighting += flashlightColor
                 * flashlightAmount
                 * wetSpecular
-                * lerp(0.025f, 0.20f, puddle);
+                * lerp(0.025f + drainedDamp * 0.035f, 0.20f, puddle);
             // 濡れた足跡も、懐中電灯の光を細く返す
             specularLighting += flashlightColor
                 * flashlightAmount

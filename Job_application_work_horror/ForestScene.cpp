@@ -10,6 +10,7 @@
 #include "Wall.h"
 #include "SkyBackdrop.h"
 #include "Application.h"
+#include "CaptureMode.h"
 #include "Game.h"
 #include "Ground.h"
 #include "Input.h"
@@ -22,8 +23,33 @@
 #include <Windows.h>
 #include <shellapi.h>
 #include <algorithm>
+#include <cmath>
 
 using namespace DirectX::SimpleMath;
+
+// 稲光の間だけ既存の点光源リストに光を足す。光源自体の形や影は描かない。
+class ForestLightning final : public Object
+{
+public:
+    void Init() override {}
+    void Update() override {}
+    void Draw(Camera*) override {}
+    void Uninit() override {}
+
+    void SetStrength(float strength) { m_Strength = strength; }
+
+    void CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const override
+    {
+        if (m_Strength > 0.0f)
+        {
+            lights.push_back({ Vector4(m_Position.x, m_Position.y, m_Position.z, 285.0f),
+                Vector4(0.67f, 0.82f, 1.0f, m_Strength) });
+        }
+    }
+
+private:
+    float m_Strength = 0.0f;
+};
 
 bool ForestScene::IsRequestedByCommandLine()
 {
@@ -136,6 +162,9 @@ ForestScene::ForestScene()
         }
     }
     m_Entrance->SetPosition(doorPosition - Vector3(0.0f, 0.0f, 2.0f));
+    m_Lightning = builder.Create<ForestLightning>("ForestLightning");
+    // 上空の斜め手前から、正面と屋根の輪郭を一緒に照らす。
+    m_Lightning->SetPosition(doorPosition + Vector3(-55.0f, 190.0f, -62.0f));
 
     // 配置を読み直したときに置き直す物（地面と草の範囲）
     Ground* ground = world.GroundObject;
@@ -191,6 +220,44 @@ void ForestScene::ReloadPropLayout()
     m_NoticeTimer = 3.0f;
 }
 
+void ForestScene::UpdateLightning(float deltaTime, const Vector3& forward)
+{
+    constexpr float flashSeconds = 0.46f;
+    if (!RainEnabled || m_EnterTimer >= 0.0f || Tools::CaptureMode::IsBenchmark())
+    {
+        m_Lightning->SetStrength(0.0f);
+        return;
+    }
+    if (m_LightningTime >= flashSeconds)
+    {
+        return;
+    }
+    if (m_LightningTime < 0.0f)
+    {
+        const Vector3 offset = m_Entrance->GetInteractionPosition() - m_Player->GetPosition();
+        const Vector2 towardLab(offset.x, offset.z);
+        const float distanceSquared = towardLab.LengthSquared();
+        const Vector2 look(forward.x, forward.z);
+        // 小道から研究所を向いたときに一度だけ発生する。足元や背後を見ている間は待つ。
+        if (offset.z <= 0.0f || distanceSquared < 60.0f * 60.0f || distanceSquared > 210.0f * 210.0f ||
+            look.Dot(towardLab) < 0.78f * std::sqrt(distanceSquared))
+        {
+            return;
+        }
+        m_LightningTime = 0.0f;
+    }
+    else
+    {
+        m_LightningTime = (std::min)(m_LightningTime + deltaTime, flashSeconds);
+    }
+
+    // 立ち上がりだけ鋭く、後半は滑らかに消す。連続点滅はさせない。
+    constexpr float riseSeconds = 0.05f;
+    const float rise = (std::min)(1.0f, m_LightningTime / riseSeconds);
+    const float tail = (std::min)(1.0f, (flashSeconds - m_LightningTime) / (flashSeconds - riseSeconds));
+    m_Lightning->SetStrength(4.8f * rise * tail * tail);
+}
+
 void ForestScene::Update()
 {
     const float deltaTime = Application::GetDeltaTime();
@@ -236,6 +303,7 @@ void ForestScene::Update()
             game->RequestSceneChange(SceneName::Intro);
         }
     }
+    UpdateLightning(deltaTime, game->GetCamera()->GetForward());
 #if defined(_DEBUG)
     // Debug版だけ：F5 を押したとき、または配置のファイルが書き換わったとき（Unity で書き出したときなど）に読み直している
     if (Input::GetKeyTrigger(VK_F5) || m_LayoutWatcher.HasChanged(PropLayoutPath, deltaTime))

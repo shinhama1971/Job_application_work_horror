@@ -150,9 +150,11 @@ struct WATER_CAUSTICS_BUFFER
     // SSRの当たりを前フレームの画像へ投影する行列と、前フレームの深度を戻す係数。
     DirectX::SimpleMath::Matrix PreviousReflectionViewProjection;
     DirectX::SimpleMath::Vector4 PreviousReflectionDepth;
+    // xy = 排水跡を描く柱の x・z、z = 浸水範囲の手前の端、w = 水面の持ち上げ量（0なら無効）。
+    DirectX::SimpleMath::Vector4 DrainTrace;
 };
 
-static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 1248, "Water caustics buffer must match HLSL layout");
+static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 1264, "Water caustics buffer must match HLSL layout");
 
 // サブセット（モデルの中で、同じマテリアルで描く部分）
 struct SUBSET{
@@ -320,7 +322,8 @@ public:
 		float floorY, float ceilingY, float strength);
 	// 浸水した範囲の水面で跳ね返った懐中電灯の光が、壁や天井に揺らいで映る効果の値を設定している。strengthが0なら計算しない。
 	static void SetWaterCaustics(
-		const DirectX::SimpleMath::Vector4& floodRect, float waterY, float time, float strength);
+		const DirectX::SimpleMath::Vector4& floodRect, float waterY, float time, float strength,
+		const DirectX::SimpleMath::Vector4& drainTrace = DirectX::SimpleMath::Vector4::Zero);
 	// 水面の光の揺らぎで使う、プレイヤーの視点のビュー行列を設定している（毎フレーム、描画の最初に呼ぶ）
 	static void SetWaterCausticsView(const DirectX::SimpleMath::Matrix& view);
 	// 水たまりの波のシミュレーションの高さのテクスチャ（t9）と、その範囲・強さを、床と壁のシェーダーへ渡している。strengthが0なら使わない。

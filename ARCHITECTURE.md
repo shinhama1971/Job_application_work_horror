@@ -194,6 +194,8 @@ Application
 
 - `WaterEffectSystem`: 水たまり判定、落下水滴、着水波紋、足音波紋。水たまりの置き方（`PuddleLayout`）は、1面は床全体のマス目に乱数で置き、2面はマス目を41ずらして廊下の決まった3か所に置く（シェーダーへの表 b13 にずらし量も渡す）
 
+西棟の排水では `Stage1WestWing` が浸水範囲の手前の端を動かし、`Ground` が進み具合に応じて浸水メッシュの高さを下げます。柱の位置、水の端、水面の高さは既存の b12 に渡します。`litTexturePS.hlsl` は水が通り過ぎた柱の根元に湿った帯を出し、`wetFloorPS.hlsl` は柱の脇で浅い残り水と湿ったコンクリートを描き分けます。残り水は描画上の演出で、足音と波紋の判定は既存の浸水範囲を使います。
+
 `Ground` には床メッシュ、水たまりのメッシュ（水たまり・雨漏り・浸水した範囲ごとの多角形。画面の外は描かず、遠いほど反射を軽くする）、Material、濡れ床Shader（水面の反射の光線は、このシェーダーの中で飛ばす）を残しています。
 
 ## 更新と描画の流れ
@@ -456,6 +458,8 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 ## 森の入口の演出
 
 `ForestScene::Update` が毎フレーム `ForestEvents::Update` にプレイヤーの足元を渡しています。`ForestEvents` は配置ファイルから作った小物（`PropLayoutFile::SpawnedProps`）を名前で探し、街灯（`PathLampBulb`・`PathLampBulb_1`）・研究所の2階の窓（`LabWindow2F4`）・玄関の灯り（`LabPorchLight`）の明るさを `Wall::SetEmissionScale` で変えています。倍率は `Wall::UploadMaterial` で光る色に、`Wall::CollectPointLights` で点光源の強さに掛けるので、面の光り方と周りの照らし方が一緒に変わります（値が変わったときだけマテリアルを送り直します）。ちらつきは時間だけから決まる式（不安定な時間の中だけ、1秒に14回、途切れるかを乱数で決める）なので、自動撮影では毎回同じ結果になります。窓が消えた瞬間の恐怖の強さを返し、`ForestScene` が `PostProcess::SetFearVision` へ渡しています。
+
+森の稲光は `ForestScene` で、研究所の手前から建物の方向を向いたときに一度だけ始めます。建物の斜め上から約0.46秒間だけ、`ForestLightning` が既存のタイルベースライティングへ青白い点光源を追加します。画面全体の露出は変えず、玄関からの暗転中と計測モードでは光を出しません。
 
 草むらを通る「見えない何か」は、`ForestEvents` が足元の位置と強さを決め、`ForestScene` が `ForestGrass::SetUnseenWalker` で草へ渡しています。`grassCS.hlsl` は、プレイヤーと同じように目標の葉先をずらすほか、踏まれた倒れ具合を `GrassState.Tip.w`、倒れる向きを `GrassState.Velocity.w`（どちらも使っていなかった値）に覚え、毎秒0.2ずつ戻しています。バッファの大きさは変えずに、通った跡を残せます。
 

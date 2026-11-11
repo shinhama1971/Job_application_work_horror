@@ -58,6 +58,8 @@ cbuffer WaterCausticsBuffer : register(b12)
     // SSRが前のフレームの同じ位置を読むための投影行列と深度の係数（xy）。
     matrix PreviousReflectionViewProjection;
     float4 PreviousReflectionDepth;
+    // xy = 排水跡を描く柱の x・z、z = 浸水範囲の手前の端、w = 水面の持ち上げ量（0なら無効）。
+    float4 DrainTrace;
 }
 
 // 水たまりの波のシミュレーションの高さ（t9。WaterRippleSimulationが毎フレーム計算している）。x = 今の高さ、y = 1つ前の高さ
