@@ -16,13 +16,14 @@
 // SSRの前のフレームの画面（t4。縮小画像の段を持つ）と、深度プリパスの深度（t8）（ScreenSpaceReflection）
 Texture2D g_SsrScene : register(t4);
 Texture2D<float> g_SsrDepth : register(t8);
+Texture2D<float> g_PreviousSsrDepth : register(t17);
 // 環境マップ（t14。カメラの位置から6方向を撮った本物の景色。GameRendering の EnvironmentProbe。pbrLighting.hlsli と同じ物）。
 // 水たまりのレイ反射で、画面の外の物の色に使っている。撮れているときだけ ReflectionParams.w が1
 TextureCube g_RayEnvironmentProbe : register(t14);
 static const float RAY_ENVIRONMENT_MIP_COUNT = 8.0f; // 128画素から1画素まで
 
 // SSR：反射の光線をビュー空間で少しずつ（だんだん大きな歩幅で）進め、画面の深度より奥へ入った所を「ぶつかった」とし、
-// その画素の色を前のフレームの画面から読む。画面に映っていない物は映らない。
+// 当たった面を前のフレームのカメラへ投影し直して、同じ位置の色を読む。前の画面で隠れていた面は使わない。
 // 返り値の xyz は色、w はぶつかった度合い（画面の端と、遠くまで進んだ所では0へ近づけている）。
 // stepCount は進める回数、stepGrowth は1回ごとに歩幅を広げる割合（レイ反射では、遠くは部屋の形で補うので少なくしている）。
 // blurPerDistance は、映る物が反射する面から離れているほどぼかす強さ（前のフレームの画面の縮小画像の段。0ならぼかさない）。
@@ -37,6 +38,7 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
     uint width = 0;
     uint height = 0;
     g_SsrDepth.GetDimensions(width, height);
+    const float2 dimensions = float2(width, height);
     const float3 viewPosition = mul(float4(worldPosition, 1.0f), CausticView).xyz;
     const float3 viewNormal = normalize(mul(float4(worldNormal, 0.0f), CausticView).xyz);
     const float3 rayDirection = reflect(normalize(viewPosition), viewNormal);
@@ -57,11 +59,11 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
         }
         const float2 ndc = clip.xy / clip.w;
         const float2 uv = float2(ndc.x * 0.5f + 0.5f, -ndc.y * 0.5f + 0.5f);
-        if (any(uv < 0.0f) || any(uv > 1.0f))
+        if (any(uv < 0.0f) || any(uv >= 1.0f))
         {
             break;
         }
-        const float sceneDepth = g_SsrDepth.Load(int3(uv * float2(width, height), 0));
+        const float sceneDepth = g_SsrDepth.Load(int3(uv * dimensions, 0));
         const float sceneViewZ = -depthOffset / (sceneDepth + depthScale);
         // 光線が面より奥に入り、その差が面の厚みとみなせる範囲なら、ぶつかったとしている
         const float behind = sceneViewZ - rayPosition.z;
@@ -79,44 +81,62 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
                 const float3 middlePosition = viewPosition + rayDirection * middle;
                 const float4 middleClip = mul(float4(middlePosition, 1.0f), CausticProjection);
                 const float2 middleNdc = middleClip.xy / max(middleClip.w, 0.001f);
-                const float2 middleUv = saturate(float2(middleNdc.x * 0.5f + 0.5f, -middleNdc.y * 0.5f + 0.5f));
-                const float middleDepth = g_SsrDepth.Load(int3(middleUv * float2(width, height), 0));
+                const float2 middleUv = float2(middleNdc.x * 0.5f + 0.5f, -middleNdc.y * 0.5f + 0.5f);
+                const int2 middlePixel = clamp(int2(middleUv * dimensions), int2(0, 0), int2(width, height) - 1);
+                const float middleDepth = g_SsrDepth.Load(int3(middlePixel, 0));
                 const float middleSceneZ = -depthOffset / (middleDepth + depthScale);
                 if (middleSceneZ - middlePosition.z > 0.0f)
                 {
                     farDistance = middle;
-                    hitUv = middleUv;
+                    hitUv = (float2(middlePixel) + 0.5f) / dimensions;
                 }
                 else
                 {
                     nearDistance = middle;
                 }
             }
-            // ぶつかった所の、画面に映っている物の位置（ワールド）を、深度から戻して高さを調べている。
-            // ビュー空間の点を、その画素の深度の所まで伸ばし、ビュー行列の向き（回転）の逆でワールドへ戻している
-            [branch]
-            if (minHitHeight > -1.0e8f)
+            // 今の深度から当たった面のワールド位置を戻し、前のカメラでその点が見えていた画素を求める。
+            const float2 hitNdc = float2(hitUv.x * 2.0f - 1.0f, 1.0f - hitUv.y * 2.0f);
+            const float hitDepth = g_SsrDepth.Load(int3(hitUv * dimensions, 0));
+            const float hitViewZ = -depthOffset / (hitDepth + depthScale);
+            const float3 hitView = float3(
+                hitNdc.x * -hitViewZ / CausticProjection[0][0],
+                hitNdc.y * -hitViewZ / CausticProjection[1][1], hitViewZ);
+            const float3 eye = -mul((float3x3)CausticView, CausticView[3].xyz);
+            const float3 hitWorld = eye + mul((float3x3)CausticView, hitView);
+            const float heightAboveMinimum = hitWorld.y - worldPosition.y - minHitHeight;
+            if (heightAboveMinimum <= 0.0f)
             {
-                const float2 hitNdc = float2(hitUv.x * 2.0f - 1.0f, 1.0f - hitUv.y * 2.0f);
-                const float hitDepth = g_SsrDepth.Load(int3(hitUv * float2(width, height), 0));
-                const float hitViewZ = -depthOffset / (hitDepth + depthScale);
-                const float3 hitView = float3(
-                    hitNdc.x * -hitViewZ / CausticProjection[0][0],
-                    hitNdc.y * -hitViewZ / CausticProjection[1][1],
-                    hitViewZ);
-                const float3 eye = -mul((float3x3)CausticView, CausticView[3].xyz);
-                const float3 hitWorld = eye + mul((float3x3)CausticView, hitView);
-                if (hitWorld.y < worldPosition.y + minHitHeight)
-                {
-                    return 0.0f;
-                }
+                // 水面近くの床を拾っても、光線の先にある壁や物を探し続ける。
+                previousDistance = distance;
+                distance *= stepGrowth;
+                continue;
             }
-            // 当たりの確からしさ（w）：画面の端に近いほど薄くし（画面の外の物は映らないため、映り込みが急に切れないように）、
-            // 歩数の上限に近い遠くの当たりだけを少し薄くしている（遠くの当たりは歩幅が大きく、位置が不確かなため）。
-            // 近くの当たりは薄めないので、呼ぶ側で部屋の形の色と混ぜても、画面から読んだ本物の色がそのまま映る
-            const float2 edge = min(hitUv, 1.0f - hitUv);
-            const float fade = saturate(min(edge.x, edge.y) * 12.0f) *
+            const float4 previousClip = mul(float4(hitWorld, 1.0f), PreviousReflectionViewProjection);
+            if (previousClip.w <= 0.001f)
+            {
+                return 0.0f;
+            }
+            const float2 previousNdc = previousClip.xy / previousClip.w;
+            const float2 sampleUv = previousNdc * float2(0.5f, -0.5f) + 0.5f;
+            if (any(sampleUv < 0.0f) || any(sampleUv >= 1.0f))
+            {
+                return 0.0f;
+            }
+            // 前の画面で別の物に隠れていた点や、前の深度に物がない点から色を拾わない。
+            const float previousDepth = g_PreviousSsrDepth.Load(int3(sampleUv * dimensions, 0));
+            const float previousSceneDistance = PreviousReflectionDepth.y / (previousDepth + PreviousReflectionDepth.x);
+            const float tolerance = 0.85f + previousClip.w * 0.008f;
+            const float depthConfidence = 1.0f - smoothstep(tolerance * 0.45f, tolerance,
+                abs(previousSceneDistance - previousClip.w));
+            const float2 edge = min(min(hitUv, 1.0f - hitUv), min(sampleUv, 1.0f - sampleUv));
+            const float fade = smoothstep(0.0f, 0.13f, min(edge.x, edge.y)) * depthConfidence *
+                smoothstep(0.0f, 1.5f, heightAboveMinimum) *
                 (1.0f - smoothstep(0.65f, 1.0f, float(step) / float(stepCount)));
+            if (fade <= 0.001f)
+            {
+                return 0.0f;
+            }
             // 映る物までの距離（反射する面から）に合わせて、ぼかしている（最大3段 = 1/8 の大きさ相当）。
             // 小さい縮小画像を1点だけ読んで引き伸ばすと、四角いブロックが見えてかくかくするので、
             // 1段細かい縮小画像を、ぼかしの大きさの分だけ4方向にずらして読み、平均している（なめらかなぼけになる）
@@ -125,17 +145,17 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
             [branch]
             if (blurLevel < 0.35f)
             {
-                reflected = g_SsrScene.SampleLevel(g_SamplerState, hitUv, 0.0f).rgb;
+                reflected = g_SsrScene.SampleLevel(g_SamplerState, sampleUv, 0.0f).rgb;
             }
             else
             {
                 const float sampleLevel = max(blurLevel - 1.0f, 0.0f);
                 const float2 spread = exp2(blurLevel) * 0.5f / float2(width, height);
                 reflected = (
-                    g_SsrScene.SampleLevel(g_SamplerState, saturate(hitUv + float2(spread.x, spread.y * 0.4f)), sampleLevel).rgb +
-                    g_SsrScene.SampleLevel(g_SamplerState, saturate(hitUv + float2(-spread.x * 0.4f, spread.y)), sampleLevel).rgb +
-                    g_SsrScene.SampleLevel(g_SamplerState, saturate(hitUv + float2(-spread.x, -spread.y * 0.4f)), sampleLevel).rgb +
-                    g_SsrScene.SampleLevel(g_SamplerState, saturate(hitUv + float2(spread.x * 0.4f, -spread.y)), sampleLevel).rgb) * 0.25f;
+                    g_SsrScene.SampleLevel(g_SamplerState, saturate(sampleUv + float2(spread.x, spread.y * 0.4f)), sampleLevel).rgb +
+                    g_SsrScene.SampleLevel(g_SamplerState, saturate(sampleUv + float2(-spread.x * 0.4f, spread.y)), sampleLevel).rgb +
+                    g_SsrScene.SampleLevel(g_SamplerState, saturate(sampleUv + float2(-spread.x, -spread.y * 0.4f)), sampleLevel).rgb +
+                    g_SsrScene.SampleLevel(g_SamplerState, saturate(sampleUv + float2(spread.x * 0.4f, -spread.y)), sampleLevel).rgb) * 0.25f;
             }
             return float4(reflected, fade);
         }
@@ -194,8 +214,7 @@ float IntersectRoom(float3 origin, float3 direction, out float3 hitNormal, out f
             hitAlbedo = RoomReflectionWallAlbedo;
         }
     }
-    // 小物（棚・ロッカー・柱など）は、カメラの近くから選んだ箱（ReflectionProps）と、3方向のスラブ法で交差させている。
-    // 色は小物の色を少し暗くして使い、画面の外にある小物も、水面や鏡の正しい位置に正しい色で映るようにしている
+    // 画面外の小物と扉も箱に当てる。扉だけは光線を扉板の座標に直し、開いた角度に合わせる。
     const float3 safeDirection3 = float3(
         safeDirection.x, abs(direction.y) > 1e-5f ? direction.y : 1e-5f, safeDirection.y);
     const float3 inverseDirection3 = 1.0f / safeDirection3;
@@ -203,8 +222,24 @@ float IntersectRoom(float3 origin, float3 direction, out float3 hitNormal, out f
     [loop]
     for (uint prop = 0; prop < propCount; ++prop)
     {
-        const float3 slabNear = (ReflectionProps[prop * 3].xyz - origin) * inverseDirection3;
-        const float3 slabFar = (ReflectionProps[prop * 3 + 1].xyz - origin) * inverseDirection3;
+        const float4 center = ReflectionProps[prop * 3];
+        const float4 halfSize = ReflectionProps[prop * 3 + 1];
+        const float2 widthAxis = float2(center.w, halfSize.w);
+        const float2 depthAxis = float2(-widthAxis.y, widthAxis.x);
+        const bool door = dot(widthAxis, widthAxis) > 0.5f;
+        float3 localOrigin = origin - center.xyz;
+        float3 inverseDirection = inverseDirection3;
+        [branch]
+        if (door)
+        {
+            localOrigin.xz = float2(dot(localOrigin.xz, widthAxis), dot(localOrigin.xz, depthAxis));
+            const float2 localDirection = float2(dot(direction.xz, widthAxis), dot(direction.xz, depthAxis));
+            inverseDirection.xz = 1.0f / float2(
+                abs(localDirection.x) > 1e-5f ? localDirection.x : 1e-5f,
+                abs(localDirection.y) > 1e-5f ? localDirection.y : 1e-5f);
+        }
+        const float3 slabNear = (-halfSize.xyz - localOrigin) * inverseDirection;
+        const float3 slabFar = (halfSize.xyz - localOrigin) * inverseDirection;
         const float3 entry = min(slabNear, slabFar);
         const float3 leave = max(slabNear, slabFar);
         const float enter = max(max(entry.x, entry.y), entry.z);
@@ -212,9 +247,23 @@ float IntersectRoom(float3 origin, float3 direction, out float3 hitNormal, out f
         if (enter > 0.05f && enter <= exit && enter < nearest)
         {
             nearest = enter;
-            hitNormal = entry.x >= entry.y && entry.x >= entry.z ? float3(-sign(safeDirection3.x), 0.0f, 0.0f)
-                : (entry.y >= entry.z ? float3(0.0f, -sign(safeDirection3.y), 0.0f) : float3(0.0f, 0.0f, -sign(safeDirection3.z)));
-            hitAlbedo = ReflectionProps[prop * 3 + 2].rgb * 0.55f;
+            hitNormal = entry.x >= entry.y && entry.x >= entry.z ? float3(-sign(inverseDirection.x), 0.0f, 0.0f)
+                : (entry.y >= entry.z ? float3(0.0f, -sign(inverseDirection.y), 0.0f) : float3(0.0f, 0.0f, -sign(inverseDirection.z)));
+            hitAlbedo = ReflectionProps[prop * 3 + 2].rgb;
+            [branch]
+            if (door)
+            {
+                // 扉の表裏にある上下2枚の鏡板を、モデルと同じ位置で少し暗くする。
+                const float2 doorUV = abs(localOrigin.xy + enter * rcp(inverseDirection.xy)) / halfSize.xy;
+                const float panel = (1.0f - smoothstep(0.62f, 0.68f, doorUV.x)) *
+                    (1.0f - smoothstep(0.28f, 0.34f, abs(doorUV.y - 0.44f))) * abs(hitNormal.z);
+                hitAlbedo *= lerp(1.0f, 0.48f, panel);
+                hitNormal.xz = hitNormal.x * widthAxis + hitNormal.z * depthAxis;
+            }
+            else
+            {
+                hitAlbedo *= 0.55f;
+            }
         }
     }
     return nearest;
@@ -246,7 +295,8 @@ float GetRoomReflectionDetail(float3 hitPosition, float3 hitNormal)
 // roughness は面の荒さ（0〜1）で、荒いほど照明の映り込みをにじませている。
 // hitDistance は当たった面までの距離（どこにも当たらなければ RoomReflectionMaxDistance）で、鏡に映る人影の前後を決めるのに使っている。
 // useEnvironment なら、当たった面の色を、環境マップ（本物の景色）から読んでいる（水たまり。鏡は自分の後ろを映すので使わない）
-float3 TraceRoomReflection(float3 origin, float3 direction, float roughness, out float hitDistance, bool useEnvironment = false)
+float3 TraceRoomReflection(float3 origin, float3 direction, float roughness,
+    out float hitDistance, out float nearVertical, bool useEnvironment = false)
 {
     float3 hitNormal = float3(0.0f, -1.0f, 0.0f);
     float3 albedo = RoomReflectionCeilingAlbedo;
@@ -255,6 +305,11 @@ float3 TraceRoomReflection(float3 origin, float3 direction, float roughness, out
         : RoomReflectionMaxDistance;
     const bool hit = hitDistance < RoomReflectionMaxDistance;
     const float3 hitPosition = origin + direction * hitDistance;
+    // 近くの壁や扉の下側は水面でも輪郭が読めるようにする。壁の上部と遠い壁は天井の反射へなじませる。
+    const float roomHeight = max(OcclusionCeilingY - OcclusionFloorY, 1.0f);
+    const float relativeHeight = (hitPosition.y - OcclusionFloorY) / roomHeight;
+    nearVertical = (1.0f - abs(hitNormal.y)) * (1.0f - smoothstep(30.0f, 85.0f, hitDistance)) *
+        (1.0f - smoothstep(0.62f, 0.95f, relativeHeight));
     // 建物の壁・天井・床に当たったときだけ、コンクリートや天井板の模様を付けている（小物の箱は小物の色のまま）
     const bool roomSurface = all(albedo == RoomReflectionWallAlbedo) ||
         all(albedo == RoomReflectionCeilingAlbedo) || all(albedo == RoomReflectionFloorAlbedo);
@@ -319,10 +374,28 @@ float3 TraceRoomReflection(float3 origin, float3 direction, float roughness, out
             lighting += Light.Diffuse.rgb * GetFlashlightTint(pixelDirection) * Light.Intensity *
                 GetFlashlightBeamProfile(pixelDirection) * rangeFade * rangeFade *
                 (0.25f + saturate(dot(hitNormal, toEye)) * 0.75f);
+            if (useEnvironment && nearVertical > 0.0f)
+            {
+                // 下を照らすときは、水面で跳ねた光が壁や扉を照らす。光が進んだ全距離で弱める。
+                const float3 waterInView = mul(float4(origin, 1.0f), CausticView).xyz;
+                const float waterDistance = max(length(waterInView), 0.001f);
+                const float3 waterDirection = waterInView / waterDistance;
+                const float bounceDistance = saturate((waterDistance + hitDistance) / max(Light.Range, 0.001f));
+                const float bounceFade = 1.0f - bounceDistance * bounceDistance;
+                lighting += Light.Diffuse.rgb * GetFlashlightTint(waterDirection) * Light.Intensity *
+                    GetFlashlightBeamProfile(waterDirection) * bounceFade * bounceFade *
+                    saturate(dot(hitNormal, -direction)) * nearVertical * 0.42f;
+            }
         }
         color = albedo * lighting;
     }
-    // 画面の外の物を、環境マップ（カメラの位置から撮った本物の景色）で映している。
+    // 距離の霧を入れた、部屋の形と今の照明から求めた反射。
+    const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb, LoopDepth);
+    const float fog = hit ? GetHorrorDistanceFog(hitDistance, LoopDepth) : 1.0f;
+    const float3 roomColor = ApplyFilmicHorrorGrade(
+        lerp(color, fogColor, fog) + glow * (1.0f - fog * 0.6f), LoopDepth);
+
+    // 画面の外の物を、環境マップ（カメラの位置から撮った本物の景色）で補っている。
     // 反射の向きのまま読むと、撮った位置（目）と水面の位置が違うので、近くの物ほど映る位置がずれる。
     // そこで、光線が部屋の形に当たった位置を、目から見た向きで読んでいる（部屋の形を使った視差の補正）。
     // 部屋の形がない所（森）や、どこにも当たらない光線は、反射の向きのまま読む。
@@ -341,15 +414,12 @@ float3 TraceRoomReflection(float3 origin, float3 direction, float roughness, out
         // キューブマップの面は左手系、このゲームの座標は右手系なので、z を反転して読んでいる（ReflectionProbe.cpp）
         const float3 environment = g_RayEnvironmentProbe.SampleLevel(g_SamplerState,
             float3(probeDirection.x, probeDirection.y, -probeDirection.z), mipLevel).rgb;
-        // 環境マップは霧を掛けて撮っているので、ここで霧を重ねない
-        return environment + glow * 0.25f;
+        // 面が順番に更新されても映り込みの輪郭が跳ねないよう、室内では部屋の形と今の照明を主体にする。
+        const float environmentWeight = OcclusionBoxCount > 0 ? 0.28f : 0.62f;
+        return lerp(roomColor, environment + glow * 0.25f, environmentWeight);
     }
 
-    // 光線が進んだ距離の分だけ、霧の闇に沈めている（どこにも当たらなければ闇の色）
-    const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb, LoopDepth);
-    const float fog = hit ? GetHorrorDistanceFog(hitDistance, LoopDepth) : 1.0f;
-    color = lerp(color, fogColor, fog) + glow * (1.0f - fog * 0.6f);
-    return ApplyFilmicHorrorGrade(color, LoopDepth);
+    return roomColor;
 }
 
 #endif

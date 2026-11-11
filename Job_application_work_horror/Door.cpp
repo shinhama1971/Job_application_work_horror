@@ -18,6 +18,11 @@
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+    const Color DoorWoodColor(0.30f, 0.13f, 0.07f, 1.0f);
+}
+
 // 扉の形（扉板・鏡板・縁の飾り・取っ手・足元の漏れ光）をMayaで作ったモデルから読み込み、マテリアルを用意している。
 void Door::Init()
 {
@@ -32,7 +37,7 @@ void Door::Init()
     const std::vector<PropModel::IndexRange> ranges = PropModel::Append(
         "assets/model/props/door.fbx",
         {
-            { "Wood", Color(0.30f, 0.13f, 0.07f, 1.0f) },
+            { "Wood", DoorWoodColor },
             { "Panel", Color(0.16f, 0.055f, 0.025f, 1.0f) },
             { "Handle", Color(0.72f, 0.48f, 0.12f, 1.0f) },
             { "Leak", Color(1.0f, 0.72f, 0.42f, 1.0f) },
@@ -491,6 +496,18 @@ void Door::DrawDepthPrepass(Camera* camera)
     m_VertexBuffer.SetGPU();
     m_IndexBuffer.SetGPU();
     context->DrawIndexed(static_cast<UINT>(m_DoorIndexCount), 0, 0);
+}
+
+// 扉板の中心と向きを本描画と同じ行列から求め、開きかけの扉も実際の角度で映す。
+bool Door::GetReflectionProxy(ReflectionProxy& proxy) const
+{
+    const Matrix world = GetDoorWorldMatrix();
+    Vector2 widthAxis(world._11, world._13);
+    widthAxis.Normalize();
+    const Vector3 halfSize(
+        std::abs(m_Scale.x) * 0.5f, std::abs(m_Scale.y) * 0.5f, std::abs(m_Scale.z) * 0.5f);
+    proxy = { world.Translation(), halfSize, DoorWoodColor, widthAxis };
+    return true;
 }
 
 // 頂点データを解放している

@@ -13,6 +13,7 @@ namespace
     // 前のフレームの画面と、写し取った深度を読むテクスチャの番号
     constexpr UINT SceneSlot = 4;
     constexpr UINT DepthSlot = 8;
+    constexpr UINT PreviousDepthSlot = 17;
 }
 
 namespace Effect
@@ -35,7 +36,10 @@ namespace Effect
         viewDesc.Texture2D.MipLevels = 1;
         ID3D11Device* device = Renderer::GetDevice();
         if (FAILED(device->CreateTexture2D(&depthDesc, nullptr, m_DepthCopy.ReleaseAndGetAddressOf())) ||
-            FAILED(device->CreateShaderResourceView(m_DepthCopy.Get(), &viewDesc, m_DepthView.ReleaseAndGetAddressOf())))
+            FAILED(device->CreateShaderResourceView(m_DepthCopy.Get(), &viewDesc, m_DepthView.ReleaseAndGetAddressOf())) ||
+            FAILED(device->CreateTexture2D(&depthDesc, nullptr, m_PreviousDepthCopy.ReleaseAndGetAddressOf())) ||
+            FAILED(device->CreateShaderResourceView(m_PreviousDepthCopy.Get(), &viewDesc,
+                m_PreviousDepthView.ReleaseAndGetAddressOf())))
         {
             utility::ReportFatalError("SSRの深度のテクスチャの作成に失敗しました。");
         }
@@ -45,8 +49,11 @@ namespace Effect
     {
         m_DepthView.Reset();
         m_DepthCopy.Reset();
+        m_PreviousDepthView.Reset();
+        m_PreviousDepthCopy.Reset();
         m_SceneMipView.Reset();
         m_SceneMips.Reset();
+        Invalidate();
     }
 
     // 前のフレームの画面を写すテクスチャ（縮小画像の段つき）を用意している。
@@ -96,12 +103,15 @@ namespace Effect
         Renderer::GetDepthStencilView()->GetResource(depthResource.GetAddressOf());
         context->CopyResource(m_DepthCopy.Get(), depthResource.Get());
         Renderer::SetBackBufferRenderTarget();
+        if (!m_HistoryValid || previousScene == nullptr)
+        {
+            return;
+        }
 
         // 前のフレームの画面を、縮小画像を持つテクスチャの一番大きい段へ写し、GenerateMips で半分ずつ縮めた段（1/2・1/4・…）を作っている。
         // 水たまりのレイ反射は、映る物が水面から離れているほど小さい段を読み、遠くの映り込みをぼかす（rayReflection.hlsli）。
         // 段を作れなかったときは、取り込んだ画面をそのまま渡す（ぼかしが無くなるだけで、反射は映る）
         ID3D11ShaderResourceView* sceneView = previousScene;
-        if (previousScene != nullptr)
         {
             Microsoft::WRL::ComPtr<ID3D11Resource> sceneResource;
             previousScene->GetResource(sceneResource.GetAddressOf());
@@ -119,8 +129,11 @@ namespace Effect
         }
 
         ID3D11ShaderResourceView* depthView = m_DepthView.Get();
+        ID3D11ShaderResourceView* previousDepthView = m_PreviousDepthView.Get();
         context->PSSetShaderResources(DepthSlot, 1, &depthView);
+        context->PSSetShaderResources(PreviousDepthSlot, 1, &previousDepthView);
         context->PSSetShaderResources(SceneSlot, 1, &sceneView);
+        Renderer::SetReflectionHistory(m_PreviousViewProjection, m_PreviousDepth);
     }
 
     void ScreenSpaceReflection::Unbind()
@@ -128,6 +141,20 @@ namespace Effect
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
         ID3D11ShaderResourceView* nullResource = nullptr;
         context->PSSetShaderResources(DepthSlot, 1, &nullResource);
+        context->PSSetShaderResources(PreviousDepthSlot, 1, &nullResource);
         context->PSSetShaderResources(SceneSlot, 1, &nullResource);
+    }
+
+    void ScreenSpaceReflection::FinishFrame(const DirectX::SimpleMath::Matrix& view,
+        const DirectX::SimpleMath::Matrix& projection, bool captured)
+    {
+        m_HistoryValid = captured;
+        if (captured)
+        {
+            m_PreviousDepthCopy.Swap(m_DepthCopy);
+            m_PreviousDepthView.Swap(m_DepthView);
+            m_PreviousViewProjection = view * projection;
+            m_PreviousDepth = DirectX::SimpleMath::Vector4(projection._33, projection._43, 0.0f, 0.0f);
+        }
     }
 }

@@ -20,10 +20,13 @@ class FuseBox;
 class KeyItem;
 class Player;
 class ShadowMan;
+class Wall;
 
 class Stage1HiddenRoomEvent final
 {
 public:
+    static constexpr std::size_t KeySpotCount = 3;
+
     // 配置（Stage1Layout）から受け取るObject。扉は暗証番号の扉と同じもの。
     struct Parts
     {
@@ -32,6 +35,7 @@ public:
         KeyItem* key = nullptr;
         FuseBox* record = nullptr;
         ShadowMan* shadow = nullptr;
+        std::array<Wall*, KeySpotCount> keyLamps{};
     };
 
     // 受け取ったObjectを覚え、鍵を隠して待機の状態から始めている
@@ -66,6 +70,7 @@ private:
     void Trap(Player& player);
     void UpdateTrapped(Player& player, float deltaTime);
     void SpawnShadow(const Player& player);
+    void UpdateKeyLamps(float deltaTime);
     void ShowNotice(std::string_view text, float seconds);
 
     // 受け取ったObject、今の状態、次の影までの秒数、前フレームで影が出ていたか、記録を読んだか
@@ -74,6 +79,8 @@ private:
     float m_ShadowTimer = 0.0f;
     bool m_ShadowWasActive = false;
     bool m_RecordRead = false;
+    std::size_t m_KeySpot = 0;
+    float m_KeyLampTime = 0.0f;
     // 知らせの文章とその残り秒数、乱数
     std::string_view m_NoticeText;
     float m_NoticeTimer = 0.0f;

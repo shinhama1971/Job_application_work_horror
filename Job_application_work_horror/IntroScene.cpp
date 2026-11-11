@@ -31,33 +31,21 @@ namespace
     {
         { Vector3(0.0f, -99.0f, 95.0f), Vector3(0.0f, -99.0f, 165.0f), 0.0f, 0.0f, 0.03f, 0.07f, 45.0f },
     };
-    // 森を歩いて玄関から入ったとき：玄関の扉の前で、ほとんど動かないカメラ
-    const std::vector<ForestBackdrop::Shot> DoorShots =
-    {
-        { Vector3(0.0f, -99.0f, 262.0f), Vector3(0.0f, -99.0f, 268.0f), 0.0f, 0.0f, 0.04f, 0.05f, 30.0f },
-    };
-
     float Fade(float time, float start, float length)
     {
         return std::clamp((time - start) / length, 0.0f, 1.0f);
     }
 }
 
-bool IntroScene::s_StartAtMission = false;
-
-IntroScene::IntroScene()
+IntroScene::IntroScene(bool startAtMission)
+    : m_StartAtMission(startAtMission),
+      m_ShowingMission(startAtMission),
+      m_StaticPlaying(!startAtMission)
 {
     m_Hud.Init();
-    const bool startAtMission = s_StartAtMission;
-    s_StartAtMission = false;
-    m_Backdrop.Init(startAtMission ? DoorShots : IntroShots, false);
-    // 受信記録の間は、無線の雑音を小さく鳴らしている（鳴らし始めは Game::ChangeScene。「通信途絶」で止める）。
-    // 目的の画面から始めるときは、最初の Update で止めている
-    m_StaticPlaying = true;
-    if (startAtMission)
+    if (!m_StartAtMission)
     {
-        m_ShowingMission = true;
-        m_MissionTimer = 0.0f;
+        m_Backdrop.Init(IntroShots, false);
     }
 }
 
@@ -69,7 +57,10 @@ IntroScene::~IntroScene()
         game->StopAudioCue(SOUND_CUE_RADIO_STATIC);
     }
     m_Hud.Uninit();
-    m_Backdrop.Uninit();
+    if (!m_StartAtMission)
+    {
+        m_Backdrop.Uninit();
+    }
 }
 
 void IntroScene::ShowMission()
@@ -89,6 +80,10 @@ void IntroScene::ShowMission()
 
 float IntroScene::GetNoise() const
 {
+    if (m_StartAtMission)
+    {
+        return 0.0f;
+    }
     if (m_ShowingMission)
     {
         // 目的の画面に移った瞬間だけ、少し乱している
@@ -124,7 +119,7 @@ void IntroScene::Update()
     }
     m_Backdrop.Update(deltaTime);
 
-    // 「通信途絶」の瞬間に、無線の雑音が途切れる（目的の画面から始めたときは、最初のフレームで止める）
+    // 「通信途絶」か、受信記録を飛ばした時点で無線の雑音が途切れる。
     if (m_StaticPlaying && (m_ShowingMission || m_Time >= SignalLostTime))
     {
         Core::Game::GetInstance()->StopAudioCue(SOUND_CUE_RADIO_STATIC);
@@ -161,6 +156,7 @@ void IntroScene::Draw(Camera* camera)
     Hud::IntroView view;
     view.Time = m_Time;
     view.Noise = GetNoise();
+    view.HideBackdrop = m_StartAtMission;
     view.Header = TransmissionHeader;
     view.HeaderAlpha = m_ShowingMission ? 0.0f : Fade(m_Time, HeaderTime, 0.6f);
     static_assert(std::size(TransmissionLines) == std::size(LineStartTimes), "LineStartTimes must match StoryText");

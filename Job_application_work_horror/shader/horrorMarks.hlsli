@@ -68,11 +68,22 @@ HorrorMarks ComputeHorrorMarks(float alongWall, float heightFromFloor, float pla
     const float cellIndex = floor(alongWall / cellWidth);
     const float2 cellKey = float2(cellIndex, floor(planeCoordinate * 0.25f + 0.125f));
     const float kind = FastHash21(cellKey + 101.3f);
+    [branch]
+    if (kind >= 0.36f)
+    {
+        return marks;
+    }
     const float seedA = FastHash21(cellKey + 13.7f);
     const float seedB = FastHash21(cellKey + 57.1f);
     const float seedC = FastHash21(cellKey + 88.9f);
     // マスの中の位置（壁の端に寄りすぎないよう、15〜55の間）
     const float2 local = float2(alongWall - cellIndex * cellWidth - (15.0f + seedA * 40.0f), heightFromFloor);
+    // 2つ目の手形や輪郭のぼけを含めても届かない範囲では、跡の形を計算しない。
+    [branch]
+    if (abs(local.x) > 14.0f || local.y < 0.0f || local.y > 48.0f)
+    {
+        return marks;
+    }
     const float fade = saturate(1.0f - footprint / 0.6f);
     // 血の付き方のむら（かすれ）
     const float smudge = 0.55f + 0.45f * FastValueNoise(local * 0.8f + cellKey * 7.0f);

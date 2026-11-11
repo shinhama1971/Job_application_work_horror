@@ -45,7 +45,7 @@ private:
     // 白熱電球の電圧の揺れ（0.86〜1）。時間で、ゆっくりした揺れと、まれに沈む揺れを重ねている
     float GetWarmBulbSag() const;
     bool m_WasPowerRestored = false;
-    // 進む先の照明：明るさと色はほかと同じまま、切れかけの電球のように不規則にちかちかさせる。
+    // 進む先の照明：普段はほかと同じ明るさと色で、明滅のときに明暗を付ける。
     // 行き先の候補か、今ちかちかさせる1灯か
     bool m_IsRouteFixture = false;
     bool m_RouteFlickerEnabled = false;

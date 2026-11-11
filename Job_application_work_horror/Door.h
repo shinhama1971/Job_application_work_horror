@@ -61,6 +61,7 @@ public:
     void DrawDepthPrepass(Camera* camera) override;
     bool UsesCameraCulling() const override { return true; }
     bool ContributesToReflection() const override { return true; }
+    bool GetReflectionProxy(ReflectionProxy& proxy) const override;
     void Uninit() override;
 
     // 閉じている間だけ調べる対象になっている

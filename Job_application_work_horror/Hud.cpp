@@ -337,10 +337,10 @@ void Hud::Draw(
 }
 
 
-// まばたきのように、画面全体を黒で覆っている（最大90%の濃さ）
-void Hud::DrawBlink(float opacity)
+// 画面全体を黒で覆う。まばたきでは最大90%、玄関から入る暗転では完全に黒くする。
+void Hud::DrawBlink(float opacity, float maximumOpacity)
 {
-    const float blinkOpacity = (std::clamp)(opacity, 0.0f, 0.90f);
+    const float blinkOpacity = (std::clamp)(opacity, 0.0f, maximumOpacity);
     if (blinkOpacity <= 0.001f)
     {
         return;

@@ -20,30 +20,24 @@ cbuffer RoomOcclusionBuffer : register(b11)
     float OcclusionStrength;    // 角で一番暗くなる割合（0〜1）
 }
 
-// 点から長方形までの距離を返している（中にあるときは負）。
-float OcclusionBoxDistance(float2 position, float4 box)
-{
-    const float2 outside = abs(position - box.xy) - box.zw;
-    return length(max(outside, 0.0f)) + min(max(outside.x, outside.y), 0.0f);
-}
-
 // 近くの壁までの距離を返している（壁の箱がないときは1000）。自分が乗っている壁（距離がほぼ0）は数えないので、
 // 壁の面では「交わる別の壁」まで、床と天井では「一番近い壁」までの距離になる。
 // 床の壁際の埃（wetFloorPS）にも使っている。
 float GetNearestWallDistance(float2 worldPositionXZ)
 {
-    float nearestWall = 1000.0f;
+    // 壁ごとの比較は距離の二乗で行い、最も近い壁が決まってから平方根を取る。
+    float nearestWallSquared = 1000.0f * 1000.0f;
     const uint boxCount = min(OcclusionBoxCount, MaxOcclusionBoxes);
     [loop]
     for (uint i = 0; i < boxCount; ++i)
     {
-        const float distanceToBox = OcclusionBoxDistance(worldPositionXZ, OcclusionBoxes[i]);
-        if (distanceToBox > 0.05f)
-        {
-            nearestWall = min(nearestWall, distanceToBox);
-        }
+        const float4 box = OcclusionBoxes[i];
+        const float2 outside = max(abs(worldPositionXZ - box.xy) - box.zw, 0.0f);
+        const float distanceSquared = dot(outside, outside);
+        nearestWallSquared = min(nearestWallSquared,
+            distanceSquared > 0.05f * 0.05f ? distanceSquared : nearestWallSquared);
     }
-    return nearestWall;
+    return sqrt(nearestWallSquared);
 }
 
 // 暗がりの計算の本体。GetRoomOcclusion から、壁の箱があるときだけ呼んでいる。

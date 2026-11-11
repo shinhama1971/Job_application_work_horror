@@ -284,7 +284,7 @@ namespace Effect
 
     // 今の作りでは3DのシーンをBackBufferへ描いているため、画面効果の入力として
     // 同じ大きさ・形式の作業用テクスチャへ写している。
-    void PostProcess::CaptureBackBuffer()
+    bool PostProcess::CaptureBackBuffer()
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
 
@@ -292,7 +292,8 @@ namespace Effect
         context->OMSetRenderTargets(0, nullptr, nullptr);
 
         // コマ落ちの間は写し取らず、前のフレームの画面を残している（Draw がそれを画面全体に出す）
-        if (m_FrameHoldTimer <= 0.0f)
+        const bool captured = m_FrameHoldTimer <= 0.0f;
+        if (captured)
         {
             Microsoft::WRL::ComPtr<ID3D11Resource> backBufferResource;
             Renderer::GetBackBufferRTV()->GetResource(backBufferResource.GetAddressOf());
@@ -300,6 +301,7 @@ namespace Effect
         }
 
         Renderer::SetBackBufferRenderTarget();
+        return captured;
     }
 
     float PostProcess::NextFrameHoldRandom()

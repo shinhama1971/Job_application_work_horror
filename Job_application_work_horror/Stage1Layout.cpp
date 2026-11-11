@@ -533,7 +533,7 @@ namespace Stage1Layout
         hiddenRoomKey->SetActive(false);
 
         FuseBox* hiddenRoomRecord = builder.Create<FuseBox>("Stage1HiddenRoomRecord");
-        hiddenRoomRecord->SetManualControl("記録を読む");
+        hiddenRoomRecord->SetManualControl("記録端末を調べる");
         hiddenRoomRecord->SetManualInteractionAllowed(true);
         place(*hiddenRoomRecord, "Stage1HiddenRoomRecord");
 
@@ -545,6 +545,20 @@ namespace Stage1Layout
         objects.hiddenRoom.key = hiddenRoomKey;
         objects.hiddenRoom.record = hiddenRoomRecord;
         objects.hiddenRoom.shadow = hiddenRoomShadow;
+
+        // 鍵の候補と同じ順に、近くの壁へ琥珀色の保管灯を付ける。
+        const std::array<const char*, Stage1HiddenRoomEvent::KeySpotCount> keyLampNames = {
+            "Stage1HiddenKeyLampSouth", "Stage1HiddenKeyLampNorthWest", "Stage1HiddenKeyLampNorthEast" };
+        for (std::size_t index = 0; index < keyLampNames.size(); ++index)
+        {
+            Wall* lamp = createPlacedStageProp(keyLampNames[index], Color(0.21f, 0.13f, 0.06f, 1.0f),
+                Color(1.0f, 0.45f, 0.08f, 1.0f), 12.0f, false);
+            lamp->SetCastsShadow(false);
+            lamp->SetVisualModel("warning_lamp");
+            lamp->SetGlowLight(46.0f, 2.5f);
+            lamp->SetEmissionScale(0.0f);
+            objects.hiddenRoom.keyLamps[index] = lamp;
+        }
 
         // 書類保管室の「照らすと止まる影」。最初は出さず、位置はStage1LightStalkerが毎フレーム決めている。
         ShadowMan* archiveStalker = builder.Create<ShadowMan>("Stage1ArchiveStalker");

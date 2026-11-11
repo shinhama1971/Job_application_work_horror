@@ -195,24 +195,31 @@ WallAgeing ComputeWallAgeing(float3 worldPosition, float3 normal, float weight)
         const float pitCellSize = 1.6f;
         const float2 pitCell = floor(uv / pitCellSize);
         const float pitSeed = FastHash21(pitCell + 17.3f);
-        const float2 pitOffset = float2(
-            FastHash21(pitCell + 3.9f), FastHash21(pitCell + 8.6f)) * 0.5f - 0.25f;
-        const float pitSize = 0.05f + 0.12f * FastHash21(pitCell + 29.4f);
-        const float pitRadius = length(frac(uv / pitCellSize) - 0.5f - pitOffset) * pitCellSize;
-        pit = step(0.92f, pitSeed) *
-            (1.0f - smoothstep(pitSize * 0.4f, pitSize + footprint, pitRadius)) *
-            saturate(1.0f - footprint / 0.5f);
+        [branch]
+        if (pitSeed >= 0.92f)
+        {
+            const float2 pitOffset = float2(
+                FastHash21(pitCell + 3.9f), FastHash21(pitCell + 8.6f)) * 0.5f - 0.25f;
+            const float pitSize = 0.05f + 0.12f * FastHash21(pitCell + 29.4f);
+            const float pitRadius = length(frac(uv / pitCellSize) - 0.5f - pitOffset) * pitCellSize;
+            pit = (1.0f - smoothstep(pitSize * 0.4f, pitSize + footprint, pitRadius)) *
+                saturate(1.0f - footprint / 0.5f);
+        }
 
         // --- ひび（ノイズの等高線を細い線として使い、別のノイズで出る場所を絞っている）
         // 等高線だけだと大きな輪のようななめらかな曲線になるため、細かいノイズで線をギザギザに揺らし、
         // さらに別のノイズで途切れ途切れにして、割れたひびらしくしている。
-        const float2 crackWarp = float2(
-            FastValueNoise(uv * 0.9f + 3.0f), FastValueNoise(uv * 0.9f + 17.0f)) - 0.5f;
-        const float crackLine = 1.0f - smoothstep(0.0f, 0.012f + footprint * 0.04f,
-            abs(FastValueNoise(uv * 0.085f + 61.0f + crackWarp * 0.22f) - 0.5f));
         const float crackMask = smoothstep(0.62f, 0.78f, FastValueNoise(uv * 0.021f + 9.0f));
-        const float crackPieces = smoothstep(0.42f, 0.58f, FastValueNoise(uv * 0.32f + 41.0f));
-        crack = crackLine * crackMask * crackPieces * saturate(1.0f - footprint / 0.35f);
+        [branch]
+        if (crackMask > 0.0f && footprint < 0.35f)
+        {
+            const float2 crackWarp = float2(
+                FastValueNoise(uv * 0.9f + 3.0f), FastValueNoise(uv * 0.9f + 17.0f)) - 0.5f;
+            const float crackLine = 1.0f - smoothstep(0.0f, 0.012f + footprint * 0.04f,
+                abs(FastValueNoise(uv * 0.085f + 61.0f + crackWarp * 0.22f) - 0.5f));
+            const float crackPieces = smoothstep(0.42f, 0.58f, FastValueNoise(uv * 0.32f + 41.0f));
+            crack = crackLine * crackMask * crackPieces * saturate(1.0f - footprint / 0.35f);
+        }
     }
 
     // --- 床際の水位線（水がたまっていた跡）。高さは場所によって6〜12で揺らいでいる
@@ -224,28 +231,36 @@ WallAgeing ComputeWallAgeing(float3 worldPosition, float3 normal, float weight)
     const float streakWidth = 2.4f;
     const float column = floor(uv.x / streakWidth);
     const float streakSeed = FastHash21(float2(column, 41.7f));
-    const float streakX = abs(frac(uv.x / streakWidth) - 0.5f);
-    const float streakHalfWidth = 0.10f + 0.22f * FastHash21(float2(column, 7.7f));
-    const float streakLength = 14.0f + 26.0f * FastHash21(float2(column, 13.1f));
-    const float fromTop = WallHeight - heightFromFloor;
-    const float streak = step(0.80f, streakSeed) *
-        (1.0f - smoothstep(streakHalfWidth * 0.35f, streakHalfWidth + footprint, streakX)) *
-        (1.0f - smoothstep(streakLength * 0.45f, streakLength, fromTop)) *
-        (0.55f + 0.45f * FastValueNoise(float2(column * 3.1f, heightFromFloor * 0.35f)));
+    float streak = 0.0f;
+    [branch]
+    if (streakSeed >= 0.80f)
+    {
+        const float streakX = abs(frac(uv.x / streakWidth) - 0.5f);
+        const float streakHalfWidth = 0.10f + 0.22f * FastHash21(float2(column, 7.7f));
+        const float streakLength = 14.0f + 26.0f * FastHash21(float2(column, 13.1f));
+        const float fromTop = WallHeight - heightFromFloor;
+        streak = (1.0f - smoothstep(streakHalfWidth * 0.35f, streakHalfWidth + footprint, streakX)) *
+            (1.0f - smoothstep(streakLength * 0.45f, streakLength, fromTop)) *
+            (0.55f + 0.45f * FastValueNoise(float2(column * 3.1f, heightFromFloor * 0.35f)));
+    }
 
     // --- カビ（床際に多く、壁の途中にも固まって生えている）。細かい斑点はなめらかなノイズで丸くにじませている
     // 値ノイズは格子に沿った四角い形が出やすいため、座標を回転させ、大きさの違う2つを混ぜて格子を崩している。
     const float moldCluster = smoothstep(0.58f, 0.82f, FastValueNoise(uv * 0.055f + 23.0f));
-    const float2 rotatedUV = float2(
-        uv.x * 0.866f - uv.y * 0.5f,
-        uv.x * 0.5f + uv.y * 0.866f);
-    const float moldGrain =
-        FastValueNoise(rotatedUV * 1.1f + 5.0f) * 0.6f +
-        FastValueNoise(uv * 2.7f - 13.0f) * 0.4f;
-    // 斑点は「ある・なし」で切らず、カビの塊の中の濃淡として使っている。
-    const float moldSpeckle = lerp(0.45f, 1.0f, smoothstep(0.30f, 0.75f, moldGrain));
-    const float mold = moldCluster * lerp(1.0f, moldSpeckle, saturate(1.0f - footprint / 0.6f)) *
-        saturate(exp(-heightFromFloor * 0.05f) + 0.30f);
+    float mold = moldCluster * saturate(exp(-heightFromFloor * 0.05f) + 0.30f);
+    [branch]
+    if (moldCluster > 0.0f && footprint < 0.6f)
+    {
+        const float2 rotatedUV = float2(
+            uv.x * 0.866f - uv.y * 0.5f,
+            uv.x * 0.5f + uv.y * 0.866f);
+        const float moldGrain =
+            FastValueNoise(rotatedUV * 1.1f + 5.0f) * 0.6f +
+            FastValueNoise(uv * 2.7f - 13.0f) * 0.4f;
+        // 斑点はカビの塊の中の濃淡として使う。
+        const float moldSpeckle = lerp(0.45f, 1.0f, smoothstep(0.30f, 0.75f, moldGrain));
+        mold *= lerp(1.0f, moldSpeckle, saturate(1.0f - footprint / 0.6f));
+    }
 
     // --- ホラーらしい跡（血の手形と引きずった跡、引っかき傷、血の垂れ跡。horrorMarks.hlsli）
     // 壁の面の位置（法線の向きの座標）も渡し、平行な別の壁に同じ跡が並ばないようにしている。
@@ -389,8 +404,12 @@ float GetWallTrickle(float3 worldPosition, float3 worldNormal, float damp)
     const float column = floor(along / columnWidth);
     const float local = frac(along / columnWidth) - 0.5f;
     const float seed = FastHash21(float2(column, 3.7f));
-    // 約2割の列にだけ筋がある
-    const float present = step(0.80f, seed);
+    // 水の筋が出る列だけで、流れや濡れ具合を計算する。
+    [branch]
+    if (seed < 0.80f || verticalSurface <= 0.0f)
+    {
+        return 0.0f;
+    }
     // 筋の線：列ごとの太さで、高さに沿ってわずかにくねらせている
     const float wobble = (FastValueNoise(float2(column * 1.3f, worldPosition.y * 0.08f)) - 0.5f) * 0.6f;
     const float width = lerp(0.07f, 0.17f, FastHash21(float2(column, 9.1f)));
@@ -410,7 +429,7 @@ float GetWallTrickle(float3 worldPosition, float3 worldNormal, float damp)
     // 壁の湿った区間（壁に沿った大きなまだら）だけに流している。床際の水の跡（damp）がある所は、少し流れやすくしている
     const float wetSection = FastValueNoise(float2(along * 0.035f, 7.0f)) + damp * 0.25f;
     const float dampArea = smoothstep(0.56f, 0.72f, wetSection);
-    return present * trickleLine * film * fromCeiling * lowerAmount * dampArea * verticalSurface;
+    return trickleLine * film * fromCeiling * lowerAmount * dampArea * verticalSurface;
 }
 
 // ホラー向けの色調と、遠くの闇の色（wetFloorPSと共通。horrorGrade.hlsli）

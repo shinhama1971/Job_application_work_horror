@@ -52,16 +52,17 @@ public:
 	virtual bool UsesCameraCulling() const { return false; }
 	// trueなら、カメラの位置から撮るキューブマップ（水たまりの反射の比較と、PBRの環境マップ）に映る。
 	virtual bool ContributesToReflection() const { return false; }
-	// レイ反射（水たまり）で、画面の外にあっても水面に映す小物なら、その物を囲む箱（ワールドの最小・最大の角）と色を返してtrueにしている。
-	// GameRendering がカメラに近い物から MaxReflectionProps 個を選び、床と壁の鏡のシェーダーへ渡している（建物の壁と天井は部屋の形で別に渡している）。
-	virtual bool GetReflectionProxy(
-		DirectX::SimpleMath::Vector3& minimum, DirectX::SimpleMath::Vector3& maximum, DirectX::SimpleMath::Color& color) const
+	struct ReflectionProxy
 	{
-		(void)minimum;
-		(void)maximum;
-		(void)color;
-		return false;
-	}
+		DirectX::SimpleMath::Vector3 Center;
+		DirectX::SimpleMath::Vector3 HalfSize;
+		DirectX::SimpleMath::Color Color;
+		// 扉は幅方向の単位ベクトル（x・z）を渡す。ほかの物は0で、箱はワールドの軸に沿う。
+		DirectX::SimpleMath::Vector2 DoorWidthAxis;
+	};
+
+	// 画面の外でもレイ反射に映す物は、箱の位置・大きさ・色を返す。建物の壁と天井は部屋の形を使う。
+	virtual bool GetReflectionProxy(ReflectionProxy&) const { return false; }
 	// 監視カメラなど、プレイヤー以外の視点で描くワールドに含めるかどうか。
 	virtual bool DrawsInAuxiliaryView() const { return true; }
 	// 描画の前にGPUで計算する物（水たまりの波）は、ここでCompute Shaderを実行している。

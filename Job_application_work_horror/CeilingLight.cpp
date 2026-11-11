@@ -47,10 +47,8 @@ void CeilingLight::Init()
     m_LightMaterial->Create(panel);
 }
 
-// 切れかけの電球のちかちか。一定の周期や規則的な点滅にならないよう、毎回長さと速さを乱数で変えている。
-// ・ぱちぱち：0.2〜0.8秒の間、1秒に16〜26回の速さで、点いたり消えたりを不規則に繰り返す
-// ・消えかけ：ときどき0.4〜0.9秒ふっと消え、最後に何度か瞬いて点き直す（このときだけ小さく電気の音を鳴らす）
-// ・間：0.5〜2.4秒。間の間も、電球のうなりで明るさが少し揺れている
+// 進む先の灯は、不ぞろいな間隔で少し長く2回光る。器具と周囲の赤い光だまりに同じ明暗を付ける。
+// ときどき長く暗くなってから点き直し、そのときだけ小さな電気の音を鳴らす。
 void CeilingLight::UpdateRouteFlicker(float& targetBrightness)
 {
     // 0〜1の乱数。器具ごとの値と回数から決まるので、同じ回の中では同じ並びになる
@@ -61,10 +59,10 @@ void CeilingLight::UpdateRouteFlicker(float& targetBrightness)
     };
     const float seed = m_FlickerOffset * 3.17f + 0.37f;
 
-    // 選ばれてすぐには始めず、少し間を置いている（選ばれた瞬間に分かってしまわないように）
+    // 新しい灯へ移ったら、短い間を置いてから最初の明滅を始める。
     if (m_RouteNextFlicker < 0.0f)
     {
-        m_RouteNextFlicker = m_Time + 0.8f + noise(seed + m_RouteFlickerSerial * 1.37f) * 1.2f;
+        m_RouteNextFlicker = m_Time + 0.35f + noise(seed + m_RouteFlickerSerial * 1.37f) * 0.40f;
     }
     if (m_Time >= m_RouteNextFlicker && m_Time >= m_RouteFlickerEnd)
     {
@@ -72,8 +70,8 @@ void CeilingLight::UpdateRouteFlicker(float& targetBrightness)
         const float length = noise(seed + m_RouteFlickerSerial * 7.31f);
         m_RouteDropout = noise(seed + m_RouteFlickerSerial * 3.77f) < 0.22f;
         m_RouteFlickerStart = m_Time;
-        m_RouteFlickerEnd = m_Time + (m_RouteDropout ? 0.40f + length * 0.50f : 0.20f + length * 0.60f);
-        m_RouteNextFlicker = m_RouteFlickerEnd + 0.50f + noise(seed + m_RouteFlickerSerial * 1.93f) * 1.90f;
+        m_RouteFlickerEnd = m_Time + (m_RouteDropout ? 0.65f + length * 0.30f : 0.65f + length * 0.20f);
+        m_RouteNextFlicker = m_RouteFlickerEnd + 0.80f + noise(seed + m_RouteFlickerSerial * 1.93f) * 1.00f;
         if (m_RouteDropout)
         {
             // 消える瞬間に、電気の接点がはじけるような小さな音
@@ -84,22 +82,11 @@ void CeilingLight::UpdateRouteFlicker(float& targetBrightness)
 
     if (m_Time < m_RouteFlickerEnd)
     {
-        const float elapsed = m_Time - m_RouteFlickerStart;
-        bool on = false;
-        if (m_RouteDropout)
-        {
-            // 消えたまま、最後の0.2秒だけ点こうとして瞬いている
-            if (m_RouteFlickerEnd - m_Time < 0.20f)
-            {
-                on = noise(seed + m_RouteFlickerSerial * 5.70f + std::floor(elapsed * 30.0f)) < 0.50f;
-            }
-        }
-        else
-        {
-            const float rate = 16.0f + noise(seed + m_RouteFlickerSerial * 2.30f) * 10.0f;
-            on = noise(seed + m_RouteFlickerSerial * 5.70f + std::floor(elapsed * rate)) < 0.45f;
-        }
-        targetBrightness *= on ? 1.0f : 0.06f;
+        const float phase = (m_Time - m_RouteFlickerStart) / (m_RouteFlickerEnd - m_RouteFlickerStart);
+        const bool on = m_RouteDropout
+            ? m_RouteFlickerEnd - m_Time < 0.22f
+            : phase < 0.30f || (phase >= 0.50f && phase < 0.84f);
+        targetBrightness *= on ? 1.40f : 0.12f;
         m_RouteFlickering = true;
     }
     else
@@ -198,7 +185,7 @@ void CeilingLight::Update()
     }
 
     // 進む先の候補の照明。停電中も非常回路の弱い光を残し、候補どうしは同じ明るさ・同じ色にしている。
-    // 今進む先の1灯だけが、切れかけの電球のように不規則にちかちかする（矢印や明るさで道を示さない）。
+    // 今進む先の1灯だけ、発光パネルと周囲の光だまりに明滅を重ねる。
     m_RouteFlickering = false;
     if (m_IsRouteFixture)
     {
@@ -266,9 +253,9 @@ void CeilingLight::Update()
     const bool startingUp = powerRestored && m_PowerOnTimer < 1.1f;
     const bool voltageDip =
         powerRestored && !startingUp && targetBrightness < 0.75f;
-    // 進む先の灯がちかちかしている間は、ほぼその場で切り替え、ぱちぱちと瞬いて見えるようにしている
+    // 進む先の灯は、明滅の山を見分けられる速さで明るさを追従させる。
     const float response = m_RouteFlickering
-        ? 0.90f
+        ? 0.72f
         : (powerRestored
             ? (startingUp ? 0.48f : (voltageDip ? 0.24f : 0.08f))
             : 0.32f);

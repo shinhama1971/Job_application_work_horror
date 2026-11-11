@@ -39,7 +39,7 @@ cbuffer WaterCausticsBuffer : register(b12)
     float4 PuddleFigure;
     // 2面の「見えない影」の異変で、影だけを落とす人影（xyz = 足もとの位置、w = 見え方0〜1。0なら影を付けない。figureShadow.hlsli）
     float4 UnseenFigure;
-    // レイ反射で水面に映す小物の箱（[i*3] = 最小の角、[i*3+1] = 最大の角、[i*3+2] = 色）。数は ReflectionParams.z
+    // レイ反射の箱。3つずつ中心・半分の大きさ・色。最初の2つの w は扉の幅方向の x・z（小物は0）。数は ReflectionParams.z
     float4 ReflectionProps[MAX_REFLECTION_PROPS * 3];
     // 2面の壁の鏡に映す自分の体（xyz = 足もとの位置、w = 映すか（1なら映す）。mirrorPS が光線とカプセルで交差させる。MirrorSelf）
     float4 MirrorSelf;
@@ -55,6 +55,9 @@ cbuffer WaterCausticsBuffer : register(b12)
     float4 PlayerBodyPose;
     // 水たまりのレイ反射が読む環境マップを撮った位置（xyz。w = 詰め物）。ReflectionParams.w が1のときだけ使う（rayReflection.hlsli）
     float4 ReflectionProbeCenter;
+    // SSRが前のフレームの同じ位置を読むための投影行列と深度の係数（xy）。
+    matrix PreviousReflectionViewProjection;
+    float4 PreviousReflectionDepth;
 }
 
 // 水たまりの波のシミュレーションの高さ（t9。WaterRippleSimulationが毎フレーム計算している）。x = 今の高さ、y = 1つ前の高さ

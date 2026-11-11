@@ -139,7 +139,7 @@ void Renderer::SetWaterRipples(ID3D11ShaderResourceView* heightTexture,
 }
 
 // 水面の反射の方式と、SSRで使う射影行列をb12へ設定している
-void Renderer::SetReflectionMode(int mode, const Matrix& projection, bool screenSpaceAvailable)
+void Renderer::SetReflectionMode(int mode, const Matrix& projection)
 {
 	if (!m_pWaterCausticsBuffer)
 	{
@@ -148,11 +148,24 @@ void Renderer::SetReflectionMode(int mode, const Matrix& projection, bool screen
 	m_WaterCaustics.Projection = projection.Transpose();
 	// z（小物の箱の数）は SetReflectionProps が決めるため、そのまま残している
 	m_WaterCaustics.Reflection.x = static_cast<float>(mode);
-	m_WaterCaustics.Reflection.y = screenSpaceAvailable ? 1.0f : 0.0f;
+	m_WaterCaustics.Reflection.y = 0.0f;
 	m_pDeviceContext->UpdateSubresource(
 		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
 		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+}
+
+void Renderer::SetReflectionHistory(const Matrix& viewProjection, const Vector4& depth)
+{
+	if (!m_pWaterCausticsBuffer)
+	{
+		return;
+	}
+	m_WaterCaustics.PreviousReflectionViewProjection = viewProjection.Transpose();
+	m_WaterCaustics.PreviousReflectionDepth = depth;
+	m_WaterCaustics.Reflection.y = 1.0f;
+	m_pDeviceContext->UpdateSubresource(
+		m_pWaterCausticsBuffer.Get(), 0, nullptr, &m_WaterCaustics, 0, 0);
 }
 
 // 水たまりのレイ反射で、画面の外の物を環境マップ（t14）から読めるかと、環境マップを撮った位置をb12へ設定している（変わらなければ送り直さない）

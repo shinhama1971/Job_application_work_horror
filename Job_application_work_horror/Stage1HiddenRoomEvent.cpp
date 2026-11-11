@@ -12,8 +12,10 @@
 #include "KeyItem.h"
 #include "Player.h"
 #include "ShadowMan.h"
+#include "Wall.h"
 
 #include <algorithm>
+#include <cmath>
 
 using namespace DirectX::SimpleMath;
 
@@ -27,7 +29,7 @@ namespace
     constexpr float TrapLineX = 64.0f;
 
     // 鍵が落ちている場所の候補（暗い部屋の隅）。電池・壁の文字・配電箱と重ならない位置にしている。
-    const std::array<Vector3, 3> KeySpots =
+    const std::array<Vector3, Stage1HiddenRoomEvent::KeySpotCount> KeySpots =
     {
         Vector3(205.0f, -95.0f, 55.0f),
         Vector3(70.0f, -95.0f, 168.0f),
@@ -59,6 +61,8 @@ void Stage1HiddenRoomEvent::Init(const Parts& parts)
     m_ShadowTimer = 0.0f;
     m_ShadowWasActive = false;
     m_RecordRead = false;
+    m_KeySpot = 0;
+    m_KeyLampTime = 0.0f;
     m_NoticeText = {};
     m_NoticeTimer = 0.0f;
     if (m_Parts.key != nullptr)
@@ -106,7 +110,8 @@ void Stage1HiddenRoomEvent::Trap(Player& player)
 
     // 鍵を3か所の候補からランダムに選んで置いている
     std::uniform_int_distribution<std::size_t> pick(0, KeySpots.size() - 1);
-    const Vector3& spot = KeySpots[pick(m_Random)];
+    m_KeySpot = pick(m_Random);
+    const Vector3& spot = KeySpots[m_KeySpot];
     m_Parts.key->SetPosition(spot.x, spot.y, spot.z);
     m_Parts.key->SetActive(true);
 
@@ -117,6 +122,7 @@ void Stage1HiddenRoomEvent::Trap(Player& player)
     game->GetPostProcess()->TriggerHorrorPulse(0.46f, 0.40f);
     Input::SetVibration(10, 0.26f);
     ShowNotice("扉が閉まった", 2.4f);
+    UpdateKeyLamps(0.0f);
 }
 
 void Stage1HiddenRoomEvent::UpdateTrapped(Player& player, float deltaTime)
@@ -129,13 +135,14 @@ void Stage1HiddenRoomEvent::UpdateTrapped(Player& player, float deltaTime)
     {
         m_RecordRead = true;
         game->RegisterEvidenceCollected();
-        ShowNotice("記録: 巡回員は3日目から戻らない 天井裏の足音は今も続いている", 6.0f);
+        ShowNotice("巡回記録：天井裏の足音は止まらない　保管灯が鍵の場所を示す", 4.0f);
     }
 
     // 鍵を拾ったら、扉の鍵を外して開け、脱出にしている。
     if (m_Parts.key->IsCollected())
     {
         m_State = State::Escaped;
+        UpdateKeyLamps(0.0f);
         game->RegisterHiddenRoomEscaped();
         m_Parts.shadow->SetActive(false);
         Door* door = m_Parts.door;
@@ -145,6 +152,8 @@ void Stage1HiddenRoomEvent::UpdateTrapped(Player& player, float deltaTime)
         ShowNotice("鍵で扉が開いた", 2.8f);
         return;
     }
+
+    UpdateKeyLamps(deltaTime);
 
     ShadowMan* shadow = m_Parts.shadow;
     if (!shadow->IsActive())
@@ -178,6 +187,37 @@ void Stage1HiddenRoomEvent::UpdateTrapped(Player& player, float deltaTime)
         m_ShadowWasActive = false;
         m_ShadowTimer = NextShadowDelay;
         ShowNotice("影に触れられた 電池を奪われた", 2.8f);
+    }
+}
+
+// 端末を読んだら順に点灯し、その後は鍵の保管場所だけ2回ずつ点滅する。
+void Stage1HiddenRoomEvent::UpdateKeyLamps(float deltaTime)
+{
+    constexpr float ScanStepSeconds = 0.65f;
+    constexpr float ScanSeconds = ScanStepSeconds * KeySpotCount;
+    constexpr float PulseCycleSeconds = 2.4f;
+    constexpr float StandbyBrightness = 0.14f;
+
+    if (m_RecordRead)
+    {
+        m_KeyLampTime += deltaTime;
+    }
+    const bool scanning = m_KeyLampTime < ScanSeconds;
+    const std::size_t scanLamp = static_cast<std::size_t>(
+        (std::min)(m_KeyLampTime, ScanSeconds) / ScanStepSeconds);
+    const float pulseTime = std::fmod((std::max)(0.0f, m_KeyLampTime - ScanSeconds), PulseCycleSeconds);
+    const bool pulseOn = pulseTime < 0.30f || (pulseTime >= 0.55f && pulseTime < 0.85f);
+
+    for (std::size_t index = 0; index < m_Parts.keyLamps.size(); ++index)
+    {
+        Wall* lamp = m_Parts.keyLamps[index];
+        if (lamp == nullptr)
+        {
+            continue;
+        }
+        const bool trapped = m_State == State::Trapped;
+        const bool lit = m_RecordRead && (scanning ? index == scanLamp : index == m_KeySpot && pulseOn);
+        lamp->SetEmissionScale(trapped ? (lit ? 1.0f : StandbyBrightness) : 0.0f);
     }
 }
 
@@ -227,7 +267,9 @@ std::string_view Stage1HiddenRoomEvent::GetObjectiveText() const
     {
         return m_ShadowWasActive
             ? "影にライトを当てて追い払う"
-            : "閉じ込められた 暗い部屋で鍵を探す";
+            : (m_RecordRead
+                ? "2回点滅する保管灯の近くで鍵を探す"
+                : "鍵を探す　部屋の奥の記録端末も調べられる");
     }
     return {};
 }

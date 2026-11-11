@@ -81,7 +81,7 @@ Application
   バルブ（`DrainValve`）は、調べている対象（`InteractionSystem` の選んだ物）でEキーを押し続けている間だけ回り、1つ回すごとに水の手前の端を奥の排水口へ動かして、水に浸かった範囲を縮めていく
 - `Stage1SafeLights`: 光の安全地帯（停電しても消えない暖かい電球の下）。円の範囲の中にいるかと、なめらかに上下する「落ち着き」（0〜1）を持ち、ライトを消して休んでいる間に戻す電池の量を返す。
   落ち着きはSceneが、心拍の強さ（`ComputeThreatRate`）・姿の見えない物音を鳴らすか（`IsAmbientSoundAllowed`）・画面のざらつきと周辺の暗さに使う
-- `Stage1HiddenRoomEvent`: 暗証番号の扉の先の部屋の閉じ込めイベント（待機 → 閉じ込め → 脱出の状態機械）。鍵（`KeyItem`）の位置をランダムに選び、
+- `Stage1HiddenRoomEvent`: 暗証番号の扉の先の部屋の閉じ込めイベント（待機 → 閉じ込め → 脱出の状態機械）。鍵（`KeyItem`）の位置を3か所から選び、記録端末の起動後は保管灯を順に点けて、鍵に対応する灯を2回ずつ点滅させます。
   見つけるまで影を出してライトで追い払わせます。触れられると電池を奪われます
 - `Stage1LightStalker`: 書類保管室の「照らすと止まる影」（待機 → 出現 → 触れた後の間の状態機械）。懐中電灯で照らしている間は止まり、光が外れると歩くより速く近づく。
   部屋を4単位の格子に分け、プレイヤーのマスから幅優先探索で各マスまでの歩数を求め、歩数が減る隣のマスへ進むことで棚の迷路を回り込む
@@ -91,9 +91,13 @@ Application
 各クラスは時間・フェーズのみを管理します（監視カメラ巡回の実行役 `StageSurveillanceController` を除く）。照明、振動、PostProcess、Objectへの命令は
 `StageScene` が行うため、演出対象の所有権をシーケンスへ渡しません。
 
+#### 進む先の天井灯
+
+`StageScene::UpdateRouteLights` が進行とプレイヤーの位置に合わせて天井灯を1灯選びます。`CeilingLight::UpdateRouteFlicker` は不ぞろいな間隔で2回の明るい点灯を作り、ときどき長い明滅を挟みます。発光パネルと周囲の点光源は同じ明るさを使うため、停電中は床や壁に落ちる赤い光でも方向が分かります。
+
 #### 施設案内図
 
-配電盤の横に、`stage1_props.txt` の `place Stage1FacilityMap` で印刷された案内図を置きます。`FlashlightWriting` の板と2枚の画像の切り替えを使い、印刷物だけは通常の照明・霧・深度で描きます。`AdvanceCorridorLoop` が最初の周回で扉の消えた画像に切り替えます。画像は `tools/generate-facility-map.ps1` から作り直せます。
+配電盤の横に、`stage1_props.txt` の `place Stage1FacilityMap` で印刷された案内図を置きます。`FlashlightWriting` の板と2枚の画像の切り替えを使い、印刷物は通常の照明・霧で描き、深度プリパスで裏の壁を隠します。壁のシェーダーでは、穴やひび、カビ、水の筋や傷が現れる範囲で細部を計算します。`AdvanceCorridorLoop` が最初の周回で扉の消えた画像に切り替えます。画像は `tools/generate-facility-map.ps1` から作り直せます。
 
 #### 録音と無線
 
@@ -286,8 +290,8 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 | 影 | GPU | `ShadowMap`（1024x1024、手元の位置から作る。`FlashlightRig.h`）、`flashlightShadow.hlsli`（PCSS：遮る物の探索8か所と比較9か所） | 深度の描画と比較は画素ごとの処理 |
 | 壁・床・天井の古さ、凹凸、部屋の角の暗がり | GPU（PS） | `GetWallAgeing`、`GetFloorAgeing`、`surfaceDetail.hlsli`、`roomOcclusion.hlsli` | 画像素材を読まずにワールド座標から計算する（メモリ帯域の代わりに計算量を使う） |
 | 壁のホラーらしい跡（血の手形・引っかき傷・血の垂れ跡） | GPU（PS） | `horrorMarks.hlsli`（`litTexturePS` の壁の古さから呼ぶ） | 壁に沿ったマス目ごとの乱数で置き場所と種類を決め、距離関数で形を作る。画像素材を読まない |
-| 水たまりの反射 | GPU（PS） | `wetFloorPS.hlsl` の `TraceRayReflection`、`rayReflection.hlsli`（SSRと、部屋の形・小物の箱とのスラブ法の交差） | 反転したカメラで景色を描き直さず、床の画素ごとに反射の光線を1本飛ばす |
-| 水たまりのメッシュと LOD | CPU・GPU（PS） | `Ground::BuildPuddleSurfaces`（マス目の表から、岸が必ず収まる楕円の多角形を作る）、`Ground::BuildDynamicSurfaces`（雨漏りと浸水した範囲。毎フレーム）、`Ground::DrawWaterSurfaces`、`wetFloorPS.hlsl` の `WaterSurfaceLevel`（b10） | 床の本体は乾いた床（水たまりの計算なし）として描き、メッシュを床の0.05上に描き重ねる。深度プリパスにもメッシュを描くので、下の床の画素は捨てられる。画面の外か（`Camera::IsSphereVisible`）と細かさはメッシュごとに CPU で決め、細かさごとにまとめて描く（b10 の書き換えは細かさの数だけ）。細かさはメッシュの中で一定なので、シェーダーの分岐は画素ごとにばらつかない |
+| 水たまりの反射 | GPU（PS） | `wetFloorPS.hlsl` の `TraceRayReflection`、`rayReflection.hlsli`（部屋の形・小物・扉へのレイ反射に、前後の深度が一致するSSRの色を混ぜる。扉は本描画と同じ開閉角度の箱を使い、近くの壁と扉は斜めからも輪郭が読めるようにする） | 反転したカメラで景色を描き直さず、床の画素ごとに反射の光線を飛ばす |
+| 水たまりのメッシュと LOD | CPU・GPU（PS） | `Ground::BuildPuddleSurfaces`（マス目の表から、岸が必ず収まる楕円の多角形を作る）、`Ground::BuildDynamicSurfaces`（雨漏りと浸水した範囲。毎フレーム）、`Ground::DrawWaterSurfaces`、`wetFloorPS.hlsl` の `WaterSurfaceLevel`（b10） | 床の本体は乾いた床（水たまりの計算なし）として描き、メッシュを床の0.05上に描き重ねる。深度プリパスにもメッシュを描くので、下の床の画素は捨てられる。画面の外か（`Camera::IsSphereVisible`）と描画グループはメッシュごとに CPU で決める。反射は画素までの距離を使い、SSRの寄与を105〜155で弱め、部屋の形による反射を300〜380で霧の色へ移す |
 | 壁の鏡（2面） | GPU（PS） | `mirrorPS.hlsl`（`rayReflection.hlsli` を床と共通で使う）、`GameRendering.cpp`（カメラに近い小物の箱16個を b12 で渡す） | 鏡の画素ごとに反射の光線を飛ばす。床と違い下向きの光線が多いため、床の高さとの交差も見ている |
 | 鏡に映る自分の姿・鏡の異変の人影（2面） | CPU・GPU（PS） | `MirrorSelf`（1秒60回の姿勢の記録から遅らせた姿勢と手足の振りを b12 で渡す）、`MirrorAnomaly`、`mirrorPS.hlsl`、`FigureVolumes`（焼いた距離場の3Dテクスチャ t6・t13・s2）、`shader/figureVolume.hlsli`（体も人影も距離場のスフィアトレーシング。体は関節のまわりに回した空間で読んで手足を振る） | 一人称で体がなく、異変の人影も物として置かないため、鏡のシェーダーの中だけに形を出している |
 | 一人称の手と懐中電灯 | CPU・GPU（VS・PS） | `FirstPersonHands`（揺れの計算、b9 に手元だけの射影行列と、前の壁で跳ね返る懐中電灯の光）、`shader/viewModel*.hlsl*`（肌・布・金属） | ビューポートの深度の範囲を 0〜0.02 にして描き、壁にめり込まないようにしている（本描画は near=1 なので、それより手前に壁は来ない） |
@@ -433,7 +437,7 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 
 ## 森から研究所へ
 
-タイトルの1面は `SceneName::Forest` から始まります。`ForestRadio` が、プレイヤーの z が決めた位置を越え、かつ前の行が消えていたら次の行を流します。こうして、走っても行が重なったり飛んだりしないようにしています。文章は `StoryText.h` にまとめ、導入（`IntroScene`）と同じものを使っています。字幕は `Hud::DrawRadio` で、ゲーム中のHUDの後に描いています。研究所の玄関は、扉の見た目と当たり判定を配置ファイルの `LabDoor`（`Wall`）が持ち、その手前に見た目のない調べる対象 `LabEntrance` を置いています。森の場面にも `InteractionSystem` を持たせ、調べられたら `ForestScene` が扉の音と暗転を出します。そのあと `IntroScene::SetStartAtMission(true)` を立てて `SceneName::Intro` へ切り替えます。導入はこの印があると目的の画面から始め、玄関の前で止まったカメラを後ろに映します。1面に入ると `GameState::BeginRun` で記録を始めるので、森で歩いた時間はクリアの時間に含めません。
+タイトルの1面は `SceneName::Forest` から始まります。`ForestRadio` が、プレイヤーの z が決めた位置を越え、かつ前の行が消えていたら次の行を流します。こうして、走っても行が重なったり飛んだりしないようにしています。文章は `StoryText.h` にまとめ、導入（`IntroScene`）と同じものを使っています。字幕は `Hud::DrawRadio` で、ゲーム中のHUDの後に描いています。研究所の玄関は、扉の見た目と当たり判定を配置ファイルの `LabDoor`（`Wall`）が持ち、その手前に見た目のない調べる対象 `LabEntrance` を置いています。森の場面にも `InteractionSystem` を持たせ、調べられたら `ForestScene` が扉の音と暗転を出します。`Game::ChangeScene` は森から導入へ切り替えるとき、`IntroScene` を目的画面から始めます。この経路では完全な暗転から黒い背景の目的画面につなぎます。森の背景と電波ノイズ・雑音は、タイトルから受信記録を始める経路で使います。1面に入ると `GameState::BeginRun` で記録を始めるので、森で歩いた時間はクリアの時間に含めません。
 
 ## 森の雨
 

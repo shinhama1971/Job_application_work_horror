@@ -19,11 +19,7 @@ namespace
 {
 	// 水たまりのメッシュを床から浮かせる高さ（約2.5mm）。床と同じ平面だと深度がそろわずちらつくため、わずかに上げている
 	constexpr float WaterSurfaceLift = 0.05f;
-	// 水たまりのメッシュの細かさを変える距離（カメラから、メッシュを囲む円の一番近い所まで）。
-	// NearWaterDistance までは、画面をたどる反射（SSR）と部屋の形への光線の両方で映す（一番きれいで重い）。
-	// MiddleWaterDistance までは、SSR を省き、部屋の形への光線だけで映す。
-	// その先は光線を飛ばさず、遠くの霧の色を映す（遠くの水面に映る物は小さく、霧に沈んで見分けられないため）。
-	// 遠くの霧（horrorGrade.hlsli の GetHorrorDistanceFog）は110から濃くなり始めるので、それより少し先から段を下げている
+	// 描画グループとデバッグ表示を分ける距離。反射の距離は wetFloorPS が水面の画素ごとに調べる。
 	constexpr float NearWaterDistance = 170.0f;
 	constexpr float MiddleWaterDistance = 340.0f;
 	// 水たまり・雨漏りの多角形の辺の数
@@ -635,10 +631,12 @@ void Ground::Draw(Camera* cam)
 		const WaterEffectSystem::Leak& leak = leaks[static_cast<std::size_t>(leakIndex)];
 		wetFloor.Leaks[leakIndex] = DirectX::SimpleMath::Vector4(leak.Center.x, leak.Center.y, leak.Radius, 0.0f);
 	}
-	wetFloor.LeakInfo = DirectX::SimpleMath::Vector4(static_cast<float>(leakCount), 0.0f, 0.0f, 0.0f);
+	const int puddleMeshMode = Tools::TechDemo::GetPuddleMeshMode();
+	wetFloor.LeakInfo = DirectX::SimpleMath::Vector4(
+		static_cast<float>(leakCount), puddleMeshMode == 2 ? 1.0f : 0.0f, 0.0f, 0.0f);
 	// 床の本体は乾いた床として描き、水たまりは後でそのメッシュに描き重ねる（DrawWaterSurfaces）。
 	// 技術デモ（F2）で「床全体で計算」を選んでいるときは、前の方式（床の全部の画素で水たまりを計算し、メッシュは描かない）にしている
-	const bool drawsPuddleMeshes = Tools::TechDemo::GetPuddleMeshMode() != 0;
+	const bool drawsPuddleMeshes = puddleMeshMode != 0;
 	wetFloor.WaterSurfaceLevel = static_cast<float>(drawsPuddleMeshes ? WaterLevel::DryFloor : WaterLevel::Near);
 	devicecontext->UpdateSubresource(
 		m_WetFloorBuffer.Get(), 0, nullptr, &wetFloor, 0, 0);

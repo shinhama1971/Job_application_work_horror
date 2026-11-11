@@ -306,7 +306,7 @@ Matrix Wall::MakeWorldMatrix() const
 }
 
 // レイ反射で水面に映す小物の箱を返している。回した箱は、それを囲む軸に沿った箱にしている
-bool Wall::GetReflectionProxy(Vector3& minimum, Vector3& maximum, Color& color) const
+bool Wall::GetReflectionProxy(ReflectionProxy& proxy) const
 {
     if (!m_Visible || m_Dissolve > 0.0f || m_IsMirror ||
         m_SurfaceMaterial.WeatheringSurface || m_SurfaceMaterial.Diffuse.w < 0.999f)
@@ -324,9 +324,7 @@ bool Wall::GetReflectionProxy(Vector3& minimum, Vector3& maximum, Color& color) 
     {
         return false;
     }
-    minimum = m_Position - extent;
-    maximum = m_Position + extent;
-    color = m_SurfaceMaterial.Diffuse;
+    proxy = { m_Position, extent, m_SurfaceMaterial.Diffuse, Vector2::Zero };
     return true;
 }
 

@@ -50,8 +50,9 @@ public:
         std::string_view MissionLead;
         std::string_view MissionGoal;
         float MissionAlpha = 0.0f;
+        bool HideBackdrop = false;
     };
-    // 1面の前の導入を、後ろの森の上に描いている（受信記録 → 目的と操作の画面）
+    // 1面の前の受信記録と目的を描く。玄関から来た場合は黒い背景に目的だけを描く。
     void DrawIntro(const IntroView& view);
     // 無線の字幕（外の森の ForestRadio、1面の Stage1Transmissions）で描く内容：見出し、タイプ途中の1行、「通信途絶」、電波の乱れ。
     // Recording が true なら、無線ではなくボイスレコーダーの録音（印を琥珀色にして、点滅させない）
@@ -142,7 +143,7 @@ public:
         float runTimeSeconds,
         int caughtCount);
     // まばたきのように画面全体を暗くしている
-    void DrawBlink(float opacity);
+    void DrawBlink(float opacity, float maximumOpacity = 0.90f);
     // 技術デモの操作パネルの1行（項目の名前、今の方式、選んでいるか）
     struct TechDemoRow
     {

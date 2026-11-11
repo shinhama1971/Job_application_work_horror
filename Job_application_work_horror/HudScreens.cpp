@@ -1232,9 +1232,11 @@ void Hud::DrawIntro(const IntroView& view)
     };
     const float noiseStep = std::floor(view.Time * 24.0f);
 
-    // 後ろの森を暗く沈め（目的の画面ではさらに暗く）、薄い走査線を重ねている
-    const float shade = 0.62f + 0.18f * view.MissionAlpha;
-    AddRectangle(0.0f, 0.0f, screenWidth, screenHeight, Color(0.0f, 0.004f, 0.003f, shade));
+    // 玄関から来たら、森での暗転を黒い背景につなぐ。受信記録では後ろの森を暗く沈める。
+    const Color background = view.HideBackdrop
+        ? Color(0.0f, 0.0f, 0.0f, 1.0f)
+        : Color(0.0f, 0.004f, 0.003f, 0.62f + 0.18f * view.MissionAlpha);
+    AddRectangle(0.0f, 0.0f, screenWidth, screenHeight, background);
     for (float y = 0.0f; y < screenHeight; y += 6.0f)
     {
         AddRectangle(0.0f, y, screenWidth, 1.0f, Color(0.0f, 0.0f, 0.0f, 0.10f));
@@ -1315,7 +1317,7 @@ void Hud::DrawIntro(const IntroView& view)
         centered(controller ? "A で始める" : "ENTER で始める", 3.0f, panelY + 262.0f,
             Color(0.58f + pulse * 0.16f, 0.70f + pulse * 0.18f, 0.62f + pulse * 0.14f, (0.62f + pulse * 0.34f) * alpha));
     }
-    else
+    else if (!view.HideBackdrop)
     {
         // 受信記録の間は、右下に飛ばし方を小さく出している
         const std::string_view skip = Input::IsControllerConnected() ? "A で飛ばす" : "ENTER で飛ばす";

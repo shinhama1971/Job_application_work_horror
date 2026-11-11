@@ -132,13 +132,10 @@ namespace Core
         // 2面の壁の鏡は、方式に関係なく、いつもレイ反射で映している（mirrorPS）
         const int reflectionMethod = Tools::TechDemo::GetReflectionMethod();
         const bool usesScreenSpaceRays = reflectionMethod >= 2 && Tools::TechDemo::UsesDepthPrepass();
-        {
-            DirectX::SimpleMath::Matrix mainView;
-            DirectX::SimpleMath::Matrix mainProjection;
-            m_Instance->m_Camera.GetMainMatrices(mainView, mainProjection);
-            Renderer::SetWaterCausticsView(mainView);
-            Renderer::SetReflectionMode(reflectionMethod, mainProjection, usesScreenSpaceRays);
-        }
+        DirectX::SimpleMath::Matrix reflectionView, reflectionProjection;
+        m_Instance->m_Camera.GetMainMatrices(reflectionView, reflectionProjection);
+        Renderer::SetWaterCausticsView(reflectionView);
+        Renderer::SetReflectionMode(reflectionMethod, reflectionProjection);
         // 画面の外の小物（棚・ロッカー・柱・2面の廊下の壁）も、水面のレイ反射と壁の鏡に映すため、
         // カメラに近い小物の箱を選んで床と鏡のシェーダーへ渡している
         {
@@ -152,25 +149,30 @@ namespace Core
                 const DirectX::SimpleMath::Vector3 eye = m_Instance->m_Camera.GetPosition();
                 for (const auto& object : m_Instance->m_ObjectManager.GetAllObjects())
                 {
-                    DirectX::SimpleMath::Vector3 minimum;
-                    DirectX::SimpleMath::Vector3 maximum;
-                    DirectX::SimpleMath::Color color;
-                    if (object->IsDestroy() || !object->GetReflectionProxy(minimum, maximum, color))
+                    Object::ReflectionProxy proxy{};
+                    if (object->IsDestroy() || !object->GetReflectionProxy(proxy))
                     {
                         continue;
                     }
                     // 箱までの水平の距離で比べている（120より遠い物は、水面ではほとんど霧に沈むので映さない）
-                    const float dx = (std::max)({ minimum.x - eye.x, 0.0f, eye.x - maximum.x });
-                    const float dz = (std::max)({ minimum.z - eye.z, 0.0f, eye.z - maximum.z });
+                    const auto& center = proxy.Center;
+                    const auto& half = proxy.HalfSize;
+                    const auto& axis = proxy.DoorWidthAxis;
+                    const DirectX::SimpleMath::Vector2 offset(eye.x - center.x, eye.z - center.z);
+                    const DirectX::SimpleMath::Vector2 localOffset = axis.LengthSquared() > 0.5f
+                        ? DirectX::SimpleMath::Vector2(offset.Dot(axis), offset.Dot({ -axis.y, axis.x }))
+                        : offset;
+                    const float dx = (std::max)(std::abs(localOffset.x) - half.x, 0.0f);
+                    const float dz = (std::max)(std::abs(localOffset.y) - half.z, 0.0f);
                     const float distanceSquared = dx * dx + dz * dz;
                     if (distanceSquared > 120.0f * 120.0f)
                     {
                         continue;
                     }
                     candidates.push_back({ distanceSquared, {
-                        DirectX::SimpleMath::Vector4(minimum.x, minimum.y, minimum.z, 0.0f),
-                        DirectX::SimpleMath::Vector4(maximum.x, maximum.y, maximum.z, 0.0f),
-                        DirectX::SimpleMath::Vector4(color.x, color.y, color.z, 1.0f) } });
+                        DirectX::SimpleMath::Vector4(center.x, center.y, center.z, axis.x),
+                        DirectX::SimpleMath::Vector4(half.x, half.y, half.z, axis.y),
+                        DirectX::SimpleMath::Vector4(proxy.Color.x, proxy.Color.y, proxy.Color.z, 0.0f) } });
                 }
                 const std::size_t keep = (std::min)(candidates.size(),
                     static_cast<std::size_t>(WATER_CAUSTICS_BUFFER::MaxReflectionProps));
@@ -532,7 +534,9 @@ namespace Core
 
         // 描き終えた画面を取り込み、露出・ブルーム・光の筋・ノイズなどの画面効果を重ねている
         m_Instance->m_GpuTimer.BeginPass(GpuPass::PostProcess, context);
-        m_Instance->m_PostProcess.CaptureBackBuffer();
+        const bool captured = m_Instance->m_PostProcess.CaptureBackBuffer();
+        m_Instance->m_ScreenSpaceReflection.FinishFrame(
+            reflectionView, reflectionProjection, useScreenSpaceReflection && captured);
         m_Instance->m_PostProcess.Draw(&m_Instance->m_GpuTimer);
         m_Instance->m_GpuTimer.EndPass(GpuPass::PostProcess, context);
 

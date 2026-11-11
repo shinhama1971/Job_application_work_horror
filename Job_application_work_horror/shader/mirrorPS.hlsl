@@ -162,7 +162,8 @@ float4 main(MIRROR_PS_IN input) : SV_Target
     const float3 direction = reflect(normalize(input.worldPos - eye), mirrorNormal);
     const float3 origin = input.worldPos + surfaceNormal * 0.1f;
     float roomDistance;
-    float3 color = TraceRoomReflection(origin, direction, 0.12f, roomDistance);
+    float nearVertical;
+    float3 color = TraceRoomReflection(origin, direction, 0.12f, roomDistance, nearVertical);
     [branch]
     if (ReflectionParams.y > 0.5f)
     {

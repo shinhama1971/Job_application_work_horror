@@ -7,7 +7,7 @@
 //   何をすれば終わりかを伝えるために作った。
 // ・Enter（A・START）で、受信記録の途中なら目的の画面へ飛ばし、目的の画面なら1面を始める。
 // ・タイトルの「1面」は、森を歩いて研究所に入る（ForestScene。受信記録は歩きながら無線で聞く）。
-//   玄関を調べて入ると、ここへ来て目的の画面だけを見せる（SetStartAtMission）。
+//   玄関を調べて入ると、暗転から続けて黒い背景に目的の画面だけを見せる。
 //   タイトルの「森を飛ばして1面から」のときは、受信記録から全部見せる。
 // ============================================================================
 
@@ -20,11 +20,9 @@
 class IntroScene final : public Scene
 {
 public:
-    IntroScene();
+    // 玄関から入ったときは、黒い背景で目的の画面から始める。
+    explicit IntroScene(bool startAtMission);
     ~IntroScene() override;
-
-    // 次に作る導入を、目的の画面から始める（森で受信記録を聞き終え、玄関から入ったとき）。作った時点で元に戻る
-    static void SetStartAtMission(bool startAtMission) { s_StartAtMission = startAtMission; }
 
     void Update() override;
     void Draw(Camera* camera) override;
@@ -44,12 +42,11 @@ private:
 
     Hud m_Hud;
     ForestBackdrop m_Backdrop;
+    const bool m_StartAtMission;
     float m_Time = 0.0f;
     // 目的の画面を出しているか、出してからの秒数
     bool m_ShowingMission = false;
     float m_MissionTimer = 0.0f;
     // 無線の雑音を鳴らしているか
     bool m_StaticPlaying = false;
-    // 目的の画面から始めるか（SetStartAtMission）
-    static bool s_StartAtMission;
 };

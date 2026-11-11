@@ -147,9 +147,12 @@ struct WATER_CAUSTICS_BUFFER
     DirectX::SimpleMath::Vector4 PlayerBodyPose;
     // 水たまりのレイ反射が読む環境マップを撮った位置（xyz。w = 詰め物）。Reflection.w が1のときだけ使う（rayReflection.hlsli）
     DirectX::SimpleMath::Vector4 ReflectionProbeCenter;
+    // SSRの当たりを前フレームの画像へ投影する行列と、前フレームの深度を戻す係数。
+    DirectX::SimpleMath::Matrix PreviousReflectionViewProjection;
+    DirectX::SimpleMath::Vector4 PreviousReflectionDepth;
 };
 
-static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 1168, "Water caustics buffer must match HLSL layout");
+static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 1248, "Water caustics buffer must match HLSL layout");
 
 // サブセット（モデルの中で、同じマテリアルで描く部分）
 struct SUBSET{
@@ -324,11 +327,12 @@ public:
 	static void SetWaterRipples(ID3D11ShaderResourceView* heightTexture,
 		const DirectX::SimpleMath::Vector2& origin, float worldSize, float strength);
 	// 水面の反射の方式（0 反射なし、1 キューブマップ、2 SSR、3 レイ反射）と、SSRで使うプレイヤーの視点の射影行列を、床と鏡のシェーダーへ渡している。
-	// screenSpaceAvailable は、このフレームでSSRの深度と前のフレームの画面を用意するか（レイ反射が画面の中の物を拾うのに使う）
 	// 水たまりのレイ反射で、画面の外の物を環境マップ（t14）から読めるか（6面とも撮れているとき true）と、環境マップを撮った位置
 	static void SetReflectionEnvironment(bool available, const DirectX::SimpleMath::Vector3& captureCenter);
-	static void SetReflectionMode(int mode, const DirectX::SimpleMath::Matrix& projection,
-		bool screenSpaceAvailable = false);
+	static void SetReflectionMode(int mode, const DirectX::SimpleMath::Matrix& projection);
+	// 対応する色と深度を用意した本描画だけ、SSRで前のフレームを参照する。
+	static void SetReflectionHistory(const DirectX::SimpleMath::Matrix& viewProjection,
+		const DirectX::SimpleMath::Vector4& depth);
 	// 2面の「血の手形」の異変で壁に浮かべる手形（最大4つ。x = 壁の表面のx、y = 高さ、z = 奥行き、w = 見え方）を、壁のシェーダーへ渡している。countが0なら描かない
 	static void SetWallHandprints(const DirectX::SimpleMath::Vector4* handprints, int count);
 	// 水面にだけ映す人影の足もとの位置と見え方（0〜1。0なら描かない）を、床のシェーダーへ渡している。
@@ -341,7 +345,7 @@ public:
 	// 計測モード（--figures）用：異変の進行に関係なく、2つの人影を指定した位置に見え方1で置き続けている（人影の描画の重さを測るため）
 	static void SetFigureOverride(bool enabled,
 		const DirectX::SimpleMath::Vector3& puddleFoot, const DirectX::SimpleMath::Vector3& unseenFoot);
-	// レイ反射で水面に映す小物の箱（props は1個につき 最小の角・最大の角・色 の3つ。最大 MaxReflectionProps 個）を、床のシェーダーへ渡している
+	// レイ反射で水面に映す小物の箱（props は1個につき 中心・半分の大きさ・色 の3つ。最初の2つの w に扉の幅方向を入れる。最大 MaxReflectionProps 個）を、床のシェーダーへ渡している
 	static void SetReflectionProps(const DirectX::SimpleMath::Vector4* props, int count);
 	// 2面の壁の鏡に映す自分の体（足もとの位置・右と前の向き・歩く手足の振り -1〜1・映すか）を、鏡のシェーダーへ渡している（MirrorSelf）
 	static void SetMirrorSelf(const DirectX::SimpleMath::Vector3& footPosition, const DirectX::SimpleMath::Vector3& right,

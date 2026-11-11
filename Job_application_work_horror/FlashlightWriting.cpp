@@ -118,11 +118,7 @@ void FlashlightWriting::Draw(Camera* cam)
         return;
     }
 
-    cam->SetCamera();
-    Matrix world = Matrix::CreateScale(m_Scale) *
-        Matrix::CreateFromYawPitchRoll(m_Rotation.y, m_Rotation.x, m_Rotation.z) *
-        Matrix::CreateTranslation(m_Position);
-    Renderer::SetWorldMatrix(&world);
+    BindGeometry(cam);
 
     MATERIAL material{};
     material.Diffuse = Color(m_InkColor.R(), m_InkColor.G(), m_InkColor.B(), m_Presence);
@@ -132,10 +128,6 @@ void FlashlightWriting::Draw(Camera* cam)
     m_Material->SetMaterial(material);
 
     ID3D11DeviceContext* context = Renderer::GetDeviceContext();
-    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_Shader.SetGPU();
-    m_VertexBuffer.SetGPU();
-    m_IndexBuffer.SetGPU();
     if (m_ShowingAlternate)
     {
         m_AlternateTexture.SetGPU();
@@ -157,6 +149,29 @@ void FlashlightWriting::Draw(Camera* cam)
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
     Renderer::SetDepthEnable(true);
     Renderer::SetBlendState(BS_NONE);
+}
+
+// 印刷物の裏の壁を本描画の前に隠す。半透明の文字は従来どおり本描画で合成する。
+void FlashlightWriting::DrawDepthPrepass(Camera* cam)
+{
+    BindGeometry(cam);
+    ID3D11DeviceContext* context = Renderer::GetDeviceContext();
+    context->PSSetShader(nullptr, nullptr, 0);
+    context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
+}
+
+void FlashlightWriting::BindGeometry(Camera* cam)
+{
+    cam->SetCamera();
+    Matrix world = Matrix::CreateScale(m_Scale) *
+        Matrix::CreateFromYawPitchRoll(m_Rotation.y, m_Rotation.x, m_Rotation.z) *
+        Matrix::CreateTranslation(m_Position);
+    Renderer::SetWorldMatrix(&world);
+
+    Renderer::GetDeviceContext()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_Shader.SetGPU();
+    m_VertexBuffer.SetGPU();
+    m_IndexBuffer.SetGPU();
 }
 
 // 読める条件：ライトが点いている・文字が十分濃い・距離が近い・視線の中心付近にある・正面に近い方向から見ている

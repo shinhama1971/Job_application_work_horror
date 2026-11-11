@@ -6,7 +6,6 @@
 #include "ForestScene.h"
 #include "ForestGrass.h"
 #include "ForestRain.h"
-#include "IntroScene.h"
 #include "LabEntrance.h"
 #include "Wall.h"
 #include "SkyBackdrop.h"
@@ -234,7 +233,6 @@ void ForestScene::Update()
         if (m_EnterTimer >= EnterFadeSeconds && !m_SceneChangeRequested)
         {
             m_SceneChangeRequested = true;
-            IntroScene::SetStartAtMission(true);
             game->RequestSceneChange(SceneName::Intro);
         }
     }
@@ -268,7 +266,7 @@ void ForestScene::Draw(Camera* camera)
     if (m_EnterTimer >= 0.0f)
     {
         const float fade = (std::min)(1.0f, m_EnterTimer / (EnterFadeSeconds * 0.85f));
-        m_Hud.DrawBlink(fade);
+        m_Hud.DrawBlink(fade, 1.0f);
     }
     // ポーズ中はポーズメニューを重ねている（ESC・P・START で開くのは Game::Update。ここで描かないと、止まっただけに見える）
     Core::Game* game = Core::Game::GetInstance();

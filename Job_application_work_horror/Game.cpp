@@ -350,6 +350,7 @@ namespace Core
     void Game::ChangeScene(SceneName sName)
     {
         const SceneName previousScene = m_CurrentScene;
+        const bool introFromForest = sName == SceneName::Intro && previousScene == SceneName::Forest;
         // リザルト画面へ移るときは、プレイを終えた記録を付けてベスト記録を保存している
         if (sName == SceneName::Result)
         {
@@ -374,6 +375,7 @@ namespace Core
         m_PostProcess.SetPresenceStatic(0.0f);
         // 前の場所の景色を金属に映さないよう、環境マップを次の描画で6面とも撮り直させている
         m_EnvironmentProbe.Invalidate();
+        m_ScreenSpaceReflection.Invalidate();
         // 光の筋の揺らぎの時間も最初に戻している（前のシーン（タイトルの後ろの森など）の長さで、次のシーンの見え方が変わらないように）
         m_LightShafts.ResetTime();
 
@@ -410,7 +412,7 @@ namespace Core
             break;
 
         case SceneName::Intro:
-            m_Scene = std::make_unique<IntroScene>();
+            m_Scene = std::make_unique<IntroScene>(introFromForest);
             break;
         }
 
@@ -422,7 +424,8 @@ namespace Core
             m_Sound.Stop(SOUND_CUE_RADIO_STATIC);
             m_Sound.Stop(SOUND_CUE_RAIN);
             // 外の森が映る画面（タイトルの後ろ・導入・外の森）では、雨音をループさせている（ForestRain と同じ雨）
-            const bool forestOnScreen = sName == SceneName::Title || sName == SceneName::Intro || sName == SceneName::Forest;
+            const bool showTransmission = sName == SceneName::Intro && !introFromForest;
+            const bool forestOnScreen = sName == SceneName::Title || sName == SceneName::Forest || showTransmission;
             if constexpr (ForestScene::RainEnabled)
             {
                 if (forestOnScreen)
@@ -433,7 +436,7 @@ namespace Core
             }
             // 導入の受信記録の間は、無線の雑音を小さく鳴らしている（「通信途絶」で IntroScene が止める）。
             // シーンを作った後にここで前の雑音を止めるので、鳴らし始めもここでしている
-            if (sName == SceneName::Intro)
+            if (showTransmission)
             {
                 m_Sound.Play(SOUND_CUE_RADIO_STATIC, 1.0f, 0.35f);
             }

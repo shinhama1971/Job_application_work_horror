@@ -25,6 +25,8 @@ public:
     void Init() override;
     void Update() override;
     void Draw(Camera* cam) override;
+    bool WritesDepthPrepass() const override { return m_PrintedSurface && m_Presence > 0.001f; }
+    void DrawDepthPrepass(Camera* cam) override;
     void Uninit() override;
     // 浮かび上がる文字は監視映像に映さない。印刷物は普通の小物と同じように映す。
     bool DrawsInAuxiliaryView() const override { return m_PrintedSurface; }
@@ -66,6 +68,8 @@ public:
     const DirectX::SimpleMath::Vector3& GetNormal() const { return m_Normal; }
 
 private:
+    void BindGeometry(Camera* cam);
+
     // 壁から浮かせる距離
     static constexpr float SurfaceOffset = 0.25f;
     static constexpr float PresenceFadeSpeed = 0.55f;   // 1秒あたりの濃さの変化量

@@ -94,8 +94,7 @@ public:
     bool UsesCameraCulling() const override { return true; }
     bool ContributesToReflection() const override { return true; }
     // 床に置いた棚・ロッカー・柱などの小物だけ、レイ反射で水面に映す箱を返している（建物の壁・天井・床板・鏡・半透明の物は除く）
-    bool GetReflectionProxy(
-        DirectX::SimpleMath::Vector3& minimum, DirectX::SimpleMath::Vector3& maximum, DirectX::SimpleMath::Color& color) const override;
+    bool GetReflectionProxy(ReflectionProxy& proxy) const override;
     void Uninit() override;
 
     // プレイヤー（半径radiusの円）が箱にめり込んでいたら、外へ押し出している
