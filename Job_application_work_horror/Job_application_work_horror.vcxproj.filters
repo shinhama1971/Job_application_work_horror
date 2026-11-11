@@ -925,6 +925,9 @@
     <FxCompile Include="shader\barkPS.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>
+    <FxCompile Include="shader\printedSurfacePS.hlsl">
+      <Filter>リソース ファイル</Filter>
+    </FxCompile>
     <FxCompile Include="shader\flashlightRevealPS.hlsl">
       <Filter>リソース ファイル</Filter>
     </FxCompile>

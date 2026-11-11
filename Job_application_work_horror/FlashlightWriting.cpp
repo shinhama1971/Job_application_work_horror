@@ -66,7 +66,7 @@ void FlashlightWriting::SetTextures(const std::string& primaryPath, const std::s
 void FlashlightWriting::SetPrintedSurface()
 {
     m_PrintedSurface = true;
-    m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+    m_Shader.Create("shader/litTextureVS.hlsl", "shader/printedSurfacePS.hlsl");
 }
 
 // 壁の表面に合わせて、位置・向き・大きさを決めている（法線は水平にそろえている）
@@ -124,6 +124,8 @@ void FlashlightWriting::Draw(Camera* cam)
     material.Diffuse = Color(m_InkColor.R(), m_InkColor.G(), m_InkColor.B(), m_Presence);
     material.Emission = Color(m_PrintedSurface ? 0.0f : m_Time, 0.0f, 0.0f, 0.0f);
     material.Roughness = 0.85f;
+    // 印刷物は貼り付けた壁までの距離を使って暗がりを付ける。
+    material.Ambient.x = m_PrintedSurface ? SurfaceOffset : 0.0f;
     material.TextureEnable = TRUE;
     m_Material->SetMaterial(material);
 

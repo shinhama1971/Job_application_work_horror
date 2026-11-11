@@ -439,6 +439,9 @@ float GetWallTrickle(float3 worldPosition, float3 worldNormal, float damp)
 
 
 // 画素の色を計算している：元の色 → 汚れと古さ → 環境光・天井灯・懐中電灯 → 濡れた光沢 → 自己発光 → 霧 → 色調
+#if defined(PRINTED_SURFACE)
+[earlydepthstencil]
+#endif
 float4 main(in LIT_PS_IN input) : SV_Target
 {
     float4 color = input.col;
@@ -489,6 +492,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 崩れて現れる・消える物（Wall::DissolveIn / DissolveOut）：ワールドの位置から作ったノイズが崩れ具合より小さい画素を捨て、
     // 残った所の縁を、焦げて燃えているように赤く光らせている（縁の明るさは下の「自ら光る色」の後で足している）。
     float dissolveEdge = 0.0f;
+#if !defined(PRINTED_SURFACE)
     [branch]
     if (Material.Dissolve > 0.0f)
     {
@@ -502,6 +506,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         clip(dissolveNoise - dissolveThreshold);
         dissolveEdge = 1.0f - smoothstep(0.0f, 0.07f, dissolveNoise - dissolveThreshold);
     }
+#endif
 
     // デバッグのフルブライト表示では、照明を使わずに返している
     if (DebugViewMode == DEBUG_VIEW_FULLBRIGHT)
@@ -521,6 +526,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     float pbrMetallic = Material.Metallic;
     float pbrRoughness = GetMaterialRoughness();
     float metalRustHeight = 0.0f;
+#if !defined(PRINTED_SURFACE)
     if (!Material.TextureEnable && emissionEnergy < 0.001f)
     {
 #if defined(ROCK_SURFACE)
@@ -609,6 +615,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
             bumpStrength);
 #endif
     }
+#endif
     const float3 detailViewNormal = normalize(mul(
         float4(detailWorldNormal, 0.0f),
         View).xyz);
@@ -671,21 +678,30 @@ float4 main(in LIT_PS_IN input) : SV_Target
             * GetPlayerBodyShadow(input.worldPos, pointLight.PositionRange.xyz);
         lighting += pointRadiance * softPointLambert;
 
+#if !defined(PRINTED_SURFACE)
         // 鏡面反射は、懐中電灯と同じビュー空間で計算している（光の向きだけをビュー空間へ回している）
         const float3 viewSpaceDirectionToLight = normalize(mul(
             float4(directionToPointLight, 0.0f), View).xyz);
         specularLighting += pointRadiance * EvaluateSpecularGGX(
             surface, detailViewNormal, viewDirection, viewSpaceDirectionToLight);
+#endif
     }
 
     // 部屋の角の暗がり。環境光と天井灯には全部、懐中電灯には一部だけ掛けている（照らせば角も見えるように）。
     // 画面空間の環境遮蔽（SSAO）も重ね、小物の下や物と物の隙間まで暗くしている（懐中電灯には一部だけ）
     const float screenOcclusion = GetScreenAmbientOcclusion(input.pos.xy);
+#if defined(PRINTED_SURFACE)
+    // 貼り付けた壁までの距離は配置時に分かるので、画素ごとに壁の一覧を走査しない。
+    const float roomOcclusion = screenOcclusion * (OcclusionBoxCount > 0
+        ? ComputeRoomOcclusion(input.worldPos, detailWorldNormal, Material.Ambuent.x) : 1.0f);
+#else
     const float roomOcclusion = GetRoomOcclusion(input.worldPos, normalize(input.worldNormal)) * screenOcclusion;
+#endif
     lighting *= roomOcclusion;
     specularLighting *= roomOcclusion;
     const float flashlightOcclusion = lerp(1.0f, roomOcclusion, 0.4f);
 
+#if !defined(PRINTED_SURFACE)
     // 環境の映り込み（IBL）：視線を面で反射した向きの景色を、環境マップから粗さに応じたぼやけ具合で読み、
     // 粗さと見る角度に応じた割合で足している。金属は拡散反射を持たないので、この映り込みで金属に見える
     // （非常灯や照明の光だまりが、配管や額縁に赤く・白く映る）。環境マップのない所でも、環境光だけは映している。
@@ -702,6 +718,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
             * GetSpecularOcclusion(nDotV, roomOcclusion, surface.roughness);
     }
 
+#endif
     // 懐中電灯の光：円錐の形・距離による弱まり・レンズの模様・面の向き・影を掛け合わせている
     if (Light.Enable && Light.FlashlightEnabled && distanceFromCamera > 0.001f)
     {
@@ -739,15 +756,18 @@ float4 main(in LIT_PS_IN input) : SV_Target
                 * GetUnseenFigureFlashlightShadow(input.worldPos)
                 * flashlightOcclusion;
             lighting += flashlightRadiance * softenedLambert;
+#if !defined(PRINTED_SURFACE)
             // 懐中電灯は目のすぐそばにあるので、金属や濡れた面を正面から照らすと、光の芯がはっきり映る
             specularLighting += flashlightRadiance * EvaluateSpecularGGX(
                 surface, normal, viewDirection, directionToLight);
+#endif
         }
     }
 
     // 懐中電灯の翼の光：明るい中心の外にも広がる、ぼんやりした弱い光（flashlightLighting.hlsli）
     lighting += GetFlashlightSpillLight(input.viewPos, detailViewNormal) * flashlightOcclusion;
 
+#if !defined(PRINTED_SURFACE)
     // 浸水した床（西棟）や、波の立った水たまりの水面で跳ね返った懐中電灯の光が、壁や天井にゆらゆら映る（waterCaustics.hlsli）
     lighting += Light.Diffuse.rgb * GetWaterCausticLight(input.worldPos, normalize(input.worldNormal));
 
@@ -756,6 +776,10 @@ float4 main(in LIT_PS_IN input) : SV_Target
     color.rgb = PointShadowOptions.y > 0.5f
         ? color.rgb * lighting
         : surface.diffuseColor * lighting + specularLighting;
+#else
+    // つや消しの印刷物は、受けた光を紙面の色に掛ける。
+    color.rgb *= lighting;
+#endif
 
     // 自ら光る色を足している
     color.rgb += Material.Emission.rgb;

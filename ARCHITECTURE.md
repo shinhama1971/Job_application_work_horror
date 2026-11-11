@@ -97,7 +97,7 @@ Application
 
 #### 施設案内図
 
-配電盤の横に、`stage1_props.txt` の `place Stage1FacilityMap` で印刷された案内図を置きます。`FlashlightWriting` の板と2枚の画像の切り替えを使い、印刷物は通常の照明・霧で描き、深度プリパスで裏の壁を隠します。壁のシェーダーでは、穴やひび、カビ、水の筋や傷が現れる範囲で細部を計算します。`AdvanceCorridorLoop` が最初の周回で扉の消えた画像に切り替えます。画像は `tools/generate-facility-map.ps1` から作り直せます。
+配電盤の横に、`stage1_props.txt` の `place Stage1FacilityMap` で印刷された案内図を置きます。`FlashlightWriting` の板と2枚の画像の切り替えを使い、印刷物は深度プリパスで裏の壁を隠します。`printedSurfacePS.hlsl` は共通の照明・影・霧を使い、紙面のつや消し材質を拡散反射で描きます。暗がりの計算には配置時の壁からの距離を渡します。壁のシェーダーでは、穴やひび、カビ、水の筋や傷が現れる範囲で細部を計算します。`AdvanceCorridorLoop` が最初の周回で扉の消えた画像に切り替えます。画像は `tools/generate-facility-map.ps1` から作り直せます。
 
 #### 録音と無線
 

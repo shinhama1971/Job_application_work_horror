@@ -40,10 +40,9 @@ float GetNearestWallDistance(float2 worldPositionXZ)
     return sqrt(nearestWallSquared);
 }
 
-// 暗がりの計算の本体。GetRoomOcclusion から、壁の箱があるときだけ呼んでいる。
-float ComputeRoomOcclusion(float3 worldPosition, float3 worldNormal)
+// 壁までの距離と床・天井の高さから暗がりを求める。
+float ComputeRoomOcclusion(float3 worldPosition, float3 worldNormal, float nearestWall)
 {
-    const float nearestWall = GetNearestWallDistance(worldPosition.xz);
     // 床と壁・天井と壁・壁と壁の角は、角から離れるにつれてなだらかに明るくしている。
     const float cornerOcclusion = exp(-nearestWall / 5.0f);
 
@@ -65,7 +64,7 @@ float GetRoomOcclusion(float3 worldPosition, float3 worldNormal)
     [branch]
     if (OcclusionBoxCount > 0)
     {
-        result = ComputeRoomOcclusion(worldPosition, worldNormal);
+        result = ComputeRoomOcclusion(worldPosition, worldNormal, GetNearestWallDistance(worldPosition.xz));
     }
     return result;
 }
