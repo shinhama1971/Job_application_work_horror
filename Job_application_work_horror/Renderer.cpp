@@ -131,10 +131,15 @@ HRESULT Renderer::Init()
 	swapChainDesc.SampleDesc.Quality = 0; // 同上
 	swapChainDesc.Windowed = TRUE; // ウィンドウモード（全画面に広げたボーダーレスのウィンドウで表示している）
 
-    // Debug構成では、D3D11のデバッグレイヤーを有効にして、使い方の間違いを出力させている
+    // Debug構成で、起動オプション --d3d-debug を付けたときだけ、D3D11のデバッグレイヤーを有効にして、使い方の間違いを出力させている。
+    // デバッグレイヤーは描画の命令を1つずつ検査するため、CPU の時間が1フレーム1〜2.5ミリ秒増え、ときどき大きく重いフレームも出る
+    // （120Hzの画面で120fpsを保てなくなる）。普段の Debug 版の起動では使わず、描画の間違いを調べるときだけ付けて起動する
     UINT deviceCreationFlags = 0;
 #if defined(DEBUG) || defined(_DEBUG)
-    deviceCreationFlags |= D3D11_CREATE_DEVICE_DEBUG;
+    if (wcsstr(GetCommandLineW(), L"--d3d-debug") != nullptr)
+    {
+        deviceCreationFlags |= D3D11_CREATE_DEVICE_DEBUG;
+    }
 #endif
 
     // 高性能なGPUがあればそれを使っている。GPUを指定するときは、ドライバーの種類をUNKNOWNにする決まりになっている。

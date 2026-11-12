@@ -136,6 +136,9 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>external\assimp\include;external\imgui;external\imgui\backends;external\directxtk\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <!-- 「マイコードのみ」のデバッグを切っている。有効だと、すべての関数の入口にデバッガーへの確認の呼び出しが入り、
+           Debug 版の CPU の時間が15〜25%ほど増えるため（ステップ実行で標準ライブラリの中にも入るようになる） -->
+      <SupportJustMyCode>false</SupportJustMyCode>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
