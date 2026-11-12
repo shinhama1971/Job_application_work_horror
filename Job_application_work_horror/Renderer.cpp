@@ -559,7 +559,23 @@ void Renderer::DrawEnd()
 			std::chrono::steady_clock::now() - presentStart).count());
 		return;
 	}
-	m_pSwapChain->Present(1, 0);
+	const HRESULT presentResult = m_pSwapChain->Present(1, 0);
+
+	// GPUのドライバーが再起動した（デバイスの消失）ときは、そのまま描き続けても画面が止まったままになる。
+	// 原因の候補を一度だけ伝えて、ゲームを終わらせている。
+	if (presentResult == DXGI_ERROR_DEVICE_REMOVED || presentResult == DXGI_ERROR_DEVICE_RESET)
+	{
+		static bool reported = false;
+		if (!reported)
+		{
+			reported = true;
+			MessageBoxW(nullptr,
+				L"グラフィックドライバーが応答しなくなったため、ゲームを終了します。\n"
+				L"ドライバーを更新するか、PCを再起動してからもう一度起動してください。",
+				L"描画エラー", MB_OK | MB_ICONERROR);
+			PostQuitMessage(0);
+		}
+	}
 }
 
 //--------------------------------------------------------------------------------------

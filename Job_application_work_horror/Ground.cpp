@@ -438,12 +438,12 @@ void Ground::AddRainRipples(float deltaTime)
 		m_PendingRainDrops = 0.0f;
 		return;
 	}
-	// 雨粒を落とす範囲（カメラから縦横にこの距離まで）。波を計算している範囲（WaterRippleSimulation の一辺192）の全体に落とし、
+	// 雨粒を落とす範囲（カメラから縦横にこの距離まで）。波を計算している範囲（外の森は一辺576）の全体に落とし、
 	// 範囲の端の水たまりにも、近くと同じように雨の輪を出している（端の2は、範囲の外へはみ出したおもりを捨てないための余白）
-	constexpr float DropArea = WaterRippleSimulation::WorldSize * 0.5f - 2.0f;
+	const float DropArea = m_RippleSimulation.GetWorldSize() * 0.5f - 2.0f;
 	// 1秒に落とす雨粒の数。水たまりの外に落ちた分は捨てるので、輪になるのは水たまりの広さの割合だけになる。
 	// 一辺96の正方形あたり1600粒（強い雨）を基準にし、範囲の面積に比例させて、1平方あたりの輪の数を一定にしている
-	constexpr float DropsPerSecond = 1600.0f * (DropArea / 48.0f) * (DropArea / 48.0f);
+	const float DropsPerSecond = 1600.0f * (DropArea / 48.0f) * (DropArea / 48.0f);
 	constexpr int MaxRingsPerFrame = 12;
 	// まだ落としていない雨粒の数をためている。重いフレームで一度に大量に落とさないよう、上限を400にしている
 	m_PendingRainDrops = (std::min)(m_PendingRainDrops + DropsPerSecond * m_RainIntensity * deltaTime, 400.0f);
@@ -470,9 +470,14 @@ void Ground::AddRainRipples(float deltaTime)
 		}
 		// 水たまりに入った雨粒を、波のシミュレーションのおもりとして足している（水面を押し下げ、そこから輪が広がる）。
 		// 足音（半径1.4・強さ1.2）より小さく弱い、細かい輪にしている（波のマス目が0.75なので、半径はそれより少し大きくしている）。
-		// 1粒の強さは雨の強さで変えず、弱い雨は輪の数だけを減らしている（強さまで下げると、少し離れた所の輪が見えなくなるため）
+		// 1粒の強さは雨の強さで変えず、弱い雨は輪の数だけを減らしている（強さまで下げると、少し離れた所の輪が見えなくなるため）。
+		// カメラから離れた雨粒ほど、輪を太く強くしている。細い輪のままだと、離れると1画素より細くなって見えなくなるため
+		// （距離40までは近くと同じ、距離240より遠くで半径が2.4倍・強さが3倍。森は1メートル ≒ 24）
+		const float distance = DirectX::SimpleMath::Vector2(drop.x - eye.x, drop.z - eye.z).Length();
+		const float farRate = std::clamp((distance - 40.0f) / 200.0f, 0.0f, 1.0f);
 		m_RippleSimulation.AddImpulse(DirectX::SimpleMath::Vector2(drop.x, drop.z),
-			0.8f + nextRandom() * 0.3f, -(0.3f + nextRandom() * 0.25f));
+			(0.8f + nextRandom() * 0.3f) * (1.0f + farRate * 1.4f),
+			-(0.3f + nextRandom() * 0.25f) * (1.0f + farRate * 2.0f));
 		++rings;
 	}
 }
@@ -584,7 +589,7 @@ void Ground::RunGpuSimulation()
 	}
 	m_RippleSimulation.Update(seconds, m_RippleCenter, m_PuddleCellBuffer.Get(), m_RippleFloodRect, m_RippleObstacles);
 	Renderer::SetWaterRipples(m_RippleSimulation.GetHeightSRV(), m_RippleSimulation.GetOrigin(),
-		WaterRippleSimulation::WorldSize, 1.0f);
+		m_RippleSimulation.GetWorldSize(), 1.0f);
 }
 
 //=======================================

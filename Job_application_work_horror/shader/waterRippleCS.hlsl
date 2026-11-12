@@ -12,9 +12,8 @@
 #include "fastNoise.hlsli"
 #include "puddleMask.hlsli"
 
-// 1スレッドグループのマスの数（16x16）と、波のマス目の数（WaterRippleSimulation::Resolutionと同じ）
+// 1スレッドグループのマスの数（16x16）
 #define GROUP_SIZE 16
-#define RIPPLE_RESOLUTION 256
 #define MAX_IMPULSES 16
 #define MAX_OBSTACLES 32
 
@@ -37,10 +36,19 @@ cbuffer WaterRippleBuffer : register(b0)
 Texture2D<float2> PreviousState : register(t0);     // 1歩前の（今の高さ, 1つ前の高さ）
 RWTexture2D<float2> NextState : register(u0);       // 次の（今の高さ, 1つ前の高さ）
 
+// 波のマス目の数（1面・2面は256、外の森は768）。テクスチャの大きさから読んでいる
+int GetRippleResolution()
+{
+    uint width;
+    uint height;
+    PreviousState.GetDimensions(width, height);
+    return int(width);
+}
+
 // 1歩前の状態を読んでいる（範囲の外は静かな水面＝0）
 float2 LoadPrevious(int2 texel)
 {
-    if (any(texel < 0) || any(texel >= RIPPLE_RESOLUTION))
+    if (any(texel < 0) || any(texel >= GetRippleResolution()))
     {
         return 0.0f;
     }
@@ -85,7 +93,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
         blocked = max(blocked, step(abs(worldPosition.x - box.x), box.z) * step(abs(worldPosition.y - box.y), box.w));
     }
     // 範囲の縁の8マスでは少しずつ弱め、縁で跳ね返った波が戻ってこないようにしている
-    const int2 edgeDistance = min(texel, RIPPLE_RESOLUTION - 1 - texel);
+    const int2 edgeDistance = min(texel, GetRippleResolution() - 1 - texel);
     const float edgeFade = saturate(min(edgeDistance.x, edgeDistance.y) / 8.0f);
     const float keep = water * edgeFade * (1.0f - blocked);
 

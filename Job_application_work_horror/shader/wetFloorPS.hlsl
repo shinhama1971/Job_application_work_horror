@@ -481,6 +481,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     const float3 viewDirection = distanceFromCamera > 0.001f
         ? -input.viewPos / distanceFromCamera
         : float3(0.0f, 1.0f, 0.0f);
+    // 離れるほど波の輪が細く見えるので、距離40から240にかけて輪の光り方を最大2.5倍まで強め、遠くの水たまりでも雨の輪が分かるようにしている
+    const float farRippleBoost = 1.0f + 1.5f * smoothstep(40.0f, 240.0f, distanceFromCamera);
     const float fresnel = pow(
         1.0f - saturate(dot(normalize(input.viewNormal), viewDirection)),
         4.0f);
@@ -620,7 +622,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
             // 足音や水滴の波：傾いた斜面が懐中電灯の光をきらっと返し、照らした所に光の輪が広がって見える
             specularLighting += flashlightColor
                 * flashlightAmount
-                * saturate(length(rippleWave.yz) * 3.0f)
+                * saturate(length(rippleWave.yz) * 3.0f * farRippleBoost)
                 * 0.40f;
         }
     }
@@ -640,7 +642,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 足音や水滴の波の、傾いた斜面が光を返して、輪が細く光る
     // （懐中電灯が当たっていない所でも、暗い中でうっすら輪が分かる程度に光らせている）
     specularLighting += float3(0.07f, 0.09f, 0.10f) *
-        saturate(length(rippleWave.yz) * 3.0f) * (0.30f + fresnel * 0.70f);
+        saturate(length(rippleWave.yz) * 3.0f * farRippleBoost) * (0.30f + fresnel * 0.70f) * farRippleBoost;
     specularLighting += float3(0.28f, 0.34f, 0.35f)
         * dripRing * 0.20f * RippleStrength;
     specularLighting += float3(0.10f, 0.13f, 0.125f)
@@ -667,7 +669,9 @@ float4 main(in LIT_PS_IN input) : SV_Target
     const int reflectionMode = int(ReflectionParams.x + 0.5f);
     float4 alternateReflection = 0.0f;
     // 反射像は実際に広がる波の傾きで少しだけ揺らす。床の凹凸と細かいノイズは光沢と波の輪に使う。
-    const float2 reflectionSlope = clamp(-rippleWave.yz * 0.28f, -0.045f, 0.045f);
+    // 遠くの水たまりは、映った景色の揺れも少し大きくして、輪が映り込みを乱す様子が見えるようにしている
+    const float2 reflectionSlope = clamp(-rippleWave.yz * 0.28f * farRippleBoost,
+        -0.045f * farRippleBoost, 0.045f * farRippleBoost);
     const float3 reflectionNormal = normalize(float3(reflectionSlope.x, 1.0f, reflectionSlope.y));
     // 「水たまり」の異変の人影が、反射の光線を遮った度合い（レイ反射のときだけ求めている）
     float puddleFigure = 0.0f;

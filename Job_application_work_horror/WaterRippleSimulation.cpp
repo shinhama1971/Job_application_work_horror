@@ -44,11 +44,14 @@ namespace
     constexpr float Damping = 0.993f;
 }
 
-void WaterRippleSimulation::Init()
+void WaterRippleSimulation::Init(int resolution, float worldSize)
 {
+    // スレッドグループ（16x16）で割り切れる数にそろえている
+    m_Resolution = (std::max)(GroupSize, resolution / GroupSize * GroupSize);
+    m_WorldSize = worldSize;
     for (Graphics::RenderTexture& state : m_States)
     {
-        state.Init(Resolution, Resolution, DXGI_FORMAT_R32G32_FLOAT, true);
+        state.Init(m_Resolution, m_Resolution, DXGI_FORMAT_R32G32_FLOAT, true);
         state.Clear(0.0f, 0.0f, 0.0f, 0.0f);
     }
     m_CurrentState = 0;
@@ -118,10 +121,10 @@ void WaterRippleSimulation::Update(float deltaTime, const Vector2& centerXZ,
     m_Accumulator -= StepSeconds * static_cast<float>(stepCount);
 
     // 範囲の最小のx・zを、マス目の単位にそろえて決めている（ずれた分はマス目の数で中身をずらす）
-    const float texelSize = WorldSize / static_cast<float>(Resolution);
+    const float texelSize = m_WorldSize / static_cast<float>(m_Resolution);
     const Vector2 snappedOrigin(
-        std::floor((centerXZ.x - WorldSize * 0.5f) / texelSize) * texelSize,
-        std::floor((centerXZ.y - WorldSize * 0.5f) / texelSize) * texelSize);
+        std::floor((centerXZ.x - m_WorldSize * 0.5f) / texelSize) * texelSize,
+        std::floor((centerXZ.y - m_WorldSize * 0.5f) / texelSize) * texelSize);
     int shiftX = 0;
     int shiftZ = 0;
     if (m_HasOrigin)
@@ -151,15 +154,15 @@ void WaterRippleSimulation::Update(float deltaTime, const Vector2& centerXZ,
             break;
         }
         const bool overlaps =
-            obstacle.x + obstacle.z > m_Origin.x && obstacle.x - obstacle.z < m_Origin.x + WorldSize &&
-            obstacle.y + obstacle.w > m_Origin.y && obstacle.y - obstacle.w < m_Origin.y + WorldSize;
+            obstacle.x + obstacle.z > m_Origin.x && obstacle.x - obstacle.z < m_Origin.x + m_WorldSize &&
+            obstacle.y + obstacle.w > m_Origin.y && obstacle.y - obstacle.w < m_Origin.y + m_WorldSize;
         if (overlaps)
         {
             selectedObstacles[obstacleCount++] = obstacle;
         }
     }
 
-    const UINT groupCount = static_cast<UINT>(Resolution / GroupSize);
+    const UINT groupCount = static_cast<UINT>(m_Resolution / GroupSize);
     for (int step = 0; step < stepCount; ++step)
     {
         // 範囲のずれとおもりは、最初の1歩でだけ使っている

@@ -136,6 +136,9 @@ ForestScene::World ForestScene::BuildWorld(SceneLayoutBuilder& builder, const Pr
         rain->SetGroundHeight(world.GroundObject->GetPosition().y);
         rain->SetIntensity(RainStrength);
         world.GroundObject->SetRainIntensity(RainStrength);
+        // 波を計算する範囲を、マス目の大きさ（0.75）を変えずに一辺576（カメラから前後左右に約12メートル）まで広げ、
+        // 少し離れた水たまりにも雨の輪が広がるようにしている
+        world.GroundObject->SetRippleArea(768, 576.0f);
     }
     return world;
 }

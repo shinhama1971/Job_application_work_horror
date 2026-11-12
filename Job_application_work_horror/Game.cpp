@@ -106,6 +106,30 @@ namespace Core
     // 入力 → シーン → カメラ/画面効果 → Object → 破棄 → シーンの切り替え → 予約した追加。
     // シーンを切り替えるフレームでは、予約した追加は捨てている。
     // 後回しの処理を最後に置くことで、Objectの配列を順に処理している途中で要素が増えたり減ったりしない。
+    // Alt+Tab などで別のウィンドウへ移ったとき、遊んでいる途中ならポーズメニューを開いている。
+    // ウィンドウは最小化されるが、そのままだと裏で敵や時間が進み、戻ったときに捕まっていることがあるため。
+    // 自動撮影・計測の間は、決めた道順を止めないよう何もしない。
+    void Game::OnFocusLost()
+    {
+        if (!m_Instance || Tools::CaptureMode::IsActive() || m_Instance->m_PauseMenu.IsOpen())
+        {
+            return;
+        }
+
+        const SceneName scene = m_Instance->m_CurrentScene;
+        const bool gameplayScene =
+            scene == SceneName::Stage ||
+            scene == SceneName::Stage2 ||
+            scene == SceneName::Stage3 ||
+            scene == SceneName::Forest ||
+            scene == SceneName::Intro;
+        if (gameplayScene)
+        {
+            m_Instance->m_PauseMenu.Open();
+            m_Instance->ApplyAudioVolume(true);
+        }
+    }
+
     void Game::Update()
     {
         Input::Update();

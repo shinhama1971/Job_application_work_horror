@@ -167,6 +167,13 @@ public:
 	}
 	// 雨の強さ（0〜1）。0より大きいと、カメラのまわりの水たまりに雨粒の輪が広がる（外の森。ForestRain と同じ雨）
 	void SetRainIntensity(float intensity) { m_RainIntensity = intensity; }
+	// 波を計算する範囲を作り直している（resolution = マス目の数、worldSize = 範囲の一辺）。
+	// 外の森は広く、普段の範囲（一辺192 ≒ 8メートル）では少し離れた水たまりに雨の輪が出ないため、広げている
+	void SetRippleArea(int resolution, float worldSize)
+	{
+		m_RippleSimulation.Uninit();
+		m_RippleSimulation.Init(resolution, worldSize);
+	}
 	// その位置が水たまり（または水に浸かった範囲）の中かを返している
 	bool IsInsidePuddle(
 		const DirectX::SimpleMath::Vector3& position) const;

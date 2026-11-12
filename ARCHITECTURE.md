@@ -308,7 +308,7 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 | 水たまりの反射の方式別計測 | GPU | `ReflectionProbe`（キューブマップ128x128を1フレームに1面）、`ScreenSpaceReflection`（深度の写し取り）、`wetFloorPS.hlsl`（キューブマップを反射の向きで読む・SSRの光線をたどる） | レイ反射と、重さと正確さの違いを見比べるため。普段はレイ反射 |
 | F1の室内と水面反射、草のLOD確認 | GPU（PS） | common.hlsl の表示番号11・12。wetFloorPS.hlsl は明るい床に通常と同じ水面マスクと反射を重ねる。grassPS.hlsl は草の頂点シェーダーが渡した区画のLOD色を使う | 室内の暗さにかかわらず映り込みを確認し、森の草の描画距離を色で見分ける |
 | 西棟の水面の光の揺らぎ（コースティクス） | GPU（PS） | `waterCaustics.hlsli`（`litTexturePS` から呼ぶ） | 壁・天井の画素ごとに、水面で折り返した点と懐中電灯の配光から求める |
-| 水たまりの波のシミュレーション | GPU（CS） | `WaterRippleSimulation`、`waterRippleCS.hlsl`（256x256マス、ピンポン、1秒に60歩）。床は `wetFloorPS`、壁は `waterCaustics.hlsli` が高さを読む | 全マスが同じ式で隣のマスだけを読むので、GPUで並列に計算できる。結果のテクスチャはCPUへ読み戻さない。描画の最初（`Object::RunGpuSimulation`）で実行し、GPU時間は約0.012ms |
+| 水たまりの波のシミュレーション | GPU（CS） | `WaterRippleSimulation`、`waterRippleCS.hlsl`（256x256マス、外の森は `Ground::SetRippleArea` で768x768マス・一辺576。マス目の数はシェーダーがテクスチャの大きさから読む。ピンポン、1秒に60歩）。床は `wetFloorPS`、壁は `waterCaustics.hlsli` が高さを読む | 全マスが同じ式で隣のマスだけを読むので、GPUで並列に計算できる。結果のテクスチャはCPUへ読み戻さない。描画の最初（`Object::RunGpuSimulation`）で実行し、GPU時間は約0.012ms |
 | ブルーム | GPU（CS） | `bloomExtractCS` → `bloomBlurHorizontalCS` → `bloomBlurVerticalCS` | ぼかしに使う画素を `groupshared` に一度読み込み、グループ内で使い回してテクスチャの読み込みを減らす |
 | 自動露出の測光と目の慣れ | GPU（CS） | `autoExposureCS.hlsl` | 4096点の明るさを1グループ256スレッドで合計する。結果はGPUのバッファに置いたまま露出のシェーダーが読み、CPUへ読み戻さない |
 | 画面効果（露出・光の筋・CRT風） | GPU（PS） | `FullScreenQuad` | 画面全体の画素ごとの処理 |

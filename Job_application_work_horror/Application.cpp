@@ -295,6 +295,15 @@ void Application::MainLoop()
             break;
         }
 
+        // 最小化している間は画面に映らないので、更新も描画もせず、次のメッセージが届くまで待っている（GPUとCPUを休ませる）。
+        // 戻ったときに長い経過時間が1フレームに入らないよう、時刻も取り直している。
+        if (IsIconic(m_hWnd) && !Tools::CaptureMode::IsActive())
+        {
+            WaitMessage();
+            previousTime = Clock::now();
+            continue;
+        }
+
         // 前フレームからの経過時間を測り、上限（0.25秒）を超えたら切り詰めている。
         const auto currentTime = Clock::now();
         auto frameTime = std::chrono::duration<double>(currentTime - previousTime);
@@ -362,6 +371,11 @@ LRESULT CALLBACK Application::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 
     case WM_ACTIVATE:
         if (wParam == WA_INACTIVE) {
+            // 遊んでいる途中なら、ポーズメニューを開いてゲームと音を止めている（終了確認の表示中は除く）
+            if (!isMessageBoxShowed)
+            {
+                Core::Game::OnFocusLost();
+            }
             // 全画面表示で、終了確認も出していないときだけ
             if (isFullscreen && !isMessageBoxShowed)
             {

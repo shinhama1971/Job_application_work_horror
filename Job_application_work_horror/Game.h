@@ -127,6 +127,8 @@ namespace Core
         static void Update();
         // 影・反射などの事前の描画、本描画、ポストプロセス、HUDの順に描いている（GameRendering.cpp）。
         static void Draw();
+        // 別のウィンドウへ切り替えたときに呼ばれ、遊んでいる途中ならポーズメニューを開いてゲームと音を止めている。
+        static void OnFocusLost();
         // 全Objectとシーン、描画・音の仕組みを解放している
         static void Uninit();
 

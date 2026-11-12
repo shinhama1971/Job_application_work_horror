@@ -64,13 +64,19 @@ cbuffer WaterCausticsBuffer : register(b12)
 
 // 水たまりの波のシミュレーションの高さ（t9。WaterRippleSimulationが毎フレーム計算している）。x = 今の高さ、y = 1つ前の高さ
 Texture2D<float2> g_WaterRipples : register(t9);
-// 波のマス目の数（WaterRippleSimulation::Resolutionと同じ）
-#define WATER_RIPPLE_RESOLUTION 256
+// 波のマス目の数（1面・2面は256、外の森は768）。テクスチャの大きさから読んでいる
+int GetWaterRippleResolution()
+{
+    uint width;
+    uint height;
+    g_WaterRipples.GetDimensions(width, height);
+    return int(max(width, 1u));
+}
 
 // 波のマス目1つの高さを読んでいる（範囲の外は0）
 float LoadRippleHeight(int2 texel)
 {
-    if (any(texel < 0) || any(texel >= WATER_RIPPLE_RESOLUTION))
+    if (any(texel < 0) || any(texel >= GetWaterRippleResolution()))
     {
         return 0.0f;
     }
@@ -81,7 +87,7 @@ float LoadRippleHeight(int2 texel)
 float SampleRippleHeight(float2 positionXZ)
 {
     const float2 texelPosition =
-        (positionXZ - CausticRipple.xy) / CausticRipple.z * WATER_RIPPLE_RESOLUTION - 0.5f;
+        (positionXZ - CausticRipple.xy) / CausticRipple.z * GetWaterRippleResolution() - 0.5f;
     const int2 baseTexel = int2(floor(texelPosition));
     const float2 blend = texelPosition - baseTexel;
     return lerp(
@@ -97,7 +103,7 @@ float3 GetRippleHeightAndSlope(float2 positionXZ)
     {
         return 0.0f;
     }
-    const float step = CausticRipple.z / WATER_RIPPLE_RESOLUTION;
+    const float step = CausticRipple.z / GetWaterRippleResolution();
     const float center = SampleRippleHeight(positionXZ);
     const float right = SampleRippleHeight(positionXZ + float2(step, 0.0f));
     const float forward = SampleRippleHeight(positionXZ + float2(0.0f, step));
@@ -112,7 +118,7 @@ float GetRippleCausticFocus(float2 positionXZ)
     {
         return 0.0f;
     }
-    const float step = CausticRipple.z / WATER_RIPPLE_RESOLUTION;
+    const float step = CausticRipple.z / GetWaterRippleResolution();
     const float center = SampleRippleHeight(positionXZ);
     const float laplacian = (
         SampleRippleHeight(positionXZ + float2(step, 0.0f)) +
