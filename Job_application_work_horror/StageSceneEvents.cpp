@@ -967,7 +967,7 @@ void StageScene::UpdateTensionPulse(const Player& player, float deltaTime)
 // ボイスレコーダーの録音と、1面の途中で届く無線
 // 字幕の順番と無線の嘘の進み具合は Stage1Transmissions に任せ、ここでは調べられた録音機と今の状態を渡している。
 // ----------------------------------------------------------------------------
-void StageScene::UpdateTransmissions(const Player& player, float deltaTime)
+void StageScene::UpdateTransmissions(const Player& player, float deltaTime, bool archiveStalkerLit)
 {
     Core::Game* game = Core::Game::GetInstance();
     for (VoiceRecorder* recorder : m_Objects.recorders)
@@ -987,7 +987,7 @@ void StageScene::UpdateTransmissions(const Player& player, float deltaTime)
     input.PowerRestored = game->IsPowerRestored();
     // 閉じ込められている間・照明が次々に明滅する演出の間・監視映像を見ている間は、新しい無線を予約しない
     input.RadioAllowed = !m_HiddenRoom.IsTrapped() && !m_ScareLightSequence.IsActive() && !m_Surveillance.IsViewing();
-    input.ArchiveStalkerActive = m_ArchiveStalker.IsActive();
+    input.ArchiveStalkerLit = archiveStalkerLit;
     m_Transmissions.Update(input);
 }
 
@@ -1040,12 +1040,12 @@ bool StageScene::IsLitByFlashlight(const Player& player, const Vector3& target) 
 
 // 書類保管室の「照らすと止まる影」を1フレーム進めている。
 // 動きのルールはStage1LightStalkerが決め、ここでは照らされているかの判定と、表示・音・電池の変化を行っている。
-void StageScene::UpdateArchiveStalker(Player& player, float deltaTime)
+bool StageScene::UpdateArchiveStalker(Player& player, float deltaTime)
 {
     ShadowMan* shadow = m_Objects.archiveStalker;
     if (shadow == nullptr)
     {
-        return;
+        return false;
     }
     Core::Game* game = Core::Game::GetInstance();
     m_ArchiveStalkerNoticeTimer = (std::max)(0.0f, m_ArchiveStalkerNoticeTimer - deltaTime);
@@ -1084,13 +1084,13 @@ void StageScene::UpdateArchiveStalker(Player& player, float deltaTime)
         shadow->SetActive(result.Visible);
     }
 
-    // 現れたとき：天井近くで低く配管の音を鳴らして気配を知らせ、初めてのときは遊び方を伝えている
+    // 現れたとき：棚の奥から低い音を鳴らし、気配のする方へ視線を誘う。
     if (result.Appeared)
     {
         game->PlayAudioCueAt(
             SOUND_CUE_PIPE_KNOCK, result.Position + Vector3(0.0f, 20.0f, 0.0f), 0.55f, 1.4f);
         m_ArchiveStalkerNotice = result.FirstAppearance
-            ? "棚の間に何かいる ライトで照らすと動かない"
+            ? "棚の奥で、何かが動いた"
             : "また棚の間に何かいる";
         m_ArchiveStalkerNoticeTimer = result.FirstAppearance ? 4.5f : 2.6f;
     }
@@ -1115,6 +1115,7 @@ void StageScene::UpdateArchiveStalker(Player& player, float deltaTime)
         m_ArchiveStalkerNotice = "影に触れられた 電池を奪われた";
         m_ArchiveStalkerNoticeTimer = 2.8f;
     }
+    return result.Visible && input.Lit;
 }
 
 // ----------------------------------------------------------------------------

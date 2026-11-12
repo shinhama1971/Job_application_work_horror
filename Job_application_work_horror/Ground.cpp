@@ -350,7 +350,7 @@ Ground::WaterLevel Ground::SelectWaterLevel(const WaterSurface& surface, Camera*
 		return WaterLevel::DryFloor;
 	}
 	const float distance = (std::max)(0.0f, Vector3::Distance(cam->GetPosition(), center) - surface.Radius);
-	// 技術デモ（F2）で「メッシュ（LODなし）」を選んでいるときは、見えている水たまりをすべて一番細かく描く
+	// 比較用の描画設定で「メッシュ（LODなし）」を選んでいるときは、見えている水たまりをすべて一番細かく描く
 	if (distance < NearWaterDistance || Tools::TechDemo::GetPuddleMeshMode() == 1)
 	{
 		return WaterLevel::Near;
@@ -576,7 +576,7 @@ void Ground::RunGpuSimulation()
 {
 	const float seconds = m_PendingRippleSeconds;
 	m_PendingRippleSeconds = 0.0f;
-	// 技術デモ（F2）で「水たまりの波：なし」を選んでいるときは、波を計算も表示もしない
+	// 比較用の描画設定で「水たまりの波：なし」を選んでいるときは、波を計算も表示もしない
 	if (!Tools::TechDemo::UsesWaterRipples())
 	{
 		Renderer::SetWaterRipples(nullptr, DirectX::SimpleMath::Vector2::Zero, 0.0f, 0.0f);
@@ -645,7 +645,7 @@ void Ground::Draw(Camera* cam)
 	wetFloor.LeakInfo = DirectX::SimpleMath::Vector4(
 		static_cast<float>(leakCount), puddleMeshMode == 2 ? 1.0f : 0.0f, 0.0f, 0.0f);
 	// 床の本体は乾いた床として描き、水たまりは後でそのメッシュに描き重ねる（DrawWaterSurfaces）。
-	// 技術デモ（F2）で「床全体で計算」を選んでいるときは、前の方式（床の全部の画素で水たまりを計算し、メッシュは描かない）にしている
+	// 比較用の描画設定で「床全体で計算」を選んでいるときは、前の方式（床の全部の画素で水たまりを計算し、メッシュは描かない）にしている
 	const bool drawsPuddleMeshes = puddleMeshMode != 0;
 	wetFloor.WaterSurfaceLevel = static_cast<float>(drawsPuddleMeshes ? WaterLevel::DryFloor : WaterLevel::Near);
 	devicecontext->UpdateSubresource(

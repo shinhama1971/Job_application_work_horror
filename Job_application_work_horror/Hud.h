@@ -144,17 +144,6 @@ public:
         int caughtCount);
     // まばたきのように画面全体を暗くしている
     void DrawBlink(float opacity, float maximumOpacity = 0.90f);
-    // 技術デモの操作パネルの1行（項目の名前、今の方式、選んでいるか）
-    struct TechDemoRow
-    {
-        std::string_view Name;
-        std::string_view Variant;
-        bool Selected = false;
-    };
-    // 技術デモの操作パネルを、画面の左に描いている（項目の一覧と、選んだ項目の説明・GPU時間の行）
-    void DrawTechDemoPanel(
-        const std::vector<TechDemoRow>& rows,
-        const std::vector<std::string>& infoLines);
     // ためた頂点を捨てている
     void Uninit();
 

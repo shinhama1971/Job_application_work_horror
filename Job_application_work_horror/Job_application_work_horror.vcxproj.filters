@@ -216,6 +216,9 @@
     <ClCompile Include="Stage2Scene.cpp">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
     </ClCompile>
+    <ClCompile Include="Stage3Scene.cpp">
+      <Filter>ソース ファイル\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="ForestScene.cpp">
       <Filter>ソース ファイル\Scene</Filter>
     </ClCompile>
@@ -712,6 +715,9 @@
     </ClInclude>
     <ClInclude Include="Stage2Scene.h">
       <Filter>ソース ファイル\Scene\Scene2</Filter>
+    </ClInclude>
+    <ClInclude Include="Stage3Scene.h">
+      <Filter>ソース ファイル\Scene</Filter>
     </ClInclude>
     <ClInclude Include="ForestScene.h">
       <Filter>ソース ファイル\Scene</Filter>

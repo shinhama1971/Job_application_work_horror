@@ -384,10 +384,14 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             ImGui::Separator();
         }
 
-        // 番号はシェーダーのDebugViewModeと対応している（8のフルブライトはcommon.hlslのDEBUG_VIEW_FULLBRIGHT）。
-        const char* debugViews[] = { "Final", "World normals", "Flashlight shadow", "Lighting only", "Puddle mask + mesh LOD (green=near yellow=middle red=far)", "Floor reflection", "Wall damp mask", "Light tiles (lights per 16x16 tile)", "Fullbright (照明・影・霧なしで全体を明るく)", "PBR material (R=metallic G=roughness B=wet)", "Ambient occlusion (SSAO)" };
+        // 表示の順番は common.hlsl のデバッグ表示番号に合わせている。
+        const char* debugViews[] = { "Final", "World normals", "Flashlight shadow", "Lighting only", "Puddle mask + mesh LOD (green=near yellow=middle red=far)", "Floor reflection", "Wall damp mask", "Light tiles (lights per 16x16 tile)", "Fullbright (照明・影・霧なしで全体を明るく)", "PBR material (R=metallic G=roughness B=wet)", "Ambient occlusion (SSAO)", "室内を明るく＋水たまりの反射", "森の草LODを色で表示" };
         ImGui::Combo("Shader debug view", &g_DebugViewMode,
             debugViews, IM_ARRAYSIZE(debugViews));
+        if (g_DebugViewMode == 12)
+        {
+            ImGui::TextUnformatted("草のLOD  緑: 近距離 / 黄: 中距離 / 赤: 遠距離");
+        }
         // 水たまりのメッシュのうち、このフレームに描いた数（細かさごと。画面の外の物は描いていない）
         if (game != nullptr)
         {

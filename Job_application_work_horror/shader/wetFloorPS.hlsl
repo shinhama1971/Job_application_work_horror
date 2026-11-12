@@ -343,7 +343,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         color *= Material.Diffuse;
     }
 
-    if (DebugViewMode == DEBUG_VIEW_FULLBRIGHT)
+    if (IsFullbrightDebugView() && DebugViewMode != DEBUG_VIEW_FULLBRIGHT_REFLECTION)
     {
         return GetFullbrightColor(color.rgb, input.viewNormal, input.viewPos);
     }
@@ -627,6 +627,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 懐中電灯の翼の光：明るい中心の外にも広がる、ぼんやりした弱い光（flashlightLighting.hlsli）
     lighting += GetFlashlightSpillLight(input.viewPos, normalize(input.viewNormal)) * flashlightOcclusion;
 
+    const float3 floorBaseColor = color.rgb;
     color.rgb *= lighting;
     // 水面の空の映り込み・波の光・水滴の輪・岸の光を足している
     specularLighting += float3(0.12f, 0.15f, 0.16f)
@@ -700,6 +701,14 @@ float4 main(in LIT_PS_IN input) : SV_Target
         puddle * alternateReflection.w *
         lerp(faceReflection, 0.72f, viewAngleReflection) * ReflectionStrength *
         lerp(0.80f, 1.0f, smoothstep(0.25f, 0.75f, grime)));
+    if (DebugViewMode == DEBUG_VIEW_FULLBRIGHT_REFLECTION)
+    {
+        // 床の材質を明るくし、通常と同じ水面マスクと反射像を重ねる。
+        const float3 floor = GetFullbrightColor(floorBaseColor, input.viewNormal, input.viewPos).rgb;
+        const float weight = saturate(max(reflectionStrength,
+            puddle * alternateReflection.w * ReflectionStrength * 0.38f));
+        return float4(lerp(floor, alternateReflection.rgb, weight), 1.0f);
+    }
     float3 reflectedScene = 0.0f;
     [branch]
     if (reflectionStrength > 0.001f)

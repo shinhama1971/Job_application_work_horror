@@ -116,7 +116,6 @@ namespace Core
         m_Instance->m_GpuTimer.BeginFrame(context);
         const int quality = m_Instance->m_Settings.GetEffectLevel();
         ++m_Instance->m_EnvironmentQualityFrame;
-        // 技術デモ（F2）で切り替えた効果も、画質設定と同じように止めている
         m_Instance->m_TiledLighting.SetLightShaftsDisabled(quality == 0 || !Tools::TechDemo::UsesLightShafts());
         // PBRを止めたとき、壁と小物のシェーダーは拡散反射だけで描く（技術デモの比較用。印はb8で渡している）
         m_Instance->m_ShadowMap.SetPbrEnabled(Tools::TechDemo::UsesPbr());
@@ -127,7 +126,7 @@ namespace Core
 
         // 水面の光の揺らぎ（壁のピクセルシェーダー）で使う、プレイヤーの視点のビュー行列を渡している。
         // 懐中電灯はこの視点から照らしているため、反射を描くときも同じ行列を使う。
-        // 水面の反射の方式（0=なし、1=キューブマップ、2=SSR、3=レイ反射（普段）。技術デモ F2 で切り替える）も、ここで床のシェーダーへ渡している。
+        // 水面の反射の方式（0=なし、1=キューブマップ、2=SSR、3=レイ反射（普段）。撮影・計測では --reflection で指定する）も、ここで床のシェーダーへ渡している。
         // SSRとレイ反射は、深度プリパスの深度と前のフレームの画面を使う（レイ反射は、使えないときは部屋の形との交差だけで映す）。
         // 2面の壁の鏡は、方式に関係なく、いつもレイ反射で映している（mirrorPS）
         const int reflectionMethod = Tools::TechDemo::GetReflectionMethod();
@@ -324,6 +323,7 @@ namespace Core
         const bool hasWetFloor =
             m_Instance->m_CurrentScene == SceneName::Stage ||
             m_Instance->m_CurrentScene == SceneName::Stage2 ||
+            m_Instance->m_CurrentScene == SceneName::Stage3 ||
             m_Instance->m_CurrentScene == SceneName::Forest ||
             m_Instance->m_CurrentScene == SceneName::Title ||
             m_Instance->m_CurrentScene == SceneName::Intro;
@@ -544,11 +544,6 @@ namespace Core
         if (m_Instance->m_Scene)
         {
             m_Instance->m_Scene->Draw(&m_Instance->m_Camera);
-        }
-        // 技術デモの操作パネル（ポーズ中は、ポーズメニューと重ならないように出さない）
-        if (!m_Instance->m_PauseMenu.IsOpen())
-        {
-            Tools::TechDemo::Draw(m_Instance->m_GpuTimer);
         }
         Debug::UI::Draw(m_Instance->m_PostProcess);
 

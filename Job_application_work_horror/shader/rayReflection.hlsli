@@ -318,6 +318,13 @@ float3 TraceRoomReflection(float3 origin, float3 direction, float roughness,
         albedo *= GetRoomReflectionDetail(hitPosition, hitNormal);
     }
 
+    if (hit && DebugViewMode == DEBUG_VIEW_FULLBRIGHT_REFLECTION)
+    {
+        // 画面外の壁や扉も、光源の位置にかかわらず反射像で確認できるようにする。
+        const float facing = abs(dot(hitNormal, direction));
+        return GetFullbrightSurfaceColor(albedo, facing);
+    }
+
     float3 lighting = GetHemisphereAmbient(hitNormal);
     float3 glow = 0.0f;
     const float glowRadius = 6.0f * (1.0f + roughness * 1.5f);

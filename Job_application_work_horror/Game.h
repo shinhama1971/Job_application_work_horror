@@ -42,7 +42,8 @@ enum class SceneName
     // 外の森（1面の前）。タイトルで1面を選ぶか、--forest で起動するか、デバッグ画面のボタンから開く（研究所の玄関から1面へ入る）
     Forest,
     // 1面の前の導入（研究棟からの受信記録と、目的・操作の説明）。タイトルで1面を選ぶと、ここを通って1面へ進む
-    Intro
+    Intro,
+    Stage3
 };
 
 class Scene;
@@ -64,7 +65,7 @@ namespace Core
         Camera m_Camera;
         Effect::PostProcess m_PostProcess;
         Effect::ShadowMap m_ShadowMap;
-        // 水面の反射の方式の比較（技術デモF2）で使う、キューブマップとSSR
+        // 水面の反射と方式別の計測で使う、キューブマップとSSR
         Effect::ReflectionProbe m_ReflectionProbe;
         // PBRの金属や濡れた面に映す景色（環境マップ）。カメラの位置から1フレームに1面ずつ撮り直し、t14 で読ませている
         Effect::ReflectionProbe m_EnvironmentProbe;

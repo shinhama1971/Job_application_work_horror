@@ -551,7 +551,7 @@ void ForestGrass::Draw(Camera* camera)
     context->RSGetState(previousRasterizer.GetAddressOf());
     context->RSSetState(m_TwoSidedRasterizer.Get());
 
-    // 技術デモ（F2）の「草のLOD」：0 = LODなし（全部の葉を5節で）、1 = LODあり（普段）、2 = LODを色で表示。
+    // 草のLODの描画設定：0 = LODなし（全部の葉を5節で）、1 = LODあり（普段）、2 = LODを色で表示。
     // 「草をカメラの上方向へ曲げる」：上から見下ろしたとき、葉の面を見せる（授業資料 p.23）
     const int lodMode = Tools::TechDemo::GetGrassLodMode();
     const float cameraBend = Tools::TechDemo::UsesGrassCameraBend() ? 1.0f : 0.0f;

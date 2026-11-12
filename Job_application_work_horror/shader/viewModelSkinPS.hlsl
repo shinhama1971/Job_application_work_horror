@@ -61,7 +61,7 @@ float4 main(in VIEW_MODEL_PS_IN input) : SV_Target
     const float rim = pow(1.0f - saturate(dot(normal, toView)), 4.0f);
     color += rim * diffuse * baseColor * 0.35f;
 
-    if (DebugViewMode == DEBUG_VIEW_FULLBRIGHT)
+    if (IsFullbrightDebugView())
     {
         return float4(baseColor * (0.6f + 0.4f * saturate(dot(normal, toView))) * 1.35f, 1.0f);
     }

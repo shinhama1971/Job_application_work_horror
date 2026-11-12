@@ -79,7 +79,7 @@ namespace StoryText
     };
     // 書類保管室に入ったとき
     inline constexpr const char* FalseRadioRoomLine = "「……そうだ、その部屋だ。奥の机まで行け。」";
-    // 照らすと止まる影が出たとき
+    // 影をしばらく照らし、止まっている様子を見たとき
     inline constexpr const char* FalseRadioLightLine = "「……ライトを消せ。あれは、光に寄ってくる。」";
     // 調査員の録音（4つ目）を聞き終えた直後
     inline constexpr const char* FalseRadioRevealLine = "「……聞いたのか。」";

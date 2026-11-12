@@ -520,13 +520,18 @@ void Player::Update()
     m_BodyWalkAmount += (walkRate - m_BodyWalkAmount) * (1.0f - std::exp(-deltaTime * 8.0f));
     Renderer::SetPlayerBody(m_Position, forward, std::sin(m_BodyWalkPhase) * m_BodyWalkAmount, m_IsFPS && !m_IsHiding);
 
-    // 電池を回復するデバッグ用のキー入力（Bキー）。Release版では遊びに影響しないよう無効にしている
+    // 3面は開発用プレビューなので、Releaseでも電池回復を使えるようにする。
+    const bool stage3Preview = Core::Game::GetInstance()->GetCurrentSceneName() == SceneName::Stage3;
 #ifdef _DEBUG
-    if (Input::GetKeyTrigger(VK_B))
+    constexpr bool allowBatteryKey = true;
+#else
+    const bool allowBatteryKey = stage3Preview;
+#endif
+    if ((allowBatteryKey && Input::GetKeyTrigger(VK_B)) ||
+        (stage3Preview && Input::GetButtonTrigger(XINPUT_BACK)))
     {
         AddBattery(50.0f);
     }
-#endif
 }
 
 // 一人称のときは懐中電灯を持った右手だけを、デバッグ用の三人称のときはメッシュを描いている。

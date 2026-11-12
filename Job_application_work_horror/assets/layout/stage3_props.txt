@@ -1,0 +1,261 @@
+# 3面の配置。西から東へ廊下が伸び、北に中継室と通信室、南西に階段がある。
+color concrete 0.32 0.31 0.28 rough 0.85
+color ceiling 0.13 0.125 0.11 rough 0.85
+color steel 0.15 0.16 0.16 metal 0.56 0.68
+color frame 0.27 0.25 0.20 metal 0.58 0.45
+color cable 0.47 0.28 0.075 rough 0.52
+color amber 1.0 0.55 0.22
+color warm 0.93 0.80 0.62
+color green 0.22 0.65 0.40
+color glass 0.018 0.03 0.029
+color bark 0.15 0.12 0.095 rough 0.88
+color rock 0.24 0.23 0.21 rough 0.83
+
+# 通路の切れ目が各部屋の開口部。
+prop HallWest 0 -74 0 4 52 48 concrete none 4 1 weathering room
+prop HallSouthWest 80 -74 -24 56 52 4 concrete none 4 1 weathering room
+prop HallSouthCenter 232 -74 -24 176 52 4 concrete none 4 1 weathering room
+prop HallSouthEast 378 -74 -24 44 52 4 concrete none 4 1 weathering room
+prop HallNorthA 55 -74 24 110 52 4 concrete none 4 1 weathering room
+prop HallNorthB 180 -74 24 80 52 4 concrete none 4 1 weathering room
+prop HallNorthC 330 -74 24 152 52 4 concrete none 4 1 weathering room
+prop LandingWest 0 -74 -53 4 52 62 concrete none 4 1 weathering room
+prop LandingEast 52 -74 -53 4 52 62 concrete none 4 1 weathering room
+prop LandingBack 26 -74 -84 56 52 4 concrete none 4 1 weathering room
+prop RelayWest 92 -74 64 4 52 80 concrete none 4 1 weathering room
+prop RelayEast 174 -74 64 4 52 80 concrete none 4 1 weathering room
+prop RelayBackWest 115 -74 105 50 52 4 concrete none 4 1 weathering room
+prop RelayBackEast 173 -74 105 6 52 4 concrete none 4 1 weathering room
+prop CommsWest 205 -74 64 4 52 80 concrete none 4 1 weathering room
+prop CommsEast 329 -74 64 4 52 80 concrete none 4 1 weathering room
+prop CommsBackWest 248.5 -74 105 91 52 4 concrete none 4 1 weathering room
+prop CommsBackEast 328.5 -74 105 5 52 4 concrete none 4 1 weathering room
+prop VestibuleNorth 422 -74 25 45 52 4 concrete none 4 1 weathering room
+prop VestibuleSouth 422 -74 -25 45 52 4 concrete none 4 1 weathering room
+prop ExitWallA 443 -74 -21.5 4 52 9 concrete none 4 1 weathering room
+prop ExitWallB 443 -74 21.5 4 52 9 concrete none 4 1 weathering room
+prop HallRoof 202 -47 0 408 3 50 ceiling none 4 0 noshadow weathering
+prop LandingRoof 26 -47 -53 54 3 64 ceiling none 4 0 noshadow weathering
+prop RelayRoof 133 -47 65 86 3 84 ceiling none 4 0 noshadow weathering
+prop CommsRoof 267 -47 65 128 3 84 ceiling none 4 0 noshadow weathering
+prop VestibuleRoof 423 -47 0 46 3 54 ceiling none 4 0 noshadow weathering
+
+# 階段は踊り場の脇に見える。中央の平らな通路から探索を始める。
+prop Step0 12 -98 -42 19 4 4.2 frame none 6 1
+prop Step1 12 -96.4 -46 19 7.2 4.2 frame none 6 1
+prop Step2 12 -94.8 -50 19 10.4 4.2 frame none 6 1
+prop Step3 12 -93.2 -54 19 13.600000000000001 4.2 frame none 6 1
+prop Step4 12 -91.6 -58 19 16.8 4.2 frame none 6 1
+prop Step5 12 -90 -62 19 20 4.2 frame none 6 1
+prop Step6 12 -88.4 -66 19 23.200000000000003 4.2 frame none 6 1
+prop Step7 12 -86.8 -70 19 26.400000000000002 4.2 frame none 6 1
+prop StairRail 22 -82 -55 1.2 1.2 45 steel none 6 1
+prop StairRailPostA 22 -90 -35 1.3 18 1.3 steel none 6 1
+prop StairRailPostB 22 -86 -73 1.3 25 1.3 steel none 6 1
+
+# ケーブルを廊下から各設備につなぐ。
+prop CableLanding 32 -99.2 -30 1.4 1.2 56 cable none 12 0 noshadow
+prop CableHall 132 -99.2 15 201 1.2 1.5 cable none 12 0 noshadow
+prop CableCorner 32 -99.2 7 1.4 1.2 17 cable none 12 0 noshadow
+prop CableRelay 123 -99.2 51 1.4 1.2 73 cable none 12 0 noshadow
+prop CableComms 232 -99.2 47 1.4 1.2 65 cable none 12 0 noshadow
+prop CableDesk 252 -99.2 79 41 1.2 1.4 cable none 12 0 noshadow
+prop CableClamp0 50 -98.6 15 2 0.7 2.7 steel none 10 0 noshadow
+prop CableClamp1 75 -98.6 15 2 0.7 2.7 steel none 10 0 noshadow
+prop CableClamp2 100 -98.6 15 2 0.7 2.7 steel none 10 0 noshadow
+prop CableClamp3 125 -98.6 15 2 0.7 2.7 steel none 10 0 noshadow
+prop CableClamp4 150 -98.6 15 2 0.7 2.7 steel none 10 0 noshadow
+prop CableClamp5 175 -98.6 15 2 0.7 2.7 steel none 10 0 noshadow
+prop CableClamp6 200 -98.6 15 2 0.7 2.7 steel none 10 0 noshadow
+
+# 中継ラック、通信卓、モニター、天井カメラ。
+prop RelayCabinet 123 -78 91 30 44 17 steel none 6 1
+prop RelayFace 123 -78 81.5 25 39 2 frame none 6 1
+prop DeskTop 266 -76 85 63 3 24 frame none 6 1
+prop DeskLeft 238 -89 85 6 22 21 steel none 6 1
+prop DeskRight 294 -89 85 6 22 21 steel none 6 1
+prop DeskBack 266 -86 95 51 20 3 steel none 6 1
+prop CRTBody 254 -63 87 30 20 15 frame none 6 1
+prop CRTGlass 254 -63 79.1 24.8 15.6 0.5 glass none 6 1
+prop CameraMount 191 -51 4 5 6 5 steel none 6 0
+prop CameraBody 188 -55 4 12 5 6 frame none 6 0
+prop CameraLens 181 -55 4 2 3 3 glass none 6 0
+prop ChairSeat 266 -88 62 13 3 12 frame none 6 1
+prop ChairBack 266 -81 57 13 16 2 steel none 6 1
+prop RackTray0 123 -92 79.8 24 2.2 1.8 steel none 12 0
+prop RackTray1 123 -86 79.8 24 2.2 1.8 steel none 12 0
+prop RackTray2 123 -80 79.8 24 2.2 1.8 steel none 12 0
+prop RackTray3 123 -74 79.8 24 2.2 1.8 steel none 12 0
+prop RackTray4 123 -68 79.8 24 2.2 1.8 steel none 12 0
+prop RackLED0 131 -92 78.7 2 0.7 0.7 steel amber 12 0 noshadow glow 12 0.4
+prop RackLED1 131 -86 78.7 2 0.7 0.7 steel green 12 0 noshadow glow 12 0.4
+prop RackLED2 131 -80 78.7 2 0.7 0.7 steel amber 12 0 noshadow glow 12 0.4
+prop RackLED3 131 -74 78.7 2 0.7 0.7 steel green 12 0 noshadow glow 12 0.4
+prop RackLED4 131 -68 78.7 2 0.7 0.7 steel amber 12 0 noshadow glow 12 0.4
+prop MainLampHallA 56 -50 0 19 1.8 7 frame warm 10 0 noshadow glow 105 1.85
+prop MainLampHallB 175 -50 0 19 1.8 7 frame warm 10 0 noshadow glow 105 1.85
+prop MainLampHallC 300 -50 0 19 1.8 7 frame warm 10 0 noshadow glow 105 1.85
+prop MainLampRelay 133 -50 64 19 1.8 7 frame warm 10 0 noshadow glow 105 1.85
+prop MainLampComms 267 -50 65 19 1.8 7 frame warm 10 0 noshadow glow 105 1.85
+prop ExitLampA 329 -68 -19 8 2 2 frame amber 12 0 noshadow glow 64 1.1
+prop ExitLampB 382 -68 -19 8 2 2 frame amber 12 0 noshadow glow 64 1.1
+prop ExitLampC 428 -68 -19 8 2 2 frame amber 12 0 noshadow glow 64 1.1
+
+# 開口部の金属枠と、廊下の腰板。
+prop RelayLintel 125 -52 24 32 4 7 steel none 8 0
+prop CommsLintel 237 -52 24 36 4 7 steel none 8 0
+prop HallSkirting 226 -96 -21.9 346 6 1.6 steel none 8 0
+prop HallTray 219 -57 -20.8 330 1.2 2.5 steel none 8 0
+prop CableHallSecond 132 -99.2 12.8 201 0.95 1 cable none 12 0 noshadow
+prop CableRelaySecond 126 -99.2 51 0.95 1 73 cable none 12 0 noshadow
+prop CableCommsSecond 235 -99.2 46 0.95 1 63 cable none 12 0 noshadow
+prop MicBase 294 -73.9 87 7 1.2 6 steel none 8 0
+prop MicStem 294 -69 87 1.2 9 1.2 steel none 8 0
+prop MicHead 294 -64.5 85 4 3 5 steel none 8 0
+
+# 南側の記録室と回線室。奥の点検通路で両室をつなぐ。
+prop RecordsWest 78 -74 -76 4 52 104 concrete none 4 1 weathering room
+prop RecordsSouth 133 -74 -128 110 52 4 concrete none 4 1 weathering room
+prop RecordsEastA 188 -74 -56 4 52 64 concrete none 4 1 weathering room
+prop RecordsEastB 188 -74 -124 4 52 8 concrete none 4 1 weathering room
+prop ServiceNorth 236 -74 -88 96 52 4 concrete none 4 1 weathering room
+prop ServiceSouth 236 -74 -120 96 52 4 concrete none 4 1 weathering room
+prop RoutingWestA 284 -74 -56 4 52 64 concrete none 4 1 weathering room
+prop RoutingWestB 284 -74 -127 4 52 14 concrete none 4 1 weathering room
+prop RoutingEast 395 -74 -79 4 52 110 concrete none 4 1 weathering room
+prop RoutingSouth 339 -74 -134 115 52 4 concrete none 4 1 weathering room
+prop RecordsRoof 133 -47 -76 114 3 108 ceiling none 4 0 noshadow weathering
+prop ServiceRoof 236 -47 -104 100 3 36 ceiling none 4 0 noshadow weathering
+prop RoutingRoof 339 -47 -79 115 3 114 ceiling none 4 0 noshadow weathering
+prop MainLampRecords 135 -50 -74 19 1.8 7 frame warm 10 0 noshadow glow 87 1.15
+prop MainLampService 238 -50 -104 14 1.8 7 frame amber 10 0 noshadow glow 65 0.6
+prop MainLampRouting 340 -50 -88 19 1.8 7 frame warm 10 0 noshadow glow 97 1.28
+prop RecordCabinet 98 -81 -110 25 38 21 steel none 12 1 model cabinet
+prop RecordTable 131 -87 -116 36 25 18 frame none 8 1 model cabinet
+prop RecordFiles 156 -88 -115 11 24 20 steel none 7 1
+prop RelayConduit 126 -99.2 -42 1.5 1.2 114 cable none 12 0 noshadow
+prop ServiceConduit 233 -99.2 -111 200 1.2 1.5 cable none 12 0 noshadow
+prop ServiceTurn 134 -99.2 -103 1.5 1.2 18 cable none 12 0 noshadow
+prop RoutingConduit 338 -99.2 -72 1.5 1.2 82 cable none 12 0 noshadow
+prop RoutingRack 340 -78 -129 100 44 7 steel none 8 1
+prop RoutingDividerA 327 -76 -124 2 40 2 frame none 9 0
+prop RoutingDividerB 352 -76 -124 2 40 2 frame none 9 0
+prop MonitorMarker 315 -58 -122 7 2 1 glass warm 8 0 noshadow glow 14 0.7
+prop ReceiveMarker 340 -58 -122 7 2 1 glass green 8 0 noshadow glow 14 0.7
+prop TransmitMarker 365 -58 -122 7 2 1 glass amber 8 0 noshadow glow 14 0.7
+prop ReleaseLamp 423 -63 22 8 2 1 steel amber 12 0 noshadow glow 38 0.9
+
+# 北側の観測区画。遮蔽壁の端を回り、奥から通信室へ戻る。
+prop ObservationWest 90 -74 164 4 52 121 concrete none 4 1 weathering
+prop ObservationEast 330 -74 164 4 52 121 concrete none 4 1 weathering
+prop ObservationNorth 210 -74 224 244 52 4 concrete none 4 1 weathering
+prop ObservationSouth 189 -74 105 27 52 4 concrete none 4 1 weathering
+prop ObservationRoof 210 -47 164 244 3 123 ceiling none 4 0 noshadow weathering
+prop ObservationBaffleA 185 -74 136 5 52 61 concrete none 4 1 weathering
+prop ObservationBaffleB 228 -74 195 5 52 59 concrete none 4 1 weathering
+prop ObservationStartStand 158 -83 144 24 34 10 steel none 8 1
+prop ObservationEndStand 286 -83 200 25 34 10 steel none 8 1
+prop ObservationDesk 111 -87 185 22 26 35 frame none 8 1 model cabinet
+prop ObservationCrate 277 -92 135 22 16 17 steel none 8 1 model crate
+prop ObservationStartLight 158 -57 140 8 3 2 frame amber 8 0 noshadow glow 63 1.3
+prop ObservationEndLight 286 -57 194 8 3 2 frame green 8 0 noshadow glow 68 1.4
+prop ObservationPathLightA 179 -91 187 2 2 6 steel green 8 0 noshadow glow 31 0.55
+prop ObservationPathLightB 209 -91 151 4 2 2 steel green 8 0 noshadow glow 32 0.6
+prop ObservationPathLightC 236 -91 151 4 2 2 steel green 8 0 noshadow glow 34 0.64
+prop ObservationAlarm 212 -53 159 11 2 4 frame amber 10 0 noshadow glow 95 2.3
+prop ObservationSensorA 185 -60 168 8 4 5 steel none 9 0
+prop ObservationSensorB 228 -60 165 8 4 5 steel none 9 0
+prop ObservationThresholdA 185 -99 190 2 1 37 cable none 9 0 noshadow
+prop ObservationThresholdB 228 -99 147 2 1 33 cable none 9 0 noshadow
+place Stage3ObservationStart 158 -74 136
+place Stage3ObservationEnd 286 -74 191
+place Stage3ObservationDoor 310 -75 105 size 32 50 4
+place Stage3ObservationShadow 210 -99 160
+
+# 非常口の外の林。
+prop OutsideTree1 480 -43 35 7 114 7 bark none 6 1 model forest_tree_dead
+prop OutsideTree2 496 -43 -35 7 114 7 bark none 6 1 model forest_tree_fork
+prop OutsideTree3 530 -43 22 7 114 7 bark none 6 1 model forest_tree_dead
+prop OutsideTree4 568 -43 -56 7 114 7 bark none 6 1 model forest_tree_fork
+prop OutsideTree5 585 -43 46 7 114 7 bark none 6 1 model forest_tree_dead
+prop OutsideTree6 465 -43 -62 7 114 7 bark none 6 1 model forest_tree_fork
+prop OutsideTree7 601 -43 38 7 114 7 bark none 6 1 model forest_tree_dead
+prop OutsideRock1 478 -96 -22 16 8 11 rock none 6 1 model forest_rock
+prop OutsideRock2 506 -96 32 16 8 11 rock none 6 1 model forest_rock
+prop OutsideRock3 559 -96 55 16 8 11 rock none 6 1 model forest_rock
+
+prop OutsideTree8 623 -38 -33 8 124 8 bark none 6 1 model forest_tree_fork
+prop OutsideTree9 656 -42 -87 7 116 7 bark none 6 1 model forest_tree_dead
+prop OutsideTree10 668 -34 89 8 132 8 bark none 6 1 model forest_tree_fork
+prop OutsideTree11 618 -38 76 7 124 7 bark none 6 1 model forest_tree_dead
+prop OutsideTree12 635 -37 -75 8 126 8 bark none 6 1 model forest_tree_fork
+
+# 屋外の分岐。北と南に中継箱、奥に独立電源の送信小屋がある。
+prop NorthFence 608 -78 133 334 44 3 steel none 8 1
+prop SouthFence 608 -78 -133 334 44 3 steel none 8 1
+prop WestFenceNorth 443 -78 79 3 44 108 steel none 8 1
+prop WestFenceSouth 443 -78 -79 3 44 108 steel none 8 1
+prop RoadFenceNorth 770 -78 76 3 44 114 steel none 8 1
+prop RoadFenceSouth 770 -78 -76 3 44 114 steel none 8 1
+prop RoadPostA 770 -75 18 5 50 5 concrete none 8 1
+prop RoadPostB 770 -75 -18 5 50 5 concrete none 8 1
+prop NorthRelayStand 543 -82 73 19 36 14 steel none 8 1
+prop SouthRelayStand 543 -82 -73 19 36 14 steel none 8 1
+prop NorthTrailLamp 511 -63 45 5 3 5 steel green 7 0 noshadow glow 74 1.5
+prop NorthPostLamp 543 -60 69 7 3 2 steel green 8 0 noshadow glow 85 1.7
+prop SouthTrailLamp 511 -63 -45 5 3 5 steel amber 7 0 noshadow glow 74 1.5
+prop SouthPostLamp 543 -60 -68 7 3 2 steel amber 8 0 noshadow glow 85 1.7
+prop TrailStakeN 511 -82 45 2 36 2 frame none 7 0
+prop TrailStakeS 511 -82 -45 2 36 2 frame none 7 0
+prop ForkCableN 500 -99.2 32 1.8 1.2 64 cable none 12 0 noshadow
+prop ForkCableS 500 -99.2 -32 1.8 1.2 64 cable none 12 0 noshadow
+prop NorthCable 565 -99.2 64 130 1.2 2 cable none 12 0 noshadow
+prop SouthCable 565 -99.2 -64 130 1.2 2 cable none 12 0 noshadow
+prop ShedCableN 614 -99.2 32 2 1.2 65 cable none 12 0 noshadow
+prop ShedCableS 619 -99.2 -32 2 1.2 65 cable none 12 0 noshadow
+prop ShedCableJoin 636 -99.2 0 44 1.2 2 cable none 12 0 noshadow
+prop ShedWestN 630 -74 33 4 52 27 concrete none 4 1 weathering
+prop ShedWestS 630 -74 -33 4 52 27 concrete none 4 1 weathering
+prop ShedNorth 669 -74 46 82 52 4 concrete none 4 1 weathering
+prop ShedSouth 669 -74 -46 82 52 4 concrete none 4 1 weathering
+prop ShedEast 710 -74 0 4 52 94 concrete none 4 1 weathering
+prop ShedRoof 670 -47 0 86 3 98 ceiling none 4 0 noshadow
+prop ShedLight 643 -54 1 14 2 5 steel warm 8 0 noshadow glow 112 1.65
+prop ShedTapeDeck 671 -85 33 65 29 19 steel none 10 1
+prop ShedReelA 654 -65 28 11 10 3 frame none 10 0
+prop ShedReelB 688 -65 28 11 10 3 frame none 10 0
+prop RoadLamp 758 -58 14 8 3 5 steel amber 8 0 noshadow glow 82 1.5
+prop RoadCableA 671 -99.2 -63 115 1.2 2 cable none 12 0 noshadow
+prop RoadCableB 728 -99.2 -31 2 1.2 63 cable none 12 0 noshadow
+prop RoadCableC 747 -99.2 0 39 1.2 2 cable none 12 0 noshadow
+
+# 門の外ではアスファルト、白線、反射ポールを懐中電灯で見分けられる。
+color road 0.092 0.098 0.102 rough 0.78
+color roadPaint 0.55 0.54 0.47 rough 0.84
+prop RoadAsphalt 824 -99.8 0 76 0.6 380 road none 4 0 noshadow
+prop RoadEdge 790 -99.45 0 1.5 0.2 190 roadPaint none 4 0 noshadow
+prop RoadDashA 823 -99.45 -40 2 0.2 28 roadPaint none 4 0 noshadow
+prop RoadDashB 823 -99.45 12 2 0.2 28 roadPaint none 4 0 noshadow
+prop RoadDashC 823 -99.45 64 2 0.2 28 roadPaint none 4 0 noshadow
+prop RoadBollardNorth 795 -92 31 2 16 2 steel none 8 0
+prop RoadBollardSouth 795 -92 -31 2 16 2 steel none 8 0
+prop RoadReflectorNorth 794.7 -85 31 1 2 2 roadPaint warm 8 0 noshadow glow 22 0.23
+prop RoadReflectorSouth 794.7 -85 -31 1 2 2 roadPaint warm 8 0 noshadow glow 22 0.23
+
+place Stage3PostNorth 543 -75 64
+place Stage3PostSouth 543 -75 -64 yaw 180
+place Stage3KeepTape 655 -73 21
+place Stage3EraseTape 688 -73 21
+place Stage3RoadGate 770 -75 0 yaw 90 size 34 50 4
+place Player 34 -99 -65
+place Stage3Ground 270 -100 0 size 25 1 20
+place Stage3Relay 121 -75 77
+place Stage3Log 131 -71 -106 yaw 180
+place Stage3MonitorChannel 315 -74 -120 yaw 180
+place Stage3Receive 340 -74 -120 yaw 180
+place Stage3Transmit 365 -74 -120 yaw 180
+place Stage3Release 423 -74 20
+place Stage3Test 284 -72 77
+place Stage3Breaker 290 -73 101
+place Stage3Exit 443 -75 0 yaw 90 size 34 50 4
+place Stage3Monitor 254 -63 78.7

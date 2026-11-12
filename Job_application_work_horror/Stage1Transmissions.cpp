@@ -20,6 +20,7 @@ void Stage1Transmissions::Reset()
     m_SignalLostTime = -1.0f;
     m_Step = RadioStep::WaitFuse;
     m_FuseTimer = 0.0f;
+    m_StalkerLitTime = 0.0f;
 }
 
 float Stage1Transmissions::GetTypingSeconds(const Line& line) const
@@ -95,7 +96,7 @@ void Stage1Transmissions::Update(const FrameInput& input)
         m_LineTime = 0.0f;
     }
 
-    // 入室や影の出現は字幕の再生中も拾う。表示は列に任せ、先に予約した行から順に流す。
+    // 入室と影を照らした時間は、ほかの字幕を再生している間も拾う。
     const bool canCall = input.RadioAllowed && !input.PowerRestored;
     switch (m_Step)
     {
@@ -128,7 +129,18 @@ void Stage1Transmissions::Update(const FrameInput& input)
         }
         break;
     case RadioStep::InRoom:
-        if (canCall && input.ArchiveStalkerActive && Stage1LightStalker::IsInsideRoom(input.PlayerPosition))
+        if (!canCall || !Stage1LightStalker::IsInsideRoom(input.PlayerPosition))
+        {
+            m_StalkerLitTime = 0.0f;
+            break;
+        }
+        // 一瞬かすめただけでは流さず、影が止まるのを見てから指示が届くようにする。
+        // 観察できた後は、室内にいる間だけ、その結果を字幕が空くまで覚えておく。
+        if (m_StalkerLitTime < ObserveStalkerSeconds)
+        {
+            m_StalkerLitTime = input.ArchiveStalkerLit ? m_StalkerLitTime + input.DeltaTime : 0.0f;
+        }
+        if (m_StalkerLitTime >= ObserveStalkerSeconds && IsIdle())
         {
             Line line;
             line.Header = StoryText::FalseRadioHeader;

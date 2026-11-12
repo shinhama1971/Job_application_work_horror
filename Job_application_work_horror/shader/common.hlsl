@@ -196,9 +196,29 @@ static const int DEBUG_VIEW_FULLBRIGHT = 8;
 static const int DEBUG_VIEW_PBR_MATERIAL = 9;
 // 画面空間の環境遮蔽（SSAO）だけを白黒で見る表示（白 = 遮る物なし、黒 = 囲まれている）
 static const int DEBUG_VIEW_AMBIENT_OCCLUSION = 10;
+// 室内を明るくし、水たまりの反射を残す表示と、森の草の LOD を色分けする表示。
+static const int DEBUG_VIEW_FULLBRIGHT_REFLECTION = 11;
+static const int DEBUG_VIEW_GRASS_LOD = 12;
+
+bool IsFullbrightDebugView()
+{
+    return DebugViewMode == DEBUG_VIEW_FULLBRIGHT ||
+        DebugViewMode == DEBUG_VIEW_FULLBRIGHT_REFLECTION ||
+        DebugViewMode == DEBUG_VIEW_GRASS_LOD;
+}
+
+float3 GetFullbrightSurfaceColor(float3 baseColor, float facing)
+{
+    if (DebugViewMode == DEBUG_VIEW_FULLBRIGHT_REFLECTION)
+    {
+        // 暗い天井板や扉の模様を残したまま、暗部の底を持ち上げる。
+        baseColor += 0.16f * (1.0f - saturate(baseColor));
+    }
+    return baseColor * (0.60f + 0.40f * facing) * 1.35f;
+}
 
 float4 GetFullbrightColor(float3 baseColor, float3 viewNormal, float3 viewPosition)
 {
     const float facing = abs(dot(normalize(viewNormal), normalize(-viewPosition)));
-    return float4(baseColor * (0.60f + 0.40f * facing) * 1.35f + Material.Emission.rgb, 1.0f);
+    return float4(GetFullbrightSurfaceColor(baseColor, facing) + Material.Emission.rgb, 1.0f);
 }

@@ -288,6 +288,7 @@
     <ClCompile Include="StageSceneEvents.cpp" />
     <ClCompile Include="StageSceneDraw.cpp" />
     <ClCompile Include="Stage2Scene.cpp" />
+    <ClCompile Include="Stage3Scene.cpp" />
     <ClCompile Include="ForestScene.cpp" />
     <ClCompile Include="ForestGrass.cpp" />
     <ClCompile Include="SkyBackdrop.cpp" />
@@ -429,6 +430,7 @@
     <ClInclude Include="StageSurveillanceCameras.h" />
     <ClInclude Include="SurveillancePatrol.h" />
     <ClInclude Include="Stage2Scene.h" />
+    <ClInclude Include="Stage3Scene.h" />
     <ClInclude Include="ForestScene.h" />
     <ClInclude Include="ForestGrass.h" />
     <ClInclude Include="SkyBackdrop.h" />

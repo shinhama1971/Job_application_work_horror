@@ -65,7 +65,7 @@ private:
     // 懐中電灯で照らすと浮かぶ壁の文字。書き換わった文字を読んだら物音の演出を起こしている。
     void UpdateWallWritings(class Player& player);
     // ボイスレコーダーを調べたら録音の字幕を流し、1面の途中で届く無線（嘘の指示）を進めている
-    void UpdateTransmissions(const class Player& player, float deltaTime);
+    void UpdateTransmissions(const class Player& player, float deltaTime, bool archiveStalkerLit);
     // 誰かの濡れた足跡：西棟の水から初めて乾いた床へ出ると、同じ水から裸足の足跡が一歩ずつ後をついて来る（1回だけ）
     void UpdateFootprintFollower(class Player& player);
     // 西棟の水面にだけ映る、天井に逆さまに張り付いた人影（見上げると何もいない。1回だけ）
@@ -75,7 +75,7 @@ private:
     // 危険度に合わせて、自分の心拍音と呼吸音を鳴らしている。
     void UpdateTensionPulse(const class Player& player, float deltaTime);
     // 書類保管室の「照らすと止まる影」を進め、表示・足音・触れられたときの電池の減少を行っている。
-    void UpdateArchiveStalker(class Player& player, float deltaTime);
+    bool UpdateArchiveStalker(class Player& player, float deltaTime);
     // 点が懐中電灯で照らされているか（光の円の中にあり、間に壁や扉がないか）を返している。
     bool IsLitByFlashlight(const class Player& player, const DirectX::SimpleMath::Vector3& target) const;
 

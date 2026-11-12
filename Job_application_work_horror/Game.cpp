@@ -10,6 +10,7 @@
 #include "TitleScene.h"
 #include "StageScene.h"
 #include "Stage2Scene.h"
+#include "Stage3Scene.h"
 #include "ForestScene.h"
 #include "IntroScene.h"
 #include "ResultScene.h"
@@ -18,7 +19,6 @@
 #include "DebugUI.h"
 #include "Application.h"
 #include "CaptureMode.h"
-#include "TechDemo.h"
 #include "Wall.h"
 #include "Door.h"
 
@@ -91,12 +91,14 @@ namespace Core
         m_Instance->m_ShadowMap.Init();
         m_Instance->m_PostProcess.Init();
         m_Instance->m_TiledLighting.Init();
-        Tools::TechDemo::Init();
         if (Tools::CaptureMode::GetEffectLevelOverride() >= 0)
             m_Instance->m_Settings.SetEffectLevel(Tools::CaptureMode::GetEffectLevelOverride());
         m_Instance->ApplyVisualSettings();
         // --forest を付けて起動したときは、タイトルの代わりに外の森から始めている
-        m_Instance->ChangeScene(ForestScene::IsRequestedByCommandLine() ? SceneName::Forest : SceneName::Title);
+        const SceneName initialScene = Stage3Scene::IsRequestedByCommandLine()
+            ? SceneName::Stage3
+            : (ForestScene::IsRequestedByCommandLine() ? SceneName::Forest : SceneName::Title);
+        m_Instance->ChangeScene(initialScene);
         return true;
     }
 
@@ -113,6 +115,7 @@ namespace Core
         const bool gameplayScene =
             m_Instance->m_CurrentScene == SceneName::Stage ||
             m_Instance->m_CurrentScene == SceneName::Stage2 ||
+            m_Instance->m_CurrentScene == SceneName::Stage3 ||
             m_Instance->m_CurrentScene == SceneName::Forest ||
             m_Instance->m_CurrentScene == SceneName::Intro;
         const bool pausePressed =
@@ -165,9 +168,6 @@ namespace Core
 
         // デバッグ画面の調整値を反映し、カメラと画面効果を更新している
         Debug::UI::ApplyTuning(m_Instance->m_PostProcess);
-        // 技術デモ（F2）の切り替えを、デバッグ画面の値の後に反映している。開いている間は方向キーで視点を回さない
-        Tools::TechDemo::Update(m_Instance->m_PostProcess);
-        m_Instance->m_Camera.SetArrowKeyLookEnabled(!Tools::TechDemo::IsActive());
 
         m_Instance->m_Camera.Update();
         m_Instance->m_PostProcess.Update();
@@ -217,7 +217,6 @@ namespace Core
         m_Instance->m_Scene.reset();
 
         m_Instance->m_ObjectManager.DeleteAll();
-        Tools::TechDemo::Uninit();
         m_Instance->m_TiledLighting.Uninit();
         m_Instance->m_PostProcess.Uninit();
         m_Instance->m_ShadowMap.Uninit();
@@ -405,6 +404,10 @@ namespace Core
 
         case SceneName::Result:
             m_Scene = std::make_unique<ResultScene>();
+            break;
+
+        case SceneName::Stage3:
+            m_Scene = std::make_unique<Stage3Scene>();
             break;
 
         case SceneName::Forest:

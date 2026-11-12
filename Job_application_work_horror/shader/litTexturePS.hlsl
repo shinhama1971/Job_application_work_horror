@@ -509,7 +509,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
 #endif
 
     // デバッグのフルブライト表示では、照明を使わずに返している
-    if (DebugViewMode == DEBUG_VIEW_FULLBRIGHT)
+    if (IsFullbrightDebugView())
     {
         return GetFullbrightColor(color.rgb, input.viewNormal, input.viewPos);
     }

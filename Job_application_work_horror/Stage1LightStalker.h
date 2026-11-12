@@ -3,7 +3,7 @@
 // 主な技術: 有限状態機械（待機 → 出現 → 触れた後の間）、照らされている間だけ止まる追跡、
 //           格子の幅優先探索による経路探索（棚の迷路を回り込む）、行き詰まったときの移動
 //
-// ・書類保管室に入ってしばらくすると、プレイヤーから一番遠い場所に影が現れる。
+// ・書類保管室に入ってしばらくすると影が現れる。入口側の通路にいるときは、初回だけ棚の陰から近づく。
 // ・懐中電灯で照らしている間はその場で止まり、光が外れると歩くより速く近づいてくる。
 //   照らし続けると電池が減り、棚の迷路を進むには目を離す必要がある、という駆け引きを作っている。
 // ・触れられると懐中電灯の電池を奪われ、影は消える。しばらくすると部屋の奥にまた現れる。
@@ -90,7 +90,7 @@ public:
             m_Timer -= input.DeltaTime;
             if (m_Timer <= 0.0f)
             {
-                Appear(input.PlayerPosition, result);
+                Appear(input.PlayerPosition, resolveCollision, result);
             }
             break;
 
@@ -168,8 +168,9 @@ private:
         DirectX::SimpleMath::Vector3(-90.0f, -99.0f, 170.0f),
     };
 
-    // プレイヤーから一番遠い候補に出している
-    void Appear(const DirectX::SimpleMath::Vector3& playerPosition, FrameResult& result)
+    // 入口側での初出現を除き、プレイヤーから一番遠い候補に出す。
+    void Appear(const DirectX::SimpleMath::Vector3& playerPosition,
+        const ResolveCollision& resolveCollision, FrameResult& result)
     {
         float farthest = -1.0f;
         for (const DirectX::SimpleMath::Vector3& point : SpawnPoints)
@@ -179,6 +180,19 @@ private:
             {
                 farthest = distance;
                 m_Position = point;
+            }
+        }
+        // 入口側の棚の通路では、初回だけ奥の棚の陰から姿を見せる。
+        // 配置が変わり、出現位置が塞がっていれば、通常の候補を使う。
+        if (!m_HasAppeared && playerPosition.x > -140.0f &&
+            playerPosition.z > 105.0f && playerPosition.z < 125.0f && resolveCollision)
+        {
+            const DirectX::SimpleMath::Vector3 behindShelf(-183.0f, -99.0f, 89.0f);
+            DirectX::SimpleMath::Vector3 clearPosition = behindShelf;
+            resolveCollision(clearPosition, BodyRadius);
+            if (HorizontalDistance(behindShelf, clearPosition) < 0.01f)
+            {
+                m_Position = behindShelf;
             }
         }
         result.Appeared = true;

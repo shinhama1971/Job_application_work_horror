@@ -11,6 +11,7 @@
 #include "Game.h"
 #include "GpuTimer.h"
 #include "Ground.h"
+#include "FuseBox.h"
 #include "ForestGrass.h"
 #include "ForestScene.h"
 #include "Door.h"
@@ -376,6 +377,7 @@ namespace
         case SceneName::Title: return "Title";
         case SceneName::Stage: return "Stage1";
         case SceneName::Stage2: return "Stage2";
+        case SceneName::Stage3: return "Stage3";
         case SceneName::Result: return "Result";
         case SceneName::Forest: return "Forest";
         case SceneName::Intro: return "Intro";
@@ -403,6 +405,99 @@ namespace
         { 34.0f, Vector3(-28,FloorY,-85), 0.15f, -0.55f, nullptr, false },
     };
     // 外の森（--capture と --forest を一緒に付けたとき）：開始地点 → 小道の街灯 → 振り返って後ろの街灯が消えるのを見る → 前方の草むらを何かが横切る → 研究所が見えてくる所 → 研究所の正面
+    // 3面の開発用撮影。通常の1面・2面の道順にはつながない。
+    const std::vector<Keyframe> Stage3Tour = {
+        { 0.0f, Vector3(34.0f, FloorY, -65.0f), 0.0f, 0.0f, nullptr, false },
+        { 1.0f, Vector3(34.0f, FloorY, -34.0f), -2.6f, -0.35f, L"01_階段踊り場", false },
+        { 1.4f, Vector3(34.0f, FloorY, -34.0f), -2.6f, -0.35f, nullptr, false },
+        { 2.0f, Vector3(34.0f, FloorY, -3.0f), Pi * 0.5f, 0.0f, nullptr, false },
+        { 4.0f, Vector3(48.0f, FloorY, 1.0f), Pi * 0.5f, -0.20f, L"02_配線の廊下", false },
+        { 4.3f, Vector3(48.0f, FloorY, 1.0f), Pi * 0.5f, -0.20f, nullptr, false },
+        { 5.0f, Vector3(123.0f, FloorY, 1.0f), 0.0f, 0.0f, nullptr, false },
+        { 7.0f, Vector3(123.0f, FloorY, 54.0f), 0.0f, -0.14f, L"03_中継室", false },
+        { 8.0f, Vector3(123.0f, FloorY, 54.0f), 0.0f, -0.14f, nullptr, false },
+        { 10.0f, Vector3(123.0f, FloorY, 2.0f), Pi * 0.5f, 0.0f, nullptr, false },
+        { 12.8f, Vector3(126.0f, FloorY, -70.0f), Pi, -0.13f, nullptr, false },
+        { 14.4f, Vector3(131.0f, FloorY, -77.0f), Pi, -0.12f, L"04_記録室", false },
+        { 15.7f, Vector3(131.0f, FloorY, -77.0f), Pi, -0.12f, L"05_保守記録", false },
+        { 16.8f, Vector3(150.0f, FloorY, -102.0f), Pi * 0.5f, -0.12f, nullptr, false },
+        { 21.0f, Vector3(265.0f, FloorY, -102.0f), Pi * 0.5f, -0.12f, L"06_点検通路", false },
+        { 23.0f, Vector3(354.0f, FloorY, -86.0f), 2.83f, -0.10f, nullptr, false },
+        { 25.2f, Vector3(354.0f, FloorY, -86.0f), 2.83f, -0.10f, L"07_送信側の遮断", false },
+        { 27.5f, Vector3(318.0f, FloorY, -86.0f), 3.23f, -0.10f, L"08_監視回線の接続", false },
+        { 29.5f, Vector3(356.0f, FloorY, -86.0f), 2.88f, -0.10f, nullptr, false },
+        { 31.4f, Vector3(338.0f, FloorY, -2.0f), 0.0f, 0.0f, nullptr, false },
+        { 34.0f, Vector3(236.0f, FloorY, 2.0f), 0.0f, 0.0f, nullptr, false },
+        { 36.00f, Vector3(249.0f, FloorY, 48.0f), 0.14f, -0.12f, nullptr, false },
+        { 38.65f, Vector3(249.0f, FloorY, 48.0f), 0.14f, -0.12f, L"09_通信卓と監視映像", false },
+        { 38.95f, Vector3(249.0f, FloorY, 48.0f), 0.14f, -0.12f, nullptr, false },
+        { 39.80f, Vector3(249.0f, FloorY, 48.0f), -0.55f, -0.15f, L"10_送信の一時停止", false },
+        { 42.20f, Vector3(278.0f, FloorY, 55.0f), -0.17f, -0.12f, L"11_主電源を落とすな", false },
+        { 43.00f, Vector3(278.0f, FloorY, 55.0f), -0.17f, -0.12f, nullptr, false },
+        { 44.00f, Vector3(237.0f, FloorY, 46.0f), Pi, 0.0f, nullptr, false },
+        { 46.00f, Vector3(237.0f, FloorY, 3.0f), Pi * 0.5f, 0.0f, nullptr, false },
+        { 50.00f, Vector3(415.0f, FloorY, 1.0f), 0.39f, -0.17f, L"12_非常口の手動解錠", false },
+        { 51.60f, Vector3(415.0f, FloorY, 1.0f), Pi * 0.5f, 0.0f, nullptr, false },
+        { 53.60f, Vector3(478.0f, FloorY, 1.0f), Pi * 0.5f, -0.04f, nullptr, false },
+        { 55.0f, Vector3(485.0f, FloorY, 0.0f), Pi * 0.5f, -0.06f, L"13_林の分岐", false },
+        { 59.0f, Vector3(536.0f, FloorY, 43.0f), 0.30f, -0.26f, nullptr, false },
+        { 61.2f, Vector3(536.0f, FloorY, 43.0f), 0.30f, -0.26f, L"14_北の受信記録", false },
+        { 63.0f, Vector3(518.0f, FloorY, 24.0f), Pi, -0.08f, nullptr, false },
+        { 66.8f, Vector3(534.0f, FloorY, -38.0f), 2.80f, -0.23f, nullptr, false },
+        { 68.7f, Vector3(534.0f, FloorY, -38.0f), 2.80f, -0.23f, L"15_南の中継箱", false },
+        { 72.5f, Vector3(615.0f, FloorY, 0.0f), Pi * 0.5f, -0.04f, L"16_送信小屋", false },
+        { 74.5f, Vector3(650.0f, FloorY, 0.0f), 0.24f, -0.22f, nullptr, false },
+        { 77.0f, Vector3(650.0f, FloorY, 0.0f), 0.24f, -0.22f, L"17_調査員の原本", false },
+        { 81.0f, Vector3(650.0f, FloorY, 0.0f), 0.24f, -0.22f, L"18_原本の扱いを選ぶ", false },
+        { 82.5f, Vector3(650.0f, FloorY, 0.0f), 0.24f, -0.22f, nullptr, false },
+        { 84.0f, Vector3(613.0f, FloorY, 0.0f), Pi, 0.0f, nullptr, false },
+        { 87.0f, Vector3(616.0f, FloorY, -60.0f), Pi * 0.5f, -0.14f, nullptr, false },
+        { 91.0f, Vector3(731.0f, FloorY, -60.0f), 0.0f, -0.08f, nullptr, false },
+        { 94.0f, Vector3(743.0f, FloorY, 0.0f), Pi * 0.5f, 0.0f, L"19_道路の門", false },
+        { 96.0f, Vector3(743.0f, FloorY, 0.0f), Pi * 0.5f, 0.0f, nullptr, false },
+        { 98.0f, Vector3(804.0f, FloorY, 0.0f), 0.30f, -0.22f, nullptr, false },
+        { 99.5f, Vector3(804.0f, FloorY, 0.0f), 0.30f, -0.22f, L"20_通信途絶", false },
+        { 101.0f, Vector3(804.0f, FloorY, 0.0f), 0.30f, -0.22f, nullptr, false },
+    };
+
+    const std::vector<Keyframe> Stage3ObservationTour = []
+    {
+        std::vector<Keyframe> tour;
+        for (const Keyframe& pose : Stage3Tour)
+        {
+            if (pose.Time <= 8.0f) tour.push_back(pose);
+        }
+        const Keyframe annex[] = {
+            { 10.0f, Vector3(154.0f, FloorY, 77.0f), 0.0f, -0.08f, nullptr, false },
+            { 12.0f, Vector3(157.0f, FloorY, 117.0f), 0.0f, -0.20f, L"04_観測区画入口", false },
+            { 12.9f, Vector3(134.0f, FloorY, 132.0f), 0.0f, -0.08f, nullptr, false },
+            { 13.6f, Vector3(134.0f, FloorY, 161.0f), 0.7f, -0.08f, nullptr, false },
+            { 14.3f, Vector3(163.0f, FloorY, 185.0f), Pi * 0.5f, -0.06f, nullptr, false },
+            { 15.4f, Vector3(198.0f, FloorY, 186.0f), 2.4f, -0.09f, L"05_観測センサー作動", false },
+            { 17.2f, Vector3(161.0f, FloorY, 188.0f), Pi * 0.5f, -0.08f, nullptr, false },
+            { 20.2f, Vector3(202.0f, FloorY, 187.0f), Pi, -0.06f, L"06_消灯して迂回", false },
+            { 22.2f, Vector3(206.0f, FloorY, 145.0f), Pi * 0.5f, -0.08f, nullptr, false },
+            { 24.6f, Vector3(250.0f, FloorY, 146.0f), 0.7f, -0.06f, L"07_遮蔽壁の先", false },
+            { 27.8f, Vector3(281.0f, FloorY, 166.0f), 0.15f, -0.23f, L"08_迂回回線の端末", false },
+            { 29.0f, Vector3(281.0f, FloorY, 166.0f), 0.15f, -0.23f, nullptr, false },
+            { 31.2f, Vector3(310.0f, FloorY, 124.0f), Pi, -0.05f, L"09_通信室への裏口", false },
+            { 32.8f, Vector3(310.0f, FloorY, 124.0f), Pi, -0.05f, nullptr, false },
+            { 34.5f, Vector3(310.0f, FloorY, 102.0f), Pi, 0.0f, nullptr, false },
+            { 36.0f, Vector3(310.0f, FloorY, 101.0f), Pi, 0.0f, nullptr, false },
+            { 38.2f, Vector3(310.0f, FloorY, 48.0f), -Pi * 0.5f, -0.06f, nullptr, false }
+        };
+        tour.insert(tour.end(), std::begin(annex), std::end(annex));
+        for (Keyframe pose : Stage3Tour)
+        {
+            if (pose.Time >= 36.0f)
+            {
+                pose.Time += 4.0f;
+                tour.push_back(pose);
+            }
+        }
+        return tour;
+    }();
+
     const std::vector<Keyframe> ForestTour = {
         { 0.0f, Vector3(0.0f, FloorY, -400.0f), 0.0f, 0.0f, nullptr, false },
         { 2.5f, Vector3(0.0f, FloorY, -398.0f), 0.0f, 0.0f, L"forest_01_開始地点", false },
@@ -429,6 +524,7 @@ namespace
     const std::vector<Keyframe>* GetTour(SceneName scene)
     {
         if (scene == SceneName::Forest) return &ForestTour;
+        if (scene == SceneName::Stage3) return g_FeatureTour ? &Stage3ObservationTour : &Stage3Tour;
         if (g_FeatureTour && scene == SceneName::Stage) return &FeatureStage1;
         if (g_FeatureTour && scene == SceneName::Stage2) return &FeatureStage2;
         if (scene == SceneName::Stage) return &Stage1Tour;
@@ -830,7 +926,12 @@ namespace Tools::CaptureMode
                 const std::wstring value = arguments[i + 1];
                 if (option == L"--effect-level" && value.size() == 1 && value[0] >= L'1' && value[0] <= L'3')
                     g_EffectOverride = static_cast<int>(value[0] - L'1');
-                if (option == L"--debug-view" && value == L"10") g_ViewOverride = 10;
+                if (option == L"--debug-view")
+                {
+                    if (value == L"10") g_ViewOverride = 10;
+                    if (value == L"11") g_ViewOverride = 11;
+                    if (value == L"12") g_ViewOverride = 12;
+                }
                 if (option == L"--reflection" && value.size() == 1 && value[0] >= L'0' && value[0] <= L'3')
                     g_ReflectionOverride = static_cast<int>(value[0] - L'0');
             }
@@ -962,7 +1063,8 @@ namespace Tools::CaptureMode
             ++g_NextShot;
         }
 
-        if (g_FeatureTour && !g_FeatureActionRequested && g_TourTime >= 0.2f)
+        if (g_FeatureTour && (scene == SceneName::Stage || scene == SceneName::Stage2) &&
+            !g_FeatureActionRequested && g_TourTime >= 0.2f)
         {
             g_FeatureActionRequested = true;
             if (Scene* current = game->GetScene())
@@ -1068,6 +1170,57 @@ namespace Tools::CaptureMode
             return;
         }
 
+        if (scene == SceneName::Stage3)
+        {
+            // 3面の撮影では、普段の操作対象を順に調べて進める。
+            const auto operate = [&](const char* name, float start)
+            {
+                if (g_TourTime >= start && g_TourTime - FrameSeconds < start)
+                {
+                    if (FuseBox* control = game->GetObj<FuseBox>(name);
+                        control != nullptr && control->IsInteractionEnabled())
+                    {
+                        control->Interact(*player);
+                    }
+                }
+            };
+            operate("Stage3Relay", 7.5f);
+            if (g_FeatureTour)
+            {
+                operate("Stage3ObservationStart", 12.25f);
+                operate("Stage3ObservationEnd", 28.3f);
+            }
+            else
+            {
+                operate("Stage3Log", 14.8f);
+                operate("Stage3Transmit", 24.3f);
+                operate("Stage3MonitorChannel", 26.8f);
+                operate("Stage3Receive", 28.7f);
+                operate("Stage3Transmit", 29.3f);
+            }
+            const float routeDelay = g_FeatureTour ? 4.0f : 0.0f;
+            operate("Stage3Test", 39.3f + routeDelay);
+            operate("Stage3Breaker", 42.6f + routeDelay);
+            operate("Stage3Release", 50.2f + routeDelay);
+            operate("Stage3PostNorth", 60.2f + routeDelay);
+            operate("Stage3PostSouth", 68.1f + routeDelay);
+            operate(g_FeatureTour ? "Stage3EraseTape" : "Stage3KeepTape", 81.5f + routeDelay);
+            const auto openDoor = [&](const char* name, float start)
+            {
+                if (g_TourTime >= start && g_TourTime - FrameSeconds < start)
+                {
+                    if (Door* door = game->GetObj<Door>(name);
+                        door != nullptr && door->IsInteractionEnabled())
+                    {
+                        door->Interact(*player);
+                    }
+                }
+            };
+            if (g_FeatureTour) openDoor("Stage3ObservationDoor", 31.6f);
+            openDoor("Stage3Exit", 51.2f + routeDelay);
+            openDoor("Stage3RoadGate", 95.0f + routeDelay);
+        }
+
         const Keyframe pose = Sample(*tour, g_TourTime);
         // 2面のロッカー: 隠れる区間に入ったら右のロッカーに入り、区間を出たら外へ出ている。
         if (pose.Hide && !player->IsHiding())
@@ -1114,6 +1267,8 @@ namespace Tools::CaptureMode
             g_TourTime >= Stage1FlashlightOffStart && g_TourTime < Stage1FlashlightOffEnd) &&
             !(scene == SceneName::Stage2 && !g_Benchmark &&
             g_TourTime >= Stage2FlashlightOffStart && g_TourTime < Stage2FlashlightOffEnd));
+        if (g_FeatureTour && scene == SceneName::Stage3 && g_TourTime >= 17.3f && g_TourTime < 29.0f)
+            player->SetFlashlightOn(false);
         if (g_FeatureTour && scene == SceneName::Stage)
             player->SetFlashlightOn((g_TourTime >= 10.0f && g_TourTime < 13.0f) || g_TourTime >= 21.0f);
         // ドア検証の20秒まではFullbrightで形を見せる。通常表示の資料画像には使わない。

@@ -89,7 +89,7 @@ float4 main(in VIEW_MODEL_PS_IN input) : SV_Target
         color += Material.Emission.rgb * weakTint * hotspot * rings * ViewModelState.x;
     }
 
-    if (DebugViewMode == DEBUG_VIEW_FULLBRIGHT)
+    if (IsFullbrightDebugView())
     {
         return float4(baseColor * (0.6f + 0.4f * saturate(dot(normal, toView))) * 1.35f, 1.0f);
     }
