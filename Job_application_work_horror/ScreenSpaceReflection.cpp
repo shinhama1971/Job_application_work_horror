@@ -154,7 +154,8 @@ namespace Effect
             m_PreviousDepthCopy.Swap(m_DepthCopy);
             m_PreviousDepthView.Swap(m_DepthView);
             m_PreviousViewProjection = view * projection;
-            m_PreviousDepth = DirectX::SimpleMath::Vector4(projection._33, projection._43, 0.0f, 0.0f);
+            // 深度から奥行きを戻すための射影行列の値（[2][2]・[3][2]・前方の符号 [2][3]。左手系のこのゲームでは前方の符号は +1）
+            m_PreviousDepth = DirectX::SimpleMath::Vector4(projection._33, projection._43, projection._34, 0.0f);
         }
     }
 }

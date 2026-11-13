@@ -490,7 +490,19 @@ void StageScene::Update()
     UpdateExitOmen(*player);
     UpdateWallWritings(*player);
     UpdateFootprintFollower(*player);
-    m_HiddenRoom.Update(*player, deltaTime, m_KeypadDoor.IsSolved());
+    // 隠し部屋の影も、書類保管室の影と同じく、棚・壁・閉じた扉を通り抜けずに回り込む
+    m_HiddenRoom.Update(*player, deltaTime, m_KeypadDoor.IsSolved(),
+        [this](Vector3& position, float radius)
+        {
+            for (const Wall* wall : m_StalkerWalls)
+            {
+                wall->ResolveCollision(position, radius);
+            }
+            for (const Door* door : m_StalkerDoors)
+            {
+                door->ResolveCollision(position, radius);
+            }
+        });
     const bool archiveStalkerLit = UpdateArchiveStalker(*player, deltaTime);
     UpdateTransmissions(*player, deltaTime, archiveStalkerLit);
     // 西棟の進行（排水バルブの長押しを含む）と、水の滴る音・背後で水の中を歩く音などの物音。

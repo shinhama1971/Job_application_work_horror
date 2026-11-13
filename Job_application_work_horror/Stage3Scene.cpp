@@ -6,6 +6,7 @@
 #include "FuseBox.h"
 #include "Game.h"
 #include "Ground.h"
+#include "LayoutExtras.h"
 #include "Player.h"
 #include "PostProcess.h"
 #include "PropLayoutFile.h"
@@ -188,6 +189,10 @@ Stage3Scene::Stage3Scene()
     m_Exit = builder.Create<Door>("Stage3Exit");
     place(*m_Exit, "Stage3Exit");
     m_Exit->SetLocked(true);
+    // 配置ファイルの ExtraLight_・ExtraBattery_ で始まる place（何個でも置ける照明と電池。Unity で足したり消したりできる）。
+    // 3面は配置ファイルを読み直さないので、置き直し方は覚えずに捨てている
+    PropLayoutFile::PlacementBindings extraBindings;
+    LayoutExtras::Spawn(builder, layout, extraBindings);
 
     m_Figure = builder.Create<Stage3FeedFigure>("Stage3FeedFigure");
     m_Figure->SetExternallyControlled(true);

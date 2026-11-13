@@ -9,6 +9,7 @@
 
 #include "BatteryItem.h"
 #include "CeilingLight.h"
+#include "LayoutExtras.h"
 #include "Door.h"
 #include "DrainValve.h"
 #include "ExitTrigger.h"
@@ -632,47 +633,27 @@ namespace Stage1Layout
         objects.firstFuse = item1;
         objects.secondFuse = item2;
         objects.thirdFuse = item3;
-        // 曲がり角の暗がりを補う通常の器具（下で、通路と部屋の天井にも照明を一通り並べている）
-        const auto addCeilingFixture = [&builder](const char* name, float x, float z, float offset)
+        // 曲がり角の暗がりを補う通常の器具。進む先の照明の誘導（下の routeLights）で使うので、名前の決まった place にしている。
+        // 位置・向き・大きさは配置ファイルの place から読んでいる（Unity のマップエディターで動かせる）
+        const auto addCeilingFixture = [&builder, &place](const char* name, float offset)
         {
             CeilingLight* light = builder.Create<CeilingLight>(name);
-            light->SetPosition(x, -50.5f, z);
             light->SetScale(22.0f, 2.0f, 10.0f);
+            place(*light, name);
             light->SetEmergencyLight(false, offset);
             return light;
         };
-        CeilingLight* leftEntranceLight = addCeilingFixture("Stage1LeftEntranceLight", -125.0f, -88.0f, 7.3f);
-        CeilingLight* rightEntranceLight = addCeilingFixture("Stage1RightEntranceLight", 125.0f, -88.0f, 8.6f);
-        CeilingLight* westEntranceLight = addCeilingFixture("Stage1WestEntranceLight", -190.0f, -20.0f, 9.7f);
-        CeilingLight* mainPowerLight = addCeilingFixture("Stage1MainPowerLight", -180.0f, 20.0f, 10.9f);
+        CeilingLight* leftEntranceLight = addCeilingFixture("Stage1LeftEntranceLight", 7.3f);
+        CeilingLight* rightEntranceLight = addCeilingFixture("Stage1RightEntranceLight", 8.6f);
+        CeilingLight* westEntranceLight = addCeilingFixture("Stage1WestEntranceLight", 9.7f);
+        CeilingLight* mainPowerLight = addCeilingFixture("Stage1MainPowerLight", 10.9f);
 
         // 通路と部屋の天井に、照明を一通り並べている。懐中電灯を消すとほとんど何も見えないため、
         // 足した照明はすべて非常回路につなぎ、停電中も赤い非常灯の光だまりが点々と続くようにしている（電力が戻ると普通の照明になる）。
         // 照明の間には暗がりが残る間隔にしている（P.T. やサイレントヒルのように、光だまりと闇が交互に続く）。
-        struct ExtraFixture { const char* Name; float X; float Z; bool Emergency; };
-        const ExtraFixture extraFixtures[] =
-        {
-            { "Stage1HallCenterLight", 0.0f, -75.0f, true },        // 開始地点と中央ホールの間
-            { "Stage1HallWestLight", -120.0f, -20.0f, true },        // 中央ホールの西
-            { "Stage1HallEastLight", 120.0f, -20.0f, true },         // 中央ホールの東
-            { "Stage1HallFarEastLight", 190.0f, 10.0f, true },      // 中央ホールの東の奥
-            { "Stage1LeftStorageInnerLight", -180.0f, -150.0f, true },  // 左の倉庫の奥
-            { "Stage1RightStorageInnerLight", 185.0f, -150.0f, true }, // 右の倉庫の奥
-            { "Stage1CenterStorageLight", 0.0f, -105.0f, true },     // 開始地点の部屋の入口
-            { "Stage1CorridorSouthLight", 0.0f, 55.0f, true },      // 廊下の入口
-            { "Stage1CorridorMidLight", 0.0f, 160.0f, true },        // 廊下の中ほど
-            { "Stage1ArchiveWestLight", -180.0f, 75.0f, true },     // 書類保管室の西
-            { "Stage1DebrisLight", -130.0f, 265.0f, true },          // 崩れた資材置き場
-            { "Stage1ExitHallLight", 0.0f, 300.0f, true },          // 脱出のホールの奥
-            { "Stage1WestWingSouthLight", -345.0f, 35.0f, true },    // 西棟の西の壁際
-            { "Stage1SouthWestHallWestLight", -345.0f, -210.0f, true }, // 南西の広間の奥
-        };
-        for (std::size_t index = 0; index < std::size(extraFixtures); ++index)
-        {
-            const ExtraFixture& fixture = extraFixtures[index];
-            CeilingLight* light = addCeilingFixture(fixture.Name, fixture.X, fixture.Z, 12.3f + static_cast<float>(index) * 0.77f);
-            light->SetEmergencyLight(fixture.Emergency, 12.3f + static_cast<float>(index) * 0.77f);
-        }
+        // 配置ファイルの ExtraLight_ で始まる place（と ExtraBattery_ で始まる電池）を、すべて作っている（LayoutExtras）。
+        // 名前で探さない物なので、Unity のマップエディターでコピーして足したり、消したりできる
+        LayoutExtras::Spawn(builder, propLayout, objects.placementBindings);
 
         // 進み具合ごとに、進む先の照明を手前から奥の順に並べている。色や明るさは変えず、そのうち1灯だけをちかちかさせる。
         objects.routeLights[static_cast<std::size_t>(Stage1RouteLight::StartSearch)] = { light1 };

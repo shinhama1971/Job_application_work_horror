@@ -284,6 +284,7 @@
     <ClCompile Include="CaptureMode.cpp" />
     <ClCompile Include="VideoWriter.cpp" />
     <ClCompile Include="PropLayoutFile.cpp" />
+    <ClCompile Include="LayoutExtras.cpp" />
     <ClCompile Include="PropLayoutEditor.cpp" />
     <ClCompile Include="MirrorSelf.cpp" />
     <ClCompile Include="HangingBulb.cpp" />
@@ -416,6 +417,7 @@
     <ClInclude Include="Stage1KeypadDoor.h" />
     <ClInclude Include="Stage1HiddenRoomEvent.h" />
     <ClInclude Include="Stage1LightStalker.h" />
+    <ClInclude Include="RoomPathGrid.h" />
     <ClInclude Include="Stage1SafeLights.h" />
     <ClInclude Include="Stage1WestWing.h" />
     <ClInclude Include="CeilingReflectionScare.h" />
@@ -427,6 +429,7 @@
     <ClInclude Include="KeypadLock.h" />
     <ClInclude Include="SceneLayoutBuilder.h" />
     <ClInclude Include="PropLayoutFile.h" />
+    <ClInclude Include="LayoutExtras.h" />
     <ClInclude Include="PropLayoutEditor.h" />
     <ClInclude Include="MirrorSelf.h" />
     <ClInclude Include="HangingBulb.h" />

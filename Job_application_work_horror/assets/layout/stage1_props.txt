@@ -137,6 +137,18 @@ prop PropArchiveShelf3  -155 -77 130   90 44 6    shelfColor none 10 1 model she
 prop PropArchiveShelf4  -115 -77 158   100 44 6   shelfColor none 10 1 model shelf_long
 prop PropArchiveDesk    -200 -89 160   26 20 14   cabinetMetal none 12 1 model cabinet
 
+# --- 暗証番号の扉の先の部屋（閉じ込められて鍵を探す部屋）の書類棚
+# 南北に長い棚4列を、端を交互に開けて並べ、入口から一番奥までジグザグの通路にしている（入口からは奥が見えない）。
+# 低い棚は、入口の通路の南の行き止まりに落ちる鍵を隠している。鍵の候補と影の経路探索は Stage1HiddenRoomEvent.cpp。
+# 通路の幅は、入口の通路が35、間の3本が24、一番奥が40（プレイヤーと影が通れる幅）。動かしたら鍵の候補も確かめる
+prop PropHiddenShelf1        85 -77  91    6 44 98   shelfColor none 10 1 model shelf_long
+prop PropHiddenShelf2       115 -77 129    6 44 98   shelfColor none 10 1 model shelf_long
+prop PropHiddenShelf3       145 -77  91    6 44 98   shelfColor none 10 1 model shelf_long
+prop PropHiddenShelf4       175 -77 129    6 44 98   shelfColor none 10 1 model shelf_long
+prop PropHiddenShelfLow    56.5 -77  72   19 44  6   shelfColor none 10 1 model shelf_short
+prop PropHiddenCrate1        53 -93 150   12 14 12   debrisColor none 6 1 model crate
+prop PropHiddenCrate2       211 -93  88   12 14 12   debrisColor none 6 1 model crate
+
 # --- 崩れた資材置き場（北西の部屋）
 prop PropDebris1     -150 -84 230   40 30 30   debrisColor none 6 1 model debris
 prop PropDebris2     -95  -88 285   50 22 24   debrisColor none 6 1 model debris
@@ -231,6 +243,27 @@ place Stage1SouthWestHallLight2      -180 -50.5 -256 size 24 2 11 yaw -94.203
 place Stage1WestWingLight1           -300 -50.5 -40 size 24 2 11
 place Stage1WestWingLight2           -300 -50.5 100 size 24 2 11
 place Stage1WestWingLight3           -300 -50.5 220 size 20 2 9
+# 部屋の入口の照明（進む先の照明の誘導で名前を使う。電力が戻る前は消えている普通の照明）
+place Stage1LeftEntranceLight        -125 -50.5 -88 size 22 2 10
+place Stage1RightEntranceLight        125 -50.5 -88 size 22 2 10
+place Stage1WestEntranceLight        -190 -50.5 -20 size 22 2 10
+place Stage1MainPowerLight           -180 -50.5 20 size 22 2 10
+# 何個でも置ける天井照明（停電中も赤い非常灯として点く）。ExtraLight_ で始まる名前の place は、ゲームがすべて作る（LayoutExtras）。
+# Unity のマップエディターでコピーして足したり、消したりできる。電池も ExtraBattery_ で始まる名前で、同じように何個でも置ける
+place ExtraLight_HallCenter            0 -50.5 -75 size 22 2 10
+place ExtraLight_HallWest           -120 -50.5 -20 size 22 2 10
+place ExtraLight_HallEast            120 -50.5 -20 size 22 2 10
+place ExtraLight_HallFarEast         190 -50.5 10 size 22 2 10
+place ExtraLight_LeftStorageInner   -180 -50.5 -150 size 22 2 10
+place ExtraLight_RightStorageInner   185 -50.5 -150 size 22 2 10
+place ExtraLight_CenterStorage         0 -50.5 -105 size 22 2 10
+place ExtraLight_CorridorSouth         0 -50.5 55 size 22 2 10
+place ExtraLight_CorridorMid           0 -50.5 160 size 22 2 10
+place ExtraLight_ArchiveWest        -180 -50.5 75 size 22 2 10
+place ExtraLight_Debris             -130 -50.5 265 size 22 2 10
+place ExtraLight_ExitHall              0 -50.5 300 size 22 2 10
+place ExtraLight_WestWingSouth      -345 -50.5 35 size 22 2 10
+place ExtraLight_SouthWestHallWest  -345 -50.5 -210 size 22 2 10
 place Door                           0 -74 40
 place FuseBox                        -35.1 -73.4 35
 place Stage1FacilityMap              -69 -68 38 yaw 180 size 37 25 1
@@ -239,13 +272,13 @@ place Stage1EmergencyCharger         -217.5 -90 -103.5 yaw 90
 place Stage1EvidenceTerminal         216.8 -79.5 -42 yaw -90
 place Stage1KeypadDoor               45 -74 110 yaw 90
 place Stage1KeypadPanel              41.5 -70.77 136.65 yaw 90
-place Stage1KeypadRoomBattery        140 -95 110
+place Stage1KeypadRoomBattery        130 -95 110
 place Stage1HiddenRoomKey            207.8 -65.44 109.61
 place Stage1HiddenRoomRecord         213 -82 150 yaw 90
 # 鍵の候補に対応する保管灯（南、北西、北東）
-place Stage1HiddenKeyLampSouth        205 -73 43  size 6 3 1.2
-place Stage1HiddenKeyLampNorthWest     70 -73 177 size 6 3 1.2
-place Stage1HiddenKeyLampNorthEast    172 -73 177 size 6 3 1.2
+place Stage1HiddenKeyLampSouth         56 -73 43  size 6 3 1.2
+place Stage1HiddenKeyLampNorthWest    130 -73 177 size 6 3 1.2
+place Stage1HiddenKeyLampNorthEast    200 -73 177 size 6 3 1.2
 place Stage1KeypadRoomFuse           196 -95 150
 place BatteryItem                    -130 -95 120
 # ボイスレコーダー（研究員たちの録音。y は置いた木箱・机の上面、yaw は手前のランプを部屋の入口へ向ける向き）

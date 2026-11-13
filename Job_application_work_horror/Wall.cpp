@@ -313,6 +313,12 @@ bool Wall::GetReflectionProxy(ReflectionProxy& proxy) const
     {
         return false;
     }
+    // 形が箱から大きく外れる見た目のモデルは、1つの箱で映すと水面に四角い箱が浮かんで見える。
+    // 箱としては映さず、画面に見えている所はSSRで本物の形を、画面の外は環境マップ（本物のモデルを撮った景色）を映す
+    if (m_VisualModel == "pump" || m_VisualModel == "tank" || m_VisualModel == "debris")
+    {
+        return false;
+    }
     const Matrix rotation = Matrix::CreateFromYawPitchRoll(m_Rotation.y, m_Rotation.x, m_Rotation.z);
     const Vector3 half(std::abs(m_Scale.x) * 0.5f, std::abs(m_Scale.y) * 0.5f, std::abs(m_Scale.z) * 0.5f);
     const Vector3 extent(

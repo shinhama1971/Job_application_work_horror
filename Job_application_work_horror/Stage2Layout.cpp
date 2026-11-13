@@ -21,6 +21,7 @@
 #include "MirrorAnomaly.h"
 #include "MirrorSelf.h"
 #include "HangingBulb.h"
+#include "LayoutExtras.h"
 #include "PropLayoutFile.h"
 #include "utility.h"
 
@@ -433,6 +434,12 @@ namespace Stage2Layout
 
         // 2面の廊下は、P.T. の廊下のような暖かい白熱電球の光にしている（1面は古い蛍光灯のまま）
         for (CeilingLight* bulb : { light1, light2, light3, light4 })
+        {
+            bulb->SetWarmBulb(true);
+        }
+        // 配置ファイルの ExtraLight_・ExtraBattery_ で始まる place（何個でも置ける照明と電池。Unity で足したり消したりできる）
+        const LayoutExtras::Spawned extras = LayoutExtras::Spawn(builder, propLayout, objects.placementBindings);
+        for (CeilingLight* bulb : extras.Lights)
         {
             bulb->SetWarmBulb(true);
         }

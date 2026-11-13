@@ -21,28 +21,33 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
-    // 隠し部屋の広さ（壁の内側）。扉はx=45の壁にあり、部屋は東側に広がっている。
+    // 隠し部屋の広さ（壁の内側）。扉はx=45の壁（内側の面はx=47）にあり、部屋は東側に広がっている。
+    // 経路探索の格子（Stage1HiddenRoomEvent.h の m_Path）も同じ範囲にしている。
+    constexpr float RoomMinX = 47.0f;
     constexpr float RoomMaxX = 218.0f;
     constexpr float RoomMinZ = 42.0f;
     constexpr float RoomMaxZ = 178.0f;
     // この線より奥まで入ったら扉を閉めている（扉のすぐ前で閉めて、プレイヤーを挟まないため）。
     constexpr float TrapLineX = 64.0f;
 
-    // 鍵が落ちている場所の候補（暗い部屋の隅）。電池・壁の文字・配電箱と重ならない位置にしている。
+    // 鍵が落ちている場所の候補。部屋は書類棚（配置ファイルの PropHiddenShelf）でジグザグの通路に区切ってあり、
+    // どれも入口からは棚に隠れて見えない。順に、入口の通路の南の行き止まり（低い棚の裏）、
+    // 真ん中の通路の北の端、一番奥の通路の北の行き止まり。保管灯（Stage1HiddenKeyLamp）もこの順に、近くの壁に付けている。
     const std::array<Vector3, Stage1HiddenRoomEvent::KeySpotCount> KeySpots =
     {
-        Vector3(205.0f, -95.0f, 55.0f),
-        Vector3(70.0f, -95.0f, 168.0f),
-        Vector3(172.0f, -95.0f, 164.0f)
+        Vector3(56.0f, -95.0f, 52.0f),
+        Vector3(130.0f, -95.0f, 162.0f),
+        Vector3(200.0f, -95.0f, 168.0f)
     };
 
-    // 影が現れる場所の候補（部屋の四隅）。プレイヤーから一番遠い隅を選んでいる。
-    const std::array<Vector3, 4> ShadowCorners =
+    // 影が現れる場所の候補（各通路の端）。棚にめり込まない候補のうち、プレイヤーから一番遠い所を選んでいる。
+    const std::array<Vector3, 5> ShadowSpawnPoints =
     {
-        Vector3(208.0f, -99.0f, 52.0f),
-        Vector3(208.0f, -99.0f, 168.0f),
-        Vector3(60.0f, -99.0f, 52.0f),
-        Vector3(60.0f, -99.0f, 168.0f)
+        Vector3(64.0f, -99.0f, 160.0f),
+        Vector3(100.0f, -99.0f, 58.0f),
+        Vector3(130.0f, -99.0f, 58.0f),
+        Vector3(160.0f, -99.0f, 165.0f),
+        Vector3(198.0f, -99.0f, 92.0f)
     };
 
     // プレイヤーが部屋の奥（閉める線より奥）にいるか
@@ -72,7 +77,8 @@ void Stage1HiddenRoomEvent::Init(const Parts& parts)
 }
 
 // 状態ごとの処理：暗証番号の扉を開けて奥まで入ったら閉じ込め、閉じ込められている間は鍵と影を見ている
-void Stage1HiddenRoomEvent::Update(Player& player, float deltaTime, bool keypadSolved)
+void Stage1HiddenRoomEvent::Update(Player& player, float deltaTime, bool keypadSolved,
+    const RoomPathGrid::ResolveCollision& resolveCollision)
 {
     m_NoticeTimer = (std::max)(0.0f, m_NoticeTimer - deltaTime);
     if (m_Parts.door == nullptr || m_Parts.key == nullptr || m_Parts.shadow == nullptr)
@@ -85,11 +91,16 @@ void Stage1HiddenRoomEvent::Update(Player& player, float deltaTime, bool keypadS
     case State::Waiting:
         if (keypadSolved && m_Parts.door->IsOpen() && IsInsideRoom(player.GetPosition()))
         {
+            // 通れるマスの表は、棚が置かれた後の、閉じ込めた時に一度だけ作っている
+            if (!m_Path.IsBuilt())
+            {
+                m_Path.Build(resolveCollision);
+            }
             Trap(player);
         }
         break;
     case State::Trapped:
-        UpdateTrapped(player, deltaTime);
+        UpdateTrapped(player, deltaTime, resolveCollision);
         break;
     case State::Escaped:
         break;
@@ -125,7 +136,8 @@ void Stage1HiddenRoomEvent::Trap(Player& player)
     UpdateKeyLamps(0.0f);
 }
 
-void Stage1HiddenRoomEvent::UpdateTrapped(Player& player, float deltaTime)
+void Stage1HiddenRoomEvent::UpdateTrapped(Player& player, float deltaTime,
+    const RoomPathGrid::ResolveCollision& resolveCollision)
 {
     Core::Game* game = Core::Game::GetInstance();
 
@@ -172,6 +184,9 @@ void Stage1HiddenRoomEvent::UpdateTrapped(Player& player, float deltaTime)
         }
         return;
     }
+
+    // 影は棚を回り込んで近づいてくる
+    MoveShadow(player, deltaTime, resolveCollision);
 
     // 影に触れられると、懐中電灯の電池を奪われる（5%は残し、完全には空にしない）。
     Vector3 toPlayer = player.GetPosition() - shadow->GetPosition();
@@ -221,32 +236,84 @@ void Stage1HiddenRoomEvent::UpdateKeyLamps(float deltaTime)
     }
 }
 
-// 部屋の四隅のうち、プレイヤーから一番遠い隅に影を出し、ゆっくり近づけている。
-// ライトを当て続けると消える（ShadowManの見られたときの反応）。
+// 通路の端の候補のうち、棚にめり込まず、プレイヤーから一番遠い所に影を出している。
+// 動きは MoveShadow が受け持ち、ライトを当て続けると消える（ShadowManの見られたときの反応）。
 void Stage1HiddenRoomEvent::SpawnShadow(const Player& player)
 {
     const Vector3 playerPosition = player.GetPosition();
-    const Vector3* farthest = &ShadowCorners[0];
-    for (const Vector3& corner : ShadowCorners)
+    const Vector3* farthest = nullptr;
+    for (const Vector3& point : ShadowSpawnPoints)
     {
-        if (Vector3::DistanceSquared(corner, playerPosition) >
+        if (m_Path.IsBuilt() && !m_Path.IsWalkable(point))
+        {
+            continue;
+        }
+        if (farthest == nullptr ||
+            Vector3::DistanceSquared(point, playerPosition) >
             Vector3::DistanceSquared(*farthest, playerPosition))
         {
-            farthest = &corner;
+            farthest = &point;
         }
+    }
+    if (farthest == nullptr)
+    {
+        farthest = &ShadowSpawnPoints[0];
     }
 
     ShadowMan* shadow = m_Parts.shadow;
     shadow->SetPosition(farthest->x, farthest->y, farthest->z);
     shadow->SetActive(true);
     shadow->EnableGazeScare(60.0f);
-    shadow->EnableChase(ShadowSpeed, 8.0f);
+    m_ShadowStride = 0.0f;
     m_ShadowWasActive = true;
 
     // 影が出た場所の天井近くで、低く配管の音を鳴らして気配を知らせている
     Core::Game* game = Core::Game::GetInstance();
     game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, *farthest + Vector3(0.0f, 20.0f, 0.0f), 0.55f, 1.4f);
     ShowNotice("何かが部屋にいる ライトを向ける", 2.8f);
+}
+
+// 影を、経路探索で次に向かう点へ進めている。棚や壁には押し戻しでめり込まないようにし、
+// 一定の歩幅ごとに影の足元から足音を鳴らしている（棚の向こうにいても、立体音響でどこから来るかが分かる）。
+void Stage1HiddenRoomEvent::MoveShadow(const Player& player, float deltaTime,
+    const RoomPathGrid::ResolveCollision& resolveCollision)
+{
+    ShadowMan* shadow = m_Parts.shadow;
+    const Vector3 before = shadow->GetPosition();
+    const Vector3 playerPosition = player.GetPosition();
+    Vector3 toPlayer = playerPosition - before;
+    toPlayer.y = 0.0f;
+    const float playerDistance = toPlayer.Length();
+    if (playerDistance < 0.001f)
+    {
+        return;
+    }
+
+    Vector3 direction = m_Path.GetSteeringTarget(before, playerPosition) - before;
+    direction.y = 0.0f;
+    const float targetDistance = direction.Length();
+    if (targetDistance < 0.001f)
+    {
+        return;
+    }
+    direction /= targetDistance;
+    Vector3 next = before + direction * (std::min)(ShadowSpeed * deltaTime, playerDistance);
+    if (resolveCollision)
+    {
+        resolveCollision(next, ShadowBodyRadius);
+    }
+    next.x = (std::clamp)(next.x, RoomMinX + ShadowBodyRadius, RoomMaxX - ShadowBodyRadius);
+    next.z = (std::clamp)(next.z, RoomMinZ + ShadowBodyRadius, RoomMaxZ - ShadowBodyRadius);
+    shadow->SetPosition(next.x, before.y, next.z);
+
+    // 実際に進んだ距離で足音を鳴らしている（押し戻されて止まっている間は鳴らない）
+    m_ShadowStride += Vector3(next.x - before.x, 0.0f, next.z - before.z).Length();
+    if (m_ShadowStride >= ShadowStrideLength)
+    {
+        m_ShadowStride -= ShadowStrideLength;
+        Core::Game::GetInstance()->PlayAudioCueAt(
+            SOUND_CUE_FOOTSTEP, Vector3(next.x, before.y + 4.0f, next.z), 0.74f, 1.7f);
+    }
 }
 
 // 知らせの文章と、表示する秒数を決めている

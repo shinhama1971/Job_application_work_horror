@@ -8,6 +8,9 @@
 // ・prop をコピー（Ctrl+D）すると、書き出すときに、元の行をひな形にして新しい行を足している（名前の空白と括弧は _ にする）。
 //   シーンから消した prop と spot は、書き出すとファイルからも行を消す（spot は組の最後の1つだけは残す）。
 //   place（扉・照明など、ゲームのコードが作る物）は、行が無いとゲームが止まるので消さずに残し、知らせを出す。
+//   ただし、名前が ExtraLight_（天井照明）・ExtraBattery_（電池）で始まる place は、何個でも置ける物なので、
+//   prop と同じようにコピーして足したり、消したりできる（ゲームの LayoutExtras が、その頭の名前の行をすべて作る）。
+// ・メニューから、1面・2面・森・3面の配置ファイルを読み込める。
 //   読み込んだ後にゲームの配置エディターや手で足された行は、シーンにまだ無いだけなので消さない（MapLayoutRoot.KnownLines で見分ける）。
 // ============================================================================
 
@@ -41,6 +44,19 @@ namespace MapLayout.Editor
         // 外の森（試作）。ゲームを --forest で起動するか、デバッグ画面（F1）のボタンで開ける
         [MenuItem("Map Layout/森を読み込む")]
         static void ImportForest() => Import(Path.Combine(LayoutDirectory, "forest_props.txt"));
+
+        // 3面（試作）。ゲームを --stage3 で起動すると始まる
+        [MenuItem("Map Layout/3面を読み込む")]
+        static void ImportStage3() => Import(Path.Combine(LayoutDirectory, "stage3_props.txt"));
+
+        // 名前の頭で種類が決まる、何個でも置ける place（ゲームの LayoutExtras.h と同じ）。
+        // 進行のコードが名前で探さないので、コピーして足したり、消したりできる
+        static readonly string[] RepeatablePlacePrefixes = { "ExtraLight_", "ExtraBattery_" };
+
+        public static bool IsRepeatablePlace(string name)
+        {
+            return RepeatablePlacePrefixes.Any(prefix => name.StartsWith(prefix, System.StringComparison.Ordinal));
+        }
 
         [MenuItem("Map Layout/配置ファイルへ書き出す")]
         static void ExportAll()
@@ -323,9 +339,10 @@ namespace MapLayout.Editor
                 string newKey = null;
                 if (!usedLines.Add(lineIndex))
                 {
-                    if (item.Kind != MapLayoutKind.Prop)
+                    // 足せるのは、prop と、何個でも置ける place（ExtraLight_・ExtraBattery_）だけ
+                    if (item.Kind != MapLayoutKind.Prop && !(item.Kind == MapLayoutKind.Place && IsRepeatablePlace(item.Key)))
                     {
-                        Debug.LogWarning("place と spot のコピーは書き出していません（名前で引くため）: " + item.name);
+                        Debug.LogWarning("この place と spot のコピーは書き出していません（ゲームのコードが名前で探すため）: " + item.name);
                         continue;
                     }
                     line = MapLayoutDocument.Line.Parse(template.Content.TrimEnd());
@@ -377,7 +394,7 @@ namespace MapLayout.Editor
                 {
                     Debug.LogWarning("読み込んだ後に足された行なので、そのまま残しています（シーンに出すには読み込み直してください）: " + line.Text.Trim());
                 }
-                else if (command == "place")
+                else if (command == "place" && !IsRepeatablePlace(line.Tokens[1].Text))
                 {
                     keptPlaces.Add(line.Tokens[1].Text);
                     Debug.LogWarning("place の物はゲームのコードが作るので、消さずに残しています: " + line.Text.Trim());
@@ -406,8 +423,10 @@ namespace MapLayout.Editor
             if (keptPlaces.Count > 0 && !Application.isBatchMode)
             {
                 EditorUtility.DisplayDialog("消せない物があります",
-                    "次の物はゲームのコードが作る物（place 行）なので、配置ファイルから消せません。行は残しました。\n" +
-                    "シーンに戻すには、配置ファイルを読み込み直してください。\n\n" + string.Join("\n", keptPlaces), "OK");
+                    "次の物はゲームのコードが名前で探す物（place 行）なので、配置ファイルから消せません。行は残しました。\n" +
+                    "シーンに戻すには、配置ファイルを読み込み直してください。\n" +
+                    "（名前が ExtraLight_・ExtraBattery_ で始まる照明と電池は、消したり足したりできます）\n\n" +
+                    string.Join("\n", keptPlaces), "OK");
             }
 
             // 書き出した後の行番号と、コピーに付けた新しい名前を印へ写している。

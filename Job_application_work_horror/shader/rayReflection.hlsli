@@ -42,9 +42,13 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
     const float3 viewPosition = mul(float4(worldPosition, 1.0f), CausticView).xyz;
     const float3 viewNormal = normalize(mul(float4(worldNormal, 0.0f), CausticView).xyz);
     const float3 rayDirection = reflect(normalize(viewPosition), viewNormal);
-    // 深度バッファの値からビュー空間の z を戻すための、射影行列の値（右手系：z = -[3][2] / (深度 + [2][2])）
+    // 深度バッファの値からビュー空間の z を戻すための、射影行列の値。
+    // 前方の符号（[2][3]）は、左手系（このゲームのカメラ。前方が +z）なら +1、右手系なら -1。
+    // 深度 = ([2][2] z + [3][2]) / ([2][3] z) なので、z = [3][2] / ([2][3] 深度 - [2][2]) で戻せる（どちらの手系でも同じ式）。
+    // 以前は右手系の式（z = -[3][2] / (深度 + [2][2])）だけを使っていたため、左手系のこのゲームでは深さがずれ、SSR が何にも当たっていなかった
     const float depthScale = CausticProjection[2][2];
     const float depthOffset = CausticProjection[3][2];
+    const float forwardSign = CausticProjection[2][3];
     float distance = 1.5f;
     float previousDistance = 0.0f;
     [loop]
@@ -64,9 +68,9 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
             break;
         }
         const float sceneDepth = g_SsrDepth.Load(int3(uv * dimensions, 0));
-        const float sceneViewZ = -depthOffset / (sceneDepth + depthScale);
-        // 光線が面より奥に入り、その差が面の厚みとみなせる範囲なら、ぶつかったとしている
-        const float behind = sceneViewZ - rayPosition.z;
+        const float sceneViewZ = depthOffset / (forwardSign * sceneDepth - depthScale);
+        // 光線が面より奥に入り、その差が面の厚みとみなせる範囲なら、ぶつかったとしている（前方の符号を掛けて、カメラからの奥行きの差にしている）
+        const float behind = (rayPosition.z - sceneViewZ) * forwardSign;
         if (behind > 0.0f && behind < 3.0f + distance * 0.06f)
         {
             // ぶつかった位置を、1つ前の歩幅との間で半分ずつ詰めている（二分探索）。
@@ -84,8 +88,8 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
                 const float2 middleUv = float2(middleNdc.x * 0.5f + 0.5f, -middleNdc.y * 0.5f + 0.5f);
                 const int2 middlePixel = clamp(int2(middleUv * dimensions), int2(0, 0), int2(width, height) - 1);
                 const float middleDepth = g_SsrDepth.Load(int3(middlePixel, 0));
-                const float middleSceneZ = -depthOffset / (middleDepth + depthScale);
-                if (middleSceneZ - middlePosition.z > 0.0f)
+                const float middleSceneZ = depthOffset / (forwardSign * middleDepth - depthScale);
+                if ((middlePosition.z - middleSceneZ) * forwardSign > 0.0f)
                 {
                     farDistance = middle;
                     hitUv = (float2(middlePixel) + 0.5f) / dimensions;
@@ -98,10 +102,12 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
             // 今の深度から当たった面のワールド位置を戻し、前のカメラでその点が見えていた画素を求める。
             const float2 hitNdc = float2(hitUv.x * 2.0f - 1.0f, 1.0f - hitUv.y * 2.0f);
             const float hitDepth = g_SsrDepth.Load(int3(hitUv * dimensions, 0));
-            const float hitViewZ = -depthOffset / (hitDepth + depthScale);
+            const float hitViewZ = depthOffset / (forwardSign * hitDepth - depthScale);
+            // 投影の w は「前方の符号 × z」（カメラからの奥行き）なので、それを掛けて画面の位置からビュー空間の x・y を戻している
+            const float hitViewW = forwardSign * hitViewZ;
             const float3 hitView = float3(
-                hitNdc.x * -hitViewZ / CausticProjection[0][0],
-                hitNdc.y * -hitViewZ / CausticProjection[1][1], hitViewZ);
+                hitNdc.x * hitViewW / CausticProjection[0][0],
+                hitNdc.y * hitViewW / CausticProjection[1][1], hitViewZ);
             const float3 eye = -mul((float3x3)CausticView, CausticView[3].xyz);
             const float3 hitWorld = eye + mul((float3x3)CausticView, hitView);
             const float heightAboveMinimum = hitWorld.y - worldPosition.y - minHitHeight;
@@ -125,7 +131,10 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
             }
             // 前の画面で別の物に隠れていた点や、前の深度に物がない点から色を拾わない。
             const float previousDepth = g_PreviousSsrDepth.Load(int3(sampleUv * dimensions, 0));
-            const float previousSceneDistance = PreviousReflectionDepth.y / (previousDepth + PreviousReflectionDepth.x);
+            // カメラからの奥行き（投影の w）= 前方の符号 × [3][2] / (前方の符号 × 深度 - [2][2])。xyz = 前のフレームの [2][2]・[3][2]・[2][3]
+            const float previousForwardSign = PreviousReflectionDepth.z;
+            const float previousSceneDistance = previousForwardSign * PreviousReflectionDepth.y /
+                (previousForwardSign * previousDepth - PreviousReflectionDepth.x);
             const float tolerance = 0.85f + previousClip.w * 0.008f;
             const float depthConfidence = 1.0f - smoothstep(tolerance * 0.45f, tolerance,
                 abs(previousSceneDistance - previousClip.w));

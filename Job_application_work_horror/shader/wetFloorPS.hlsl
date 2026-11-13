@@ -256,7 +256,11 @@ float3 TraceRayReflection(float3 worldPosition, float3 worldNormal, float roughn
         // 水面より1.5以上高い物に当たったときだけ映し、床そのものへの誤った当たりは捨てている（かくかくした映り込みを防ぐ）
         const float4 screen = TraceScreenSpaceReflection(worldPosition, worldNormal, 32, 1.14f,
             1.0f / 85.0f, 0.55f + roughness, 1.5f);
-        color = lerp(color, screen.rgb, screen.w * nearWeight * 0.48f);
+        // 画面に見えている物は、部屋の形で近づけた色より本物なので、SSRが当たった所はその色を主にしている
+        color = lerp(color, screen.rgb, screen.w * nearWeight * 0.85f);
+        // SSRが水面より上に立つ物（ポンプ・机・扉など）に当たったときは、箱で映す小物と同じく「近くの縦の面」として扱い、
+        // 見下ろす角度でも輪郭が読める強さで映している（これがないと、見下ろしたときの映り込みは約7%しか混ざらない）
+        nearVertical = max(nearVertical, screen.w * nearWeight);
     }
     // 人影は画面に描いていないため、SSRで拾った物より手前に立っているものとして、最後に重ねている（ほぼ黒い影）。
     // 人の形が崩れないよう、人影も細かい凹凸を除いた同じ向きで映す。

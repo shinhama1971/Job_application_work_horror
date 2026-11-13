@@ -297,6 +297,9 @@
     <ClCompile Include="PropLayoutFile.cpp">
       <Filter>ソース ファイル\Scene\Common</Filter>
     </ClCompile>
+    <ClCompile Include="LayoutExtras.cpp">
+      <Filter>ソース ファイル\Scene\Common</Filter>
+    </ClCompile>
     <ClCompile Include="ResultScene.cpp">
       <Filter>ソース ファイル\Scene\Common</Filter>
     </ClCompile>
@@ -647,6 +650,9 @@
     <ClInclude Include="PropLayoutFile.h">
       <Filter>ヘッダー ファイル\Scene\Common</Filter>
     </ClInclude>
+    <ClInclude Include="LayoutExtras.h">
+      <Filter>ヘッダー ファイル\Scene\Common</Filter>
+    </ClInclude>
     <ClInclude Include="ResultScene.h">
       <Filter>ヘッダー ファイル\Scene\Common</Filter>
     </ClInclude>
@@ -706,6 +712,9 @@
     </ClInclude>
     <ClInclude Include="Stage1LightStalker.h">
       <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
+    </ClInclude>
+    <ClInclude Include="RoomPathGrid.h">
+      <Filter>ヘッダー ファイル\Gameplay</Filter>
     </ClInclude>
     <ClInclude Include="Stage1Objective.h">
       <Filter>ヘッダー ファイル\Scene\Stage1</Filter>

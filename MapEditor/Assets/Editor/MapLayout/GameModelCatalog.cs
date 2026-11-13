@@ -2,8 +2,9 @@
 // ファイルの役割: 配置ファイルの物を、ゲームと同じ FBX のモデルで表示するための表を作っている。
 // ・モデルの FBX は、ゲームの assets/model から Assets/GameModels へ写している（Git には入れない。元はゲームの側）。
 // ・prop 行の model の名前と、FBX・標準の大きさ・長い向きへ回すかは、ゲームの Wall.cpp の表を読んでいる（表を二重に持たない）。
-// ・place 行の物の種類（扉・照明・電池など）は、ゲームの Stage1Layout.cpp・Stage2Layout.cpp の builder.Create<種類>("名前") と、
-//   名前の配列・作る関数（createDrainValve・createLocker）から読み取っている。
+// ・place 行の物の種類（扉・照明・電池など）は、ゲームの Stage1Layout.cpp・Stage2Layout.cpp・Stage3Scene.cpp の builder.Create<種類>("名前") と、
+//   名前の配列・作る関数（createDrainValve・createLocker・addCeilingFixture・makeSwitch）から読み取っている。
+//   名前が ExtraLight_・ExtraBattery_ で始まる place は、何個でも置ける照明と電池（ゲームの LayoutExtras.h）。
 // ・座標の向き：ゲーム（Assimp）は FBX の z を反転して読み、Unity は x を反転して読むので、同じ FBX が
 //   y 軸まわりに180度回った向きになる。モデルにはこの分の回転を足している。
 // ============================================================================
@@ -130,7 +131,7 @@ namespace MapLayout.Editor
                     return s_PlaceTypes;
                 }
                 s_PlaceTypes = new Dictionary<string, string>();
-                foreach (var file in new[] { "Stage1Layout.cpp", "Stage2Layout.cpp" })
+                foreach (var file in new[] { "Stage1Layout.cpp", "Stage2Layout.cpp", "Stage3Scene.cpp" })
                 {
                     var text = File.ReadAllText(Path.Combine(GameDirectory, file));
                     // builder.Create<種類>("名前") と、名前の配列を使う builder.Create<種類>(配列[番号])
@@ -159,6 +160,15 @@ namespace MapLayout.Editor
                     foreach (Match match in Regex.Matches(text, @"createLocker\(""(\w+)"""))
                     {
                         s_PlaceTypes[match.Groups[1].Value] = "Locker";
+                    }
+                    // 1面の部屋の入口の照明（addCeilingFixture）と、3面のスイッチ（makeSwitch。配電盤の形）
+                    foreach (Match match in Regex.Matches(text, @"addCeilingFixture\(""(\w+)"""))
+                    {
+                        s_PlaceTypes[match.Groups[1].Value] = "CeilingLight";
+                    }
+                    foreach (Match match in Regex.Matches(text, @"makeSwitch\(""(\w+)"""))
+                    {
+                        s_PlaceTypes[match.Groups[1].Value] = "FuseBox";
                     }
                 }
                 return s_PlaceTypes;
@@ -240,6 +250,15 @@ namespace MapLayout.Editor
 
         public static PlaceModel FindPlaceModel(string placeName)
         {
+            // 名前の頭で種類が決まる、何個でも置ける物（ゲームの LayoutExtras.h）。シーンでコピーした物は名前の後ろに番号が付く
+            if (placeName.StartsWith("ExtraLight_", System.StringComparison.Ordinal))
+            {
+                return PlaceModels["CeilingLight"];
+            }
+            if (placeName.StartsWith("ExtraBattery_", System.StringComparison.Ordinal))
+            {
+                return PlaceModels["BatteryItem"];
+            }
             return PlaceTypes.TryGetValue(placeName, out var type) && PlaceModels.TryGetValue(type, out var model) ? model : null;
         }
 
