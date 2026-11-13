@@ -299,7 +299,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 190
+  LineIndex: 192
   Key: PropWestWingShelf1
   HasYaw: 0
   HasSize: 0
@@ -947,6 +947,7 @@ Transform:
   - {fileID: 1984867054}
   - {fileID: 35328163}
   - {fileID: 1056638032}
+  - {fileID: 860902128}
   - {fileID: 324479491}
   - {fileID: 590559013}
   - {fileID: 1263188231}
@@ -1050,7 +1051,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 254
+  LineIndex: 260
   Key: PropLoopMarker2
   HasYaw: 0
   HasSize: 1
@@ -1102,7 +1103,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 217
+  LineIndex: 219
   Key: CeilingLight4
   HasYaw: 0
   HasSize: 1
@@ -2335,7 +2336,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 250
+  LineIndex: 256
   Key: Stage1ExitOmen
   HasYaw: 0
   HasSize: 0
@@ -3369,6 +3370,137 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 155975800}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &168782012
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 168782013}
+  - component: {fileID: 168782017}
+  - component: {fileID: 168782016}
+  - component: {fileID: 168782015}
+  - component: {fileID: 168782014}
+  m_Layer: 0
+  m_Name: DoorLampLoopDoorRight (1)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &168782013
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 168782012}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0.9991175, z: -0, w: -0.042002726}
+  m_LocalPosition: {x: 78.77, y: -64, z: -177.3}
+  m_LocalScale: {x: 10, y: 4, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1006211591}
+  m_Father: {fileID: 407460832}
+  m_LocalEulerAnglesHint: {x: 0, y: -184.815, z: 0}
+--- !u!114 &168782014
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 168782012}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5ee53cc6adce2ae4480cd88b1028777e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
+  Kind: 0
+  LineIndex: 184
+  Key: DoorLampLoopDoorRight_1
+  HasYaw: 0
+  HasSize: 0
+--- !u!23 &168782015
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 168782012}
+  m_Enabled: 0
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 1383768535}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!65 &168782016
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 168782012}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!33 &168782017
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 168782012}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &169104470
 GameObject:
   m_ObjectHideFlags: 0
@@ -3549,7 +3681,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 183
+  LineIndex: 185
   Key: DoorLampArchive
   HasYaw: 0
   HasSize: 0
@@ -3680,7 +3812,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 188
+  LineIndex: 190
   Key: DoorLampLoopCorner
   HasYaw: 0
   HasSize: 0
@@ -4117,7 +4249,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 237
+  LineIndex: 239
   Key: Stage1KeypadDoor
   HasYaw: 1
   HasSize: 0
@@ -5534,7 +5666,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 203
+  LineIndex: 205
   Key: PropSafeLightDeskBase
   HasYaw: 0
   HasSize: 0
@@ -5728,7 +5860,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 239
+  LineIndex: 241
   Key: Stage1KeypadRoomBattery
   HasYaw: 0
   HasSize: 0
@@ -7034,7 +7166,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 261
+  LineIndex: 267
   Key: Stage1WestWingValveEast
   HasYaw: 1
   HasSize: 0
@@ -7426,7 +7558,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 219
+  LineIndex: 221
   Key: CeilingLight6
   HasYaw: 0
   HasSize: 1
@@ -8091,7 +8223,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 201
+  LineIndex: 203
   Key: PropSafeLightHubBulb
   HasYaw: 0
   HasSize: 0
@@ -8499,7 +8631,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 243
+  LineIndex: 249
   Key: BatteryItem
   HasYaw: 0
   HasSize: 0
@@ -8551,7 +8683,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 229
+  LineIndex: 231
   Key: Stage1WestWingLight2
   HasYaw: 0
   HasSize: 1
@@ -9077,6 +9209,8 @@ Transform:
   - {fileID: 1874945482}
   - {fileID: 1330070082}
   - {fileID: 1773307233}
+  - {fileID: 168782013}
+  - {fileID: 517854207}
   - {fileID: 173061978}
   - {fileID: 1158368379}
   - {fileID: 1544865454}
@@ -9269,7 +9403,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 230
+  LineIndex: 232
   Key: Stage1WestWingLight3
   HasYaw: 0
   HasSize: 1
@@ -9668,7 +9802,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 192
+  LineIndex: 194
   Key: PropWestWingDeskTop
   HasYaw: 0
   HasSize: 0
@@ -9871,6 +10005,38 @@ Transform:
   m_Children:
   - {fileID: 1290079911}
   m_Father: {fileID: 285804386}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &477876110
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 477876111}
+  m_Layer: 0
+  m_Name: "\u30E2\u30C7\u30EB\u306E\u5927\u304D\u3055"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &477876111
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 477876110}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.1, y: 0.25, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1593533273}
+  m_Father: {fileID: 517854207}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &481233407
 GameObject:
@@ -10397,7 +10563,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 226
+  LineIndex: 228
   Key: Stage1SouthWestHallLight1
   HasYaw: 1
   HasSize: 1
@@ -10711,6 +10877,137 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 514862379}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &517854206
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 517854207}
+  - component: {fileID: 517854211}
+  - component: {fileID: 517854210}
+  - component: {fileID: 517854209}
+  - component: {fileID: 517854208}
+  m_Layer: 0
+  m_Name: DoorLampLoopDoorRight (2)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &517854207
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 517854206}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0.9991175, z: -0, w: -0.042002726}
+  m_LocalPosition: {x: -75.99, y: -64, z: -177.86}
+  m_LocalScale: {x: 10, y: 4, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 477876111}
+  m_Father: {fileID: 407460832}
+  m_LocalEulerAnglesHint: {x: 0, y: -184.815, z: 0}
+--- !u!114 &517854208
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 517854206}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5ee53cc6adce2ae4480cd88b1028777e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
+  Kind: 0
+  LineIndex: 183
+  Key: DoorLampLoopDoorRight_2
+  HasYaw: 0
+  HasSize: 0
+--- !u!23 &517854209
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 517854206}
+  m_Enabled: 0
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 1383768535}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!65 &517854210
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 517854206}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!33 &517854211
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 517854206}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!21 &520865714
 Material:
@@ -11139,7 +11436,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 247
+  LineIndex: 253
   Key: Stage1RecorderWestWing
   HasYaw: 1
   HasSize: 0
@@ -11465,7 +11762,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 257
+  LineIndex: 263
   Key: Stage1WestWingValveSouth
   HasYaw: 1
   HasSize: 0
@@ -11937,7 +12234,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 271
+  LineIndex: 277
   Key: Stage1KeypadRoomWriting
   HasYaw: 1
   HasSize: 1
@@ -12021,7 +12318,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 259
+  LineIndex: 265
   Key: Stage1WestWingValveWest
   HasYaw: 1
   HasSize: 0
@@ -12397,7 +12694,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 220
+  LineIndex: 222
   Key: CeilingLight7
   HasYaw: 1
   HasSize: 1
@@ -12878,7 +13175,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 275
+  LineIndex: 281
   Key: Stage1KeypadClueLabel3
   HasYaw: 1
   HasSize: 0
@@ -13240,7 +13537,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 266
+  LineIndex: 272
   Key: Stage1WritingPower
   HasYaw: 1
   HasSize: 1
@@ -13401,7 +13698,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 212
+  LineIndex: 214
   Key: Player
   HasYaw: 0
   HasSize: 0
@@ -13542,7 +13839,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 251
+  LineIndex: 257
   Key: PropDoorIndicator
   HasYaw: 0
   HasSize: 1
@@ -13839,7 +14136,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 269
+  LineIndex: 275
   Key: Stage1WritingLap2
   HasYaw: 1
   HasSize: 1
@@ -14043,7 +14340,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 2
-  LineIndex: 280
+  LineIndex: 286
   Key: Stage1FirstFuse
   HasYaw: 0
   HasSize: 0
@@ -14172,7 +14469,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 262
+  LineIndex: 268
   Key: PropWestWingValveLampEast
   HasYaw: 0
   HasSize: 1
@@ -14939,6 +15236,10 @@ MonoBehaviour:
     24 0 noshadow glow 55 1.9 model warning_lamp
   - prop DoorLampLoopDoorRight    22   -64  37.5    10 4 1   doorLampBody doorLamp
     24 0 noshadow glow 55 1.9 model warning_lamp
+  - prop DoorLampLoopDoorRight_2    -75.99   -64  -177.86    10 4 1   doorLampBody
+    doorLamp 24 0 noshadow glow 55 1.9 model warning_lamp
+  - prop DoorLampLoopDoorRight_1    78.77   -64  -177.3    10 4 1   doorLampBody
+    doorLamp 24 0 noshadow glow 55 1.9 model warning_lamp
   - prop DoorLampArchive         -42.5 -64  104     1 4 10   doorLampBody doorLamp
     24 0 noshadow glow 62 2.1 model warning_lamp
   - prop DoorLampArchive_1         -42.5 -64  136.3     1 4 10   doorLampBody doorLamp
@@ -15009,6 +15310,9 @@ MonoBehaviour:
   - place Stage1KeypadRoomBattery        140 -95 110
   - place Stage1HiddenRoomKey            207.8 -65.44 109.61
   - place Stage1HiddenRoomRecord         213 -82 150 yaw 90
+  - place Stage1HiddenKeyLampSouth        205 -73 43  size 6 3 1.2
+  - place Stage1HiddenKeyLampNorthWest     70 -73 177 size 6 3 1.2
+  - place Stage1HiddenKeyLampNorthEast    172 -73 177 size 6 3 1.2
   - place Stage1KeypadRoomFuse           196 -95 150
   - place BatteryItem                    -130 -95 120
   - place Stage1RecorderHall             95 -86 30 yaw 0
@@ -15197,7 +15501,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 193
+  LineIndex: 195
   Key: PropWestWingDeskLeg1
   HasYaw: 0
   HasSize: 0
@@ -16666,7 +16970,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 264
+  LineIndex: 270
   Key: Stage1WritingWarning
   HasYaw: 1
   HasSize: 1
@@ -16717,7 +17021,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 245
+  LineIndex: 251
   Key: Stage1RecorderHall
   HasYaw: 1
   HasSize: 0
@@ -16892,6 +17196,76 @@ PrefabInstance:
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
   m_PrefabInstance: {fileID: 778612795}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1001 &780289944
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 1786294149}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 836e4c89f11ba4543b32451f067d0209, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 25.3
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 836e4c89f11ba4543b32451f067d0209, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 836e4c89f11ba4543b32451f067d0209, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -1.9
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 836e4c89f11ba4543b32451f067d0209, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.6803654
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 836e4c89f11ba4543b32451f067d0209, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 836e4c89f11ba4543b32451f067d0209, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.73287314
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 836e4c89f11ba4543b32451f067d0209, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 836e4c89f11ba4543b32451f067d0209, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 836e4c89f11ba4543b32451f067d0209, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 94.256
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 836e4c89f11ba4543b32451f067d0209, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 836e4c89f11ba4543b32451f067d0209, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 1176444107}
+    - target: {fileID: -7511558181221131132, guid: 836e4c89f11ba4543b32451f067d0209, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: 1481288100}
+    - target: {fileID: 919132149155446097, guid: 836e4c89f11ba4543b32451f067d0209, type: 3}
+      propertyPath: m_Name
+      value: ceiling_light
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 836e4c89f11ba4543b32451f067d0209, type: 3}
+--- !u!4 &780289945 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 836e4c89f11ba4543b32451f067d0209, type: 3}
+  m_PrefabInstance: {fileID: 780289944}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &781920309
 GameObject:
@@ -17215,7 +17589,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 187
+  LineIndex: 189
   Key: DoorLampPumpRoom
   HasYaw: 0
   HasSize: 0
@@ -17345,7 +17719,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 225
+  LineIndex: 227
   Key: Stage1SouthWestHallBattery
   HasYaw: 0
   HasSize: 0
@@ -18019,7 +18393,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 240
+  LineIndex: 242
   Key: Stage1HiddenRoomKey
   HasYaw: 0
   HasSize: 0
@@ -18851,7 +19225,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 268
+  LineIndex: 274
   Key: Stage1WritingLap1
   HasYaw: 1
   HasSize: 1
@@ -19145,6 +19519,58 @@ Transform:
   - {fileID: 644686006}
   m_Father: {fileID: 1879219434}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &860902127
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 860902128}
+  - component: {fileID: 860902129}
+  m_Layer: 0
+  m_Name: CeilingLight5 (1)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &860902128
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 860902127}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 113.03, y: -50.5, z: 105}
+  m_LocalScale: {x: 18, y: 2, z: 8}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1402913761}
+  - {fileID: 1450871765}
+  - {fileID: 1786294149}
+  m_Father: {fileID: 29257981}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &860902129
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 860902127}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5ee53cc6adce2ae4480cd88b1028777e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
+  Kind: 1
+  LineIndex: 220
+  Key: CeilingLight5
+  HasYaw: 0
+  HasSize: 1
 --- !u!1 &865978181
 GameObject:
   m_ObjectHideFlags: 0
@@ -19224,7 +19650,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 273
+  LineIndex: 279
   Key: Stage1KeypadClueLabel1
   HasYaw: 1
   HasSize: 0
@@ -19407,7 +19833,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 222
+  LineIndex: 224
   Key: Stage1WestWingDoor
   HasYaw: 1
   HasSize: 0
@@ -19458,7 +19884,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 258
+  LineIndex: 264
   Key: PropWestWingValveLampSouth
   HasYaw: 0
   HasSize: 1
@@ -19580,7 +20006,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 241
+  LineIndex: 243
   Key: Stage1HiddenRoomRecord
   HasYaw: 1
   HasSize: 0
@@ -19823,7 +20249,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 255
+  LineIndex: 261
   Key: PropLoopMarker3
   HasYaw: 0
   HasSize: 1
@@ -19945,7 +20371,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 236
+  LineIndex: 238
   Key: Stage1EvidenceTerminal
   HasYaw: 1
   HasSize: 0
@@ -20050,8 +20476,7 @@ Material:
   m_Shader: {fileID: 46, guid: 0000000000000000f000000000000000, type: 0}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
-  - _EMISSION
+  m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -20521,7 +20946,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 248
+  LineIndex: 254
   Key: Stage1RecorderArchive
   HasYaw: 1
   HasSize: 0
@@ -20626,8 +21051,7 @@ Material:
   m_Shader: {fileID: 46, guid: 0000000000000000f000000000000000, type: 0}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
-  - _EMISSION
+  m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -21138,7 +21562,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 235
+  LineIndex: 237
   Key: Stage1EmergencyCharger
   HasYaw: 1
   HasSize: 0
@@ -21515,6 +21939,38 @@ Transform:
   m_Children:
   - {fileID: 206797807}
   m_Father: {fileID: 467832329}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1006211590
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1006211591}
+  m_Layer: 0
+  m_Name: "\u30E2\u30C7\u30EB\u306E\u5927\u304D\u3055"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1006211591
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1006211590}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.1, y: 0.25, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1740701130}
+  m_Father: {fileID: 168782013}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1008138359
 GameObject:
@@ -22101,7 +22557,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 215
+  LineIndex: 217
   Key: CeilingLight2
   HasYaw: 0
   HasSize: 1
@@ -22535,7 +22991,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 218
+  LineIndex: 220
   Key: CeilingLight5
   HasYaw: 0
   HasSize: 1
@@ -22911,7 +23367,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 246
+  LineIndex: 252
   Key: Stage1RecorderSouthWestHall
   HasYaw: 1
   HasSize: 0
@@ -23126,7 +23582,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 2
-  LineIndex: 283
+  LineIndex: 289
   Key: Stage1SecondFuse
   HasYaw: 0
   HasSize: 0
@@ -23288,7 +23744,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 223
+  LineIndex: 225
   Key: Stage1WestWingBattery
   HasYaw: 0
   HasSize: 0
@@ -23340,7 +23796,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 2
-  LineIndex: 282
+  LineIndex: 288
   Key: Stage1SecondFuse
   HasYaw: 0
   HasSize: 0
@@ -24008,7 +24464,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 276
+  LineIndex: 282
   Key: Stage1KeypadClueLabel4
   HasYaw: 1
   HasSize: 0
@@ -24145,8 +24601,7 @@ Material:
   m_Shader: {fileID: 46, guid: 0000000000000000f000000000000000, type: 0}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
-  - _EMISSION
+  m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -24617,7 +25072,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 195
+  LineIndex: 197
   Key: PropWestWingDeskLeg3
   HasYaw: 0
   HasSize: 0
@@ -24915,7 +25370,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 214
+  LineIndex: 216
   Key: CeilingLight1
   HasYaw: 0
   HasSize: 1
@@ -25020,8 +25475,7 @@ Material:
   m_Shader: {fileID: 46, guid: 0000000000000000f000000000000000, type: 0}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
-  - _EMISSION
+  m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -25231,7 +25685,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 184
+  LineIndex: 186
   Key: DoorLampArchive_1
   HasYaw: 0
   HasSize: 0
@@ -27477,7 +27931,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 221
+  LineIndex: 223
   Key: CeilingLight8
   HasYaw: 0
   HasSize: 1
@@ -28027,7 +28481,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 213
+  LineIndex: 215
   Key: Ground
   HasYaw: 0
   HasSize: 1
@@ -28292,7 +28746,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 231
+  LineIndex: 233
   Key: Door
   HasYaw: 0
   HasSize: 0
@@ -29526,7 +29980,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 196
+  LineIndex: 198
   Key: PropWestWingDeskLeg4
   HasYaw: 0
   HasSize: 0
@@ -30395,7 +30849,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 197
+  LineIndex: 199
   Key: PropWestWingCrate
   HasYaw: 0
   HasSize: 0
@@ -30584,8 +31038,7 @@ Material:
   m_Shader: {fileID: 46, guid: 0000000000000000f000000000000000, type: 0}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
-  - _EMISSION
+  m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -31162,6 +31615,96 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1395304532}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1402913760
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1402913761}
+  - component: {fileID: 1402913763}
+  - component: {fileID: 1402913762}
+  m_Layer: 0
+  m_Name: "\u5370"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &1402913761
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1402913760}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 860902128}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &1402913762
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1402913760}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 763208519}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1402913763
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1402913760}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &1406617544
 GameObject:
   m_ObjectHideFlags: 0
@@ -31471,7 +32014,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 242
+  LineIndex: 248
   Key: Stage1KeypadRoomFuse
   HasYaw: 0
   HasSize: 0
@@ -31805,6 +32348,96 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1431976529}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1450871764
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1450871765}
+  - component: {fileID: 1450871767}
+  - component: {fileID: 1450871766}
+  m_Layer: 0
+  m_Name: "\u6B63\u9762"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1450871765
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1450871764}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0.75}
+  m_LocalScale: {x: 0.1, y: 0.1, z: 0.5}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 860902128}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &1450871766
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1450871764}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 763208519}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1450871767
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1450871764}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &1452425787
 GameObject:
   m_ObjectHideFlags: 0
@@ -31975,7 +32608,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 234
+  LineIndex: 236
   Key: ExitPowerPanel
   HasYaw: 0
   HasSize: 0
@@ -32221,7 +32854,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 265
+  LineIndex: 271
   Key: Stage1WritingThree
   HasYaw: 1
   HasSize: 1
@@ -33061,8 +33694,7 @@ Material:
   m_Shader: {fileID: 46, guid: 0000000000000000f000000000000000, type: 0}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
-  - _EMISSION
+  m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -33313,7 +33945,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 204
+  LineIndex: 206
   Key: PropSafeLightDeskArm
   HasYaw: 0
   HasSize: 0
@@ -33846,7 +34478,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 253
+  LineIndex: 259
   Key: PropLoopMarker1
   HasYaw: 0
   HasSize: 1
@@ -34027,7 +34659,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 274
+  LineIndex: 280
   Key: Stage1KeypadClueLabel2
   HasYaw: 1
   HasSize: 0
@@ -34153,7 +34785,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 238
+  LineIndex: 240
   Key: Stage1KeypadPanel
   HasYaw: 1
   HasSize: 0
@@ -34270,7 +34902,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 185
+  LineIndex: 187
   Key: DoorLampKeypad
   HasYaw: 0
   HasSize: 0
@@ -34709,7 +35341,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 270
+  LineIndex: 276
   Key: Stage1WritingLap3
   HasYaw: 1
   HasSize: 1
@@ -34859,7 +35491,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 227
+  LineIndex: 229
   Key: Stage1SouthWestHallLight2
   HasYaw: 1
   HasSize: 1
@@ -35115,6 +35747,76 @@ Transform:
   - {fileID: 1721971297}
   m_Father: {fileID: 324808623}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &1593533272
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 477876111}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: -0.00000004371139
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 1365147038}
+    - target: {fileID: -7511558181221131132, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: 1383768535}
+    - target: {fileID: 919132149155446097, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_Name
+      value: wall_warning_lamp
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+--- !u!4 &1593533273 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+  m_PrefabInstance: {fileID: 1593533272}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1595038935
 GameObject:
   m_ObjectHideFlags: 0
@@ -36099,7 +36801,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 2
-  LineIndex: 286
+  LineIndex: 292
   Key: Stage1ThirdFuse
   HasYaw: 0
   HasSize: 0
@@ -36798,7 +37500,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 2
-  LineIndex: 288
+  LineIndex: 294
   Key: Stage1ThirdFuse
   HasYaw: 0
   HasSize: 0
@@ -37649,7 +38351,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 191
+  LineIndex: 193
   Key: PropWestWingShelf2
   HasYaw: 0
   HasSize: 0
@@ -37811,7 +38513,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 224
+  LineIndex: 226
   Key: Stage1DebrisRoomBattery
   HasYaw: 0
   HasSize: 0
@@ -38237,6 +38939,76 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1739719356}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1001 &1740701129
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 1006211591}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: -0.00000004371139
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 1365147038}
+    - target: {fileID: -7511558181221131132, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: 1383768535}
+    - target: {fileID: 919132149155446097, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+      propertyPath: m_Name
+      value: wall_warning_lamp
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+--- !u!4 &1740701130 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 49d9c80be1327e24caa80d1e318d8546, type: 3}
+  m_PrefabInstance: {fileID: 1740701129}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1748482698
 GameObject:
   m_ObjectHideFlags: 0
@@ -38506,7 +39278,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 2
-  LineIndex: 284
+  LineIndex: 290
   Key: Stage1SecondFuse
   HasYaw: 0
   HasSize: 0
@@ -39102,7 +39874,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 205
+  LineIndex: 207
   Key: PropSafeLightDeskShade
   HasYaw: 0
   HasSize: 0
@@ -39264,7 +40036,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 2
-  LineIndex: 290
+  LineIndex: 296
   Key: Stage1WestWingKey
   HasYaw: 0
   HasSize: 0
@@ -39645,6 +40417,38 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1775535094}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1786294148
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1786294149}
+  m_Layer: 0
+  m_Name: "\u30E2\u30C7\u30EB\u306E\u5927\u304D\u3055"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1786294149
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1786294148}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.045454547, y: 0.5, z: 0.1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 780289945}
+  m_Father: {fileID: 860902128}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1798569145
 GameObject:
   m_ObjectHideFlags: 0
@@ -40031,8 +40835,7 @@ Material:
   m_Shader: {fileID: 46, guid: 0000000000000000f000000000000000, type: 0}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
-  - _EMISSION
+  m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -40322,7 +41125,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 267
+  LineIndex: 273
   Key: Stage1WritingTurn
   HasYaw: 1
   HasSize: 1
@@ -40902,7 +41705,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 252
+  LineIndex: 258
   Key: Stage1EvidenceMarker
   HasYaw: 0
   HasSize: 1
@@ -41571,7 +42374,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 232
+  LineIndex: 234
   Key: FuseBox
   HasYaw: 0
   HasSize: 0
@@ -42487,7 +43290,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 202
+  LineIndex: 204
   Key: PropSafeLightHubBulb_1
   HasYaw: 0
   HasSize: 0
@@ -43119,7 +43922,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 260
+  LineIndex: 266
   Key: PropWestWingValveLampWest
   HasYaw: 0
   HasSize: 1
@@ -44172,7 +44975,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 216
+  LineIndex: 218
   Key: CeilingLight3
   HasYaw: 0
   HasSize: 1
@@ -44223,7 +45026,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 249
+  LineIndex: 255
   Key: ScareTrigger_Corridor
   HasYaw: 0
   HasSize: 0
@@ -44483,8 +45286,7 @@ Material:
   m_Shader: {fileID: 46, guid: 0000000000000000f000000000000000, type: 0}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
-  - _EMISSION
+  m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -44907,7 +45709,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 228
+  LineIndex: 230
   Key: Stage1WestWingLight1
   HasYaw: 0
   HasSize: 1
@@ -45091,7 +45893,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 200
+  LineIndex: 202
   Key: PropSafeLightHubCord
   HasYaw: 0
   HasSize: 0
@@ -45606,7 +46408,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 194
+  LineIndex: 196
   Key: PropWestWingDeskLeg2
   HasYaw: 0
   HasSize: 0
@@ -46121,7 +46923,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 2
-  LineIndex: 287
+  LineIndex: 293
   Key: Stage1ThirdFuse
   HasYaw: 0
   HasSize: 0
@@ -47659,7 +48461,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 1
-  LineIndex: 233
+  LineIndex: 235
   Key: Stage1FacilityMap
   HasYaw: 1
   HasSize: 1
@@ -47826,7 +48628,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapLayout.MapLayoutItem
   Kind: 0
-  LineIndex: 186
+  LineIndex: 188
   Key: DoorLampWestWing
   HasYaw: 0
   HasSize: 0

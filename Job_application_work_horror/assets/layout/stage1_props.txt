@@ -181,6 +181,8 @@ prop DoorLampSouthWestNorth -138   -64 -177.5   10 4 1   doorLampBody doorLamp 2
 prop DoorLampSouthWestSouth -138   -64 -182.5   10 4 1   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
 prop DoorLampLoopDoorLeft    -22   -64  37.5    10 4 1   doorLampBody doorLamp 24 0 noshadow glow 55 1.9 model warning_lamp
 prop DoorLampLoopDoorRight    22   -64  37.5    10 4 1   doorLampBody doorLamp 24 0 noshadow glow 55 1.9 model warning_lamp
+prop DoorLampLoopDoorRight_2    -75.99   -64  -177.86    10 4 1   doorLampBody doorLamp 24 0 noshadow glow 55 1.9 model warning_lamp
+prop DoorLampLoopDoorRight_1    78.77   -64  -177.3    10 4 1   doorLampBody doorLamp 24 0 noshadow glow 55 1.9 model warning_lamp
 prop DoorLampArchive         -42.5 -64  104     1 4 10   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
 prop DoorLampArchive_1         -42.5 -64  136.3     1 4 10   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
 prop DoorLampKeypad           42.5 -64  86.2      1 4 10   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
@@ -275,7 +277,8 @@ place Stage1WritingLap2              88 -70 -140 yaw -90 size 64 16 0
 place Stage1WritingLap3              -88 -70 -140 yaw 90 size 60 15 0
 place Stage1KeypadRoomWriting        218 -70 70 yaw -90 size 64 16 0
 # 暗証番号の手がかり（「ひとつめ」などの文字。数字はその右に30離して置いている）
-place Stage1KeypadClueLabel1         88 -70 -137.1 yaw -90
+# 「ひとつめ」は仕切りの壁（Wall10）の倉庫の側（x=92・向き90）。開始地点の側（x=88）には2周目の文字（Stage1WritingLap2）が浮かび、重なるため
+place Stage1KeypadClueLabel1         92 -70 -150 yaw 90
 place Stage1KeypadClueLabel2         -218 -70 -155 yaw 90
 place Stage1KeypadClueLabel3         120 -70 -68 yaw 0
 place Stage1KeypadClueLabel4         218 -70 -135 yaw -90
