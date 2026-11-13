@@ -20,6 +20,13 @@
 - 直した物：Alt+Tab で切り替えたときにポーズを開き、最小化の間は更新と描画を止める（切り替え後の CPU 使用が 0 になることを確かめた）。描画のデバイスが消えたときは、伝えて終了する。
 - 気になるが直していない物：3面の道路の門の脇の街灯（`RoadLamp`）と通信室の天井灯は、近くで見ると色一色の箱に見える。3面は試作なので、審査会で見せるなら先に確かめる。
 
+## ソリューションエクスプローラーのフォルダー分け（11月13日）
+
+- `.vcxproj.filters` だけを書き換え、表示用のフォルダーを役割ごとに分け直した（実際のファイルの場所は動かしていない）。
+- `.cpp` は `ソース ファイル`、`.h` は `ヘッダー ファイル` の下の、同じ名前のフォルダーに入れる：Core / Rendering（Effects）/ Camera / World（Water）/ Gameplay / Collision / Ui / Audio / Asset / Tools（撮影・計測・デバッグ画面・配置エディター）/ Scene（Common・Forest・Stage1・Stage2・Stage3）/ ThirdParty（ImGui）。シェーダーは `リソース ファイル\Shader` の下の Include / Vertex / Pixel / Compute。
+- 直したこと：`Warld` → `World`、`\` が抜けて別のフォルダーになっていた `ソース ファイルRendering`、どこにも入っていなかったファイル（CaptureMode など）と、フィルターに載っていなかったシェーダー2つ（`surveillanceFeedPS.hlsl`・`tiledLightCullingCS.hlsl`）。
+- 新しいファイルを足したら、このどれかに入れる。
+
 ## 森の水たまりの雨の輪を遠くまで（11月13日）
 
 - 森だけ、波を計算する範囲を一辺192から576（768x768マス）へ広げた（`ForestScene::BuildWorld` → `Ground::SetRippleArea`）。少し離れた水たまりにも雨の輪が出る。
