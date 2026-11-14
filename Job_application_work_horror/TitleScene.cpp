@@ -118,7 +118,7 @@ void TitleScene::Update()
     if (Input::GetKeyTrigger(VK_RIGHT) || Input::GetKeyTrigger(VK_D) || Input::GetKeyTrigger(VK_DOWN) ||
         Input::GetKeyTrigger(VK_S) || Input::GetButtonTrigger(XINPUT_RIGHT) || Input::GetButtonTrigger(XINPUT_DOWN) || stickRight)
     {
-        s_SelectedStage = (std::min)(2, s_SelectedStage + 1);
+        s_SelectedStage = (std::min)(StageChoiceCount - 1, s_SelectedStage + 1);
     }
     if (Input::GetKeyTrigger(VK_1))
     {
@@ -132,6 +132,10 @@ void TitleScene::Update()
     {
         s_SelectedStage = 2;
     }
+    if (Input::GetKeyTrigger(VK_4))
+    {
+        s_SelectedStage = 3;
+    }
     if (s_SelectedStage != previousStage)
     {
         Input::SetVibration(1, 0.05f);
@@ -142,8 +146,8 @@ void TitleScene::Update()
         Input::GetButtonTrigger(XINPUT_START))
     {
         // 1面は、雨の森を歩いて研究所に入ってから始める（森で研究棟からの無線を聞き、玄関で目的の画面を見る）。
-        // 3つ目は、森を飛ばして、導入（受信記録と目的の画面）から1面を始める
-        constexpr SceneName stages[] = { SceneName::Forest, SceneName::Stage2, SceneName::Intro };
+        // 3つ目は、森を飛ばして、導入（受信記録と目的の画面）から1面を始める。4つ目（一番下）は、試作中の3面から始める
+        constexpr SceneName stages[StageChoiceCount] = { SceneName::Forest, SceneName::Stage2, SceneName::Intro, SceneName::Stage3 };
         Core::Game::GetInstance()->RequestSceneChange(stages[s_SelectedStage]);
     }
 }

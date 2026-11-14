@@ -1,5 +1,5 @@
 ﻿// ============================================================================
-// ファイルの役割: 2面の壁の引っかき傷（文字の形を作る小片）の名前と数、ノックの音の出どころを定義している。
+// ファイルの役割: 2面の壁の引っかき傷（文字の形を作る小片）の名前と数、ノックの音の出どころ、出口の先の階段の寸法を定義している。
 // 主な技術: constexpr、配列の要素数の自動計算
 // 傷の数は、配置（Stage2Layout）と、傷を少しずつ見せる進行（Stage2Scene）の両方で使っている。
 // ============================================================================
@@ -31,3 +31,12 @@ inline constexpr float Stage2KnockSpots[4][3] =
     { -50.0f, -78.0f, 40.0f },
     { 50.0f, -78.0f, 85.0f }
 };
+
+// 出口の扉（中心 z=140）の先の階段室。寸法は assets/layout/stage2_props.txt の Stage2Stair* と合わせている。
+// 段は奥行き7・高さ4で10段（z=150〜220）、その先が上の踊り場（床は y=-60）。
+// 最後のループで z=146 を越えたら（周回の判定と同じ位置）、階段を上る演出を始めている
+inline constexpr float Stage2StairAutoStartZ = 146.0f;
+inline constexpr float Stage2StairStartZ = 150.0f;
+inline constexpr float Stage2StairStepRun = 7.0f;
+inline constexpr float Stage2StairStepRise = 4.0f;
+inline constexpr int Stage2StairStepCount = 10;

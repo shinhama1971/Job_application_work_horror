@@ -59,6 +59,8 @@ class Stage2Scene : public Scene
 private:
     // 看板・ランプなどの小さな光源を設定している（タイルベースライティングで数を増やせるため）。
     void SetupPracticalLights();
+    // 出口の扉の先の階段を、上の踊り場の奥へ向けて自動で上らせている（3面へ移る演出）
+    void StartExitStairClimb(Player& player);
     // 目的表示の文章を選ぶために、今の状態を集めている（Stage2SceneDraw.cpp）。
     Stage2ObjectiveInput MakeObjectiveInput(bool confirmationPending) const;
     // 配置のファイルを読み直し、建物と、扉・照明などの置き場所を置き直している（Debug版の F5 と、ファイルが書き換わったとき）

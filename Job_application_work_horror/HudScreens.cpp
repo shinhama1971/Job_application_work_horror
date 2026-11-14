@@ -135,19 +135,22 @@ void Hud::DrawTitle(
     AddText(left + 4.0f, titleY + titleHeight + 18.0f, "SIGNAL LOST", 3.0f, Color(0.40f, 0.70f, 0.50f, 0.80f));
     AddText(left + 4.0f, titleY + titleHeight + 54.0f, "終わらない廊下から脱出する", 2.4f, textColor);
 
-    // --- 始める面の選択：縦に3つ並べ、選んでいる面の枠を明るくし、その下に説明を出している
-    constexpr std::string_view stageNames[] = { "1面  森から研究所へ", "2面  ループする廊下", "1面  森を飛ばして始める" };
+    // --- 始める面の選択：縦に4つ並べ、選んでいる面の枠を明るくし、その下に説明を出している（試作中の3面は一番下）
+    constexpr std::string_view stageNames[] =
+        { "1面  森から研究所へ", "2面  ループする廊下", "1面  森を飛ばして始める", "3面  通信室（試作）" };
     constexpr std::string_view stageNotes[] =
     {
         "雨の森を歩いて研究所に入る  クリアの記録が残る",
         "2面から遊ぶ  クリアしても記録には残らない",
-        "受信記録を見て、研究所の中から始める"
+        "受信記録を見て、研究所の中から始める",
+        "試作中の3面から遊ぶ  クリアしても記録には残らない"
     };
-    constexpr int stageCount = 3;
+    constexpr int stageCount = 4;
     const int stage = (std::clamp)(selectedStage, 0, stageCount - 1);
     constexpr float stageBoxWidth = 340.0f;
-    constexpr float stageBoxHeight = 42.0f;
-    constexpr float stageBoxGap = 12.0f;
+    // 4つ並べても、下の「ゲーム開始」と操作の説明の位置が3つのときと同じになるよう、枠を少し低くしている
+    constexpr float stageBoxHeight = 34.0f;
+    constexpr float stageBoxGap = 6.0f;
     constexpr float stageTextPixelSize = 2.4f;
     constexpr float stageTop = 370.0f;
     for (int index = 0; index < stageCount; ++index)

@@ -8,6 +8,7 @@
 #include "SceneLayoutBuilder.h"
 
 #include "BatteryItem.h"
+#include "CaptureMode.h"
 #include "CeilingLight.h"
 #include "Door.h"
 #include "ExitTrigger.h"
@@ -444,14 +445,17 @@ namespace Stage2Layout
             bulb->SetWarmBulb(true);
         }
 
-        // 出口の扉と、その先の出口（調べるとリザルト画面へ）
+        // 出口の扉と、その先の出口。最後のループで扉を抜けると、階段を上って3面へ移る（Stage2Scene が階段の演出を始める）。
+        // 自動撮影では、道順の時間がずれないよう、階段の演出をせず、これまでどおり調べてリザルト画面へ移る
         Door* door = builder.Create<Door>("Stage2Door");
         place(*door, "Stage2Door");
         door->ResetClosed(0);
 
+        const bool capture = Tools::CaptureMode::IsActive();
         ExitTrigger* exit = builder.Create<ExitTrigger>("Stage2Exit");
         place(*exit, "Stage2Exit");
-        exit->SetNextScene(SceneName::Result);
+        exit->SetNextScene(capture ? SceneName::Result : SceneName::Stage3);
+        exit->SetStairClimb(!capture);
         exit->SetInteractionEnabled(false);
 
         objects.player = player;

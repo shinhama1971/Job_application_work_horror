@@ -431,6 +431,13 @@ namespace Core
             break;
 
         case SceneName::Stage3:
+            // タイトルから3面を選んだときは、2面から始めたときと同じく、ベスト記録に残さないプレイとして始めている。
+            // 2面の階段を上ってきたときは、それまでの時間と捕まった回数を引き継いでいる
+            if (previousScene == SceneName::Title)
+            {
+                m_State.BeginRun(false);
+                m_State.EnterStage2();
+            }
             m_Scene = std::make_unique<Stage3Scene>();
             break;
 

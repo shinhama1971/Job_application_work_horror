@@ -30,6 +30,33 @@ prop Stage2TrimRight          39.4 -96 -10  1 6 292    stage2Trim none 7 0
 prop Stage2PipeLeft          -34 -53 -10    3 3 282    stage2Trim none 7 0 noshadow model pipe_run
 prop Stage2PipeRight          34 -53 -10    3 3 282    stage2Trim none 7 0 noshadow model pipe_run
 
+# --- 出口の扉の先の階段室（扉を開けたとき、奥に何もない白い空間が見えないようにしている）。
+# 1面の最後の扉の先と同じ寸法で、段は奥行き7・高さ4で10段（z=150〜220）、上の踊り場の床は y=-60。
+# 寸法は Stage2Scene.cpp の階段を上る演出と合わせている。ループの途中では、段に着く前（z=146）で廊下の始めへ戻される。
+# 部屋の形（room）には入れず、角の暗がりの箱の数（最大32）を増やさないようにしている
+prop Stage2StairDoorHead       0 -24.5 140   38 49 4    stage2Wall none 4 0 noshadow weathering
+prop Stage2StairWallWest     -17 -50 210     4 100 140  stage2Wall none 4 1 weathering
+prop Stage2StairWallEast      17 -50 210     4 100 140  stage2Wall none 4 1 weathering
+prop Stage2StairWallEnd        0 -50 280     38 100 4   stage2Wall none 4 1 weathering
+prop Stage2StairStep1          0 -98 153.5   30 4 7     stage2Wall none 4 1
+prop Stage2StairStep2          0 -96 160.5   30 8 7     stage2Wall none 4 1
+prop Stage2StairStep3          0 -94 167.5   30 12 7    stage2Wall none 4 1
+prop Stage2StairStep4          0 -92 174.5   30 16 7    stage2Wall none 4 1
+prop Stage2StairStep5          0 -90 181.5   30 20 7    stage2Wall none 4 1
+prop Stage2StairStep6          0 -88 188.5   30 24 7    stage2Wall none 4 1
+prop Stage2StairStep7          0 -86 195.5   30 28 7    stage2Wall none 4 1
+prop Stage2StairStep8          0 -84 202.5   30 32 7    stage2Wall none 4 1
+prop Stage2StairStep9          0 -82 209.5   30 36 7    stage2Wall none 4 1
+prop Stage2StairStep10         0 -80 216.5   30 40 7    stage2Wall none 4 1
+prop Stage2StairLanding        0 -80 249     30 40 58   stage2Wall none 4 1
+prop Stage2StairCeilingDoor    0 -47 152     30 3 24    stage2Ceiling none 4 0 noshadow weathering
+prop Stage2StairCeilingLow     0 -23.5 178   30 3 30    stage2Ceiling none 4 0 noshadow weathering
+prop Stage2StairCeilingMid     0 -10.5 206   30 3 28    stage2Ceiling none 4 0 noshadow weathering
+prop Stage2StairCeilingHigh    0 -3.5 250    30 3 60    stage2Ceiling none 4 0 noshadow weathering
+prop Stage2StairBulkhead1      0 -35.5 164   30 27 2    stage2Wall none 4 0 noshadow weathering
+prop Stage2StairBulkhead2      0 -17 192     30 16 2    stage2Wall none 4 0 noshadow weathering
+prop Stage2StairBulkhead3      0 -7 220      30 10 2    stage2Wall none 4 0 noshadow weathering
+
 # --- 進行のコードが作る物の置き場所（place 名前 x y z [yaw 度] [size 幅 高さ 奥行き]）
 # 物の種類と動き（鍵がかかっているか、非常灯か、最初は隠すか）は Stage2Layout.cpp が決め、置き場所だけをここから読んでいる。
 # yaw は真上から見て +Z を0度とした向き、size は大きさ（照明は器具の幅・厚さ・奥行き、扉・配管は拡大率）。
@@ -58,6 +85,7 @@ place Stage2ClockFrameNear           -38.9 -70 -36 size 1.8 24 2
 place Stage2ClockFrameFar            -38.9 -70 -14 size 1.8 24 2
 place Stage2LoopMark                 -39.4 -68 52 size 1 18 12
 place Stage2DoorIndicator            23.7 -65.7 137.4 size 10 5 1
+place ExtraLight_Stage2StairLanding  0 -6 249 size 18 2 8
 place Stage2FalseDoorPanel           -39.3 -76 70 size 1.2 40 22
 place Stage2FalseDoorFrameNear       -39 -76 58 size 1.8 44 2
 place Stage2FalseDoorFrameFar        -39 -76 82 size 1.8 44 2

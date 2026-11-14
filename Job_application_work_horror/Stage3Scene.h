@@ -68,6 +68,8 @@ private:
     float m_FootstepTimer = 0.0f;
     float m_RoutingFeedback = 0.0f;
     float m_SourceReadTime = 0.0f;
+    // 道路に出た後、リザルト画面への切り替えを頼んだか（一度だけ頼むため）
+    bool m_ResultRequested = false;
     Step m_Step = Step::Relay;
     Hud m_Hud;
     InteractionSystem m_Interaction;

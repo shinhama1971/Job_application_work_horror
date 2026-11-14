@@ -1,6 +1,8 @@
 #include "Stage3Scene.h"
 
 #include "Application.h"
+#include "Camera.h"
+#include "CaptureMode.h"
 #include "Door.h"
 #include "ForestRain.h"
 #include "FuseBox.h"
@@ -28,6 +30,8 @@ namespace
     constexpr float OutsideX = 443.0f;
     constexpr float TestSeconds = 2.4f;
     constexpr float FeedInterval = 0.30f;
+    // 道路に出てから、リザルト画面へ移るまでの秒数
+    constexpr float CompleteSeconds = 6.0f;
     constexpr Vector3 FeedEye(191.0f, -53.0f, 1.0f);
     constexpr Vector3 FeedTarget(55.0f, -79.0f, 0.0f);
 
@@ -221,6 +225,26 @@ Stage3Scene::Stage3Scene()
     game.GetCamera()->SetCameraPitch(0.0f);
     m_Hud.Init();
     m_Hud.SetEvidenceVisible(false);
+
+    // 2面の最後の階段を上ってきた続きとして、下の段から3段上がって踊り場に出る演出で始めている
+    // （2面の始まりと同じ。少し見上げた視点で、目の高さを12低い所から段ごとに上げ、約1.6秒で普段の操作に戻る）。
+    // 踊り場（x=2〜50、z=-82〜-24）の中で、北（+z）へ28だけ進む。自動撮影・計測では、この演出は出さない
+    if (!Tools::CaptureMode::IsActive())
+    {
+        game.GetCamera()->SetCameraPitch(0.22f);
+        Player::StairClimb arrival;
+        arrival.Direction = Vector3(0.0f, 0.0f, 1.0f);
+        arrival.FlatDistance = 3.0f;
+        arrival.StepRun = 7.0f;
+        arrival.StepRise = 4.0f;
+        arrival.StepCount = 3;
+        arrival.EndFlatDistance = 4.0f;
+        arrival.Speed = 18.0f;
+        arrival.EyeDrop = arrival.StepRise * static_cast<float>(arrival.StepCount);
+        arrival.TargetPitch = 0.0f;
+        arrival.HoldAtEnd = false;
+        m_Player->StartStairClimb(arrival);
+    }
 }
 
 Stage3Scene::~Stage3Scene()
@@ -446,6 +470,12 @@ void Stage3Scene::Update()
         }
         break;
     case Step::Complete:
+        // 「通信途絶」の文字を見せてから、リザルト画面へ移っている（切り替えの要求は一度だけ）
+        if (!m_ResultRequested && m_StepTime >= CompleteSeconds)
+        {
+            m_ResultRequested = true;
+            game.RequestSceneChange(SceneName::Result);
+        }
         break;
     }
 

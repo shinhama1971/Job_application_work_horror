@@ -206,6 +206,30 @@ void Stage2Scene::Init()
     }
 }
 
+// 扉の先の階段を、上の踊り場の奥（x=0、z=250）へ向けて歩かせ、段ごとに目の高さを上げている。
+// 斜めに歩くときは、段の奥行きを向きで割り、z の方向に7進むごとに1段上がるようにしている
+void Stage2Scene::StartExitStairClimb(Player& player)
+{
+    const Vector3 position = player.GetPosition();
+    const Vector3 landing(0.0f, position.y,
+        Stage2StairStartZ + Stage2StairStepRun * static_cast<float>(Stage2StairStepCount) + 30.0f);
+    Vector3 direction = landing - position;
+    direction.y = 0.0f;
+    direction.Normalize();
+    const float forward = (std::max)(direction.z, 0.1f);
+    Player::StairClimb climb;
+    climb.Direction = direction;
+    climb.FlatDistance = (std::max)(0.0f, (Stage2StairStartZ - position.z) / forward);
+    climb.StepRun = Stage2StairStepRun / forward;
+    climb.StepRise = Stage2StairStepRise;
+    climb.StepCount = Stage2StairStepCount;
+    climb.EndFlatDistance = 30.0f;
+    climb.Speed = 26.0f;
+    climb.TargetPitch = 0.16f;
+    climb.HoldAtEnd = true;
+    player.StartStairClimb(climb);
+}
+
 // 信号盤の目印や扉のランプ、肖像画の目が、自分の光る色で廊下を照らすようにしている。
 // 色の変化（正解で緑になる、異変で赤く光るなど）が、そのまま周りの光の色になる。
 void Stage2Scene::SetupPracticalLights()
@@ -271,8 +295,23 @@ void Stage2Scene::Update()
     player->SetSprintAllowed(
         m_FinalSequence.IsSequenceActive() || m_FinalSequence.IsPursuitActive());
 
-    // 出口から脱出している間は、追跡をやめ、影をすべて消して何もしない
+    // 最後のループで出口の扉を抜けたら（扉の中心はz=140）、扉の先の階段を自動で上らせている。
+    // 出口を扉の手前から調べたときも、同じように上らせる。上り切る頃に、出口の演出が3面へ移す
     ExitTrigger* exit = m_Objects.exit;
+    if (exit != nullptr && exit->IsStairClimb())
+    {
+        if (!exit->IsEscaping() && exit->IsInteractionEnabled() && player->CanControl() &&
+            player->GetPosition().z > Stage2StairAutoStartZ)
+        {
+            exit->BeginEscape(*player);
+        }
+        if (exit->IsEscaping() && !player->IsClimbingStairs())
+        {
+            StartExitStairClimb(*player);
+        }
+    }
+
+    // 出口から脱出している間は、追跡をやめ、影をすべて消して何もしない
     if (exit != nullptr && exit->IsEscaping())
     {
         m_FinalSequence.StopPursuit();
