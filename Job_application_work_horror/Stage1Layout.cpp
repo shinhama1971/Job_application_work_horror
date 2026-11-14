@@ -8,6 +8,7 @@
 #include "SceneLayoutBuilder.h"
 
 #include "BatteryItem.h"
+#include "CaptureMode.h"
 #include "CeilingLight.h"
 #include "LayoutExtras.h"
 #include "Door.h"
@@ -572,6 +573,9 @@ namespace Stage1Layout
         exit->SetPosition(Stage1EndDoorX + 4.0f, -80.0f, Stage1EndDoorZ);
         exit->SetNextScene(SceneName::Stage2);
         exit->SetInteractionEnabled(false);
+        // ドアの先の階段を上って2階（2面）へ移る演出にしている。
+        // 自動撮影・計測は時間で道順を決めているので、2面の始まりがずれないよう、前の演出（光とノイズ、2.12秒）のままにしている
+        exit->SetStairClimb(!Tools::CaptureMode::IsActive());
 
         // 電池（書類保管室）
         BatteryItem* battery = builder.Create<BatteryItem>("BatteryItem");

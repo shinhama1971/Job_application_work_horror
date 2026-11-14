@@ -104,6 +104,46 @@ private:
 
     // 隠れている間の見回せる範囲の制限と、外へ出る操作
     void UpdateHiding(Camera& camera, float deltaTime);
+
+public:
+    // ===== 階段を自動で上る演出（1面の最後の扉の先・2面の始まり） =====
+    // 決めた向きへ一定の速さで歩かせ、段を踏むたびに目の高さを上げている。足元の位置（当たり判定の高さ）は床のままで、
+    // カメラだけを上げている（このゲームの当たり判定は上から見た箱なので、段の箱には当たらずに通り抜ける）。
+    struct StairClimb
+    {
+        DirectX::SimpleMath::Vector3 Direction = DirectX::SimpleMath::Vector3(0.0f, 0.0f, 1.0f); // 歩く向き（水平）
+        float FlatDistance = 0.0f;      // 最初の段までの平らな距離
+        float StepRun = 7.0f;           // 1段の奥行き
+        float StepRise = 4.0f;          // 1段の高さ
+        int StepCount = 10;             // 段の数
+        float EndFlatDistance = 0.0f;   // 最後の段の後に歩く平らな距離
+        float Speed = 26.0f;            // 歩く速さ（普段の歩きは30）
+        float EyeDrop = 0.0f;           // 始まりの目の高さを、普段よりこれだけ低くする（2面の始まり：下の段から上がってくる）
+        float TargetPitch = 0.0f;       // 歩きながら向ける上下の向き（正で上）
+        bool HoldAtEnd = false;         // 上り切った後もその姿勢で止まっているか（false なら、普段の操作に戻る）
+    };
+    // 階段を自動で上り始めている（上っている間は、移動・視点・懐中電灯のスイッチの入力を読まない）
+    void StartStairClimb(const StairClimb& climb);
+    // 階段を自動で上っている最中か
+    bool IsClimbingStairs() const { return m_Climb.Active; }
+
+private:
+    // 階段を上る演出の状態（始めた位置・歩いた距離・最後に踏んだ段・始めたときの視点の向き）
+    struct ClimbState
+    {
+        StairClimb Settings;
+        bool Active = false;
+        DirectX::SimpleMath::Vector3 Start;
+        float Distance = 0.0f;
+        float Time = 0.0f;
+        int LastStepIndex = -1;
+        float StartYaw = 0.0f;
+        float StartPitch = 0.0f;
+    };
+    ClimbState m_Climb;
+    // 階段を上る演出を1フレーム進め、カメラを段の高さに置いている
+    void UpdateStairClimb(float deltaTime);
+
 public:
     void Init() override;
     void Update() override;

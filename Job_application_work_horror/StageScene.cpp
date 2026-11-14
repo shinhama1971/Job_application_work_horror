@@ -534,8 +534,32 @@ void StageScene::Update()
             stageExitDoor->ResetClosed(0);
         }
         stageExitDoor->SetLocked(waitingForExitPower);
-        if (exitPowerReady && stageExit != nullptr && IsThroughEndDoor(player->GetPosition()))
+        if (exitPowerReady && stageExit != nullptr && !stageExit->IsEscaping() &&
+            IsThroughEndDoor(player->GetPosition()))
         {
+            // ドアの先の階段を、自動で上らせている（上の踊り場の奥へ向けて歩き、段ごとに目の高さを上げる）。
+            // 上り切る頃に、出口の演出が2面へ移す
+            if (stageExit->IsStairClimb())
+            {
+                const Vector3 position = player->GetPosition();
+                const Vector3 landing(
+                    Stage1StairStartX + Stage1StairStepRun * static_cast<float>(Stage1StairStepCount) + 30.0f,
+                    position.y, Stage1EndDoorZ);
+                Vector3 direction = landing - position;
+                direction.y = 0.0f;
+                direction.Normalize();
+                Player::StairClimb climb;
+                climb.Direction = direction;
+                climb.FlatDistance = (std::max)(0.0f, (Stage1StairStartX - position.x) / (std::max)(direction.x, 0.1f));
+                climb.StepRun = Stage1StairStepRun / (std::max)(direction.x, 0.1f);
+                climb.StepRise = Stage1StairStepRise;
+                climb.StepCount = Stage1StairStepCount;
+                climb.EndFlatDistance = 30.0f;
+                climb.Speed = 26.0f;
+                climb.TargetPitch = 0.16f;
+                climb.HoldAtEnd = true;
+                player->StartStairClimb(climb);
+            }
             stageExit->BeginEscape(*player);
         }
     }

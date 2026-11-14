@@ -48,6 +48,12 @@ enum class Stage1RouteLight : std::size_t
 constexpr float Stage1EndDoorX = 196.0f;
 constexpr float Stage1EndDoorZ = 255.0f;
 constexpr float Stage1EndDoorHalfWidth = 18.0f;
+// 最後のドアの先の、2階へ上る階段（外壁の外へ東に延びる）。段の箱は配置ファイル（stage1_props.txt の PropStair）に置いていて、
+// 出口の送電の後にドアを通ると、プレイヤーがこの寸法で自動で上り、上り切る頃に2面へ移る。配置を変えたらここも合わせる
+constexpr float Stage1StairStartX = 206.0f;     // 1段目の手前の端
+constexpr float Stage1StairStepRun = 7.0f;      // 1段の奥行き
+constexpr float Stage1StairStepRise = 4.0f;     // 1段の高さ
+constexpr int Stage1StairStepCount = 10;        // 段の数（上の踊り場の床は y=-60）
 // 開始地点の奥の壁（南の外壁）のドア。最後のドアと同じ形で、裏側（壁の外）には最後の廊下の突き当たりと同じ幅の通路を作っている。
 // 電力が戻る前に最後のドアを開けると、その瞬間に、このドアの裏側の同じ位置・同じ向きへ移し、このドアを開け始めている。
 // 開いたドアの向こうに開始地点が見えるので、P.T.のように「ドアの先が最初の場所にそのまま続いている」ように見える。

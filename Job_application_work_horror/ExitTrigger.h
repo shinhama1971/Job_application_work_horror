@@ -20,6 +20,13 @@ private:
     int m_EscapePhase = 0;
     SceneName m_NextScene;
     bool m_InteractionEnabled = true;
+    // 階段を上って次の階へ移る演出にするか（1面の最後の扉）。光とノイズの代わりに、上りながら暗くしている
+    bool m_StairClimb = false;
+
+    // 普段の演出（光とノイズ）の長さと、階段を上る演出の長さ（秒）
+    static constexpr float EscapeSeconds = 2.12f;
+    static constexpr float StairClimbSeconds = 3.2f;
+    float GetDuration() const { return m_StairClimb ? StairClimbSeconds : EscapeSeconds; }
 
 public:
     void Init() override;
@@ -42,7 +49,7 @@ public:
     // 脱出の演出の進み具合（0〜1）を返している
     float GetEscapeProgress() const
     {
-        const float progress = m_EscapeTimer / 2.12f;
+        const float progress = m_EscapeTimer / GetDuration();
         return progress < 0.0f
             ? 0.0f
             : (progress > 1.0f ? 1.0f : progress);
@@ -51,6 +58,9 @@ public:
     void SetNextScene(SceneName nextScene) { m_NextScene = nextScene; }
     // 調べられるかどうかを切り替えている
     void SetInteractionEnabled(bool enabled) { m_InteractionEnabled = enabled; }
+    // 階段を上って次の階へ移る演出にしている（プレイヤーを上らせるのはシーンの側）
+    void SetStairClimb(bool stairClimb) { m_StairClimb = stairClimb; }
+    bool IsStairClimb() const { return m_StairClimb; }
 
     // 置き場所を決めている
     void SetPosition(float x, float y, float z)

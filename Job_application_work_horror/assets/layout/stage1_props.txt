@@ -49,7 +49,10 @@ color doorLampBody  0.60  0.48  0.31  rough 0.30
 
 # --- 建物の壁（外周・部屋の仕切り・ループ廊下・西棟・南西の広間）。名前を変えずに位置と大きさだけ直せる
 prop Wall1                     0 -74 340   440 50 4   concrete none 4 1 weathering room
-prop Wall2                     220 -74 80   4 50 520   concrete none 4 1 weathering room
+# 東の外壁。最後のドアの先（z=235〜275）だけ開けて、外の階段室（下の PropStair）へつないでいる。
+# 部屋の形（room。最大32個）は数が足りないので、北の短い方には付けていない
+prop Wall2                     220 -74 27.5   4 50 415   concrete none 4 1 weathering room
+prop Wall2North                220 -74 307.5  4 50 65    concrete none 4 1 weathering
 prop Wall3West                 -197.5 -74 -180   45 50 4   concrete none 4 1 weathering room
 prop Wall3                     -81.5 -74 -180   127 50 4   concrete none 4 1 weathering room
 prop Wall3East                 119 -74 -180   202 50 4   concrete none 4 1 weathering room
@@ -71,6 +74,31 @@ prop LoopWall1                 -45 -74 227.5   4 50 95   concrete none 4 1 weath
 prop LoopWall2                 45 -74 207.5   4 50 55   concrete none 4 1 weathering room
 prop LoopWall3                 122.5 -74 235   155 50 4   concrete none 4 1 weathering room
 prop LoopWall4                 77.5 -74 275   245 50 4   concrete none 4 1 weathering room
+
+# --- 最後のドアの先の、2階へ上る階段室（外壁の外へ東へ延びる）
+# 段は奥行き7・高さ4で10段（x=206〜276）、上の踊り場の床は y=-60。寸法は Stage1Layout.h の Stage1Stair* と合わせている
+# （出口の送電の後にドアを通ると、プレイヤーがこの段を自動で上り、上り切る頃に2面へ移る）。天井は段に合わせて3段階に上げている
+prop PropStairWallSouth        267 -50 235    134 100 4   concrete none 4 1 weathering
+prop PropStairWallNorth        267 -50 275    134 100 4   concrete none 4 1 weathering
+prop PropStairWallEnd          334 -50 255    4 100 44    concrete none 4 1 weathering
+prop PropStairStep1          209.5 -98   255    7 4 36    concrete none 4 1
+prop PropStairStep2          216.5 -96   255    7 8 36    concrete none 4 1
+prop PropStairStep3          223.5 -94   255    7 12 36   concrete none 4 1
+prop PropStairStep4          230.5 -92   255    7 16 36   concrete none 4 1
+prop PropStairStep5          237.5 -90   255    7 20 36   concrete none 4 1
+prop PropStairStep6          244.5 -88   255    7 24 36   concrete none 4 1
+prop PropStairStep7          251.5 -86   255    7 28 36   concrete none 4 1
+prop PropStairStep8          258.5 -84   255    7 32 36   concrete none 4 1
+prop PropStairStep9          265.5 -82   255    7 36 36   concrete none 4 1
+prop PropStairStep10         272.5 -80   255    7 40 36   concrete none 4 1
+prop PropStairLanding          304 -80   255    56 40 36  concrete none 4 1
+prop PropStairCeilingLow       233 -23.5 255    30 3 40   ceilingPanel none 4 0 noshadow weathering
+prop PropStairCeilingMid       262 -10.5 255    28 3 40   ceilingPanel none 4 0 noshadow weathering
+prop PropStairCeilingHigh      305 -3.5  255    58 3 40   ceilingPanel none 4 0 noshadow weathering
+prop PropStairBulkhead1        219 -35.5 255    2 27 40   concrete none 4 0 noshadow weathering
+prop PropStairBulkhead2        248 -17   255    2 16 40   concrete none 4 0 noshadow weathering
+prop PropStairBulkhead3        276 -7    255    2 10 40   concrete none 4 0 noshadow weathering
+prop PropStairLandingLamp    331.5 -42   255    1 4 10    doorLampBody doorLamp 24 0 noshadow glow 55 1.9 model warning_lamp
 prop WestWingOuter             -380 -74 80   4 50 364   concrete none 4 1 weathering room
 prop WestWingSouth             -300 -74 -100   164 50 4   concrete none 4 1 weathering room
 prop WestWingNorth             -300 -74 260   164 50 4   concrete none 4 1 weathering room
@@ -99,7 +127,8 @@ prop PropCeilingSouthWestHall  -250  -47   -256   264 3 156   ceilingPanel none 
 prop PropCeilingStartPassage   0     -47   -230   44 3 104      ceilingPanel none 4 0 noshadow weathering
 
 # --- 壁際と天井近くを走る配管（Stage1AmbientSounds が、この線に沿って配管の音を鳴らしている）
-prop PropPipeRight           215.89    -55   60    3 3 450       darkMetal none 22 0 model pipe_run
+# 東の外壁沿いの配管は、最後のドアの先の階段の入口（z=235〜275）の手前で止めている（上るときに頭に当たらないように）
+prop PropPipeRight           215.89    -55   34    3 3 398       darkMetal none 22 0 model pipe_run
 prop PropPipeCrossDoor       -115   -52.5 37    175 2.5 2.5   darkMetal none 22 0 model pipe_run
 prop PropPipeCrossDoorRight  115    -52.5 37    175 2.5 2.5   darkMetal none 22 0 model pipe_run
 prop PropPipeCrossHall       -132.5 -52.5 177   175 2.5 2.5   darkMetal none 22 0 model pipe_run
@@ -108,7 +137,8 @@ prop PropPipeCrossHallRight  132.5  -52.5 177   175 2.5 2.5   darkMetal none 22 
 # --- 幅木（西側は、西棟の扉 z=-35〜-5 の前で途切れさせている）
 prop PropBaseboardLeft       -217.2 -96.5 -105  1.5 6 140   trimColor none 5 0
 prop PropBaseboardLeftNorth  -217.2 -96.5 165   1.5 6 340   trimColor none 5 0
-prop PropBaseboardRight      217.2  -96.5 80    1.5 6 510   trimColor none 5 0
+prop PropBaseboardRight      217.2  -96.5 30    1.5 6 410   trimColor none 5 0
+prop PropBaseboardRightNorth 217.2  -96.5 305   1.5 6 60    trimColor none 5 0
 
 # --- 棚や設備（当たり判定あり）
 prop PropCabinetLeft   -190 -87 -132   28 24 12   cabinetMetal none 14 1 model cabinet
@@ -264,6 +294,7 @@ place ExtraLight_Debris             -130 -50.5 265 size 22 2 10
 place ExtraLight_ExitHall              0 -50.5 300 size 22 2 10
 place ExtraLight_WestWingSouth      -345 -50.5 35 size 22 2 10
 place ExtraLight_SouthWestHallWest  -345 -50.5 -210 size 22 2 10
+place ExtraLight_StairLanding        304 -6 255 size 22 2 10
 place Door                           0 -74 40
 place FuseBox                        -35.1 -73.4 35
 place Stage1FacilityMap              -69 -68 38 yaw 180 size 37 25 1

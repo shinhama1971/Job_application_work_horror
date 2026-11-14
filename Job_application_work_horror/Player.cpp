@@ -83,6 +83,12 @@ void Player::Update()
     // Scene::UpdateはObject::Updateより先に呼ばれるため、前フレームの値を
     // Sceneが読んだ後で、今回の足音の大きさを作り直している。
     m_SurfaceNoisePulse = 0.0f;
+    // 階段を自動で上っている間は、操作できない演出の最中でも、歩かせてカメラを段の高さに置いている
+    if (m_Climb.Active)
+    {
+        UpdateStairClimb(Application::GetDeltaTime());
+        return;
+    }
     if (!m_CanControl)
     {
         m_Movement.StopControl();
@@ -656,4 +662,111 @@ void Player::UpdateHiding(Camera& camera, float deltaTime)
     m_Position = m_HideExitPosition;
     m_Movement.ResetVelocity();
     Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_DOOR, m_HidePosition, 1.35f, 0.55f);
+}
+
+// 階段を自動で上り始めている。今の足元を始まりの位置にし、今の視点の向きから、歩く向き・決めた上下の向きへ少しずつ向けていく
+void Player::StartStairClimb(const StairClimb& climb)
+{
+    m_Climb = ClimbState{};
+    m_Climb.Settings = climb;
+    Vector3 direction(climb.Direction.x, 0.0f, climb.Direction.z);
+    if (direction.LengthSquared() < 1e-6f)
+    {
+        direction = Vector3(0.0f, 0.0f, 1.0f);
+    }
+    direction.Normalize();
+    m_Climb.Settings.Direction = direction;
+    m_Climb.Active = true;
+    m_Climb.Start = m_Position;
+    const Camera* camera = Core::Game::GetInstance()->GetCamera();
+    m_Climb.StartYaw = camera->GetCameraDirection();
+    m_Climb.StartPitch = camera->GetCameraPitch();
+    m_Movement.ResetVelocity();
+}
+
+// 階段を上る演出を1フレーム進めている。
+// ・決めた向きへ一定の速さで歩き、段の奥行きごとに1段ずつ目の高さを上げる（段を踏む瞬間に少しだけ沈んで持ち上がる）。
+// ・1段ごとに、少し重い足音を鳴らす（平らな所も同じ間隔で鳴らす）。
+// ・視点は、始めたときの向きから、歩く向きと決めた上下の向きへ、0.8秒かけて向ける。
+void Player::UpdateStairClimb(float deltaTime)
+{
+    const StairClimb& settings = m_Climb.Settings;
+    const float stairsLength = settings.StepRun * static_cast<float>(settings.StepCount);
+    const float total = settings.FlatDistance + stairsLength + settings.EndFlatDistance;
+    m_Climb.Time += deltaTime;
+    m_Climb.Distance = (std::min)(total, m_Climb.Distance + settings.Speed * deltaTime);
+    const bool finished = m_Climb.Distance >= total;
+
+    // 足元は床の高さのまま、決めた向きへ動かしている
+    m_Position = Vector3(
+        m_Climb.Start.x + settings.Direction.x * m_Climb.Distance,
+        m_Climb.Start.y,
+        m_Climb.Start.z + settings.Direction.z * m_Climb.Distance);
+
+    // 今いる段の高さ。段の始まりで次の段へ足を乗せ、奥行きの最初の4割で持ち上がる
+    const float stairDistance = m_Climb.Distance - settings.FlatDistance;
+    float height = 0.0f;
+    if (stairDistance > 0.0f)
+    {
+        const float steps = stairDistance / settings.StepRun;
+        const float fullSteps = std::floor(steps);
+        if (fullSteps >= static_cast<float>(settings.StepCount))
+        {
+            height = settings.StepRise * static_cast<float>(settings.StepCount);
+        }
+        else
+        {
+            const float fraction = steps - fullSteps;
+            const float lift = (std::clamp)(fraction / 0.4f, 0.0f, 1.0f);
+            height = settings.StepRise * (fullSteps + lift * lift * (3.0f - 2.0f * lift));
+        }
+    }
+
+    // 1段（平らな所は同じ間隔）ごとに足音を鳴らしている。段を上るときは、普段の足音より少し低く重くしている
+    const int stepIndex = static_cast<int>(m_Climb.Distance / settings.StepRun);
+    if (stepIndex != m_Climb.LastStepIndex && !finished)
+    {
+        m_Climb.LastStepIndex = stepIndex;
+        ++m_FootstepIndex;
+        const bool onStairs = stairDistance > 0.0f && stairDistance < stairsLength;
+        const float pitch = (m_FootstepIndex % 2 == 0 ? 0.90f : 0.95f) - (onStairs ? 0.06f : 0.0f);
+        Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, m_Position, pitch, onStairs ? 1.15f : 0.95f);
+        if (onStairs)
+        {
+            Input::SetVibration(2, 0.05f);
+        }
+    }
+
+    // 段を踏むたびに、目が少し沈んで戻る揺れ（歩くときの頭の揺れの代わり）
+    const float stepPhase = m_Climb.Distance / settings.StepRun * DirectX::XM_PI;
+    const float bob = finished ? 0.0f : -std::abs(std::sin(stepPhase)) * 0.7f;
+
+    Camera* camera = Core::Game::GetInstance()->GetCamera();
+    // 歩く向きと決めた上下の向きへ、0.8秒かけて向けている（向きの差は、近い回り方で縮める）
+    const float turn = (std::clamp)(m_Climb.Time / 0.8f, 0.0f, 1.0f);
+    const float smoothTurn = turn * turn * (3.0f - 2.0f * turn);
+    const float targetYaw = std::atan2(settings.Direction.x, settings.Direction.z);
+    const float yawDifference = std::remainder(targetYaw - m_Climb.StartYaw, DirectX::XM_2PI);
+    const float yaw = m_Climb.StartYaw + yawDifference * smoothTurn;
+    const float pitch = m_Climb.StartPitch + (settings.TargetPitch - m_Climb.StartPitch) * smoothTurn;
+    camera->SetCameraDirection(yaw);
+    camera->SetCameraPitch(pitch);
+
+    Vector3 eye = m_Position;
+    eye.y += m_CameraHeightOffset - settings.EyeDrop + height + bob;
+    camera->SetPosition(eye);
+    const float cosPitch = std::cos(pitch);
+    camera->SetTarget(eye + Vector3(std::sin(yaw) * cosPitch, std::sin(pitch), std::cos(yaw) * cosPitch));
+
+    // 上っている間は、懐中電灯を持った手を下げている（手すりにつかまって上るような姿勢）
+    FirstPersonHands::FrameInput handInput;
+    handInput.DeltaTime = deltaTime;
+    handInput.Lowered = true;
+    m_Hands.Update(handInput);
+
+    if (finished && !settings.HoldAtEnd)
+    {
+        m_Climb.Active = false;
+        m_Movement.ResetVelocity();
+    }
 }

@@ -8,6 +8,8 @@
 #include "Application.h"
 
 #include "BatteryItem.h"
+#include "Camera.h"
+#include "CaptureMode.h"
 #include "CeilingLight.h"
 #include "Door.h"
 #include "ExitTrigger.h"
@@ -172,10 +174,36 @@ void Stage2Scene::Init()
         static_cast<unsigned int>(m_Objects.wallFootprints.size()),
         -100.0f, -48.5f, 0.55f);
 
+    // 2面は、廊下の入口から北（+z）の奥を向いて始めている。
+    // カメラは前のシーンから持ち越されるので、1面の最後に向いていた向き（階段を上った東向きなど）のままにならないよう、ここで決めている
+    game->GetCamera()->SetCameraDirection(0.0f);
+    game->GetCamera()->SetCameraPitch(0.0f);
     // カメラの位置を最初から合わせるため、プレイヤーを一度更新している
     m_Objects.player->Update();
     m_Hud.Init();
     SetupPracticalLights();
+
+    // 1面の最後の階段を上ってきた続きとして、下の段から3段上がって廊下に出る演出で始めている
+    // （少し見上げた視点で、目の高さを12低い所から段ごとに上げる。約1.6秒で普段の操作に戻る）。
+    // 自動撮影・計測は決めた位置から撮るので、この演出は出さない
+    if (!Tools::CaptureMode::IsActive())
+    {
+        Camera* camera = game->GetCamera();
+        const float yaw = camera->GetCameraDirection();
+        camera->SetCameraPitch(0.22f);
+        Player::StairClimb arrival;
+        arrival.Direction = Vector3(std::sin(yaw), 0.0f, std::cos(yaw));
+        arrival.FlatDistance = 3.0f;
+        arrival.StepRun = 7.0f;
+        arrival.StepRise = 4.0f;
+        arrival.StepCount = 3;
+        arrival.EndFlatDistance = 4.0f;
+        arrival.Speed = 18.0f;
+        arrival.EyeDrop = arrival.StepRise * static_cast<float>(arrival.StepCount);
+        arrival.TargetPitch = 0.0f;
+        arrival.HoldAtEnd = false;
+        m_Objects.player->StartStairClimb(arrival);
+    }
 }
 
 // 信号盤の目印や扉のランプ、肖像画の目が、自分の光る色で廊下を照らすようにしている。

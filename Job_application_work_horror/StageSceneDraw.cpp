@@ -184,6 +184,12 @@ void StageScene::Draw(Camera* camera)
     {
         m_Hud.DrawBlink(m_Surveillance.GetCaughtFadeRate() * 0.96f);
     }
+    // 最後のドアの先の階段を上っている間は、上の段へ近づくにつれて画面をなめらかに暗くし、上り切る頃に真っ暗にしている（2面へ続く）
+    if (m_Objects.exitTrigger != nullptr && m_Objects.exitTrigger->IsEscaping() && m_Objects.exitTrigger->IsStairClimb())
+    {
+        const float fadeRate = (std::clamp)((m_Objects.exitTrigger->GetEscapeProgress() - 0.55f) / 0.45f, 0.0f, 1.0f);
+        m_Hud.DrawBlink(fadeRate * fadeRate * (3.0f - 2.0f * fadeRate), 1.0f);
+    }
     // 暗証番号の入力画面を開いていれば描いている
     m_KeypadDoor.Draw(m_Hud);
 

@@ -32,6 +32,16 @@ void ExitTrigger::Update()
     m_EscapeTimer += deltaTime;
 
     Core::Game* game = Core::Game::GetInstance();
+    // 階段を上る演出：光やノイズは出さず、上り切る頃に次のシーンへ移っている（暗くするのはシーンの描画）
+    if (m_StairClimb)
+    {
+        if (m_EscapePhase == 0 && m_EscapeTimer >= StairClimbSeconds)
+        {
+            m_EscapePhase = 4;
+            game->RequestSceneChange(m_NextScene);
+        }
+        return;
+    }
     // 0.28秒：画面を明るく光らせ、振動させている
     if (m_EscapePhase == 0 && m_EscapeTimer >= 0.28f)
     {
@@ -63,7 +73,7 @@ void ExitTrigger::Update()
         m_EscapePhase = 3;
     }
     // 2.12秒：次のシーンへの切り替えを要求している（実際の切り替えはフレームの終わりに安全に行われる）
-    else if (m_EscapePhase == 3 && m_EscapeTimer >= 2.12f)
+    else if (m_EscapePhase == 3 && m_EscapeTimer >= EscapeSeconds)
     {
         m_EscapePhase = 4;
         game->RequestSceneChange(m_NextScene);
@@ -92,7 +102,8 @@ void ExitTrigger::BeginEscape(Player& player)
     m_EscapeTimer = 0.0f;
     m_EscapePhase = 0;
     player.SetCanControl(false);
-    game->GetPostProcess()->TriggerHorrorPulse(0.18f, 0.25f);
+    // 階段を上る演出では、扉を抜けた瞬間の画面の乱れは小さくしている（上る様子を見せるため）
+    game->GetPostProcess()->TriggerHorrorPulse(m_StairClimb ? 0.08f : 0.18f, 0.25f);
     Input::SetVibration(6, 0.12f);
 }
 
