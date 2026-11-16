@@ -42,6 +42,50 @@ namespace
     constexpr float HiddenStalkerLingerSeconds = 7.0f;
     constexpr float HiddenStalkerSearchSpeed = 5.5f;
     constexpr float HiddenStalkerStopDistance = 14.0f;
+    // 探している影の息づかいが聞こえ始める距離と、その間隔。ロッカーに触れるのは、止まる距離よりこれだけ遠い所
+    constexpr float SearcherBreathDistance = 45.0f;
+    constexpr float SearcherBreathInterval = 1.8f;
+    constexpr float SearcherTouchMargin = 3.0f;
+    constexpr float SearcherBreathHeight = 30.0f;
+
+    // --- 足音の影：危険度がこれ以上になったら、プレイヤーの後ろに出して追わせる（ライトで照らせば追い払える）
+    constexpr float NoiseStalkerSpawnThreat = 0.74f;
+    constexpr float NoiseStalkerSpawnBehind = 68.0f;
+    // 出す位置は廊下の中に収める（壁から少し離した範囲）
+    constexpr float NoiseStalkerSpawnHalfWidth = 30.0f;
+    constexpr float NoiseStalkerSpawnMinZ = -145.0f;
+    constexpr float NoiseStalkerSpawnMaxZ = 128.0f;
+    // 追う速さ（危険度が高いほど速い）、止まる距離、見られたときに驚かせる秒数
+    constexpr float NoiseStalkerBaseSpeed = 13.0f;
+    constexpr float NoiseStalkerSpeedPerThreat = 6.0f;
+    constexpr float NoiseStalkerStopDistance = 12.0f;
+    constexpr float NoiseStalkerGazeScareSeconds = 7.5f;
+    // 近いほど危険度を上げる範囲（この距離から、この幅で遠ざかるほど弱く）と、捕まる距離
+    constexpr float NoiseStalkerNearDistance = 14.0f;
+    constexpr float NoiseStalkerThreatRange = 72.0f;
+    constexpr float NoiseStalkerCatchDistance = 15.5f;
+    // これより近くに足音の影がいる間は、静かに歩いても危険度を下げない
+    constexpr float NoiseStalkerNearbyDistance = 25.0f;
+
+    // --- 時計の異変：近くで正面から見たか
+    const Vector3 ClockCenter(-38.0f, -70.0f, -25.0f);
+    constexpr float ClockLookDistance = 98.0f;
+    constexpr float ClockLookFacing = 0.91f;
+
+    // --- 信号盤の間に背後から来る影：段階が進むほど近くに出て速く追う。間違えた回数が多いほど遠く遅くして助ける
+    constexpr float SignalStalkerBaseDistance = 78.0f;
+    constexpr float SignalStalkerDistancePerStep = 7.0f;
+    constexpr float SignalStalkerDistancePerAssist = 13.0f;
+    constexpr float SignalStalkerBaseSpeed = 13.0f;
+    constexpr float SignalStalkerSpeedPerStep = 2.0f;
+    constexpr float SignalStalkerSlowdownPerAssist = 1.6f;
+    constexpr int SignalStalkerMaxAssist = 2;
+    constexpr float SignalStalkerStopDistance = 30.0f;
+    constexpr float SignalStalkerGazeScareSeconds = 24.0f;
+    // 近いほど危険度を上げる範囲と、この距離まで来たら信号盤をやり直させる距離
+    constexpr float SignalStalkerNearDistance = 30.0f;
+    constexpr float SignalStalkerThreatRange = 90.0f;
+    constexpr float SignalStalkerCatchDistance = 35.0f;
 }
 
 // 隠れている間の処理。隠れていなければfalseを返している
@@ -94,12 +138,13 @@ bool Stage2Scene::UpdateHiddenFromStalker(Player& player, float deltaTime)
     // 探している影の気配：近くにいる間は低い息づかいがときどき聞こえ、すぐ前まで来るとロッカーに一度触れる
     const float searcherDistance = toSearcher.Length();
     m_SearcherSoundTimer -= deltaTime;
-    if (searcherDistance < 45.0f && m_SearcherSoundTimer <= 0.0f)
+    if (searcherDistance < SearcherBreathDistance && m_SearcherSoundTimer <= 0.0f)
     {
-        game->PlayAudioCueAt(SOUND_CUE_BREATH, noiseShadow->GetPosition() + Vector3(0.0f, 30.0f, 0.0f), 0.62f, 0.55f);
-        m_SearcherSoundTimer = 1.8f;
+        game->PlayAudioCueAt(SOUND_CUE_BREATH,
+            noiseShadow->GetPosition() + Vector3(0.0f, SearcherBreathHeight, 0.0f), 0.62f, 0.55f);
+        m_SearcherSoundTimer = SearcherBreathInterval;
     }
-    if (!m_SearcherTouchedLocker && searcherDistance < HiddenStalkerStopDistance + 3.0f)
+    if (!m_SearcherTouchedLocker && searcherDistance < HiddenStalkerStopDistance + SearcherTouchMargin)
     {
         game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, player.GetPosition(), 0.55f, 0.45f);
         Input::SetVibration(3, 0.10f);
@@ -138,7 +183,7 @@ bool Stage2Scene::UpdateHiddenFromStalker(Player& player, float deltaTime)
     m_NoiseThreatSystem.SetStalkerCooldown((std::max)(
         m_NoiseThreatSystem.GetStalkerCooldown(), 9.0f));
     m_NoiseThreatSystem.SetWarningTimer(0.0f);
-    m_Notices.hiding = 2.8f;
+    m_Notices.hiding = Stage2NoticeSeconds;
     game->GetPostProcess()->TriggerBloomPulse(0.16f, 0.16f);
     Input::SetVibration(2, 0.06f);
     return true;
@@ -164,8 +209,8 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
 
     // 3周目で信号盤を直し終えた後も、同じように危険度を下げている
     const bool signalStealthActive =
-        m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete();
-    if (m_LoopCount >= 3 && !signalStealthActive)
+        m_LoopCount >= Stage2FinalLoopCount && !m_SignalPuzzle.IsComplete();
+    if (m_LoopCount >= Stage2FinalLoopCount && !signalStealthActive)
     {
         m_NoiseThreatSystem.SetThreat((std::max)(0.0f,
             m_NoiseThreatSystem.GetThreat() - deltaTime * 0.8f));
@@ -212,11 +257,11 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         toShadow.y = 0.0f;
         const float distance = toShadow.Length();
         const float proximity = 1.0f - (std::clamp)(
-            (distance - 14.0f) / 72.0f, 0.0f, 1.0f);
+            (distance - NoiseStalkerNearDistance) / NoiseStalkerThreatRange, 0.0f, 1.0f);
         m_NoiseThreatSystem.SetThreat((std::max)(
             m_NoiseThreatSystem.GetThreat(), proximity * 0.92f));
 
-        if (distance <= 15.5f)
+        if (distance <= NoiseStalkerCatchDistance)
         {
             StartCaughtSequence(
                 player, CaughtSequence::Reason::NoiseStalker);
@@ -231,9 +276,9 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
     {
         Vector3 offset = noiseShadow->GetPosition() - player.GetPosition();
         offset.y = 0.0f;
-        nearbyThreat = offset.LengthSquared() <= 25.0f * 25.0f;
+        nearbyThreat = offset.LengthSquared() <= NoiseStalkerNearbyDistance * NoiseStalkerNearbyDistance;
     }
-    const bool quietEligible = m_LoopCount < 3 &&
+    const bool quietEligible = m_LoopCount < Stage2FinalLoopCount &&
         !m_ObservedScareSequence.IsActive() &&
         m_LoopTransitionTimer < 0.0f &&
         (m_NoiseThreatSystem.GetThreat() > 0.05f ||
@@ -256,7 +301,7 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
 
     // 危険度が0.74以上になったら、背後68に足音の影を出し、追わせている（ライトで照らせば追い払える）
     const bool canSpawnNoiseStalker =
-        m_NoiseThreatSystem.GetThreat() >= 0.74f &&
+        m_NoiseThreatSystem.GetThreat() >= NoiseStalkerSpawnThreat &&
         m_NoiseThreatSystem.GetStalkerCooldown() <= 0.0f &&
         !m_FinalSequence.IsSequenceActive() &&
         !m_FinalSequence.IsPursuitActive() &&
@@ -264,17 +309,18 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
     if (canSpawnNoiseStalker)
     {
         const Vector3 forward = player.GetForward();
-        Vector3 spawnPosition = player.GetPosition() - forward * 68.0f;
-        spawnPosition.x = (std::clamp)(spawnPosition.x, -30.0f, 30.0f);
-        spawnPosition.y = -99.0f;
-        spawnPosition.z = (std::clamp)(spawnPosition.z, -145.0f, 128.0f);
+        Vector3 spawnPosition = player.GetPosition() - forward * NoiseStalkerSpawnBehind;
+        spawnPosition.x = (std::clamp)(spawnPosition.x, -NoiseStalkerSpawnHalfWidth, NoiseStalkerSpawnHalfWidth);
+        spawnPosition.y = Stage2FootY;
+        spawnPosition.z = (std::clamp)(spawnPosition.z, NoiseStalkerSpawnMinZ, NoiseStalkerSpawnMaxZ);
 
         noiseShadow->SetPosition(
             spawnPosition.x, spawnPosition.y, spawnPosition.z);
         noiseShadow->SetActive(true);
         noiseShadow->EnableChase(
-            13.0f + m_NoiseThreatSystem.GetThreat() * 6.0f, 12.0f);
-        noiseShadow->EnableGazeScare(7.5f);
+            NoiseStalkerBaseSpeed + m_NoiseThreatSystem.GetThreat() * NoiseStalkerSpeedPerThreat,
+            NoiseStalkerStopDistance);
+        noiseShadow->EnableGazeScare(NoiseStalkerGazeScareSeconds);
         noiseShadow->SetOnObserved([this]()
         {
             ShadowMan* currentShadow =
@@ -303,7 +349,7 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         ResetSignalPuzzle();
         RegisterPuzzleMistake(4);
         m_PuzzleFeedback.Set(4, 2.8f);
-        m_Notices.signal = 3.0f;
+        m_Notices.signal = Stage2LongNoticeSeconds;
         m_NoiseThreatSystem.SetWarningTimer(3.0f);
         m_NoiseThreatSystem.SetThreat(0.30f);
         m_NoiseThreatSystem.SetEventCooldown(2.8f);
@@ -356,7 +402,7 @@ void Stage2Scene::AdvanceLoop(Player& player)
     m_GuidancePulseCooldown = 1.2f;
     m_LoopBlinkTimer = 0.28f;
     m_LoopTransitionTimer = 0.0f;
-    m_Notices.loop = 3.0f;
+    m_Notices.loop = Stage2LongNoticeSeconds;
     m_LightZoneProgress.Reset();
     m_ScratchAnomaly.ResetProgressForLoop();
     m_PortraitAnomaly.ResetProgressForLoop();
@@ -368,11 +414,13 @@ void Stage2Scene::AdvanceLoop(Player& player)
     m_FootprintFollowerUsedThisLoop = false;
     // 周回が切り替わった瞬間、吊るした裸電球が大きく揺れる（同じ廊下に戻ってきた合図）
     KickHangingBulbs(0.5f);
-    // 周回ごとに、天井の雨漏りを1か所ずつ増やしている（3周目まで。周回を重ねるほど廊下が濡れていく）
-    const Vector2 leakSpots[] = { Vector2(-22.0f, -40.0f), Vector2(24.0f, 58.0f), Vector2(-20.0f, -128.0f) };
-    if (m_Objects.ground != nullptr && m_LoopCount >= 1 && m_LoopCount <= 3)
+    // 周回ごとに、天井の雨漏りを1か所ずつ増やしている（3周目まで。周回を重ねるほど廊下が濡れていく）。
+    // 位置と大きさは配置ファイルの place Stage2LoopLeak1〜3（Stage2Layout が読む）。水たまりは45秒かけて広がる
+    constexpr float loopLeakGrowSeconds = 45.0f;
+    if (m_Objects.ground != nullptr && m_LoopCount >= 1 && m_LoopCount <= Stage2FinalLoopCount)
     {
-        m_Objects.ground->AddLeak(leakSpots[m_LoopCount - 1], 6.0f, 45.0f);
+        const Vector3& leak = m_Objects.loopLeaks[static_cast<std::size_t>(m_LoopCount - 1)];
+        m_Objects.ground->AddLeak(Vector2(leak.x, leak.y), leak.z, loopLeakGrowSeconds);
     }
     m_KnockingAnomaly.ResetProgressForLoop();
     m_UnseenPresence.ResetProgressForLoop();
@@ -398,7 +446,7 @@ void Stage2Scene::AdvanceLoop(Player& player)
         confirmationPanel->ResetActivation();
         confirmationPanel->SetManualInteractionAllowed(false);
     }
-    player.SetPosition(Vector3(0.0f, -99.0f, -125.0f));
+    player.SetPosition(Vector3(0.0f, Stage2FootY, Stage2EntranceZ));
     Door* loopDoor = m_Objects.door;
     if (loopDoor != nullptr)
     {
@@ -556,7 +604,7 @@ void Stage2Scene::ConfigureClockForLoop()
 {
     m_ClockAnomaly.ConfigureForLoop(
         m_LoopCount, m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Clock));
-    if (m_LoopCount >= 3)
+    if (m_LoopCount >= Stage2FinalLoopCount)
     {
         Wall* face = m_Objects.clockFace;
         if (face != nullptr)
@@ -605,9 +653,8 @@ void Stage2Scene::UpdateClockObservation()
     }
 
     Core::Game* game = Core::Game::GetInstance();
-    const Vector3 clockCenter(-38.0f, -70.0f, -25.0f);
     Vector3 cameraToClock =
-        clockCenter - game->GetCamera()->GetPosition();
+        ClockCenter - game->GetCamera()->GetPosition();
     const float distance = cameraToClock.Length();
     if (distance > 0.001f)
     {
@@ -617,7 +664,7 @@ void Stage2Scene::UpdateClockObservation()
     // 近く（98以内）で正面（内積0.91以上）から見たとき、ライトが点いていれば間違い、消えていれば見つけたことにしている
     const float facing =
         game->GetCamera()->GetForward().Dot(cameraToClock);
-    if (distance > 98.0f || facing < 0.91f)
+    if (distance > ClockLookDistance || facing < ClockLookFacing)
     {
         return;
     }
@@ -630,7 +677,7 @@ void Stage2Scene::UpdateClockObservation()
     }
 
     m_ClockAnomaly.MarkObserved();
-    m_Notices.loop = 2.8f;
+    m_Notices.loop = Stage2NoticeSeconds;
 
     CeilingLight* doorLight =
         m_Objects.Light(Stage2Light::DoorLight);
@@ -690,7 +737,7 @@ void Stage2Scene::RegisterPuzzleMistake(int type)
 void Stage2Scene::ResetSignalPuzzle()
 {
     m_SignalPuzzle.Reset();
-    if (m_LoopCount >= 3)
+    if (m_LoopCount >= Stage2FinalLoopCount)
     {
         m_FinalSequenceArmed = false;
     }
@@ -705,7 +752,7 @@ void Stage2Scene::ResetSignalPuzzle()
         if (terminal != nullptr)
         {
             terminal->ResetActivation();
-            terminal->SetManualInteractionAllowed(m_LoopCount >= 3);
+            terminal->SetManualInteractionAllowed(m_LoopCount >= Stage2FinalLoopCount);
         }
     }
     ApplySignalLightingState();
@@ -729,7 +776,7 @@ void Stage2Scene::UpdateSignalPuzzle()
     };
 
     const bool puzzleActive =
-        m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete();
+        m_LoopCount >= Stage2FinalLoopCount && !m_SignalPuzzle.IsComplete();
     for (int signalIndex = 0; signalIndex < 3; ++signalIndex)
     {
         FuseBox* terminal = m_Objects.signalTerminals[static_cast<std::size_t>(signalIndex)];
@@ -755,12 +802,12 @@ void Stage2Scene::UpdateSignalPuzzle()
             // 順番が違えば、間違いを数えて危険度を大きく上げている
             if (acceptResult == SignalPuzzle::AcceptResult::WrongOrder)
             {
-                if (m_LoopCount >= 3)
+                if (m_LoopCount >= Stage2FinalLoopCount)
                 {
                     m_FinalSequenceArmed = false;
                 }
                 RegisterPuzzleMistake(3);
-                m_Notices.signal = 2.8f;
+                m_Notices.signal = Stage2NoticeSeconds;
                 m_NoiseThreatSystem.SetThreat(0.92f);
                 game->GetPostProcess()->TriggerHorrorPulse(0.62f, 0.42f);
                 Input::SetVibration(11, 0.24f);
@@ -775,7 +822,7 @@ void Stage2Scene::UpdateSignalPuzzle()
                 1.0f,
                 m_NoiseThreatSystem.GetThreat() + 0.12f -
                     retryAssist * 0.025f));
-            m_Notices.signal = 2.4f;
+            m_Notices.signal = Stage2ShortNoticeSeconds;
             m_ProgressHintTimer = 0.0f;
             game->GetPostProcess()->TriggerBloomPulse(0.52f, 0.20f);
             Input::SetVibration(
@@ -794,7 +841,7 @@ void Stage2Scene::UpdateSignalPuzzle()
             if (acceptResult == SignalPuzzle::AcceptResult::Completed)
             {
                 m_FinalSequenceArmed = true;
-                m_Notices.loop = 3.2f;
+                m_Notices.loop = Stage2ImportantNoticeSeconds;
                 ApplySignalLightingState();
                 game->RegisterAnomalyHandled();
                 ShadowMan* signalShadow =
@@ -830,22 +877,22 @@ void Stage2Scene::UpdateSignalPuzzle()
                     }
                     backward.Normalize();
                     const float assistLevel = static_cast<float>((std::min)(
-                        m_PuzzleFeedback.GetMistakeCount(), 2));
+                        m_PuzzleFeedback.GetMistakeCount(), SignalStalkerMaxAssist));
                     const float spawnDistance =
-                        78.0f - m_SignalPuzzle.GetStep() * 7.0f +
-                            assistLevel * 13.0f;
+                        SignalStalkerBaseDistance - m_SignalPuzzle.GetStep() * SignalStalkerDistancePerStep +
+                            assistLevel * SignalStalkerDistancePerAssist;
                     signalShadow->SetPosition(
                         playerPosition.x + backward.x * spawnDistance,
-                        -99.0f,
+                        Stage2FootY,
                         playerPosition.z + backward.z * spawnDistance);
                     signalShadow->SetActive(false);
                     signalShadow->SetActive(true);
                     signalShadow->EnableChase(
-                        13.0f + static_cast<float>(
-                            m_SignalPuzzle.GetStep()) * 2.0f -
-                            assistLevel * 1.6f,
-                        30.0f);
-                    signalShadow->EnableGazeScare(24.0f);
+                        SignalStalkerBaseSpeed + static_cast<float>(
+                            m_SignalPuzzle.GetStep()) * SignalStalkerSpeedPerStep -
+                            assistLevel * SignalStalkerSlowdownPerAssist,
+                        SignalStalkerStopDistance);
+                    signalShadow->EnableGazeScare(SignalStalkerGazeScareSeconds);
                     signalShadow->SetOnObserved(
                         [this]()
                         {
@@ -860,7 +907,7 @@ void Stage2Scene::UpdateSignalPuzzle()
                             m_NoiseThreatSystem.SetThreat((std::max)(0.12f,
                                 m_NoiseThreatSystem.GetThreat() - 0.24f));
                             m_PuzzleFeedback.Set(6, 2.0f);
-                            m_Notices.signal = 2.4f;
+                            m_Notices.signal = Stage2ShortNoticeSeconds;
                             currentGame->GetPostProcess()->TriggerBloomPulse(0.72f, 0.22f);
                             Input::SetVibration(4, 0.10f);
                         });
@@ -904,7 +951,7 @@ void Stage2Scene::UpdateSignalPuzzle()
 // 信号盤の段階に合わせて、照明を戻している（直していない区画は赤い非常灯のまま）
 void Stage2Scene::ApplySignalLightingState()
 {
-    if (m_LoopCount < 3)
+    if (m_LoopCount < Stage2FinalLoopCount)
     {
         return;
     }
@@ -951,7 +998,7 @@ void Stage2Scene::ApplySignalLightingState()
 // 信号盤パズルの間に背後から来る影：近いほど危険度を上げ、35まで近づかれたらパズルをやり直させている
 void Stage2Scene::UpdateSignalStalker()
 {
-    if (m_LoopCount < 3 || m_SignalPuzzle.IsComplete() ||
+    if (m_LoopCount < Stage2FinalLoopCount || m_SignalPuzzle.IsComplete() ||
         m_SignalPuzzle.GetStep() <= 0)
     {
         return;
@@ -968,11 +1015,12 @@ void Stage2Scene::UpdateSignalStalker()
     Vector3 toShadow = shadow->GetPosition() - player->GetPosition();
     toShadow.y = 0.0f;
     const float distance = toShadow.Length();
-    const float proximity = 1.0f - (std::clamp)((distance - 30.0f) / 90.0f, 0.0f, 1.0f);
+    const float proximity = 1.0f - (std::clamp)(
+        (distance - SignalStalkerNearDistance) / SignalStalkerThreatRange, 0.0f, 1.0f);
     m_NoiseThreatSystem.SetThreat((std::max)(
         m_NoiseThreatSystem.GetThreat(), proximity * 0.78f));
 
-    if (distance > 35.0f)
+    if (distance > SignalStalkerCatchDistance)
     {
         return;
     }
@@ -981,7 +1029,7 @@ void Stage2Scene::UpdateSignalStalker()
     ResetSignalPuzzle();
     RegisterPuzzleMistake(5);
     m_PuzzleFeedback.Set(5, 2.8f);
-    m_Notices.signal = 3.0f;
+    m_Notices.signal = Stage2LongNoticeSeconds;
     m_NoiseThreatSystem.SetThreat(0.38f);
     m_NoiseThreatSystem.SetEventCooldown(2.8f);
     game->GetPostProcess()->TriggerHorrorPulse(0.88f, 0.48f);
@@ -995,8 +1043,8 @@ void Stage2Scene::SetFalseDoorState(bool visible, bool rightSide)
     m_FalseDoorAnomaly.SetVisualState(visible, rightSide);
     const float surfaceX = rightSide ? 39.3f : -39.3f;
     const float frameX = rightSide ? 39.0f : -39.0f;
-    const float handleX = rightSide ? 38.3f : -38.3f;
-    const float centerZ = rightSide ? -88.0f : 70.0f;
+    const float handleX = rightSide ? Stage2FalseDoorHandleX : -Stage2FalseDoorHandleX;
+    const float centerZ = rightSide ? Stage2FalseDoorRightZ : Stage2FalseDoorLeftZ;
 
     Wall* panel = m_Objects.falseDoorPanel;
     Wall* frameNear = m_Objects.falseDoorFrameNear;

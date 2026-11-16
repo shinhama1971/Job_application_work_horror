@@ -31,6 +31,91 @@
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+    // 人影の足もとの高さ（床 y=-100 のわずか上）
+    constexpr float FootY = -99.0f;
+
+    // --- 入口の演出：中央の扉の先（この z より奥、廊下の幅の中）へ初めて入ったら、前と後ろの照明を順に明滅させる
+    constexpr float EntranceThresholdZ = 62.0f;
+    constexpr float EntranceHalfWidth = 58.0f;
+    constexpr float EntranceAheadFlickerSeconds = 0.38f;
+    constexpr float EntranceBehindFlickerSeconds = 1.12f;
+
+    // --- 左の倉庫の演出：2回目に倉庫の奥（x・z がこれより小さい所）へ入ったら、物音の後に影を出す
+    constexpr float StorageScareEnterMaxX = -110.0f;
+    constexpr float StorageScareEnterMaxZ = -108.0f;
+    // 物音から影を出すまでの秒数と、そのときまだ倉庫の中（x・z がこれより小さい所）にいるか
+    constexpr float StorageScareDelaySeconds = 0.8f;
+    constexpr float StorageScareStayMaxX = -100.0f;
+    constexpr float StorageScareStayMaxZ = -90.0f;
+    const Vector3 StorageShadowPosition(-155.0f, FootY, -88.0f);
+    constexpr float StorageShadowGazeSeconds = 5.0f;
+    // 知らせの秒数（物音のとき・影が出たとき・影を見たとき）
+    constexpr float StorageNoiseNoticeSeconds = 2.1f;
+    constexpr float StorageShadowNoticeSeconds = 2.0f;
+    constexpr float StorageObservedNoticeSeconds = 1.8f;
+
+    // --- 開始地点の奥のドア：通ってきて、部屋へこれだけ入り、ドアに背を向けたら（前の向きの z がこれより大きい）閉める
+    constexpr float StartDoorCloseWalkIn = 30.0f;
+    constexpr float StartDoorCloseFacingZ = 0.2f;
+    // ドアを叩く音（この周回から）、取っ手が揺れる（この周回から）、ドアの隙間が開いて見える（この周回から）
+    constexpr int StartDoorKnockLoop = 2;
+    constexpr int StartDoorRattleLoop = 3;
+    constexpr int StartDoorHauntedGapLoop = 4;
+    // 開始地点の部屋の範囲（z がこれより小さく、x の絶対値がこれより小さい）
+    constexpr float StartRoomMaxZ = -70.0f;
+    constexpr float StartRoomHalfWidth = 90.0f;
+    // 叩く間隔：部屋に戻ってきてから最初まで、続けて叩く間、叩き終えた後の間（基本＋回ごとにずらす量を周期で折り返す）
+    constexpr float StartDoorKnockReturnDelay = 2.5f;
+    constexpr float StartDoorKnockBurstInterval = 0.38f;
+    constexpr float StartDoorKnockPauseBase = 6.5f;
+    constexpr float StartDoorKnockPauseStep = 2.7f;
+    constexpr float StartDoorKnockPauseRange = 4.0f;
+
+    // 突き当たりの最後のドアを抜けたとみなす、ドアの幅からのゆとり
+    constexpr float EndDoorPassMargin = 2.0f;
+    // ループ廊下を1周進めたときの知らせの秒数
+    constexpr float CorridorLoopNoticeSeconds = 2.4f;
+    // 1周目に中央の廊下へ出す影の位置と、3周目に開始地点のドアの奥へ出す影の、ドアからの距離
+    const Vector3 CorridorShadowPosition(0.0f, FootY, -25.0f);
+    constexpr float StartDoorShadowBehind = 70.0f;
+
+    // --- ヒューズの後に出る影：2本目は中央の廊下（z=-22）、3本目は出口の前（z=118）に出し、見せる秒数を変える
+    constexpr float FuseWatcherSecondZ = -22.0f;
+    constexpr float FuseWatcherThirdZ = 118.0f;
+    constexpr float FuseWatcherSecondSeconds = 5.8f;
+    constexpr float FuseWatcherThirdSeconds = 7.2f;
+    constexpr float FuseWatcherObservedNoticeSeconds = 1.8f;
+
+    // --- 出口の前兆：送電の後、出口の前（z と x がこれ以上の所）へ来たら影を出す
+    constexpr float ExitOmenMinZ = 215.0f;
+    constexpr float ExitOmenMinX = 28.0f;
+    constexpr float ExitOmenGazeSeconds = 4.2f;
+    // 電力が戻ってから、この秒数は周りの物音を鳴らさない
+    constexpr float PowerRestoreQuietSeconds = 6.0f;
+
+    // --- 心拍：影が近いほど強める範囲（この距離から、この幅で遠ざかるほど弱く）。隠し部屋に閉じ込められている間の弱い心拍
+    constexpr float HeartbeatNearDistance = 14.0f;
+    constexpr float HeartbeatRange = 72.0f;
+    constexpr float HiddenRoomHeartbeat = 0.30f;
+
+    // --- 懐中電灯で照らしているか：光が届く距離（約275）より少し手前まで、光の円錐の中（向きとの内積）、
+    // 遮る物を調べる線分を目標のこれだけ手前で止める
+    constexpr float FlashlightLitDistance = 240.0f;
+    constexpr float FlashlightLitFacing = 0.927f;
+    constexpr float FlashlightLitEndMargin = 4.0f;
+
+    // --- 書類保管室の照らすと止まる影：照らされたかを調べる胸の高さ、音を鳴らす高さ、知らせの秒数、電池を奪っても残す量
+    constexpr float ArchiveStalkerChestHeight = 17.0f;
+    constexpr float ArchiveStalkerKnockHeight = 20.0f;
+    constexpr float ArchiveStalkerStepHeight = 4.0f;
+    constexpr float ArchiveStalkerFirstNoticeSeconds = 4.5f;
+    constexpr float ArchiveStalkerNoticeSeconds = 2.6f;
+    constexpr float ArchiveStalkerCaughtNoticeSeconds = 2.8f;
+    constexpr float ArchiveStalkerBatteryFloor = 5.0f;
+}
+
 // 入口の演出：中央の扉の先へ初めて入ったとき、前と後ろの照明を順に明滅させている（電力が戻るまで）
 void StageScene::UpdateEntranceThresholdEvent(Player& player)
 {
@@ -42,8 +127,8 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
         const Vector3 position = player.GetPosition();
         const bool crossedDoorThreshold =
             !game->IsPowerRestored() &&
-            position.z > 62.0f &&
-            std::abs(position.x) < 58.0f;
+            position.z > EntranceThresholdZ &&
+            std::abs(position.x) < EntranceHalfWidth;
         if (!crossedDoorThreshold)
         {
             return;
@@ -80,7 +165,7 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
 
     // 0.38秒で前の照明、1.12秒で後ろの照明を明滅させて終えている
     m_EntranceEventTimer += deltaTime;
-    if (m_EntranceEventPhase == 0 && m_EntranceEventTimer >= 0.38f)
+    if (m_EntranceEventPhase == 0 && m_EntranceEventTimer >= EntranceAheadFlickerSeconds)
     {
         CeilingLight* lightAhead =
             m_Objects.CeilingLightAt(5);
@@ -94,7 +179,7 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
         m_EntranceEventPhase = 1;
     }
     else if (m_EntranceEventPhase == 1 &&
-        m_EntranceEventTimer >= 1.12f)
+        m_EntranceEventTimer >= EntranceBehindFlickerSeconds)
     {
         CeilingLight* lightBehind =
             m_Objects.CeilingLightAt(4);
@@ -128,14 +213,14 @@ void StageScene::UpdateStorageScare(Player& player)
     {
         // 2回目に左の倉庫へ踏み込んだとき、先に物音と照明で背後を意識させている。
         if (m_CorridorLoopCount < 1 || game->GetItemCount() != 1 ||
-            position.x > -110.0f || position.z > -108.0f)
+            position.x > StorageScareEnterMaxX || position.z > StorageScareEnterMaxZ)
         {
             return;
         }
 
         m_StorageScarePhase = 1;
         m_StorageScareTimer = 0.0f;
-        m_StorageScareNoticeTimer = 2.1f;
+        m_StorageScareNoticeTimer = StorageNoiseNoticeSeconds;
         game->PlayAudioCue(SOUND_CUE_DOOR, 0.68f);
         CeilingLight* light = m_Objects.CeilingLightAt(2);
         if (light != nullptr)
@@ -146,14 +231,14 @@ void StageScene::UpdateStorageScare(Player& player)
     }
 
     m_StorageScareTimer += Application::GetDeltaTime();
-    if (m_StorageScareTimer < 0.8f)
+    if (m_StorageScareTimer < StorageScareDelaySeconds)
     {
         return;
     }
     m_StorageScarePhase = 2;
 
     // 倉庫から離れた場合は出さず、視界の外に人影が突然残るのを防いでいる。
-    if (position.x > -100.0f || position.z > -90.0f)
+    if (position.x > StorageScareStayMaxX || position.z > StorageScareStayMaxZ)
     {
         m_StorageScarePhase = 3;
         return;
@@ -165,17 +250,17 @@ void StageScene::UpdateStorageScare(Player& player)
         m_StorageScarePhase = 3;
         return;
     }
-    shadow->SetPosition(-155.0f, -99.0f, -88.0f);
+    shadow->SetPosition(StorageShadowPosition.x, StorageShadowPosition.y, StorageShadowPosition.z);
     shadow->SetActive(true);
-    shadow->EnableGazeScare(5.0f);
-    m_StorageScareNoticeTimer = 2.0f;
+    shadow->EnableGazeScare(StorageShadowGazeSeconds);
+    m_StorageScareNoticeTimer = StorageShadowNoticeSeconds;
     // 影を見たら、異変に対処した数を増やして、照明と音で反応している
     shadow->SetOnObserved([this]()
     {
         Core::Game* currentGame = Core::Game::GetInstance();
         currentGame->RegisterAnomalyHandled();
         m_StorageScarePhase = 3;
-        m_StorageScareNoticeTimer = 1.8f;
+        m_StorageScareNoticeTimer = StorageObservedNoticeSeconds;
         CeilingLight* light =
             m_Objects.CeilingLightAt(2);
         if (light != nullptr)
@@ -207,8 +292,8 @@ void StageScene::UpdateCorridorLoop(Player& player)
     Door* startDoor = m_Objects.startDoor;
     if (startDoor != nullptr && startDoor->IsOpen())
     {
-        const bool walkedIntoRoom = player.GetPosition().z > Stage1StartDoorZ + 30.0f;
-        const bool facingAway = game->GetCamera()->GetForward().z > 0.2f;
+        const bool walkedIntoRoom = player.GetPosition().z > Stage1StartDoorZ + StartDoorCloseWalkIn;
+        const bool facingAway = game->GetCamera()->GetForward().z > StartDoorCloseFacingZ;
         if (walkedIntoRoom && facingAway)
         {
             startDoor->ResetClosed(0);
@@ -221,7 +306,7 @@ void StageScene::UpdateCorridorLoop(Player& player)
     {
         // 既存の遮蔽判定を使い、壁越しにライトを向けただけでは閉じない。
         const bool lit = IsLitByFlashlight(player, startDoor->GetPosition());
-        startDoor->SetHauntedGap(m_CorridorLoopCount >= 4 && !game->IsPowerRestored(), lit);
+        startDoor->SetHauntedGap(m_CorridorLoopCount >= StartDoorHauntedGapLoop && !game->IsPowerRestored(), lit);
     }
     if (game->IsPowerRestored() || m_LoopCooldown > 0.0f)
     {
@@ -230,27 +315,27 @@ void StageScene::UpdateCorridorLoop(Player& player)
 
     // 2周目以降：開始地点の奥のドアが閉まった後、部屋にいる間だけ、ドアの向こうから誰かが叩く（2〜4回続けて叩き、間を空けてまた叩く）。
     // 3周目からは、叩く合間に取っ手がガタガタ揺れる（通ってきたドアの向こうに、何かがついて来ている）。
-    if (m_CorridorLoopCount >= 2 && startDoor != nullptr && startDoor->IsLocked())
+    if (m_CorridorLoopCount >= StartDoorKnockLoop && startDoor != nullptr && startDoor->IsLocked())
     {
         const Vector3 position = player.GetPosition();
-        const bool inStartRoom = position.z < -70.0f && std::abs(position.x) < 90.0f;
+        const bool inStartRoom = position.z < StartRoomMaxZ && std::abs(position.x) < StartRoomHalfWidth;
         if (!inStartRoom)
         {
             // 部屋の外では鳴らさず、戻ってきてから少し間を置いて鳴らしている
             m_StartDoorKnocksLeft = 0;
-            m_StartDoorKnockTimer = (std::max)(m_StartDoorKnockTimer, 2.5f);
+            m_StartDoorKnockTimer = (std::max)(m_StartDoorKnockTimer, StartDoorKnockReturnDelay);
         }
         else if ((m_StartDoorKnockTimer -= deltaTime) <= 0.0f)
         {
             if (m_StartDoorKnocksLeft <= 0)
             {
                 ++m_StartDoorKnockEvents;
-                const bool rattle = m_CorridorLoopCount >= 3 && (m_StartDoorKnockEvents % 2) == 0;
+                const bool rattle = m_CorridorLoopCount >= StartDoorRattleLoop && (m_StartDoorKnockEvents % 2) == 0;
                 if (rattle)
                 {
                     // 鍵のかかったドアを調べたときと同じく、取っ手が揺れて音が鳴り、画面がわずかに脈打つ
                     startDoor->Interact(player);
-                    m_StartDoorKnockTimer = 6.5f + std::fmod(static_cast<float>(m_StartDoorKnockEvents) * 2.7f, 4.0f);
+                    m_StartDoorKnockTimer = StartDoorKnockPauseBase + std::fmod(static_cast<float>(m_StartDoorKnockEvents) * StartDoorKnockPauseStep, StartDoorKnockPauseRange);
                 }
                 else
                 {
@@ -264,8 +349,8 @@ void StageScene::UpdateCorridorLoop(Player& player)
                 game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, startDoor->GetPosition(),
                     0.58f + static_cast<float>(m_StartDoorKnocksLeft) * 0.03f, 1.5f);
                 m_StartDoorKnockTimer = m_StartDoorKnocksLeft > 0
-                    ? 0.38f
-                    : 6.5f + std::fmod(static_cast<float>(m_StartDoorKnockEvents) * 2.7f, 4.0f);
+                    ? StartDoorKnockBurstInterval
+                    : StartDoorKnockPauseBase + std::fmod(static_cast<float>(m_StartDoorKnockEvents) * StartDoorKnockPauseStep, StartDoorKnockPauseRange);
             }
         }
     }
@@ -284,7 +369,7 @@ bool StageScene::IsThroughEndDoor(const Vector3& position) const
     return endDoor != nullptr &&
         endDoor->IsOpen() &&
         position.x > Stage1EndDoorX &&
-        std::abs(position.z - Stage1EndDoorZ) < Stage1EndDoorHalfWidth + 2.0f;
+        std::abs(position.z - Stage1EndDoorZ) < Stage1EndDoorHalfWidth + EndDoorPassMargin;
 }
 
 // ループ廊下を1周進めている：開始地点の奥のドアの裏側へ移し、周回の数に応じて印・扉・照明・ヒューズ・影を変えている
@@ -321,7 +406,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     }
     m_LoopCooldown = 1.0f;
     m_ProgressHintTimer = 0.0f;
-    m_LoopNoticeTimer = 2.4f;
+    m_LoopNoticeTimer = CorridorLoopNoticeSeconds;
 
     const int loopPhase = m_CorridorLoopCount < 3
         ? m_CorridorLoopCount
@@ -417,7 +502,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
         game->RequestAddObject<ShadowMan>(
             [](ShadowMan& shadow)
             {
-                shadow.SetPosition(0.0f, -99.0f, -25.0f);
+                shadow.SetPosition(CorridorShadowPosition.x, CorridorShadowPosition.y, CorridorShadowPosition.z);
             });
     }
     // 3周目以降：照明の配置を変えている
@@ -442,7 +527,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
             game->RequestAddObject<ShadowMan>(
                 [this](ShadowMan& shadow)
                 {
-                    shadow.SetPosition(Stage1StartDoorX, -99.0f, Stage1StartDoorZ - 70.0f);
+                    shadow.SetPosition(Stage1StartDoorX, FootY, Stage1StartDoorZ - StartDoorShadowBehind);
                     shadow.EnableGazeScare();
                     shadow.SetOnObserved(
                         [this]()
@@ -618,15 +703,15 @@ void StageScene::StartFuseWatcher(int fuseCount)
     watcher->SetActive(false);
     watcher->SetPosition(
         0.0f,
-        -99.0f,
-        fuseCount == 2 ? -22.0f : 118.0f);
+        FootY,
+        fuseCount == 2 ? FuseWatcherSecondZ : FuseWatcherThirdZ);
     watcher->SetActive(true);
-    watcher->EnableGazeScare(fuseCount == 2 ? 5.8f : 7.2f);
+    watcher->EnableGazeScare(fuseCount == 2 ? FuseWatcherSecondSeconds : FuseWatcherThirdSeconds);
     watcher->SetOnObserved(
         [this]()
         {
             m_FuseWatcherState = 2;
-            m_FuseWatcherNoticeTimer = 1.8f;
+            m_FuseWatcherNoticeTimer = FuseWatcherObservedNoticeSeconds;
 
             Core::Game* game = Core::Game::GetInstance();
             game->RegisterAnomalyHandled();
@@ -648,7 +733,7 @@ void StageScene::StartFuseWatcher(int fuseCount)
         });
 
     m_FuseWatcherState = 1;
-    m_FuseWatcherNoticeTimer = fuseCount == 2 ? 5.8f : 7.2f;
+    m_FuseWatcherNoticeTimer = fuseCount == 2 ? FuseWatcherSecondSeconds : FuseWatcherThirdSeconds;
     game->GetPostProcess()->TriggerHorrorPulse(
         fuseCount == 2 ? 0.20f : 0.32f,
         0.30f);
@@ -810,8 +895,8 @@ void StageScene::UpdateExitOmen(Player& player)
     Core::Game* game = Core::Game::GetInstance();
     const Vector3 playerPosition = player.GetPosition();
     if (!m_PowerSequence.IsExitComplete() ||
-        playerPosition.z < 215.0f ||
-        playerPosition.x < 28.0f)
+        playerPosition.z < ExitOmenMinZ ||
+        playerPosition.x < ExitOmenMinX)
     {
         return;
     }
@@ -823,7 +908,7 @@ void StageScene::UpdateExitOmen(Player& player)
     if (shadow != nullptr)
     {
         shadow->SetActive(true);
-        shadow->EnableGazeScare(4.2f);
+        shadow->EnableGazeScare(ExitOmenGazeSeconds);
     }
 
     for (int lightNumber : { 7, 8 })
@@ -850,7 +935,7 @@ bool StageScene::IsAmbientSoundAllowed() const
     const Player* player = m_Objects.player;
     const ExitTrigger* exit = m_Objects.exitTrigger;
     const bool powerRestoring =
-        m_PowerSequence.IsRestoreActive() && m_PowerSequence.GetRestoreTimer() < 6.0f;
+        m_PowerSequence.IsRestoreActive() && m_PowerSequence.GetRestoreTimer() < PowerRestoreQuietSeconds;
     return player != nullptr &&
         player->CanControl() &&
         !m_Surveillance.IsViewing() &&
@@ -938,13 +1023,13 @@ float StageScene::ComputeThreatRate(const Player& player) const
         Vector3 toShadow = shadow->GetPosition() - player.GetPosition();
         toShadow.y = 0.0f;
         const float danger = 1.0f - (std::clamp)(
-            (toShadow.Length() - 14.0f) / 72.0f, 0.0f, 1.0f);
+            (toShadow.Length() - HeartbeatNearDistance) / HeartbeatRange, 0.0f, 1.0f);
         threatRate = (std::max)(threatRate, danger);
     }
     // 隠し部屋に閉じ込められている間は、影が出ていなくても小さく心拍が聞こえるようにしている（息は荒くしない）。
     if (m_HiddenRoom.IsTrapped())
     {
-        threatRate = (std::max)(threatRate, 0.30f);
+        threatRate = (std::max)(threatRate, HiddenRoomHeartbeat);
     }
     // 暖かい灯りの下（光の安全地帯）にいる間は、心拍と息が静まっていく
     return threatRate * (1.0f - m_SafeLights.GetCalm());
@@ -1005,21 +1090,21 @@ bool StageScene::IsLitByFlashlight(const Player& player, const Vector3& target) 
     Vector3 toTarget = target - eye;
     const float distance = toTarget.Length();
     // 懐中電灯の光が届く距離（約275）より少し手前までにしている
-    if (distance < 0.001f || distance > 240.0f)
+    if (distance < 0.001f || distance > FlashlightLitDistance)
     {
         return false;
     }
     toTarget /= distance;
     Vector3 forward = camera->GetForward();
     forward.Normalize();
-    if (forward.Dot(toTarget) < 0.927f)
+    if (forward.Dot(toTarget) < FlashlightLitFacing)
     {
         return false;
     }
 
     // 間に壁・棚・閉じた扉があれば、光は届いていない。
     // 線分の終点は目標の少し手前にし、目標のすぐ近くの棚の面に当たって照らされない扱いになるのを防いでいる。
-    const Vector3 end = eye + toTarget * (distance - 4.0f);
+    const Vector3 end = eye + toTarget * (distance - FlashlightLitEndMargin);
     float hitDistance = 0.0f;
     for (const Wall* wall : m_StalkerWalls)
     {
@@ -1056,7 +1141,7 @@ bool StageScene::UpdateArchiveStalker(Player& player, float deltaTime)
     input.Enabled = !game->IsPowerRestored() && !m_HiddenRoom.IsTrapped();
     // 照らされているかは、影の胸のあたり（足元から17）で判定している（ShadowManの「見られたか」と同じ高さ）
     input.Lit = m_ArchiveStalker.IsActive() &&
-        IsLitByFlashlight(player, shadow->GetPosition() + Vector3(0.0f, 17.0f, 0.0f));
+        IsLitByFlashlight(player, shadow->GetPosition() + Vector3(0.0f, ArchiveStalkerChestHeight, 0.0f));
     input.DeltaTime = deltaTime;
 
     // 影は棚・壁・閉じた扉を通り抜けず、押し戻されて沿うように回り込む
@@ -1088,18 +1173,18 @@ bool StageScene::UpdateArchiveStalker(Player& player, float deltaTime)
     if (result.Appeared)
     {
         game->PlayAudioCueAt(
-            SOUND_CUE_PIPE_KNOCK, result.Position + Vector3(0.0f, 20.0f, 0.0f), 0.55f, 1.4f);
+            SOUND_CUE_PIPE_KNOCK, result.Position + Vector3(0.0f, ArchiveStalkerKnockHeight, 0.0f), 0.55f, 1.4f);
         m_ArchiveStalkerNotice = result.FirstAppearance
             ? "棚の奥で、何かが動いた"
             : "また棚の間に何かいる";
-        m_ArchiveStalkerNoticeTimer = result.FirstAppearance ? 4.5f : 2.6f;
+        m_ArchiveStalkerNoticeTimer = result.FirstAppearance ? ArchiveStalkerFirstNoticeSeconds : ArchiveStalkerNoticeSeconds;
     }
 
     // 光が外れて近づいている間は、影の足元から重い足音を鳴らしている（立体音響で、見えなくても方向が分かる）
     if (result.Step)
     {
         game->PlayAudioCueAt(
-            SOUND_CUE_FOOTSTEP, result.Position + Vector3(0.0f, 4.0f, 0.0f), 0.74f, 1.6f);
+            SOUND_CUE_FOOTSTEP, result.Position + Vector3(0.0f, ArchiveStalkerStepHeight, 0.0f), 0.74f, 1.6f);
     }
 
     // 触れられたとき：懐中電灯の電池を奪っている（5%は残し、完全には空にしない）
@@ -1107,13 +1192,13 @@ bool StageScene::UpdateArchiveStalker(Player& player, float deltaTime)
     {
         constexpr float BatteryPenalty = 30.0f;
         const float taken = (std::min)(
-            BatteryPenalty, (std::max)(0.0f, player.GetBattery() - 5.0f));
+            BatteryPenalty, (std::max)(0.0f, player.GetBattery() - ArchiveStalkerBatteryFloor));
         player.AddBattery(-taken);
         game->PlayAudioCue(SOUND_CUE_SCARE, 0.9f);
         game->GetPostProcess()->TriggerHorrorPulse(0.72f, 0.55f);
         Input::SetVibration(14, 0.36f);
         m_ArchiveStalkerNotice = "影に触れられた 電池を奪われた";
-        m_ArchiveStalkerNoticeTimer = 2.8f;
+        m_ArchiveStalkerNoticeTimer = ArchiveStalkerCaughtNoticeSeconds;
     }
     return result.Visible && input.Lit;
 }

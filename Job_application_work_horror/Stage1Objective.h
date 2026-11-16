@@ -66,6 +66,10 @@ struct Stage1ObjectiveInput
     int westWingValvesOpened = 0;
     // 暗証番号の扉が開いているか（3本目のヒューズの、もう1つの手に入れ方。開いていれば、その部屋の奥を目的にする）
     bool keypadSolved = false;
+    // 暗証番号の部屋を3本目の段階より先に開けていて、3本目の段階になったときに、空だった箱へヒューズが戻ったか
+    bool keypadFuseReturned = false;
+    // 3本目の段階より前に、暗証番号の部屋の空のヒューズの箱へ近づいたときの知らせ
+    bool emptyFuseCaseNotice = false;
     // 西棟の、バルブを回している間の進み具合と短い知らせ（空なら出さない）
     std::string_view westWingText;
     // 光の安全地帯に初めて入ったときの知らせ（空なら出さない）

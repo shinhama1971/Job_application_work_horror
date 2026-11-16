@@ -16,6 +16,38 @@
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+	// 人影の大きさ（高さ16倍で、人の背丈くらいの約30）。モデルはこの大きさを1にした空間で読み込む
+	const Vector3 ShadowSize(8.0f, 16.0f, 8.0f);
+	// 最初に表示する秒数と、追うときに止まる距離（EnableChase で変えられる）
+	constexpr float DefaultLifeSeconds = 4.0f;
+	constexpr float DefaultChaseStopDistance = 28.0f;
+	// 足音を鳴らす高さと、左右の足の音の高さ、音量
+	constexpr float FootstepHeight = 4.0f;
+	constexpr float FootstepPitchLeft = 0.72f;
+	constexpr float FootstepPitchRight = 0.77f;
+	constexpr float FootstepVolume = 1.7f;
+	// 見られたか：現れてからこの秒数が過ぎ、ライトを点けていて、この距離より近く、視線の中心（向きとの内積がこれ以上）に
+	// 影の胸（足もとからこの高さ）があるとき
+	constexpr float GazeIgnoreSeconds = 0.18f;
+	constexpr float GazeDistance = 220.0f;
+	constexpr float GazeFacing = 0.955f;
+	constexpr float ChestHeight = 17.0f;
+	// 見られている間に崩れる速さと、表示時間が減る速さ。目を離したときに戻る速さ
+	constexpr float ObservedRate = 3.6f;
+	constexpr float ObservedLifeDrain = 2.0f;
+	constexpr float ObservedRecoverRate = 1.08f;
+	// ほとんど崩れたら（この割合を超えたら）、この秒数以内に消す
+	constexpr float VanishObservedAmount = 0.82f;
+	constexpr float VanishSeconds = 0.4f;
+	// 現れるのにかける秒数、消えるのにかける秒数、見られて崩れる割合の最大、崩れる縁の幅
+	constexpr float AppearSeconds = 0.35f;
+	constexpr float DisappearSeconds = 0.5f;
+	constexpr float GazeDissolveMax = 0.88f;
+	constexpr float DissolveEdgeWidth = 0.085f;
+}
+
 // 状態を初期化し、Mayaで作った人の形のモデルを読み込んでいる
 void ShadowMan::Init()
 {
@@ -27,16 +59,16 @@ void ShadowMan::Init()
 	m_IsActive = true;
 	m_DeactivateOnExpire = false;
 	m_OnObserved = nullptr;
-	m_LifeTime = 4.0f;
+	m_LifeTime = DefaultLifeSeconds;
 	m_ChaseSpeed = 0.0f;
-	m_ChaseStopDistance = 28.0f;
+	m_ChaseStopDistance = DefaultChaseStopDistance;
 	m_ChaseStepDistance = 0.0f;
 
     // 細長い手足と、前へ傾いた頭の人の形（tools/maya/build_props.py）。ほとんど黒に近い色にしている。
     // モデルは身長約31の実際の大きさなので、ワールド行列で掛ける拡大率（下の m_Scale）で割って読み込んでいる
     PropModel::Append("assets/model/props/shadow_man.fbx",
         { { "Body", Color(0.025f, 0.03f, 0.027f, 1.0f) } },
-        Vector3(8.0f, 16.0f, 8.0f), m_Vertices, m_Indices);
+        ShadowSize, m_Vertices, m_Indices);
 
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
@@ -58,7 +90,7 @@ void ShadowMan::Init()
     m_Material->Create(material);
 
     // 人の背丈くらいの大きさ（高さ16倍で約30）
-    m_Scale = Vector3(8.0f, 16.0f, 8.0f);
+    m_Scale = ShadowSize;
 }
 
 // 表示時間を減らし、追ってくる・プレイヤーの方を向く・見られたかの判定をしている
@@ -143,9 +175,9 @@ void ShadowMan::Update()
                 // プレイヤーより低く重い足音にし、左右の足で少しだけ音の高さを変えている。
                 game->PlayAudioCueAt(
                     SOUND_CUE_FOOTSTEP,
-                    m_Position + Vector3(0.0f, 4.0f, 0.0f),
-                    m_ChaseStepLeft ? 0.72f : 0.77f,
-                    1.7f);
+                    m_Position + Vector3(0.0f, FootstepHeight, 0.0f),
+                    m_ChaseStepLeft ? FootstepPitchLeft : FootstepPitchRight,
+                    FootstepVolume);
             }
         }
     }
@@ -156,7 +188,7 @@ void ShadowMan::Update()
     }
 
 	// 見られたか：ライトを点けていて、220より近く、視線の中心（内積0.955超）に影の胸のあたりがあるとき
-	const Vector3 shadowCenter = m_Position + Vector3(0.0f, 17.0f, 0.0f);
+	const Vector3 shadowCenter = m_Position + Vector3(0.0f, ChestHeight, 0.0f);
 	Vector3 cameraToShadow = shadowCenter - game->GetCamera()->GetPosition();
 	const float distanceToShadow = cameraToShadow.Length();
 	if (distanceToShadow > 0.001f)
@@ -167,16 +199,16 @@ void ShadowMan::Update()
 	const float gazeAlignment =
 		game->GetCamera()->GetForward().Dot(cameraToShadow);
 	const bool illuminatedByGaze =
-		m_Age > 0.18f &&
+		m_Age > GazeIgnoreSeconds &&
 		player->IsFlashlightOn() &&
-		distanceToShadow < 220.0f &&
-		gazeAlignment > 0.955f;
+		distanceToShadow < GazeDistance &&
+		gazeAlignment > GazeFacing;
 
 	// 見られている間は崩れていき、表示時間も早く減っている。最初に見られた瞬間に画面と振動で驚かせている
 	if (illuminatedByGaze)
 	{
-		m_ObservedAmount += 3.6f * deltaTime;
-		m_LifeTime -= 2.0f * deltaTime;
+		m_ObservedAmount += ObservedRate * deltaTime;
+		m_LifeTime -= ObservedLifeDrain * deltaTime;
 
 		if (!m_ReactedToGaze)
 		{
@@ -201,14 +233,14 @@ void ShadowMan::Update()
 	// 目を離すと、崩れ具合が少しずつ戻る
 	else
 	{
-		m_ObservedAmount -= 1.08f * deltaTime;
+		m_ObservedAmount -= ObservedRecoverRate * deltaTime;
 	}
 
 	m_ObservedAmount = (std::clamp)(m_ObservedAmount, 0.0f, 1.0f);
 	// ほとんど崩れたら、0.4秒以内に消している
-	if (m_ObservedAmount > 0.82f)
+	if (m_ObservedAmount > VanishObservedAmount)
 	{
-		m_LifeTime = (std::min)(m_LifeTime, 0.4f);
+		m_LifeTime = (std::min)(m_LifeTime, VanishSeconds);
 	}
 }
 
@@ -237,18 +269,18 @@ void ShadowMan::Draw(Camera* camera)
     m_Material->SetGPU();
 
     // 0.35秒かけて現れ、残り0.5秒で消えていく
-    const float appear = (std::min)(m_Age / 0.35f, 1.0f);
+    const float appear = (std::min)(m_Age / AppearSeconds, 1.0f);
     const float disappear = (std::min)(
-        m_LifeTime / 0.5f,
+        m_LifeTime / DisappearSeconds,
         1.0f);
 
     DissolveBuffer dissolve{};
     dissolve.Time = m_Age;
-	const float gazeDissolve = 1.0f - m_ObservedAmount * 0.88f;
+	const float gazeDissolve = 1.0f - m_ObservedAmount * GazeDissolveMax;
     dissolve.Visibility = (std::min)(
 		(std::min)(appear, disappear),
 		gazeDissolve);
-    dissolve.EdgeWidth = 0.085f;
+    dissolve.EdgeWidth = DissolveEdgeWidth;
     context->UpdateSubresource(
         m_DissolveBuffer.Get(),
         0,

@@ -82,7 +82,7 @@ Application
 - `Stage1SafeLights`: 光の安全地帯（停電しても消えない暖かい電球の下）。円の範囲の中にいるかと、なめらかに上下する「落ち着き」（0〜1）を持ち、ライトを消して休んでいる間に戻す電池の量を返す。
   落ち着きはSceneが、心拍の強さ（`ComputeThreatRate`）・姿の見えない物音を鳴らすか（`IsAmbientSoundAllowed`）・画面のざらつきと周辺の暗さに使う
 - `Stage1HiddenRoomEvent`: 暗証番号の扉の先の部屋の閉じ込めイベント（待機 → 閉じ込め → 脱出の状態機械）。鍵（`KeyItem`）の位置を3か所から選び、記録端末の起動後は保管灯を順に点けて、鍵に対応する灯を2回ずつ点滅させます。部屋は配置ファイルの書類棚（`PropHiddenShelf`）でジグザグの通路にしてあり、鍵の候補はどれも入口から見えない行き止まりです。影は `RoomPathGrid`（部屋の広さを渡して使う、格子の幅優先探索。考え方は書類保管室の `Stage1LightStalker` と同じ）で、棚を回り込んで近づきます。通れるマスの表は、閉じ込めたときに一度だけ、シーンが渡す壁・扉の押し戻しで作ります。
-- 階段を上る演出（`Player::StartStairClimb`）：決めた向きへ一定の速さで歩かせ、段の奥行きごとに目の高さを上げます（足元の位置は床のまま、カメラだけを上げる。当たり判定は上から見た箱なので、段の箱は通り抜ける）。操作できない演出の最中でも動きます。1面の最後のドアを出口の送電の後に通ると、`StageScene` がドアの先の階段（配置ファイルの `PropStair*`、寸法は `Stage1Layout.h` の `Stage1Stair*`）を上らせ、`ExitTrigger` の階段の演出（`SetStairClimb`。光とノイズの代わりに、上りながら暗くして3.2秒で次のシーンへ）が2面へ移します。2面の始まりは、同じ仕組みで下の段から3段上がってきます。自動撮影・計測の間は、時間で決めた道順がずれないよう、どちらの演出も出しません。
+- 階段を上る演出（`Player::StartStairClimb`）：決めた向きへ一定の速さで歩かせ、段の奥行きごとに目の高さを上げます（足元の位置は床のまま、カメラだけを上げる。当たり判定は上から見た箱なので、段の箱は通り抜ける）。操作できない演出の最中でも動きます。動きの組み立ては、出口の階段が `Player::MakeExitClimb`（1面・2面）、面の始まりが `Player::MakeArrivalClimb`（2面・3面）にまとめてあり、速さ・見上げる角度・段の数などの値は `Player` の `ExitClimb*`・`Arrival*` の定数です。1面の最後のドアを出口の送電の後に通ると、`StageScene` がドアの先の階段（配置ファイルの `PropStair*`、寸法は `Stage1Layout.h` の `Stage1Stair*`）を上らせ、`ExitTrigger` の階段の演出（`SetStairClimb`。光とノイズの代わりに、上りながら暗くして3.2秒で次のシーンへ）が2面へ移します。2面の始まりは、同じ仕組みで下の段から3段上がってきます。自動撮影・計測の間は、時間で決めた道順がずれないよう、どちらの演出も出しません。
   見つけるまで影を出してライトで追い払わせます。触れられると電池を奪われます
 - `Stage1LightStalker`: 書類保管室の「照らすと止まる影」（待機 → 出現 → 触れた後の間の状態機械）。懐中電灯で照らしている間は止まり、光が外れると歩くより速く近づく。入口側の通路では初出現位置を棚の陰に寄せ、既存の経路探索で通路へ近づかせる。`StageScene` は実際に影が表示され、遮られていない光で止まったフレームを `Stage1Transmissions` に渡す。連続0.65秒の観察を満たすと、室内で字幕が空いた時点で嘘の指示を流す。
   部屋を4単位の格子に分け、プレイヤーのマスから幅優先探索で各マスまでの歩数を求め、歩数が減る隣のマスへ進むことで棚の迷路を回り込む
@@ -201,6 +201,8 @@ Application
 
 ## 更新と描画の流れ
 
+描く速さの上限は約60fps（`Renderer::DrawEnd` → `GetPresentInterval`）。ウィンドウがある画面の速さを約1秒ごとに読み、画面の速さ ÷ 60 を四捨五入した回数（1〜4）だけ垂直同期を待つ。更新は実際に経った時間（`Application::GetDeltaTime`）で進めるので、速さが変わっても動きの速さは変わらない。計測モードは垂直同期を待たない。自動撮影は1フレームの時間を固定しているので、上限があっても撮れる画像は同じ。
+
 ```text
 Game::Update
   1. Scene::Update
@@ -294,7 +296,7 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 | 壁・床・天井の古さ、凹凸、部屋の角の暗がり | GPU（PS） | `GetWallAgeing`、`GetFloorAgeing`、`surfaceDetail.hlsli`、`roomOcclusion.hlsli` | 画像素材を読まずにワールド座標から計算する（メモリ帯域の代わりに計算量を使う） |
 | 壁のホラーらしい跡（血の手形・引っかき傷・血の垂れ跡） | GPU（PS） | `horrorMarks.hlsli`（`litTexturePS` の壁の古さから呼ぶ） | 壁に沿ったマス目ごとの乱数で置き場所と種類を決め、距離関数で形を作る。画像素材を読まない |
 | 水たまりの反射 | GPU（PS） | `wetFloorPS.hlsl` の `TraceRayReflection`、`rayReflection.hlsli`（部屋の形・小物・扉へのレイ反射に、前後の深度が一致するSSRの色を混ぜる。扉は本描画と同じ開閉角度の箱を使い、近くの壁と扉は斜めからも輪郭が読めるようにする） | 反転したカメラで景色を描き直さず、床の画素ごとに反射の光線を飛ばす |
-| 水たまりのメッシュと LOD | CPU・GPU（PS） | `Ground::BuildPuddleSurfaces`（マス目の表から、岸が必ず収まる楕円の多角形を作る）、`Ground::BuildDynamicSurfaces`（雨漏りと浸水した範囲。毎フレーム）、`Ground::DrawWaterSurfaces`、`wetFloorPS.hlsl` の `WaterSurfaceLevel`（b10） | 床の本体は乾いた床（水たまりの計算なし）として描き、メッシュを床の0.05上に描き重ねる。深度プリパスにもメッシュを描くので、下の床の画素は捨てられる。画面の外か（`Camera::IsSphereVisible`）と描画グループはメッシュごとに CPU で決める。反射は画素までの距離を使い、SSRの寄与を105〜155で弱め、部屋の形による反射を300〜380で霧の色へ移す |
+| 水たまりのメッシュと LOD | CPU・GPU（PS） | `Ground::BuildPuddleSurfaces`（マス目の表から、岸が必ず収まる楕円の多角形を作る）、`Ground::BuildDynamicSurfaces`（雨漏りと浸水した範囲。毎フレーム）、`Ground::DrawWaterSurfaces`、`wetFloorPS.hlsl` の `WaterSurfaceLevel`（b10） | 床の本体は乾いた床（水たまりの計算なし）として描き、メッシュを床の0.05上に描き重ねる。深度プリパスにもメッシュを描くので、下の床の画素は捨てられる。画面の外か（`Camera::IsSphereVisible`）と描画グループはメッシュごとに CPU で決める。反射は画素までの距離を使い、SSRの寄与を160〜230で弱め（11月14日に105〜155から広げた）、部屋の形による反射を300〜380で霧の色へ移す |
 | 壁の鏡（2面） | GPU（PS） | `mirrorPS.hlsl`（`rayReflection.hlsli` を床と共通で使う）、`GameRendering.cpp`（カメラに近い小物の箱16個を b12 で渡す） | 鏡の画素ごとに反射の光線を飛ばす。床と違い下向きの光線が多いため、床の高さとの交差も見ている |
 | 鏡に映る自分の姿・鏡の異変の人影（2面） | CPU・GPU（PS） | `MirrorSelf`（1秒60回の姿勢の記録から遅らせた姿勢と手足の振りを b12 で渡す）、`MirrorAnomaly`、`mirrorPS.hlsl`、`FigureVolumes`（焼いた距離場の3Dテクスチャ t6・t13・s2）、`shader/figureVolume.hlsli`（体も人影も距離場のスフィアトレーシング。体は関節のまわりに回した空間で読んで手足を振る） | 一人称で体がなく、異変の人影も物として置かないため、鏡のシェーダーの中だけに形を出している |
 | 一人称の手と懐中電灯 | CPU・GPU（VS・PS） | `FirstPersonHands`（揺れの計算、b9 に手元だけの射影行列と、前の壁で跳ね返る懐中電灯の光）、`shader/viewModel*.hlsl*`（肌・布・金属） | ビューポートの深度の範囲を 0〜0.02 にして描き、壁にめり込まないようにしている（本描画は near=1 なので、それより手前に壁は来ない） |
@@ -306,7 +308,7 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 | 小物と人影のモデル | CPU（読み込み時） | `PropModel`（FBXの部位をマテリアルの名前で選び、頂点カラーの環境遮蔽 × 部位の色を頂点の色にして、各クラスの頂点の配列へ足す） | モデルは実際の大きさで作り、各クラスが掛ける拡大率で位置と法線を割っている。描き方は箱で組んでいたときと同じ |
 | 濡れた足跡 | CPU・GPU（PS） | `WetFootprints`（輪のバッファ・乾き）、`Ground`（b10へ渡す）、`shader/wetFootprints.hlsli`、`FootprintFollower`（2面の誰かの足跡） | 足跡ごとに近くの画素だけ形を計算し、遠い画素は距離で省いている |
 | 崩れて現れる・消える | GPU（PS） | `Wall::DissolveIn` / `DissolveOut`、`litTexturePS.hlsl`（clip と焦げた縁） | マテリアルの詰め物を崩れ具合に使い、定数バッファを増やしていない |
-| 水たまりの反射の方式別計測 | GPU | `ReflectionProbe`（キューブマップ128x128を1フレームに1面）、`ScreenSpaceReflection`（深度の写し取り）、`wetFloorPS.hlsl`（キューブマップを反射の向きで読む・SSRの光線をたどる） | レイ反射と、重さと正確さの違いを見比べるため。普段はレイ反射 |
+| 水たまりの反射の方式別計測 | GPU | `ReflectionProbe`（キューブマップ256x256を1フレームに1面。11月14日に128から上げた）、`ScreenSpaceReflection`（深度の写し取り）、`wetFloorPS.hlsl`（キューブマップを反射の向きで読む・SSRの光線をたどる） | レイ反射と、重さと正確さの違いを見比べるため。普段はレイ反射 |
 | F1の室内と水面反射、草のLOD確認 | GPU（PS） | common.hlsl の表示番号11・12。wetFloorPS.hlsl は明るい床に通常と同じ水面マスクと反射を重ねる。grassPS.hlsl は草の頂点シェーダーが渡した区画のLOD色を使う | 室内の暗さにかかわらず映り込みを確認し、森の草の描画距離を色で見分ける |
 | 西棟の水面の光の揺らぎ（コースティクス） | GPU（PS） | `waterCaustics.hlsli`（`litTexturePS` から呼ぶ） | 壁・天井の画素ごとに、水面で折り返した点と懐中電灯の配光から求める |
 | 水たまりの波のシミュレーション | GPU（CS） | `WaterRippleSimulation`、`waterRippleCS.hlsl`（256x256マス、外の森は `Ground::SetRippleArea` で768x768マス・一辺576。マス目の数はシェーダーがテクスチャの大きさから読む。ピンポン、1秒に60歩）。床は `wetFloorPS`、壁は `waterCaustics.hlsli` が高さを読む | 全マスが同じ式で隣のマスだけを読むので、GPUで並列に計算できる。結果のテクスチャはCPUへ読み戻さない。描画の最初（`Object::RunGpuSimulation`）で実行し、GPU時間は約0.012ms |

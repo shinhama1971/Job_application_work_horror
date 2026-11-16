@@ -17,6 +17,7 @@
 
 #include <SimpleMath.h>
 #include <array>
+#include "CaptureMode.h"
 #include <random>
 #include <string>
 #include <string_view>
@@ -97,7 +98,7 @@ private:
     // 受け取ったObject、進み具合、乱数、予定している音、次に水が滴るまでの秒数
     Parts m_Parts;
     Step m_Step = Step::Waiting;
-    std::mt19937 m_Random{ std::random_device{}() };
+    std::mt19937 m_Random{ Tools::CaptureMode::MakeRandomSeed(1105u) };
     std::vector<ScheduledCue> m_Scheduled;
     float m_DripTimer = 0.0f;
     float m_InsideSeconds = 0.0f;   // 西棟に入ってからの合計秒数

@@ -20,6 +20,66 @@
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+    // --- 足音
+    // 押し戻しの後に、1秒あたりこれより速く動けたときだけ鳴らす（壁へ押し続けても鳴らさない）
+    constexpr float FootstepMinSpeed = 4.8f;
+    // 鳴らす間隔（歩く・走る）
+    constexpr float WalkFootstepInterval = 0.46f;
+    constexpr float SprintFootstepInterval = 0.31f;
+    // 左右の足で少し高さを変える（歩く・走る）。水の中では少し低くする
+    constexpr float WalkFootstepPitchLeft = 0.97f;
+    constexpr float WalkFootstepPitchRight = 1.03f;
+    constexpr float SprintFootstepPitchLeft = 1.08f;
+    constexpr float SprintFootstepPitchRight = 1.14f;
+    constexpr float WetFootstepPitchRate = 0.92f;
+    // 足音の大きさ（2面の影が反応する）：水の中を走る・水の中を歩く・乾いた床を走る（乾いた床を歩くのは0）
+    constexpr float WetSprintNoise = 1.0f;
+    constexpr float WetWalkNoise = 0.62f;
+    constexpr float DrySprintNoise = 0.32f;
+
+    // --- 懐中電灯
+    // 照らす距離と、光の強さ
+    constexpr float FlashlightRange = 275.0f;
+    constexpr float FlashlightIntensity = 1.50f;
+    // 光の形：内側の角度までは全部の明るさ、外側の角度で消え、その間はこの乗数で暗くする
+    constexpr float FlashlightInnerConeDegrees = 14.0f;
+    constexpr float FlashlightOuterConeDegrees = 32.0f;
+    constexpr float FlashlightConeFalloff = 1.8f;
+    // 近い面を探す一番遠い距離と、近い面で光を弱め始める距離・弱めきる距離までの幅
+    constexpr float FlashlightSurfaceSearchDistance = 70.0f;
+    constexpr float FlashlightNearSurfaceDistance = 12.0f;
+    constexpr float FlashlightNearSurfaceRange = 42.0f;
+    // 近い面で弱める明るさの割合（最大）と、縮める照らす距離
+    constexpr float FlashlightNearSurfaceDim = 0.20f;
+    constexpr float FlashlightNearSurfaceRangeCut = 48.0f;
+    // 電池がこの残量（%）を切ると弱り始め、空で明るさ・照らす距離をこの割合だけ下げる
+    constexpr float FlashlightWeakBattery = 60.0f;
+    constexpr float FlashlightWeakDim = 0.30f;
+    constexpr float FlashlightWeakRangeCut = 0.18f;
+
+    // --- 三人称（デバッグ用）の視点：プレイヤーの後ろ・上の距離と、見る高さ
+    constexpr float ThirdPersonDistance = 45.0f;
+    constexpr float ThirdPersonHeight = 28.0f;
+    constexpr float ThirdPersonTargetHeight = 18.0f;
+    // 開発用の電池の回復量（Debug と 3面の確認中の B キー）
+    constexpr float DebugBatteryRefill = 50.0f;
+
+    // --- 階段を上る演出
+    // 1段の奥行きのうち、最初のこの割合で次の段の高さへ上がりきる（残りは段の上を平らに歩く）
+    constexpr float ClimbLiftFraction = 0.4f;
+    // 段を踏むたびに目が沈む深さ、歩く向きへ視点を向けるのにかける秒数
+    constexpr float ClimbStepBob = 0.7f;
+    constexpr float ClimbTurnSeconds = 0.8f;
+    // 足音の高さ（左右の足）と、段の上で下げる量、音量（段の上・平らな所）
+    constexpr float ClimbFootstepPitchLeft = 0.90f;
+    constexpr float ClimbFootstepPitchRight = 0.95f;
+    constexpr float ClimbStairPitchDrop = 0.06f;
+    constexpr float ClimbStairFootstepVolume = 1.15f;
+    constexpr float ClimbFlatFootstepVolume = 0.95f;
+}
+
 // 描画資源とプレイヤーの状態を初期化している。配置する座標はScene側がInitの後に設定している。
 void Player::Init()
 {
@@ -153,9 +213,9 @@ void Player::Update()
     const Vector3 positionBeforeMove = m_Position;
     m_Position += m_Movement.GetVelocity() * deltaTime;
 
-    if (m_Position.y < -99.0f)
+    if (m_Position.y < MIN_Y_POSITION)
     {
-        m_Position.y = -99.0f;
+        m_Position.y = MIN_Y_POSITION;
         m_Movement.StopVerticalVelocity();
     }
 
@@ -189,7 +249,7 @@ void Player::Update()
         m_Position.x - positionBeforeMove.x,
         0.0f,
         m_Position.z - positionBeforeMove.z);
-    const float footstepMovementThreshold = 4.8f * deltaTime;
+    const float footstepMovementThreshold = FootstepMinSpeed * deltaTime;
     if (actualMovement.LengthSquared() >
         footstepMovementThreshold * footstepMovementThreshold &&
         m_FootstepTimer <= 0.0f)
@@ -203,8 +263,8 @@ void Player::Update()
                 m_Position, sprinting) || wetStep;
         }
         const float alternatingPitch = (m_FootstepIndex % 2 == 0)
-            ? (sprinting ? 1.08f : 0.97f)
-            : (sprinting ? 1.14f : 1.03f);
+            ? (sprinting ? SprintFootstepPitchLeft : WalkFootstepPitchLeft)
+            : (sprinting ? SprintFootstepPitchRight : WalkFootstepPitchRight);
         // 外の森では、雨で濡れた道の足音（歩く・走るで別の音）にしている
         const bool inForest = Core::Game::GetInstance()->GetCurrentSceneName() == SceneName::Forest;
         SOUND_LABEL step = SOUND_CUE_FOOTSTEP;
@@ -217,13 +277,13 @@ void Player::Update()
             step = sprinting ? SOUND_CUE_FOREST_RUN : SOUND_CUE_FOREST_STEP;
         }
         Core::Game::GetInstance()->PlayAudioCue(
-            step, wetStep ? alternatingPitch * 0.92f : alternatingPitch);
+            step, wetStep ? alternatingPitch * WetFootstepPitchRate : alternatingPitch);
         // 足音の大きさ：水の中なら大きく、走ればさらに大きい（2面の影が反応する）
         m_SurfaceNoisePulse = wetStep
-            ? (sprinting ? 1.0f : 0.62f)
-            : (sprinting ? 0.32f : 0.0f);
+            ? (sprinting ? WetSprintNoise : WetWalkNoise)
+            : (sprinting ? DrySprintNoise : 0.0f);
         ++m_FootstepIndex;
-        m_FootstepTimer = sprinting ? 0.31f : 0.46f;
+        m_FootstepTimer = sprinting ? SprintFootstepInterval : WalkFootstepInterval;
     }
     m_WetSurfaceOverride = false;
 
@@ -290,7 +350,7 @@ void Player::Update()
     }
     // 壁や床が近いときは、懐中電灯の明るさを下げている。
     // 明るさが一定だと、近くの面が白く飛んで、材質の細かい模様が消えるためである。
-    float closestSurfaceDistance = 70.0f;
+    float closestSurfaceDistance = FlashlightSurfaceSearchDistance;
     // 照り返しの点光源を置く、光が最初に当たる面までの距離（BounceReach より遠ければ、照り返しは出さない）
     constexpr float BounceReach = 180.0f;
     float beamHitDistance = BounceReach;
@@ -342,7 +402,7 @@ void Player::Update()
     // 近い面までの距離が12〜54の間で、近いほど光を弱め、照らす距離も短くしている（急に変わらないよう、なめらかに近づけている）
     const float nearSurfaceTarget = visibleLight
         ? 1.0f - (std::clamp)(
-            (closestSurfaceDistance - 12.0f) / 42.0f, 0.0f, 1.0f)
+            (closestSurfaceDistance - FlashlightNearSurfaceDistance) / FlashlightNearSurfaceRange, 0.0f, 1.0f)
         : 0.0f;
     const float nearSurfaceResponse = 1.0f - std::pow(
         1.0f - 0.18f, deltaTime * 60.0f);
@@ -351,7 +411,7 @@ void Player::Update()
         nearSurfaceResponse;
 
     // 電池の弱り具合（60%を切ると0から増え、空で1）。弱るほど光が暗く・黄色く・短くなり、光の輪のむらがはっきりする
-    const float batteryWeakness = (std::clamp)((60.0f - m_Flashlight.GetBattery()) / 60.0f, 0.0f, 1.0f);
+    const float batteryWeakness = (std::clamp)((FlashlightWeakBattery - m_Flashlight.GetBattery()) / FlashlightWeakBattery, 0.0f, 1.0f);
 
     // シェーダーへ渡す懐中電灯の光（スポットライト）を作っている
     LIGHT light{};
@@ -361,13 +421,13 @@ void Player::Update()
     // 近い面で弱める量は最大2割。以前は4割強だったが、壁・小物の懐中電灯の拡散光に上限を付けて（flashlightLighting.hlsli の
     // GetFlashlightDiffuseResponse）近くの壁が白く飛ばなくなったため、弱めすぎて「壁に近づくと何も見えない」状態になっていた
     const float proximityExposure =
-        1.0f - m_FlashlightNearSurfaceBlend * 0.20f;
+        1.0f - m_FlashlightNearSurfaceBlend * FlashlightNearSurfaceDim;
     light.Intensity = renderFlashlight
-        ? 1.50f * lightOutput * proximityExposure *
+        ? FlashlightIntensity * lightOutput * proximityExposure *
             flashlightState.powerBlend *
-            (1.0f - batteryWeakness * 0.30f)
+            (1.0f - batteryWeakness * FlashlightWeakDim)
         : 0.0f;
-    light.Range = (275.0f - m_FlashlightNearSurfaceBlend * 48.0f) * (1.0f - batteryWeakness * 0.18f);
+    light.Range = (FlashlightRange - m_FlashlightNearSurfaceBlend * FlashlightNearSurfaceRangeCut) * (1.0f - batteryWeakness * FlashlightWeakRangeCut);
     // 手で持ったライトの小さな揺れを加えている。電池が少ないときは視点は動かさず、
     // 光だけに電気的・機械的な不安定さを足している。
     const float flashlightSway = renderFlashlight
@@ -386,9 +446,9 @@ void Player::Update()
     // スポットライトの形：14度の内側は全部の明るさ、32度の外側で消え、その間は1.8乗で暗くしている（照らした輪の外がすぐ闇になる）。
     // 審査会で「暗くて見えない」と言われ、11度・26度から広げた（輪の外の闇は残し、照らせる範囲だけを広げている）
     light.SpotParams = Vector4(
-        cosf(DirectX::XMConvertToRadians(14.0f)),
-        cosf(DirectX::XMConvertToRadians(32.0f)),
-        1.8f,
+        cosf(DirectX::XMConvertToRadians(FlashlightInnerConeDegrees)),
+        cosf(DirectX::XMConvertToRadians(FlashlightOuterConeDegrees)),
+        FlashlightConeFalloff,
         batteryWeakness
     );
 
@@ -491,8 +551,8 @@ void Player::Update()
     else
     {
         // 三人称（デバッグ用）：プレイヤーの後ろ上からのぞき込む視点
-        float distance = 45.0f;
-        float height = 28.0f;
+        const float distance = ThirdPersonDistance;
+        const float height = ThirdPersonHeight;
 
         Vector3 camPos = m_Position;
         camPos -= forward * distance;
@@ -501,7 +561,7 @@ void Player::Update()
         cam->SetPosition(camPos);
 
         Vector3 target = m_Position;
-        target.y += 18.0f;
+        target.y += ThirdPersonTargetHeight;
         cam->SetTarget(target);
     }
 
@@ -536,7 +596,7 @@ void Player::Update()
     if ((allowBatteryKey && Input::GetKeyTrigger(VK_B)) ||
         (stage3Preview && Input::GetButtonTrigger(XINPUT_BACK)))
     {
-        AddBattery(50.0f);
+        AddBattery(DebugBatteryRefill);
     }
 }
 
@@ -664,6 +724,44 @@ void Player::UpdateHiding(Camera& camera, float deltaTime)
     Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_DOOR, m_HidePosition, 1.35f, 0.55f);
 }
 
+// 出口の扉の先の階段を上る動き：今の位置から踊り場の奥へ向け、最初の段までの平らな距離と、斜めに歩くときの1段の歩く距離を求めている
+Player::StairClimb Player::MakeExitClimb(const Vector3& position, const Vector3& stairAxis, float stairStart,
+    float stepRun, float stepRise, int stepCount, const Vector3& landing)
+{
+    // 段の向きの成分がこれより小さい（ほぼ横向き）ときは、この値で割って、距離が大きくなりすぎないようにしている
+    constexpr float minimumForward = 0.1f;
+    Vector3 direction = landing - position;
+    direction.y = 0.0f;
+    direction.Normalize();
+    const float forward = (std::max)(direction.Dot(stairAxis), minimumForward);
+    StairClimb climb;
+    climb.Direction = direction;
+    climb.FlatDistance = (std::max)(0.0f, (stairStart - position.Dot(stairAxis)) / forward);
+    climb.StepRun = stepRun / forward;
+    climb.StepRise = stepRise;
+    climb.StepCount = stepCount;
+    climb.EndFlatDistance = ExitClimbLandingDepth;
+    climb.Speed = ExitClimbSpeed;
+    climb.TargetPitch = ExitClimbTargetPitch;
+    climb.HoldAtEnd = true;
+    return climb;
+}
+
+// 面の始まりに下の段から上がってくる動き：段の数だけ目の高さを下げた所から、段ごとに上げて、普段の操作に戻る
+Player::StairClimb Player::MakeArrivalClimb(const Vector3& direction)
+{
+    StairClimb arrival;
+    arrival.Direction = direction;
+    arrival.FlatDistance = ArrivalFlatDistance;
+    arrival.StepCount = ArrivalStepCount;
+    arrival.EndFlatDistance = ArrivalEndFlatDistance;
+    arrival.Speed = ArrivalSpeed;
+    arrival.EyeDrop = arrival.StepRise * static_cast<float>(arrival.StepCount);
+    arrival.TargetPitch = 0.0f;
+    arrival.HoldAtEnd = false;
+    return arrival;
+}
+
 // 階段を自動で上り始めている。今の足元を始まりの位置にし、今の視点の向きから、歩く向き・決めた上下の向きへ少しずつ向けていく
 void Player::StartStairClimb(const StairClimb& climb)
 {
@@ -717,7 +815,7 @@ void Player::UpdateStairClimb(float deltaTime)
         else
         {
             const float fraction = steps - fullSteps;
-            const float lift = (std::clamp)(fraction / 0.4f, 0.0f, 1.0f);
+            const float lift = (std::clamp)(fraction / ClimbLiftFraction, 0.0f, 1.0f);
             height = settings.StepRise * (fullSteps + lift * lift * (3.0f - 2.0f * lift));
         }
     }
@@ -729,8 +827,8 @@ void Player::UpdateStairClimb(float deltaTime)
         m_Climb.LastStepIndex = stepIndex;
         ++m_FootstepIndex;
         const bool onStairs = stairDistance > 0.0f && stairDistance < stairsLength;
-        const float pitch = (m_FootstepIndex % 2 == 0 ? 0.90f : 0.95f) - (onStairs ? 0.06f : 0.0f);
-        Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, m_Position, pitch, onStairs ? 1.15f : 0.95f);
+        const float pitch = (m_FootstepIndex % 2 == 0 ? ClimbFootstepPitchLeft : ClimbFootstepPitchRight) - (onStairs ? ClimbStairPitchDrop : 0.0f);
+        Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, m_Position, pitch, onStairs ? ClimbStairFootstepVolume : ClimbFlatFootstepVolume);
         if (onStairs)
         {
             Input::SetVibration(2, 0.05f);
@@ -739,11 +837,11 @@ void Player::UpdateStairClimb(float deltaTime)
 
     // 段を踏むたびに、目が少し沈んで戻る揺れ（歩くときの頭の揺れの代わり）
     const float stepPhase = m_Climb.Distance / settings.StepRun * DirectX::XM_PI;
-    const float bob = finished ? 0.0f : -std::abs(std::sin(stepPhase)) * 0.7f;
+    const float bob = finished ? 0.0f : -std::abs(std::sin(stepPhase)) * ClimbStepBob;
 
     Camera* camera = Core::Game::GetInstance()->GetCamera();
     // 歩く向きと決めた上下の向きへ、0.8秒かけて向けている（向きの差は、近い回り方で縮める）
-    const float turn = (std::clamp)(m_Climb.Time / 0.8f, 0.0f, 1.0f);
+    const float turn = (std::clamp)(m_Climb.Time / ClimbTurnSeconds, 0.0f, 1.0f);
     const float smoothTurn = turn * turn * (3.0f - 2.0f * turn);
     const float targetYaw = std::atan2(settings.Direction.x, settings.Direction.z);
     const float yawDifference = std::remainder(targetYaw - m_Climb.StartYaw, DirectX::XM_2PI);

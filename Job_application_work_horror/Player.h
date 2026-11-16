@@ -122,6 +122,25 @@ public:
         float TargetPitch = 0.0f;       // 歩きながら向ける上下の向き（正で上）
         bool HoldAtEnd = false;         // 上り切った後もその姿勢で止まっているか（false なら、普段の操作に戻る）
     };
+    // 出口の扉の先の階段（1面・2面の最後）：上の踊り場へ、この距離だけ歩いて止まる。上りながら少し見上げる
+    static constexpr float ExitClimbLandingDepth = 30.0f;
+    static constexpr float ExitClimbSpeed = 26.0f;
+    static constexpr float ExitClimbTargetPitch = 0.16f;
+    // 面の始まり（2面・3面）：下の段から3段上がって出てくる。少し見上げた視点から始め、普段の高さへ戻す
+    static constexpr int ArrivalStepCount = 3;
+    static constexpr float ArrivalStartPitch = 0.22f;
+    static constexpr float ArrivalFlatDistance = 3.0f;
+    static constexpr float ArrivalEndFlatDistance = 4.0f;
+    static constexpr float ArrivalSpeed = 18.0f;
+
+    // 出口の扉の先の階段を上る動きを作っている。stairAxis は段が並ぶ向き（ワールドの x か z の単位ベクトル）、
+    // stairStart はその向きでの最初の段の位置、landing は向かう先（上の踊り場の奥）。
+    // 斜めに歩くときは、段の奥行きを向きで割り、stairAxis の向きに stepRun 進むごとに1段上がるようにしている
+    static StairClimb MakeExitClimb(const DirectX::SimpleMath::Vector3& position,
+        const DirectX::SimpleMath::Vector3& stairAxis, float stairStart, float stepRun, float stepRise, int stepCount,
+        const DirectX::SimpleMath::Vector3& landing);
+    // 面の始まりに、下の段から上がってくる動きを作っている（目の高さを段の分だけ低い所から上げる）
+    static StairClimb MakeArrivalClimb(const DirectX::SimpleMath::Vector3& direction);
     // 階段を自動で上り始めている（上っている間は、移動・視点・懐中電灯のスイッチの入力を読まない）
     void StartStairClimb(const StairClimb& climb);
     // 階段を自動で上っている最中か

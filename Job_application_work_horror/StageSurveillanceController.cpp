@@ -36,6 +36,26 @@ namespace
     constexpr float PatrolLookAlignment = 0.90f;
     // 異常なしの回の割合。いつも異常がある状態では、報告がただの作業になってしまうためである。
     constexpr float PatrolNoAnomalyChance = 0.25f;
+    // 映像に映る人影を、現地確認の制限時間よりこの秒数だけ長く残す（見つける前に消えないように）。人影の胸の高さ
+    constexpr float FigureExtraSeconds = 60.0f;
+    constexpr float FigureChestHeight = 17.0f;
+    // 捕まった後に戻す、記録端末の前の位置
+    const Vector3 TerminalReturnPosition(190.0f, -99.0f, -42.0f);
+    // 巡回をすべて終えたときに回復する電池、警告を出してから次に出せるまでの秒数
+    constexpr float CompleteBattery = 8.0f;
+    constexpr float WarningCooldownSeconds = 3.0f;
+    // 知らせを出す秒数（異常なしを確認・異常を確認・反応が途絶えた・端末の前に戻された）
+    constexpr float ClearNoticeSeconds = 2.2f;
+    constexpr float FoundNoticeSeconds = 2.6f;
+    constexpr float LostNoticeSeconds = 2.8f;
+    constexpr float ReturnedNoticeSeconds = 3.0f;
+    // 監視カメラの映像：画角（寄ったとき・普段）、縦横比、描く距離、カメラの位置に足す補助の光の範囲
+    constexpr float FeedZoomedFieldOfViewDegrees = 32.0f;
+    constexpr float FeedFieldOfViewDegrees = 56.0f;
+    constexpr float FeedAspect = 16.0f / 9.0f;
+    constexpr float FeedNear = 1.0f;
+    constexpr float FeedFar = 420.0f;
+    constexpr float FeedHelperLightRange = 260.0f;
 
     // float[3]をVector3にしている
     Vector3 ToVector3(const float (&value)[3])
@@ -277,7 +297,7 @@ void StageSurveillanceController::UpdateViewing(Player& player)
         }
         else
         {
-            ShowNotice("異常なしを確認した", 2.2f);
+            ShowNotice("異常なしを確認した", ClearNoticeSeconds);
         }
         break;
     case SurveillancePatrol::ReportResult::Wrong:
@@ -310,7 +330,7 @@ void StageSurveillanceController::UpdateDispatch(Player& player, float deltaTime
         if (m_Patrol.GetRemainingTime() <= PatrolWarningTime &&
             m_WarningCooldown <= 0.0f)
         {
-            m_WarningCooldown = 3.0f;
+            m_WarningCooldown = WarningCooldownSeconds;
             game->GetPostProcess()->TriggerHorrorPulse(0.16f, 0.30f);
             Input::SetVibration(4, 0.08f);
         }
@@ -326,7 +346,7 @@ void StageSurveillanceController::UpdateDispatch(Player& player, float deltaTime
         }
         else
         {
-            ShowNotice("異常を確認した 端末へ戻る", 2.6f);
+            ShowNotice("異常を確認した 端末へ戻る", FoundNoticeSeconds);
             if (FuseBox* terminal = m_Objects->evidenceTerminal)
             {
                 terminal->SetManualInteractionAllowed(true);
@@ -336,7 +356,7 @@ void StageSurveillanceController::UpdateDispatch(Player& player, float deltaTime
     case SurveillancePatrol::DispatchResult::TimedOut:
         SetAnomalyVisible(anomaly, false);
         game->RegisterPuzzleMistake();
-        ShowNotice("映像の反応が途絶えた 端末へ戻る", 2.8f);
+        ShowNotice("映像の反応が途絶えた 端末へ戻る", LostNoticeSeconds);
         game->PlayAudioCue(SOUND_CUE_SCARE, 0.62f);
         game->GetPostProcess()->TriggerHorrorPulse(0.32f, 0.30f);
         if (FuseBox* terminal = m_Objects->evidenceTerminal)
@@ -418,7 +438,7 @@ void StageSurveillanceController::SetAnomalyVisible(
                 figure->SetActive(true);
                 // 現地確認の制限時間より長く残し、見つける前に消えないようにしている。
                 figure->EnableGazeScare(
-                    SurveillancePatrol::DispatchTimeLimit + 60.0f);
+                    SurveillancePatrol::DispatchTimeLimit + FigureExtraSeconds);
             }
         }
         break;
@@ -468,7 +488,7 @@ bool StageSurveillanceController::IsIlluminatingAnomaly(const Player& player) co
     switch (anomaly.type)
     {
     case SurveillancePatrol::AnomalyType::Figure:
-        target = ToVector3(camera.FigurePosition) + Vector3(0.0f, 17.0f, 0.0f);
+        target = ToVector3(camera.FigurePosition) + Vector3(0.0f, FigureChestHeight, 0.0f);
         break;
     case SurveillancePatrol::AnomalyType::LightOut:
         target = m_Objects->CeilingLightAt(camera.LightNumber)->GetPosition();
@@ -532,7 +552,7 @@ void StageSurveillanceController::UpdateCaught(Player& player, float deltaTime)
 
     // 暗転の間に端末の前へ戻し、巡回をやり直せる状態にしている（対処した回数はそのまま残している）。
     m_Caught.Complete();
-    player.SetPosition(Vector3(190.0f, -99.0f, -42.0f));
+    player.SetPosition(TerminalReturnPosition);
     player.SetCanControl(true);
     if (ShadowMan* figure = m_Objects->evidenceShadow)
     {
@@ -543,7 +563,7 @@ void StageSurveillanceController::UpdateCaught(Player& player, float deltaTime)
         terminal->ResetActivation();
         terminal->SetManualInteractionAllowed(true);
     }
-    ShowNotice("気がつくと端末の前にいた", 3.0f);
+    ShowNotice("気がつくと端末の前にいた", ReturnedNoticeSeconds);
 }
 
 void StageSurveillanceController::Complete(Player& player)
@@ -551,7 +571,7 @@ void StageSurveillanceController::Complete(Player& player)
     // 記録端末の知らせはSceneが出すため、ここでは完了したことだけを伝えている。
     m_CompletedThisFrame = true;
     // ごほうびに電池を少し回復し、端末の目印を緑に変えて、記録を回収したことにしている
-    player.AddBattery(8.0f);
+    player.AddBattery(CompleteBattery);
 
     if (FuseBox* terminal = m_Objects->evidenceTerminal)
     {
@@ -615,8 +635,8 @@ void StageSurveillanceController::RenderFeeds()
         const Matrix view = Matrix::CreateLookAt(
             cameraPosition, cameraTarget, Vector3::Up);
         const Matrix projection = Matrix::CreatePerspectiveFieldOfView(
-            DirectX::XMConvertToRadians(zoomed ? 32.0f : 56.0f),
-            16.0f / 9.0f, 1.0f, 420.0f);
+            DirectX::XMConvertToRadians(zoomed ? FeedZoomedFieldOfViewDegrees : FeedFieldOfViewDegrees),
+            FeedAspect, FeedNear, FeedFar);
 
         output.SetRenderTarget();
         output.Clear(0.018f, 0.028f, 0.022f, 1.0f);
@@ -633,7 +653,7 @@ void StageSurveillanceController::RenderFeeds()
         std::vector<ENVIRONMENT_POINT_LIGHT> surveillanceLights = previousPointLights;
         ENVIRONMENT_POINT_LIGHT helper{};
         helper.PositionRange = Vector4(
-            cameraPosition.x, cameraPosition.y, cameraPosition.z, 260.0f);
+            cameraPosition.x, cameraPosition.y, cameraPosition.z, FeedHelperLightRange);
         helper.ColorIntensity = Vector4(0.72f, 0.92f, 0.78f, 0.52f);
         surveillanceLights.push_back(helper);
         tiledLighting->SetLights(surveillanceLights);

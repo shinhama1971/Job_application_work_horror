@@ -75,6 +75,20 @@ public:
     // wetFloorPS.hlsl の PuddleCellBuffer と同じ値にする。
     static constexpr int PuddleCellMin = -8;
     static constexpr int PuddleCellCount = 16;
+    // 水たまりの形（puddleMask.hlsli と同じ値にする）：
+    // マス目の一辺、水たまりを置くマスの乱数のしきい値（これ以上なら置く）、中心をマスの中でずらす幅、
+    // 楕円の半径（横・縦。基本の値＋乱数で足す幅。マスの一辺を1とした値）、岸の線（楕円の距離）と、岸のゆがみの最大の振れ幅
+    static constexpr float PuddleCellSize = 82.0f;
+    static constexpr float PuddleChance = 0.62f;
+    static constexpr float PuddleCenterJitter = 0.22f;
+    static constexpr float PuddleAxisX = 0.72f;
+    static constexpr float PuddleAxisXRange = 0.25f;
+    static constexpr float PuddleAxisZ = 0.43f;
+    static constexpr float PuddleAxisZRange = 0.20f;
+    static constexpr float PuddleShoreRadius = 0.37f;
+    static constexpr float PuddleShoreWarpMax = 0.177f;
+    // 水面のメッシュで覆う楕円の大きさ（岸が必ず収まる0.62に、多角形が楕円の内側に入る分の4%を足している）
+    static constexpr float PuddleCoverRadius = 0.62f * 1.04f;
     // マス目ごとの水たまりの値（x = 水たまりがあれば1、y・z = 中心のずれと回転に使う乱数）
     using PuddleCellTable = std::array<DirectX::SimpleMath::Vector4, PuddleCellCount * PuddleCellCount>;
     // シェーダーへ渡す水たまりの表（puddleMask.hlsli の PuddleCellBuffer と同じ並び）

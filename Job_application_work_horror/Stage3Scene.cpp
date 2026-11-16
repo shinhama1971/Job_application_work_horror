@@ -27,17 +27,106 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // 上から見た長方形の範囲（x と z の、両端を含まない範囲）
+    struct AreaXZ
+    {
+        float MinX;
+        float MaxX;
+        float MinZ;
+        float MaxZ;
+
+        bool Contains(const Vector3& position) const
+        {
+            return position.x > MinX && position.x < MaxX && position.z > MinZ && position.z < MaxZ;
+        }
+    };
+
+    // --- 場所（stage3_props.txt の壁の位置と合わせている）
+    // 非常口の壁の x。これより東（+x）は屋外
     constexpr float OutsideX = 443.0f;
+    // 通信室（監視映像を撮り、人影が通る部屋）
+    constexpr AreaXZ CommunicationRoom{ 205.0f, 329.0f, 25.0f, 105.0f };
+    // 通信室の中で、この z より奥へ入ると監視映像の時間を進め始める
+    constexpr float MonitorStartZ = 40.0f;
+    // 北の観測区画（迂回回線の通路）
+    constexpr float ObservationSectorMinZ = 107.0f;
+    constexpr float ObservationSectorMaxZ = 223.0f;
+    // 観測区画の西側の起動盤の側（ここへ戻ると、見つかった状態から再挑戦できる）
+    constexpr float ObservationRetryMaxX = 177.0f;
+    // 観測区画のセンサーが光と走る音に反応する範囲（x）
+    constexpr float ObservationSensorMinX = 179.0f;
+    constexpr float ObservationSensorMaxX = 267.0f;
+    // センサーに気づかれたときにノックの音を鳴らす位置
+    constexpr Vector3 ObservationKnockPosition(211.0f, -72.0f, 160.0f);
+    // 屋外の送信小屋（雨を止める屋根の下）と、原本の録音を聞ける範囲
+    constexpr AreaXZ TransmitterShed{ 632.0f, 708.0f, -44.0f, 44.0f };
+    constexpr AreaXZ SourceListeningArea{ 632.0f, 705.0f, -43.0f, 43.0f };
+    // 道路の門を越えた所（ここへ着くと3面を終える）
+    constexpr float RoadReachedX = 790.0f;
+    constexpr float RoadHalfWidth = 34.0f;
+    // 非常灯をたどって出口へ向かう間、後ろの足音を鳴らし始める x
+    constexpr float LeavingFootstepStartX = 260.0f;
+    // 出口へ向かう間の足音は、プレイヤーのこれだけ後ろ（-x）の廊下の中央で鳴らす。通信卓の前では、机の陰で鳴らす
+    constexpr float LeavingFootstepBehind = 42.0f;
+    constexpr float FootstepHeight = -95.0f;
+    constexpr Vector3 DeskFootstepPosition(248.0f, FootstepHeight, 19.0f);
+
+    // --- 時間（秒）
+    // 送信を一時停止してから、主電源を操作できるまで
     constexpr float TestSeconds = 2.4f;
+    // 監視映像を撮り直す間隔
     constexpr float FeedInterval = 0.30f;
     // 道路に出てから、リザルト画面へ移るまでの秒数
     constexpr float CompleteSeconds = 6.0f;
+    // 監視映像の時間がこれを過ぎてから、人影が画面を横切り始める。横切るのにかかる時間
+    constexpr float FigureCrossDelay = 0.35f;
+    constexpr float FigureCrossSeconds = 1.50f;
+    // センサーに見つかったときの警報と人影を出す時間
+    constexpr float ObservationScareSeconds = 1.35f;
+    // 回線の接続順を間違えたときの案内を出す時間
+    constexpr float RoutingMistakeSeconds = 3.2f;
+    // 原本の録音を聞き終えて、回収と消去を選べるようになるまで
+    constexpr float SourceListenSeconds = 5.5f;
+    // 足音を鳴らす間隔（出口へ向かう間と、通信卓の前）
+    constexpr float LeavingFootstepInterval = 0.85f;
+    constexpr float DeskFootstepInterval = 1.15f;
+    // 無線の字幕を出す時間（試験停止・主電源の直後と、道路に出る前）
+    constexpr float RadioWarningSeconds = 5.0f;
+    constexpr float RadioEndingSeconds = 7.0f;
+    // 「通信途絶」の文字が浮かび上がるまで
+    constexpr float SignalLostFadeSeconds = 0.7f;
+
+    // --- 監視映像（通信卓に貼る、廊下を向いた補助カメラ）
     constexpr Vector3 FeedEye(191.0f, -53.0f, 1.0f);
     constexpr Vector3 FeedTarget(55.0f, -79.0f, 0.0f);
+    constexpr UINT FeedWidth = 320;
+    constexpr UINT FeedHeight = 200;
+    constexpr float FeedFieldOfView = 0.93f;
+    constexpr float FeedAspect = 1.6f;
+    constexpr float FeedNear = 1.0f;
+    constexpr float FeedFar = 300.0f;
+    // 通信卓の画面の半分の幅と高さ
+    constexpr float MonitorHalfWidth = 12.0f;
+    constexpr float MonitorHalfHeight = 7.5f;
+    // 映像を横切る人影の通り道（x・y は一定、z を始点から幅の分だけ進める）
+    constexpr Vector3 FigureCrossStart(137.0f, -99.0f, -18.0f);
+    constexpr float FigureCrossLength = 36.0f;
+
+    // --- 罰と音
+    // センサーに見つかったとき、懐中電灯の電池を最大この量だけ奪う（ただし、この残量より下は奪わない）
+    constexpr float ObservationBatteryPenalty = 12.0f;
+    constexpr float ObservationBatteryFloor = 8.0f;
+    // 屋外の雨の強さ（送信小屋の屋根の下では0）
+    constexpr float OutdoorRainIntensity = 0.35f;
+    // 無線の雑音の音量（試験中・停電後・屋外・中継箱を調べた後）
+    constexpr float RadioStaticVolume = 0.24f;
+    constexpr float RadioStaticAfterPowerOff = 0.08f;
+    constexpr float RadioStaticOutside = 0.18f;
+    constexpr float RadioStaticTraced = 0.34f;
 
     bool IsInCommunicationRoom(const Vector3& position)
     {
-        return position.x > 205.0f && position.x < 329.0f && position.z > 25.0f && position.z < 105.0f;
+        return CommunicationRoom.Contains(position);
     }
 }
 
@@ -49,10 +138,10 @@ public:
     {
         const Vector3 normal(0.0f, 0.0f, -1.0f);
         const Color white(1.0f, 1.0f, 1.0f, 1.0f);
-        const VERTEX_3D topLeft{ Vector3(-12.0f, 7.5f, 0.0f), normal, white, Vector2(0.0f, 0.0f) };
-        const VERTEX_3D topRight{ Vector3(12.0f, 7.5f, 0.0f), normal, white, Vector2(1.0f, 0.0f) };
-        const VERTEX_3D bottomLeft{ Vector3(-12.0f, -7.5f, 0.0f), normal, white, Vector2(0.0f, 1.0f) };
-        const VERTEX_3D bottomRight{ Vector3(12.0f, -7.5f, 0.0f), normal, white, Vector2(1.0f, 1.0f) };
+        const VERTEX_3D topLeft{ Vector3(-MonitorHalfWidth, MonitorHalfHeight, 0.0f), normal, white, Vector2(0.0f, 0.0f) };
+        const VERTEX_3D topRight{ Vector3(MonitorHalfWidth, MonitorHalfHeight, 0.0f), normal, white, Vector2(1.0f, 0.0f) };
+        const VERTEX_3D bottomLeft{ Vector3(-MonitorHalfWidth, -MonitorHalfHeight, 0.0f), normal, white, Vector2(0.0f, 1.0f) };
+        const VERTEX_3D bottomRight{ Vector3(MonitorHalfWidth, -MonitorHalfHeight, 0.0f), normal, white, Vector2(1.0f, 1.0f) };
         m_VertexBuffer.Create({ topLeft, topRight, bottomLeft, bottomLeft, topRight, bottomRight });
         m_Shader.Create("shader/litTextureVS.hlsl", "shader/surveillanceFeedPS.hlsl");
     }
@@ -207,7 +296,7 @@ Stage3Scene::Stage3Scene()
     m_Rain->SetIntensity(0.0f);
     for (auto& feed : m_Feeds)
     {
-        feed.Init(320, 200);
+        feed.Init(FeedWidth, FeedHeight);
     }
 
     game.SetPowerRestored(true);
@@ -231,19 +320,8 @@ Stage3Scene::Stage3Scene()
     // 踊り場（x=2〜50、z=-82〜-24）の中で、北（+z）へ28だけ進む。自動撮影・計測では、この演出は出さない
     if (!Tools::CaptureMode::IsActive())
     {
-        game.GetCamera()->SetCameraPitch(0.22f);
-        Player::StairClimb arrival;
-        arrival.Direction = Vector3(0.0f, 0.0f, 1.0f);
-        arrival.FlatDistance = 3.0f;
-        arrival.StepRun = 7.0f;
-        arrival.StepRise = 4.0f;
-        arrival.StepCount = 3;
-        arrival.EndFlatDistance = 4.0f;
-        arrival.Speed = 18.0f;
-        arrival.EyeDrop = arrival.StepRise * static_cast<float>(arrival.StepCount);
-        arrival.TargetPitch = 0.0f;
-        arrival.HoldAtEnd = false;
-        m_Player->StartStairClimb(arrival);
+        game.GetCamera()->SetCameraPitch(Player::ArrivalStartPitch);
+        m_Player->StartStairClimb(Player::MakeArrivalClimb(Vector3(0.0f, 0.0f, 1.0f)));
     }
 }
 
@@ -274,7 +352,7 @@ void Stage3Scene::EnableTransmissionTest()
     m_ObservationEnd->SetManualInteractionAllowed(false);
     m_ObservationDoor->SetLocked(false);
     m_Test->SetManualInteractionAllowed(true);
-    Core::Game::GetInstance()->PlayAudioCue(SOUND_CUE_RADIO_STATIC, 1.0f, 0.24f);
+    Core::Game::GetInstance()->PlayAudioCue(SOUND_CUE_RADIO_STATIC, 1.0f, RadioStaticVolume);
     m_Step = Step::Test;
     m_StepTime = 0.0f;
 }
@@ -282,26 +360,28 @@ void Stage3Scene::EnableTransmissionTest()
 void Stage3Scene::UpdateObservationRoute(float seconds)
 {
     const Vector3 position = m_Player->GetPosition();
-    const bool inSector = position.z > 107.0f && position.z < 223.0f;
+    const bool inSector = position.z > ObservationSectorMinZ && position.z < ObservationSectorMaxZ;
     const bool armed = m_Step == Step::Routing && m_ObservationStart->IsActivated();
     m_ObservationScare = (std::max)(0.0f, m_ObservationScare - seconds);
 
-    if (armed && inSector && position.x < 177.0f)
+    if (armed && inSector && position.x < ObservationRetryMaxX)
     {
         m_ObservationBlocked = false;
     }
-    const bool sensorArea = inSector && position.x > 179.0f && position.x < 267.0f;
+    const bool sensorArea = inSector && position.x > ObservationSensorMinX && position.x < ObservationSensorMaxX;
     if (armed && sensorArea && !m_ObservationBlocked &&
         (m_Player->IsFlashlightOn() || m_Player->IsSprinting()))
     {
         m_ObservationBlocked = true;
-        m_ObservationScare = 1.35f;
+        m_ObservationScare = ObservationScareSeconds;
         auto& game = *Core::Game::GetInstance();
-        game.PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, Vector3(211.0f, -72.0f, 160.0f), 0.66f, 1.2f);
+        game.PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, ObservationKnockPosition, 0.66f, 1.2f);
         game.GetPostProcess()->TriggerHorrorPulse(0.35f, 0.30f);
-        m_Player->AddBattery(-(std::min)(12.0f, (std::max)(0.0f, m_Player->GetBattery() - 8.0f)));
+        m_Player->AddBattery(-(std::min)(ObservationBatteryPenalty,
+            (std::max)(0.0f, m_Player->GetBattery() - ObservationBatteryFloor)));
     }
-    m_ObservationEnd->SetManualInteractionAllowed(armed && !m_ObservationBlocked && inSector && position.x > 267.0f);
+    m_ObservationEnd->SetManualInteractionAllowed(
+        armed && !m_ObservationBlocked && inSector && position.x > ObservationSensorMaxX);
     if (m_ObservationEnd->IsActivated() && m_Step == Step::Routing)
     {
         EnableTransmissionTest();
@@ -321,20 +401,21 @@ void Stage3Scene::Update()
     m_StepTime += seconds;
     if (m_Step >= Step::Trace)
     {
-        const bool inShed = position.x > 632.0f && position.x < 708.0f && std::abs(position.z) < 44.0f;
-        m_Rain->SetIntensity(position.x > OutsideX && !inShed ? 0.35f : 0.0f);
+        const bool inShed = TransmitterShed.Contains(position);
+        m_Rain->SetIntensity(position.x > OutsideX && !inShed ? OutdoorRainIntensity : 0.0f);
     }
     if (IsInCommunicationRoom(position) && m_Step < Step::Release)
     {
         m_FeedTimer -= seconds;
-        if (m_MonitorTime > 0.0f || position.z > 40.0f)
+        if (m_MonitorTime > 0.0f || position.z > MonitorStartZ)
         {
             m_MonitorTime += seconds;
         }
     }
-    const float crossing = (m_MonitorTime - 0.35f) / 1.50f;
+    const float crossing = (m_MonitorTime - FigureCrossDelay) / FigureCrossSeconds;
     m_Figure->SetActive(m_Step < Step::Release && crossing > 0.0f && crossing < 1.0f);
-    m_Figure->SetPosition(137.0f, -99.0f, -18.0f + 36.0f * (std::clamp)(crossing, 0.0f, 1.0f));
+    m_Figure->SetPosition(FigureCrossStart.x, FigureCrossStart.y,
+        FigureCrossStart.z + FigureCrossLength * (std::clamp)(crossing, 0.0f, 1.0f));
 
     m_RoutingFeedback = (std::max)(0.0f, m_RoutingFeedback - seconds);
     m_Interaction.Update(*m_Player);
@@ -368,7 +449,7 @@ void Stage3Scene::Update()
                     control->ResetActivation();
                 }
                 m_RouteProgress = 0;
-                m_RoutingFeedback = 3.2f;
+                m_RoutingFeedback = RoutingMistakeSeconds;
                 game.PlayAudioCue(SOUND_CUE_PIPE_KNOCK, 0.78f, 0.8f);
                 break;
             }
@@ -393,7 +474,7 @@ void Stage3Scene::Update()
         if (m_StepTime >= TestSeconds)
         {
             m_Breaker->SetManualInteractionAllowed(true);
-            game.PlayAudioCue(SOUND_CUE_RADIO_STATIC, 1.0f, 0.24f);
+            game.PlayAudioCue(SOUND_CUE_RADIO_STATIC, 1.0f, RadioStaticVolume);
             m_Step = Step::Breaker;
             m_StepTime = 0.0f;
         }
@@ -407,7 +488,7 @@ void Stage3Scene::Update()
             }
             m_Monitor->SetFeed(nullptr);
             m_Release->SetManualInteractionAllowed(true);
-            game.SetAudioCueVolume(SOUND_CUE_RADIO_STATIC, 0.08f);
+            game.SetAudioCueVolume(SOUND_CUE_RADIO_STATIC, RadioStaticAfterPowerOff);
             game.PlayAudioCue(SOUND_CUE_POWER, 0.72f);
             m_Step = Step::Release;
             m_StepTime = 0.0f;
@@ -424,7 +505,7 @@ void Stage3Scene::Update()
     case Step::Exit:
         if (m_Exit->IsOpen() && position.x > OutsideX)
         {
-            game.SetAudioCueVolume(SOUND_CUE_RADIO_STATIC, 0.18f);
+            game.SetAudioCueVolume(SOUND_CUE_RADIO_STATIC, RadioStaticOutside);
             game.PlayAudioCue(SOUND_CUE_RAIN, 1.0f, 0.62f);
             for (FuseBox* post : m_OutdoorPosts)
             {
@@ -437,16 +518,16 @@ void Stage3Scene::Update()
     case Step::Trace:
         if (m_OutdoorPosts[0]->IsActivated() && m_OutdoorPosts[1]->IsActivated())
         {
-            game.SetAudioCueVolume(SOUND_CUE_RADIO_STATIC, 0.34f);
+            game.SetAudioCueVolume(SOUND_CUE_RADIO_STATIC, RadioStaticTraced);
             m_Step = Step::Source;
             m_StepTime = 0.0f;
         }
         break;
     case Step::Source:
-        if (position.x > 632.0f && position.x < 705.0f && std::abs(position.z) < 43.0f)
+        if (SourceListeningArea.Contains(position))
         {
             m_SourceReadTime += seconds;
-            if (m_SourceReadTime >= 5.5f)
+            if (m_SourceReadTime >= SourceListenSeconds)
             {
                 m_KeepTape->SetManualInteractionAllowed(true);
                 m_EraseTape->SetManualInteractionAllowed(true);
@@ -463,7 +544,7 @@ void Stage3Scene::Update()
         }
         break;
     case Step::Road:
-        if (m_RoadGate->IsOpen() && position.x > 790.0f && std::abs(position.z) < 34.0f)
+        if (m_RoadGate->IsOpen() && position.x > RoadReachedX && std::abs(position.z) < RoadHalfWidth)
         {
             m_Step = Step::Complete;
             m_StepTime = 0.0f;
@@ -480,16 +561,18 @@ void Stage3Scene::Update()
     }
 
     const bool nearDesk = (m_Step == Step::Test || m_Step == Step::Breaker) && IsInCommunicationRoom(position);
-    const bool leaving = (m_Step == Step::Release || m_Step == Step::Exit) && position.x > 260.0f && position.x < OutsideX;
+    const bool leaving = (m_Step == Step::Release || m_Step == Step::Exit) &&
+        position.x > LeavingFootstepStartX && position.x < OutsideX;
     if (nearDesk || leaving)
     {
         m_FootstepTimer -= seconds;
         if (m_FootstepTimer <= 0.0f)
         {
-            const Vector3 footstep = leaving ? Vector3(position.x - 42.0f, -95.0f, 0.0f)
-                : Vector3(248.0f, -95.0f, 19.0f);
+            const Vector3 footstep = leaving
+                ? Vector3(position.x - LeavingFootstepBehind, FootstepHeight, 0.0f)
+                : DeskFootstepPosition;
             game.PlayAudioCueAt(SOUND_CUE_FOOTSTEP, footstep, 0.58f, 1.1f, 0.12f);
-            m_FootstepTimer = leaving ? 0.85f : 1.15f;
+            m_FootstepTimer = leaving ? LeavingFootstepInterval : DeskFootstepInterval;
         }
     }
 }
@@ -506,7 +589,7 @@ void Stage3Scene::RenderOffscreen()
     auto& game = *Core::Game::GetInstance();
     Camera& camera = *game.GetCamera();
     const Matrix view = Matrix::CreateLookAt(FeedEye, FeedTarget, Vector3::Up);
-    const Matrix projection = Matrix::CreatePerspectiveFieldOfView(0.93f, 1.6f, 1.0f, 300.0f);
+    const Matrix projection = Matrix::CreatePerspectiveFieldOfView(FeedFieldOfView, FeedAspect, FeedNear, FeedFar);
     const LIGHT originalLight = Renderer::GetLight();
     LIGHT feedLight = originalLight;
     feedLight.FlashlightEnabled = FALSE;
@@ -550,7 +633,7 @@ void Stage3Scene::Draw(Camera*)
     if (m_Step == Step::Routing)
     {
         const Vector3 position = m_Player->GetPosition();
-        if (position.z > 107.0f && m_ObservationStart->IsActivated())
+        if (position.z > ObservationSectorMinZ && m_ObservationStart->IsActivated())
         {
             objective = m_ObservationBlocked ? "見つかった。西側の起動盤まで戻ってやり直す"
                 : "ライトを消し、走らずに緑の灯りの端末まで進む";
@@ -586,7 +669,7 @@ void Stage3Scene::Draw(Camera*)
     Hud::RadioView radio;
     radio.Time = m_StepTime;
     radio.Header = "受信　——　第3研究棟";
-    if (m_Step == Step::Routing && m_ObservationStart->IsActivated() && m_Player->GetPosition().z > 107.0f)
+    if (m_Step == Step::Routing && m_ObservationStart->IsActivated() && m_Player->GetPosition().z > ObservationSectorMinZ)
     {
         radio.Header = "観測区画　——　保守用迂回回線";
         radio.Line = "『センサーは強い光と走る音に反応する。消灯し、歩いて通過。』";
@@ -600,13 +683,13 @@ void Stage3Scene::Draw(Camera*)
         radio.LineAlpha = 1.0f;
         radio.Recording = true;
     }
-    else if (m_Step == Step::Test && m_StepTime < 5.0f)
+    else if (m_Step == Step::Test && m_StepTime < RadioWarningSeconds)
     {
         radio.Line = "「そこは触らなくていい。送信機はそのままにしろ。」";
         radio.LineAlpha = 1.0f;
         radio.Noise = 0.18f;
     }
-    else if (m_Step == Step::Breaker && m_StepTime < 5.0f)
+    else if (m_Step == Step::Breaker && m_StepTime < RadioWarningSeconds)
     {
         radio.Line = "「……聞こえるか。主電源は落とすな。」";
         radio.LineAlpha = 1.0f;
@@ -631,12 +714,12 @@ void Stage3Scene::Draw(Camera*)
     else if (m_Step == Step::Source)
     {
         radio.Header = "原本　——　調査員の最後の記録";
-        radio.Line = m_SourceReadTime < 5.5f ? "『玄関で聞こえる声は、私が入る前に残した録音だ。』"
+        radio.Line = m_SourceReadTime < SourceListenSeconds ? "『玄関で聞こえる声は、私が入る前に残した録音だ。』"
             : "『声は私のものだが、指示を変えて送り直している。送信機を止めてくれ。』";
         radio.LineAlpha = 1.0f;
         radio.Recording = true;
     }
-    else if (m_Step == Step::Road && m_StepTime < 7.0f)
+    else if (m_Step == Step::Road && m_StepTime < RadioEndingSeconds)
     {
         radio.Header = "送信停止";
         radio.Line = m_KeepTape->IsActivated() ? "『原本を回収した。今度は、こちらから伝えられる。』"
@@ -647,7 +730,7 @@ void Stage3Scene::Draw(Camera*)
     else if (m_Step == Step::Complete)
     {
         radio.SignalLost = m_KeepTape->IsActivated() ? "通信途絶　原本回収" : "通信途絶　原本消去";
-        radio.SignalLostAlpha = (std::min)(m_StepTime / 0.7f, 1.0f);
+        radio.SignalLostAlpha = (std::min)(m_StepTime / SignalLostFadeSeconds, 1.0f);
     }
     m_Hud.DrawRadio(radio);
 

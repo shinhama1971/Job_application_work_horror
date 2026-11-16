@@ -27,6 +27,35 @@
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+    // --- 1面の進行の値
+    // 最初に開始地点のドアを叩く音が鳴るまでの秒数
+    constexpr float StartDoorFirstKnockSeconds = 4.0f;
+    // 次に進む方向の天井灯：今の灯りからこの距離より離れるまでは、次の灯りへ進めない
+    constexpr float RouteLightAdvanceDistance = 35.0f;
+    // H（LB）でヒントを頼んだときに、進めていない時間をこの秒数まで進め、すぐに強いヒントを出している
+    constexpr float RequestedHintSeconds = 35.0f;
+    // 知らせの文字を出す秒数（ヒューズを拾ったとき・非常用充電器・監視映像をすべて確かめたとき）
+    constexpr float FuseNoticeSeconds = 2.35f;
+    constexpr float ChargerNoticeSeconds = 2.8f;
+    constexpr float EvidenceNoticeSeconds = 3.2f;
+    // 非常用充電器で回復する電池の量
+    constexpr float ChargerBattery = 35.0f;
+    // 電池がこれより少なくなると、少ないほど画面のノイズと周辺の暗さを強める
+    constexpr float LowBatteryThreshold = 25.0f;
+    // 電力が戻ってから、画面効果が落ち着いた状態へ移りきるまでの秒数
+    constexpr float PowerRestoreBlendSeconds = 2.5f;
+    // 出口の前兆で、扉のランプを速く点滅させる秒数
+    constexpr float ExitOmenBlinkSeconds = 3.2f;
+    // 暗証番号の部屋の空のヒューズの箱：この距離まで近づいたら知らせを出し、この秒数だけ出す
+    constexpr float EmptyFuseCaseNoticeDistance = 30.0f;
+    constexpr float EmptyFuseCaseNoticeSeconds = 3.2f;
+    // 箱にヒューズが戻るときの、金属の箱に物を置くような低い音（配管を叩く音を低くして使っている）の高さと音量
+    constexpr float KeypadFuseReturnPitch = 0.62f;
+    constexpr float KeypadFuseReturnVolume = 1.3f;
+}
+
 // 作るときに初期化している
 StageScene::StageScene()
 {
@@ -60,7 +89,11 @@ void StageScene::Init()
     m_EvidenceNoticeTimer = 0.0f;
     m_LoopCooldown = 0.0f;
     m_LoopNoticeTimer = 0.0f;
-    m_StartDoorKnockTimer = 4.0f;
+    m_EmptyFuseCaseNoticeTimer = 0.0f;
+    m_NearEmptyFuseCase = false;
+    m_KeypadFuseReturned = false;
+    m_WasThirdFuseStage = false;
+    m_StartDoorKnockTimer = StartDoorFirstKnockSeconds;
     m_StartDoorKnocksLeft = 0;
     m_StartDoorKnockEvents = 0;
     m_EntranceEventTriggered = false;
@@ -167,6 +200,9 @@ bool StageScene::IsThirdFuseStage() const
 // ・暗証番号の扉の先：壁の文字から4桁の番号を探す → 扉を開ける → 閉じ込められ、影に追われながら鍵を探す → 部屋の奥
 // 暗証番号の部屋のヒューズは、3本目を探す段階になるまで出さない（先に取れると、2本目の左の倉庫の進行と食い違うため）。
 // 寄り道で先に暗証番号の扉を開けていれば、3本目はその部屋へ取りに行くだけになる（探索のごほうび）。
+// 先に開けた人が空の部屋で迷わないよう、ヒューズの置き場所には空の箱（配置ファイルの PropKeypadFuseCase）を置き、
+// 近づくと「箱は空だ」と知らせる。3本目の段階になった瞬間に、箱に物を置く音を部屋の方から鳴らし、
+// 進む先の照明と目的の表示で、空だった箱に何かが戻ったことを伝えている（ループ廊下を2周した合図にもなる）。
 // どちらか一方を取ったら、もう一方は消して、4本目として拾えないようにしている。
 void StageScene::UpdateThirdFuseRoutes()
 {
@@ -187,9 +223,32 @@ void StageScene::UpdateThirdFuseRoutes()
         keypadFuse->SetActive(false);
         return;
     }
-    keypadFuse->SetActive(IsThirdFuseStage());
-}
 
+    const bool thirdFuseStage = IsThirdFuseStage();
+    Core::Game* game = Core::Game::GetInstance();
+    // 3本目の段階より前に部屋を開けていた人へ：段階が来た瞬間に、空だった箱へヒューズが戻る音を鳴らしている
+    if (thirdFuseStage && !m_WasThirdFuseStage && m_KeypadDoor.IsSolved())
+    {
+        m_KeypadFuseReturned = true;
+        game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, keypadFuse->GetPosition(), KeypadFuseReturnPitch, KeypadFuseReturnVolume);
+        game->GetPostProcess()->TriggerHorrorPulse(0.14f, 0.30f);
+    }
+    m_WasThirdFuseStage = thirdFuseStage;
+
+    // 3本目の段階より前に、開けた部屋の空の箱へ近づいたら、そのときだけ「箱は空だ」と知らせている
+    const Player* player = m_Objects.player;
+    const bool nearCase = m_KeypadDoor.IsSolved() && !thirdFuseStage && player != nullptr &&
+        Vector3::DistanceSquared(player->GetPosition(), keypadFuse->GetPosition()) <
+            EmptyFuseCaseNoticeDistance * EmptyFuseCaseNoticeDistance;
+    if (nearCase && !m_NearEmptyFuseCase)
+    {
+        m_EmptyFuseCaseNoticeTimer = EmptyFuseCaseNoticeSeconds;
+    }
+    m_NearEmptyFuseCase = nearCase;
+    m_EmptyFuseCaseNoticeTimer = (std::max)(0.0f, m_EmptyFuseCaseNoticeTimer - Application::GetDeltaTime());
+
+    keypadFuse->SetActive(thirdFuseStage);
+}
 // 進む先の天井照明を1灯だけ、切れかけの電球のように不規則にちかちかさせている（ほかの照明は落ち着いて点いたまま）。
 // 明滅と周囲に落ちる光を、次に向かう場所の目印にする。
 // 経路の選択は進行を参照するだけで、鍵・アイテム・扉の状態は変更しない。
@@ -232,6 +291,11 @@ void StageScene::UpdateRouteLights()
         else if (fuseCount >= 3)
         {
             selected = Stage1RouteLight::MainPower;
+        }
+        else if (m_KeypadFuseReturned && westWingStep == Stage1WestWing::Step::FindKey)
+        {
+            // 先に開けていた暗証番号の部屋の箱に、ヒューズが戻った（西棟へ向かい始めていなければ、そちらへ案内する）
+            selected = Stage1RouteLight::KeypadRoom;
         }
         else if (westWingStep == Stage1WestWing::Step::FindKey)
         {
@@ -289,7 +353,7 @@ void StageScene::UpdateRouteLights()
     {
         const float currentDistance = distanceSquared(fixtures[m_RouteFixtureIndex]);
         const float nextDistance = distanceSquared(fixtures[m_RouteFixtureIndex + 1]);
-        if (currentDistance > 35.0f * 35.0f && nextDistance >= currentDistance)
+        if (currentDistance > RouteLightAdvanceDistance * RouteLightAdvanceDistance && nextDistance >= currentDistance)
         {
             break;
         }
@@ -380,7 +444,7 @@ void StageScene::Update()
     if (m_Surveillance.Update(*player, Application::GetDeltaTime()))
     {
         // 巡回をすべて終えたら、記録端末の完了の知らせを出している。
-        m_EvidenceNoticeTimer = 3.2f;
+        m_EvidenceNoticeTimer = EvidenceNoticeSeconds;
     }
     // 暗証番号の入力画面も、操作できない間に入力を受け取るため、操作できるかの判定より前に更新している。
     m_KeypadDoor.Update(*player, Application::GetDeltaTime());
@@ -400,7 +464,7 @@ void StageScene::Update()
     if (Input::GetKeyTrigger(VK_H) ||
         Input::GetButtonTrigger(XINPUT_LEFT_SHOULDER))
     {
-        m_ProgressHintTimer = (std::max)(m_ProgressHintTimer, 35.0f);
+        m_ProgressHintTimer = (std::max)(m_ProgressHintTimer, RequestedHintSeconds);
         Input::SetVibration(2, 0.04f);
     }
 
@@ -440,7 +504,7 @@ void StageScene::Update()
     {
         m_LastFuseCount = currentFuseCount;
         m_ProgressHintTimer = 0.0f;
-        m_FuseNoticeTimer = 2.35f;
+        m_FuseNoticeTimer = FuseNoticeSeconds;
         game->GetPostProcess()->TriggerBloomPulse(
             0.48f + static_cast<float>(currentFuseCount) * 0.12f,
             0.28f);
@@ -465,8 +529,8 @@ void StageScene::Update()
         emergencyCharger->IsActivated())
     {
         m_ChargerHandled = true;
-        m_ChargerNoticeTimer = 2.8f;
-        player->AddBattery(35.0f);
+        m_ChargerNoticeTimer = ChargerNoticeSeconds;
+        player->AddBattery(ChargerBattery);
         game->RegisterChargerUsed();
         StartFuseWatcher(2);
 
@@ -543,22 +607,11 @@ void StageScene::Update()
             {
                 const Vector3 position = player->GetPosition();
                 const Vector3 landing(
-                    Stage1StairStartX + Stage1StairStepRun * static_cast<float>(Stage1StairStepCount) + 30.0f,
+                    Stage1StairStartX + Stage1StairStepRun * static_cast<float>(Stage1StairStepCount) +
+                        Player::ExitClimbLandingDepth,
                     position.y, Stage1EndDoorZ);
-                Vector3 direction = landing - position;
-                direction.y = 0.0f;
-                direction.Normalize();
-                Player::StairClimb climb;
-                climb.Direction = direction;
-                climb.FlatDistance = (std::max)(0.0f, (Stage1StairStartX - position.x) / (std::max)(direction.x, 0.1f));
-                climb.StepRun = Stage1StairStepRun / (std::max)(direction.x, 0.1f);
-                climb.StepRise = Stage1StairStepRise;
-                climb.StepCount = Stage1StairStepCount;
-                climb.EndFlatDistance = 30.0f;
-                climb.Speed = 26.0f;
-                climb.TargetPitch = 0.16f;
-                climb.HoldAtEnd = true;
-                player->StartStairClimb(climb);
+                player->StartStairClimb(Player::MakeExitClimb(position, Vector3(1.0f, 0.0f, 0.0f), Stage1StairStartX,
+                    Stage1StairStepRun, Stage1StairStepRise, Stage1StairStepCount, landing));
             }
             stageExit->BeginEscape(*player);
         }
@@ -602,7 +655,7 @@ void StageScene::Update()
     {
         const float omenRate = m_ExitOmenSequence.IsTriggered()
             ? 1.0f - (std::clamp)(
-                m_ExitOmenSequence.GetTimer() / 3.2f, 0.0f, 1.0f)
+                m_ExitOmenSequence.GetTimer() / ExitOmenBlinkSeconds, 0.0f, 1.0f)
             : 0.0f;
         const float indicatorPulse =
             0.72f + std::sin(m_StageVisualTimer *
@@ -625,13 +678,13 @@ void StageScene::Update()
     }
 
     // 画面効果：電池の少なさ・走っているか・ループ廊下の奥への近さで、ノイズと周辺減光を強めている
-    float lowBattery = (25.0f - player->GetBattery()) / 25.0f;
+    float lowBattery = (LowBatteryThreshold - player->GetBattery()) / LowBatteryThreshold;
     if (lowBattery < 0.0f) lowBattery = 0.0f;
     if (lowBattery > 1.0f) lowBattery = 1.0f;
 
     const float powerBlend = game->IsPowerRestored()
         ? (std::clamp)(
-            m_PowerSequence.GetRestoreTimer() / 2.5f, 0.0f, 1.0f)
+            m_PowerSequence.GetRestoreTimer() / PowerRestoreBlendSeconds, 0.0f, 1.0f)
         : 0.0f;
     const float powerCalm = 0.03f * powerBlend;
     const float sprintStress = player->IsSprinting() ? 1.0f : 0.0f;

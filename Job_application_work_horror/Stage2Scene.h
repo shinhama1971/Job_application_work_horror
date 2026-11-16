@@ -39,6 +39,7 @@
 #include <array>
 #include <cstddef>
 #include <optional>
+#include "CaptureMode.h"
 #include <random>
 #include <string>
 
@@ -195,7 +196,7 @@ private:
     // 1周目・2周目にどの異変を探させるか。プレイごとにランダムに決めている。
     Stage2AnomalyPlan m_AnomalyPlan;
     // 背後の気配の間隔に使う乱数
-    std::mt19937 m_PresenceRandom{ std::random_device{}() };
+    std::mt19937 m_PresenceRandom{ Tools::CaptureMode::MakeRandomSeed(1201u) };
 
     // timerが負なら実行していない、0以上なら対応する演出が進んでいる途中。
     // 何周目か（0〜3）

@@ -74,7 +74,7 @@ void Hud::DrawTitle(
     };
     const auto textWidth = [](std::string_view text, float pixelSize)
     {
-        return static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * 6.0f;
+        return static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * GlyphAdvance;
     };
 
     // 左側の暗い帯：左端はほぼ黒、右へ行くほど透明にして、後ろの森が右側に見えるようにしている
@@ -276,7 +276,7 @@ void Hud::DrawResult(
     constexpr float titlePixelSize = 7.0f;
     const float titleWidth =
         static_cast<float>(CountDisplayedCharacters(title)) *
-        titlePixelSize * 6.0f;
+        titlePixelSize * GlyphAdvance;
     AddText(
         (screenWidth - titleWidth) * 0.5f,
         panelY + 48.0f,
@@ -287,7 +287,7 @@ void Hud::DrawResult(
     constexpr std::string_view floorText = "2階をクリア";
     constexpr float floorPixelSize = 3.0f;
     const float floorWidth =
-        static_cast<float>(CountDisplayedCharacters(floorText)) * floorPixelSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(floorText)) * floorPixelSize * GlyphAdvance;
     AddText(
         (screenWidth - floorWidth) * 0.5f,
         panelY + 116.0f,
@@ -338,7 +338,7 @@ void Hud::DrawResult(
                 : Color(0.74f, 0.42f, 0.34f, 0.92f * reveal)));
     constexpr float rankPixelSize = 5.0f;
     const float rankWidth =
-        static_cast<float>(CountDisplayedCharacters(rankText)) * rankPixelSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(rankText)) * rankPixelSize * GlyphAdvance;
     AddText(
         (screenWidth - rankWidth) * 0.5f,
         panelY + 158.0f,
@@ -363,17 +363,17 @@ void Hud::DrawResult(
         std::to_string(totalEvidence);
     constexpr float statPixelSize = 2.5f;
     const float timeWidth =
-        static_cast<float>(CountDisplayedCharacters(timeText)) * statPixelSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(timeText)) * statPixelSize * GlyphAdvance;
     const float caughtWidth =
-        static_cast<float>(CountDisplayedCharacters(caughtText)) * statPixelSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(caughtText)) * statPixelSize * GlyphAdvance;
     const float anomalyWidth =
-        static_cast<float>(CountDisplayedCharacters(anomalyText)) * statPixelSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(anomalyText)) * statPixelSize * GlyphAdvance;
     const float mistakeWidth =
-        static_cast<float>(CountDisplayedCharacters(mistakeText)) * statPixelSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(mistakeText)) * statPixelSize * GlyphAdvance;
     const float chargerWidth =
-        static_cast<float>(CountDisplayedCharacters(chargerText)) * statPixelSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(chargerText)) * statPixelSize * GlyphAdvance;
     const float evidenceWidth =
-        static_cast<float>(CountDisplayedCharacters(evidenceText)) * statPixelSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(evidenceText)) * statPixelSize * GlyphAdvance;
     AddText(
         (screenWidth - timeWidth) * 0.5f,
         panelY + 232.0f,
@@ -420,7 +420,7 @@ void Hud::DrawResult(
         float y, std::string_view text, float pixelSize, const Color& color)
     {
         const float width =
-            static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * 6.0f;
+            static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * GlyphAdvance;
         AddText((screenWidth - width) * 0.5f, y, text, pixelSize, color);
     };
     AddRectangle(panelX + 60.0f, panelY + 446.0f, panelWidth - 120.0f, 1.0f, dim);
@@ -471,7 +471,7 @@ void Hud::DrawResult(
         constexpr float achievementPixelSize = 2.2f;
         const float achievementWidth = static_cast<float>(
             CountDisplayedCharacters(achievement)) *
-            achievementPixelSize * 6.0f;
+            achievementPixelSize * GlyphAdvance;
         AddText(
             (screenWidth - achievementWidth) * 0.5f,
             panelY + 632.0f,
@@ -486,7 +486,7 @@ void Hud::DrawResult(
     constexpr float promptPixelSize = 3.0f;
     const float promptWidth =
         static_cast<float>(CountDisplayedCharacters(prompt)) *
-        promptPixelSize * 6.0f;
+        promptPixelSize * GlyphAdvance;
     AddText(
         (screenWidth - promptWidth) * 0.5f,
         panelY + 672.0f,
@@ -565,7 +565,7 @@ void Hud::DrawSurveillanceFeed(
         std::to_string(requiredRounds);
     constexpr float statusSize = 2.0f;
     const float statusWidth =
-        static_cast<float>(CountDisplayedCharacters(status)) * statusSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(status)) * statusSize * GlyphAdvance;
     const float warningBoxSize = 12.0f;
     const float warningWidth =
         static_cast<float>(mistakesUntilCaught) * (warningBoxSize + 6.0f);
@@ -625,7 +625,7 @@ void Hud::DrawSurveillanceFeed(
     constexpr float promptSize = 2.8f;
     const float promptWidth =
         static_cast<float>(CountDisplayedCharacters(prompt)) *
-        promptSize * 6.0f;
+        promptSize * GlyphAdvance;
     AddRectangle(feedX, feedY + feedHeight + 18.0f,
         feedWidth, 54.0f, dark);
     AddText((screenWidth - promptWidth) * 0.5f,
@@ -683,9 +683,9 @@ void Hud::DrawChapterCard(
     constexpr float chapterPixelSize = 4.0f;
     constexpr float subtitlePixelSize = 2.5f;
     const float chapterWidth =
-        static_cast<float>(chapter.size()) * chapterPixelSize * 6.0f;
+        static_cast<float>(chapter.size()) * chapterPixelSize * GlyphAdvance;
     const float subtitleWidth =
-        static_cast<float>(subtitle.size()) * subtitlePixelSize * 6.0f;
+        static_cast<float>(subtitle.size()) * subtitlePixelSize * GlyphAdvance;
     AddText((screenWidth - chapterWidth) * 0.5f,
         panelY + 28.0f, chapter, chapterPixelSize, accent);
     AddText((screenWidth - subtitleWidth) * 0.5f,
@@ -740,7 +740,7 @@ void Hud::DrawObjectiveGuide(
         (Input::IsControllerConnected() ? "   LB ヒント" : "   H ヒント");
     constexpr float pixelSize = 2.0f;
     const float textWidth =
-        static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * GlyphAdvance;
     const float panelWidth = textWidth + 28.0f;
     const float panelX = 34.0f;
     const float panelY = 76.0f;
@@ -874,7 +874,7 @@ void Hud::DrawKeypad(
         float y, std::string_view text, float pixelSize, const Color& color)
     {
         const float width =
-            static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * 6.0f;
+            static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * GlyphAdvance;
         AddText((screenWidth - width) * 0.5f, y, text, pixelSize, color);
     };
     addCenteredText(panelY + 20.0f, "暗証番号", 3.4f, pale);
@@ -967,7 +967,7 @@ void Hud::DrawHidingView(float elapsedSeconds, float dangerRate, float breathLef
         : "E 外に出る";
     constexpr float promptPixelSize = 2.2f;
     const float promptWidth =
-        static_cast<float>(CountDisplayedCharacters(prompt)) * promptPixelSize * 6.0f;
+        static_cast<float>(CountDisplayedCharacters(prompt)) * promptPixelSize * GlyphAdvance;
     AddText((screenWidth - promptWidth) * 0.5f, screenHeight - 90.0f,
         prompt, promptPixelSize, Color(0.62f, 0.70f, 0.66f, 0.80f));
 
@@ -994,7 +994,7 @@ void Hud::DrawHidingView(float elapsedSeconds, float dangerRate, float breathLef
             : (Input::IsControllerConnected() ? "RB 長押しで息を止める" : "SPACE 長押しで息を止める");
         constexpr float breathPixelSize = 2.0f;
         const float breathWidth =
-            static_cast<float>(CountDisplayedCharacters(breathPrompt)) * breathPixelSize * 6.0f;
+            static_cast<float>(CountDisplayedCharacters(breathPrompt)) * breathPixelSize * GlyphAdvance;
         AddText((screenWidth - breathWidth) * 0.5f, meterY - 26.0f, breathPrompt, breathPixelSize,
             holding ? Color(0.62f, 0.78f, 0.84f, 0.90f) : Color(0.86f, 0.62f, 0.52f, 0.90f));
     }
@@ -1063,7 +1063,7 @@ void Hud::DrawPause(
         const Color& color)
     {
         const float width =
-            static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * 6.0f;
+            static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * GlyphAdvance;
         AddText((screenWidth - width) * 0.5f,
             y, text, pixelSize, color);
     };
@@ -1179,7 +1179,7 @@ void Hud::DrawIntro(const IntroView& view)
     };
     const auto textWidth = [](std::string_view text, float pixelSize)
     {
-        return static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * 6.0f;
+        return static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * GlyphAdvance;
     };
     const float noiseStep = std::floor(view.Time * 24.0f);
 
@@ -1299,7 +1299,7 @@ void Hud::DrawRadio(const RadioView& view)
     };
     const auto textWidth = [](std::string_view text, float pixelSize)
     {
-        return static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * 6.0f;
+        return static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * GlyphAdvance;
     };
     const float noiseStep = std::floor(view.Time * 24.0f);
     const float jitter = noise > 0.1f ? (hash(noiseStep) - 0.5f) * 22.0f * noise : 0.0f;

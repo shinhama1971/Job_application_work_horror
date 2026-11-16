@@ -17,6 +17,7 @@
 #include "SurveillancePatrol.h"
 
 #include <array>
+#include "CaptureMode.h"
 #include <random>
 
 class Hud;
@@ -73,7 +74,7 @@ private:
     // 巡回の状態、捕まった演出、乱数
     SurveillancePatrol m_Patrol;
     CaughtSequence m_Caught;
-    std::mt19937 m_Random{ std::random_device{}() };
+    std::mt19937 m_Random{ Tools::CaptureMode::MakeRandomSeed(1106u) };
 
     // 選んでいるカメラの映像と、端末を開いた瞬間に記録した各カメラの基準映像。
     Graphics::RenderTexture m_Feed;

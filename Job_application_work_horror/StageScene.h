@@ -168,6 +168,12 @@ private:
     float m_EvidenceNoticeTimer = 0.0f;
     float m_LoopCooldown = 0.0f;
     float m_LoopNoticeTimer = 0.0f;
+    // 暗証番号の部屋のヒューズ：空の箱の知らせを出す残り秒数、箱に近づいている間か（近づいた瞬間だけ知らせる）、
+    // 3本目の段階になったときに、先に開けていた部屋の箱へヒューズが戻ったか、前のフレームで3本目の段階だったか
+    float m_EmptyFuseCaseNoticeTimer = 0.0f;
+    bool m_NearEmptyFuseCase = false;
+    bool m_KeypadFuseReturned = false;
+    bool m_WasThirdFuseStage = false;
     // 2周目以降、開始地点の奥のドアの向こうから叩く音：次に鳴らすまでの秒数、続けて叩く残りの回数、これまでに鳴らした回数
     float m_StartDoorKnockTimer = 0.0f;
     int m_StartDoorKnocksLeft = 0;

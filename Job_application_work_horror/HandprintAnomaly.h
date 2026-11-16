@@ -16,6 +16,9 @@
 #include <algorithm>
 #include <array>
 
+// 血の手形の異変：最後の手形がこの見え方以上で照らされていれば見たとみなす。知らせの秒数
+inline constexpr float HandprintLitVisibility = 0.8f;
+inline constexpr float HandprintNoticeSeconds = 2.6f;
 class HandprintAnomaly final
 {
 public:
@@ -92,7 +95,7 @@ public:
 
         // 最後に現れた手形が浮かびきってから照らし続けると、次の手形が現れる（4つ目なら見つけた）
         const float latestVisibility = m_Visibility[static_cast<std::size_t>(m_RevealedCount - 1)];
-        m_LitSeconds = (litLatest && latestVisibility >= 0.8f) ? m_LitSeconds + deltaTime : 0.0f;
+        m_LitSeconds = (litLatest && latestVisibility >= HandprintLitVisibility) ? m_LitSeconds + deltaTime : 0.0f;
         if (m_LitSeconds < RequiredLitSeconds)
         {
             return Event::None;
@@ -104,7 +107,7 @@ public:
             return Event::NextAppeared;
         }
         m_Found = true;
-        m_NoticeTimer = 2.6f;
+        m_NoticeTimer = HandprintNoticeSeconds;
         return Event::Found;
     }
 

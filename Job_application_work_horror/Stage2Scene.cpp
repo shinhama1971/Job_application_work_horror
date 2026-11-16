@@ -112,7 +112,7 @@ void Stage2Scene::Init()
     Renderer::SetLoopDepth(0.0f);
     m_LoopCooldown = 0.0f;
     m_Notices.Reset();
-    m_Notices.loop = 2.8f;
+    m_Notices.loop = Stage2NoticeSeconds;
     m_VisualTimer = 0.0f;
     m_ObservedScareSequence.Reset();
     m_FinalSequence.Reset();
@@ -190,19 +190,9 @@ void Stage2Scene::Init()
     {
         Camera* camera = game->GetCamera();
         const float yaw = camera->GetCameraDirection();
-        camera->SetCameraPitch(0.22f);
-        Player::StairClimb arrival;
-        arrival.Direction = Vector3(std::sin(yaw), 0.0f, std::cos(yaw));
-        arrival.FlatDistance = 3.0f;
-        arrival.StepRun = 7.0f;
-        arrival.StepRise = 4.0f;
-        arrival.StepCount = 3;
-        arrival.EndFlatDistance = 4.0f;
-        arrival.Speed = 18.0f;
-        arrival.EyeDrop = arrival.StepRise * static_cast<float>(arrival.StepCount);
-        arrival.TargetPitch = 0.0f;
-        arrival.HoldAtEnd = false;
-        m_Objects.player->StartStairClimb(arrival);
+        camera->SetCameraPitch(Player::ArrivalStartPitch);
+        m_Objects.player->StartStairClimb(
+            Player::MakeArrivalClimb(Vector3(std::sin(yaw), 0.0f, std::cos(yaw))));
     }
 }
 
@@ -212,22 +202,10 @@ void Stage2Scene::StartExitStairClimb(Player& player)
 {
     const Vector3 position = player.GetPosition();
     const Vector3 landing(0.0f, position.y,
-        Stage2StairStartZ + Stage2StairStepRun * static_cast<float>(Stage2StairStepCount) + 30.0f);
-    Vector3 direction = landing - position;
-    direction.y = 0.0f;
-    direction.Normalize();
-    const float forward = (std::max)(direction.z, 0.1f);
-    Player::StairClimb climb;
-    climb.Direction = direction;
-    climb.FlatDistance = (std::max)(0.0f, (Stage2StairStartZ - position.z) / forward);
-    climb.StepRun = Stage2StairStepRun / forward;
-    climb.StepRise = Stage2StairStepRise;
-    climb.StepCount = Stage2StairStepCount;
-    climb.EndFlatDistance = 30.0f;
-    climb.Speed = 26.0f;
-    climb.TargetPitch = 0.16f;
-    climb.HoldAtEnd = true;
-    player.StartStairClimb(climb);
+        Stage2StairStartZ + Stage2StairStepRun * static_cast<float>(Stage2StairStepCount) +
+            Player::ExitClimbLandingDepth);
+    player.StartStairClimb(Player::MakeExitClimb(position, Vector3(0.0f, 0.0f, 1.0f), Stage2StairStartZ,
+        Stage2StairStepRun, Stage2StairStepRise, Stage2StairStepCount, landing));
 }
 
 // 信号盤の目印や扉のランプ、肖像画の目が、自分の光る色で廊下を照らすようにしている。
@@ -350,13 +328,13 @@ void Stage2Scene::Update()
         switch (debugAction)
         {
         case SceneDebugAction::AdvanceProgression:
-            if (m_LoopCount < 3)
+            if (m_LoopCount < Stage2FinalLoopCount)
             {
                 AdvanceLoop(*player);
             }
             break;
         case SceneDebugAction::PlayFinalSequence:
-            while (m_LoopCount < 3)
+            while (m_LoopCount < Stage2FinalLoopCount)
             {
                 AdvanceLoop(*player);
             }
@@ -445,7 +423,7 @@ void Stage2Scene::Update()
     if (m_LoopTransitionTimer >= 0.0f)
     {
         m_LoopTransitionTimer += deltaTime;
-        if (m_LoopTransitionTimer >= 4.20f)
+        if (m_LoopTransitionTimer >= Stage2LoopTransitionSeconds)
         {
             m_LoopTransitionTimer = -1.0f;
         }
@@ -455,7 +433,7 @@ void Stage2Scene::Update()
     if (Input::GetKeyTrigger(VK_H) ||
         Input::GetButtonTrigger(XINPUT_LEFT_SHOULDER))
     {
-        m_ProgressHintTimer = (std::max)(m_ProgressHintTimer, 30.0f);
+        m_ProgressHintTimer = (std::max)(m_ProgressHintTimer, Stage2RequestedHintSeconds);
         Input::SetVibration(2, 0.04f);
     }
 
@@ -482,7 +460,7 @@ void Stage2Scene::Update()
 
     Door* corridorDoor = m_Objects.door;
     if (corridorDoor != nullptr && corridorDoor->IsLocked() &&
-        m_ProgressHintTimer >= 15.0f &&
+        m_ProgressHintTimer >= Stage2GuidanceHintSeconds &&
         m_GuidancePulseCooldown <= 0.0f)
     {
         // しばらく進めていないとき、探すべき異変の近くの照明を揺らしている（偽の扉は奥寄り、時計と肖像画は中央付近、
@@ -504,13 +482,13 @@ void Stage2Scene::Update()
             guideLight->TriggerEventFlicker(0.72f, 0.58f);
         }
         game->GetPostProcess()->TriggerBloomPulse(0.30f, 0.16f);
-        m_GuidancePulseCooldown = 2.8f;
+        m_GuidancePulseCooldown = Stage2GuidancePulseInterval;
     }
 
-    if (m_LoopCount < 3 && m_LoopCooldown <= 0.0f &&
+    if (m_LoopCount < Stage2FinalLoopCount && m_LoopCooldown <= 0.0f &&
         // プレイヤーが廊下の扉を開けて通った後だけ、周回の状態を変えている。
         // 扉の中心の座標はz=140。
-        player->GetPosition().z > 146.0f)
+        player->GetPosition().z > Stage2LoopDoorPassZ)
     {
         AdvanceLoop(*player);
     }
@@ -518,7 +496,7 @@ void Stage2Scene::Update()
     // 信号盤が直り、準備ができていれば、廊下の中央（z>-8）まで来たときに最後の停電を始めている
     if (m_SignalPuzzle.IsComplete() && m_FinalSequenceArmed &&
         !m_FinalSequence.IsSequenceActive() &&
-        player->GetPosition().z > -8.0f)
+        player->GetPosition().z > Stage2FinalSequenceStartZ)
     {
         StartFinalSequence();
     }
@@ -539,7 +517,7 @@ void Stage2Scene::Update()
     UpdateClock(deltaTime);
     UpdateClockObservation();
     // ロッカーは周回中だけ使える（信号盤パズルと最後の追跡では、隠れずに対処させるため）。
-    const bool lockersUsable = m_LoopCount < 3 &&
+    const bool lockersUsable = m_LoopCount < Stage2FinalLoopCount &&
         !m_FinalSequence.IsSequenceActive() && !m_FinalSequence.IsPursuitActive();
     for (Locker* locker : m_Objects.lockers)
     {
@@ -559,12 +537,12 @@ void Stage2Scene::Update()
         emergencyCharger->IsActivated())
     {
         m_ChargerHandled = true;
-        m_Notices.charger = 2.8f;
-        m_NoiseThreatSystem.SetWarningTimer(3.2f);
+        m_Notices.charger = Stage2NoticeSeconds;
+        m_NoiseThreatSystem.SetWarningTimer(Stage2ChargerWarningSeconds);
         m_NoiseThreatSystem.SetThreat((std::max)(
-            m_NoiseThreatSystem.GetThreat(), 0.76f));
-        m_NoiseThreatSystem.SetEventCooldown(0.12f);
-        player->AddBattery(30.0f);
+            m_NoiseThreatSystem.GetThreat(), Stage2ChargerThreat));
+        m_NoiseThreatSystem.SetEventCooldown(Stage2ChargerEventCooldown);
+        player->AddBattery(Stage2ChargerBattery);
         game->RegisterChargerUsed();
 
         CeilingLight* startLight =
@@ -585,11 +563,11 @@ void Stage2Scene::Update()
             evidence->IsActivated())
         {
             m_EvidenceHandled[evidenceIndex] = true;
-            m_Notices.evidence = 3.2f;
+            m_Notices.evidence = Stage2ImportantNoticeSeconds;
             game->RegisterEvidenceCollected();
-            player->AddBattery(6.0f);
+            player->AddBattery(Stage2EvidenceBattery);
             m_NoiseThreatSystem.SetThreat((std::max)(
-                0.0f, m_NoiseThreatSystem.GetThreat() - 0.18f));
+                0.0f, m_NoiseThreatSystem.GetThreat() - Stage2EvidenceThreatRelief));
             Wall* marker = m_Objects.evidenceMarkers[evidenceIndex];
             if (marker != nullptr)
             {
@@ -619,7 +597,7 @@ void Stage2Scene::Update()
         {
             m_ConfirmationHandledThisLoop = true;
             game->RegisterAnomalyHandled();
-            m_Notices.loop = 2.8f;
+            m_Notices.loop = Stage2NoticeSeconds;
             m_FalseDoorAnomaly.ClearNotice();
             m_ClockAnomaly.ClearNotice();
             m_ProgressHintTimer = 0.0f;
@@ -640,7 +618,7 @@ void Stage2Scene::Update()
     }
 
     // 画面効果を、周回の進み具合・近くの照明の明るさ・危険度に合わせて変えている
-    const float loopRate = static_cast<float>(m_LoopCount) / 3.0f;
+    const float loopRate = static_cast<float>(m_LoopCount) / static_cast<float>(Stage2FinalLoopCount);
     // P.T. のように、周回が進むほど廊下の色調を赤黒く沈め、霧を濃くしている（扉を抜けた直後の暗転の間に、約1秒で変わる）
     m_LoopDepth += (loopRate - m_LoopDepth) * (std::min)(deltaTime * 2.5f, 1.0f);
     Renderer::SetLoopDepth(m_LoopDepth);
@@ -684,7 +662,7 @@ void Stage2Scene::Update()
         0.14f + loopRate * 0.08f);
     // 信号盤パズルの間と、足音の影が近いときは、監視映像のような信号の乱れを出している
     const bool signalRestorationActive =
-        m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete();
+        m_LoopCount >= Stage2FinalLoopCount && !m_SignalPuzzle.IsComplete();
     const float unresolvedSignalRate =
         1.0f - static_cast<float>(m_SignalPuzzle.GetStep()) / 3.0f;
     ShadowMan* activeNoiseShadow =

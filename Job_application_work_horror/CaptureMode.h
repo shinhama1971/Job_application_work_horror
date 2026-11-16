@@ -26,6 +26,10 @@ namespace Tools::CaptureMode
     void ConfigureFromCommandLine();
     // 自動撮影モード（または計測モード）で起動したかどうか
     bool IsActive();
+    // 乱数の種を作っている。普段は毎回ちがう種（std::random_device）、自動撮影・計測の間は captureSeed をそのまま返す。
+    // 2面の異変の順番・1面の物音・ヒューズの置き場所などが毎回同じになり、撮った画像を前の版と画素ごとに比べられる。
+    // captureSeed は使う場所ごとに変えている（同じ種だと、別の乱数どうしが同じ並びになるため）
+    unsigned int MakeRandomSeed(unsigned int captureSeed);
     // --benchmark で起動したとき true になる（IsActive も true になる）。
     bool IsBenchmark();
     // --benchmark に --vsync を付けたとき true（垂直同期を待って、実際に遊ぶときのフレーム時間のばらつきを測る）

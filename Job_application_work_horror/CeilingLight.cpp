@@ -12,6 +12,67 @@
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+    // 照明器具の標準の大きさ（モデルはこの大きさを1にした空間で作っている）
+    const Vector3 FixtureModelSize(22.0f, 2.0f, 10.0f);
+
+    // --- 電力が戻ったときの点き方：器具ごとに最大0.5秒ずらし（5段階 × 0.1秒）、0.58秒のあいだ1秒に24回の決まった並びで明滅する
+    constexpr float StartupStaggerSteps = 5.0f;
+    constexpr float StartupStaggerSeconds = 0.10f;
+    constexpr float StartupSeconds = 0.58f;
+    constexpr float StartupPulsesPerSecond = 24.0f;
+    constexpr float StartupWarmupBrightness = 0.40f;  // 点き始めの明るさ（ここから、この幅だけ上げて1にする）
+    constexpr float StartupWarmupRise = 0.60f;
+    constexpr float StartupOffBrightness = 0.025f;    // 明滅で消えている間の明るさ
+    // 点き始めの間（この秒数まで）は、明るさを速く追いつかせる
+    constexpr float StartupFastResponseSeconds = 1.1f;
+    // 目標の明るさがこれより低いときは、電圧の低下として速く追いつかせる
+    constexpr float VoltageDipBrightness = 0.75f;
+
+    // --- 停電中の非常灯：この周期で、この秒数だけ一瞬消える
+    constexpr float EmergencyBlackoutCycle = 4.3f;
+    constexpr float EmergencyBlackoutSeconds = 0.12f;
+
+    // --- 進む先の灯の明滅：新しい灯へ移ってから最初の明滅まで（最短＋乱数の幅）、長く暗くなる確率、
+    // 1回の明滅の長さ（最短＋乱数の幅。長く暗くなるときは少し長い）、次の明滅までの間（最短＋乱数の幅）、
+    // 長く暗くなった後に点き直す長さ、明滅で点いている間・消えている間の明るさの倍率
+    constexpr float RouteFirstDelay = 0.35f;
+    constexpr float RouteFirstDelayRange = 0.40f;
+    constexpr float RouteDropoutChance = 0.22f;
+    constexpr float RouteFlickerSeconds = 0.65f;
+    constexpr float RouteFlickerRange = 0.20f;
+    constexpr float RouteDropoutRange = 0.30f;
+    constexpr float RouteGapSeconds = 0.80f;
+    constexpr float RouteGapRange = 1.00f;
+    constexpr float RouteRelightSeconds = 0.22f;
+    constexpr float RouteOnBrightness = 1.40f;
+    constexpr float RouteOffBrightness = 0.12f;
+
+    // --- 故障した蛍光灯：器具ごとの周期（最短＋ずらし）、周期の初めに長く消える秒数、不安定に消えることがある秒数、
+    // 不安定に消える揺れのしきい値、消えている間の明るさ、点いている間の明るさの倍率
+    constexpr float FaultCycleSeconds = 3.1f;
+    constexpr float FaultCycleRange = 1.4f;
+    constexpr float FaultLongDropoutSeconds = 0.36f;
+    constexpr float FaultUnstableSeconds = 1.15f;
+    constexpr float FaultUnstableThreshold = -0.32f;
+    constexpr float FaultOffBrightness = 0.018f;
+    constexpr float FaultDimRate = 0.58f;
+
+    // --- 影が出たときなどの演出の明滅：1秒あたりの切り替えの回数、消えている間の明るさ
+    constexpr float EventPulsesPerSecond = 26.0f;
+    constexpr float EventOffBrightness = 0.008f;
+
+    // --- 点光源：ほとんど消えている器具は登録しない明るさ、発光パネルから下げる距離、照らす範囲（電力が戻った後・停電中）
+    constexpr float MinimumLightBrightness = 0.01f;
+    constexpr float LightBelowPanel = 3.0f;
+    constexpr float PoweredLightRange = 140.0f;
+    constexpr float EmergencyLightRange = 135.0f;
+
+    // --- 白熱電球の電圧の揺れ：短く沈む周期と、沈んでいる秒数
+    constexpr float WarmBulbDipCycle = 6.3f;
+    constexpr float WarmBulbDipSeconds = 0.18f;
+}
 // 照明器具の形（本体と縁・格子のルーバー、下に付いた発光パネル）をMayaで作ったモデルから読み込み、マテリアルを作っている。
 void CeilingLight::Init()
 {
@@ -23,7 +84,7 @@ void CeilingLight::Init()
             { "Body", Color(0.16f, 0.17f, 0.16f, 1.0f) },
             { "Panel", Color(0.72f, 0.70f, 0.62f, 1.0f) },
         },
-        Vector3(22.0f, 2.0f, 10.0f), m_Vertices, m_Indices);
+        FixtureModelSize, m_Vertices, m_Indices);
     m_BodyIndexCount = ranges[0].Count;
 
     m_VertexBuffer.Create(m_Vertices);
@@ -62,16 +123,16 @@ void CeilingLight::UpdateRouteFlicker(float& targetBrightness)
     // 新しい灯へ移ったら、短い間を置いてから最初の明滅を始める。
     if (m_RouteNextFlicker < 0.0f)
     {
-        m_RouteNextFlicker = m_Time + 0.35f + noise(seed + m_RouteFlickerSerial * 1.37f) * 0.40f;
+        m_RouteNextFlicker = m_Time + RouteFirstDelay + noise(seed + m_RouteFlickerSerial * 1.37f) * RouteFirstDelayRange;
     }
     if (m_Time >= m_RouteNextFlicker && m_Time >= m_RouteFlickerEnd)
     {
         m_RouteFlickerSerial += 1.0f;
         const float length = noise(seed + m_RouteFlickerSerial * 7.31f);
-        m_RouteDropout = noise(seed + m_RouteFlickerSerial * 3.77f) < 0.22f;
+        m_RouteDropout = noise(seed + m_RouteFlickerSerial * 3.77f) < RouteDropoutChance;
         m_RouteFlickerStart = m_Time;
-        m_RouteFlickerEnd = m_Time + (m_RouteDropout ? 0.65f + length * 0.30f : 0.65f + length * 0.20f);
-        m_RouteNextFlicker = m_RouteFlickerEnd + 0.80f + noise(seed + m_RouteFlickerSerial * 1.93f) * 1.00f;
+        m_RouteFlickerEnd = m_Time + (m_RouteDropout ? RouteFlickerSeconds + length * RouteDropoutRange : RouteFlickerSeconds + length * RouteFlickerRange);
+        m_RouteNextFlicker = m_RouteFlickerEnd + RouteGapSeconds + noise(seed + m_RouteFlickerSerial * 1.93f) * RouteGapRange;
         if (m_RouteDropout)
         {
             // 消える瞬間に、電気の接点がはじけるような小さな音
@@ -84,9 +145,9 @@ void CeilingLight::UpdateRouteFlicker(float& targetBrightness)
     {
         const float phase = (m_Time - m_RouteFlickerStart) / (m_RouteFlickerEnd - m_RouteFlickerStart);
         const bool on = m_RouteDropout
-            ? m_RouteFlickerEnd - m_Time < 0.22f
+            ? m_RouteFlickerEnd - m_Time < RouteRelightSeconds
             : phase < 0.30f || (phase >= 0.50f && phase < 0.84f);
-        targetBrightness *= on ? 1.40f : 0.12f;
+        targetBrightness *= on ? RouteOnBrightness : RouteOffBrightness;
         m_RouteFlickering = true;
     }
     else
@@ -128,21 +189,21 @@ void CeilingLight::Update()
         // 照明を順番に点け、各蛍光灯が完全に点く直前に短く明滅させている。
         // 一斉に点くのを避け、古い設備が復旧するときの不安定さを出している。
         const float startupDelay =
-            std::fmod(std::fabs(m_FlickerOffset), 5.0f) * 0.10f;
+            std::fmod(std::fabs(m_FlickerOffset), StartupStaggerSteps) * StartupStaggerSeconds;
         const float startupTime = m_PowerOnTimer - startupDelay;
 
-        if (startupTime >= 0.0f && startupTime < 0.58f)
+        if (startupTime >= 0.0f && startupTime < StartupSeconds)
         {
             // 1/24秒ごとに、点いているか消えているかを決まった並びで切り替えている（点き始めの蛍光灯の明滅）
-            const int pulse = static_cast<int>(startupTime * 24.0f);
+            const int pulse = static_cast<int>(startupTime * StartupPulsesPerSecond);
             const bool tubeIsOn =
                 (pulse == 0) || (pulse == 3) || (pulse == 4) ||
                 (pulse >= 7 && (pulse % 3) != 1);
             const float warmup =
-                0.40f + (startupTime / 0.58f) * 0.60f;
-            targetBrightness = tubeIsOn ? warmup : 0.025f;
+                StartupWarmupBrightness + (startupTime / StartupSeconds) * StartupWarmupRise;
+            targetBrightness = tubeIsOn ? warmup : StartupOffBrightness;
         }
-        else if (startupTime >= 0.58f)
+        else if (startupTime >= StartupSeconds)
         {
             // 器具ごとに安定器の個体差を持たせ、まれに起きる電圧の低下を再現している。
             // 一定すぎる光を避け、古い施設らしさを出している。
@@ -177,7 +238,7 @@ void CeilingLight::Update()
             std::sin(flickerTime * 13.0f) *
             std::sin(flickerTime * 29.0f);
         const bool shortBlackout =
-            std::fmod(flickerTime, 4.3f) < 0.12f;
+            std::fmod(flickerTime, EmergencyBlackoutCycle) < EmergencyBlackoutSeconds;
         // 懐中電灯を消すとほとんど闇なので、赤い光だまりが見えるよう、前より明るくしている
         targetBrightness = shortBlackout
             ? 0.015f
@@ -211,17 +272,17 @@ void CeilingLight::Update()
     if (m_IsFaulted && powerRestored)
     {
         const float faultTime = m_Time + std::fabs(m_FlickerOffset) * 0.73f;
-        const float faultCycle = 3.1f +
-            std::fmod(std::fabs(m_FlickerOffset) * 0.41f, 1.4f);
+        const float faultCycle = FaultCycleSeconds +
+            std::fmod(std::fabs(m_FlickerOffset) * 0.41f, FaultCycleRange);
         const float faultPhase = std::fmod(faultTime, faultCycle);
         const float ballastNoise =
             std::sin(faultTime * 17.0f) * std::sin(faultTime * 31.0f);
-        const bool longDropout = faultPhase < 0.36f;
+        const bool longDropout = faultPhase < FaultLongDropoutSeconds;
         const bool unstableDropout =
-            faultPhase < 1.15f && ballastNoise < -0.32f;
+            faultPhase < FaultUnstableSeconds && ballastNoise < FaultUnstableThreshold;
         targetBrightness = (longDropout || unstableDropout)
-            ? 0.018f
-            : targetBrightness * 0.58f;
+            ? FaultOffBrightness
+            : targetBrightness * FaultDimRate;
     }
 
     // イベント用の明滅（影が出たときなど）。決まった並びで点滅させ、点いている間は普段より明るくしている
@@ -232,7 +293,7 @@ void CeilingLight::Update()
             m_EventFlickerTimer - deltaTime);
         const float elapsed =
             m_EventFlickerDuration - m_EventFlickerTimer;
-        const int pulse = static_cast<int>(elapsed * 26.0f);
+        const int pulse = static_cast<int>(elapsed * EventPulsesPerSecond);
         const bool tubeOn =
             (pulse == 0) || (pulse == 2) ||
             (pulse >= 4 && (pulse % 3) != 1);
@@ -240,7 +301,7 @@ void CeilingLight::Update()
             0.38f + m_EventFlickerStrength * 0.48f;
         targetBrightness = tubeOn
             ? (std::max)(targetBrightness, flareBrightness)
-            : 0.008f;
+            : EventOffBrightness;
     }
 
     // 演出で強制的に消しているときは、何があっても真っ暗にしている
@@ -250,9 +311,9 @@ void CeilingLight::Update()
     }
 
     // 明るさの追いつく速さ：点き始めと電圧低下は速く、普段はゆっくり変えている
-    const bool startingUp = powerRestored && m_PowerOnTimer < 1.1f;
+    const bool startingUp = powerRestored && m_PowerOnTimer < StartupFastResponseSeconds;
     const bool voltageDip =
-        powerRestored && !startingUp && targetBrightness < 0.75f;
+        powerRestored && !startingUp && targetBrightness < VoltageDipBrightness;
     // 進む先の灯は、明滅の山を見分けられる速さで明るさを追従させる。
     const float response = m_RouteFlickering
         ? 0.72f
@@ -349,7 +410,7 @@ void CeilingLight::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& ligh
 {
     const float brightness = GetBrightness();
     // ほとんど消えている照明は登録しない（タイルベースのライティングの計算を減らすため）
-    if (brightness <= 0.01f)
+    if (brightness <= MinimumLightBrightness)
     {
         return;
     }
@@ -359,8 +420,8 @@ void CeilingLight::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& ligh
 
     // 発光パネルより少し下へ光源を置き、天井に埋もれず室内を照らすようにしている。
     pointLight.PositionRange = Vector4(
-        m_Position.x, m_Position.y - 3.0f, m_Position.z,
-        powerRestored ? 140.0f : 135.0f);
+        m_Position.x, m_Position.y - LightBelowPanel, m_Position.z,
+        powerRestored ? PoweredLightRange : EmergencyLightRange);
 
     // 進行先の器具も、周囲と同じ非常灯・蛍光灯の色で照らす。
     // 電力が戻っても、古い蛍光灯のように少し緑がかった弱い光にし、照明と照明の間に暗がりが残るようにしている。
@@ -389,7 +450,7 @@ float CeilingLight::GetWarmBulbSag() const
 {
     const float time = m_Time + m_FlickerOffset * 3.7f;
     const float slow = std::sin(time * 1.3f) * 0.5f + 0.5f;
-    const float dipPhase = std::fmod(time, 6.3f);
-    const float dip = dipPhase < 0.18f ? std::sin(dipPhase / 0.18f * 3.14159265f) : 0.0f;
+    const float dipPhase = std::fmod(time, WarmBulbDipCycle);
+    const float dip = dipPhase < WarmBulbDipSeconds ? std::sin(dipPhase / WarmBulbDipSeconds * DirectX::XM_PI) : 0.0f;
     return 1.0f - slow * 0.04f - dip * 0.10f;
 }

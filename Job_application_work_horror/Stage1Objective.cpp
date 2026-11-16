@@ -44,6 +44,11 @@ namespace
         {
             "3本目 西棟の奥か、暗証番号の扉の先", "ヒント 右の倉庫の鍵で西棟へ、または壁の光る数字で扉を開ける", "ヒント 右側の部屋か、壁の数字を照らす"
         };
+        // 先に部屋を開けていた人には、空だった箱にヒューズが戻ったことを伝えている（ループを2周した合図）
+        if (in.keypadSolved && in.keypadFuseReturned && variant == 0)
+        {
+            return "暗証番号の部屋の箱に、何かが戻っている";
+        }
         return in.keypadSolved ? KeypadTexts[variant] : ChoiceTexts[variant];
     }
 }
@@ -96,6 +101,11 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
     {
         // 西棟のバルブを回している間の進み具合と、水が引いたなどの知らせ。
         objectiveText = std::string(in.westWingText);
+    }
+    else if (in.emptyFuseCaseNotice)
+    {
+        // 3本目の段階より前に暗証番号の部屋を開けた人に、ここにはまだヒューズがないことを伝えている。
+        objectiveText = "ヒューズの箱は空だ。誰かが持ち去ったらしい";
     }
     else if (!in.safeLightText.empty())
     {

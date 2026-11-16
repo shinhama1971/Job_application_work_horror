@@ -163,6 +163,8 @@ private:
     // HUDの座標は「縦864の画面」を基準に、画素単位で決めてある。実際の描画解像度との比で
     // キャンバスの大きさを決め、画面の大きさが変わってもHUDが画面に対して同じ大きさに見えるようにしている。
     static constexpr float ReferenceHeight = 864.0f;
+    // 文字1つの幅（文字の大きさの倍率に掛ける。5画素の字と1画素の間）
+    static constexpr float GlyphAdvance = 6.0f;
     // キャンバスの拡大率（描画解像度の高さ÷864）、キャンバスの幅（画面の縦横比に合わせて変わる）、高さ（常に864）
     static float GetCanvasScale();
     static float GetCanvasWidth();

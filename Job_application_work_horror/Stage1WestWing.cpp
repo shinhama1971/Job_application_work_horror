@@ -33,13 +33,41 @@ namespace
     const Vector3 EntranceDoorPosition(-220.0f, -74.0f, -20.0f);
     // 奥のポンプ室の排水口の位置。水はここへ向かって引いていく。
     const Vector3 DrainPosition(-290.0f, -99.5f, 228.0f);
+    // 1つ目・2つ目のバルブを回したときの水の手前の端（z）
+    constexpr float FirstValveWaterEdgeZ = 20.0f;
+    constexpr float SecondValveWaterEdgeZ = 140.0f;
     // 回したバルブの数ごとの、水の手前の端（z）。3つ回すと奥の端（MaxZ）まで引き、水がなくなる。
     constexpr std::array<float, Stage1WestWing::ValveCount + 1> WaterEdgeTargets =
     {
-        Stage1WestWing::MinZ, 20.0f, 140.0f, Stage1WestWing::MaxZ
+        Stage1WestWing::MinZ, FirstValveWaterEdgeZ, SecondValveWaterEdgeZ, Stage1WestWing::MaxZ
     };
     // 水の端が引いていく速さ（1秒あたり）
     constexpr float WaterDrainSpeed = 10.0f;
+    // 初めて入ったときに、奥の配管を叩く音を鳴らす位置（ポンプ室の天井近く）
+    const Vector3 FirstEntryKnockPosition(-330.0f, -60.0f, 220.0f);
+    // 天井から滴る水の音：プレイヤーからこの距離の範囲の、この高さで鳴らす
+    constexpr float DripMinDistance = 10.0f;
+    constexpr float DripMaxDistance = 38.0f;
+    constexpr float DripHeight = -60.0f;
+    // バルブ：回している割合の表示を残す秒数、きしむ音の間隔
+    constexpr float TurningTextSeconds = 0.6f;
+    constexpr float TurnCreakInterval = 0.55f;
+    // 排水口から水が抜ける音を鳴らし直す間隔（1つのバルブで水が引く長さとほぼ同じ）
+    constexpr float GurgleInterval = 12.5f;
+    // 排水の跡を出す、手前のコンクリート柱の足もとの位置（x・z）
+    const Vector2 DrainTraceStart(-330.0f, 10.0f);
+    // 背後で水の中を歩く音：真後ろのこの距離から、1歩ごとにこの距離だけ近づき、左右にこの幅だけ揺れる。
+    // 最初の1歩までの秒数と、1歩の間隔、足もとの高さ
+    constexpr float WadingStartDistance = 24.0f;
+    constexpr float WadingStepCloser = 3.0f;
+    constexpr float WadingSway = 1.5f;
+    constexpr float WadingFirstDelay = 0.35f;
+    constexpr float WadingStepInterval = 0.62f;
+    constexpr float WadingFootY = -99.0f;
+    // 知らせを出す秒数（西棟に入ったとき・水が引いたとき・全部のバルブを開けたとき）
+    constexpr float FloodedNoticeSeconds = 3.6f;
+    constexpr float DrainedNoticeSeconds = 3.2f;
+    constexpr float ValveNoticeSeconds = 3.0f;
     // バルブのランプの色（回す前は赤、回したら緑）
     const Color ValveLampClosed(0.90f, 0.08f, 0.05f, 1.0f);
     const Color ValveLampOpened(0.10f, 0.85f, 0.25f, 1.0f);
@@ -230,14 +258,14 @@ void Stage1WestWing::Update(const Player& player, float deltaTime,
         // 初めて中に入ったとき、何をすればよいかを短く伝えている
         if (IsInside(position) && !m_EnteredOnce)
         {
-            ShowNotice("床が水に沈んでいる 赤いランプのバルブで水を抜く", 3.6f);
+            ShowNotice("床が水に沈んでいる 赤いランプのバルブで水を抜く", FloodedNoticeSeconds);
         }
         UpdateValves(player, deltaTime, listenerForward, focused, cues);
         if (UpdateWaterLevel(deltaTime, cues))
         {
             m_Step = Step::FindFuse;
             m_Parts.fuse->SetActive(true);
-            ShowNotice("水が引いた 奥のポンプ室でヒューズを探す", 3.2f);
+            ShowNotice("水が引いた 奥のポンプ室でヒューズを探す", DrainedNoticeSeconds);
             // 水が引ききった瞬間、奥の排水口で配管が一度大きく鳴っている
             AmbientSoundCue knock;
             knock.Label = SOUND_CUE_PIPE_KNOCK;
@@ -286,7 +314,7 @@ void Stage1WestWing::Update(const Player& player, float deltaTime,
         m_EnteredOnce = true;
         AmbientSoundCue knock;
         knock.Label = SOUND_CUE_PIPE_KNOCK;
-        knock.Position = Vector3(-330.0f, -60.0f, 220.0f);
+        knock.Position = FirstEntryKnockPosition;
         knock.Pitch = 0.82f;
         knock.Volume = 0.75f;
         cues.push_back(knock);
@@ -299,12 +327,12 @@ void Stage1WestWing::Update(const Player& player, float deltaTime,
     {
         m_DripTimer = RandomRange(MinDripInterval, MaxDripInterval);
         const float angle = RandomRange(0.0f, 6.2831853f);
-        const float distance = RandomRange(10.0f, 38.0f);
+        const float distance = RandomRange(DripMinDistance, DripMaxDistance);
         AmbientSoundCue drip;
         drip.Label = SOUND_CUE_WATER_DROP;
         drip.Position = Vector3(
             (std::clamp)(position.x + std::cos(angle) * distance, MinX, MaxX),
-            -60.0f,
+            DripHeight,
             (std::clamp)(position.z + std::sin(angle) * distance, MinZ, MaxZ));
         drip.Pitch = RandomRange(0.92f, 1.08f);
         drip.Volume = RandomRange(0.38f, 0.52f);
@@ -345,13 +373,13 @@ void Stage1WestWing::UpdateValves(const Player& player, float deltaTime,
         m_TurningProgress = valve->GetProgress();
         m_TurningText = "バルブを回している " +
             std::to_string(static_cast<int>(m_TurningProgress * 100.0f)) + "%";
-        m_TurningTimer = 0.6f;
+        m_TurningTimer = TurningTextSeconds;
 
         // 回し始めと、回している間は0.55秒ごとに、錆びた金属がきしむ音を鳴らしている
         m_TurnSoundTimer -= deltaTime;
         if (m_TurnSoundTimer <= 0.0f)
         {
-            m_TurnSoundTimer = 0.55f;
+            m_TurnSoundTimer = TurnCreakInterval;
             AmbientSoundCue creak;
             creak.Label = SOUND_CUE_PIPE_KNOCK;
             creak.Position = valve->GetInteractionPosition();
@@ -367,7 +395,7 @@ void Stage1WestWing::UpdateValves(const Player& player, float deltaTime,
             const int openedCount = GetOpenedValveCount();
             ShowNotice(openedCount < ValveCount
                 ? "水が引き始めた 残りのバルブを探す"
-                : "全部のバルブを開けた 水が奥へ引いていく", 3.0f);
+                : "全部のバルブを開けた 水が奥へ引いていく", ValveNoticeSeconds);
 
             // 配管の奥で、低い音がゆっくり遠ざかっていく（水が流れ出した合図）
             AmbientSoundCue knock;
@@ -397,7 +425,7 @@ bool Stage1WestWing::UpdateWaterLevel(float deltaTime, std::vector<AmbientSoundC
         m_GurgleTimer -= deltaTime;
         if (m_GurgleTimer <= 0.0f)
         {
-            m_GurgleTimer = 12.5f;
+            m_GurgleTimer = GurgleInterval;
             AmbientSoundCue gurgle;
             gurgle.Label = SOUND_CUE_DRAIN;
             gurgle.Position = DrainPosition;
@@ -422,7 +450,7 @@ void Stage1WestWing::ApplyFloodRegion()
         m_Parts.ground->SetFloodRegion(Vector2(MinX, m_WaterEdgeZ), Vector2(MaxX, MaxZ));
         // 手前のコンクリート柱（WestWingColumn1）と、その足元に排水の跡を出す。
         const float progress = (m_WaterEdgeZ - MinZ) / (MaxZ - MinZ);
-        m_Parts.ground->SetDrainTrace(Vector2(-330.0f, 10.0f), m_WaterEdgeZ, progress);
+        m_Parts.ground->SetDrainTrace(DrainTraceStart, m_WaterEdgeZ, progress);
     }
 }
 
@@ -441,16 +469,16 @@ void Stage1WestWing::ScheduleWading(const Vector3& listenerPosition, const Vecto
     constexpr int StepCount = 4;
     for (int index = 0; index < StepCount; ++index)
     {
-        const float distance = 24.0f - static_cast<float>(index) * 3.0f;
+        const float distance = WadingStartDistance - static_cast<float>(index) * WadingStepCloser;
         // 左右に少しずつ揺らし、歩いているように聞こえるようにしている
-        const float sway = (index % 2 == 0 ? 1.0f : -1.0f) * 1.5f;
+        const float sway = (index % 2 == 0 ? 1.0f : -1.0f) * WadingSway;
         Vector3 stepPosition = listenerPosition + backward * distance + side * sway;
         stepPosition.x = (std::clamp)(stepPosition.x, MinX, MaxX);
         stepPosition.z = (std::clamp)(stepPosition.z, MinZ, MaxZ);
-        stepPosition.y = -99.0f;
+        stepPosition.y = WadingFootY;
 
         ScheduledCue scheduled;
-        scheduled.Delay = 0.35f + static_cast<float>(index) * 0.62f;
+        scheduled.Delay = WadingFirstDelay + static_cast<float>(index) * WadingStepInterval;
         scheduled.Cue.Label = SOUND_CUE_WATER_STEP;
         scheduled.Cue.Position = stepPosition;
         scheduled.Cue.Pitch = 0.86f;

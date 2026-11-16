@@ -29,6 +29,73 @@ using namespace DirectX::SimpleMath;
 
 #include "Stage2SceneConstants.h"
 
+namespace
+{
+    // --- 床と入口（値は Stage2SceneConstants.h）
+    constexpr float FloorY = Stage2FloorY;
+    constexpr float FootY = Stage2FootY;
+    // 足音の影に捕まった後に戻す入口の位置
+    const Vector3 EntrancePosition(0.0f, FootY, Stage2EntranceZ);
+
+    // --- 偽の扉：ライトで照らして正面から見たら「見た」、その後に目をそらすか離れたら右の壁へ移す。
+    // 見ているかは、左の壁の扉の取っ手の高さあたり（y=-72）を狙って調べる
+    const Vector3 FalseDoorCenter(-Stage2FalseDoorHandleX, -72.0f, Stage2FalseDoorLeftZ);
+    constexpr float FalseDoorObserveDistance = 105.0f;
+    constexpr float FalseDoorObserveFacing = 0.88f;   // 見ている向きとの内積（1が真正面）
+    constexpr float FalseDoorLookAwayFacing = 0.30f;
+    constexpr float FalseDoorLeaveDistance = 118.0f;
+
+    // --- 壁の傷の文字：近さ（この距離から、この幅で遠ざかるほど弱く）と、正面から見ている度合いで照らす強さを決める
+    const Vector3 ScratchMessageCenter(39.45f, -71.0f, 31.0f);
+    constexpr float ScratchNearDistance = 24.0f;
+    constexpr float ScratchFadeRange = 95.0f;
+    constexpr float ScratchGazeStartFacing = 0.62f;
+    constexpr float ScratchGazeRange = 0.30f;
+
+    // --- 血の手形：最後に現れた手形を、近くでライトの中心に捉えたか
+    constexpr float HandprintLitDistance = 110.0f;
+    constexpr float HandprintLitFacing = 0.93f;
+
+    // --- 鏡：鏡の中の自分が遅れる秒数と、鏡の中の人影が現れる・消える秒数
+    constexpr float MirrorSelfDelaySeconds = 0.45f;
+    constexpr float MirrorFigureFadeInSeconds = 0.35f;
+    constexpr float MirrorFigureFadeOutSeconds = 0.5f;
+
+    // --- 肖像画：ライトを点けて、近くで正面から見つめているか。瞳の向きを求める目の位置
+    const Vector3 PortraitCenter(38.72f, -69.0f, -25.0f);
+    constexpr float PortraitLookDistance = 105.0f;
+    constexpr float PortraitLookFacing = 0.91f;
+    const Vector3 PortraitEyeCenter(38.9f, -67.5f, -25.0f);
+
+    // --- 最後の追跡：影をプレイヤーのこれだけ後ろに出し、この速さで追わせる。
+    // 捕まった回数が多いほど、1回につきこの分だけ遅くする（最大の回数まで）
+    constexpr float PursuitStartBehind = 72.0f;
+    constexpr float PursuitSpeed = 18.0f;
+    constexpr float PursuitRetrySlowdown = 1.5f;
+    constexpr int PursuitRetrySlowdownMaxCatches = 2;
+    constexpr float PursuitStopDistance = 30.0f;
+    constexpr float PursuitGazeScareSeconds = 8.0f;
+
+    // --- 足音の影に捕まって入口へ戻ったとき：危険度を下げ、しばらく影を出さない
+    constexpr float NoiseCatchResetThreat = 0.18f;
+    constexpr float NoiseCatchStalkerCooldown = 7.0f;
+    constexpr float NoiseCatchStalkerNoticeSeconds = 3.0f;
+
+    // --- 見えない影：ライトが胸に当たったか（胸の高さ・距離・光の中心からのずれ）。息づかいを鳴らす頭の高さ
+    constexpr float UnseenChestHeight = 24.0f;
+    constexpr float UnseenHeadHeight = 36.0f;
+    constexpr float UnseenLitDistance = 75.0f;
+    constexpr float UnseenLitFacing = 0.95f;
+    // 歩幅、左右の足の間隔の半分、水に触れた後に濡れた足跡を残す歩数、影だけの見え方を上げ下げする秒数
+    constexpr float UnseenStride = 7.0f;
+    constexpr float UnseenFootOffset = 2.4f;
+    constexpr int UnseenWetStepCount = 9;
+    constexpr float UnseenShadowFadeSeconds = 0.4f;
+
+    // --- 背後の気配：真後ろに置けないときに、次の機会へ回す秒数
+    constexpr float BehindPresenceRetrySeconds = 3.0f;
+}
+
 
 // 偽の扉の異変：ライトで照らして見た後、目を離した隙に反対側（右）の壁へ移している
 void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
@@ -41,8 +108,7 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
     }
 
     Core::Game* game = Core::Game::GetInstance();
-    const Vector3 doorCenter(-38.3f, -72.0f, 70.0f);
-    Vector3 cameraToDoor = doorCenter - game->GetCamera()->GetPosition();
+    Vector3 cameraToDoor = FalseDoorCenter - game->GetCamera()->GetPosition();
     const float distance = cameraToDoor.Length();
     if (distance > 0.001f)
     {
@@ -51,7 +117,7 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
 
     // 近く（105未満）で正面（内積0.88超）から見たとき、ライトが点いていれば「見た」、消えていれば間違いとして数えている
     const float facing = game->GetCamera()->GetForward().Dot(cameraToDoor);
-    if (distance < 105.0f && facing > 0.88f)
+    if (distance < FalseDoorObserveDistance && facing > FalseDoorObserveFacing)
     {
         if (!player.IsFlashlightOn())
         {
@@ -65,7 +131,7 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
 
     // 見た後で、目をそらす（内積0.30以下）か離れたら、右の壁へ移して照明と画面で知らせている
     if (!m_FalseDoorAnomaly.WasObserved() ||
-        (facing > 0.30f && distance < 118.0f))
+        (facing > FalseDoorLookAwayFacing && distance < FalseDoorLeaveDistance))
     {
         return;
     }
@@ -73,7 +139,7 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
     m_FalseDoorAnomaly.MarkMoved();
     SetFalseDoorState(true, true);
 
-    m_Notices.loop = 2.8f;
+    m_Notices.loop = Stage2NoticeSeconds;
 
     CeilingLight* doorLight =
         m_Objects.Light(Stage2Light::DoorLight);
@@ -169,7 +235,7 @@ void Stage2Scene::StartFinalSequence()
     KickHangingBulbs(0.9f);
     m_NoiseThreatSystem.SetThreat(0.0f);
     m_NoiseThreatSystem.SetWarningTimer(0.0f);
-    m_Notices.loop = 2.8f;
+    m_Notices.loop = Stage2NoticeSeconds;
 
     Core::Game* game = Core::Game::GetInstance();
     Player* player = m_Objects.player;
@@ -188,15 +254,15 @@ void Stage2Scene::StartFinalSequence()
         const Vector3 playerPosition = player->GetPosition();
         shadow->SetPosition(
             playerPosition.x,
-            -99.0f,
-            playerPosition.z - 72.0f);
+            FootY,
+            playerPosition.z - PursuitStartBehind);
         shadow->SetActive(false);
         shadow->SetActive(true);
         // 捕まった回数が多いほど影を遅くしている（1回1.5ずつ、最大2回分）
         const float retryAssist = static_cast<float>((std::min)(
-            game->GetCaughtCount(), 2)) * 1.5f;
-        shadow->EnableChase(18.0f - retryAssist, 30.0f);
-        shadow->EnableGazeScare(8.0f);
+            game->GetCaughtCount(), PursuitRetrySlowdownMaxCatches)) * PursuitRetrySlowdown;
+        shadow->EnableChase(PursuitSpeed - retryAssist, PursuitStopDistance);
+        shadow->EnableGazeScare(PursuitGazeScareSeconds);
         // 追跡中に影を見てしまうと、照明が一斉に明滅する罰を出している（続けては出さない）
         shadow->SetOnObserved(
             [this]()
@@ -206,7 +272,9 @@ void Stage2Scene::StartFinalSequence()
                     return;
                 }
 
-                m_Notices.loop = 1.65f;
+                // 追跡の最中なので、知らせは短く（走りながらでも一目で読める長さ）
+                constexpr float gazePenaltyNoticeSeconds = 1.65f;
+                m_Notices.loop = gazePenaltyNoticeSeconds;
                 Core::Game* game = Core::Game::GetInstance();
                 for (CeilingLight* light : m_Objects.lights)
                 {
@@ -285,7 +353,7 @@ void Stage2Scene::UpdateFinalSequence(float deltaTime)
     // 演出が終わったら、出口の扉の鍵を外し、出口を調べられるようにし、扉のランプを緑にしている
     m_FinalDoorReady = true;
     m_FinalSequenceArmed = false;
-    m_Notices.loop = 3.0f;
+    m_Notices.loop = Stage2LongNoticeSeconds;
 
     Door* finalDoor = m_Objects.door;
     if (finalDoor != nullptr)
@@ -496,7 +564,7 @@ void Stage2Scene::UpdateCaughtSequence(Player& player, float deltaTime)
     }
 
     // 足音の影に捕まった場合は今の周回を残し、入口へ戻して再挑戦させている。
-    player.SetPosition(Vector3(0.0f, -99.0f, -125.0f));
+    player.SetPosition(EntrancePosition);
     player.RestoreStamina();
     player.SetCanControl(true);
     const bool wasNoiseCatch = m_CaughtSequence.WasNoiseStalker();
@@ -510,11 +578,11 @@ void Stage2Scene::UpdateCaughtSequence(Player& player, float deltaTime)
     }
     else
     {
-        m_NoiseThreatSystem.SetThreat(0.18f);
-        m_NoiseThreatSystem.SetStalkerCooldown(7.0f);
-        m_NoiseThreatSystem.SetStalkerNoticeTimer(3.0f);
+        m_NoiseThreatSystem.SetThreat(NoiseCatchResetThreat);
+        m_NoiseThreatSystem.SetStalkerCooldown(NoiseCatchStalkerCooldown);
+        m_NoiseThreatSystem.SetStalkerNoticeTimer(NoiseCatchStalkerNoticeSeconds);
     }
-    m_Notices.loop = 3.2f;
+    m_Notices.loop = Stage2ImportantNoticeSeconds;
 
     Door* door = m_Objects.door;
     if (door != nullptr && !wasNoiseCatch)
@@ -572,7 +640,7 @@ void Stage2Scene::RevealScratchPieces(int first, int last, float emission)
 // 照明の区画：廊下を進むと照明を明滅させ、2周目以降は通り過ぎた照明を消している
 void Stage2Scene::UpdateLightZones(const Player& player)
 {
-    if (m_LoopCount >= 3 || m_FinalSequence.IsSequenceActive())
+    if (m_LoopCount >= Stage2FinalLoopCount || m_FinalSequence.IsSequenceActive())
     {
         return;
     }
@@ -651,9 +719,8 @@ void Stage2Scene::UpdateScratchMessage(
     }
 
     Core::Game* game = Core::Game::GetInstance();
-    const Vector3 messageCenter(39.45f, -71.0f, 31.0f);
     Vector3 cameraToMessage =
-        messageCenter - game->GetCamera()->GetPosition();
+        ScratchMessageCenter - game->GetCamera()->GetPosition();
     const float distance = cameraToMessage.Length();
     if (distance > 0.001f)
     {
@@ -665,11 +732,11 @@ void Stage2Scene::UpdateScratchMessage(
         game->GetCamera()->GetForward().Dot(cameraToMessage),
         0.0f);
     const float proximity = 1.0f - (std::clamp)(
-        (distance - 24.0f) / 95.0f,
+        (distance - ScratchNearDistance) / ScratchFadeRange,
         0.0f,
         1.0f);
     const float gaze = (std::clamp)(
-        (facing - 0.62f) / 0.30f,
+        (facing - ScratchGazeStartFacing) / ScratchGazeRange,
         0.0f,
         1.0f);
     const float flashlightResponse =
@@ -717,7 +784,8 @@ void Stage2Scene::UpdateHandprintAnomaly(const Player& player, float deltaTime)
         if (distance > 0.001f)
         {
             toPrint /= distance;
-            litLatest = distance < 110.0f && game->GetCamera()->GetForward().Dot(toPrint) > 0.93f;
+            litLatest = distance < HandprintLitDistance &&
+                game->GetCamera()->GetForward().Dot(toPrint) > HandprintLitFacing;
         }
     }
 
@@ -738,7 +806,7 @@ void Stage2Scene::UpdateHandprintAnomaly(const Player& player, float deltaTime)
     else if (handprintEvent == HandprintAnomaly::Event::Found)
     {
         // 最後の手形を照らした：奥の確認スイッチが押せるようになる
-        m_Notices.loop = 2.8f;
+        m_Notices.loop = Stage2NoticeSeconds;
         game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, m_HandprintAnomaly.GetLatestPosition(), 0.62f, 1.4f);
         game->GetPostProcess()->TriggerHorrorPulse(0.30f, 0.40f);
         game->GetPostProcess()->TriggerBloomPulse(0.40f, 0.20f);
@@ -770,15 +838,15 @@ void Stage2Scene::UpdateMirrorAnomaly(const Player& player, float deltaTime)
     // 鏡の異変の周回で、まだ見つけていない間は、鏡の中の自分だけが少し遅れて動く
     if (m_Objects.mirrorSelf != nullptr)
     {
-        m_Objects.mirrorSelf->SetDelaySeconds(active && !m_MirrorAnomaly.WasFound() ? 0.45f : 0.0f);
+        m_Objects.mirrorSelf->SetDelaySeconds(active && !m_MirrorAnomaly.WasFound() ? MirrorSelfDelaySeconds : 0.0f);
     }
 
     // 鏡の中の人影を、異変の周回で、まだ見つけていない間だけ映している（0.35秒で現れ、見つけたら0.5秒で消える）。
     // 人影は物として置かず、位置と見え方を鏡のシェーダーへ渡し、鏡で反射した光線の上にだけ黒い人の形を重ねている
     const bool showFigure = active && m_MirrorAnomaly.IsFigureVisible();
     m_MirrorFigureVisibility = showFigure
-        ? (std::min)(1.0f, m_MirrorFigureVisibility + deltaTime / 0.35f)
-        : (std::max)(0.0f, m_MirrorFigureVisibility - deltaTime / 0.5f);
+        ? (std::min)(1.0f, m_MirrorFigureVisibility + deltaTime / MirrorFigureFadeInSeconds)
+        : (std::max)(0.0f, m_MirrorFigureVisibility - deltaTime / MirrorFigureFadeOutSeconds);
     Renderer::SetMirrorFigure(m_MirrorAnomaly.GetFigurePosition(), m_MirrorFigureVisibility);
 
     if (mirrorEvent == MirrorAnomaly::Event::Seen)
@@ -791,7 +859,7 @@ void Stage2Scene::UpdateMirrorAnomaly(const Player& player, float deltaTime)
     else if (mirrorEvent == MirrorAnomaly::Event::Found)
     {
         // 振り返ると誰もいない：鏡の上の照明が一瞬揺れ、奥の確認スイッチが押せるようになる
-        m_Notices.loop = 2.8f;
+        m_Notices.loop = Stage2NoticeSeconds;
         KickHangingBulbs(0.55f);
         CeilingLight* mirrorLight = m_Objects.Light(Stage2NearestLight(MirrorAnomaly::CenterZ));
         if (mirrorLight != nullptr)
@@ -872,7 +940,7 @@ void Stage2Scene::UpdatePuddleAnomaly(const Player& player, float deltaTime)
     else if (puddleEvent == PuddleReflectionAnomaly::Event::Found)
     {
         // 顔を上げると誰もいない：立っていた所の水面だけが揺れていて、奥の確認スイッチが押せるようになる
-        m_Notices.loop = 2.8f;
+        m_Notices.loop = Stage2NoticeSeconds;
         if (m_Objects.ground != nullptr)
         {
             m_Objects.ground->AddRippleImpulse(figurePosition, 2.2f, -1.6f);
@@ -901,9 +969,8 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player, float deltaTime)
     }
 
     Core::Game* game = Core::Game::GetInstance();
-    const Vector3 portraitCenter(38.72f, -69.0f, -25.0f);
     Vector3 cameraToPortrait =
-        portraitCenter - game->GetCamera()->GetPosition();
+        PortraitCenter - game->GetCamera()->GetPosition();
     const float distance = cameraToPortrait.Length();
     if (distance > 0.001f)
     {
@@ -914,7 +981,7 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player, float deltaTime)
         game->GetCamera()->GetForward().Dot(cameraToPortrait);
     // ライトが点いていて、近く（105未満）で正面（内積0.91超）から見ているか
     const bool lookingAtPortrait =
-        player.IsFlashlightOn() && distance < 105.0f && facing > 0.91f;
+        player.IsFlashlightOn() && distance < PortraitLookDistance && facing > PortraitLookFacing;
     // 見つめている間は、絵の中の閉じた目がかすかに開きかけ、目を離すと閉じる（目の見え方は UpdatePortraitEyes）。
     if (!m_PortraitAnomaly.UpdateStare(lookingAtPortrait, deltaTime))
     {
@@ -922,7 +989,7 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player, float deltaTime)
     }
 
     // 見つめ続けた: 絵の中で目が見開かれ、赤く光る瞳がこちらを追い始める。奥の確認スイッチが押せるようになる。
-    m_Notices.loop = 2.8f;
+    m_Notices.loop = Stage2NoticeSeconds;
     constexpr float emission = 0.28f;
     Wall* portrait = m_Objects.portrait;
     if (portrait != nullptr)
@@ -972,8 +1039,7 @@ void Stage2Scene::UpdatePortraitEyes(float deltaTime)
     m_PortraitEyeGlow = (std::clamp)(m_PortraitEyeGlow + (opened ? 1.0f : -3.0f) * deltaTime, 0.0f, 1.0f);
 
     // 瞳の向き：絵の目の高さ・位置から見たカメラの方向（絵の面からの距離で割った横と縦のずれ）
-    const Vector3 eyeCenter(38.9f, -67.5f, -25.0f);
-    const Vector3 toCamera = Core::Game::GetInstance()->GetCamera()->GetPosition() - eyeCenter;
+    const Vector3 toCamera = Core::Game::GetInstance()->GetCamera()->GetPosition() - PortraitEyeCenter;
     const float depth = (std::max)(-toCamera.x, 1.0f);
     const float gazeX = (std::clamp)(toCamera.z / depth, -1.0f, 1.0f);
     const float gazeY = (std::clamp)(toCamera.y / depth, -1.0f, 1.0f);
@@ -1042,7 +1108,7 @@ void Stage2Scene::UpdateKnockingAnomaly(const Player& player, float deltaTime)
 
     // 聞き当てた: 壁のすぐ向こうで一度だけ強く叩き、音が止まる。
     game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, spot, 0.52f, 2.2f);
-    m_Notices.loop = 2.8f;
+    m_Notices.loop = Stage2NoticeSeconds;
     CeilingLight* nearbyLight = m_Objects.Light(Stage2NearestLight(spot.z));
     if (nearbyLight != nullptr)
     {
@@ -1068,9 +1134,10 @@ void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
     if (enabled && m_UnseenPresence.IsActive() && player.IsFlashlightOn())
     {
         const Camera* camera = Core::Game::GetInstance()->GetCamera();
-        const Vector3 toChest = m_UnseenPresence.GetPosition() + Vector3(0.0f, 24.0f, 0.0f) - camera->GetPosition();
+        const Vector3 toChest = m_UnseenPresence.GetPosition() + Vector3(0.0f, UnseenChestHeight, 0.0f) - camera->GetPosition();
         const float distance = toChest.Length();
-        lit = distance > 0.001f && distance < 75.0f && camera->GetForward().Dot(toChest / distance) > 0.95f;
+        lit = distance > 0.001f && distance < UnseenLitDistance &&
+            camera->GetForward().Dot(toChest / distance) > UnseenLitFacing;
     }
     const UnseenPresenceAnomaly::Result result = m_UnseenPresence.Update(
         deltaTime, player.GetPosition(), player.IsMovingHorizontally(), player.IsHiding(), enabled, lit);
@@ -1091,24 +1158,26 @@ void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
             m_UnseenHasStep = true;
         }
         // 水に触れた直後だけ9歩残す。乾いた通路では新しく濡れない。
-        if (ground->IsInsidePuddle(position)) m_UnseenWetSteps = 9;
+        if (ground->IsInsidePuddle(position)) m_UnseenWetSteps = UnseenWetStepCount;
         Vector3 direction = position - m_UnseenLastStep;
         direction.y = 0.0f;
-        if (direction.LengthSquared() >= 7.0f * 7.0f)
+        if (direction.LengthSquared() >= UnseenStride * UnseenStride)
         {
             const float yaw = std::atan2(direction.x, direction.z);
             // 水たまりの中を歩くと、姿は見えないまま、足もとから波紋が広がり、ぴちゃりと水音が鳴る
             // （遠くからでも「あの水たまりを今通った」と分かる手がかり）
             if (ground->IsInsidePuddle(position))
             {
-                ground->AddRippleImpulse(Vector3(position.x, -100.0f, position.z), 1.6f, -1.3f);
+                ground->AddRippleImpulse(Vector3(position.x, FloorY, position.z), 1.6f, -1.3f);
                 Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_WATER_STEP, position, 0.72f, 0.60f);
             }
             if (m_UnseenWetSteps > 0)
             {
                 const Vector2 right(std::cos(yaw), -std::sin(yaw));
-                ground->AddFootprint(Vector2(position.x, position.z) + right * (2.4f * m_UnseenFootSide),
-                    yaw, m_UnseenFootSide, true, 0.35f + 0.65f * m_UnseenWetSteps / 9.0f);
+                // 濡れた足跡は、水から離れるほど薄くしている（最初の一歩で1、最後の一歩で約0.4）
+                ground->AddFootprint(Vector2(position.x, position.z) + right * (UnseenFootOffset * m_UnseenFootSide),
+                    yaw, m_UnseenFootSide, true,
+                    0.35f + 0.65f * m_UnseenWetSteps / static_cast<float>(UnseenWetStepCount));
                 --m_UnseenWetSteps;
                 m_UnseenFootSide = -m_UnseenFootSide;
             }
@@ -1119,8 +1188,8 @@ void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
     // shader/figureShadow.hlsli）。捕まえた直後に奥へ戻る瞬間移動が目立たないよう、そのフレームは消し、0.4秒で上げ下げしている
     const bool shadowShown = enabled && m_UnseenPresence.IsActive() && result == UnseenPresenceAnomaly::Result::None;
     m_UnseenShadowVisibility = result == UnseenPresenceAnomaly::Result::Caught ? 0.0f
-        : shadowShown ? (std::min)(1.0f, m_UnseenShadowVisibility + deltaTime / 0.4f)
-        : (std::max)(0.0f, m_UnseenShadowVisibility - deltaTime / 0.4f);
+        : shadowShown ? (std::min)(1.0f, m_UnseenShadowVisibility + deltaTime / UnseenShadowFadeSeconds)
+        : (std::max)(0.0f, m_UnseenShadowVisibility - deltaTime / UnseenShadowFadeSeconds);
     Vector3 shadowFoot = m_UnseenPresence.GetPosition();
     shadowFoot.y = PuddleReflectionAnomaly::FloorY;
     Renderer::SetUnseenFigure(shadowFoot, m_UnseenShadowVisibility);
@@ -1129,7 +1198,7 @@ void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
     if (m_UnseenPresence.WasNoticedThisFrame())
     {
         // 照らして気づかれた：影のいる所から短い息づかいが聞こえ、吊るした裸電球が揺れ、心拍が跳ねる
-        game->PlayAudioCueAt(SOUND_CUE_BREATH, m_UnseenPresence.GetPosition() + Vector3(0.0f, 36.0f, 0.0f), 0.70f, 0.55f);
+        game->PlayAudioCueAt(SOUND_CUE_BREATH, m_UnseenPresence.GetPosition() + Vector3(0.0f, UnseenHeadHeight, 0.0f), 0.70f, 0.55f);
         KickHangingBulbs(0.35f);
         game->GetPostProcess()->TriggerHorrorPulse(0.22f, 0.30f);
         Input::SetVibration(3, 0.10f);
@@ -1240,7 +1309,7 @@ void Stage2Scene::UpdateBehindPresence(Player& player, float deltaTime)
         backward.y = 0.0f;
         if (backward.LengthSquared() < 0.001f)
         {
-            m_BehindPresence.Postpone(3.0f);
+            m_BehindPresence.Postpone(BehindPresenceRetrySeconds);
             break;
         }
         backward.Normalize();
@@ -1248,11 +1317,11 @@ void Stage2Scene::UpdateBehindPresence(Player& player, float deltaTime)
         if (std::abs(spawn.x) > CorridorHalfWidth ||
             spawn.z < CorridorMinZ || spawn.z > CorridorMaxZ)
         {
-            m_BehindPresence.Postpone(3.0f);
+            m_BehindPresence.Postpone(BehindPresenceRetrySeconds);
             break;
         }
 
-        presence->SetPosition(spawn.x, -99.0f, spawn.z);
+        presence->SetPosition(spawn.x, FootY, spawn.z);
         presence->SetActive(true);
         presence->EnableGazeScare(BehindPresence::MaxFollowSeconds + 10.0f);
         presence->EnableChase(PresenceCreepSpeed, 8.0f);

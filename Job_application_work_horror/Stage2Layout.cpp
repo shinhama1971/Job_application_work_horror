@@ -192,6 +192,13 @@ namespace Stage2Layout
             Vector4(0.0f, 1.0f, 0.0f, 1.0f) };  // 出口側：中心(-9, 91)。右側を回れる
         ground->SetPuddleLayout(puddleLayout);
         objects.ground = ground;
+        // 周回ごとに増える天井の雨漏りの位置と、広がりきったときの水たまりの大きさ（size の幅 = 直径）
+        constexpr const char* loopLeakNames[Stage2FinalLoopCount] = { "Stage2LoopLeak1", "Stage2LoopLeak2", "Stage2LoopLeak3" };
+        for (std::size_t leakIndex = 0; leakIndex < objects.loopLeaks.size(); ++leakIndex)
+        {
+            const PropPlacement& leak = at(loopLeakNames[leakIndex]);
+            objects.loopLeaks[leakIndex] = Vector3(leak.Position.x, leak.Position.z, leak.Size.x * 0.5f);
+        }
 
 
         // 残された記録の端末の上に付けた、緑に光る目印

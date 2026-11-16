@@ -40,7 +40,9 @@ class VoiceRecorder;
 enum class Stage1RouteLight : std::size_t
 {
     StartSearch, HallEntrance, CorridorDoor, LeftStorage, RightStorage,
-    WestWing, MainPower, PumpRoom, ExitPower, ExitDoor, Count
+    WestWing, MainPower, PumpRoom, ExitPower, ExitDoor,
+    // 暗証番号の部屋（先に開けていた人に、3本目の段階でヒューズが箱に戻ったことを知らせる）
+    KeypadRoom, Count
 };
 
 // ループ廊下の突き当たりのドア（1面の最後のドア）の位置。廊下（z=237〜273）をふさぐ向きに置いている。

@@ -26,6 +26,31 @@ private:
     static constexpr float StaminaDrainPerSecond = 10.0f;
     static constexpr float StaminaRecoveryPerSecond = 26.0f;
     static constexpr float StaminaRecoveryWhileWalkingPerSecond = 15.0f;
+    // スタミナを使い切った後、この割合まで戻るまでは走れない
+    static constexpr float ExhaustedSprintResumeRate = 0.25f;
+    // 走るのをやめてから回復を始めるまでの待ち（普段と、使い切ったとき）
+    static constexpr float StaminaRecoveryDelaySeconds = 0.45f;
+    static constexpr float ExhaustedRecoveryDelaySeconds = 1.0f;
+
+    // 速度の追いつき方（60fpsで1フレームあたりに近づける割合。走るときは少し重く）と、入力がないときの止まり方
+    static constexpr float WalkAcceleration = 0.30f;
+    static constexpr float SprintAcceleration = 0.24f;
+    static constexpr float StopDecelerationPerFrame = 0.72f;
+
+    // 歩くときの頭の揺れ：位相の進む速さ（走る・歩く）、遅いときに速さを落とす割合、上下の揺れの大きさ（走る・歩く）、
+    // 上下の揺れの中心を下げる割合（足を着いたときに沈む形にする）、左右の揺れの大きさと速さ（上下の半分）、
+    // 揺れを目標へ近づける割合（上下・左右）、止まったときに真ん中へ戻す割合（60fpsで1フレームあたり）
+    static constexpr float SprintBobFrequency = 13.2f;
+    static constexpr float WalkBobFrequency = 8.4f;
+    static constexpr float BobSlowSpeedFrequencyRate = 0.55f;
+    static constexpr float SprintBobAmplitude = 0.48f;
+    static constexpr float WalkBobAmplitude = 0.30f;
+    static constexpr float BobVerticalCenterRate = 0.48f;
+    static constexpr float BobSideAmplitudeRate = 0.34f;
+    static constexpr float BobSideFrequencyRate = 0.5f;
+    static constexpr float BobVerticalResponse = 0.30f;
+    static constexpr float BobSideResponse = 0.24f;
+    static constexpr float BobReturnPerFrame = 0.84f;
 
     // 60fpsで1フレームあたりresponseだけ近づける動きを、フレームレートが違っても同じ速さになるよう補正している
     static float GetResponse(float responseAt60Fps, float deltaTime)
@@ -69,7 +94,7 @@ public:
         const bool isMoving = moveLengthSquared > 0.0001f;
 
         // スタミナ切れの後は、25%まで回復するまで走れないようにしている
-        if (m_SprintExhausted && m_Stamina >= MaxStamina * 0.25f)
+        if (m_SprintExhausted && m_Stamina >= MaxStamina * ExhaustedSprintResumeRate)
         {
             m_SprintExhausted = false;
         }
@@ -82,12 +107,12 @@ public:
         {
             m_Stamina = (std::max)(
                 0.0f, m_Stamina - StaminaDrainPerSecond * deltaTime);
-            m_StaminaRecoveryDelay = 0.45f;
+            m_StaminaRecoveryDelay = StaminaRecoveryDelaySeconds;
             if (m_Stamina <= 0.0f)
             {
                 m_IsSprinting = false;
                 m_SprintExhausted = true;
-                m_StaminaRecoveryDelay = 1.0f;
+                m_StaminaRecoveryDelay = ExhaustedRecoveryDelaySeconds;
                 exhaustedThisFrame = true;
             }
         }
@@ -114,7 +139,7 @@ public:
             const DirectX::SimpleMath::Vector3 desiredVelocity =
                 moveDirection * currentMoveSpeed;
             const float acceleration = GetResponse(
-                m_IsSprinting ? 0.24f : 0.30f, deltaTime);
+                m_IsSprinting ? SprintAcceleration : WalkAcceleration, deltaTime);
             m_Velocity.x +=
                 (desiredVelocity.x - m_Velocity.x) * acceleration;
             m_Velocity.z +=
@@ -123,7 +148,7 @@ public:
         // 入力がなければ、速度を少しずつ0へ近づけて止めている
         else
         {
-            const float deceleration = std::pow(0.72f, deltaTime * 60.0f);
+            const float deceleration = std::pow(StopDecelerationPerFrame, deltaTime * 60.0f);
             m_Velocity.x *= deceleration;
             m_Velocity.z *= deceleration;
             if (std::abs(m_Velocity.x) < 0.001f) m_Velocity.x = 0.0f;
@@ -147,25 +172,25 @@ public:
             const float speedRate = (std::min)(
                 horizontalSpeed / GetMaximumHorizontalSpeed(), 1.0f);
             m_HeadBobTimer +=
-                (m_IsSprinting ? 13.2f : 8.4f) *
-                (0.55f + speedRate * 0.45f) * deltaTime;
+                (m_IsSprinting ? SprintBobFrequency : WalkBobFrequency) *
+                (BobSlowSpeedFrequencyRate + speedRate * (1.0f - BobSlowSpeedFrequencyRate)) * deltaTime;
             const float amplitude =
-                (m_IsSprinting ? 0.48f : 0.30f) * speedRate;
+                (m_IsSprinting ? SprintBobAmplitude : WalkBobAmplitude) * speedRate;
             const float verticalTarget =
                 std::abs(std::sin(m_HeadBobTimer)) * amplitude -
-                amplitude * 0.48f;
+                amplitude * BobVerticalCenterRate;
             const float sideTarget =
-                std::sin(m_HeadBobTimer * 0.5f) * amplitude * 0.34f;
+                std::sin(m_HeadBobTimer * BobSideFrequencyRate) * amplitude * BobSideAmplitudeRate;
             m_HeadBobOffset +=
                 (verticalTarget - m_HeadBobOffset) *
-                GetResponse(0.30f, deltaTime);
+                GetResponse(BobVerticalResponse, deltaTime);
             m_HeadBobSideOffset +=
                 (sideTarget - m_HeadBobSideOffset) *
-                GetResponse(0.24f, deltaTime);
+                GetResponse(BobSideResponse, deltaTime);
         }
         else
         {
-            const float returnDecay = std::pow(0.84f, deltaTime * 60.0f);
+            const float returnDecay = std::pow(BobReturnPerFrame, deltaTime * 60.0f);
             m_HeadBobOffset *= returnDecay;
             m_HeadBobSideOffset *= returnDecay;
         }

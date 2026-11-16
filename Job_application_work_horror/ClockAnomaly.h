@@ -10,6 +10,12 @@
 #include <cmath>
 #include <DirectXMath.h>
 
+// 時計の異変：異変の周回で針が逆に回る速さ（長針・短針。1秒あたりのラジアン）、普段の針が進む速さ、知らせの秒数
+inline constexpr float ClockReverseMinuteSpeed = 0.82f;
+inline constexpr float ClockReverseHourSpeed = 0.068f;
+inline constexpr float ClockMinuteSpeed = 0.035f;
+inline constexpr float ClockHourSpeed = 0.0029f;
+inline constexpr float ClockNoticeSeconds = 2.6f;
 // 2面の廊下の時計。周回ごとに針の位置と動き方を変え、異変の周回では針を逆回りさせている。
 class ClockAnomaly final
 {
@@ -57,13 +63,13 @@ public:
     {
         if (anomalyLoop)
         {
-            m_MinuteAngle -= deltaTime * 0.82f;
-            m_HourAngle -= deltaTime * 0.068f;
+            m_MinuteAngle -= deltaTime * ClockReverseMinuteSpeed;
+            m_HourAngle -= deltaTime * ClockReverseHourSpeed;
         }
         else if (loopCount == 0)
         {
-            m_MinuteAngle += deltaTime * 0.035f;
-            m_HourAngle += deltaTime * 0.0029f;
+            m_MinuteAngle += deltaTime * ClockMinuteSpeed;
+            m_HourAngle += deltaTime * ClockHourSpeed;
         }
     }
 
@@ -95,7 +101,7 @@ public:
     void MarkObserved() noexcept
     {
         m_ObservedThisLoop = true;
-        m_NoticeTimer = 2.6f;
+        m_NoticeTimer = ClockNoticeSeconds;
     }
 
     // 通知の残り秒数を返す・通知を消している

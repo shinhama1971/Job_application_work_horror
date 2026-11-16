@@ -8,6 +8,12 @@
 
 #include <algorithm>
 
+// 最後の追跡：逃げる時間、心拍の間隔（最初・遠いとき。近いほどこの分だけ短く）、影を見てしまったときの罰の秒数
+inline constexpr float FinalPursuitSeconds = 7.0f;
+inline constexpr float FinalPursuitFirstPulse = 0.12f;
+inline constexpr float FinalPursuitPulseInterval = 0.72f;
+inline constexpr float FinalPursuitPulseShorten = 0.40f;
+inline constexpr float FinalGazePenaltySeconds = 1.45f;
 // 最後の停電の演出（決まった時刻に照明や音を順に変える）と、その後に影から逃げる追跡の時間を管理している。
 class FinalSequence final
 {
@@ -36,8 +42,8 @@ public:
     void Start() noexcept
     {
         m_SequenceTimer = 0.0f;
-        m_PursuitTimer = 7.0f;
-        m_PursuitPulseTimer = 0.12f;
+        m_PursuitTimer = FinalPursuitSeconds;
+        m_PursuitPulseTimer = FinalPursuitFirstPulse;
         m_GazePenaltyTimer = 0.0f;
         m_Phase = 0;
     }
@@ -80,7 +86,7 @@ public:
     // 次の脈動までの秒数を決めている。影が近いほど間隔を短くしている（0.72秒〜0.32秒）
     void SchedulePursuitPulse(float proximity) noexcept
     {
-        m_PursuitPulseTimer = 0.72f - proximity * 0.40f;
+        m_PursuitPulseTimer = FinalPursuitPulseInterval - proximity * FinalPursuitPulseShorten;
     }
 
     // 追跡中に影を見てしまったとき、罰を出してよいかを返している（1.45秒に1回まで）
@@ -90,7 +96,7 @@ public:
         {
             return false;
         }
-        m_GazePenaltyTimer = 1.45f;
+        m_GazePenaltyTimer = FinalGazePenaltySeconds;
         return true;
     }
 
@@ -121,6 +127,6 @@ public:
     // 罰の残り具合（0〜1）を返している
     float GetGazePenaltyRate() const noexcept
     {
-        return (std::clamp)(m_GazePenaltyTimer / 1.45f, 0.0f, 1.0f);
+        return (std::clamp)(m_GazePenaltyTimer / FinalGazePenaltySeconds, 0.0f, 1.0f);
     }
 };

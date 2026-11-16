@@ -253,6 +253,8 @@ Stage1ObjectiveInput StageScene::MakeObjectiveInput() const
     input.westWingValvesOpened = m_WestWing.GetOpenedValveCount();
     input.westWingText = m_WestWing.GetObjectiveText();
     input.keypadSolved = m_KeypadDoor.IsSolved();
+    input.keypadFuseReturned = m_KeypadFuseReturned;
+    input.emptyFuseCaseNotice = m_EmptyFuseCaseNoticeTimer > 0.0f;
     // 暗証番号の部屋で3本目を取った後は、西棟の知らせ（水が引いた、ヒューズを探す など）を出さない
     if (m_Objects.keypadRoomFuse != nullptr && m_Objects.keypadRoomFuse->IsCollected())
     {

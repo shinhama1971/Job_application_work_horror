@@ -100,6 +100,9 @@ struct Stage2Objects
     std::array<FuseBox*, 3> signalTerminals{};
     std::array<Wall*, 3> signalMarkers{};
     std::array<Wall*, Stage2ScratchCount> scratches{};
+    // 周回ごとに1か所ずつ増える天井の雨漏り（1〜3周目）。xy = 真下の水たまりの中心の x・z、z = 広がりきったときの半径。
+    // 配置ファイルの place Stage2LoopLeak1〜3（size の幅が直径）から読んでいる
+    std::array<DirectX::SimpleMath::Vector3, Stage2FinalLoopCount> loopLeaks{};
     // 部屋の角の暗がりの計算に使う、廊下の壁を上から見た長方形（中心x・z、半分の幅・奥行き）
     std::vector<DirectX::SimpleMath::Vector4> wallFootprints;
     // 配置ファイルから作った建物（名前とWall）と、place 行で置いた物の置き直し方（配置ファイルを読み直したときに使う）

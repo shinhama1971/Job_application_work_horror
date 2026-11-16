@@ -82,9 +82,9 @@ void Stage2Scene::Draw(Camera* camera)
         m_Hud.DrawStage2Status(
             m_LoopCount, threatRate, m_FinalDoorReady,
             m_SignalPuzzle.GetStep(),
-            m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete());
+            m_LoopCount >= Stage2FinalLoopCount && !m_SignalPuzzle.IsComplete());
         // 危険度があるとき・息を潜めている間だけ、その進み具合を出している
-        if (m_LoopCount < 3 && !m_ObservedScareSequence.IsActive() &&
+        if (m_LoopCount < Stage2FinalLoopCount && !m_ObservedScareSequence.IsActive() &&
             !m_FinalSequence.IsPursuitActive() &&
             !m_FinalSequence.IsSequenceActive() &&
             m_LoopTransitionTimer < 0.0f &&
@@ -126,7 +126,7 @@ void Stage2Scene::Draw(Camera* camera)
         {
             guideTarget = Vector3(35.5f, -90.0f, 112.0f);
         }
-        else if (m_LoopCount >= 3 && !m_SignalPuzzle.IsComplete())
+        else if (m_LoopCount >= Stage2FinalLoopCount && !m_SignalPuzzle.IsComplete())
         {
             if (m_SignalPuzzle.GetStep() == 0)
             {

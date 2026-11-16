@@ -19,6 +19,9 @@ namespace
     constexpr float HideOffset = 2.5f;
     // 出たときに立つ位置（扉の正面から12離れた所）
     constexpr float ExitOffset = 12.0f;
+    // 調べる位置を、扉の面からこの距離だけ前に出す。隠れる・出る位置の足もとの高さ
+    constexpr float InteractionOffset = 0.8f;
+    constexpr float FootY = -99.0f;
 }
 
 // 扉の板・枠・取っ手と、目の高さの通気口の羽根を、Mayaで作ったモデル（tools/maya/build_props.py）から読み込んでいる。
@@ -70,15 +73,15 @@ void Locker::Place(const Vector3& doorCenter, float facing)
 
     // 扉の正面の向き。ヨーの向きはPlayerのforward（sin, cos）と同じ決め方にしている。
     const Vector3 front(std::sin(facing), 0.0f, std::cos(facing));
-    m_HidePosition = Vector3(doorCenter.x, -99.0f, doorCenter.z) + front * HideOffset;
-    m_ExitPosition = Vector3(doorCenter.x, -99.0f, doorCenter.z) + front * ExitOffset;
+    m_HidePosition = Vector3(doorCenter.x, FootY, doorCenter.z) + front * HideOffset;
+    m_ExitPosition = Vector3(doorCenter.x, FootY, doorCenter.z) + front * ExitOffset;
 }
 
 // 調べるときの位置は、扉の面から少し前にしている
 Vector3 Locker::GetInteractionPosition() const
 {
     const Vector3 front(std::sin(m_Facing), 0.0f, std::cos(m_Facing));
-    return m_Position + front * 0.8f;
+    return m_Position + front * InteractionOffset;
 }
 
 // 調べたらプレイヤーを中に隠れさせ、扉の音（少し高く小さい音）を鳴らしている

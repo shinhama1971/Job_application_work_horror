@@ -19,6 +19,12 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // 水面と鏡に箱として映す小物の大きさ（上から見た向きでの半分の大きさ）：低すぎる物（床の縁取り・板）、
+    // 大きすぎる物（床や天井のような板。部屋の形と重なってちらつく）、細すぎる物は映さない
+    constexpr float ReflectionProxyMinHeight = 3.0f;
+    constexpr float ReflectionProxyMaxWidth = 40.0f;
+    constexpr float ReflectionProxyMinWidth = 0.8f;
+
     // 見た目だけモデルにするときの部位。UsesSurfaceColor の部位は配置ファイルの色（SetAppearance）で塗り、
     // それ以外（書類・取っ手・すき間の暗がりなど）はここで決めた色で塗っている
     // Glows の部位（警告灯のレンズ・電球）だけに、配置ファイルの光る色を付けている（枠や笠は光らせない）
@@ -326,7 +332,8 @@ bool Wall::GetReflectionProxy(ReflectionProxy& proxy) const
         std::abs(rotation._12) * half.x + std::abs(rotation._22) * half.y + std::abs(rotation._32) * half.z,
         std::abs(rotation._13) * half.x + std::abs(rotation._23) * half.y + std::abs(rotation._33) * half.z);
     // 低い物（床の縁取り・板）と、床や天井のような大きな板は映さない（部屋の形と重なり、ちらつくため）
-    if (extent.y < 3.0f || extent.x > 40.0f || extent.z > 40.0f || (std::max)(extent.x, extent.z) < 0.8f)
+    if (extent.y < ReflectionProxyMinHeight || extent.x > ReflectionProxyMaxWidth || extent.z > ReflectionProxyMaxWidth ||
+        (std::max)(extent.x, extent.z) < ReflectionProxyMinWidth)
     {
         return false;
     }

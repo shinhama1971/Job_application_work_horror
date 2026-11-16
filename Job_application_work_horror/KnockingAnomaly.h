@@ -11,8 +11,17 @@
 #pragma once
 
 #include <algorithm>
+#include "CaptureMode.h"
 #include <random>
 
+// 壁の向こうのノック：続けて叩く回数（最少＋乱数で足す最大）、続けて叩く間の秒数の範囲、叩き終えた後の間の範囲、知らせの秒数
+inline constexpr int KnockMinBurst = 2;
+inline constexpr float KnockExtraBurst = 1.99f;
+inline constexpr float KnockBurstMinGap = 0.30f;
+inline constexpr float KnockBurstMaxGap = 0.46f;
+inline constexpr float KnockPauseMin = 2.2f;
+inline constexpr float KnockPauseMax = 3.6f;
+inline constexpr float KnockNoticeSeconds = 2.6f;
 class KnockingAnomaly final
 {
 public:
@@ -26,7 +35,7 @@ private:
     static constexpr float FirstKnockDelay = 3.0f;
 
     // 乱数、今の出どころ、今の連打で残っている回数、次のノックまでの秒数、聞き続けている秒数、通知の残り秒数、見つけたか
-    std::mt19937 m_Random{ std::random_device{}() };
+    std::mt19937 m_Random{ Tools::CaptureMode::MakeRandomSeed(1101u) };
     int m_Spot = 0;
     int m_KnocksLeftInBurst = 0;
     float m_KnockTimer = FirstKnockDelay;
@@ -79,12 +88,12 @@ public:
         }
         if (m_KnocksLeftInBurst <= 0)
         {
-            m_KnocksLeftInBurst = 2 + static_cast<int>(RandomRange(0.0f, 1.99f));
+            m_KnocksLeftInBurst = KnockMinBurst + static_cast<int>(RandomRange(0.0f, KnockExtraBurst));
         }
         --m_KnocksLeftInBurst;
         m_KnockTimer = m_KnocksLeftInBurst > 0
-            ? RandomRange(0.30f, 0.46f)
-            : RandomRange(2.2f, 3.6f);
+            ? RandomRange(KnockBurstMinGap, KnockBurstMaxGap)
+            : RandomRange(KnockPauseMin, KnockPauseMax);
         return true;
     }
 
@@ -102,7 +111,7 @@ public:
             return false;
         }
         m_Found = true;
-        m_NoticeTimer = 2.6f;
+        m_NoticeTimer = KnockNoticeSeconds;
         return true;
     }
 

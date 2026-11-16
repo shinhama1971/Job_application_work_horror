@@ -29,6 +29,47 @@ namespace
     // 視線との内積がこの値以下の場所だけを選んでいる（0で真横、負で背後寄り）。
     constexpr float MaxFacingDot = 0.35f;
 
+    // 条件に合う場所が見つからないときに、選び直すまで待つ秒数
+    constexpr float RetryDelay = 4.0f;
+    // 扉の音は目立つので、この確率で後回しにしている
+    constexpr float DoorPostponeChance = 0.6f;
+
+    // --- 天井裏の足音：真後ろから左右この角度（度）の範囲で、この距離から歩き始め、プレイヤーの真上をこの幅だけ外れた所へ向かう
+    constexpr float CeilingStepSpreadDegrees = 100.0f;
+    constexpr float CeilingStepMinStart = 85.0f;
+    constexpr float CeilingStepMaxStart = 125.0f;
+    constexpr float CeilingStepPassOffset = 28.0f;
+    // 歩幅、歩数（最少＋乱数で足す最大）、1歩の間隔、この歩数以上の道筋が見つかったら決める
+    constexpr float CeilingStepStride = 18.0f;
+    constexpr int CeilingStepMinCount = 5;
+    constexpr float CeilingStepExtraCount = 2.99f;
+    constexpr float CeilingStepMinInterval = 0.54f;
+    constexpr float CeilingStepMaxInterval = 0.66f;
+    constexpr int CeilingStepRequiredCount = 3;
+    // 人より重く低い足音（左右の足の音の高さ）、音量、壁越しでもこもらせる最低の量
+    constexpr float CeilingStepPitchLeft = 0.60f;
+    constexpr float CeilingStepPitchRight = 0.66f;
+    constexpr float CeilingStepVolume = 1.9f;
+    constexpr float CeilingStepMinimumOcclusion = 0.72f;
+
+    // --- 配管を叩く音：視線の外で、この距離の範囲の配管を、回数（最少＋乱数で足す最大）だけ、ためらうような間を空けて叩く
+    constexpr float PipeKnockMinDistance = 60.0f;
+    constexpr float PipeKnockMaxDistance = 200.0f;
+    constexpr int PipeKnockMinCount = 2;
+    constexpr float PipeKnockExtraCount = 2.99f;
+    constexpr float PipeKnockMinGap = 0.42f;
+    constexpr float PipeKnockMaxGap = 0.90f;
+    constexpr float PipeKnockMinPitch = 0.88f;
+    constexpr float PipeKnockMaxPitch = 1.08f;
+    constexpr float PipeKnockVolume = 1.2f;
+
+    // --- 遠くの扉のきしみ：視線の外で、この距離の範囲の扉を選ぶ。音の高さの範囲と音量
+    constexpr float DoorCreakMinDistance = 90.0f;
+    constexpr float DoorCreakMaxDistance = 260.0f;
+    constexpr float DoorCreakMinPitch = 0.72f;
+    constexpr float DoorCreakMaxPitch = 0.82f;
+    constexpr float DoorCreakVolume = 0.95f;
+
     // 壁際の配管。Stage1Layoutの配管（PropPipe...）に沿った線分。
     struct PipeSegment
     {
@@ -108,7 +149,7 @@ void Stage1AmbientSounds::Update(
             // 条件に合う場所が見つからないときは、少し待ってから（4秒後に）選び直している。
             m_WaitTimer = TryStartEvent(powerRestored, listenerPosition, listenerForward)
                 ? NextInterval(powerRestored)
-                : 4.0f;
+                : RetryDelay;
         }
     }
 
@@ -151,7 +192,7 @@ bool Stage1AmbientSounds::TryStartEvent(
     // 扉の音は目立つので、足音・配管より出にくくしている。
     std::array<Kind, 3> order = { Kind::CeilingSteps, Kind::PipeKnocks, Kind::DistantDoor };
     std::shuffle(order.begin(), order.end(), m_Random);
-    if (RandomRange(0.0f, 1.0f) < 0.6f && order[0] == Kind::DistantDoor)
+    if (RandomRange(0.0f, 1.0f) < DoorPostponeChance && order[0] == Kind::DistantDoor)
     {
         std::swap(order[0], order[2]);
     }
@@ -202,8 +243,8 @@ bool Stage1AmbientSounds::ScheduleCeilingSteps(
     for (int attempt = 0; attempt < 10; ++attempt)
     {
         // 真後ろから左右100度の範囲で、少し離れた場所（85〜125）から歩き始めている。
-        const float angle = RandomRange(-100.0f, 100.0f) * Pi / 180.0f;
-        const float distance = RandomRange(85.0f, 125.0f);
+        const float angle = RandomRange(-CeilingStepSpreadDegrees, CeilingStepSpreadDegrees) * Pi / 180.0f;
+        const float distance = RandomRange(CeilingStepMinStart, CeilingStepMaxStart);
         Vector3 start = listenerPosition +
             (-forward * std::cos(angle) + right * std::sin(angle)) * distance;
         start.y = CeilingVoidY;
@@ -213,7 +254,7 @@ bool Stage1AmbientSounds::ScheduleCeilingSteps(
         }
 
         // プレイヤーの真上を少し外れた場所へ向かって歩いている。
-        Vector3 target = listenerPosition + right * RandomRange(-28.0f, 28.0f);
+        Vector3 target = listenerPosition + right * RandomRange(-CeilingStepPassOffset, CeilingStepPassOffset);
         target.y = CeilingVoidY;
         Vector3 direction = target - start;
         if (direction.LengthSquared() < 1.0f)
@@ -223,9 +264,9 @@ bool Stage1AmbientSounds::ScheduleCeilingSteps(
         direction.Normalize();
 
         // 歩幅18で5〜7歩、0.54〜0.66秒おきに鳴らしている（施設の外に出たらそこで止める）
-        constexpr float Stride = 18.0f;
-        const int stepCount = 5 + static_cast<int>(RandomRange(0.0f, 2.99f));
-        const float stepInterval = RandomRange(0.54f, 0.66f);
+        constexpr float Stride = CeilingStepStride;
+        const int stepCount = CeilingStepMinCount + static_cast<int>(RandomRange(0.0f, CeilingStepExtraCount));
+        const float stepInterval = RandomRange(CeilingStepMinInterval, CeilingStepMaxInterval);
         m_Scheduled.clear();
         for (int step = 0; step < stepCount; ++step)
         {
@@ -239,13 +280,13 @@ bool Stage1AmbientSounds::ScheduleCeilingSteps(
             scheduled.Cue.Label = SOUND_CUE_FOOTSTEP;
             scheduled.Cue.Position = position;
             // 人より重く低い足音にし、左右の足でわずかに音の高さを変えている。
-            scheduled.Cue.Pitch = (step % 2 == 0) ? 0.60f : 0.66f;
-            scheduled.Cue.Volume = 1.9f;
-            scheduled.Cue.MinimumOcclusion = 0.72f;
+            scheduled.Cue.Pitch = (step % 2 == 0) ? CeilingStepPitchLeft : CeilingStepPitchRight;
+            scheduled.Cue.Volume = CeilingStepVolume;
+            scheduled.Cue.MinimumOcclusion = CeilingStepMinimumOcclusion;
             m_Scheduled.push_back(scheduled);
         }
         // 3歩以上鳴らせる道筋が見つかったら決定している
-        if (m_Scheduled.size() >= 3)
+        if (m_Scheduled.size() >= CeilingStepRequiredCount)
         {
             return true;
         }
@@ -268,12 +309,12 @@ bool Stage1AmbientSounds::SchedulePipeKnocks(
             static_cast<std::size_t>(segmentDistribution(m_Random))];
         const Vector3 spot = Vector3::Lerp(
             segment.Start, segment.End, RandomRange(0.0f, 1.0f));
-        if (!IsUnseenSpot(spot, listenerPosition, listenerForward, 60.0f, 200.0f))
+        if (!IsUnseenSpot(spot, listenerPosition, listenerForward, PipeKnockMinDistance, PipeKnockMaxDistance))
         {
             continue;
         }
 
-        const int knockCount = 2 + static_cast<int>(RandomRange(0.0f, 2.99f));
+        const int knockCount = PipeKnockMinCount + static_cast<int>(RandomRange(0.0f, PipeKnockExtraCount));
         float delay = 0.0f;
         m_Scheduled.clear();
         for (int knock = 0; knock < knockCount; ++knock)
@@ -282,11 +323,11 @@ bool Stage1AmbientSounds::SchedulePipeKnocks(
             scheduled.Delay = delay;
             scheduled.Cue.Label = SOUND_CUE_PIPE_KNOCK;
             scheduled.Cue.Position = spot;
-            scheduled.Cue.Pitch = RandomRange(0.88f, 1.08f);
-            scheduled.Cue.Volume = 1.2f;
+            scheduled.Cue.Pitch = RandomRange(PipeKnockMinPitch, PipeKnockMaxPitch);
+            scheduled.Cue.Volume = PipeKnockVolume;
             m_Scheduled.push_back(scheduled);
             // 一定の間隔にせず、ためらうような間を空けている。
-            delay += RandomRange(0.42f, 0.90f);
+            delay += RandomRange(PipeKnockMinGap, PipeKnockMaxGap);
         }
         return true;
     }
@@ -314,15 +355,15 @@ bool Stage1AmbientSounds::ScheduleDistantDoor(
     // 視線の外で90〜260離れた扉を1つ選んでいる
     for (const Vector3& door : doors)
     {
-        if (!IsUnseenSpot(door, listenerPosition, listenerForward, 90.0f, 260.0f))
+        if (!IsUnseenSpot(door, listenerPosition, listenerForward, DoorCreakMinDistance, DoorCreakMaxDistance))
         {
             continue;
         }
         ScheduledCue scheduled;
         scheduled.Cue.Label = SOUND_CUE_DOOR;
         scheduled.Cue.Position = door;
-        scheduled.Cue.Pitch = RandomRange(0.72f, 0.82f);
-        scheduled.Cue.Volume = 0.95f;
+        scheduled.Cue.Pitch = RandomRange(DoorCreakMinPitch, DoorCreakMaxPitch);
+        scheduled.Cue.Volume = DoorCreakVolume;
         m_Scheduled.clear();
         m_Scheduled.push_back(scheduled);
         return true;

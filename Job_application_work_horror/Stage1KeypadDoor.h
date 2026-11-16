@@ -13,6 +13,7 @@
 #include "KeypadLock.h"
 
 #include <array>
+#include "CaptureMode.h"
 #include <random>
 
 class Door;
@@ -64,5 +65,5 @@ private:
     bool m_InputOpen = false;
     float m_InputDelayTimer = 0.0f;
     float m_WrongTimer = 0.0f;
-    std::mt19937 m_Random{ std::random_device{}() };
+    std::mt19937 m_Random{ Tools::CaptureMode::MakeRandomSeed(1104u) };
 };

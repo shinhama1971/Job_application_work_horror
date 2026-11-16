@@ -220,6 +220,13 @@ float TracePuddleFigure(float3 origin, float3 direction)
     return TraceFigureVolume(localOrigin, localDirection, 1.6f, depth) * saturate(visibility);
 }
 
+// 水たまりのSSR：光線をたどる回数と、1歩ごとに歩幅を広げる割合
+static const int SsrStepCount = 48;
+static const float SsrStepGrowth = 1.10f;
+// 水たまりのSSR：カメラからこの距離の間で、SSRの映り込みを薄めて消している（遠くは部屋の形と環境マップで映す）
+static const float SsrFadeStartDistance = 160.0f;
+static const float SsrFadeEndDistance = 230.0f;
+
 // レイ反射の本体：部屋の形との交差を基準にし、近くで前後の画面が一致する所だけSSRの細部を足す。
 // SSRは深度プリパスの深度と前のフレームの画面を使うため、それが用意されているとき（ReflectionParams.y）だけ使っている。
 // figure は「水たまり」の異変の人影が光線を遮った度合い（0〜1）で、床の色そのものも沈めるのに使っている。
@@ -245,16 +252,18 @@ float3 TraceRayReflection(float3 worldPosition, float3 worldNormal, float roughn
     float3 color = TraceRoomReflection(worldPosition + float3(0.0f, 0.05f, 0.0f), direction,
         roughness, roomDistance, nearVertical, true);
     // SSRの寄与は画素までの距離で薄め、薄くなりきった場所では光線をたどる計算も省く。
-    const float nearWeight = 1.0f - smoothstep(105.0f, 155.0f, distanceFromCamera);
+    // 60fpsに抑えて空いたGPUの時間で、SSRで本物の景色を映す範囲を、カメラから105〜155から160〜230へ広げている
+    const float nearWeight = 1.0f - smoothstep(SsrFadeStartDistance, SsrFadeEndDistance, distanceFromCamera);
     [branch]
     if (nearWeight > 0.0f && ReflectionParams.y > 0.5f)
     {
-        // 近い水たまりは、画面の中を細かい歩幅で多めにたどっている（32歩、1歩ごとに歩幅を1.14倍）。
+        // 近い水たまりは、画面の中を細かい歩幅で多めにたどっている（48歩、1歩ごとに歩幅を1.10倍。届く距離は約146）。
         // 歩幅が粗いと光線が物をすり抜けて外れ、部屋の形の簡単な色で埋めることになり、映り込みが濁るため。
+        // 以前の32歩・1.14倍（届く距離は約99）より歩幅が細かく、遠くの物まで届く。
         // 映る物が水面から離れているほど、前フレームの画面のぼやけた段を読む（距離85で1段、最大3段）。
         // 粗い水面（浅い縁や波の強い所）は、最初から少しぼかしている
         // 水面より1.5以上高い物に当たったときだけ映し、床そのものへの誤った当たりは捨てている（かくかくした映り込みを防ぐ）
-        const float4 screen = TraceScreenSpaceReflection(worldPosition, worldNormal, 32, 1.14f,
+        const float4 screen = TraceScreenSpaceReflection(worldPosition, worldNormal, SsrStepCount, SsrStepGrowth,
             1.0f / 85.0f, 0.55f + roughness, 1.5f);
         // 画面に見えている物は、部屋の形で近づけた色より本物なので、SSRが当たった所はその色を主にしている
         color = lerp(color, screen.rgb, screen.w * nearWeight * 0.85f);

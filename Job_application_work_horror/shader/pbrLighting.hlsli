@@ -158,7 +158,7 @@ MetalWear GetMetalWear(float3 baseColor, float metallic, float roughness, float3
 // 縮小画像（ミップ）の段を持ち、粗い面ほど小さくぼやけた段を読んでいる（粗さに応じてぼやけた映り込みの近似）。
 // 1面と2面の間だけ設定している。設定していない場面では黒が返るので、呼ぶ側で環境光と合わせている。
 TextureCube g_EnvironmentProbe : register(t14);
-static const float PBR_ENVIRONMENT_MIP_COUNT = 8.0f; // 128画素から1画素まで
+static const float PBR_ENVIRONMENT_MIP_COUNT = 9.0f; // 256画素から1画素まで（ReflectionProbe::FaceSize と合わせている）
 
 float3 SampleEnvironment(float3 worldDirection, float roughness)
 {

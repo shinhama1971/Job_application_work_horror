@@ -38,7 +38,6 @@ prop Stage2StairDoorHead       0 -24.5 140   38 49 4    stage2Wall none 4 0 nosh
 prop Stage2StairWallWest     -17 -50 210     4 100 140  stage2Wall none 4 1 weathering
 prop Stage2StairWallEast      17 -50 210     4 100 140  stage2Wall none 4 1 weathering
 prop Stage2StairWallEnd        0 -50 280     38 100 4   stage2Wall none 4 1 weathering
-prop Stage2StairStep1          0 -98 153.5   30 4 7     stage2Wall none 4 1
 prop Stage2StairStep2          0 -96 160.5   30 8 7     stage2Wall none 4 1
 prop Stage2StairStep3          0 -94 167.5   30 12 7    stage2Wall none 4 1
 prop Stage2StairStep4          0 -92 174.5   30 16 7    stage2Wall none 4 1
@@ -86,6 +85,10 @@ place Stage2ClockFrameFar            -38.9 -70 -14 size 1.8 24 2
 place Stage2LoopMark                 -39.4 -68 52 size 1 18 12
 place Stage2DoorIndicator            23.7 -65.7 137.4 size 10 5 1
 place ExtraLight_Stage2StairLanding  0 -6 249 size 18 2 8
+# 周回ごとに1か所ずつ増える天井の雨漏り（1〜3周目。size の幅が、広がりきったときの水たまりの直径）
+place Stage2LoopLeak1                -22 -100 -40 size 12 1 12
+place Stage2LoopLeak2                24 -100 58 size 12 1 12
+place Stage2LoopLeak3                -20 -100 -128 size 12 1 12
 place Stage2FalseDoorPanel           -39.3 -76 70 size 1.2 40 22
 place Stage2FalseDoorFrameNear       -39 -76 58 size 1.8 44 2
 place Stage2FalseDoorFrameFar        -39 -76 82 size 1.8 44 2

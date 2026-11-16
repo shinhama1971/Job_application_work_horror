@@ -15,6 +15,7 @@
 #include "RoomPathGrid.h"
 
 #include <array>
+#include "CaptureMode.h"
 #include <random>
 #include <string_view>
 
@@ -97,5 +98,5 @@ private:
     // 知らせの文章とその残り秒数、乱数
     std::string_view m_NoticeText;
     float m_NoticeTimer = 0.0f;
-    std::mt19937 m_Random{ std::random_device{}() };
+    std::mt19937 m_Random{ Tools::CaptureMode::MakeRandomSeed(1102u) };
 };

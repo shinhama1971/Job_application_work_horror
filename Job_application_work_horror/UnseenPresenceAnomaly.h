@@ -20,6 +20,19 @@
 #include <algorithm>
 #include <cmath>
 
+// 見えない影の動きの値：遠くにいる間のふらつく速さと幅、プレイヤーへ寄る速さ（気づかれた・近くで歩いている・近くで止まっている・遠く）、
+// 近いとみなす奥行きの距離、動ける x の範囲、近さを危険度にする範囲（この距離から、この幅で遠ざかるほど弱く）、知らせの秒数
+inline constexpr float UnseenWanderFrequency = 0.55f;
+inline constexpr float UnseenWanderWidth = 6.0f;
+inline constexpr float UnseenAlertPullRate = 9.0f;
+inline constexpr float UnseenNearMovingPullRate = 7.0f;
+inline constexpr float UnseenNearStillPullRate = 1.2f;
+inline constexpr float UnseenIdlePullRate = 3.0f;
+inline constexpr float UnseenNearDistance = 60.0f;
+inline constexpr float UnseenHalfWidth = 30.0f;
+inline constexpr float UnseenThreatNearDistance = 14.0f;
+inline constexpr float UnseenThreatRange = 96.0f;
+inline constexpr float UnseenNoticeSeconds = 2.8f;
 class UnseenPresenceAnomaly final
 {
 public:
@@ -147,13 +160,13 @@ public:
         }
 
         // 横の動き：ゆっくりふらつき、近くでプレイヤーが動いていると、足音の方へ寄ってくる（止まっていれば、ほとんど寄らない）
-        const float wander = std::sin(m_Time * 0.55f) * 6.0f;
+        const float wander = std::sin(m_Time * UnseenWanderFrequency) * UnseenWanderWidth;
         const float alongDistance = std::abs(playerPosition.z - m_Z);
-        const float pullRate = alerted ? 9.0f : (alongDistance < 60.0f ? (playerMoving ? 7.0f : 1.2f) : 0.0f);
-        const float targetX = alerted || alongDistance < 60.0f ? playerPosition.x : wander;
-        const float maximumStep = (pullRate > 0.0f ? pullRate : 3.0f) * deltaTime;
+        const float pullRate = alerted ? UnseenAlertPullRate : (alongDistance < UnseenNearDistance ? (playerMoving ? UnseenNearMovingPullRate : UnseenNearStillPullRate) : 0.0f);
+        const float targetX = alerted || alongDistance < UnseenNearDistance ? playerPosition.x : wander;
+        const float maximumStep = (pullRate > 0.0f ? pullRate : UnseenIdlePullRate) * deltaTime;
         m_X += (std::clamp)(targetX - m_X, -maximumStep, maximumStep);
-        m_X = (std::clamp)(m_X, -30.0f, 30.0f);
+        m_X = (std::clamp)(m_X, -UnseenHalfWidth, UnseenHalfWidth);
 
         const float distance = GetHorizontalDistance(playerPosition);
         if (!playerHiding && distance < CatchDistance)
@@ -174,7 +187,7 @@ public:
         {
             m_Found = true;
             m_Active = false;
-            m_NoticeTimer = 2.8f;
+            m_NoticeTimer = UnseenNoticeSeconds;
             return Result::Passed;
         }
         // 近くまで来ずに離れた（折り返した）場合は、すれ違いを数え直している
@@ -210,7 +223,7 @@ public:
         {
             return 0.0f;
         }
-        return 1.0f - (std::clamp)((GetHorizontalDistance(playerPosition) - 14.0f) / 96.0f, 0.0f, 1.0f);
+        return 1.0f - (std::clamp)((GetHorizontalDistance(playerPosition) - UnseenThreatNearDistance) / UnseenThreatRange, 0.0f, 1.0f);
     }
     // すぐそばまで来ているか（目的表示で「動かずにやり過ごす」と出すため）
     bool IsNear(const DirectX::SimpleMath::Vector3& playerPosition) const noexcept

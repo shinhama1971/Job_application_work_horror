@@ -91,10 +91,20 @@ namespace Stage1Layout
             Vector2(Stage1WestWing::MinX, Stage1WestWing::MinZ),
             Vector2(Stage1WestWing::MaxX, Stage1WestWing::MaxZ));
         objects.ground = ground;
-        // 西棟の周りの天井の雨漏り（水滴が落ち続け、真下の水たまりが約2分かけて広がる）
-        ground->AddLeak(Vector2(-195.0f, -25.0f), 6.0f, 120.0f);
-        ground->AddLeak(Vector2(-150.0f, -45.0f), 5.0f, 140.0f);
-        ground->AddLeak(Vector2(-100.0f, -95.0f), 5.0f, 160.0f);
+        // 西棟の周りの天井の雨漏り（水滴が落ち続け、真下の水たまりが約2分かけて広がる）。
+        // 位置と、広がりきったときの水たまりの大きさ（size の幅 = 直径）は配置ファイルの place Stage1Leak1〜3 に書いている。
+        // 広がりきるまでの秒数は、雨漏りごとにずらしてここで決めている（同時に広がりきらないように）
+        constexpr std::pair<const char*, float> leaks[] =
+        {
+            { "Stage1Leak1", 120.0f },
+            { "Stage1Leak2", 140.0f },
+            { "Stage1Leak3", 160.0f },
+        };
+        for (const auto& [leakName, growSeconds] : leaks)
+        {
+            const PropPlacement& leak = at(leakName);
+            ground->AddLeak(Vector2(leak.Position.x, leak.Position.z), leak.Size.x * 0.5f, growSeconds);
+        }
 
         // 建物の壁（外周・部屋の仕切り・ループ廊下・西棟・南西の広間）と柱は、下の小物のファイルに書いている（room・weathering）
 
@@ -169,10 +179,14 @@ namespace Stage1Layout
 
         // 光の安全地帯（暖かい電球の下）の範囲。電球そのものは小物のファイルに置いている（PropSafeLight...）。
         // 下にいると落ち着き、ライトを消して休むと電池が戻る（Stage1SafeLights）。
+        // 範囲の中心と大きさ（size の幅 = 直径）は配置ファイルの place SafeZone_... に書いている。
         // 1つ目：中央ホールの西、配電盤と西棟の扉の間の裸電球（何度も通る場所の休み所）
-        objects.safeZones.push_back({ Vector3(-198.0f, -99.0f, 12.0f), 30.0f });
         // 2つ目：南西の広間の机の上の電気スタンド（寄り道の先の休み所）
-        objects.safeZones.push_back({ Vector3(-322.0f, -99.0f, -292.0f), 34.0f });
+        for (const char* zoneName : { "SafeZone_CentralHall", "SafeZone_SouthWestHall" })
+        {
+            const PropPlacement& zone = at(zoneName);
+            objects.safeZones.push_back({ zone.Position, zone.Size.x * 0.5f });
+        }
 
         // 扉の状態を示すランプ（停電中は赤）。色は進行のコードが変えるので、小物のファイルではなくここで作っている
         Wall* doorIndicator = createPlacedStageProp("PropDoorIndicator", Color(0.26f, 0.025f, 0.018f, 1.0f),
@@ -230,7 +244,7 @@ namespace Stage1Layout
         // ヒューズ。どの部屋にあるかは固定し（目的表示と演出の流れを保つため）、
         // 部屋の中のどこに落ちているかを、プレイごとに候補からランダムに選んでいる。
         // 覚えた場所へ走るのではなく、毎回ライトで部屋を探させるためである。
-        std::mt19937 fuseRandom{ std::random_device{}() };
+        std::mt19937 fuseRandom{ Tools::CaptureMode::MakeRandomSeed(1107u) };
         // 候補の場所は、配置のファイルの spot 行（1本目 Stage1FirstFuse：開始地点の区画の配管の陰・左奥・右奥、
         // 2本目 Stage1SecondFuse：左の倉庫。倉庫の演出（StageScene::UpdateStorageScare）が始まる x<-110, z<-108 の範囲の中だけ、
         // 3本目 Stage1ThirdFuse：西棟の一番奥のポンプ室。西棟の鍵を拾って扉を開け、排水バルブで水を抜くまで現れない）
@@ -591,9 +605,20 @@ namespace Stage1Layout
         // 電力が戻った後、中央の廊下へ入ると、奥に影が現れる驚かせる演出
         ScareTrigger* corridorScare =
             builder.Create<ScareTrigger>("ScareTrigger_Corridor");
-        place(*corridorScare, "ScareTrigger_Corridor");
-        corridorScare->SetSize(Vector3(70.0f, 30.0f, 32.0f));
-        corridorScare->SetShadowPosition(Vector3(0.0f, -99.0f, 150.0f));
+        // 踏み込むと影が出る範囲（size）と、影を出す位置は、配置ファイルの place ScareTrigger_Corridor・ScareTrigger_CorridorShadow
+        const auto placeCorridorScare = [corridorScare](const PropPlacement& placement)
+        {
+            PropLayoutFile::MoveTo(*corridorScare, placement.Position);
+            corridorScare->SetSize(placement.Size);
+        };
+        placeCorridorScare(at("ScareTrigger_Corridor"));
+        bind("ScareTrigger_Corridor", placeCorridorScare);
+        const auto placeCorridorShadow = [corridorScare](const PropPlacement& placement)
+        {
+            corridorScare->SetShadowPosition(placement.Position);
+        };
+        placeCorridorShadow(at("ScareTrigger_CorridorShadow"));
+        bind("ScareTrigger_CorridorShadow", placeCorridorShadow);
         corridorScare->SetRequiresPower(true);
 
         // 演出用の人影。どれも最初は隠しておき、StageSceneの演出で出している（時間切れで破棄せずに隠す）
@@ -670,6 +695,8 @@ namespace Stage1Layout
         objects.routeLights[static_cast<std::size_t>(Stage1RouteLight::MainPower)] = { westWingLight2, westWingLight1, mainPowerLight };
         objects.routeLights[static_cast<std::size_t>(Stage1RouteLight::ExitPower)] = { light4, light5, light8, light7 };
         objects.routeLights[static_cast<std::size_t>(Stage1RouteLight::ExitDoor)] = { light7 };
+        // 暗証番号の扉（x=45・z=110）は、中央の廊下の CeilingLight5 のすぐ東
+        objects.routeLights[static_cast<std::size_t>(Stage1RouteLight::KeypadRoom)] = { light4, light5 };
 
         objects.ceilingLights = {
             light1, light2, light3, light4, light5, light6, light7, light8 };

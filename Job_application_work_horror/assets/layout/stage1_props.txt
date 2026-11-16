@@ -176,6 +176,8 @@ prop PropHiddenShelf2       115 -77 129    6 44 98   shelfColor none 10 1 model 
 prop PropHiddenShelf3       145 -77  91    6 44 98   shelfColor none 10 1 model shelf_long
 prop PropHiddenShelf4       175 -77 129    6 44 98   shelfColor none 10 1 model shelf_long
 prop PropHiddenShelfLow    56.5 -77  72   19 44  6   shelfColor none 10 1 model shelf_short
+# 暗証番号の部屋のヒューズの箱（place Stage1KeypadRoomFuse の真下）。3本目の段階より前に開けると空で、段階が来るとヒューズが戻る
+prop PropKeypadFuseCase      196 -98 150    10 4 8    cabinetMetal none 12 0
 prop PropHiddenCrate1        53 -93 150   12 14 12   debrisColor none 6 1 model crate
 prop PropHiddenCrate2       211 -93  88   12 14 12   debrisColor none 6 1 model crate
 
@@ -317,7 +319,15 @@ place Stage1RecorderHall             95 -86 30 yaw 0
 place Stage1RecorderSouthWestHall    -308 -75 -296 yaw -135
 place Stage1RecorderWestWing         -318 -75 -74 yaw -135
 place Stage1RecorderArchive          -196 -79 157 yaw -45
-place ScareTrigger_Corridor          0 -90 65
+place ScareTrigger_Corridor          0 -90 65 size 70 30 32
+place ScareTrigger_CorridorShadow    0 -99 150
+# 西棟の周りの天井の雨漏り（size の幅が、広がりきったときの水たまりの直径）
+place Stage1Leak1                    -195 -100 -25 size 12 1 12
+place Stage1Leak2                    -150 -100 -45 size 10 1 10
+place Stage1Leak3                    -100 -100 -95 size 10 1 10
+# 光の安全地帯の範囲（size の幅が直径。電球は PropSafeLight...）
+place SafeZone_CentralHall           -198 -99 12 size 60 1 60
+place SafeZone_SouthWestHall         -322 -99 -292 size 68 1 68
 place Stage1ExitOmen                 92 -99 278
 place PropDoorIndicator              65.4 -68 177.4 size 10 5 1
 place Stage1EvidenceMarker           217.2 -65 -42 size 1 5 18

@@ -17,6 +17,15 @@ namespace
     // 聞く前のランプ（赤）と、聞いた後のランプ（緑）の色
     const Color UnplayedLampColor(1.0f, 0.10f, 0.06f, 1.0f);
     const Color PlayedLampColor(0.16f, 0.95f, 0.30f, 1.0f);
+    // 聞く前のランプの点滅：この周期で、初めのこの秒数だけ光る。聞いた後は、この明るさで弱く点いたまま
+    constexpr float BlinkCycleSeconds = 1.6f;
+    constexpr float BlinkOnSeconds = 0.55f;
+    constexpr float PlayedLampLevel = 0.35f;
+    // ランプの小さな点光源：ほとんど消えているときは出さない明るさ、ランプから上げる高さ、照らす範囲、強さ
+    constexpr float MinimumLampLevel = 0.01f;
+    constexpr float LampLightHeight = 2.0f;
+    constexpr float LampLightRange = 18.0f;
+    constexpr float LampLightIntensity = 1.1f;
 }
 
 // 箱を1つ足している。壁（Wall）と同じく、表と裏の両方の順番で三角形を並べ、どちらから見ても欠けないようにしている
@@ -139,10 +148,10 @@ float VoiceRecorder::GetLampLevel() const
 {
     if (m_Played)
     {
-        return 0.35f;
+        return PlayedLampLevel;
     }
-    const float phase = std::fmod(m_BlinkTime, 1.6f);
-    return phase < 0.55f ? std::sin(phase / 0.55f * 3.14159265f) : 0.0f;
+    const float phase = std::fmod(m_BlinkTime, BlinkCycleSeconds);
+    return phase < BlinkOnSeconds ? std::sin(phase / BlinkOnSeconds * DirectX::XM_PI) : 0.0f;
 }
 
 void VoiceRecorder::Update()
@@ -204,14 +213,14 @@ void VoiceRecorder::Draw(Camera* cam)
 void VoiceRecorder::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const
 {
     const float level = GetLampLevel();
-    if (level <= 0.01f)
+    if (level <= MinimumLampLevel)
     {
         return;
     }
     const Color lampColor = m_Played ? PlayedLampColor : UnplayedLampColor;
     ENVIRONMENT_POINT_LIGHT light{};
-    light.PositionRange = Vector4(m_Position.x, m_Position.y + 2.0f, m_Position.z, 18.0f);
-    light.ColorIntensity = Vector4(lampColor.x, lampColor.y, lampColor.z, 1.1f * level);
+    light.PositionRange = Vector4(m_Position.x, m_Position.y + LampLightHeight, m_Position.z, LampLightRange);
+    light.ColorIntensity = Vector4(lampColor.x, lampColor.y, lampColor.z, LampLightIntensity * level);
     lights.push_back(light);
 }
 

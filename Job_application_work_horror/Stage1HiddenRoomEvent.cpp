@@ -29,6 +29,22 @@ namespace
     constexpr float RoomMaxZ = 178.0f;
     // この線より奥まで入ったら扉を閉めている（扉のすぐ前で閉めて、プレイヤーを挟まないため）。
     constexpr float TrapLineX = 64.0f;
+    // 影に触れられて電池を奪われても、この残量（%）は残す
+    constexpr float BatteryFloor = 5.0f;
+    // 鍵のそばの保管灯が2回ずつ点滅する並び（1回目はこの秒数まで点く、2回目はこの間だけ点く）
+    constexpr float FirstPulseEnd = 0.30f;
+    constexpr float SecondPulseStart = 0.55f;
+    constexpr float SecondPulseEnd = 0.85f;
+    // 影を見られても消さない秒数（部屋にいる間は消えずに追い続ける）。足音を鳴らす高さ
+    constexpr float ShadowGazeSeconds = 60.0f;
+    constexpr float ShadowFootstepHeight = 4.0f;
+    // 知らせを出す秒数（扉が閉まった・記録を読んだ・鍵で開いた・影が消えた・触れられた・何かがいる）
+    constexpr float DoorClosedNoticeSeconds = 2.4f;
+    constexpr float LogNoticeSeconds = 4.0f;
+    constexpr float UnlockedNoticeSeconds = 2.8f;
+    constexpr float ShadowGoneNoticeSeconds = 2.6f;
+    constexpr float CaughtNoticeSeconds = 2.8f;
+    constexpr float ShadowAppearedNoticeSeconds = 2.8f;
 
     // 鍵が落ちている場所の候補。部屋は書類棚（配置ファイルの PropHiddenShelf）でジグザグの通路に区切ってあり、
     // どれも入口からは棚に隠れて見えない。順に、入口の通路の南の行き止まり（低い棚の裏）、
@@ -132,7 +148,7 @@ void Stage1HiddenRoomEvent::Trap(Player& player)
     game->PlayAudioCueAt(SOUND_CUE_SCARE, door->GetPosition(), 0.85f, 0.7f);
     game->GetPostProcess()->TriggerHorrorPulse(0.46f, 0.40f);
     Input::SetVibration(10, 0.26f);
-    ShowNotice("扉が閉まった", 2.4f);
+    ShowNotice("扉が閉まった", DoorClosedNoticeSeconds);
     UpdateKeyLamps(0.0f);
 }
 
@@ -147,7 +163,7 @@ void Stage1HiddenRoomEvent::UpdateTrapped(Player& player, float deltaTime,
     {
         m_RecordRead = true;
         game->RegisterEvidenceCollected();
-        ShowNotice("巡回記録：天井裏の足音は止まらない　保管灯が鍵の場所を示す", 4.0f);
+        ShowNotice("巡回記録：天井裏の足音は止まらない　保管灯が鍵の場所を示す", LogNoticeSeconds);
     }
 
     // 鍵を拾ったら、扉の鍵を外して開け、脱出にしている。
@@ -161,7 +177,7 @@ void Stage1HiddenRoomEvent::UpdateTrapped(Player& player, float deltaTime,
         door->SetLocked(false);
         door->Interact(player);
         game->GetPostProcess()->TriggerBloomPulse(0.48f, 0.24f);
-        ShowNotice("鍵で扉が開いた", 2.8f);
+        ShowNotice("鍵で扉が開いた", UnlockedNoticeSeconds);
         return;
     }
 
@@ -175,7 +191,7 @@ void Stage1HiddenRoomEvent::UpdateTrapped(Player& player, float deltaTime,
         {
             m_ShadowWasActive = false;
             m_ShadowTimer = NextShadowDelay;
-            ShowNotice("影が消えた 今のうちに鍵を探す", 2.6f);
+            ShowNotice("影が消えた 今のうちに鍵を探す", ShadowGoneNoticeSeconds);
         }
         m_ShadowTimer -= deltaTime;
         if (m_ShadowTimer <= 0.0f)
@@ -193,7 +209,7 @@ void Stage1HiddenRoomEvent::UpdateTrapped(Player& player, float deltaTime,
     toPlayer.y = 0.0f;
     if (toPlayer.Length() < ShadowCatchDistance)
     {
-        const float taken = (std::min)(BatteryPenalty, (std::max)(0.0f, player.GetBattery() - 5.0f));
+        const float taken = (std::min)(BatteryPenalty, (std::max)(0.0f, player.GetBattery() - BatteryFloor));
         player.AddBattery(-taken);
         shadow->SetActive(false);
         game->PlayAudioCue(SOUND_CUE_SCARE, 0.9f);
@@ -201,7 +217,7 @@ void Stage1HiddenRoomEvent::UpdateTrapped(Player& player, float deltaTime,
         Input::SetVibration(14, 0.36f);
         m_ShadowWasActive = false;
         m_ShadowTimer = NextShadowDelay;
-        ShowNotice("影に触れられた 電池を奪われた", 2.8f);
+        ShowNotice("影に触れられた 電池を奪われた", CaughtNoticeSeconds);
     }
 }
 
@@ -221,7 +237,7 @@ void Stage1HiddenRoomEvent::UpdateKeyLamps(float deltaTime)
     const std::size_t scanLamp = static_cast<std::size_t>(
         (std::min)(m_KeyLampTime, ScanSeconds) / ScanStepSeconds);
     const float pulseTime = std::fmod((std::max)(0.0f, m_KeyLampTime - ScanSeconds), PulseCycleSeconds);
-    const bool pulseOn = pulseTime < 0.30f || (pulseTime >= 0.55f && pulseTime < 0.85f);
+    const bool pulseOn = pulseTime < FirstPulseEnd || (pulseTime >= SecondPulseStart && pulseTime < SecondPulseEnd);
 
     for (std::size_t index = 0; index < m_Parts.keyLamps.size(); ++index)
     {
@@ -263,14 +279,14 @@ void Stage1HiddenRoomEvent::SpawnShadow(const Player& player)
     ShadowMan* shadow = m_Parts.shadow;
     shadow->SetPosition(farthest->x, farthest->y, farthest->z);
     shadow->SetActive(true);
-    shadow->EnableGazeScare(60.0f);
+    shadow->EnableGazeScare(ShadowGazeSeconds);
     m_ShadowStride = 0.0f;
     m_ShadowWasActive = true;
 
     // 影が出た場所の天井近くで、低く配管の音を鳴らして気配を知らせている
     Core::Game* game = Core::Game::GetInstance();
     game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, *farthest + Vector3(0.0f, 20.0f, 0.0f), 0.55f, 1.4f);
-    ShowNotice("何かが部屋にいる ライトを向ける", 2.8f);
+    ShowNotice("何かが部屋にいる ライトを向ける", ShadowAppearedNoticeSeconds);
 }
 
 // 影を、経路探索で次に向かう点へ進めている。棚や壁には押し戻しでめり込まないようにし、
@@ -312,7 +328,7 @@ void Stage1HiddenRoomEvent::MoveShadow(const Player& player, float deltaTime,
     {
         m_ShadowStride -= ShadowStrideLength;
         Core::Game::GetInstance()->PlayAudioCueAt(
-            SOUND_CUE_FOOTSTEP, Vector3(next.x, before.y + 4.0f, next.z), 0.74f, 1.7f);
+            SOUND_CUE_FOOTSTEP, Vector3(next.x, before.y + ShadowFootstepHeight, next.z), 0.74f, 1.7f);
     }
 }
 

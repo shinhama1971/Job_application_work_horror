@@ -157,6 +157,14 @@ private:
     // 歩数が求まっていない（たどり着けない）マス
     static constexpr std::uint16_t Unreachable = (std::numeric_limits<std::uint16_t>::max)();
 
+    // 初めて現れるとき：プレイヤーが入口側の棚の通路（x がこれより東、z がこの範囲）にいたら、奥の棚の陰から姿を見せる
+    static constexpr float FirstAppearMinX = -140.0f;
+    static constexpr float FirstAppearMinZ = 105.0f;
+    static constexpr float FirstAppearMaxZ = 125.0f;
+    static constexpr DirectX::SimpleMath::Vector3 BehindShelfPosition{ -183.0f, -99.0f, 89.0f };
+    // 動けなくなったとみなす割合（一定時間に進めたはずの距離に対して、実際に進んだ距離がこれより小さい）
+    static constexpr float StuckMoveRate = 0.3f;
+
     // 現れる場所の候補（部屋の四隅と棚の間の通路。棚にめり込まない位置を選んでいる）
     static constexpr std::array<DirectX::SimpleMath::Vector3, 6> SpawnPoints =
     {
@@ -184,10 +192,10 @@ private:
         }
         // 入口側の棚の通路では、初回だけ奥の棚の陰から姿を見せる。
         // 配置が変わり、出現位置が塞がっていれば、通常の候補を使う。
-        if (!m_HasAppeared && playerPosition.x > -140.0f &&
-            playerPosition.z > 105.0f && playerPosition.z < 125.0f && resolveCollision)
+        if (!m_HasAppeared && playerPosition.x > FirstAppearMinX &&
+            playerPosition.z > FirstAppearMinZ && playerPosition.z < FirstAppearMaxZ && resolveCollision)
         {
-            const DirectX::SimpleMath::Vector3 behindShelf(-183.0f, -99.0f, 89.0f);
+            const DirectX::SimpleMath::Vector3 behindShelf = BehindShelfPosition;
             DirectX::SimpleMath::Vector3 clearPosition = behindShelf;
             resolveCollision(clearPosition, BodyRadius);
             if (HorizontalDistance(behindShelf, clearPosition) < 0.01f)
@@ -261,7 +269,7 @@ private:
         m_StuckTimer += input.DeltaTime;
         if (m_StuckTimer >= StuckWindow)
         {
-            if (m_StuckMoved < m_StuckExpected * 0.3f)
+            if (m_StuckMoved < m_StuckExpected * StuckMoveRate)
             {
                 Relocate(input.PlayerPosition);
             }

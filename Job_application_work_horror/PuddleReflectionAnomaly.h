@@ -20,6 +20,19 @@
 #include <algorithm>
 #include <cmath>
 
+// 水たまりの異変の判定の値：足元をのぞいているとみなす下向きの量、人影を置く x の範囲、人影が現れる・消える秒数、
+// 映った人影を見つけたとみなす距離と向き、顔を上げたとみなす向き、顔を上げて確かめる距離、近づく足音を遅らせる割合、知らせの秒数
+inline constexpr float PuddleLookDownForwardY = -0.42f;
+inline constexpr float PuddleFigureMinX = -12.0f;
+inline constexpr float PuddleFigureMaxX = 30.0f;
+inline constexpr float PuddleFigureFadeInSeconds = 0.6f;
+inline constexpr float PuddleFigureFadeOutSeconds = 0.25f;
+inline constexpr float PuddleFoundDistance = 70.0f;
+inline constexpr float PuddleFoundFacing = 0.90f;
+inline constexpr float PuddleLookUpFacing = 0.60f;
+inline constexpr float PuddleLookUpDistance = 80.0f;
+inline constexpr float PuddleFirstStepDelayRate = 1.6f;
+inline constexpr float PuddleNoticeSeconds = 2.6f;
 class PuddleReflectionAnomaly final
 {
 public:
@@ -71,7 +84,7 @@ private:
     // 足もとをのぞき込んでいるか（下へ向けた度合い）。顔を上げたかの判定にも使っている
     static bool IsLookingDown(const DirectX::SimpleMath::Vector3& forward) noexcept
     {
-        return forward.y < -0.42f;
+        return forward.y < PuddleLookDownForwardY;
     }
 
 public:
@@ -105,7 +118,7 @@ public:
         const float side = playerPosition.z < PuddleCenterZ ? 1.0f : -1.0f;
         const float depth = FigureDepthOffset + (BoldFigureDepthOffset - FigureDepthOffset) * boldness;
         return DirectX::SimpleMath::Vector3(
-            (std::clamp)(playerPosition.x, -12.0f, 30.0f), FloorY, PuddleCenterZ + depth * side);
+            (std::clamp)(playerPosition.x, PuddleFigureMinX, PuddleFigureMaxX), FloorY, PuddleCenterZ + depth * side);
     }
 
     // 目の位置eyeから見て、pointが水面に映っているかを調べている。
@@ -142,8 +155,8 @@ public:
         // 見え方は、映っている間は0.6秒で現れ、見つけた後や異変でない周回は0.25秒で消している
         const bool shown = active && !m_Found;
         m_Visibility = shown
-            ? (std::min)(1.0f, m_Visibility + deltaTime / 0.6f)
-            : (std::max)(0.0f, m_Visibility - deltaTime / 0.25f);
+            ? (std::min)(1.0f, m_Visibility + deltaTime / PuddleFigureFadeInSeconds)
+            : (std::max)(0.0f, m_Visibility - deltaTime / PuddleFigureFadeOutSeconds);
         if (!shown)
         {
             return Event::None;
@@ -172,7 +185,7 @@ public:
                     }
                     const DirectX::SimpleMath::Vector3 toHit = hit - eye;
                     const float distance = toHit.Length();
-                    if (distance > 0.001f && distance < 70.0f && forward.Dot(toHit / distance) > 0.90f)
+                    if (distance > 0.001f && distance < PuddleFoundDistance && forward.Dot(toHit / distance) > PuddleFoundFacing)
                     {
                         visible = true;
                         break;
@@ -187,7 +200,7 @@ public:
             // 見た：人影は顔を上げるのを待ち、のぞき続けると近づいて来る
             m_Seen = true;
             m_LookUpTimer = LookUpWindowSeconds;
-            m_StepTimer = GetStepSeconds() * 1.6f;
+            m_StepTimer = GetStepSeconds() * PuddleFirstStepDelayRate;
             return Event::Seen;
         }
 
@@ -201,10 +214,10 @@ public:
             flatForward.y = 0.0f;
             const float forwardLength = flatForward.Length();
             if (distance > 0.001f && forwardLength > 0.001f &&
-                (flatForward / forwardLength).Dot(toFigure / distance) > 0.60f)
+                (flatForward / forwardLength).Dot(toFigure / distance) > PuddleLookUpFacing)
             {
                 m_Found = true;
-                m_NoticeTimer = 2.6f;
+                m_NoticeTimer = PuddleNoticeSeconds;
                 return Event::Found;
             }
         }
@@ -229,7 +242,7 @@ public:
         }
         // 顔を上げずに時間が過ぎるか、遠くへ離れたら、また水たまりの向こうに立ち直す
         m_LookUpTimer -= deltaTime;
-        if (m_LookUpTimer <= 0.0f || distance > 80.0f)
+        if (m_LookUpTimer <= 0.0f || distance > PuddleLookUpDistance)
         {
             m_Seen = false;
             m_SeenSeconds = 0.0f;

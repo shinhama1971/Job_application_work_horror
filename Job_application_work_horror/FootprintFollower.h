@@ -16,6 +16,10 @@
 #include <algorithm>
 #include <cmath>
 
+// 濡れた足跡：足跡の高さ（床のわずか上）と、最後の足跡を見たとみなす距離と向き
+inline constexpr float FootprintSurfaceY = -99.5f;
+inline constexpr float FootprintLookDistance = 90.0f;
+inline constexpr float FootprintLookFacing = 0.93f;
 class FootprintFollower final
 {
 public:
@@ -94,9 +98,9 @@ public:
         // 一番新しい足跡を懐中電灯の中心で照らす（正面から内積0.93超、90未満の距離）と、そこで止まる
         if (m_HasLatest && flashlightOn)
         {
-            DirectX::SimpleMath::Vector3 toLatest(m_Latest.x - eye.x, -99.5f - eye.y, m_Latest.y - eye.z);
+            DirectX::SimpleMath::Vector3 toLatest(m_Latest.x - eye.x, FootprintSurfaceY - eye.y, m_Latest.y - eye.z);
             const float distance = toLatest.Length();
-            if (distance > 0.001f && distance < 90.0f && forward.Dot(toLatest / distance) > 0.93f)
+            if (distance > 0.001f && distance < FootprintLookDistance && forward.Dot(toLatest / distance) > FootprintLookFacing)
             {
                 m_Active = false;
                 return Event::Lit;

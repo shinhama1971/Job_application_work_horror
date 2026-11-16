@@ -32,6 +32,39 @@ namespace
     // 手首を少しひねり、親指を内側へ傾けている
     constexpr float GripRoll = 0.16f;
 
+    // ばねを進める細かさ（1秒を240に割る）と、1フレームで進める時間の上限（止まった後の大きな飛びを防ぐ）
+    constexpr float SpringStepSeconds = 1.0f / 240.0f;
+    constexpr float MaxFrameSeconds = 0.1f;
+    // 視点を回したときの遅れ：回す速さに掛ける割合、ずれの上限（横・縦）、ばねの硬さと減衰、位置と向きへの効き方
+    constexpr float LookSwayYawRate = 0.045f;
+    constexpr float LookSwayPitchRate = 0.040f;
+    constexpr float LookSwayYawLimit = 0.14f;
+    constexpr float LookSwayPitchLimit = 0.12f;
+    constexpr float LookSwayStiffness = 140.0f;
+    constexpr float LookSwayDamping = 17.0f;
+    constexpr float LookSwayYawOffset = 1.6f;
+    constexpr float LookSwayPitchOffset = 1.4f;
+    // 歩くときの揺れ：頭の揺れに掛ける割合（横・縦）と、ばねの硬さと減衰
+    constexpr float BobSideRate = 0.9f;
+    constexpr float BobVerticalRate = 0.55f;
+    constexpr float BobStiffness = 90.0f;
+    constexpr float BobDamping = 14.0f;
+    // 走る・手を下げる・壁が近い・スイッチ・光が一瞬暗くなった、の状態へ近づく速さ（1秒あたり）
+    constexpr float SprintApproachRate = 6.0f;
+    constexpr float LowerApproachRate = 5.0f;
+    constexpr float RaiseApproachRate = 3.5f;
+    constexpr float NearSurfaceApproachRate = 8.0f;
+    constexpr float ClickDecayRate = 9.0f;
+    constexpr float JoltDecayRate = 5.0f;
+    // 走るとき・壁が近いとき・手を下げたときの位置のずれ（ビュー空間）、スイッチを押したときに手前へ引く量
+    const Vector3 SprintOffset(0.35f, -0.75f, -0.55f);
+    const Vector3 NearSurfaceOffset(-0.15f, 0.25f, -0.9f);
+    const Vector3 LoweredOffset(0.4f, -3.2f, -0.8f);
+    constexpr float ClickPull = 0.10f;
+    // 息で手がゆっくり上下する速さと大きさ
+    constexpr float BreathFrequency = 1.15f;
+    constexpr float BreathLift = 0.02f;
+
     // 経過時間でなめらかに目標へ近づける割合
     float Approach(float current, float target, float ratePerSecond, float deltaTime)
     {
@@ -54,7 +87,7 @@ namespace
 // ばねの式（目標との差に比例する力と、速さに比例する減衰）を、時間を細かく割って進めている
 void FirstPersonHands::Spring::Update(float target, float stiffness, float damping, float deltaTime)
 {
-    const int steps = (std::max)(1, static_cast<int>(std::ceil(deltaTime / (1.0f / 240.0f))));
+    const int steps = (std::max)(1, static_cast<int>(std::ceil(deltaTime / SpringStepSeconds)));
     const float step = deltaTime / static_cast<float>(steps);
     for (int index = 0; index < steps; ++index)
     {
@@ -153,7 +186,7 @@ void FirstPersonHands::ResetMotion()
 // 視点の回転・歩き・走り・息・スイッチ・電池の揺れから、手元の空間 → ビュー空間の行列を作っている
 void FirstPersonHands::Update(const FrameInput& input)
 {
-    const float deltaTime = (std::min)(input.DeltaTime, 0.1f);
+    const float deltaTime = (std::min)(input.DeltaTime, MaxFrameSeconds);
     m_Time += deltaTime;
 
     // 視点を回したとき、手は少し遅れて付いてくる（回した向きと逆へずれ、ばねで戻る）
@@ -167,32 +200,34 @@ void FirstPersonHands::Update(const FrameInput& input)
     m_PreviousYaw = input.Yaw;
     m_PreviousPitch = input.Pitch;
     m_HasPreviousLook = true;
-    m_LookSwayYaw.Update((std::clamp)(-yawVelocity * 0.045f, -0.14f, 0.14f), 140.0f, 17.0f, deltaTime);
-    m_LookSwayPitch.Update((std::clamp)(pitchVelocity * 0.040f, -0.12f, 0.12f), 140.0f, 17.0f, deltaTime);
+    m_LookSwayYaw.Update((std::clamp)(-yawVelocity * LookSwayYawRate, -LookSwayYawLimit, LookSwayYawLimit),
+        LookSwayStiffness, LookSwayDamping, deltaTime);
+    m_LookSwayPitch.Update((std::clamp)(pitchVelocity * LookSwayPitchRate, -LookSwayPitchLimit, LookSwayPitchLimit),
+        LookSwayStiffness, LookSwayDamping, deltaTime);
 
     // 歩くと、頭の揺れより少し大きく、遅れて揺れる
-    m_BobX.Update(input.HeadBobSide * 0.9f, 90.0f, 14.0f, deltaTime);
-    m_BobY.Update(-input.HeadBobVertical * 0.55f, 90.0f, 14.0f, deltaTime);
+    m_BobX.Update(input.HeadBobSide * BobSideRate, BobStiffness, BobDamping, deltaTime);
+    m_BobY.Update(-input.HeadBobVertical * BobVerticalRate, BobStiffness, BobDamping, deltaTime);
 
-    m_Sprint = Approach(m_Sprint, input.Sprinting ? 1.0f : 0.0f, 6.0f, deltaTime);
-    m_Lower = Approach(m_Lower, input.Lowered ? 1.0f : 0.0f, input.Lowered ? 5.0f : 3.5f, deltaTime);
-    m_NearSurface = Approach(m_NearSurface, input.NearSurface, 8.0f, deltaTime);
-    m_Click = input.Toggled ? 1.0f : m_Click * std::exp(-deltaTime * 9.0f);
-    m_Jolt = input.VoltageDrop ? 1.0f : m_Jolt * std::exp(-deltaTime * 5.0f);
+    m_Sprint = Approach(m_Sprint, input.Sprinting ? 1.0f : 0.0f, SprintApproachRate, deltaTime);
+    m_Lower = Approach(m_Lower, input.Lowered ? 1.0f : 0.0f, input.Lowered ? LowerApproachRate : RaiseApproachRate, deltaTime);
+    m_NearSurface = Approach(m_NearSurface, input.NearSurface, NearSurfaceApproachRate, deltaTime);
+    m_Click = input.Toggled ? 1.0f : m_Click * std::exp(-deltaTime * ClickDecayRate);
+    m_Jolt = input.VoltageDrop ? 1.0f : m_Jolt * std::exp(-deltaTime * JoltDecayRate);
     m_LensGlow = input.LensGlow;
     m_BatteryWeakness = input.BatteryWeakness;
     m_Bounce = input.Bounce;
 
     // 位置のずれ（ビュー空間）
     Vector3 position = GripPosition;
-    position.x += m_LookSwayYaw.Value * 1.6f + m_BobX.Value;
-    position.y += m_LookSwayPitch.Value * 1.4f + m_BobY.Value + std::sin(m_Time * 1.15f) * 0.02f;
+    position.x += m_LookSwayYaw.Value * LookSwayYawOffset + m_BobX.Value;
+    position.y += m_LookSwayPitch.Value * LookSwayPitchOffset + m_BobY.Value + std::sin(m_Time * BreathFrequency) * BreathLift;
     // 走ると手を下げて体に引き寄せ、前の壁が近いと手を引いて少し上げる
-    position += Vector3(0.35f, -0.75f, -0.55f) * m_Sprint;
-    position += Vector3(-0.15f, 0.25f, -0.9f) * m_NearSurface;
-    position.z += m_Click * 0.10f;
+    position += SprintOffset * m_Sprint;
+    position += NearSurfaceOffset * m_NearSurface;
+    position.z += m_Click * ClickPull;
     // 手を下げて画面の外へ
-    position += Vector3(0.4f, -3.2f, -0.8f) * m_Lower;
+    position += LoweredOffset * m_Lower;
 
     // 向き：握る位置から画面の中央の遠くへ向け、そこへ揺れの回転を足している
     Vector3 forward = AimPoint - GripPosition;
@@ -211,7 +246,7 @@ void FirstPersonHands::Update(const FrameInput& input)
     const float jolt = std::sin(m_Time * 38.0f) * 0.035f * m_Jolt;
     const float yaw = m_LookSwayYaw.Value * 0.6f + 0.25f * m_Sprint + jolt * 0.6f + tremor;
     const float pitch = -m_LookSwayPitch.Value * 0.5f + 0.45f * m_Sprint - 0.12f * m_NearSurface -
-        0.05f * m_Click + 0.9f * m_Lower + jolt + std::sin(m_Time * 1.15f + 0.6f) * 0.006f;
+        0.05f * m_Click + 0.9f * m_Lower + jolt + std::sin(m_Time * BreathFrequency + 0.6f) * 0.006f;
     const float roll = GripRoll + m_BobX.Value * 0.25f + 0.2f * m_Sprint + tremor * 1.5f;
     m_ViewPose = Matrix::CreateFromYawPitchRoll(yaw, pitch, roll) * aim * Matrix::CreateTranslation(position);
 }

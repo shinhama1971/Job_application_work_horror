@@ -20,7 +20,11 @@ Texture2D<float> g_PreviousSsrDepth : register(t17);
 // 環境マップ（t14。カメラの位置から6方向を撮った本物の景色。GameRendering の EnvironmentProbe。pbrLighting.hlsli と同じ物）。
 // 水たまりのレイ反射で、画面の外の物の色に使っている。撮れているときだけ ReflectionParams.w が1
 TextureCube g_RayEnvironmentProbe : register(t14);
-static const float RAY_ENVIRONMENT_MIP_COUNT = 8.0f; // 128画素から1画素まで
+static const float RAY_ENVIRONMENT_MIP_COUNT = 9.0f; // 256画素から1画素まで（ReflectionProbe::FaceSize と合わせている）
+// 環境マップで読む一番小さい段（256画素の3段下 = 32画素。これより小さい段を引き伸ばすと四角いブロックが見える）
+static const float RAY_ENVIRONMENT_MAX_BLUR_MIP = 3.0f;
+// SSRでぶつかった位置を、1つ前の歩幅との間で半分ずつ詰める回数（7回で歩幅の1/128まで詰まる）
+static const int SSR_REFINE_STEPS = 7;
 
 // SSR：反射の光線をビュー空間で少しずつ（だんだん大きな歩幅で）進め、画面の深度より奥へ入った所を「ぶつかった」とし、
 // 当たった面を前のフレームのカメラへ投影し直して、同じ位置の色を読む。前の画面で隠れていた面は使わない。
@@ -79,7 +83,7 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
             float farDistance = distance;
             float2 hitUv = uv;
             [unroll]
-            for (int refine = 0; refine < 5; ++refine)
+            for (int refine = 0; refine < SSR_REFINE_STEPS; ++refine)
             {
                 const float middle = (nearDistance + farDistance) * 0.5f;
                 const float3 middlePosition = viewPosition + rayDirection * middle;
@@ -424,9 +428,9 @@ float3 TraceRoomReflection(float3 origin, float3 direction, float roughness,
         const float3 probeCenter = ReflectionProbeCenter.xyz;
         const float3 probeDirection = hit ? normalize(hitPosition - probeCenter) : direction;
         // 離れた所ほど、粗い水面ほど、少しぼやけた段を読んでいる（遠くの映り込みのぼけ）。
-        // 環境マップは1面128画素しかないので、16画素の段（3段目）より小さい段は読まない（四角いブロックが見えるため）
+        // 環境マップは1面256画素なので、32画素の段（3段目）より小さい段は読まない（四角いブロックが見えるため）
         const float environmentBlur = saturate(roughness * 0.45f + (hit ? hitDistance / 400.0f : 0.6f));
-        const float mipLevel = environmentBlur * 3.0f;
+        const float mipLevel = environmentBlur * RAY_ENVIRONMENT_MAX_BLUR_MIP;
         // キューブマップの面は左手系、このゲームの座標は右手系なので、z を反転して読んでいる（ReflectionProbe.cpp）
         const float3 environment = g_RayEnvironmentProbe.SampleLevel(g_SamplerState,
             float3(probeDirection.x, probeDirection.y, -probeDirection.z), mipLevel).rgb;

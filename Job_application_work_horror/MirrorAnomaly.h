@@ -17,6 +17,16 @@
 #include <algorithm>
 #include <cmath>
 
+// 鏡の異変の判定の値：鏡の中の人影をプレイヤーから見た位置（x にこの分足す、ただしこの x まで。z はこの分だけ手前）、
+// 映った人影を見つけたとみなす距離と向き、振り向いたとみなす向き、振り向いて確かめる距離、知らせの秒数
+inline constexpr float MirrorFigureOffsetX = 16.0f;
+inline constexpr float MirrorFigureMaxX = 34.0f;
+inline constexpr float MirrorFigureOffsetZ = 11.5f;
+inline constexpr float MirrorFoundDistance = 80.0f;
+inline constexpr float MirrorFoundFacing = 0.94f;
+inline constexpr float MirrorTurnFacing = 0.70f;
+inline constexpr float MirrorTurnDistance = 90.0f;
+inline constexpr float MirrorNoticeSeconds = 2.6f;
 class MirrorAnomaly final
 {
 public:
@@ -74,7 +84,7 @@ public:
     static DirectX::SimpleMath::Vector3 FigurePositionBehind(const DirectX::SimpleMath::Vector3& playerPosition) noexcept
     {
         return DirectX::SimpleMath::Vector3(
-            (std::min)(playerPosition.x + 16.0f, 34.0f), -99.0f, playerPosition.z - 11.5f);
+            (std::min)(playerPosition.x + MirrorFigureOffsetX, MirrorFigureMaxX), -99.0f, playerPosition.z - MirrorFigureOffsetZ);
     }
 
     // 目の位置eyeから見て、pointが鏡に映っているかを調べている。
@@ -127,7 +137,7 @@ public:
                 }
                 DirectX::SimpleMath::Vector3 toHit = hit - eye;
                 const float distance = toHit.Length();
-                if (distance > 0.001f && distance < 80.0f && forward.Dot(toHit / distance) > 0.94f)
+                if (distance > 0.001f && distance < MirrorFoundDistance && forward.Dot(toHit / distance) > MirrorFoundFacing)
                 {
                     visible = true;
                     break;
@@ -153,15 +163,15 @@ public:
         const float distance = toFigure.Length();
         const float forwardLength = flatForward.Length();
         if (distance > 0.001f && forwardLength > 0.001f &&
-            (flatForward / forwardLength).Dot(toFigure / distance) > 0.70f)
+            (flatForward / forwardLength).Dot(toFigure / distance) > MirrorTurnFacing)
         {
             m_Found = true;
-            m_NoticeTimer = 2.6f;
+            m_NoticeTimer = MirrorNoticeSeconds;
             return Event::Found;
         }
         // 振り返らずに時間が過ぎるか、遠くへ離れたら、また鏡の中で後ろについて来る
         m_TurnTimer -= deltaTime;
-        if (m_TurnTimer <= 0.0f || distance > 90.0f)
+        if (m_TurnTimer <= 0.0f || distance > MirrorTurnDistance)
         {
             m_Seen = false;
             m_SeenSeconds = 0.0f;

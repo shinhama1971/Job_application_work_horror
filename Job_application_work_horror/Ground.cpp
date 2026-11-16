@@ -227,8 +227,8 @@ void Ground::BuildPuddleSurfaces()
 	m_PuddleSurfaceVertices.clear();
 	m_PuddleSurfaces.clear();
 	const WaterEffectSystem::PuddleCellBufferData& data = m_WaterEffects.GetPuddleCellData();
-	constexpr float cellSize = 82.0f;
-	constexpr float coverRadius = 0.62f * 1.04f;
+	constexpr float cellSize = WaterEffectSystem::PuddleCellSize;
+	constexpr float coverRadius = WaterEffectSystem::PuddleCoverRadius;
 	const Vector2 gridOffset(data.GridOffset.x, data.GridOffset.y);
 	std::vector<Vector2> outline(PuddleOutlineSegments);
 	for (int row = 0; row < WaterEffectSystem::PuddleCellCount; ++row)
@@ -245,8 +245,9 @@ void Ground::BuildPuddleSurfaces()
 			const float angle = randomValue.x * DirectX::XM_2PI;
 			const float cosine = std::cos(angle);
 			const float sine = std::sin(angle);
-			const Vector2 axes(0.72f + randomValue.x * 0.25f, 0.43f + randomValue.y * 0.20f);
-			const Vector2 shift = (randomValue - Vector2(0.5f, 0.5f)) * 0.22f;
+			const Vector2 axes(WaterEffectSystem::PuddleAxisX + randomValue.x * WaterEffectSystem::PuddleAxisXRange,
+				WaterEffectSystem::PuddleAxisZ + randomValue.y * WaterEffectSystem::PuddleAxisZRange);
+			const Vector2 shift = (randomValue - Vector2(0.5f, 0.5f)) * WaterEffectSystem::PuddleCenterJitter;
 			const Vector2 cellCenter(
 				static_cast<float>(WaterEffectSystem::PuddleCellMin + column) + 0.5f,
 				static_cast<float>(WaterEffectSystem::PuddleCellMin + row) + 0.5f);

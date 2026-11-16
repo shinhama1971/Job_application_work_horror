@@ -21,6 +21,43 @@ using namespace DirectX::SimpleMath;
 namespace
 {
     const Color DoorWoodColor(0.30f, 0.13f, 0.07f, 1.0f);
+    // 扉の大きさ（幅30・高さ50・厚さ4）。モデルはこの大きさを1にした空間で作っている
+    const Vector3 DoorSize(30.0f, 50.0f, 4.0f);
+    // 開ききったときの角度（1.5ラジアン、約86度）と、漏れ光が一番明るくなる開き具合の角度
+    constexpr float DoorOpenAngle = 1.50f;
+    constexpr float DoorLeakFullOpenAngle = 1.20f;
+
+    // 鍵のかかった扉を調べたとき：この秒数だけ、この速さ・大きさで小刻みに揺らす
+    constexpr float LockedRattleSeconds = 0.28f;
+    constexpr float LockedRattleFrequency = 62.0f;
+    constexpr float LockedRattleAngle = 0.018f;
+
+    // 開始地点のドアの隙間（1面の4周目から）：照らされていない間だけ、この角度までゆっくり開き、照らされると速く閉じる
+    constexpr float HauntedGapAngle = 0.18f;
+    constexpr float HauntedGapOpenSpeed = 0.025f;
+    constexpr float HauntedGapCloseSpeed = 0.65f;
+
+    // 開く前のためで揺れる大きさと速さ（周回が進むほど強く速く）、漏れ光をちらつかせる速さ
+    constexpr float OpenDelayRattleAngle = 0.006f;
+    constexpr float OpenDelayRattleAnglePerLoop = 0.0045f;
+    constexpr float OpenDelayRattleFrequency = 30.0f;
+    constexpr float OpenDelayRattleFrequencyPerLoop = 7.0f;
+    constexpr float OpenDelayGlowFrequency = 45.0f;
+
+    // 周回ごとの開き方（1秒あたりに開く角度と、開く前のための秒数）。2周目は重く、最終周は一度ためてから不自然な速さで開く
+    struct OpenStyle
+    {
+        float SpeedPerSecond;
+        float DelaySeconds;
+    };
+    constexpr OpenStyle OpenStyles[] =
+    {
+        { 1.92f, 0.06f },
+        { 1.74f, 0.20f },
+        { 1.38f, 0.38f },
+        { 2.76f, 0.58f },
+    };
+    constexpr int LastLoopPhase = static_cast<int>(std::size(OpenStyles)) - 1;
 }
 
 // 扉の形（扉板・鏡板・縁の飾り・取っ手・足元の漏れ光）をMayaで作ったモデルから読み込み、マテリアルを用意している。
@@ -42,7 +79,7 @@ void Door::Init()
             { "Handle", Color(0.72f, 0.48f, 0.12f, 1.0f) },
             { "Leak", Color(1.0f, 0.72f, 0.42f, 1.0f) },
         },
-        Vector3(30.0f, 50.0f, 4.0f), m_Vertices, m_Indices);
+        DoorSize, m_Vertices, m_Indices);
     // 取っ手は金属のマテリアルで、足元の漏れ光は別のマテリアルで描くので、インデックスの位置を覚えている。
     // 漏れ光は、扉の下の隙間から漏れる奥の部屋の光で、影を落とさない
     m_HandleIndexStart = ranges[2].Start;
@@ -79,7 +116,7 @@ void Door::Init()
     m_LeakMaterial->Create(leakMaterial);
 
     // 扉の大きさ（幅30・高さ50・厚さ4）
-    m_Scale = Vector3(30.0f, 50.0f, 4.0f);
+    m_Scale = DoorSize;
 }
 // 1フレーム分、扉の動きを進めている：鍵がかかっていれば小刻みに揺らし、開け始めたら少しためてから回転させている
 void Door::Update()
@@ -88,13 +125,12 @@ void Door::Update()
     // 鍵がかかった扉を調べた直後：0.28秒だけ小さくガタガタ揺らしている
     if (m_LockedRattleTimer > 0.0f)
     {
-        constexpr float rattleDuration = 0.28f;
         m_LockedRattleTimer = (std::max)(
             0.0f,
             m_LockedRattleTimer - deltaTime);
-        const float remaining = m_LockedRattleTimer / rattleDuration;
-        const float elapsed = rattleDuration - m_LockedRattleTimer;
-        m_OpenAngle = std::sin(elapsed * 62.0f) * 0.018f * remaining;
+        const float remaining = m_LockedRattleTimer / LockedRattleSeconds;
+        const float elapsed = LockedRattleSeconds - m_LockedRattleTimer;
+        m_OpenAngle = std::sin(elapsed * LockedRattleFrequency) * LockedRattleAngle * remaining;
         if (m_LockedRattleTimer <= 0.0f)
         {
             m_OpenAngle = 0.0f;
@@ -106,8 +142,8 @@ void Door::Update()
     {
         if (!m_IsOpen && m_IsLocked)
         {
-            const float target = m_HauntedGap && !m_HauntedLit ? 0.18f : 0.0f;
-            const float speed = target > m_OpenAngle ? 0.025f : 0.65f;
+            const float target = m_HauntedGap && !m_HauntedLit ? HauntedGapAngle : 0.0f;
+            const float speed = target > m_OpenAngle ? HauntedGapOpenSpeed : HauntedGapCloseSpeed;
             m_OpenAngle += (std::clamp)(target - m_OpenAngle, -speed * deltaTime, speed * deltaTime);
         }
         return;
@@ -123,9 +159,9 @@ void Door::Update()
         const float remaining = m_OpenDelayTimer /
             (std::max)(m_OpenDelayDuration, 0.001f);
         const float rattleStrength =
-            0.006f + static_cast<float>(m_LoopPhase) * 0.0045f;
+            OpenDelayRattleAngle + static_cast<float>(m_LoopPhase) * OpenDelayRattleAnglePerLoop;
         m_OpenAngle = std::sin(
-            elapsed * (30.0f + static_cast<float>(m_LoopPhase) * 7.0f)) *
+            elapsed * (OpenDelayRattleFrequency + static_cast<float>(m_LoopPhase) * OpenDelayRattleFrequencyPerLoop)) *
             rattleStrength * remaining;
 
         if (m_OpenDelayTimer <= 0.0f)
@@ -136,12 +172,11 @@ void Door::Update()
     }
 
     // 1.5ラジアン（約86度）まで、周回ごとの速さで開いている
-    constexpr float targetAngle = 1.50f;
     m_OpenAngle = (std::min)(
         m_OpenAngle + m_OpenSpeedPerSecond * deltaTime,
-        targetAngle);
+        DoorOpenAngle);
 
-    if (m_OpenAngle >= targetAngle)
+    if (m_OpenAngle >= DoorOpenAngle)
     {
         m_IsOpen = true;
         m_IsOpening = false;
@@ -165,7 +200,7 @@ void Door::Interact(Player& player)
     if (m_IsLocked)
     {
         Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_DOOR_LOCKED, m_Position);
-        m_LockedRattleTimer = 0.28f;
+        m_LockedRattleTimer = LockedRattleSeconds;
         Core::Game::GetInstance()->GetPostProcess()->TriggerHorrorPulse(
             0.10f,
             0.16f);
@@ -217,30 +252,13 @@ void Door::ResetClosed(int loopPhase)
     m_IsLocked = false;
     m_LockedRattleTimer = 0.0f;
     m_OpenDelayTimer = 0.0f;
-    m_LoopPhase = (std::clamp)(loopPhase, 0, 3);
+    m_LoopPhase = (std::clamp)(loopPhase, 0, LastLoopPhase);
 
     // 同じ扉でも周回ごとに開き方を変えている。2周目は重く、最終周は一度ためてから
     // 不自然な速さで開き、見慣れた空間の違和感を強めている。
-    if (m_LoopPhase == 0)
-    {
-        m_OpenSpeedPerSecond = 1.92f;
-        m_OpenDelayDuration = 0.06f;
-    }
-    else if (m_LoopPhase == 1)
-    {
-        m_OpenSpeedPerSecond = 1.74f;
-        m_OpenDelayDuration = 0.20f;
-    }
-    else if (m_LoopPhase == 2)
-    {
-        m_OpenSpeedPerSecond = 1.38f;
-        m_OpenDelayDuration = 0.38f;
-    }
-    else
-    {
-        m_OpenSpeedPerSecond = 2.76f;
-        m_OpenDelayDuration = 0.58f;
-    }
+    const OpenStyle& style = OpenStyles[static_cast<std::size_t>(m_LoopPhase)];
+    m_OpenSpeedPerSecond = style.SpeedPerSecond;
+    m_OpenDelayDuration = style.DelaySeconds;
 }
 
 // 2点を結ぶ線分を、閉じた扉板がさえぎるかを判定している（開いている・開き始めていれば何もさえぎらない）
@@ -415,7 +433,7 @@ void Door::Draw(Camera* camera)
         0);
 
     // 開き具合（0〜1）をなめらかな曲線（smoothstep）に変えている
-    const float normalizedOpen = (std::clamp)(m_OpenAngle / 1.20f, 0.0f, 1.0f);
+    const float normalizedOpen = (std::clamp)(m_OpenAngle / DoorLeakFullOpenAngle, 0.0f, 1.0f);
     const float openAmount = normalizedOpen * normalizedOpen *
         (3.0f - 2.0f * normalizedOpen);
     // 開く前のためで揺れている間は、漏れ光もちらつかせている
@@ -426,7 +444,7 @@ void Door::Draw(Camera* camera)
         const float remaining = m_OpenDelayTimer /
             (std::max)(m_OpenDelayDuration, 0.001f);
         rattleGlow =
-            (std::sin(elapsed * 45.0f) * 0.5f + 0.5f) * remaining;
+            (std::sin(elapsed * OpenDelayGlowFrequency) * 0.5f + 0.5f) * remaining;
     }
 
     // 漏れ光の明るさ：周回が進むほど、開くほど、明るくしている

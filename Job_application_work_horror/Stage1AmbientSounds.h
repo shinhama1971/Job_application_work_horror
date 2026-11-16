@@ -11,6 +11,7 @@
 #include "sound.h"
 
 #include <SimpleMath.h>
+#include "CaptureMode.h"
 #include <random>
 #include <vector>
 
@@ -100,5 +101,5 @@ private:
     std::vector<ScheduledCue> m_Scheduled;
     float m_WaitTimer = FirstDelay;
     Kind m_LastKind = Kind::DistantDoor;
-    std::mt19937 m_Random{ std::random_device{}() };
+    std::mt19937 m_Random{ Tools::CaptureMode::MakeRandomSeed(1103u) };
 };

@@ -24,6 +24,25 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // --- 遊んでいる間の HUD の並べ方（キャンバスの単位。キャンバスは高さ864）
+    // 画面の左・右・上の余白、右上の知らせの枠の内側の余白
+    constexpr float LeftMargin = 34.0f;
+    constexpr float RightMargin = 52.0f;
+    constexpr float TopMargin = 28.0f;
+    constexpr float NoticePadding = 14.0f;
+    // 左下のゲージの枠の幅と、名前の文字を置く x
+    constexpr float GaugePanelWidth = 230.0f;
+    constexpr float GaugeLabelX = 43.0f;
+    // ヒューズの数（左下の3つの四角）
+    constexpr int FuseSlotCount = 3;
+    // 電池とスタミナの最大値（%）と、色を変える割合（電池：半分以下で黄、2割以下で赤。スタミナ：4割以下で黄、2割以下で赤）
+    constexpr float GaugeMaximum = 100.0f;
+    constexpr float BatteryWarningRate = 0.5f;
+    constexpr float BatteryDangerRate = 0.2f;
+    constexpr float StaminaWarningRate = 0.40f;
+    constexpr float StaminaDangerRate = 0.20f;
+    // 右上に「電池残量が少ない」と出す残量（%）
+    constexpr float LowBatteryNoticePercent = 20.0f;
     // UTF-8の文字列で、画面に出る文字の数を数えている（2バイト目以降のバイトは数えない）
     size_t CountDisplayedCharacters(std::string_view text)
     {
@@ -166,8 +185,8 @@ void Hud::Draw(
             ? Color(0.52f, 0.92f, 0.58f, 0.95f)
             : Color(0.88f, 0.82f, 0.62f, 0.95f);
 
-        AddRectangle(34.0f, 28.0f, objectiveWidth, 39.0f, dark);
-        AddRectangle(34.0f, 28.0f, 4.0f, 39.0f, objectiveColor);
+        AddRectangle(LeftMargin, TopMargin, objectiveWidth, 39.0f, dark);
+        AddRectangle(LeftMargin, TopMargin, 4.0f, 39.0f, objectiveColor);
         AddText(48.0f, 37.0f, objectiveText, pixelSize, objectiveColor);
     }
 
@@ -183,15 +202,15 @@ void Hud::Draw(
     constexpr float evidencePixelSize = 2.0f;
     const float evidenceWidth =
         static_cast<float>(CountDisplayedCharacters(evidenceText)) *
-        evidencePixelSize * 6.0f;
-    const float evidenceX = screenWidth - evidenceWidth - 52.0f;
+        evidencePixelSize * GlyphAdvance;
+    const float evidenceX = screenWidth - evidenceWidth - RightMargin;
     const Color evidenceColor = evidenceCount >= Core::GameState::TotalEvidenceCount
         ? Color(0.92f, 0.78f, 0.34f, 0.96f)
         : Color(0.62f, 0.78f, 0.70f, 0.88f);
     if (m_EvidenceVisible)
     {
-        AddRectangle(evidenceX - 14.0f, 74.0f + m_TopRightOffset,
-            evidenceWidth + 28.0f, 34.0f, dark);
+        AddRectangle(evidenceX - NoticePadding, 74.0f + m_TopRightOffset,
+            evidenceWidth + NoticePadding * 2.0f, 34.0f, dark);
         AddText(evidenceX, 82.0f + m_TopRightOffset,
             evidenceText, evidencePixelSize, evidenceColor);
     }
@@ -206,9 +225,9 @@ void Hud::Draw(
     // 負の個数を「ヒューズの表示なし」として扱い、ヒューズのない面でも電池のHUDを共用している。
     if (fuseCount >= 0)
     {
-        AddRectangle(34.0f, screenHeight - 112.0f, 112.0f, 36.0f, dark);
-        const int clampedFuseCount = std::clamp(fuseCount, 0, 3);
-        for (int i = 0; i < 3; ++i)
+        AddRectangle(LeftMargin, screenHeight - 112.0f, 112.0f, 36.0f, dark);
+        const int clampedFuseCount = std::clamp(fuseCount, 0, FuseSlotCount);
+        for (int i = 0; i < FuseSlotCount; ++i)
         {
             AddRectangle(
                 46.0f + static_cast<float>(i) * 32.0f,
@@ -222,21 +241,21 @@ void Hud::Draw(
 
     // 懐中電灯の電池の枠と残りのゲージを描いている（50%以下で黄色、20%以下で赤）。
     const float batteryRate = std::clamp(
-        player.GetBattery() / 100.0f, 0.0f, 1.0f);
+        player.GetBattery() / GaugeMaximum, 0.0f, 1.0f);
     Color batteryColor(0.42f, 0.82f, 0.48f, 0.95f);
-    if (batteryRate <= 0.2f)
+    if (batteryRate <= BatteryDangerRate)
     {
         batteryColor = Color(0.92f, 0.18f, 0.12f, 0.95f);
     }
-    else if (batteryRate <= 0.5f)
+    else if (batteryRate <= BatteryWarningRate)
     {
         batteryColor = Color(0.92f, 0.68f, 0.16f, 0.95f);
     }
 
     constexpr float barFillX = 104.0f;
     constexpr float barFillWidth = 152.0f;
-    AddRectangle(34.0f, screenHeight - 66.0f, 230.0f, 30.0f, dark);
-    AddText(43.0f, screenHeight - 58.0f,
+    AddRectangle(LeftMargin, screenHeight - 66.0f, GaugePanelWidth, 30.0f, dark);
+    AddText(GaugeLabelX, screenHeight - 58.0f,
         "ライト", 1.5f, white);
     AddRectangle(barFillX, screenHeight - 57.0f,
         barFillWidth, 12.0f, inactive);
@@ -248,13 +267,13 @@ void Hud::Draw(
 
     // スタミナのゲージの色（40%以下で黄色、20%以下で赤）
     const float staminaRate = std::clamp(
-        player.GetStamina() / 100.0f, 0.0f, 1.0f);
+        player.GetStamina() / GaugeMaximum, 0.0f, 1.0f);
     Color staminaColor(0.34f, 0.70f, 0.86f, 0.95f);
-    if (staminaRate <= 0.20f)
+    if (staminaRate <= StaminaDangerRate)
     {
         staminaColor = Color(0.90f, 0.25f, 0.16f, 0.95f);
     }
-    else if (staminaRate <= 0.40f)
+    else if (staminaRate <= StaminaWarningRate)
     {
         staminaColor = Color(0.90f, 0.62f, 0.16f, 0.95f);
     }
@@ -262,8 +281,8 @@ void Hud::Draw(
     // 走れない間はスタミナを使わないため、ゲージ自体を出していない。
     if (player.IsSprintAllowed())
     {
-        AddRectangle(34.0f, screenHeight - 32.0f, 230.0f, 24.0f, dark);
-        AddText(43.0f, screenHeight - 26.0f,
+        AddRectangle(LeftMargin, screenHeight - 32.0f, GaugePanelWidth, 24.0f, dark);
+        AddText(GaugeLabelX, screenHeight - 26.0f,
             "スタミナ", 1.5f, white);
         AddRectangle(barFillX, screenHeight - 25.0f,
             barFillWidth, 10.0f, inactive);
@@ -284,7 +303,7 @@ void Hud::Draw(
         constexpr float promptPixelSize = 2.0f;
         const float promptTextWidth =
             static_cast<float>(CountDisplayedCharacters(interactionPrompt)) *
-            promptPixelSize * 6.0f;
+            promptPixelSize * GlyphAdvance;
         const float panelWidth = 88.0f + promptTextWidth;
         const float panelHeight = 58.0f;
         const float panelX = (screenWidth - panelWidth) * 0.5f;
@@ -315,7 +334,7 @@ void Hud::Draw(
     {
         batteryNotice = "電池を回復した";
     }
-    else if (player.GetBattery() <= 20.0f)
+    else if (player.GetBattery() <= LowBatteryNoticePercent)
     {
         batteryNotice = "電池残量が少ない";
         batteryNoticeColor = Color(0.94f, 0.30f, 0.18f, 0.96f);
@@ -325,10 +344,10 @@ void Hud::Draw(
         constexpr float noticePixelSize = 2.0f;
         const float noticeWidth =
             static_cast<float>(CountDisplayedCharacters(batteryNotice)) *
-            noticePixelSize * 6.0f;
-        const float noticeX = screenWidth - noticeWidth - 52.0f;
-        AddRectangle(noticeX - 14.0f, 28.0f + m_TopRightOffset,
-            noticeWidth + 28.0f, 34.0f, dark);
+            noticePixelSize * GlyphAdvance;
+        const float noticeX = screenWidth - noticeWidth - RightMargin;
+        AddRectangle(noticeX - NoticePadding, TopMargin + m_TopRightOffset,
+            noticeWidth + NoticePadding * 2.0f, 34.0f, dark);
         AddText(noticeX, 36.0f + m_TopRightOffset,
             batteryNotice, noticePixelSize, batteryNoticeColor);
     }
@@ -763,6 +782,6 @@ void Hud::AddText(
             }
         }
 
-        cursorX += pixelSize * 6.0f;
+        cursorX += pixelSize * GlyphAdvance;
     }
 }

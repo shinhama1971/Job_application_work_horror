@@ -27,6 +27,23 @@
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+    // 研究所の玄関の扉の位置（配置ファイルに LabDoor がないときに使う）と、調べる点を扉から手前へ出す距離
+    const Vector3 DefaultLabDoorPosition(0.0f, -77.0f, 297.4f);
+    constexpr float EntranceInFront = 2.0f;
+    // 稲光を光らせる位置（扉から見た上空の斜め手前）、照らす範囲、一番明るいときの強さ
+    const Vector3 LightningOffset(-55.0f, 190.0f, -62.0f);
+    constexpr float LightningRange = 285.0f;
+    constexpr float LightningStrength = 4.8f;
+    // 稲光が起きる条件：研究所からこの距離の範囲にいて、研究所の方を向いている（向きとの内積がこれ以上）
+    constexpr float LightningMinDistance = 60.0f;
+    constexpr float LightningMaxDistance = 210.0f;
+    constexpr float LightningFacing = 0.78f;
+    // 草むらを通る「見えない何か」が草を押し倒す半径
+    constexpr float WalkerGrassRadius = 10.0f;
+}
+
 // 稲光の間だけ既存の点光源リストに光を足す。光源自体の形や影は描かない。
 class ForestLightning final : public Object
 {
@@ -42,7 +59,7 @@ public:
     {
         if (m_Strength > 0.0f)
         {
-            lights.push_back({ Vector4(m_Position.x, m_Position.y, m_Position.z, 285.0f),
+            lights.push_back({ Vector4(m_Position.x, m_Position.y, m_Position.z, LightningRange),
                 Vector4(0.67f, 0.82f, 1.0f, m_Strength) });
         }
     }
@@ -156,7 +173,7 @@ ForestScene::ForestScene()
 
     // 研究所の玄関：扉（配置ファイルの LabDoor）の手前に、「研究所に入る」と調べられる点を置いている
     m_Entrance = builder.Create<LabEntrance>("LabEntrance");
-    Vector3 doorPosition(0.0f, -77.0f, 297.4f);
+    Vector3 doorPosition = DefaultLabDoorPosition;
     for (const auto& [name, wall] : m_LayoutProps)
     {
         if (name == "LabDoor" && wall != nullptr)
@@ -164,10 +181,10 @@ ForestScene::ForestScene()
             doorPosition = wall->GetPosition();
         }
     }
-    m_Entrance->SetPosition(doorPosition - Vector3(0.0f, 0.0f, 2.0f));
+    m_Entrance->SetPosition(doorPosition - Vector3(0.0f, 0.0f, EntranceInFront));
     m_Lightning = builder.Create<ForestLightning>("ForestLightning");
     // 上空の斜め手前から、正面と屋根の輪郭を一緒に照らす。
-    m_Lightning->SetPosition(doorPosition + Vector3(-55.0f, 190.0f, -62.0f));
+    m_Lightning->SetPosition(doorPosition + LightningOffset);
 
     // 配置を読み直したときに置き直す物（地面と草の範囲）
     Ground* ground = world.GroundObject;
@@ -242,8 +259,9 @@ void ForestScene::UpdateLightning(float deltaTime, const Vector3& forward)
         const float distanceSquared = towardLab.LengthSquared();
         const Vector2 look(forward.x, forward.z);
         // 小道から研究所を向いたときに一度だけ発生する。足元や背後を見ている間は待つ。
-        if (offset.z <= 0.0f || distanceSquared < 60.0f * 60.0f || distanceSquared > 210.0f * 210.0f ||
-            look.Dot(towardLab) < 0.78f * std::sqrt(distanceSquared))
+        if (offset.z <= 0.0f || distanceSquared < LightningMinDistance * LightningMinDistance ||
+            distanceSquared > LightningMaxDistance * LightningMaxDistance ||
+            look.Dot(towardLab) < LightningFacing * std::sqrt(distanceSquared))
         {
             return;
         }
@@ -258,7 +276,7 @@ void ForestScene::UpdateLightning(float deltaTime, const Vector3& forward)
     constexpr float riseSeconds = 0.05f;
     const float rise = (std::min)(1.0f, m_LightningTime / riseSeconds);
     const float tail = (std::min)(1.0f, (flashSeconds - m_LightningTime) / (flashSeconds - riseSeconds));
-    m_Lightning->SetStrength(4.8f * rise * tail * tail);
+    m_Lightning->SetStrength(LightningStrength * rise * tail * tail);
 }
 
 void ForestScene::Update()
@@ -277,7 +295,7 @@ void ForestScene::Update()
     // 草むらを通る「見えない何か」の足元の草を、草の Compute Shader で押し倒している
     if (m_Grass != nullptr)
     {
-        m_Grass->SetUnseenWalker(m_Events.GetWalkerPosition(), 10.0f, m_Events.GetWalkerStrength());
+        m_Grass->SetUnseenWalker(m_Events.GetWalkerPosition(), WalkerGrassRadius, m_Events.GetWalkerStrength());
     }
 
     // 研究棟からの無線：小道を進むと、受信記録が1行ずつ届き、研究所が見えてくると途絶える。行が届く瞬間に画面も乱れる

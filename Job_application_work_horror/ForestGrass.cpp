@@ -73,10 +73,58 @@ namespace
     // 1スレッドグループの葉の数（grassCS.hlsl の GRASS_GROUP_SIZE と同じ）
     constexpr std::uint32_t GroupSize = 256;
 
+    // 研究所までの小道の曲がり：中心の x が、z に沿ってこの振れ幅・この長さの周期（2π倍）で左右に揺れる
+    constexpr float PathSwing = 28.0f;
+    constexpr float PathWavelength = 115.0f;
+    // 小道の中心からこの距離までは生やさず、この距離で普通の濃さに戻る
+    constexpr float PathBareWidth = 7.0f;
+    constexpr float PathFullWidth = 17.0f;
+    // 群れの濃さ（0〜1）がこの範囲で、生やす割合が0から1へ上がる。高い草になる濃さの範囲
+    constexpr float ClumpKeepStart = 0.30f;
+    constexpr float ClumpKeepEnd = 0.58f;
+    constexpr float ClumpTallStart = 0.40f;
+    constexpr float ClumpTallEnd = 0.80f;
+    // 葉の高さ（最低＋高い群れで足す分）、幅（最低＋乱数の幅）、傾きの最大、硬さ（最低＋乱数の幅）
+    constexpr float BladeMinHeight = 3.5f;
+    constexpr float BladeTallExtra = 8.5f;
+    constexpr float BladeMinWidth = 0.55f;
+    constexpr float BladeWidthRange = 0.55f;
+    constexpr float BladeMaxLean = 0.45f;
+    constexpr float BladeMinStiffness = 14.0f;
+    constexpr float BladeStiffnessRange = 22.0f;
+    // 候補の数が上限を超えないよう密度を下げるとき、群れで捨てる分（約半分）を見込んで、この倍まで候補を作る
+    constexpr float CandidateHeadroom = 1.6f;
+    // 葉を生やさない所：枯れた茂みの枝の広がり（大きさに掛ける割合）、この高さより上にある物（屋根の上など）は数えない、
+    // 細い物（木の幹。この太さ未満）の周りに空ける幅、そのほかの物の周りに空ける幅、水面の岸から空ける幅
+    constexpr float BrushClearRate = 0.42f;
+    constexpr float FootprintMaxHeight = 120.0f;
+    constexpr float ThinTrunkWidth = 12.0f;
+    constexpr float ThinTrunkMargin = 2.5f;
+    constexpr float FootprintMargin = 1.0f;
+    constexpr float PuddleShoreMargin = 3.0f;
+    // 風の強さと向き、プレイヤーが葉を押し分ける半径、目がこの高さより地面から離れていたら押さない（デバッグの自由視点）
+    constexpr float WindStrength = 0.55f;
+    const Vector2 WindDirection(0.80f, 0.60f);
+    constexpr float PlayerPushRadius = 9.0f;
+    constexpr float PlayerPushMaxEyeHeight = 80.0f;
+    // 1回のシミュレーションで進める時間の上限（止まった後の大きな飛びを防ぐ）
+    constexpr float MaxSimulationSeconds = 0.1f;
+    // 最初の大きさ（置き場所の place ForestGrass で上書きされる）と、床の高さ
+    constexpr float DefaultFieldSize = 400.0f;
+    constexpr float GroundY = -100.0f;
+    // LOD：遠い区画で描く本数の割合、中くらいの区画で最大まで減らす割合、節の数（近い・中くらい・遠い）
+    constexpr float FarBladeFraction = 0.22f;
+    constexpr float MiddleBladeReduction = 0.6f;
+    constexpr std::uint32_t NearSegments = 5;
+    constexpr std::uint32_t MiddleSegments = 3;
+    constexpr std::uint32_t FarSegments = 1;
+    // 区画の中心から一番近い角までの距離（一辺に対する割合。√2 ÷ 2）
+    constexpr float ChunkCornerRate = 0.71f;
+
     // 研究所までの小道の中心（forest_props.txt のコメントと同じ式。木や岩もこの式から離して置いている）
     float GetPathCenterX(float z)
     {
-        return 28.0f * std::sin(z / 115.0f);
+        return PathSwing * std::sin(z / PathWavelength);
     }
 
     // 植える場所のむら（群れ）に使う、なめらかな乱数（シェーダーの FastValueNoise と同じく、格子の点の乱数をなめらかにつないでいる）
@@ -170,8 +218,8 @@ void ForestGrass::Init()
     }
 
     // 最初の大きさは、置き場所（place ForestGrass）で上書きされる
-    m_Position = Vector3(0.0f, -100.0f, 0.0f);
-    m_Scale = Vector3(400.0f, 1.0f, 400.0f);
+    m_Position = Vector3(0.0f, GroundY, 0.0f);
+    m_Scale = Vector3(DefaultFieldSize, 1.0f, DefaultFieldSize);
     m_NeedsRebuild = true;
 }
 
@@ -191,7 +239,7 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
     // 候補が多すぎるときは、上限に収まるよう密度を下げている（群れで半分ほどに減る分を見込んでいる）
     float density = CandidateDensity;
     const float area = halfX * 2.0f * halfZ * 2.0f;
-    density = (std::min)(density, static_cast<float>(MaxBlades) * 1.6f / area);
+    density = (std::min)(density, static_cast<float>(MaxBlades) * CandidateHeadroom / area);
     const float spacing = 1.0f / std::sqrt(density);
 
     // 葉を生やさない所：当たり判定があり、足元が地面の近くにある物（木の幹・岩・倒木・研究所の壁と屋根の下・門柱・街灯の柱）
@@ -211,18 +259,18 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
             {
                 const float yaw = wall->GetRotation().y;
                 footprints.push_back(Footprint{ Vector2(position.x, position.z),
-                    Vector2(scale.x * 0.42f, scale.z * 0.42f), std::cos(yaw), std::sin(yaw) });
+                    Vector2(scale.x * BrushClearRate, scale.z * BrushClearRate), std::cos(yaw), std::sin(yaw) });
             }
             continue;
         }
         // 屋根の下（研究所の中）にも生やさないよう、低い所にある物は全部含めている
-        if (position.y - scale.y * 0.5f > groundY + 120.0f)
+        if (position.y - scale.y * 0.5f > groundY + FootprintMaxHeight)
         {
             continue;
         }
         const float yaw = wall->GetRotation().y;
         // 木の幹は細いので、少し広めに空けている
-        const float margin = (std::min)(scale.x, scale.z) < 12.0f ? 2.5f : 1.0f;
+        const float margin = (std::min)(scale.x, scale.z) < ThinTrunkWidth ? ThinTrunkMargin : FootprintMargin;
         footprints.push_back(Footprint{ Vector2(position.x, position.z),
             Vector2(scale.x * 0.5f + margin, scale.z * 0.5f + margin), std::cos(yaw), std::sin(yaw) });
     }
@@ -283,8 +331,8 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
                 ValueNoise(x * 0.07f - 11.0f, z * 0.07f + 5.0f) * 0.35f;
             // 小道の上は踏まれて生えず、縁は短くまばらにしている
             const float pathDistance = std::fabs(x - GetPathCenterX(z));
-            const float pathFade = SmoothStep(7.0f, 17.0f, pathDistance);
-            const float keep = SmoothStep(0.30f, 0.58f, clump) * pathFade;
+            const float pathFade = SmoothStep(PathBareWidth, PathFullWidth, pathDistance);
+            const float keep = SmoothStep(ClumpKeepStart, ClumpKeepEnd, clump) * pathFade;
             if (unit(random) > keep)
             {
                 continue;
@@ -305,7 +353,7 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
                 continue;
             }
             // 見えている水面と、そのすぐ外の岸（水面のふちが草に隠れないよう、3単位）には生やさない
-            if (ground != nullptr && ground->IsNearVisiblePuddle(Vector3(x, groundY, z), 3.0f))
+            if (ground != nullptr && ground->IsNearVisiblePuddle(Vector3(x, groundY, z), PuddleShoreMargin))
             {
                 continue;
             }
@@ -313,19 +361,19 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
             Blade blade{};
             blade.Root = Vector3(x, groundY, z);
             // 高さ：群れの濃い所ほど高い（膝より少し下まで）。小道の縁は短い
-            const float tall = SmoothStep(0.40f, 0.80f, clump);
-            blade.Height = (3.5f + tall * 8.5f) * (0.65f + unit(random) * 0.6f) * (0.55f + pathFade * 0.45f);
+            const float tall = SmoothStep(ClumpTallStart, ClumpTallEnd, clump);
+            blade.Height = (BladeMinHeight + tall * BladeTallExtra) * (0.65f + unit(random) * 0.6f) * (0.55f + pathFade * 0.45f);
             const float angle = unit(random) * DirectX::XM_2PI;
             blade.Facing = Vector2(std::cos(angle), std::sin(angle));
-            blade.Width = 0.55f + unit(random) * 0.55f;
-            blade.Lean = (unit(random) * 2.0f - 1.0f) * 0.45f;
+            blade.Width = BladeMinWidth + unit(random) * BladeWidthRange;
+            blade.Lean = (unit(random) * 2.0f - 1.0f) * BladeMaxLean;
             // 色：雨に濡れた夜の草。枯れた黄土色と、くすんだ緑を混ぜている（照らしたとき、枯れ草が多い寂しい森に見えるように）
             const float dry = std::clamp(ValueNoise(x * 0.03f + 40.0f, z * 0.03f) * 1.3f - 0.15f + (unit(random) - 0.5f) * 0.3f, 0.0f, 1.0f);
             // 地面のテクスチャに近い明るさにしている（暗すぎると、懐中電灯で照らした地面の上で草が黒い影に見えるため）
             const Vector3 green(0.17f, 0.21f, 0.10f);
             const Vector3 straw(0.34f, 0.29f, 0.16f);
             blade.Color = Vector3::Lerp(green, straw, dry) * (0.8f + unit(random) * 0.4f);
-            blade.Stiffness = 14.0f + unit(random) * 22.0f;
+            blade.Stiffness = BladeMinStiffness + unit(random) * BladeStiffnessRange;
             blades.push_back(blade);
         }
     }
@@ -477,7 +525,7 @@ void ForestGrass::RunGpuSimulation()
         m_PlantedScale = m_Scale;
         m_NeedsRebuild = false;
     }
-    const float seconds = (std::min)(m_PendingSeconds, 0.1f);
+    const float seconds = (std::min)(m_PendingSeconds, MaxSimulationSeconds);
     m_PendingSeconds = 0.0f;
     if (m_BladeCount == 0 || seconds <= 0.0f)
     {
@@ -489,13 +537,13 @@ void ForestGrass::RunGpuSimulation()
     params.Time = m_Time;
     params.DeltaTime = seconds;
     params.BladeCount = static_cast<std::uint32_t>(m_BladeCount);
-    params.WindStrength = 0.55f;
-    params.WindDirection = Vector2(0.80f, 0.60f);
+    params.WindStrength = WindStrength;
+    params.WindDirection = WindDirection;
     // プレイヤーの足元（目の高さから下ろした位置）。目が地面から離れすぎている（デバッグの自由視点など）ときは押さない
     const Vector3 eye = Core::Game::GetInstance()->GetCamera()->GetPosition();
     params.PlayerPosition = Vector2(eye.x, eye.z);
-    params.PlayerRadius = 9.0f;
-    params.PlayerStrength = eye.y - m_Position.y < 80.0f ? 1.0f : 0.0f;
+    params.PlayerRadius = PlayerPushRadius;
+    params.PlayerStrength = eye.y - m_Position.y < PlayerPushMaxEyeHeight ? 1.0f : 0.0f;
     params.UnseenPosition = m_UnseenPosition;
     params.UnseenRadius = m_UnseenRadius;
     params.UnseenStrength = m_UnseenStrength;
@@ -559,14 +607,14 @@ void ForestGrass::Draw(Camera* camera)
     for (const Chunk& chunk : m_Chunks)
     {
         const float distance = Vector2::Distance(Vector2(eye.x, eye.z), Vector2(chunk.Center.x, chunk.Center.z));
-        const float nearestDistance = (std::max)(0.0f, distance - ChunkSize * 0.71f);
+        const float nearestDistance = (std::max)(0.0f, distance - ChunkSize * ChunkCornerRate);
         if (nearestDistance > FadeEnd || !camera->IsSphereVisible(chunk.Center, chunk.Radius))
         {
             continue;
         }
         // LOD：区画のいちばん近い所までの距離で、描く本数の割合と葉の節の数を決めている
         float fraction = 1.0f;
-        std::uint32_t segments = 5;
+        std::uint32_t segments = NearSegments;
         std::uint32_t lodLevel = 1;
         if (lodMode == 0)
         {
@@ -574,14 +622,14 @@ void ForestGrass::Draw(Camera* camera)
         }
         else if (nearestDistance > MiddleDistance)
         {
-            fraction = 0.22f;
-            segments = 1;
+            fraction = FarBladeFraction;
+            segments = FarSegments;
             lodLevel = 3;
         }
         else if (nearestDistance > NearDistance)
         {
-            fraction = 1.0f - 0.6f * SmoothStep(NearDistance, MiddleDistance, nearestDistance);
-            segments = 3;
+            fraction = 1.0f - MiddleBladeReduction * SmoothStep(NearDistance, MiddleDistance, nearestDistance);
+            segments = MiddleSegments;
             lodLevel = 2;
         }
         const std::uint32_t count = (std::max)(1u, static_cast<std::uint32_t>(chunk.Count * fraction));

@@ -37,6 +37,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <random>
 #include <sstream>
 #include <vector>
 
@@ -948,6 +949,12 @@ namespace Tools::CaptureMode
     bool IsActive()
     {
         return g_Active;
+    }
+
+    // 自動撮影・計測の間は決まった種、普段は毎回ちがう種を返している
+    unsigned int MakeRandomSeed(unsigned int captureSeed)
+    {
+        return g_Active ? captureSeed : std::random_device{}();
     }
 
     // 計測モードかどうかを返している

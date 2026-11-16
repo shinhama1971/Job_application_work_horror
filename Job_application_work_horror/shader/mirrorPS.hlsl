@@ -167,7 +167,10 @@ float4 main(MIRROR_PS_IN input) : SV_Target
     [branch]
     if (ReflectionParams.y > 0.5f)
     {
-        const float4 screen = TraceScreenSpaceReflection(input.worldPos, mirrorNormal, 20, 1.22f);
+        // 鏡は水たまりより近くを映すので、歩幅を細かくしている（32歩・1.14倍。以前は20歩・1.22倍で、映る物の輪郭が階段状にずれていた）
+        const int mirrorSsrSteps = 32;
+        const float mirrorSsrGrowth = 1.14f;
+        const float4 screen = TraceScreenSpaceReflection(input.worldPos, mirrorNormal, mirrorSsrSteps, mirrorSsrGrowth);
         color = lerp(color, screen.rgb, screen.w);
     }
 
