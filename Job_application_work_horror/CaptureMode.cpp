@@ -749,6 +749,7 @@ namespace
             { "環境マップ", GpuPass::EnvironmentProbe },
             { "電球の影", GpuPass::BulbShadow },
             { "環境遮蔽", GpuPass::AmbientOcclusion },
+            { "間接光", GpuPass::GlobalIllumination },
         };
 
         for (const BenchmarkResult& result : g_BenchmarkResults)
@@ -895,6 +896,14 @@ namespace Tools::CaptureMode
     int GetEffectLevelOverride() { return g_EffectOverride; }
     int g_ReflectionOverride = -1;
     int GetReflectionMethodOverride() { return g_ReflectionOverride; }
+    // トーンマッピングの曲線の番号（Effect::ToneMapMode。0 = ACES、1 = HDRにする前に近い曲線）
+    constexpr int ToneMapAcesNumber = 0;
+    constexpr int ToneMapLegacyNumber = 1;
+    int g_ToneMapOverride = -1;
+    int GetToneMapOverride() { return g_ToneMapOverride; }
+    // DDGI の間接光を使うか（--ddgi off で止める）
+    bool g_UsesGlobalIllumination = true;
+    bool UsesGlobalIllumination() { return g_UsesGlobalIllumination; }
 
     void ConfigureFromCommandLine()
     {
@@ -935,6 +944,12 @@ namespace Tools::CaptureMode
                 }
                 if (option == L"--reflection" && value.size() == 1 && value[0] >= L'0' && value[0] <= L'3')
                     g_ReflectionOverride = static_cast<int>(value[0] - L'0');
+                if (option == L"--tonemap" && value == L"aces")
+                    g_ToneMapOverride = ToneMapAcesNumber;
+                if (option == L"--tonemap" && value == L"legacy")
+                    g_ToneMapOverride = ToneMapLegacyNumber;
+                if (option == L"--ddgi" && value == L"off")
+                    g_UsesGlobalIllumination = false;
             }
             for (int i = 1; i < argumentCount; ++i)
             {

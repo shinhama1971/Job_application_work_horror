@@ -47,7 +47,8 @@ namespace Effect
         // 0は、1画素まで縮めた縮小画像をすべて持つ指定
         textureDesc.MipLevels = withMipChain ? 0 : 1;
         textureDesc.ArraySize = 6;
-        textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        // 本描画と同じHDRの形式にし、映り込む電球や懐中電灯の光を1で切らずに残している
+        textureDesc.Format = Renderer::SceneHdrFormat;
         textureDesc.SampleDesc.Count = 1;
         textureDesc.Usage = D3D11_USAGE_DEFAULT;
         textureDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;

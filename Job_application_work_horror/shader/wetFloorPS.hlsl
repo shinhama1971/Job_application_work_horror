@@ -487,8 +487,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 濡れた足跡は、水を吸って暗くなっている
     color.rgb = lerp(color.rgb, color.rgb * 0.38f + float3(0.004f, 0.007f, 0.008f), footprintWet * 0.90f);
 
-    // 上下で色を変えた環境光と、浅い角度ほど強い反射（フレネル）
-    float3 lighting = GetHemisphereAmbient(detailWorldNormal);
+    // 上下で色を変えた環境光と DDGI の間接光（壁や床で跳ね返った光）と、浅い角度ほど強い反射（フレネル）
+    float3 lighting = GetHemisphereAmbient(detailWorldNormal) + GetScreenIndirectLight(input.pos.xy);
     float3 specularLighting = 0.0f;
     const float distanceFromCamera = length(input.viewPos);
     const float3 viewDirection = distanceFromCamera > 0.001f
@@ -504,6 +504,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     uint pointLightListOffset;
     const uint pointLightCount =
         GetPixelLightCount(input.pos.xy, pointLightListOffset);
+    // 天井の照明の接触影（一番強く照らしている点光源の向きで求めてある）
+    const float screenContactShadow = GetScreenContactShadow(input.pos.xy);
     [loop]
     for (uint i = 0; i < pointLightCount; ++i)
     {
@@ -525,6 +527,11 @@ float4 main(in LIT_PS_IN input) : SV_Target
             offsetToLight / max(distanceToLight, 0.001f);
         float pointAttenuation = saturate(1.0f - distanceToLight / lightRange);
         pointAttenuation *= pointAttenuation;
+        // 棚・机・ロッカーの足元の細い影（接触影。SSAOと一緒に求めた画像。screenAmbientOcclusion.hlsli）
+        pointAttenuation *= screenContactShadow;
+        // 光源との間に建物の壁があれば、光は届かない（壁を抜けて隣の部屋を照らさないように。roomOcclusion.hlsli）
+        pointAttenuation *= GetRoomLightVisibility(input.worldPos, pointLight.PositionRange.xyz,
+            GetPixelLightWallMask(pointLightListOffset, i));
         // 揺れる裸電球の光は、電球との間に物があれば届かない（床に落ちる、揺れる影。pointShadow.hlsli）
         pointAttenuation *= GetPointLightShadow(input.worldPos, input.worldNormal, pointLight.PositionRange.xyz);
         // 見えない影の異変では、姿の見えない人影が、この光源の光を遮って床に影だけを落とす（figureShadow.hlsli）

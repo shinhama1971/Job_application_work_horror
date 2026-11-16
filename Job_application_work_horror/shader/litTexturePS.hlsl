@@ -436,6 +436,7 @@ float GetWallTrickle(float3 worldPosition, float3 worldNormal, float damp)
 #include "horrorGrade.hlsli"
 #include "horrorMist.hlsli"
 #include "figureShadow.hlsli"
+#include "toneMapping.hlsli"
 
 
 // 画素の色を計算している：元の色 → 汚れと古さ → 環境光・天井灯・懐中電灯 → 濡れた光沢 → 自己発光 → 霧 → 色調
@@ -643,14 +644,16 @@ float4 main(in LIT_PS_IN input) : SV_Target
     const float3 viewDirection = normalize(-input.viewPos);
     float3 specularLighting = 0.0f;
 
-    // 上下で色を変えた環境光から始めている
-    float3 lighting = GetHemisphereAmbient(detailWorldNormal);
+    // 上下で色を変えた環境光と、DDGI の間接光（壁や床で跳ね返った光）から始めている
+    float3 lighting = GetHemisphereAmbient(detailWorldNormal) + GetScreenIndirectLight(input.pos.xy);
     const float distanceFromCamera = length(input.viewPos);
 
     // 天井の点光源は、パネルだけでなく、近くの床と壁も照らしている。
     uint pointLightListOffset;
     const uint pointLightCount =
         GetPixelLightCount(input.pos.xy, pointLightListOffset);
+    // 天井の照明の接触影（棚・机の足元の細い影。一番強く照らしている点光源の向きで求めてある）
+    const float screenContactShadow = GetScreenContactShadow(input.pos.xy);
     [loop]
     for (uint i = 0; i < pointLightCount; ++i)
     {
@@ -684,11 +687,16 @@ float4 main(in LIT_PS_IN input) : SV_Target
             1.0f,
             smoothstep(0.04f, 0.72f, downwardAmount));
 
-        // 揺れる裸電球の光は、電球との間に物があれば届かない（pointShadow.hlsli）
+        // 揺れる裸電球の光は、電球との間に物があれば届かない（pointShadow.hlsli）。
+        // 物と触れている所の細い影（接触影。SSAOと一緒に求めた画像。screenAmbientOcclusion.hlsli）も掛けている。
+        // 光源との間に建物の壁があれば、光は届かない（壁を抜けて隣の部屋を照らさないように。roomOcclusion.hlsli）
         const float3 pointRadiance = pointLight.ColorIntensity.rgb
             * pointLight.ColorIntensity.a
             * pointAttenuation
             * fixtureDistribution
+            * screenContactShadow
+            * GetRoomLightVisibility(input.worldPos, pointLight.PositionRange.xyz,
+                GetPixelLightWallMask(pointLightListOffset, i))
             * GetPointLightShadow(input.worldPos, input.worldNormal, pointLight.PositionRange.xyz)
             * GetUnseenFigureShadow(input.worldPos, pointLight.PositionRange.xyz)
             * GetPlayerBodyShadow(input.worldPos, pointLight.PositionRange.xyz);
@@ -797,9 +805,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     color.rgb *= lighting;
 #endif
 
-    // 自ら光る色を足している
-    color.rgb += Material.Emission.rgb;
-    color.rgb += paintingEmission;
+    // 自ら光る色を足している。0〜1の画面に出したい明るさで決めてあるので、トーンマッピングの後にその明るさで見えるHDRの値に直している（toneMapping.hlsli）
+    color.rgb += InverseToneMapEmission(Material.Emission.rgb + paintingEmission);
     // 崩れている縁：焦げて黒ずみ、その外側が燃えるように赤く光る
     color.rgb *= 1.0f - dissolveEdge * 0.55f;
     color.rgb += float3(0.95f, 0.34f, 0.07f) * (dissolveEdge * dissolveEdge) * 1.5f;

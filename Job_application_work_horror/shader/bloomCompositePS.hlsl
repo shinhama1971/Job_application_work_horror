@@ -1,5 +1,6 @@
 // ============================================================================
 // シェーダーの役割: 元の画面の色へ、ブルームの画像（と横に伸びる光の筋・レンズの汚れ）を加算合成している。
+// 主な技術: 大きさの違う4段のブルームを重みを付けて重ねる（マルチレベルのブルーム）
 // ============================================================================
 
 // 頂点シェーダー（unlitTextureVS）から受け取る値
@@ -42,9 +43,33 @@ float LensDirtWave(float2 uv)
     return saturate(first * 0.24f + second * 0.31f + broad * 0.45f + 0.50f);
 }
 
-// ぼかしたブルームの画像（t0）とサンプラー（s0）
+// ぼかしたブルームの画像の段（t0 = 縦横1/4、t1 = 1/8、t2 = 1/16、t3 = 1/32）とサンプラー（s0）
 Texture2D bloomTexture : register(t0);
+Texture2D bloomWide1Texture : register(t1);
+Texture2D bloomWide2Texture : register(t2);
+Texture2D bloomWide3Texture : register(t3);
 SamplerState bloomSampler : register(s0);
+
+// 段ごとの重み。1/4の段は光の近くの強いにじみ、小さい段ほど部屋に広がる淡い光の暈（かさ）になる。
+// 光の近くのにじみは以前の1段だけのブルームに近い強さで残し、その上に広い段を足している
+// （合計を1にすると、広い段は1画素あたりの明るさが小さいので、暈がほとんど見えなかった）
+static const float BLOOM_LEVEL0_WEIGHT = 0.75f;
+static const float BLOOM_LEVEL1_WEIGHT = 0.50f;
+static const float BLOOM_LEVEL2_WEIGHT = 0.40f;
+static const float BLOOM_LEVEL3_WEIGHT = 0.35f;
+
+// 段を線形補間で読んでいる。サンプラー（s0）は繰り返しの設定なので、画面の端で反対側の端の光が混ざらないよう、
+// 端の画素の中心より外は読まないようにしている（小さい段ほど1画素が大きく、混ざると目立つ）
+static const float BLOOM_EDGE_TEXEL_MARGIN = 0.5f;
+
+float3 SampleBloomLevel(Texture2D levelTexture, float2 uv)
+{
+    uint width;
+    uint height;
+    levelTexture.GetDimensions(width, height);
+    const float2 margin = BLOOM_EDGE_TEXEL_MARGIN / float2(width, height);
+    return levelTexture.SampleLevel(bloomSampler, clamp(uv, margin, 1.0f - margin), 0.0f).rgb;
+}
 
 float4 main(PS_IN input) : SV_TARGET
 {
@@ -53,10 +78,14 @@ float4 main(PS_IN input) : SV_TARGET
     bloomTexture.GetDimensions(bloomWidth, bloomHeight);
     const float2 texelSize = rcp(float2(bloomWidth, bloomHeight));
     const float2 uv = saturate(input.uv);
-    const float3 bloom = bloomTexture.SampleLevel(
-        bloomSampler,
-        uv,
-        0.0f).rgb;
+    // 光の筋の形を決める、一番細かい段
+    const float3 sharpBloom = SampleBloomLevel(bloomTexture, uv);
+    // 段を重みを付けて重ねている（小さい段は線形補間で読むので、引き伸ばしても四角く見えない）
+    const float3 bloom =
+        sharpBloom * BLOOM_LEVEL0_WEIGHT +
+        SampleBloomLevel(bloomWide1Texture, uv) * BLOOM_LEVEL1_WEIGHT +
+        SampleBloomLevel(bloomWide2Texture, uv) * BLOOM_LEVEL2_WEIGHT +
+        SampleBloomLevel(bloomWide3Texture, uv) * BLOOM_LEVEL3_WEIGHT;
 
     // ぼかしたブルームを使い回して、控えめな横方向の光の筋を作っている。
     // 広い間隔で読み取り、テクスチャを足さずに、蛍光灯の横長の形を強調している。
@@ -75,7 +104,7 @@ float4 main(PS_IN input) : SV_TARGET
         streak,
         float3(0.2126f, 0.7152f, 0.0722f));
     const float bloomLuminanceForShape = dot(
-        bloom,
+        sharpBloom,
         float3(0.2126f, 0.7152f, 0.0722f));
     const float compactHighlight = saturate(
         (streakLuminance - bloomLuminanceForShape * 0.72f) * 4.2f + 0.20f);

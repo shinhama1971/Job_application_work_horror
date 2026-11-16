@@ -57,8 +57,12 @@ namespace
     float g_WallDampStrength = 1.0f;
     // タイルベースライティングで、タイルの一番奥の深度より奥の光源を外すか（外す前との比較用）
     bool g_TileDepthBounds = true;
+    // DDGI の間接光を使うか（使わない場合との比較用）
+    bool g_GlobalIllumination = true;
     // 画面の明るさから目の慣れの倍率を求める自動露出を使うか（使わない場合との比較用）
     bool g_AutoExposure = true;
+    // トーンマッピングの曲線（0 = ACES、1 = HDRにする前に近い曲線。Effect::ToneMapMode の番号）
+    int g_ToneMapMode = static_cast<int>(Effect::ToneMapMode::Aces);
     // 直近120フレームのフレーム時間（グラフ表示用）と、次に書く位置
     float g_FrameTimes[120]{};
     int g_FrameTimeOffset = 0;
@@ -157,6 +161,7 @@ void Debug::UI::ApplyTuning(Effect::PostProcess& postProcess)
     Renderer::SetDebugViewMode(
         g_DebugViewMode, g_WallDampStrength);
     postProcess.SetAutoExposureEnabled(g_AutoExposure);
+    postProcess.SetToneMapMode(static_cast<Effect::ToneMapMode>(g_ToneMapMode));
 
     if (!g_OverridePostProcess)
     {
@@ -261,6 +266,8 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
                     "Bulb shadow", gpuTimer->GetTiming(GpuPass::BulbShadow));
                 drawGpuTiming(
                     "Ambient occlusion", gpuTimer->GetTiming(GpuPass::AmbientOcclusion));
+                drawGpuTiming(
+                    "DDGI indirect light", gpuTimer->GetTiming(GpuPass::GlobalIllumination));
                 ImGui::TextDisabled("4-frame query ring / no GPU wait");
             }
         }
@@ -279,6 +286,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
                 tiledLighting->GetTileCount());
             // 深度プリパスの深度で、タイルの一番奥より奥の光源を外すか（Light tilesの表示で効果を比べられる）
             ImGui::Checkbox("Tile depth bounds (cull lights behind walls)", &g_TileDepthBounds);
+            ImGui::Checkbox("DDGI indirect light (probes)", &g_GlobalIllumination);
             ImGui::Text("Spatial voices: %zu / %zu (X3DAudio)",
                 currentGame->GetActiveSpatialVoiceCount(),
                 Sound::MaxSpatialVoices);
@@ -483,6 +491,9 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
 
         // 自動露出（画面の明るさを測って目の慣れを決める）は、上書きとは別にいつでも切り替えられる
         ImGui::Checkbox("Auto exposure (measure scene luminance)", &g_AutoExposure);
+        ImGui::RadioButton("Tone map: ACES (HDR)", &g_ToneMapMode, static_cast<int>(Effect::ToneMapMode::Aces));
+        ImGui::SameLine();
+        ImGui::RadioButton("Legacy (before HDR)", &g_ToneMapMode, static_cast<int>(Effect::ToneMapMode::Legacy));
         // 画面効果の値を1つずつ調整するスライダー（上書きをオンにしたときだけ操作できる）
         ImGui::Checkbox("Override post process", &g_OverridePostProcess);
         ImGui::BeginDisabled(!g_OverridePostProcess);
@@ -573,6 +584,15 @@ bool Debug::UI::ShouldPauseGameplay()
 }
 
 // タイルの深度の範囲で光源を絞るかを返している（Releaseは常に絞る）
+bool Debug::UI::IsGlobalIlluminationEnabled()
+{
+#if defined(ENABLE_IMGUI)
+    return g_GlobalIllumination;
+#else
+    return true;
+#endif
+}
+
 bool Debug::UI::IsTileDepthBoundsEnabled()
 {
 #if defined(ENABLE_IMGUI)

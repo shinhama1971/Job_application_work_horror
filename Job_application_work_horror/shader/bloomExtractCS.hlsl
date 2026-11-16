@@ -6,6 +6,12 @@
 Texture2D<float4> InputTexture : register(t0);
 RWTexture2D<float4> OutputTexture : register(u0);
 
+// にじませ始める明るさと、全部にじませる明るさ
+static const float BLOOM_THRESHOLD_START = 0.72f;
+static const float BLOOM_THRESHOLD_FULL = 0.98f;
+// にじみに使う明るさの上限（HDRにする前は1で切れていた。強い光ほど少し広くにじむよう、その2倍まで残している）
+static const float BLOOM_MAX_LUMINANCE = 2.0f;
+
 // 1スレッドが、縮めた画像の1画素を担当している
 [numthreads(8, 8, 1)]
 void main(uint3 dispatchThreadId : SV_DispatchThreadID)
@@ -51,6 +57,8 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
         (color0 + color1 + color2 + color3) * 0.15f;
     const float luminance = dot(brightColor, float3(0.2126f, 0.7152f, 0.0722f));
     // 壁や床の中くらいの明るさは除き、照明・非常灯などの明るい部分だけを取り出している。
-    const float contribution = smoothstep(0.72f, 0.98f, luminance);
-    OutputTexture[dispatchThreadId.xy] = float4(brightColor * contribution, 1.0f);
+    const float contribution = smoothstep(BLOOM_THRESHOLD_START, BLOOM_THRESHOLD_FULL, luminance);
+    // 画面はHDRなので、電球の芯は1を大きく超える。そのまま使うと、にじみが部屋中に広がるため、明るさに上限を付けている
+    const float limitScale = BLOOM_MAX_LUMINANCE / max(luminance, BLOOM_MAX_LUMINANCE);
+    OutputTexture[dispatchThreadId.xy] = float4(brightColor * contribution * limitScale, 1.0f);
 }

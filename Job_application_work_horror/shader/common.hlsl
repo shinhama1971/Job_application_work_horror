@@ -123,6 +123,9 @@ cbuffer TiledLightBuffer : register(b6)
 StructuredBuffer<ENVIRONMENT_POINT_LIGHT> g_PointLights : register(t10);
 StructuredBuffer<uint> g_TileLightIndices : register(t11);
 StructuredBuffer<uint> g_TileLightCounts : register(t12);
+// 点光源ごとの、光の届く範囲に重なる建物の壁の印（1ビット = 1枚。光源が付いている壁は除く。TiledLighting が CPU で求めている）。
+// 壁を抜けて隣の部屋を照らさない判定（roomOcclusion.hlsli の GetRoomLightVisibility）で、調べる壁を絞るのに使う
+StructuredBuffer<uint> g_PointLightWallMasks : register(t19);
 
 // タイルの大きさと、1タイルに入れる光源の上限（TiledLighting.hと同じ値）
 static const uint LIGHT_TILE_SIZE = 16;
@@ -161,6 +164,18 @@ float4 GetLightTileHeatmap(float2 pixelPosition, uint lightCount)
     const float2 inTile = fmod(max(localPixel, 0.0f), float(LIGHT_TILE_SIZE));
     const bool onEdge = inTile.x < 1.0f || inTile.y < 1.0f;
     return float4(onEdge ? heat * 0.45f : heat, 1.0f);
+}
+
+// その画素で計算するlightNumber番目の光源の、光源の一覧（t10）での番号を返している
+uint GetPixelLightIndex(uint listOffset, uint lightNumber)
+{
+    return TiledLightMode == 0 ? lightNumber : g_TileLightIndices[listOffset + lightNumber];
+}
+
+// その画素で計算するlightNumber番目の光源の、光の届く範囲に重なる壁の印
+uint GetPixelLightWallMask(uint listOffset, uint lightNumber)
+{
+    return g_PointLightWallMasks[GetPixelLightIndex(listOffset, lightNumber)];
 }
 
 // その画素で計算するlightNumber番目の光源を返している（タイルのリストを使うときは番号を読み替えている）

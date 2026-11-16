@@ -505,6 +505,23 @@ void Renderer::SetBackBufferRenderTarget()
     m_pDeviceContext->RSSetViewports(1, &viewport);
 }
 
+// 本描画の間、描画先をHDRの描き先にしている。描画先を戻す処理（SetBackBufferRenderTarget）や、
+// 描き終えた画面を写す処理（PostProcess::CaptureBackBuffer）は、そのままHDRの描き先を使う
+void Renderer::BeginHdrScene()
+{
+	if (m_pSceneHdrRenderTargetView)
+	{
+		m_pRenderTargetView = m_pSceneHdrRenderTargetView;
+	}
+}
+
+// 描画先をスワップチェーンのバックバッファに戻している
+void Renderer::EndHdrScene()
+{
+	m_pRenderTargetView = m_pSwapChainRenderTargetView;
+	SetBackBufferRenderTarget();
+}
+
 // バックバッファを指定の色で消している
 void Renderer::ClearBackBuffer(float r, float g, float b, float a)
 {

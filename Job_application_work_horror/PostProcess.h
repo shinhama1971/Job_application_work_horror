@@ -6,6 +6,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 
 #include "RenderTexture.h"
 #include "FullScreenQuad.h"
@@ -15,6 +16,17 @@ class GpuTimer;
 
 namespace Effect
 {
+    // HDRの画面を、画面に出せる0〜1の明るさへ移す曲線（トーンマッピング）。toneMapPS.hlsl の ToneMapMode と同じ番号
+    enum class ToneMapMode : unsigned int
+    {
+        // ACES（映画の色の規格の曲線の近似。Narkowicz 2015）。明るい所を白く飛ばさず、なだらかに丸める
+        Aces = 0,
+        // HDRにする前に近い曲線（ACESを28%だけ混ぜて、1で切る）。見比べる用
+        Legacy = 1,
+        // 曲線を掛けず1で切るだけ。デバッグ表示（法線・光源のタイル・SSAOなど）の色を、そのまま見せるときに使う
+        Passthrough = 2,
+    };
+
     // 描き終えた画面を取り込み、ブルームを作り、露出やノイズなどの画面効果を重ねている。演出からは一時的な効果を起こせる。
     class PostProcess
     {
@@ -92,10 +104,17 @@ namespace Effect
         Graphics::RenderTexture m_BloomVerticalTexture;
         Graphics::FullScreenQuad m_FullScreenQuad;
 
-        // 明るい部分の抽出・横のぼかし・縦のぼかしのコンピュートシェーダー
+        // 広くにじむブルームの段（縦横1/8・1/16・1/32）。段ごとに、縮めた物・横にぼかした物・縦にぼかした物を持つ
+        static constexpr unsigned int WideBloomLevelCount = Graphics::FullScreenQuad::BloomLevelCount - 1;
+        std::array<Graphics::RenderTexture, WideBloomLevelCount> m_WideBloomDownsampled;
+        std::array<Graphics::RenderTexture, WideBloomLevelCount> m_WideBloomHorizontal;
+        std::array<Graphics::RenderTexture, WideBloomLevelCount> m_WideBloomBlurred;
+
+        // 明るい部分の抽出・横のぼかし・縦のぼかし・縦横半分への縮小のコンピュートシェーダー
         ComputeShader m_BloomExtractShader;
         ComputeShader m_BloomHorizontalShader;
         ComputeShader m_BloomVerticalShader;
+        ComputeShader m_BloomDownsampleShader;
 
         // 自動露出のCompute Shaderへ渡す値（b0）。autoExposureCS.hlslのAutoExposureBufferと同じ並び
         struct AutoExposureParams
@@ -122,7 +141,11 @@ namespace Effect
         bool m_EnableAutoExposure = true;
         bool m_ResetAutoExposure = true;
 
+        // トーンマッピングの曲線
+        ToneMapMode m_ToneMapMode = ToneMapMode::Aces;
+
         // 明るい部分の抽出 → 横のぼかし → 縦のぼかしの順で、ブルームの画像を作っている。
+        // 続けて、ぼかした画像を縦横半分に縮めては横と縦にぼかし、広くにじむ段を作っている。
         void RunBloom();
         // 描いた画面の明るさを測り、目の慣れの倍率をGPUのバッファへ書いている。
         void RunAutoExposure();
@@ -137,7 +160,9 @@ namespace Effect
         bool CaptureBackBuffer();
         // 取り込んだ画面（画面効果を掛ける前）。次のフレームの本描画では「前のフレームの画面」として、SSRの色に使っている
         ID3D11ShaderResourceView* GetCapturedSceneSRV() { return m_RenderTexture.GetSRV(); }
-        void Draw(GpuTimer* gpuTimer); // 写した画面へ画面効果を合成している。
+        // 写した画面へ画面効果を合成し、最後にトーンマッピングでHDRの画面をバックバッファへ移している。
+        // この後の描画（HUD・デバッグ画面）は、バックバッファへそのまま描かれる
+        void Draw(GpuTimer* gpuTimer);
 
         // 一時的な演出。指定した強さから始まり、durationかけて元に戻る。
         // BloomPulse: 停電からの復旧などで、一瞬強く光らせている。
@@ -184,6 +209,17 @@ namespace Effect
         void ResetAutoExposure()
         {
             m_ResetAutoExposure = true;
+        }
+
+        // トーンマッピングの曲線を選んでいる（デバッグ画面で見比べる用）
+        void SetToneMapMode(ToneMapMode mode)
+        {
+            m_ToneMapMode = mode;
+        }
+
+        ToneMapMode GetToneMapMode() const
+        {
+            return m_ToneMapMode;
         }
 
         // ブルームとフィルムノイズのON/OFF

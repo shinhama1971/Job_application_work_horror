@@ -13,6 +13,7 @@
 #include "utility.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 using namespace DirectX::SimpleMath;
@@ -24,6 +25,38 @@ namespace
     constexpr UINT TileIndexSlot = 11;
     constexpr UINT TileCountSlot = 12;
     constexpr UINT ShadingParamsSlot = 6;
+    // ライトごとの壁の印（common.hlsl の g_PointLightWallMasks）
+    constexpr UINT WallMaskSlot = 19;
+    // 光源がこの幅より深く壁の箱の中にあるときだけ、その壁を印に入れない（roomOcclusion.hlsli の ROOM_LIGHT_MOUNT_MARGIN と同じ値）。
+    // 壁に付けたランプの光源は壁の面から少し外にあるので、付いている壁も印に入れる（入れないと、ランプが壁の裏の部屋まで照らした）
+    constexpr float LightMountMargin = 0.0f;
+
+    // 光源の届く円（上から見た位置と半径）に重なる建物の壁の印を求めている。光源が箱の中にある壁は入れない
+    uint32_t ComputeWallMask(const ENVIRONMENT_POINT_LIGHT& light, const ROOM_OCCLUSION_BUFFER& room)
+    {
+        uint32_t mask = 0;
+        const float lightX = light.PositionRange.x;
+        const float lightZ = light.PositionRange.z;
+        const float range = light.PositionRange.w;
+        for (unsigned int index = 0; index < room.BoxCount; ++index)
+        {
+            const Vector4& box = room.Boxes[index];
+            const float offsetX = std::fabs(lightX - box.x);
+            const float offsetZ = std::fabs(lightZ - box.y);
+            if (offsetX < box.z - LightMountMargin && offsetZ < box.w - LightMountMargin)
+            {
+                continue;
+            }
+            // 円の中心から長方形までの一番近い距離が、半径より近ければ重なる
+            const float outsideX = (std::max)(offsetX - box.z, 0.0f);
+            const float outsideZ = (std::max)(offsetZ - box.w, 0.0f);
+            if (outsideX * outsideX + outsideZ * outsideZ <= range * range)
+            {
+                mask |= 1u << index;
+            }
+        }
+        return mask;
+    }
 
     // StructuredBuffer（構造体の配列のバッファ）を作っている
     bool CreateStructuredBuffer(
@@ -107,6 +140,10 @@ namespace Effect
                 m_LightBuffer.ReleaseAndGetAddressOf()) &&
             CreateBufferSRV(m_LightBuffer.Get(), MaxLights,
                 m_LightSRV.ReleaseAndGetAddressOf()) &&
+            CreateStructuredBuffer(sizeof(uint32_t), MaxLights, false,
+                m_WallMaskBuffer.ReleaseAndGetAddressOf()) &&
+            CreateBufferSRV(m_WallMaskBuffer.Get(), MaxLights,
+                m_WallMaskSRV.ReleaseAndGetAddressOf()) &&
             CreateStructuredBuffer(sizeof(uint32_t), indexCount, true,
                 m_TileIndexBuffer.ReleaseAndGetAddressOf()) &&
             CreateBufferSRV(m_TileIndexBuffer.Get(), indexCount,
@@ -137,8 +174,13 @@ namespace Effect
         ID3D11ShaderResourceView* nullViews[3] = {};
         Renderer::GetDeviceContext()->PSSetShaderResources(
             PointLightSlot, 3, nullViews);
+        Renderer::GetDeviceContext()->PSSetShaderResources(
+            WallMaskSlot, 1, nullViews);
 
         m_CullingShader.Uninit();
+        m_WallMaskSRV.Reset();
+        m_WallMaskBuffer.Reset();
+        m_WallMasks.clear();
         m_ShadingParamsBuffer.Reset();
         m_CullingParamsBuffer.Reset();
         m_TileCountUAV.Reset();
@@ -171,6 +213,23 @@ namespace Effect
                     sizeof(ENVIRONMENT_POINT_LIGHT) * m_UploadedLightCount);
             }
             context->Unmap(m_LightBuffer.Get(), 0);
+        }
+
+        // ライトごとに、光の届く範囲に重なる建物の壁の印を求めて送っている（壁を抜けて照らさない判定で、調べる壁を絞るため）
+        const ROOM_OCCLUSION_BUFFER& room = Renderer::GetRoomOcclusion();
+        m_WallMasks.resize(m_UploadedLightCount);
+        for (uint32_t index = 0; index < m_UploadedLightCount; ++index)
+        {
+            m_WallMasks[index] = ComputeWallMask(m_Lights[index], room);
+        }
+        if (SUCCEEDED(context->Map(
+            m_WallMaskBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped)))
+        {
+            if (m_UploadedLightCount > 0)
+            {
+                std::memcpy(mapped.pData, m_WallMasks.data(), sizeof(uint32_t) * m_UploadedLightCount);
+            }
+            context->Unmap(m_WallMaskBuffer.Get(), 0);
         }
         BindAllLights();
     }
@@ -272,7 +331,7 @@ namespace Effect
             m_ShadingParamsBuffer.Get(), 0, nullptr, &params, 0, 0);
     }
 
-    // b6に定数バッファを、t10〜t12にライトの一覧・タイルのリスト・タイルごとの数を設定している
+    // b6に定数バッファを、t10〜t12にライトの一覧・タイルのリスト・タイルごとの数を、t19にライトごとの壁の印を設定している
     void TiledLighting::BindForShading()
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
@@ -281,5 +340,7 @@ namespace Effect
         ID3D11ShaderResourceView* views[3] = {
             m_LightSRV.Get(), m_TileIndexSRV.Get(), m_TileCountSRV.Get() };
         context->PSSetShaderResources(PointLightSlot, 3, views);
+        ID3D11ShaderResourceView* wallMasks = m_WallMaskSRV.Get();
+        context->PSSetShaderResources(WallMaskSlot, 1, &wallMasks);
     }
 }

@@ -12,6 +12,7 @@
 #include "DebugUI.h"
 #include "TechDemo.h"
 #include "HangingBulb.h"
+#include "CaptureMode.h"
 
 #include <algorithm>
 #include <array>
@@ -465,7 +466,8 @@ namespace Core
             UINT viewportCount = 1;
             D3D11_VIEWPORT viewport{};
             context->RSGetViewports(&viewportCount, &viewport);
-            m_Instance->m_AmbientOcclusion.Compute(occlusionProjection, viewport);
+            m_Instance->m_AmbientOcclusion.Compute(occlusionView, occlusionProjection, viewport,
+                m_Instance->m_TiledLighting.GetLightSRV(), m_Instance->m_TiledLighting.GetLightCount());
             m_Instance->m_TiledLighting.SetAmbientOcclusionActive(true);
             m_Instance->m_GpuTimer.EndPass(GpuPass::AmbientOcclusion, context);
         }
@@ -473,6 +475,33 @@ namespace Core
         {
             m_Instance->m_AmbientOcclusion.Unbind();
             m_Instance->m_GpuTimer.SkipPass(GpuPass::AmbientOcclusion);
+        }
+        // DDGI の間接光：部屋に並べたプローブから光線を飛ばして跳ね返った光を更新し、画面の各画素の間接光を t18 に設定している。
+        // 壁と床のシェーダーは、SSAO と同じく本描画のときだけ読む（環境遮蔽を求めたフレームだけ使う）
+        const bool useGlobalIllumination = useDepthPrepass && hasWetFloor && quality >= 1 &&
+            Tools::TechDemo::UsesAmbientOcclusion() &&
+            Debug::UI::IsGlobalIlluminationEnabled() && Tools::CaptureMode::UsesGlobalIllumination();
+        if (useGlobalIllumination)
+        {
+            m_Instance->m_GpuTimer.BeginPass(GpuPass::GlobalIllumination, context);
+            DirectX::SimpleMath::Matrix giView;
+            DirectX::SimpleMath::Matrix giProjection;
+            m_Instance->m_Camera.GetMainMatrices(giView, giProjection);
+            UINT viewportCount = 1;
+            D3D11_VIEWPORT viewport{};
+            context->RSGetViewports(&viewportCount, &viewport);
+            if (m_Instance->m_GlobalIllumination.Update(
+                    m_Instance->m_TiledLighting.GetLightSRV(), m_Instance->m_TiledLighting.GetLightCount(),
+                    Renderer::GetLight(), m_Instance->m_Camera.GetPosition(), giView))
+            {
+                m_Instance->m_GlobalIllumination.Apply(giView, giProjection, viewport);
+            }
+            m_Instance->m_GpuTimer.EndPass(GpuPass::GlobalIllumination, context);
+        }
+        else
+        {
+            m_Instance->m_GlobalIllumination.Unbind();
+            m_Instance->m_GpuTimer.SkipPass(GpuPass::GlobalIllumination);
         }
         bool halfShafts = false;
         if (useDepthPrepass && hasWetFloor && quality >= 1 && Tools::TechDemo::UsesLightShafts())

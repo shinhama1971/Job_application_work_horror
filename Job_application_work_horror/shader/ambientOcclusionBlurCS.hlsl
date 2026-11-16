@@ -1,5 +1,5 @@
 // ============================================================================
-// シェーダーの役割: 画面空間の環境遮蔽（ambientOcclusionCS）の粒々を、深さの近い画素どうしだけで平均してなめらかにしている。
+// シェーダーの役割: 画面空間の環境遮蔽と接触影（ambientOcclusionCS）の粒々を、深さの近い画素どうしだけで平均してなめらかにしている。
 // 主な技術: 4x4の範囲の平均（標本の向きを回した4x4の模様をちょうど打ち消す）、深さの差で重みを下げる縁を保つぼかし
 // 環境遮蔽は描く範囲の縦横半分の解像度で持っているので、深さは対応する画素（2倍の位置）から読んでいる。
 // ============================================================================
@@ -19,8 +19,9 @@ cbuffer AmbientOcclusionBuffer : register(b0)
 };
 
 Texture2D<float> SceneDepth : register(t0);
-Texture2D<float> RawOcclusion : register(t1);
-RWTexture2D<float> OcclusionOutput : register(u0);
+// x = 環境遮蔽、y = 接触影（ambientOcclusionCS）。どちらも同じぼかしで粒を消している
+Texture2D<float2> RawOcclusion : register(t1);
+RWTexture2D<float2> OcclusionOutput : register(u0);
 
 // 半分の解像度の画素に対応する所の深さ（0〜1）を、カメラからの前向きの距離へ戻している
 float LinearDepthAt(int2 occlusionPixel)
@@ -40,7 +41,7 @@ void main(uint3 id : SV_DispatchThreadID)
         return;
     }
     const float centerDepth = LinearDepthAt(pixel);
-    float total = 0.0f;
+    float2 total = 0.0f;
     float weightSum = 0.0f;
     [unroll]
     for (int y = -2; y < 2; ++y)

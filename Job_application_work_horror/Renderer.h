@@ -207,6 +207,12 @@ private:
 	static Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_pRenderTargetView;
 	static Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_pDepthStencilView;
 	static Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_pDepthShaderResourceView;
+	// スワップチェーンのバックバッファの描画先（m_pRenderTargetView は、本描画の間だけHDRの描画先を指す）
+	static Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_pSwapChainRenderTargetView;
+	// 本描画のHDRの描き先（1を超える明るさを残す16ビットの浮動小数点）。画面効果の最後のトーンマッピングで、バックバッファへ移す
+	static Microsoft::WRL::ComPtr<ID3D11Texture2D> m_pSceneHdrTexture;
+	static Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_pSceneHdrRenderTargetView;
+	static Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_pSceneHdrShaderResourceView;
 
 	// ワールド・ビュー・射影の行列の定数バッファ
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pWorldBuffer;
@@ -222,6 +228,9 @@ private:
 	static void UploadDebugViewBuffer();
 	// 部屋の角の暗がりとマテリアルの定数バッファ、今のライト、ライトの計算をするか
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pRoomOcclusionBuffer;
+	// 送った部屋の形の写しと、送り直すたびに増える番号（DDGI がプローブの格子を作り直すかの判断に使う）
+	static ROOM_OCCLUSION_BUFFER m_RoomOcclusion;
+	static unsigned int m_RoomOcclusionVersion;
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pWaterCausticsBuffer;
 	static WATER_CAUSTICS_BUFFER m_WaterCaustics;
 	// 計測モード（--figures）で、水たまりの人影と見えない影を決めた位置に置き続けるか、その足もとの位置
@@ -311,6 +320,7 @@ public:
 	// デバッグ用のシェーダーの表示（法線・光源のタイルなど）を切り替えている。0で普段の表示。
 	static void SetDebugViewMode(
 		int mode, float wallDampStrength = 1.0f);
+	static int GetDebugViewMode() { return m_DebugView.Mode; }
 	// 壁の古さ（0〜1）と、それに混ぜるホラーの跡（血の手形・引っかき傷・血の垂れ跡）の濃さ（0〜1）を設定している。
 	// 古さが0なら前と同じ見た目のまま。
 	static void SetWallWeathering(float weathering, float horrorMarks = 1.0f);
@@ -322,6 +332,10 @@ public:
 	static void SetRoomOcclusion(
 		const DirectX::SimpleMath::Vector4* boxes, unsigned int boxCount,
 		float floorY, float ceilingY, float strength);
+	// 今の部屋の形（壁の長方形・床と天井の高さ）と、その定数バッファ（b11）、送り直した回数を返している（DDGI が光線を当てる形に使う）
+	static const ROOM_OCCLUSION_BUFFER& GetRoomOcclusion() { return m_RoomOcclusion; }
+	static ID3D11Buffer* GetRoomOcclusionBuffer() { return m_pRoomOcclusionBuffer.Get(); }
+	static unsigned int GetRoomOcclusionVersion() { return m_RoomOcclusionVersion; }
 	// 浸水した範囲の水面で跳ね返った懐中電灯の光が、壁や天井に揺らいで映る効果の値を設定している。strengthが0なら計算しない。
 	static void SetWaterCaustics(
 		const DirectX::SimpleMath::Vector4& floodRect, float waterY, float time, float strength,
@@ -383,6 +397,18 @@ public:
 	static ID3D11ShaderResourceView* GetDepthShaderResourceView()
 	{
 		return m_pDepthShaderResourceView.Get();
+	}
+
+	// 本描画のHDRの描き先の形式（画面効果が取り込む画像も同じ形式にしている）
+	static constexpr DXGI_FORMAT SceneHdrFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+	// 本描画の間、描画先（GetBackBufferRTV・SetBackBufferRenderTarget）をHDRの描き先にしている（DrawStartが呼ぶ）
+	static void BeginHdrScene();
+	// 描画先をスワップチェーンのバックバッファに戻している（トーンマッピングの直前。この後のHUDは、そのままバックバッファへ描く）
+	static void EndHdrScene();
+	// HDRの描き先を読むビュー（トーンマッピングの入力）
+	static ID3D11ShaderResourceView* GetSceneHdrSRV()
+	{
+		return m_pSceneHdrShaderResourceView.Get();
 	}
 
 	// 画面以外へ描いた後、描画先をバックバッファへ戻している。

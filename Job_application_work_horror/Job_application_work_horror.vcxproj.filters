@@ -276,6 +276,9 @@
     <ClCompile Include="AmbientOcclusion.cpp">
       <Filter>ソース ファイル\Rendering\Effects</Filter>
     </ClCompile>
+    <ClCompile Include="DDGIVolume.cpp">
+      <Filter>ソース ファイル\Rendering\Effects</Filter>
+    </ClCompile>
     <ClCompile Include="PointShadowMap.cpp">
       <Filter>ソース ファイル\Rendering\Effects</Filter>
     </ClCompile>
@@ -626,6 +629,9 @@
     <ClInclude Include="AmbientOcclusion.h">
       <Filter>ヘッダー ファイル\Rendering\Effects</Filter>
     </ClInclude>
+    <ClInclude Include="DDGIVolume.h">
+      <Filter>ヘッダー ファイル\Rendering\Effects</Filter>
+    </ClInclude>
     <ClInclude Include="LightShafts.h">
       <Filter>ヘッダー ファイル\Rendering\Effects</Filter>
     </ClInclude>
@@ -947,6 +953,9 @@
     <ClInclude Include="shader\horrorGrade.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
+    <ClInclude Include="shader\toneMapping.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
     <ClInclude Include="shader\horrorMarks.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
@@ -977,6 +986,12 @@
     <ClInclude Include="shader\screenAmbientOcclusion.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
+    <ClInclude Include="shader\ddgiCommon.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\ddgiUpdate.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
     <ClInclude Include="shader\surfaceDetail.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
@@ -997,6 +1012,18 @@
     <FxCompile Include="shader\ambientOcclusionCS.hlsl">
       <Filter>リソース ファイル\Shader\Compute</Filter>
     </FxCompile>
+    <FxCompile Include="shader\ddgiTraceCS.hlsl">
+      <Filter>リソース ファイル\Shader\Compute</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\ddgiIrradianceUpdateCS.hlsl">
+      <Filter>リソース ファイル\Shader\Compute</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\ddgiDistanceUpdateCS.hlsl">
+      <Filter>リソース ファイル\Shader\Compute</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\ddgiApplyCS.hlsl">
+      <Filter>リソース ファイル\Shader\Compute</Filter>
+    </FxCompile>
     <FxCompile Include="shader\autoExposureCS.hlsl">
       <Filter>リソース ファイル\Shader\Compute</Filter>
     </FxCompile>
@@ -1007,6 +1034,9 @@
       <Filter>リソース ファイル\Shader\Compute</Filter>
     </FxCompile>
     <FxCompile Include="shader\bloomExtractCS.hlsl">
+      <Filter>リソース ファイル\Shader\Compute</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\bloomDownsampleCS.hlsl">
       <Filter>リソース ファイル\Shader\Compute</Filter>
     </FxCompile>
     <FxCompile Include="shader\lightShaftsCS.hlsl">
@@ -1025,6 +1055,9 @@
       <Filter>リソース ファイル\Shader\Pixel</Filter>
     </FxCompile>
     <FxCompile Include="shader\bloomCompositePS.hlsl">
+      <Filter>リソース ファイル\Shader\Pixel</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\toneMapPS.hlsl">
       <Filter>リソース ファイル\Shader\Pixel</Filter>
     </FxCompile>
     <FxCompile Include="shader\clockPS.hlsl">

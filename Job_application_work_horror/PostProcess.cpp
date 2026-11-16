@@ -49,9 +49,11 @@ namespace Effect
         m_FearBeat = 0.0f;
         m_FearVisionHold = 0.0f;
 
+        // 本描画のHDRの描き先を、そのまま写せるよう同じ形式にしている
         m_RenderTexture.Init(
             Application::GetWidth(),
-            Application::GetHeight()
+            Application::GetHeight(),
+            Renderer::SceneHdrFormat
         );
 
         // ブルームは縦横1/4の解像度で処理している。元の画面は拡大しないため、
@@ -65,9 +67,22 @@ namespace Effect
         m_BloomHorizontalTexture.Init(bloomWidth, bloomHeight, bloomFormat, true);
         m_BloomVerticalTexture.Init(bloomWidth, bloomHeight, bloomFormat, true);
 
+        // 広くにじむ段は、1つ上の段の縦横半分（1/8・1/16・1/32）。小さくなりすぎないよう1画素で止める
+        int levelWidth = bloomWidth;
+        int levelHeight = bloomHeight;
+        for (unsigned int level = 0; level < WideBloomLevelCount; ++level)
+        {
+            levelWidth = (std::max)(1, (levelWidth + 1) / 2);
+            levelHeight = (std::max)(1, (levelHeight + 1) / 2);
+            m_WideBloomDownsampled[level].Init(levelWidth, levelHeight, bloomFormat, true);
+            m_WideBloomHorizontal[level].Init(levelWidth, levelHeight, bloomFormat, true);
+            m_WideBloomBlurred[level].Init(levelWidth, levelHeight, bloomFormat, true);
+        }
+
         m_BloomExtractShader.Create("shader/bloomExtractCS.hlsl");
         m_BloomHorizontalShader.Create("shader/bloomBlurHorizontalCS.hlsl");
         m_BloomVerticalShader.Create("shader/bloomBlurVerticalCS.hlsl");
+        m_BloomDownsampleShader.Create("shader/bloomDownsampleCS.hlsl");
 
         // 自動露出：慣れた明るさ（対数）と倍率の2つの値を、Compute Shaderが書き、露出のシェーダーが読むバッファに置いている
         m_AutoExposureShader.Create("shader/autoExposureCS.hlsl");
@@ -125,10 +140,17 @@ namespace Effect
         m_AutoExposureUAV.Reset();
         m_AutoExposureState.Reset();
         m_AutoExposureShader.Uninit();
+        m_BloomDownsampleShader.Uninit();
         m_BloomVerticalShader.Uninit();
         m_BloomHorizontalShader.Uninit();
         m_BloomExtractShader.Uninit();
         m_FullScreenQuad.Uninit();
+        for (unsigned int level = 0; level < WideBloomLevelCount; ++level)
+        {
+            m_WideBloomBlurred[level].Uninit();
+            m_WideBloomHorizontal[level].Uninit();
+            m_WideBloomDownsampled[level].Uninit();
+        }
         m_BloomVerticalTexture.Uninit();
         m_BloomHorizontalTexture.Uninit();
         m_BloomExtractTexture.Uninit();
@@ -282,7 +304,7 @@ namespace Effect
         m_LensDropAge = 0.0f;
     }
 
-    // 今の作りでは3DのシーンをBackBufferへ描いているため、画面効果の入力として
+    // 3Dのシーンは、本描画の間の描画先（HDRの描き先。Renderer::BeginHdrScene）へ描いているため、画面効果の入力として
     // 同じ大きさ・形式の作業用テクスチャへ写している。
     bool PostProcess::CaptureBackBuffer()
     {
@@ -364,6 +386,36 @@ namespace Effect
             m_BloomVerticalTexture.GetUAV(),
             bloomWidth,
             (bloomHeight + 127) / 128);
+
+        // 広くにじむ段：1つ上の段のぼかした画像を縦横半分に縮め（8x8画素を1グループ）、横と縦にぼかしている。
+        // 同じ9画素のぼかしでも、段が小さいほど画面の上では広くにじむ
+        constexpr UINT downsampleGroupSize = 8;
+        constexpr UINT blurGroupSize = 128;
+        ID3D11ShaderResourceView* previousLevel = m_BloomVerticalTexture.GetSRV();
+        for (unsigned int level = 0; level < WideBloomLevelCount; ++level)
+        {
+            const UINT levelWidth = static_cast<UINT>(m_WideBloomDownsampled[level].GetWidth());
+            const UINT levelHeight = static_cast<UINT>(m_WideBloomDownsampled[level].GetHeight());
+            dispatchPass(
+                m_BloomDownsampleShader,
+                previousLevel,
+                m_WideBloomDownsampled[level].GetUAV(),
+                (levelWidth + downsampleGroupSize - 1) / downsampleGroupSize,
+                (levelHeight + downsampleGroupSize - 1) / downsampleGroupSize);
+            dispatchPass(
+                m_BloomHorizontalShader,
+                m_WideBloomDownsampled[level].GetSRV(),
+                m_WideBloomHorizontal[level].GetUAV(),
+                (levelWidth + blurGroupSize - 1) / blurGroupSize,
+                levelHeight);
+            dispatchPass(
+                m_BloomVerticalShader,
+                m_WideBloomHorizontal[level].GetSRV(),
+                m_WideBloomBlurred[level].GetUAV(),
+                levelWidth,
+                (levelHeight + blurGroupSize - 1) / blurGroupSize);
+            previousLevel = m_WideBloomBlurred[level].GetSRV();
+        }
 
         context->CSSetShader(nullptr, nullptr, 0);
         Renderer::SetBackBufferRenderTarget();
@@ -450,9 +502,16 @@ namespace Effect
         // 残るため見やすさは変わらず、古いGPUで最も重い追加の描画だけを省ける。
         const float volumeQuality = (std::clamp)(
             (effectScale - 0.75f) / 0.25f, 0.0f, 1.0f);
+        // ブルームの段（1/4・1/8・1/16・1/32）を、合成のシェーダーへまとめて渡している
+        std::array<ID3D11ShaderResourceView*, Graphics::FullScreenQuad::BloomLevelCount> bloomLevels{};
+        bloomLevels[0] = m_BloomVerticalTexture.GetSRV();
+        for (unsigned int level = 0; level < WideBloomLevelCount; ++level)
+        {
+            bloomLevels[level + 1] = m_WideBloomBlurred[level].GetSRV();
+        }
         m_FullScreenQuad.Draw(
             m_RenderTexture.GetSRV(),
-            m_EnableBloom ? m_BloomVerticalTexture.GetSRV() : nullptr,
+            m_EnableBloom ? bloomLevels.data() : nullptr,
             m_AutoExposureSRV.Get(),
             m_Time,
             m_EnableBloom ? adjustedBloom : 0.0f,
@@ -476,5 +535,14 @@ namespace Effect
             (std::clamp)(m_FearBeat * effectScale, 0.0f, 1.0f),
             m_LensDropSeed,
             m_LensDropAge);
+
+        // 最後に、HDRの画面を曲線で0〜1へ移して、バックバッファへ描いている（自動撮影・計測では --tonemap で曲線を選べる）
+        const int toneMapOverride = Tools::CaptureMode::GetToneMapOverride();
+        // デバッグ表示の間は、色分けがずれないよう曲線を掛けない
+        const ToneMapMode toneMapMode = Renderer::GetDebugViewMode() != 0
+            ? ToneMapMode::Passthrough
+            : (toneMapOverride >= 0 ? static_cast<ToneMapMode>(toneMapOverride) : m_ToneMapMode);
+        Renderer::EndHdrScene();
+        m_FullScreenQuad.DrawToneMap(Renderer::GetSceneHdrSRV(), static_cast<unsigned int>(toneMapMode));
     }
 }

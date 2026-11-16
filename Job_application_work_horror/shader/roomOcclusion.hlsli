@@ -57,6 +57,86 @@ float ComputeRoomOcclusion(float3 worldPosition, float3 worldNormal, float neare
     return 1.0f - saturate(OcclusionStrength) * occlusion;
 }
 
+// 点光源が壁を抜けて照らさないための判定に使う値。
+// 光源がこの幅より深く壁の箱の中にあるときだけ、その壁を数えない（TiledLighting.cpp の LightMountMargin と同じ値）。
+// 壁に付けたランプの光源は壁の面から少し外にあるので、付いている壁も数える（数えないと、ランプが壁の裏の部屋まで照らした）
+static const float ROOM_LIGHT_MOUNT_MARGIN = 0.0f;
+// 自分の乗っている壁を「間の壁」と見ないよう、線分の両端から外す長さ
+static const float ROOM_LIGHT_SURFACE_OFFSET = 0.1f;
+// 0で割らないための小さな値
+static const float ROOM_LIGHT_EPSILON = 1e-4f;
+
+// 線分（position から lightPosition）が、壁 i の上から見た長方形を通るか（スラブ法）
+bool DoesSegmentCrossWall(float2 positionXZ, float2 inverseDirection, float segmentLength, uint i)
+{
+    const float4 box = OcclusionBoxes[i];
+    const float2 slabNear = (box.xy - box.zw - positionXZ) * inverseDirection;
+    const float2 slabFar = (box.xy + box.zw - positionXZ) * inverseDirection;
+    const float enter = max(min(slabNear.x, slabFar.x), min(slabNear.y, slabFar.y));
+    const float exit = min(max(slabNear.x, slabFar.x), max(slabNear.y, slabFar.y));
+    return enter <= exit && exit > ROOM_LIGHT_SURFACE_OFFSET && enter < segmentLength - ROOM_LIGHT_SURFACE_OFFSET;
+}
+
+// 線分の長さと、上から見た向きの逆数（0で割らないよう向きを丸めている）
+float GetRoomLightSegment(float3 position, float3 lightPosition, out float2 inverseDirection)
+{
+    const float3 offset = lightPosition - position;
+    const float segmentLength = length(offset);
+    const float3 direction = offset / max(segmentLength, ROOM_LIGHT_EPSILON);
+    const float2 safeDirection = float2(
+        abs(direction.x) > ROOM_LIGHT_EPSILON ? direction.x : ROOM_LIGHT_EPSILON,
+        abs(direction.z) > ROOM_LIGHT_EPSILON ? direction.z : ROOM_LIGHT_EPSILON);
+    inverseDirection = 1.0f / safeDirection;
+    return segmentLength;
+}
+
+// 点光源（lightPosition）と点（position）の間に壁があれば0、なければ1を返している。
+// 点光源には影の画像がないので、光の届く範囲が壁をまたぐと、壁の向こうの部屋まで照らしていた（作者が遊んで見つけた）。
+// 壁は床から天井までの箱なので、上から見た長方形と線分の交差だけで分かる（スラブ法）。
+// wallMask は、この光源の届く範囲に重なる壁の印（1ビット = 1枚。TiledLighting が光源ごとに CPU で求めて t19 で渡している）。
+// 全部の壁を調べると、照明の多い1面で本描画が 3.5〜6ms 重くなったので、印の付いた数枚だけを調べている
+float GetRoomLightVisibility(float3 position, float3 lightPosition, uint wallMask)
+{
+    float2 inverseDirection;
+    const float segmentLength = GetRoomLightSegment(position, lightPosition, inverseDirection);
+    uint remaining = wallMask;
+    [loop]
+    while (remaining != 0)
+    {
+        // 一番下の印の番号（配列の外を読まないよう、上限に収めている）
+        const uint i = min(firstbitlow(remaining), MaxOcclusionBoxes - 1u);
+        remaining &= remaining - 1u;
+        if (DoesSegmentCrossWall(position.xz, inverseDirection, segmentLength, i))
+        {
+            return 0.0f;
+        }
+    }
+    return 1.0f;
+}
+
+// 印を使わず全部の壁を調べる版（光源の付いている壁は、ここで除く）。DDGI の光線の当たった面で使っている
+float GetRoomLightVisibility(float3 position, float3 lightPosition)
+{
+    float2 inverseDirection;
+    const float segmentLength = GetRoomLightSegment(position, lightPosition, inverseDirection);
+    const uint boxCount = min(OcclusionBoxCount, MaxOcclusionBoxes);
+    [loop]
+    for (uint i = 0; i < boxCount; ++i)
+    {
+        const float4 box = OcclusionBoxes[i];
+        // 光源が箱の中にある壁は数えない
+        if (all(abs(lightPosition.xz - box.xy) < box.zw - ROOM_LIGHT_MOUNT_MARGIN))
+        {
+            continue;
+        }
+        if (DoesSegmentCrossWall(position.xz, inverseDirection, segmentLength, i))
+        {
+            return 0.0f;
+        }
+    }
+    return 1.0f;
+}
+
 // 1なら暗がりなし、小さいほど暗い値を返している。照明（環境光と天井灯）に掛けて使っている。
 float GetRoomOcclusion(float3 worldPosition, float3 worldNormal)
 {

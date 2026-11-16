@@ -21,6 +21,7 @@
 #include "ReflectionProbe.h"
 #include "PointShadowMap.h"
 #include "AmbientOcclusion.h"
+#include "DDGIVolume.h"
 #include "LightShafts.h"
 #include "ScreenSpaceReflection.h"
 #include "TiledLighting.h"
@@ -75,6 +76,8 @@ namespace Core
         Effect::FigureVolumes m_FigureVolumes;
         // 画面空間の環境遮蔽（SSAO）。本描画の直前に深度プリパスの深度から作り、t15 で読ませている
         Effect::AmbientOcclusion m_AmbientOcclusion;
+        // DDGI：壁や床で跳ね返った間接光（プローブの格子と、画面の間接光の画像）
+        Effect::DDGIVolume m_GlobalIllumination;
         Effect::LightShafts m_LightShafts;
         unsigned int m_EnvironmentQualityFrame = 0;
         Effect::ScreenSpaceReflection m_ScreenSpaceReflection;

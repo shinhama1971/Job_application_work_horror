@@ -10,7 +10,7 @@ using namespace DirectX::SimpleMath;
 
 namespace Graphics
 {
-    // 画面と同じ大きさの四角形（左上が原点の画素単位）と、4種類の画面効果のシェーダー、定数バッファを作っている
+    // 画面と同じ大きさの四角形（左上が原点の画素単位）と、5種類の画面効果のシェーダー、定数バッファを作っている
     void FullScreenQuad::Init()
     {
         m_Vertices.resize(4);
@@ -68,6 +68,12 @@ namespace Graphics
             "shader/exposurePS.hlsl"
         );
 
+        // HDRの画面を0〜1へ移すシェーダー（画面効果の最後）
+        m_ToneMapShader.Create(
+            "shader/unlitTextureVS.hlsl",
+            "shader/toneMapPS.hlsl"
+        );
+
         m_Material = std::make_unique<Material>();
 
         MATERIAL mtrl{};
@@ -81,18 +87,52 @@ namespace Graphics
             sizeof(TimeBuffer),
             m_TimeBuffer.ReleaseAndGetAddressOf()
         );
+        Renderer::CreateConstantBuffer(
+            sizeof(ToneMapBuffer),
+            m_ToneMapBuffer.ReleaseAndGetAddressOf()
+        );
     }
 
     // 定数バッファを解放している
     void FullScreenQuad::Uninit()
     {
+        m_ToneMapBuffer.Reset();
         m_TimeBuffer.Reset();
+    }
+
+    // HDRの画面を、選んだ曲線で0〜1へ移して描いている。合成せずに上書きするので、描画先の前の中身は残らない
+    void FullScreenQuad::DrawToneMap(ID3D11ShaderResourceView* hdrSceneSRV, unsigned int mode)
+    {
+        ID3D11DeviceContext* context = Renderer::GetDeviceContext();
+        Renderer::SetWorldViewProjection2D();
+        Renderer::SetDepthEnable(false);
+        Renderer::SetUV(0.0f, 0.0f, 1.0f, 1.0f);
+
+        ToneMapBuffer buffer{};
+        buffer.mode = mode;
+        context->UpdateSubresource(m_ToneMapBuffer.Get(), 0, nullptr, &buffer, 0, 0);
+
+        m_VertexBuffer.SetGPU();
+        m_IndexBuffer.SetGPU();
+        m_Material->SetGPU();
+        m_ToneMapShader.SetGPU();
+        ID3D11Buffer* toneMapBuffer = m_ToneMapBuffer.Get();
+        context->PSSetConstantBuffers(0, 1, &toneMapBuffer);
+        context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+        Renderer::SetBlendState(BS_NONE);
+        context->PSSetShaderResources(0, 1, &hdrSceneSRV);
+        context->DrawIndexed(4, 0, 0);
+
+        // 次のフレームでHDRの描き先へ描けるよう、読み取りを外している
+        ID3D11ShaderResourceView* nullResource = nullptr;
+        context->PSSetShaderResources(0, 1, &nullResource);
+        Renderer::SetDepthEnable(true);
     }
 
     // 画面効果の値を定数バッファへ入れ、描画済みの画面の上に効果を順に重ねて描いている
     void FullScreenQuad::Draw(
         ID3D11ShaderResourceView* sceneSRV,
-        ID3D11ShaderResourceView* bloomSRV,
+        ID3D11ShaderResourceView* const* bloomSRVs,
         ID3D11ShaderResourceView* autoExposureSRV,
         float time,
         float bloomIntensity,
@@ -181,16 +221,18 @@ namespace Graphics
         context->PSSetShaderResources(3, 1, &nullResource);
 
         // 露出の補正の後にブルームを加算し、明るい照明のにじみを残している。
-        if (bloomSRV != nullptr && bloomIntensity > 0.001f)
+        // 大きさの違う段（t0〜t3。1/4・1/8・1/16・1/32）を合成のシェーダーで重ねている
+        if (bloomSRVs != nullptr && bloomIntensity > 0.001f)
         {
             m_BloomShader.SetGPU();
             Renderer::SetBlendState(BS_ADDITIVE);
-            context->PSSetShaderResources(0, 1, &bloomSRV);
+            context->PSSetShaderResources(0, BloomLevelCount, bloomSRVs);
             context->DrawIndexed(4, 0, 0);
         }
 
         // 次の描画で同じテクスチャへ書き込めるよう、読み取りの設定を外している
-        context->PSSetShaderResources(0, 1, &nullResource);
+        ID3D11ShaderResourceView* nullBloomResources[BloomLevelCount] = {};
+        context->PSSetShaderResources(0, BloomLevelCount, nullBloomResources);
 
         // 懐中電灯の光線の上で、短い区間の大気の散乱を積み重ねている。
         // シャドウマップの深度を参照し、壁の位置で光の筋を止めている。

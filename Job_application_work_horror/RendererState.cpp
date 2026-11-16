@@ -83,6 +83,8 @@ void Renderer::SetRoomOcclusion(
 	buffer.FloorY = floorY;
 	buffer.CeilingY = ceilingY;
 	buffer.Strength = strength;
+	m_RoomOcclusion = buffer;
+	++m_RoomOcclusionVersion;
 	m_pDeviceContext->UpdateSubresource(
 		m_pRoomOcclusionBuffer.Get(), 0, NULL, &buffer, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(

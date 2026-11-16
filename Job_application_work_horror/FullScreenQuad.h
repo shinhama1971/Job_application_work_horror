@@ -17,6 +17,10 @@ namespace Graphics
     // 描画済みの画面の上に、画面効果を重ねて描くための四角形
     class FullScreenQuad
     {
+    public:
+        // ブルームの段の数（縦横1/4・1/8・1/16・1/32。bloomCompositePS.hlsl の t0〜t3）
+        static constexpr unsigned int BloomLevelCount = 4;
+
     private:
         // 画面効果のシェーダーへ渡す値（定数バッファb0）。16バイト単位にそろえるため、最後に詰め物を入れている
         struct TimeBuffer
@@ -62,21 +66,33 @@ namespace Graphics
         Shader m_VolumeShader;
         Shader m_OverlayShader;
         Shader m_ExposureShader;
+        // HDRの画面を0〜1へ移すトーンマッピングのシェーダー
+        Shader m_ToneMapShader;
         std::unique_ptr<Material> m_Material;
 
         // 画面効果の値を入れる定数バッファ
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_TimeBuffer;
+
+        // トーンマッピングへ渡す値（定数バッファb0。toneMapPS.hlsl の ToneMapBuffer と同じ並び）
+        struct ToneMapBuffer
+        {
+            unsigned int mode;     // Effect::ToneMapMode の番号
+            unsigned int padding[3];
+        };
+        static_assert(sizeof(ToneMapBuffer) == 16, "ToneMapBuffer must match toneMapPS.hlsl");
+        Microsoft::WRL::ComPtr<ID3D11Buffer> m_ToneMapBuffer;
 
     public:
         // 四角形・シェーダー・定数バッファを作る／解放する
         void Init();
         void Uninit();
 
-        // sceneSRVは描画済みの画面、bloomSRVはぼかした明るい部分、autoExposureSRVは自動露出の倍率（露出のシェーダーのt3）。
+        // sceneSRVは描画済みの画面、bloomSRVsはぼかした明るい部分の段（BloomLevelCount個の配列。使わないときはnullptr）、
+        // autoExposureSRVは自動露出の倍率（露出のシェーダーのt3）。
         // 値を定数バッファへ入れて、効果を順に重ねて描いている
         void Draw(
             ID3D11ShaderResourceView* sceneSRV,
-            ID3D11ShaderResourceView* bloomSRV,
+            ID3D11ShaderResourceView* const* bloomSRVs,
             ID3D11ShaderResourceView* autoExposureSRV,
             float time,
             float bloomIntensity,
@@ -97,5 +113,8 @@ namespace Graphics
             float fearBeat = 0.0f,
             float lensDropSeed = 0.0f,
             float lensDropAge = 0.0f);
+
+        // HDRの画面（hdrSceneSRV）を、選んだ曲線（Effect::ToneMapMode の番号）で今の描画先へ描いている（上書き）
+        void DrawToneMap(ID3D11ShaderResourceView* hdrSceneSRV, unsigned int mode);
     };
 }

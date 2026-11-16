@@ -216,8 +216,8 @@ Game::Draw
   1. ShadowMap更新
   2. 技術デモでキューブマップを選んだときだけReflectionProbe更新（普段のレイ反射は本描画のシェーダーの中で計算）
   3. 監視映像などSceneの補助カメラ描画
-  4. 深度プリパス（不透明な壁・床・扉の深度だけ）→ タイル別ライトリスト作成（Compute Shader）→ ワールドObject描画
-  5. PostProcess（ブルーム → 自動露出の測光 → 露出・画面効果の合成）
+  4. 深度プリパス（不透明な壁・床・扉の深度だけ）→ SSAO と接触影 → DDGI（光線 → 八面体マップの更新 → 画面の間接光）→ タイル別ライトリスト作成（Compute Shader）→ ワールドObject描画
+  5. PostProcess（ブルーム → 自動露出の測光 → 露出・画面効果の合成 → トーンマッピング（ACES）でHDRの描き先からバックバッファへ）
   6. SceneのHUD・画面演出
   7. Debug UI
 ```
@@ -312,7 +312,7 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 | F1の室内と水面反射、草のLOD確認 | GPU（PS） | common.hlsl の表示番号11・12。wetFloorPS.hlsl は明るい床に通常と同じ水面マスクと反射を重ねる。grassPS.hlsl は草の頂点シェーダーが渡した区画のLOD色を使う | 室内の暗さにかかわらず映り込みを確認し、森の草の描画距離を色で見分ける |
 | 西棟の水面の光の揺らぎ（コースティクス） | GPU（PS） | `waterCaustics.hlsli`（`litTexturePS` から呼ぶ） | 壁・天井の画素ごとに、水面で折り返した点と懐中電灯の配光から求める |
 | 水たまりの波のシミュレーション | GPU（CS） | `WaterRippleSimulation`、`waterRippleCS.hlsl`（256x256マス、外の森は `Ground::SetRippleArea` で768x768マス・一辺576。マス目の数はシェーダーがテクスチャの大きさから読む。ピンポン、1秒に60歩）。床は `wetFloorPS`、壁は `waterCaustics.hlsli` が高さを読む | 全マスが同じ式で隣のマスだけを読むので、GPUで並列に計算できる。結果のテクスチャはCPUへ読み戻さない。描画の最初（`Object::RunGpuSimulation`）で実行し、GPU時間は約0.012ms |
-| ブルーム | GPU（CS） | `bloomExtractCS` → `bloomBlurHorizontalCS` → `bloomBlurVerticalCS` | ぼかしに使う画素を `groupshared` に一度読み込み、グループ内で使い回してテクスチャの読み込みを減らす |
+| ブルーム（4段） | GPU（CS） | `bloomExtractCS` → `bloomBlurHorizontalCS` → `bloomBlurVerticalCS`（縦横1/4）。続けて `bloomDownsampleCS`（縦横半分へ）→ 横 → 縦 を3回（1/8・1/16・1/32）。`bloomCompositePS` が4段を重みを付けて重ねる | ぼかしに使う画素を `groupshared` に一度読み込み、グループ内で使い回してテクスチャの読み込みを減らす。小さい段ほど同じ9画素のぼかしで広くにじむので、広い暈を少ない計算で作れる（4段で約0.14ms） |
 | 自動露出の測光と目の慣れ | GPU（CS） | `autoExposureCS.hlsl` | 4096点の明るさを1グループ256スレッドで合計する。結果はGPUのバッファに置いたまま露出のシェーダーが読み、CPUへ読み戻さない |
 | 画面効果（露出・光の筋・CRT風） | GPU（PS） | `FullScreenQuad` | 画面全体の画素ごとの処理 |
 
@@ -322,7 +322,8 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 
 ## ライティングモデル
 
-壁・扉・小物には金属/粗さとGGX・Smith・Schlickの鏡面反射を導入しています。従来の拡散光・ホラー向けの色調と組み合わせており、全描画をリニア/HDRにした純粋なPBRレンダラーではありません。
+壁・扉・小物には金属/粗さとGGX・Smith・Schlickの鏡面反射を導入しています。従来の拡散光・ホラー向けの色調と組み合わせています。
+本描画はHDR（16bitの浮動小数点の描き先）で描き、画面効果の最後にACESのトーンマッピングを1回だけ掛けています。テクスチャはガンマ空間のまま読んでいるので、リニア空間で計算する純粋なPBRレンダラーではありません。
 
 | 要素 | 現在の実装 | 場所 |
 |---|---|---|
@@ -331,8 +332,12 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 | フレネル | `pow(1 - N·V, 4)` の近似（濡れた床の反射の強さ、湿った壁の光沢） | `wetFloorPS.hlsl`、`litTexturePS.hlsl` |
 | 環境光 | 上向きの面は青白く、下向きの面は暖かくする半球環境光 | `flashlightLighting.hlsli` |
 | 遮蔽 | 部屋の形からの解析的な角の暗がりに加え、半解像度SSAOを本描画へ適用 | `roomOcclusion.hlsli`、`AmbientOcclusion.*` |
-| 懐中電灯 | 内側・外側の円錐による配光、レンズのむら、シャドウマップ。距離減衰は届く範囲の端で0になる減衰に、距離の2乗に反比例する物理的な減衰を3割ほど混ぜたもの | `flashlightLighting.hlsli`、`flashlightShadow.hlsli` |
-| 色空間 | テクスチャ・バックバッファとも `R8G8B8A8_UNORM` で、ガンマ空間のまま計算 | `Texture.cpp`、`Renderer.cpp` |
+| 点光源の壁の判定 | 点光源には影の画像がないので、点と光源の間に建物の壁（部屋の形の長方形）があれば光を届けない。調べる壁は、光源ごとに光の届く円に重なる物だけを CPU で印にして t19 で渡している（光源の付いた壁は除く） | `roomOcclusion.hlsli` の `GetRoomLightVisibility`、`TiledLighting::SetLights`、`common.hlsl` の `g_PointLightWallMasks` |
+| 間接光（DDGI） | 部屋の範囲に並べたプローブ（約1.5m 間隔・高さ4段、1方向32個まで）から64本の光線を部屋の形に当て、当たった面の直接光と前のフレームの間接光を、八面体マップ（放射照度 8x8・距離 16x16）にヒステリシス 0.92 で混ぜる。画面は縦横半分の解像度で、まわり8つのプローブを位置・向き・チェビシェフの不等式で重み付けして読み、壁と床の照明に足す。点とプローブの間に壁があるプローブは、部屋の形との交差で直接調べて使わない（光漏れの防止）。RTXGI は DX12・DXR が前提なので、論文の方式を DX11 の Compute Shader で作った | `DDGIVolume`、`ddgiCommon.hlsli`、`ddgiTraceCS`、`ddgiIrradianceUpdateCS`・`ddgiDistanceUpdateCS`（`ddgiUpdate.hlsli`）、`ddgiApplyCS` |
+| 接触影 | SSAOと同じ Compute Shader で、画素ごとに一番強く照らしている点光源の方へ短い光線を深度に沿ってたどり、物の裏に入ったら影にする（半解像度、SSAOと同じぼかし。2チャンネル目）。壁と床は点光源の光に掛ける。懐中電灯はシャドウマップで影を付けている | `ambientOcclusionCS.hlsl`、`screenAmbientOcclusion.hlsli` |
+| 懐中電灯 | 内側・外側の円錐による配光、レンズのむら、シャドウマップ。円錐の中は、周りの約2.2倍の明るさの芯、芯の縁の明るい輪と暗い隙間、ゆがんだ反射鏡の輪で形を付け（`GetFlashlightLensPattern`）、円の中の光の合計は以前と同じにそろえている。距離減衰は届く範囲の端で0になる減衰に、距離の2乗に反比例する物理的な減衰を3割ほど混ぜたもの | `flashlightLighting.hlsli`、`flashlightShadow.hlsli` |
+| 色空間 | テクスチャはガンマ空間のまま読んで計算する。本描画の描き先と環境マップは `R16G16B16A16_FLOAT`（HDR。1を超える明るさを残す）、バックバッファは `R8G8B8A8_UNORM` | `Texture.cpp`、`Renderer.cpp`、`ReflectionProbe.cpp` |
+| トーンマッピング | 画面効果を全部足した後に、ACES の曲線（Narkowicz 2015）を1回だけ掛ける。曲線の75%は輝度に掛けて、懐中電灯の暖かい光や霧の色を保つ。自ら光る色は曲線の逆で HDR の値に直して足し、曲線の後に決めた明るさで見えるようにしている。F1 と `--tonemap legacy` で以前の曲線と見比べられる | `toneMapPS.hlsl`、`toneMapping.hlsli`、`PostProcess`、`FullScreenQuad` |
 | 露出 | シーンが決めた目標の露出（演出の意図）に、Compute Shaderで測った画面の明るさの対数平均（中央を重く）から求めた目の慣れの倍率（0.95〜1.08）を掛ける。暗い所へは約3秒、明るい所へは約0.4秒で慣れる | `PostProcess`、`autoExposureCS.hlsl`、`exposurePS.hlsl` |
 
 ### 懐中電灯の影・濡れた床・水面の光
@@ -376,7 +381,7 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 ### リニア/HDRのPBRへ進める場合の残りの変更
 
 1. テクスチャを `_SRGB` 形式で読み込み、ライティングをリニア空間で計算する。
-2. 描画先を浮動小数点のHDRにし、トーンマッピングで表示用の範囲へ変換する（ブルームの中間バッファはすでにFP16）。
+2. （済み。2026年11月16日）描画先を浮動小数点のHDRにし、ACESのトーンマッピングで表示用の範囲へ変換する。
 3. `Material` のroughness・metallicは追加済み。今後はリニア/HDRの光の単位と整合させる。
 4. GGX・Schlick・Smithの鏡面反射は導入済み。今後は拡散光を `(1 - F)(1 - metallic) * albedo / π` にして、エネルギー保存を守る。
 5. 粗さに応じたキューブマップの鏡面反射は導入済み。拡散の照度や物理的なプリフィルターは今後の検討。

@@ -79,6 +79,11 @@ Microsoft::WRL::ComPtr<ID3D11RenderTargetView> Renderer::m_pRenderTargetView;
 // 深度ステンシルビュー＝深度バッファ（奥行きで前後関係を判定する）
 Microsoft::WRL::ComPtr<ID3D11DepthStencilView> Renderer::m_pDepthStencilView;
 Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Renderer::m_pDepthShaderResourceView;
+// スワップチェーンのバックバッファの描画先と、本描画のHDRの描き先（テクスチャ・描画先・読み取り）
+Microsoft::WRL::ComPtr<ID3D11RenderTargetView> Renderer::m_pSwapChainRenderTargetView;
+Microsoft::WRL::ComPtr<ID3D11Texture2D> Renderer::m_pSceneHdrTexture;
+Microsoft::WRL::ComPtr<ID3D11RenderTargetView> Renderer::m_pSceneHdrRenderTargetView;
+Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> Renderer::m_pSceneHdrShaderResourceView;
 
 // ワールド・ビュー・射影の行列の定数バッファ（b0〜b2）
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pWorldBuffer;
@@ -90,6 +95,8 @@ Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pLightBuffer;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pDebugViewBuffer;
 DEBUG_VIEW_BUFFER Renderer::m_DebugView{ 0, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pRoomOcclusionBuffer;
+ROOM_OCCLUSION_BUFFER Renderer::m_RoomOcclusion{};
+unsigned int Renderer::m_RoomOcclusionVersion = 0;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pWaterCausticsBuffer;
 WATER_CAUSTICS_BUFFER Renderer::m_WaterCaustics{};
 bool Renderer::m_FigureOverride = false;
@@ -407,8 +414,28 @@ HRESULT Renderer::CreateRenderAndDepthResources()
     hr = m_pDevice->CreateRenderTargetView(
         renderTarget.Get(),
         NULL,
-		m_pRenderTargetView.ReleaseAndGetAddressOf());
+		m_pSwapChainRenderTargetView.ReleaseAndGetAddressOf());
     if (FAILED(hr)) return hr;
+	m_pRenderTargetView = m_pSwapChainRenderTargetView;
+
+	// 本描画のHDRの描き先。明るさを1で切らずに残し、ブルームとトーンマッピング（ACES）で明るい所をなだらかに丸める
+	D3D11_TEXTURE2D_DESC hdrDesc{};
+	hdrDesc.Width = Application::GetWidth();
+	hdrDesc.Height = Application::GetHeight();
+	hdrDesc.MipLevels = 1;
+	hdrDesc.ArraySize = 1;
+	hdrDesc.Format = SceneHdrFormat;
+	hdrDesc.SampleDesc.Count = 1;
+	hdrDesc.Usage = D3D11_USAGE_DEFAULT;
+	hdrDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+	hr = m_pDevice->CreateTexture2D(&hdrDesc, nullptr, m_pSceneHdrTexture.ReleaseAndGetAddressOf());
+	if (FAILED(hr)) return hr;
+	hr = m_pDevice->CreateRenderTargetView(
+		m_pSceneHdrTexture.Get(), nullptr, m_pSceneHdrRenderTargetView.ReleaseAndGetAddressOf());
+	if (FAILED(hr)) return hr;
+	hr = m_pDevice->CreateShaderResourceView(
+		m_pSceneHdrTexture.Get(), nullptr, m_pSceneHdrShaderResourceView.ReleaseAndGetAddressOf());
+	if (FAILED(hr)) return hr;
 
 	// 深度ステンシルバッファを作っている
 	// （深度バッファ＝Zバッファ。奥行きを判定して、前後関係を正しく描けるようにしている）
@@ -498,6 +525,10 @@ void Renderer::Uninit()
 	m_pDepthStencilView.Reset();
 	m_pDepthShaderResourceView.Reset();
 	m_pRenderTargetView.Reset();
+	m_pSwapChainRenderTargetView.Reset();
+	m_pSceneHdrShaderResourceView.Reset();
+	m_pSceneHdrRenderTargetView.Reset();
+	m_pSceneHdrTexture.Reset();
 	m_pSwapChain.Reset();
 
     // 資源の解放はドライバー側で後回しにされることがあるため、デバイスコンテキストを壊す前にFlushしている。
@@ -526,6 +557,8 @@ void Renderer::DrawStart()
 	// 画面を塗りつぶす色
 	float clearColor[4] = { 0.003f, 0.005f, 0.008f, 1.0f }; // 背景色（わずかに青みのある黒）
 
+	// 本描画はHDRの描き先へ描く（画面効果の最後のトーンマッピングで、バックバッファへ移す）
+	BeginHdrScene();
 	// 描画先と、使う深度バッファを指定している
 	m_pDeviceContext->OMSetRenderTargets(
 		1, m_pRenderTargetView.GetAddressOf(), m_pDepthStencilView.Get());
@@ -632,8 +665,12 @@ HRESULT Renderer::ResizeWindow(int width, int height)
 	m_pDeviceContext->OMSetRenderTargets(0, nullptr, nullptr);
 	m_pDeviceContext->Flush();
 
-	// 今の描画先のビューを解放している
+	// 今の描画先のビューを解放している（バックバッファを指すビューを全部手放さないと、ResizeBuffersが失敗する）
 	m_pRenderTargetView.Reset();
+	m_pSwapChainRenderTargetView.Reset();
+	m_pSceneHdrShaderResourceView.Reset();
+	m_pSceneHdrRenderTargetView.Reset();
+	m_pSceneHdrTexture.Reset();
 
 	// 今の深度ステンシルビューを解放している
 	m_pDepthStencilView.Reset();

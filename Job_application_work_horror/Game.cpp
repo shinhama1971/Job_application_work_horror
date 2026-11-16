@@ -87,6 +87,7 @@ namespace Core
         m_Instance->m_FigureVolumes.Init();
         m_Instance->m_LightShafts.Init(static_cast<int>(Application::GetWidth()), static_cast<int>(Application::GetHeight()));
         m_Instance->m_AmbientOcclusion.Init(static_cast<int>(Application::GetWidth()), static_cast<int>(Application::GetHeight()));
+        m_Instance->m_GlobalIllumination.Init(static_cast<int>(Application::GetWidth()), static_cast<int>(Application::GetHeight()));
         m_Instance->m_ScreenSpaceReflection.Init(Application::GetWidth(), Application::GetHeight());
         m_Instance->m_ShadowMap.Init();
         m_Instance->m_PostProcess.Init();
@@ -248,6 +249,7 @@ namespace Core
         m_Instance->m_EnvironmentProbe.Uninit();
         m_Instance->m_PointShadowMap.Uninit();
         m_Instance->m_AmbientOcclusion.Uninit();
+        m_Instance->m_GlobalIllumination.Uninit();
         m_Instance->m_ScreenSpaceReflection.Uninit();
 
         m_Instance->m_Sound.Uninit();

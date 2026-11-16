@@ -24,7 +24,7 @@ namespace
     constexpr float OcclusionBias = 0.35f;
     constexpr float OcclusionMaxDistance = 260.0f;
 
-    // 1チャンネルの、Compute Shaderが書けてピクセルシェーダーが読めるテクスチャを作っている
+    // 2チャンネル（環境遮蔽と接触影）の、Compute Shaderが書けてピクセルシェーダーが読めるテクスチャを作っている
     bool CreateOcclusionTexture(int width, int height,
         Microsoft::WRL::ComPtr<ID3D11Texture2D>& texture,
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView>& uav,
@@ -36,7 +36,7 @@ namespace
         desc.Height = static_cast<UINT>(height);
         desc.MipLevels = 1;
         desc.ArraySize = 1;
-        desc.Format = DXGI_FORMAT_R8_UNORM;
+        desc.Format = DXGI_FORMAT_R8G8_UNORM;
         desc.SampleDesc.Count = 1;
         desc.Usage = D3D11_USAGE_DEFAULT;
         desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
@@ -77,11 +77,15 @@ namespace Effect
         m_BlurredTexture.Reset();
     }
 
-    void AmbientOcclusion::Compute(const Matrix& projection, const D3D11_VIEWPORT& viewport)
+    void AmbientOcclusion::Compute(const Matrix& view, const Matrix& projection, const D3D11_VIEWPORT& viewport,
+        ID3D11ShaderResourceView* pointLights, uint32_t lightCount)
     {
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
 
         Parameters parameters{};
+        parameters.View = view.Transpose();
+        // 点光源の一覧がないときは、接触影を求めない
+        parameters.LightCount = pointLights != nullptr ? lightCount : 0u;
         parameters.Projection = projection.Transpose();
         parameters.InverseProjection = projection.Invert().Transpose();
         // 描く範囲が作ったテクスチャより大きいときは、テクスチャの大きさまでにしている
@@ -108,10 +112,11 @@ namespace Effect
         const UINT groupsX = (static_cast<UINT>(parameters.OcclusionSize.x) + 7) / 8;
         const UINT groupsY = (static_cast<UINT>(parameters.OcclusionSize.y) + 7) / 8;
 
-        // 1回目：環境遮蔽を求めている（t0 = 深度、u0 = ぼかす前）
+        // 1回目：環境遮蔽と接触影を求めている（t0 = 深度、t1 = 点光源、u0 = ぼかす前）
         m_OcclusionShader.SetGPU();
         ID3D11ShaderResourceView* depth = Renderer::GetDepthShaderResourceView();
-        context->CSSetShaderResources(0, 1, &depth);
+        ID3D11ShaderResourceView* occlusionInputs[2] = { depth, pointLights };
+        context->CSSetShaderResources(0, 2, occlusionInputs);
         ID3D11UnorderedAccessView* rawUAV = m_RawUAV.Get();
         context->CSSetUnorderedAccessViews(0, 1, &rawUAV, nullptr);
         context->Dispatch(groupsX, groupsY, 1);

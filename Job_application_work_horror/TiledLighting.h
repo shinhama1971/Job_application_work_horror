@@ -51,6 +51,8 @@ namespace Effect
 
         // 送ったライトの数と、タイルの数を返している（デバッグ画面用）
         uint32_t GetLightCount() const { return m_UploadedLightCount; }
+        // 送った点光源の一覧（SSAOの接触影が、一番強く照らしている光源を選ぶのに使う）
+        ID3D11ShaderResourceView* GetLightSRV() const { return m_LightSRV.Get(); }
         uint32_t GetTileCount() const { return m_TilesX * m_TilesY; }
 
     private:
@@ -96,6 +98,10 @@ namespace Effect
         // ライトの一覧（CPUから毎フレーム書き換える）とその読み取り口
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_LightBuffer;
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_LightSRV;
+        // ライトごとの、光の届く範囲に重なる建物の壁の印（1ビット = 1枚。壁を抜けて照らさない判定で、調べる壁を絞る。t19）
+        Microsoft::WRL::ComPtr<ID3D11Buffer> m_WallMaskBuffer;
+        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_WallMaskSRV;
+        std::vector<uint32_t> m_WallMasks;
         // タイルごとのライトの番号の並び（Compute Shaderが書き、ピクセルシェーダーが読む）
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_TileIndexBuffer;
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_TileIndexSRV;

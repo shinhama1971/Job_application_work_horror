@@ -196,6 +196,9 @@
     <FxCompile Include="shader\bloomCompositePS.hlsl">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
+    <FxCompile Include="shader\toneMapPS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="shader\surveillanceFeedPS.hlsl">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
@@ -266,6 +269,7 @@
     <ClCompile Include="ShadowMan.cpp" />
     <ClCompile Include="ShadowMap.cpp" />
     <ClCompile Include="AmbientOcclusion.cpp" />
+    <ClCompile Include="DDGIVolume.cpp" />
     <ClCompile Include="PointShadowMap.cpp" />
     <ClCompile Include="sound.cpp" />
     <ClCompile Include="StageScene.cpp" />
@@ -404,6 +408,7 @@
     <ClInclude Include="ShadowMan.h" />
     <ClInclude Include="ShadowMap.h" />
     <ClInclude Include="AmbientOcclusion.h" />
+    <ClInclude Include="DDGIVolume.h" />
     <ClInclude Include="PointShadowMap.h" />
     <ClInclude Include="sound.h" />
     <ClInclude Include="StageScene.h" />
@@ -481,6 +486,8 @@
     <ClInclude Include="shader\viewModel.hlsli" />
     <ClInclude Include="shader\figureVolume.hlsli" />
     <ClInclude Include="shader\screenAmbientOcclusion.hlsli" />
+    <ClInclude Include="shader\ddgiCommon.hlsli" />
+    <ClInclude Include="shader\ddgiUpdate.hlsli" />
     <ClInclude Include="shader\roomOcclusion.hlsli" />
     <ClInclude Include="shader\waterCaustics.hlsli" />
     <ClInclude Include="shader\puddleMask.hlsli" />
@@ -493,6 +500,7 @@
     <ClInclude Include="shader\forestWetness.hlsli" />
     <ClInclude Include="shader\facadeSurface.hlsli" />
     <ClInclude Include="shader\horrorGrade.hlsli" />
+    <ClInclude Include="shader\toneMapping.hlsli" />
     <ClInclude Include="shader\horrorMist.hlsli" />
     <ClInclude Include="shader\surfaceDetail.hlsli" />
   </ItemGroup>
@@ -515,6 +523,18 @@
     <FxCompile Include="shader\ambientOcclusionCS.hlsl">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
+    <FxCompile Include="shader\ddgiTraceCS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\ddgiIrradianceUpdateCS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\ddgiDistanceUpdateCS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\ddgiApplyCS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
     <FxCompile Include="shader\ambientOcclusionBlurCS.hlsl">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
@@ -531,6 +551,9 @@
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\bloomExtractCS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\bloomDownsampleCS.hlsl">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\autoExposureCS.hlsl">
