@@ -7,6 +7,9 @@
 #ifndef DOOR_PAINTING_INCLUDED
 #define DOOR_PAINTING_INCLUDED
 
+// ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
+#include "fastNoise.hlsli"
+
 // 扉の色と、凹凸（羽目板の段差・剥げた塗装の縁）
 struct DoorPaint
 {

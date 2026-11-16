@@ -8,6 +8,9 @@
 #ifndef PORTRAIT_PAINTING_INCLUDED
 #define PORTRAIT_PAINTING_INCLUDED
 
+// ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
+#include "fastNoise.hlsli"
+
 // 絵の色と、筆の跡・ひびの凹凸（法線を傾けるのに使う高さ）
 struct PortraitPaint
 {

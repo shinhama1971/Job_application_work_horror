@@ -13,6 +13,9 @@
 #ifndef RAY_REFLECTION_INCLUDED
 #define RAY_REFLECTION_INCLUDED
 
+// ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
+#include "fastNoise.hlsli"
+
 // SSRの前のフレームの画面（t4。縮小画像の段を持つ）と、深度プリパスの深度（t8）（ScreenSpaceReflection）
 Texture2D g_SsrScene : register(t4);
 Texture2D<float> g_SsrDepth : register(t8);

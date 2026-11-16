@@ -11,6 +11,9 @@
 #ifndef ROCK_SURFACE_INCLUDED
 #define ROCK_SURFACE_INCLUDED
 
+// ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
+#include "fastNoise.hlsli"
+
 // 岩の1画素分の材質
 struct RockSurface
 {

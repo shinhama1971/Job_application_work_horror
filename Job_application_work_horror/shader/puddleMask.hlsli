@@ -7,6 +7,9 @@
 #ifndef PUDDLE_MASK_INCLUDED
 #define PUDDLE_MASK_INCLUDED
 
+// ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
+#include "fastNoise.hlsli"
+
 // マス目ごとの水たまりの表（b13）。WaterEffectSystem::Init がCPUで決めて渡している。
 // x = 水たまりがあれば1、yz = 中心のずれと回転に使う乱数。マス目(PUDDLE_CELL_MIN, PUDDLE_CELL_MIN)から16x16マス。
 // sin を使った乱数をシェーダーで計算すると、GPUの種類で sin の精度が違い、水たまりの場所が変わるため、表にしている。

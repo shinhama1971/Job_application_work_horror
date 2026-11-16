@@ -6,6 +6,9 @@
 #ifndef WET_FOOTPRINTS_INCLUDED
 #define WET_FOOTPRINTS_INCLUDED
 
+// ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
+#include "fastNoise.hlsli"
+
 // 楕円の内側で1、外側で0（縁を少しぼかしている）
 float FootprintEllipse(float2 position, float2 center, float2 radius)
 {

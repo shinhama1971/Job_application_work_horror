@@ -11,6 +11,9 @@
 #ifndef PBR_LIGHTING_INCLUDED
 #define PBR_LIGHTING_INCLUDED
 
+// ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
+#include "fastNoise.hlsli"
+
 static const float PBR_PI = 3.14159265f;
 // 金属でない物（コンクリート・木・塗装・プラスチック）の、正面から見たときの反射率
 static const float PBR_DIELECTRIC_F0 = 0.04f;

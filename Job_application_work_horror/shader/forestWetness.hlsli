@@ -10,6 +10,9 @@
 #ifndef FOREST_WETNESS_INCLUDED
 #define FOREST_WETNESS_INCLUDED
 
+// ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
+#include "fastNoise.hlsli"
+
 // 雨で濡れた後の色・粗さ・濡れ具合（元の材質に、雨の分を足した物）
 struct ForestWetSurface
 {

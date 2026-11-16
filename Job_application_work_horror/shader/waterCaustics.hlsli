@@ -11,6 +11,9 @@
 #ifndef WATER_CAUSTICS_INCLUDED
 #define WATER_CAUSTICS_INCLUDED
 
+// ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
+#include "fastNoise.hlsli"
+
 // レイ反射で水面に映す小物の箱の最大数（Renderer.h の WATER_CAUSTICS_BUFFER::MaxReflectionProps と同じ）
 #define MAX_REFLECTION_PROPS 16
 

@@ -14,6 +14,9 @@
 #ifndef FACADE_SURFACE_INCLUDED
 #define FACADE_SURFACE_INCLUDED
 
+// ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
+#include "fastNoise.hlsli"
+
 // 外壁の1画素分の材質
 struct FacadeSurface
 {

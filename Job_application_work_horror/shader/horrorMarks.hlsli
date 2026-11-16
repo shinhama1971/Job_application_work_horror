@@ -10,6 +10,9 @@
 #ifndef HORROR_MARKS_INCLUDED
 #define HORROR_MARKS_INCLUDED
 
+// ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
+#include "fastNoise.hlsli"
+
 struct HorrorMarks
 {
     float blood;    // 血の濃さ（0〜1）。色を赤黒くし、濡れた光沢を足すのに使っている

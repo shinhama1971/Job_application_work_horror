@@ -7,6 +7,9 @@
 #ifndef CLOCK_FACE_INCLUDED
 #define CLOCK_FACE_INCLUDED
 
+// ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
+#include "fastNoise.hlsli"
+
 // 文字盤の色と、凹凸（目盛り・数字の刻み）
 struct ClockPaint
 {

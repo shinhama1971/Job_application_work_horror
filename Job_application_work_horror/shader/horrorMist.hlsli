@@ -11,6 +11,9 @@
 #ifndef HORROR_MIST_INCLUDED
 #define HORROR_MIST_INCLUDED
 
+// ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
+#include "fastNoise.hlsli"
+
 // 床の高さ、霧が薄くなる高さ（この高さ上がるごとに約1/3）、濃さ
 #define MIST_FLOOR_Y (-100.0f)
 #define MIST_HEIGHT_SCALE 13.0f

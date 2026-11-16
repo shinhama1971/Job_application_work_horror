@@ -5,6 +5,9 @@
 #ifndef FLASHLIGHT_LIGHTING_INCLUDED
 #define FLASHLIGHT_LIGHTING_INCLUDED
 
+// ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
+#include "fastNoise.hlsli"
+
 // 上を向いた面はわずかに青白く、下を向いた面はわずかに暖かい色にした環境光を返している
 float3 GetHemisphereAmbient(float3 worldNormal)
 {
