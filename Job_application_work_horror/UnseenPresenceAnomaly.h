@@ -38,6 +38,9 @@ class UnseenPresenceAnomaly final
 {
 public:
     // これより近づかれると捕まる距離、すれ違ったとみなす近さ（水平の距離）
+    // 足元の高さと、通り過ぎたとみなす範囲（すれ違う距離の倍率）
+    static constexpr float FootY = -99.0f;
+    static constexpr float NearPassingScale = 1.6f;
     static constexpr float CatchDistance = 13.0f;
     static constexpr float PassingDistance = 26.0f;
     // 歩く速さ（プレイヤーの歩きより遅い）。廊下の奥と入口の折り返す位置
@@ -208,7 +211,7 @@ public:
     // 影の位置（床の高さ）
     DirectX::SimpleMath::Vector3 GetPosition() const noexcept
     {
-        return DirectX::SimpleMath::Vector3(m_X, -99.0f, m_Z);
+        return DirectX::SimpleMath::Vector3(m_X, FootY, m_Z);
     }
     // プレイヤーとの水平の距離
     float GetHorizontalDistance(const DirectX::SimpleMath::Vector3& playerPosition) const noexcept
@@ -229,7 +232,7 @@ public:
     // すぐそばまで来ているか（目的表示で「動かずにやり過ごす」と出すため）
     bool IsNear(const DirectX::SimpleMath::Vector3& playerPosition) const noexcept
     {
-        return m_Active && GetHorizontalDistance(playerPosition) < PassingDistance * 1.6f;
+        return m_Active && GetHorizontalDistance(playerPosition) < PassingDistance * NearPassingScale;
     }
     bool IsActive() const noexcept { return m_Active; }
     // 懐中電灯で照らされて、このフレームで新しく気づいたか。

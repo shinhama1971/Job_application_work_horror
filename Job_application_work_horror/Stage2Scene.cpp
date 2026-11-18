@@ -93,6 +93,9 @@ namespace
     constexpr float FilmGradePerLoop = 0.20f;
     constexpr float LensDirtBase = 0.14f;
     constexpr float LensDirtPerLoop = 0.08f;
+    // 2面の始めの露出（電力が戻った、少し暗い廊下）と、2面を出るときに戻すレンズの歪み（作った直後と同じ強さ）
+    constexpr float StartExposure = 0.95f;
+    constexpr float ExitLensDistortionStrength = Effect::PostProcess::StartupLensDistortionStrength;
     // 信号の乱れ：信号盤の数、足音の影が近いときに乱れ始める危険度と強まり方と上限、信号盤パズルの間の乱れ
     constexpr int SignalTerminalTotal = 3;
     constexpr float StalkerInterferenceStartThreat = 0.52f;
@@ -105,6 +108,16 @@ namespace
     constexpr float VolumetricBase = 0.38f;
     constexpr float VolumetricPerLoop = 0.20f;
     constexpr float VolumetricPerDarkness = 0.055f;
+    // 壁と天井の古さの強さ。血の手形や引っかき傷は2面では異変として出すので、決まった跡（ホラーの跡）は描かない
+    constexpr float WallWeathering = 0.85f;
+    constexpr float WallHorrorMarks = 0.0f;
+    // 看板やランプが周りを照らす光（届く距離と強さ）：扉のランプ、信号盤と記録の端末の目印、肖像画の赤く光る目
+    constexpr float DoorIndicatorGlowRange = 45.0f;
+    constexpr float DoorIndicatorGlowIntensity = 2.0f;
+    constexpr float MarkerGlowRange = 40.0f;
+    constexpr float MarkerGlowIntensity = 1.8f;
+    constexpr float PortraitGlowRange = 30.0f;
+    constexpr float PortraitGlowIntensity = 2.4f;
 
     // --- 扉のランプ：鍵がかかっている間は赤くゆっくり、外れたら緑で速く点滅させる（点滅の速さ、色、光沢）
     constexpr float LockedIndicatorPulseSpeed = 3.4f;
@@ -187,14 +200,14 @@ void Stage2Scene::Init()
     Core::Game* game = Core::Game::GetInstance();
     // 2面は電力が戻った状態から始め、画面効果を2面の雰囲気（少し暗く、光の筋あり）にしている
     game->SetPowerRestored(true);
-    game->GetPostProcess()->SetCorridorTension(0.38f);
-    game->GetPostProcess()->SetExposure(0.95f);
-    game->GetPostProcess()->SetAtmosphere(0.20f, 0.62f);
-    game->GetPostProcess()->SetLensDistortionStrength(0.20f);
-    game->GetPostProcess()->SetFilmGradeStrength(0.58f);
+    game->GetPostProcess()->SetCorridorTension(TensionBase);
+    game->GetPostProcess()->SetExposure(StartExposure);
+    game->GetPostProcess()->SetAtmosphere(NoiseBase, VignetteBase);
+    game->GetPostProcess()->SetLensDistortionStrength(DistortionBase);
+    game->GetPostProcess()->SetFilmGradeStrength(FilmGradeBase);
     game->GetPostProcess()->SetSignalInterference(0.0f);
     game->GetPostProcess()->SetVolumetricLight(true);
-    game->GetPostProcess()->SetVolumetricIntensity(0.38f);
+    game->GetPostProcess()->SetVolumetricIntensity(VolumetricBase);
 
     // 進行の状態をすべて最初に戻している
     m_LoopCount = 0;
@@ -258,7 +271,7 @@ void Stage2Scene::Init()
         *game, m_ClockAnomaly.GetHourAngle(), m_ClockAnomaly.GetMinuteAngle());
     // 壁と天井の古さ（継ぎ目・ひび・水の跡・カビ・天井板）と、部屋の角の暗がりを1面と同じ仕組みで描いている。
     // 血の手形や引っかき傷は2面では異変として出すため、決まった跡は描かない（ホラーの跡の濃さを0にしている）。
-    Renderer::SetWallWeathering(0.85f, 0.0f);
+    Renderer::SetWallWeathering(WallWeathering, WallHorrorMarks);
     Renderer::SetRoomOcclusion(
         m_Objects.wallFootprints.data(),
         static_cast<unsigned int>(m_Objects.wallFootprints.size()),
@@ -302,17 +315,17 @@ void Stage2Scene::StartExitStairClimb(Player& player)
 // 色の変化（正解で緑になる、異変で赤く光るなど）が、そのまま周りの光の色になる。
 void Stage2Scene::SetupPracticalLights()
 {
-    m_Objects.doorIndicator->SetGlowLight(45.0f, 2.0f);
+    m_Objects.doorIndicator->SetGlowLight(DoorIndicatorGlowRange, DoorIndicatorGlowIntensity);
     for (Wall* marker : m_Objects.signalMarkers)
     {
-        marker->SetGlowLight(40.0f, 1.8f);
+        marker->SetGlowLight(MarkerGlowRange, MarkerGlowIntensity);
     }
     for (Wall* marker : m_Objects.evidenceMarkers)
     {
-        marker->SetGlowLight(40.0f, 1.8f);
+        marker->SetGlowLight(MarkerGlowRange, MarkerGlowIntensity);
     }
     // 肖像画は、目が開いて赤く光ったとき（自ら光る色が付いたとき）だけ、周りを赤く照らす
-    m_Objects.portrait->SetGlowLight(30.0f, 2.4f);
+    m_Objects.portrait->SetGlowLight(PortraitGlowRange, PortraitGlowIntensity);
 }
 
 // 周回の数、視線、足音、信号盤パズル、追われる演出を同時に見て、進行を更新している。
@@ -866,13 +879,13 @@ void Stage2Scene::Uninit()
     Renderer::SetLoopDepth(0.0f);
     Renderer::SetRoomOcclusion(nullptr, 0, 0.0f, 0.0f, 0.0f);
     game->GetPostProcess()->SetCorridorTension(0.0f);
-    game->GetPostProcess()->SetAtmosphere(0.18f, 0.55f);
-    game->GetPostProcess()->SetExposure(1.0f);
-    game->GetPostProcess()->SetLensDistortionStrength(0.32f);
-    game->GetPostProcess()->SetFilmGradeStrength(0.55f);
+    game->GetPostProcess()->SetAtmosphere(Effect::PostProcess::DefaultNoiseAmount, Effect::PostProcess::DefaultVignetteStrength);
+    game->GetPostProcess()->SetExposure(Effect::PostProcess::DefaultExposure);
+    game->GetPostProcess()->SetLensDistortionStrength(ExitLensDistortionStrength);
+    game->GetPostProcess()->SetFilmGradeStrength(Effect::PostProcess::DefaultFilmGradeStrength);
     game->GetPostProcess()->SetSignalInterference(0.0f);
     game->GetPostProcess()->SetVolumetricLight(false);
-    game->GetPostProcess()->SetVolumetricIntensity(0.58f);
+    game->GetPostProcess()->SetVolumetricIntensity(Effect::PostProcess::DefaultVolumetricIntensity);
 
     // Stage2Layoutが作るときに記録した名前の一覧で破棄している（名前を書く場所を1か所にするため）。
     for (const std::string& name : m_Objects.objectNames)

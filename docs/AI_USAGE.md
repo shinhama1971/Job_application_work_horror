@@ -390,3 +390,4 @@ Claude Code（Anthropic）が、作者の指示（AIっぽさ・マジックナ�
 続けて Claude Code（Anthropic）が、作者が選んだ「長い関数の分割」として、`Game::Draw`・`Player::Update`・`Stage2Scene::Update` を、中身の順番を変えずに段階ごとの関数へ分けました。移した所の数に名前を付け、変更の前後で数の値の一覧を比べて確かめました。
 続けて Claude Code（Anthropic）が、`StageScene::Update`・`Debug::UI::Draw`・`SelectStage2Objective` も同じように分けました。目的表示は、99種類の文章が前後で同じであることを機械的に比べて確かめました。
 続けて Claude Code（Anthropic）が、作者の「残りも分ける」という指示で、`Renderer::Init`・`Hud::AddText`・`Hud::DrawResult`・`CaptureMode` の撮影の道順・`StageScene::UpdateRouteLights`、1面と2面の配置を組み立てる `Build` を分けました。配置は、物を作る順番を変えずに場所ごとの手順へ分け、数の値と文字列の一覧が前後で同じであることを機械的に比べて確かめました。
+作者が前回の提出物の zip を見せて「ソースファイルの一覧と似た構成を作って」と伝えたのを受け、Claude Code（Anthropic）が、同じ形のフォルダと zip を作るスクリプト（`tools/make-source-package.ps1`）を作りました。前回の zip にビルドで作られる物が入り、説明書が入っていなかったことを中身の一覧の比較で見つけ、git が管理しているファイルだけを集めるようにしました。展開した zip でビルドが警告0で通ることを確かめました（11月19日）。

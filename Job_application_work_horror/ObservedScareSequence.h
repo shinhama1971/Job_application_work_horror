@@ -14,6 +14,8 @@ class ObservedScareSequence final
 private:
     // 演出の長さ（秒）
     static constexpr float Duration = 1.35f;
+    // 知らせを出す秒数
+    static constexpr float NoticeSeconds = 2.8f;
 
     // 演出の経過秒（負なら演出していない）、通知の残り秒数、次に起こす段階
     float m_Timer = -1.0f;
@@ -38,7 +40,7 @@ public:
         }
 
         m_Timer = 0.0f;
-        m_NoticeTimer = 2.8f;
+        m_NoticeTimer = NoticeSeconds;
         m_Phase = 0;
         return true;
     }

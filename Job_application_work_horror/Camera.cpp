@@ -13,13 +13,27 @@
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+    // 最初の位置と向き（ヨー。約πなので -Z 方向を向く）。実際の位置と向きは、Scene が配置に合わせて設定し直す
+    const Vector3 InitialPosition(0.0f, 20.0f, -50.0f);
+    constexpr float InitialYaw = 3.14f;
+    // 視点の速さ：マウス（1画素あたりのラジアン）、スティック（1秒あたりのラジアン。横・縦）、デバッグ用の方向キー
+    constexpr float MouseRadiansPerPixel = 0.003f;
+    constexpr float StickYawSpeed = 3.9f;
+    constexpr float StickPitchSpeed = 3.0f;
+    constexpr float ArrowKeyYawSpeed = 6.0f;
+    // 視線が真上・真下に近く、右方向を作れないとみなす長さの2乗
+    constexpr float MinimumRightLengthSquared = 0.0001f;
+}
+
 // 初期位置と向きを決め、マウスで視点を動かせる状態にしている（カーソルは隠している）。
 // 実際の位置と向きは、Player::Initの後にSceneが配置に合わせて設定し直している。
 void Camera::Init()
 {
-    m_Position = Vector3(0.0f, 20.0f, -50.0f);
+    m_Position = InitialPosition;
     // ヨー（水平の向き）。約πなので、最初は-Z方向を向いている
-    m_CameraDirection = 3.14f;
+    m_CameraDirection = InitialYaw;
     m_CameraPitch = 0.0f;
 
     m_MouseLookEnable = true;
@@ -65,7 +79,7 @@ void Camera::Update()
             // カーソルの移動量は実際の画素単位なので、拡大率が大きい画面では同じ手の動きでも値が大きくなる。
             // 拡大率で割って、拡大率に関係なく同じ視点の速さにしている。
             const float sensitivity =
-                0.003f * m_LookSensitivityScale /
+                MouseRadiansPerPixel * m_LookSensitivityScale /
                 (std::max)(Application::GetDpiScale(), 1.0f);
 
             m_CameraDirection += dx * sensitivity;
@@ -101,9 +115,9 @@ void Camera::Update()
 
     // スティックは時間あたりの回転速度として使い、横より縦を少し遅くしている
     const float controllerYawSpeed =
-        3.9f * m_LookSensitivityScale * deltaTime;
+        StickYawSpeed * m_LookSensitivityScale * deltaTime;
     const float controllerPitchSpeed =
-        3.0f * m_LookSensitivityScale * deltaTime;
+        StickPitchSpeed * m_LookSensitivityScale * deltaTime;
     m_CameraDirection += controllerLookX * controllerYawSpeed;
     m_CameraPitch += controllerLookY * controllerPitchSpeed;
 
@@ -112,12 +126,12 @@ void Camera::Update()
     {
         if (Input::GetKeyPress(VK_LEFT))
         {
-            m_CameraDirection += 6.0f * m_LookSensitivityScale * deltaTime;
+            m_CameraDirection += ArrowKeyYawSpeed * m_LookSensitivityScale * deltaTime;
         }
 
         if (Input::GetKeyPress(VK_RIGHT))
         {
-            m_CameraDirection -= 6.0f * m_LookSensitivityScale * deltaTime;
+            m_CameraDirection -= ArrowKeyYawSpeed * m_LookSensitivityScale * deltaTime;
         }
 
         const float pitchStep = 1.8f * m_LookSensitivityScale * deltaTime;
@@ -264,7 +278,7 @@ bool Camera::IsSphereVisible(
     Vector3 right(forward.z, 0.0f, -forward.x);
     const float rightLengthSquared =
         right.x * right.x + right.z * right.z;
-    if (rightLengthSquared <= 0.0001f)
+    if (rightLengthSquared <= MinimumRightLengthSquared)
     {
         right = Vector3(1.0f, 0.0f, 0.0f);
     }

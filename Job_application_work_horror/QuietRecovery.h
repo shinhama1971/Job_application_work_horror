@@ -11,6 +11,8 @@ struct QuietRecovery
 {
     // 2秒続ければ成功し、成功した後は10秒間使えない
     static constexpr float RequiredSeconds = 2.0f;
+    // 息を潜めきったことを知らせる秒数
+    static constexpr float SuccessNoticeSeconds = 2.5f;
     static constexpr float CooldownSeconds = 10.0f;
     // 続けた秒数、次に使えるまでの残り秒数、成功の知らせの残り秒数、影が近すぎるか
     float progress = 0.0f;
@@ -40,7 +42,7 @@ struct QuietRecovery
         if (progress < RequiredSeconds) return false;
         progress = 0.0f;
         cooldown = CooldownSeconds;
-        successNotice = 2.5f;
+        successNotice = SuccessNoticeSeconds;
         return true;
     }
 };

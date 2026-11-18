@@ -13,6 +13,19 @@
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+    // 電力が戻った後の影は、見つめるとこの秒数で消える
+    constexpr float GazeScareSeconds = 5.0f;
+    // 驚かせる瞬間：強い振動、画面の乱れ（強さと秒数）、ブラウン管のようなノイズ（強さと秒数）
+    constexpr int ScareRumbleFrames = 14;
+    constexpr float ScareRumbleStrength = 0.34f;
+    constexpr float ScarePulseStrength = 1.0f;
+    constexpr float ScarePulseSeconds = 0.65f;
+    constexpr float ScareNoisePower = 0.82f;
+    constexpr float ScareNoiseSeconds = 0.55f;
+}
+
 // 準備するものはない
 void ScareTrigger::Init()
 {
@@ -43,22 +56,22 @@ void ScareTrigger::Update()
 
             if (makePersistentScare)
             {
-                shadow.EnableGazeScare(5.0f);
+                shadow.EnableGazeScare(GazeScareSeconds);
             }
         });
 
     // 強い振動・驚かせる音・画面の乱れ・ブラウン管のようなノイズで驚かせている
-    Input::SetVibration(14, 0.34f);
+    Input::SetVibration(ScareRumbleFrames, ScareRumbleStrength);
     game->PlayAudioCue(SOUND_CUE_SCARE);
-    game->GetPostProcess()->TriggerHorrorPulse(1.0f, 0.65f);
+    game->GetPostProcess()->TriggerHorrorPulse(ScarePulseStrength, ScarePulseSeconds);
 
     ScreenDustOverlay* crt =
         game->GetObj<ScreenDustOverlay>("CRTNoise");
     if (crt != nullptr)
     {
-        crt->SetPower(0.82f);
+        crt->SetPower(ScareNoisePower);
         crt->SetActive(true);
-        crt->SetTimer(0.55f);
+        crt->SetTimer(ScareNoiseSeconds);
     }
 }
 

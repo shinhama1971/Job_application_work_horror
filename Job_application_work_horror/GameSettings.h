@@ -14,6 +14,12 @@ namespace Core
     public:
         // 各設定の段階の最大値（明るさ0〜4、演出の強さ0〜2、視点の感度0〜4、音量0〜4、目的表示0〜1）
         static constexpr int MaxBrightnessLevel = 4;
+        // 明るさ：真ん中の段（足さない段）と、1段ごとに足す明るさ
+        static constexpr int NeutralBrightnessLevel = 2;
+        static constexpr float BrightnessStep = 0.055f;
+        // 視点の速さ：一番遅い段の倍率と、1段ごとに足す倍率
+        static constexpr float MinLookSensitivity = 0.60f;
+        static constexpr float LookSensitivityStep = 0.20f;
         static constexpr int MaxEffectLevel = 2;
         static constexpr int MaxLookSensitivityLevel = 4;
         static constexpr int MaxVolumeLevel = 4;
@@ -103,7 +109,7 @@ namespace Core
         // 明るさは真ん中(2)を0とし、1段階ごとに露出を0.055ずらしている。
         float GetBrightnessOffset() const
         {
-            return static_cast<float>(m_BrightnessLevel - 2) * 0.055f;
+            return static_cast<float>(m_BrightnessLevel - NeutralBrightnessLevel) * BrightnessStep;
         }
 
         // 演出の強さ：画面効果の強さに掛ける倍率（低0.70・中1.0・高1.25）
@@ -119,7 +125,7 @@ namespace Core
         // 視点の感度：0.60倍から0.20ずつ上げ、最大1.40倍
         float GetLookSensitivityScale() const
         {
-            return 0.60f + static_cast<float>(m_LookSensitivityLevel) * 0.20f;
+            return MinLookSensitivity + static_cast<float>(m_LookSensitivityLevel) * LookSensitivityStep;
         }
 
         // 音量：全体の音量に掛ける倍率（0は無音）

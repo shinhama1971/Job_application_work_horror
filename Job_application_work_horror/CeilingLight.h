@@ -62,6 +62,9 @@ private:
     void UpdateRouteFlicker(float& targetBrightness);
 
 public:
+    // 通路の標準の器具の大きさ（モデルはこの大きさを1にした空間で作っている。配置ファイルに size が無い行もこの大きさ）
+    static constexpr DirectX::SimpleMath::Vector3 StandardSize{ 22.0f, 2.0f, 10.0f };
+
     void Init() override;
     void Update() override;
     void Draw(Camera* camera) override;

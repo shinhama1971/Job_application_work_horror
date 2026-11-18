@@ -25,8 +25,47 @@ namespace
     constexpr float LightRange = 95.0f;
     constexpr float LightIntensity = 1.6f;
     const Color BulbColor(1.0f, 0.68f, 0.38f, 1.0f);
-    // コードの円柱の分割数
+    // コードの円柱の分割数と、太さ（半径）
     constexpr int Segments = 10;
+    constexpr float CordRadius = 0.08f;
+    // 作る頂点の数の見込み（コードとモデルの分。先に入れ物の大きさを決めておく）
+    constexpr std::size_t ReservedVertexCount = 512;
+    // モデルの頂点の色（白。色はマテリアルで決める）
+    const Color ModelVertexColor(1.0f, 1.0f, 1.0f, 1.0f);
+    // コード（黒い布の被覆）と電球のガラスのマテリアル。電球の光る強さは、色にこの倍率を掛ける
+    const Color CordDiffuse(0.05f, 0.045f, 0.04f, 1.0f);
+    const Color CordAmbient(0.03f, 0.03f, 0.03f, 1.0f);
+    const Color CordSpecular(0.08f, 0.08f, 0.08f, 1.0f);
+    constexpr float CordShininess = 12.0f;
+    const Color BulbGlassDiffuse(0.9f, 0.85f, 0.75f, 1.0f);
+    constexpr float BulbEmissionScale = 1.6f;
+    // ソケットの長さ（コードの先から電球の上端まで）
+    constexpr float SocketLength = 1.1f;
+
+    // 押されたときに揺れる向きを決める乱数（時間と種に掛ける倍率）
+    constexpr float KickTimeScale = 3.71f;
+    constexpr float KickSeedScale = 5.3f;
+    // 1フレームの時間の上限（止まった後に一気に揺れないように）
+    constexpr float MaxDeltaTime = 0.05f;
+    // すきま風：いつもの強さと、影が近いときに足す強さ。向きを変える2つの揺れ（速さと種の倍率）と、2つ目の揺れの割合
+    constexpr float DraftBase = 0.020f;
+    constexpr float DraftDisturbance = 0.16f;
+    constexpr float DraftRateX = 0.71f;
+    constexpr float DraftRateX2 = 2.3f;
+    constexpr float DraftSeedScaleX2 = 2.0f;
+    constexpr float DraftSecondaryRatio = 0.4f;
+    constexpr float DraftRateZ = 0.53f;
+    constexpr float DraftSeedScaleZ = 1.7f;
+    // 揺れの角度の上限（ラジアン）
+    constexpr float MaxSwingAngle = 0.7f;
+    // 接触の悪いソケットの明るさの揺れ：2つの速さの sin を掛けた揺れ、強く揺れる判定、
+    // 揺れの速さに掛ける倍率と暗くなる上限、弱いときの割合
+    constexpr float ContactRateA = 37.0f;
+    constexpr float ContactRateB = 13.0f;
+    constexpr float ContactThreshold = 0.6f;
+    constexpr float SwingDimScale = 0.5f;
+    constexpr float MaxSwingDim = 0.35f;
+    constexpr float WeakContactRatio = 0.15f;
 
     // 三角形を1つ足している（表と裏の両方の順番を入れている）
     void AddTriangle(std::vector<VERTEX_3D>& vertices, std::vector<unsigned int>& indices,
@@ -40,7 +79,7 @@ namespace
             VERTEX_3D vertex{};
             vertex.position = positions[index];
             vertex.normal = normals[index];
-            vertex.color = Color(1.0f, 1.0f, 1.0f, 1.0f);
+            vertex.color = ModelVertexColor;
             vertices.push_back(vertex);
         }
         const unsigned int faces[] = { base, base + 1, base + 2, base + 2, base + 1, base };
@@ -74,13 +113,13 @@ void HangingBulb::Init()
     m_Vertices.clear();
     m_Indices.clear();
     // 付け根（原点）から下へ、コード・ソケットの順に作り、その後ろに電球を作っている（電球だけ光らせるため）
-    m_Vertices.reserve(512);
-    AddVerticalCylinder(m_Vertices, m_Indices, 0.0f, -m_CordLength, 0.08f);
+    m_Vertices.reserve(ReservedVertexCount);
+    AddVerticalCylinder(m_Vertices, m_Indices, 0.0f, -m_CordLength, CordRadius);
     // ソケットと電球は、Mayaで作ったモデル（上端が原点。tools/maya/build_props.py）を、コードの長さだけ下へずらしている
     const size_t modelStart = m_Vertices.size();
     const std::vector<PropModel::IndexRange> ranges = PropModel::Append(
         "assets/model/props/hanging_bulb.fbx",
-        { { "Socket", Color(1.0f, 1.0f, 1.0f, 1.0f) }, { "Bulb", Color(1.0f, 1.0f, 1.0f, 1.0f) } },
+        { { "Socket", ModelVertexColor }, { "Bulb", ModelVertexColor } },
         Vector3::One, m_Vertices, m_Indices);
     for (size_t index = modelStart; index < m_Vertices.size(); ++index)
     {
@@ -93,17 +132,17 @@ void HangingBulb::Init()
     m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
     MATERIAL cord{};
-    cord.Diffuse = Color(0.05f, 0.045f, 0.04f, 1.0f);
-    cord.Ambient = Color(0.03f, 0.03f, 0.03f, 1.0f);
-    cord.Specular = Color(0.08f, 0.08f, 0.08f, 1.0f);
-    cord.Shininess = 12.0f;
+    cord.Diffuse = CordDiffuse;
+    cord.Ambient = CordAmbient;
+    cord.Specular = CordSpecular;
+    cord.Shininess = CordShininess;
     cord.TextureEnable = FALSE;
     m_CordMaterial = std::make_unique<Material>();
     m_CordMaterial->CreateRequired(cord);
 
     MATERIAL bulb = cord;
-    bulb.Diffuse = Color(0.9f, 0.85f, 0.75f, 1.0f);
-    bulb.Emission = BulbColor * 1.6f;
+    bulb.Diffuse = BulbGlassDiffuse;
+    bulb.Emission = BulbColor * BulbEmissionScale;
     m_BulbMaterial = std::make_unique<Material>();
     m_BulbMaterial->CreateRequired(bulb);
 }
@@ -117,32 +156,33 @@ void HangingBulb::Place(const Vector3& anchor, float seed)
 void HangingBulb::Kick(float strength)
 {
     // 向きは、種と時間から決めた乱数（毎回違う向きに揺れる）
-    const float angle = std::fmod(m_Time * 3.71f + m_Seed * 5.3f, DirectX::XM_2PI);
+    const float angle = std::fmod(m_Time * KickTimeScale + m_Seed * KickSeedScale, DirectX::XM_2PI);
     m_VelocityX += std::cos(angle) * strength;
     m_VelocityZ += std::sin(angle) * strength;
 }
 
 void HangingBulb::Update()
 {
-    const float deltaTime = (std::min)(Application::GetDeltaTime(), 0.05f);
+    const float deltaTime = (std::min)(Application::GetDeltaTime(), MaxDeltaTime);
     m_Time += deltaTime;
 
     // すきま風：ゆっくり向きの変わる小さな力。影が近いほど強くなる
-    const float draft = 0.020f + m_Disturbance * 0.16f;
-    const float forceX = std::sin(m_Time * 0.71f + m_Seed) * draft + std::sin(m_Time * 2.3f + m_Seed * 2.0f) * draft * 0.4f;
-    const float forceZ = std::cos(m_Time * 0.53f + m_Seed * 1.7f) * draft;
+    const float draft = DraftBase + m_Disturbance * DraftDisturbance;
+    const float forceX = std::sin(m_Time * DraftRateX + m_Seed) * draft +
+        std::sin(m_Time * DraftRateX2 + m_Seed * DraftSeedScaleX2) * draft * DraftSecondaryRatio;
+    const float forceZ = std::cos(m_Time * DraftRateZ + m_Seed * DraftSeedScaleZ) * draft;
 
     // 減衰する振り子：角加速度 = -ω²・角度 - 減衰・角速度 + 力
     const float stiffness = SwingFrequency * SwingFrequency;
     m_VelocityX += (-stiffness * m_AngleX - SwingDamping * m_VelocityX + forceX) * deltaTime;
     m_VelocityZ += (-stiffness * m_AngleZ - SwingDamping * m_VelocityZ + forceZ) * deltaTime;
-    m_AngleX = (std::clamp)(m_AngleX + m_VelocityX * deltaTime, -0.7f, 0.7f);
-    m_AngleZ = (std::clamp)(m_AngleZ + m_VelocityZ * deltaTime, -0.7f, 0.7f);
+    m_AngleX = (std::clamp)(m_AngleX + m_VelocityX * deltaTime, -MaxSwingAngle, MaxSwingAngle);
+    m_AngleZ = (std::clamp)(m_AngleZ + m_VelocityZ * deltaTime, -MaxSwingAngle, MaxSwingAngle);
 
     // 大きく揺れている間は、接触の悪いソケットのように明るさが少し揺れる
     const float swing = std::sqrt(m_VelocityX * m_VelocityX + m_VelocityZ * m_VelocityZ);
-    const float contact = std::sin(m_Time * 37.0f + m_Seed) * std::sin(m_Time * 13.0f);
-    m_Brightness = 1.0f - (std::min)(swing * 0.5f, 0.35f) * (contact > 0.6f ? 1.0f : 0.15f);
+    const float contact = std::sin(m_Time * ContactRateA + m_Seed) * std::sin(m_Time * ContactRateB);
+    m_Brightness = 1.0f - (std::min)(swing * SwingDimScale, MaxSwingDim) * (contact > ContactThreshold ? 1.0f : WeakContactRatio);
 }
 
 Matrix HangingBulb::MakeWorldMatrix() const
@@ -153,7 +193,7 @@ Matrix HangingBulb::MakeWorldMatrix() const
 
 Vector3 HangingBulb::GetBulbPosition() const
 {
-    return Vector3::Transform(Vector3(0.0f, -m_CordLength - 1.1f - BulbRadius, 0.0f), MakeWorldMatrix());
+    return Vector3::Transform(Vector3(0.0f, -m_CordLength - SocketLength - BulbRadius, 0.0f), MakeWorldMatrix());
 }
 
 float HangingBulb::GetLightRange() const
@@ -178,11 +218,11 @@ void HangingBulb::Draw(Camera* camera)
 
     // 電球は、明るさの揺れに合わせて光る強さを変えている
     MATERIAL bulb{};
-    bulb.Diffuse = Color(0.9f, 0.85f, 0.75f, 1.0f);
-    bulb.Ambient = Color(0.03f, 0.03f, 0.03f, 1.0f);
-    bulb.Specular = Color(0.08f, 0.08f, 0.08f, 1.0f);
-    bulb.Emission = BulbColor * (1.6f * m_Brightness);
-    bulb.Shininess = 12.0f;
+    bulb.Diffuse = BulbGlassDiffuse;
+    bulb.Ambient = CordAmbient;
+    bulb.Specular = CordSpecular;
+    bulb.Emission = BulbColor * (BulbEmissionScale * m_Brightness);
+    bulb.Shininess = CordShininess;
     bulb.TextureEnable = FALSE;
     m_BulbMaterial->SetMaterial(bulb);
     m_BulbMaterial->SetGPU();

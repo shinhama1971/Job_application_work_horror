@@ -15,6 +15,12 @@
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+    // 調べる対象がこれより近いときは、向きを計算しない（0で割らないため）
+    constexpr float MinimumInteractionDistance = 0.001f;
+}
+
 // 調べられる対象の中から一番よいものを選び、Eキー（コントローラーはA）が押されたら調べている
 void InteractionSystem::Update(Player& player)
 {
@@ -39,7 +45,7 @@ void InteractionSystem::Update(Player& player)
         Vector3 toCandidate = candidate->GetInteractionPosition() - origin;
         const float distance = toCandidate.Length();
 
-        if (distance <= 0.001f || distance > MaxInteractionDistance)
+        if (distance <= MinimumInteractionDistance || distance > MaxInteractionDistance)
         {
             continue;
         }

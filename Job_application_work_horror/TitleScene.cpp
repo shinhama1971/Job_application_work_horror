@@ -31,9 +31,29 @@ namespace
         { Vector3(0.0f, -99.0f, 126.0f), Vector3(0.0f, -99.0f, 150.0f), 0.0f, 0.0f, 0.02f, 0.07f, 13.0f },
     };
 
+    // sin を使う決まった式で 0〜1 の値を作る係数
+    constexpr float HashFrequency = 12.9898f;
+    constexpr float HashAmplitude = 43758.5453f;
+
+    // ときどき来る短い乱れ：この秒数ごとに、この確率で、この秒数だけ、この強さで乱れる（乱数の種のずらし）
+    constexpr float GlitchWindowSeconds = 3.7f;
+    constexpr float GlitchSeedOffset = 0.37f;
+    constexpr float GlitchChance = 0.55f;
+    constexpr float GlitchSeconds = 0.18f;
+    constexpr float GlitchStrength = 0.55f;
+    // 題名のノイズを、画面全体の電波障害とラジオの雑音の乱れへ渡す割合
+    constexpr float InterferenceScale = 0.85f;
+    constexpr float PresenceStaticScale = 0.55f;
+    // 左スティック：この量より倒したら1回動かし、この量より戻したら次を受け付ける
+    constexpr float StickSelectThreshold = 0.6f;
+    constexpr float StickReleaseThreshold = 0.3f;
+    // 選ぶ面が変わったときの短い振動
+    constexpr int SelectRumbleFrames = 1;
+    constexpr float SelectRumbleStrength = 0.05f;
+
     float Hash(float value)
     {
-        const float s = std::sin(value * 12.9898f) * 43758.5453f;
+        const float s = std::sin(value * HashFrequency) * HashAmplitude;
         return s - std::floor(s);
     }
 }
@@ -63,12 +83,11 @@ float TitleScene::GetNoise() const
     // 場面が変わった瞬間の強い乱れ
     float noise = m_Backdrop.GetCutNoise();
     // ときどき来る短い乱れ（約3.7秒ごとに、半分くらいの確率で0.18秒だけ）
-    constexpr float window = 3.7f;
-    const float index = std::floor(m_TitleTime / window);
-    const float local = m_TitleTime - index * window;
-    if (Hash(index + 0.37f) < 0.55f && local < 0.18f)
+    const float index = std::floor(m_TitleTime / GlitchWindowSeconds);
+    const float local = m_TitleTime - index * GlitchWindowSeconds;
+    if (Hash(index + GlitchSeedOffset) < GlitchChance && local < GlitchSeconds)
     {
-        noise = (std::max)(noise, 0.55f * (1.0f - local / 0.18f));
+        noise = (std::max)(noise, GlitchStrength * (1.0f - local / GlitchSeconds));
     }
     return std::clamp(noise, 0.0f, 1.0f);
 }
@@ -85,8 +104,8 @@ void TitleScene::Update()
     // 題名のノイズに合わせて、画面全体にも電波障害の横線と色ずれを出している
     const float noise = GetNoise();
     Effect::PostProcess* postProcess = Core::Game::GetInstance()->GetPostProcess();
-    postProcess->SetSignalInterference(noise * 0.85f);
-    postProcess->SetPresenceStatic(noise * 0.55f);
+    postProcess->SetSignalInterference(noise * InterferenceScale);
+    postProcess->SetPresenceStatic(noise * PresenceStaticScale);
 
     if (Input::GetKeyTrigger(VK_Q) ||
         Input::GetButtonTrigger(XINPUT_B))
@@ -97,13 +116,13 @@ void TitleScene::Update()
 
     // 左スティックは、倒した瞬間に1回だけ動かしている（戻すまで次は動かさない）
     const float stickX = Input::GetLeftAnalogStick().x;
-    const bool stickLeft = m_StickReleased && stickX < -0.6f;
-    const bool stickRight = m_StickReleased && stickX > 0.6f;
+    const bool stickLeft = m_StickReleased && stickX < -StickSelectThreshold;
+    const bool stickRight = m_StickReleased && stickX > StickSelectThreshold;
     if (stickLeft || stickRight)
     {
         m_StickReleased = false;
     }
-    else if (std::abs(stickX) < 0.3f)
+    else if (std::abs(stickX) < StickReleaseThreshold)
     {
         m_StickReleased = true;
     }
@@ -138,7 +157,7 @@ void TitleScene::Update()
     }
     if (s_SelectedStage != previousStage)
     {
-        Input::SetVibration(1, 0.05f);
+        Input::SetVibration(SelectRumbleFrames, SelectRumbleStrength);
     }
 
     if (Input::GetKeyTrigger(VK_RETURN) ||

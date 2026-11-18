@@ -40,6 +40,14 @@ namespace
     constexpr float CeilingStepMinStart = 85.0f;
     constexpr float CeilingStepMaxStart = 125.0f;
     constexpr float CeilingStepPassOffset = 28.0f;
+    // 歩き始める場所を探す回数（施設の外になった候補は捨てて引き直す）
+    constexpr int CeilingStepStartAttempts = 10;
+    // 1度あたりのラジアン
+    constexpr float RadiansPerDegree = Pi / 180.0f;
+    // 聞き手の向きがこれより短いときは、前後を決められないとみなす
+    constexpr float MinimumForwardLengthSquared = 0.0001f;
+    // 歩き始めと向かう先がこれより近いときは、向きを決められないので引き直す
+    constexpr float MinimumStepDirectionLengthSquared = 1.0f;
     // 歩幅、歩数（最少＋乱数で足す最大）、1歩の間隔、この歩数以上の道筋が見つかったら決める
     constexpr float CeilingStepStride = 18.0f;
     constexpr int CeilingStepMinCount = 5;
@@ -103,7 +111,7 @@ namespace
             return false;
         }
         Vector3 forward(listenerForward.x, 0.0f, listenerForward.z);
-        if (forward.LengthSquared() < 0.0001f)
+        if (forward.LengthSquared() < MinimumForwardLengthSquared)
         {
             return true;
         }
@@ -234,17 +242,17 @@ bool Stage1AmbientSounds::ScheduleCeilingSteps(
     const Vector3& listenerForward)
 {
     Vector3 forward(listenerForward.x, 0.0f, listenerForward.z);
-    if (forward.LengthSquared() < 0.0001f)
+    if (forward.LengthSquared() < MinimumForwardLengthSquared)
     {
         forward = Vector3(0.0f, 0.0f, 1.0f);
     }
     forward.Normalize();
     const Vector3 right(forward.z, 0.0f, -forward.x);
 
-    for (int attempt = 0; attempt < 10; ++attempt)
+    for (int attempt = 0; attempt < CeilingStepStartAttempts; ++attempt)
     {
         // 真後ろから左右100度の範囲で、少し離れた場所（85〜125）から歩き始めている。
-        const float angle = RandomRange(-CeilingStepSpreadDegrees, CeilingStepSpreadDegrees) * Pi / 180.0f;
+        const float angle = RandomRange(-CeilingStepSpreadDegrees, CeilingStepSpreadDegrees) * RadiansPerDegree;
         const float distance = RandomRange(CeilingStepMinStart, CeilingStepMaxStart);
         Vector3 start = listenerPosition +
             (-forward * std::cos(angle) + right * std::sin(angle)) * distance;
@@ -258,7 +266,7 @@ bool Stage1AmbientSounds::ScheduleCeilingSteps(
         Vector3 target = listenerPosition + right * RandomRange(-CeilingStepPassOffset, CeilingStepPassOffset);
         target.y = CeilingVoidY;
         Vector3 direction = target - start;
-        if (direction.LengthSquared() < 1.0f)
+        if (direction.LengthSquared() < MinimumStepDirectionLengthSquared)
         {
             continue;
         }

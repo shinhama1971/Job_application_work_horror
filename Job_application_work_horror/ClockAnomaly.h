@@ -20,9 +20,19 @@ inline constexpr float ClockNoticeSeconds = 2.6f;
 class ClockAnomaly final
 {
 private:
+    // 針の角度（ラジアン。時針・分針）：1周目（少しずつ正しく進む時計）、時計の異変の周回（逆回り）、それ以外の1〜2周目（止まっている）
+    static constexpr float FirstLoopHourAngle = 0.42f;
+    static constexpr float FirstLoopMinuteAngle = -0.78f;
+    static constexpr float AnomalyHourAngle = -0.62f;
+    static constexpr float AnomalyMinuteAngle = 2.72f;
+    static constexpr float StoppedHourAngle = 1.18f;
+    static constexpr float StoppedMinuteAngle = -2.34f;
+    // この周回から、両方の針が真下を指す
+    static constexpr int PointingDownLoop = 3;
+
     // 時針と分針の角度（ラジアン）、気づいたときの通知を出す残り秒数、この周回で異変を見たか
-    float m_HourAngle = 0.42f;
-    float m_MinuteAngle = -0.78f;
+    float m_HourAngle = FirstLoopHourAngle;
+    float m_MinuteAngle = FirstLoopMinuteAngle;
     float m_NoticeTimer = 0.0f;
     bool m_ObservedThisLoop = false;
 
@@ -30,8 +40,8 @@ public:
     // 1周目の状態（少しずつ正しく進む時計）に戻している
     void Reset() noexcept
     {
-        m_HourAngle = 0.42f;
-        m_MinuteAngle = -0.78f;
+        m_HourAngle = FirstLoopHourAngle;
+        m_MinuteAngle = FirstLoopMinuteAngle;
         m_NoticeTimer = 0.0f;
         m_ObservedThisLoop = false;
     }
@@ -41,20 +51,20 @@ public:
     void ConfigureForLoop(int loopCount, bool anomalyLoop) noexcept
     {
         m_ObservedThisLoop = false;
-        if (loopCount >= 3)
+        if (loopCount >= PointingDownLoop)
         {
             m_HourAngle = DirectX::XM_PI;
             m_MinuteAngle = DirectX::XM_PI;
         }
         else if (anomalyLoop)
         {
-            m_HourAngle = -0.62f;
-            m_MinuteAngle = 2.72f;
+            m_HourAngle = AnomalyHourAngle;
+            m_MinuteAngle = AnomalyMinuteAngle;
         }
         else if (loopCount >= 1)
         {
-            m_HourAngle = 1.18f;
-            m_MinuteAngle = -2.34f;
+            m_HourAngle = StoppedHourAngle;
+            m_MinuteAngle = StoppedMinuteAngle;
         }
     }
 

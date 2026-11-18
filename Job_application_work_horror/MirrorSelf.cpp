@@ -18,6 +18,13 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // 歩く動きへ切り替わる速さ（1秒あたり）と、歩く周期を戻す回数（値が大きくなりすぎないように）
+    constexpr float WalkBlendRate = 8.0f;
+    constexpr float WalkPhaseWrapCycles = 64.0f;
+}
+
+namespace
+{
     // 1歩で進む距離の2倍（脚が1往復する距離）
     constexpr float StrideCycleDistance = 34.0f;
 }
@@ -76,11 +83,11 @@ void MirrorSelf::Update()
     moved.y = 0.0f;
     const float speed = moved.Length() / (6.0f * SampleInterval);
     const float targetAmount = (std::clamp)(speed / 35.0f, 0.0f, 1.0f);
-    m_WalkAmount += (targetAmount - m_WalkAmount) * (std::min)(deltaTime * 8.0f, 1.0f);
+    m_WalkAmount += (targetAmount - m_WalkAmount) * (std::min)(deltaTime * WalkBlendRate, 1.0f);
     m_WalkPhase += speed / StrideCycleDistance * DirectX::XM_2PI * deltaTime;
-    if (m_WalkPhase > DirectX::XM_2PI * 64.0f)
+    if (m_WalkPhase > DirectX::XM_2PI * WalkPhaseWrapCycles)
     {
-        m_WalkPhase -= DirectX::XM_2PI * 64.0f;
+        m_WalkPhase -= DirectX::XM_2PI * WalkPhaseWrapCycles;
     }
 
     // 体の右と前の向き（体の空間の+xと+zを、向きの回転で回したもの）

@@ -24,6 +24,22 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // 作った直後の目の高さ（実際の位置は Scene が配置に合わせて設定し直す）
+    constexpr float InitialEyeY = -85.0f;
+    // 照り返しの光がこれより弱ければ出さない
+    constexpr float MinimumBounceIntensity = 0.01f;
+    // 懐中電灯のスイッチの音の高さ
+    constexpr float FlashlightClickPitch = 0.94f;
+    // ロッカーから出るときの、高くきしむ音（高さと音量）
+    constexpr float LockerCreakPitch = 1.35f;
+    constexpr float LockerCreakVolume = 0.55f;
+    // 階段を1段上るときの振動
+    constexpr int StairStepRumbleFrames = 2;
+    constexpr float StairStepRumbleStrength = 0.05f;
+}
+
+namespace
+{
     // --- 足音
     // 押し戻しの後に、1秒あたりこれより速く動けたときだけ鳴らす（壁へ押し続けても鳴らさない）
     constexpr float FootstepMinSpeed = 4.8f;
@@ -198,7 +214,7 @@ void Player::Init()
     }
 
     // 移動・懐中電灯・足音の状態を初期化している
-    m_Position = Vector3(0.0f, -85.0f, 0.0f);
+    m_Position = Vector3(0.0f, InitialEyeY, 0.0f);
     m_Scale = Vector3(1.0f, 1.0f, 1.0f);
     m_Movement.Initialize();
     m_Flashlight.InitializeRuntimeNotifications();
@@ -698,7 +714,7 @@ void Player::HandleDebugBatteryKey()
 // 一人称のときは懐中電灯を持った右手だけを、デバッグ用の三人称のときはメッシュを描いている。
 void Player::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const
 {
-    if (m_BounceIntensity < 0.01f || !m_HasBouncePosition)
+    if (m_BounceIntensity < MinimumBounceIntensity || !m_HasBouncePosition)
     {
         return;
     }
@@ -787,7 +803,7 @@ void Player::EnterHiding(const Vector3& hidePosition, const Vector3& exitPositio
     m_Movement.ResetVelocity();
     if (m_Flashlight.IsOn() && m_Flashlight.Toggle())
     {
-        Core::Game::GetInstance()->PlayAudioCue(SOUND_CUE_FLASHLIGHT, 0.94f);
+        Core::Game::GetInstance()->PlayAudioCue(SOUND_CUE_FLASHLIGHT, FlashlightClickPitch);
     }
     Core::Game::GetInstance()->GetCamera()->SetCameraDirection(facing);
 }
@@ -813,7 +829,7 @@ void Player::UpdateHiding(Camera& camera, float deltaTime)
     m_HidingInputTimer = HidingInputDelay;
     m_Position = m_HideExitPosition;
     m_Movement.ResetVelocity();
-    Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_DOOR, m_HidePosition, 1.35f, 0.55f);
+    Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_DOOR, m_HidePosition, LockerCreakPitch, LockerCreakVolume);
 }
 
 // 出口の扉の先の階段を上る動き：今の位置から踊り場の奥へ向け、最初の段までの平らな距離と、斜めに歩くときの1段の歩く距離を求めている
@@ -923,7 +939,7 @@ void Player::UpdateStairClimb(float deltaTime)
         Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, m_Position, pitch, onStairs ? ClimbStairFootstepVolume : ClimbFlatFootstepVolume);
         if (onStairs)
         {
-            Input::SetVibration(2, 0.05f);
+            Input::SetVibration(StairStepRumbleFrames, StairStepRumbleStrength);
         }
     }
 

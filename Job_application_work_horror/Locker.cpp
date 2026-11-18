@@ -22,6 +22,21 @@ namespace
     // 調べる位置を、扉の面からこの距離だけ前に出す。隠れる・出る位置の足もとの高さ
     constexpr float InteractionOffset = 0.8f;
     constexpr float FootY = -99.0f;
+    // 扉の板・枠・すき間・取っ手の色（くすんだ緑がかった灰色の金属）
+    const Color PanelColor(0.24f, 0.28f, 0.26f, 1.0f);
+    const Color FrameColor(0.13f, 0.15f, 0.14f, 1.0f);
+    const Color SlitColor(0.015f, 0.018f, 0.016f, 1.0f);
+    const Color HandleColor(0.42f, 0.42f, 0.38f, 1.0f);
+    // マテリアル：色は頂点の色で付けるため白。PBR は塗装の剥げかけた鋼板（叩かれてへこんだ金属の鈍い光沢）
+    const Color MaterialDiffuse(1.0f, 1.0f, 1.0f, 1.0f);
+    const Color MaterialAmbient(0.3f, 0.3f, 0.3f, 1.0f);
+    const Color MaterialSpecular(0.30f, 0.32f, 0.30f, 1.0f);
+    constexpr float MaterialShininess = 24.0f;
+    constexpr float MaterialMetallic = 0.50f;
+    constexpr float MaterialRoughness = 0.45f;
+    // 扉を開けて入るときの、高くきしむ音（高さと音量）
+    constexpr float DoorCreakPitch = 1.35f;
+    constexpr float DoorCreakVolume = 0.55f;
 }
 
 // 扉の板・枠・取っ手と、目の高さの通気口の羽根を、Mayaで作ったモデル（tools/maya/build_props.py）から読み込んでいる。
@@ -34,10 +49,10 @@ void Locker::BuildGeometry()
     // 扉の板・枠・すき間・取っ手の色（くすんだ緑がかった灰色の金属）
     PropModel::Append("assets/model/props/locker_door.fbx",
         {
-            { "Panel", Color(0.24f, 0.28f, 0.26f, 1.0f) },
-            { "Frame", Color(0.13f, 0.15f, 0.14f, 1.0f) },
-            { "Slit", Color(0.015f, 0.018f, 0.016f, 1.0f) },
-            { "Handle", Color(0.42f, 0.42f, 0.38f, 1.0f) },
+            { "Panel", PanelColor },
+            { "Frame", FrameColor },
+            { "Slit", SlitColor },
+            { "Handle", HandleColor },
         },
         Vector3::One, m_Vertices, m_Indices);
 }
@@ -51,14 +66,13 @@ void Locker::Init()
 
     // 色は頂点の色で付けるため、マテリアルは白にしている（シェーダーは頂点の色×マテリアルの色で塗っている）。
     MATERIAL material{};
-    material.Diffuse = Color(1.0f, 1.0f, 1.0f, 1.0f);
-    material.Ambient = Color(0.3f, 0.3f, 0.3f, 1.0f);
-    material.Specular = Color(0.30f, 0.32f, 0.30f, 1.0f);
-    material.Shininess = 24.0f;
+    material.Diffuse = MaterialDiffuse;
+    material.Ambient = MaterialAmbient;
+    material.Specular = MaterialSpecular;
+    material.Shininess = MaterialShininess;
     material.TextureEnable = FALSE;
-    // PBR：塗装の剥げかけた鋼板のロッカー（叩かれてへこんだ金属の鈍い光沢）
-    material.Metallic = 0.50f;
-    material.Roughness = 0.45f;
+    material.Metallic = MaterialMetallic;
+    material.Roughness = MaterialRoughness;
     m_Material = std::make_unique<Material>();
     m_Material->CreateRequired(material);
 }
@@ -93,7 +107,7 @@ void Locker::Interact(Player& player)
     }
     m_Occupant = &player;
     player.EnterHiding(m_HidePosition, m_ExitPosition, m_Facing);
-    Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_DOOR, m_Position, 1.35f, 0.55f);
+    Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_DOOR, m_Position, DoorCreakPitch, DoorCreakVolume);
 }
 
 void Locker::Update()

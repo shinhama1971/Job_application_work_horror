@@ -14,6 +14,13 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // 反射の環境マップを描く距離（手前・奥）
+    constexpr float ProbeNear = 0.5f;
+    constexpr float ProbeFar = 600.0f;
+}
+
+namespace
+{
     // キューブマップの6面（+X、-X、+Y、-Y、+Z、-Z）を撮るカメラの向きと上の向き。
     // Direct3Dのキューブマップの面は左手系で決まっているが、このゲームの行列は右手系（SimpleMath）なので、
     // z を反転した向きで撮り、読むときも反射の向きの z を反転している（wetFloorPS）。こうすると左右が裏返らない。
@@ -134,7 +141,7 @@ namespace Effect
         const FaceDirection& face = FaceDirections[m_NextFace];
         m_FaceView = Matrix::CreateLookAt(m_CaptureCenter, m_CaptureCenter + face.Forward, face.Up);
         const Matrix projection = Matrix::CreatePerspectiveFieldOfView(
-            DirectX::XM_PIDIV2, 1.0f, 0.5f, 600.0f);
+            DirectX::XM_PIDIV2, 1.0f, ProbeNear, ProbeFar);
         camera.SetOverrideMatrices(m_FaceView, projection);
     }
 

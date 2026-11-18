@@ -11,6 +11,35 @@
 #include "Player.h"
 #include "ScreenDustOverlay.h"
 
+namespace
+{
+    // 脱出の演出の各段階が始まる秒数（光る・乱れる・最も強く光る）
+    constexpr float FlashPhaseSeconds = 0.28f;
+    constexpr float DisturbPhaseSeconds = 0.86f;
+    constexpr float PeakPhaseSeconds = 1.48f;
+    // 1段目：画面を明るく光らせ、振動させる
+    constexpr int FlashRumbleFrames = 7;
+    constexpr float FlashRumbleStrength = 0.13f;
+    // 2段目：画面を乱し、ブラウン管のようなノイズを出す（強さと秒数）
+    constexpr float DisturbPulseStrength = 0.32f;
+    constexpr float DisturbPulseSeconds = 0.38f;
+    constexpr int DisturbRumbleFrames = 10;
+    constexpr float DisturbRumbleStrength = 0.22f;
+    constexpr float DisturbNoisePower = 0.88f;
+    constexpr float DisturbNoiseSeconds = 0.72f;
+    // 3段目：最も強く光らせ、強く振動させる
+    constexpr float PeakBloom = 2.15f;
+    constexpr float PeakBloomSeconds = 0.75f;
+    constexpr int PeakRumbleFrames = 16;
+    constexpr float PeakRumbleStrength = 0.30f;
+    // 扉を抜けた瞬間の画面の乱れ（階段を上る演出では、上る様子を見せるため小さく）と振動
+    constexpr float StairEntryPulse = 0.08f;
+    constexpr float EntryPulse = 0.18f;
+    constexpr float EntryPulseSeconds = 0.25f;
+    constexpr int EntryRumbleFrames = 6;
+    constexpr float EntryRumbleStrength = 0.12f;
+}
+
 // 脱出していない状態から始め、次のシーンはリザルト画面にしている
 void ExitTrigger::Init()
 {
@@ -44,35 +73,35 @@ void ExitTrigger::Update()
         return;
     }
     // 0.28秒：画面を明るく光らせ、振動させている
-    if (m_EscapePhase == 0 && m_EscapeTimer >= 0.28f)
+    if (m_EscapePhase == 0 && m_EscapeTimer >= FlashPhaseSeconds)
     {
         constexpr float InitialBloomPeak = 0.92f;
         constexpr float InitialBloomSeconds = 0.52f;
         game->GetPostProcess()->TriggerBloomPulse(InitialBloomPeak, InitialBloomSeconds);
-        Input::SetVibration(7, 0.13f);
+        Input::SetVibration(FlashRumbleFrames, FlashRumbleStrength);
         m_EscapePhase = 1;
     }
     // 0.86秒：画面を乱し、ブラウン管のようなノイズを0.72秒出している
-    else if (m_EscapePhase == 1 && m_EscapeTimer >= 0.86f)
+    else if (m_EscapePhase == 1 && m_EscapeTimer >= DisturbPhaseSeconds)
     {
-        game->GetPostProcess()->TriggerHorrorPulse(0.32f, 0.38f);
-        Input::SetVibration(10, 0.22f);
+        game->GetPostProcess()->TriggerHorrorPulse(DisturbPulseStrength, DisturbPulseSeconds);
+        Input::SetVibration(DisturbRumbleFrames, DisturbRumbleStrength);
 
         ScreenDustOverlay* crt =
             game->GetObj<ScreenDustOverlay>("CRTNoise");
         if (crt != nullptr)
         {
-            crt->SetPower(0.88f);
+            crt->SetPower(DisturbNoisePower);
             crt->SetActive(true);
-            crt->SetTimer(0.72f);
+            crt->SetTimer(DisturbNoiseSeconds);
         }
         m_EscapePhase = 2;
     }
     // 1.48秒：最も強く光らせ、強く振動させている
-    else if (m_EscapePhase == 2 && m_EscapeTimer >= 1.48f)
+    else if (m_EscapePhase == 2 && m_EscapeTimer >= PeakPhaseSeconds)
     {
-        game->GetPostProcess()->TriggerBloomPulse(2.15f, 0.75f);
-        Input::SetVibration(16, 0.30f);
+        game->GetPostProcess()->TriggerBloomPulse(PeakBloom, PeakBloomSeconds);
+        Input::SetVibration(PeakRumbleFrames, PeakRumbleStrength);
         m_EscapePhase = 3;
     }
     // 2.12秒：次のシーンへの切り替えを要求している（実際の切り替えはフレームの終わりに安全に行われる）
@@ -106,8 +135,8 @@ void ExitTrigger::BeginEscape(Player& player)
     m_EscapePhase = 0;
     player.SetCanControl(false);
     // 階段を上る演出では、扉を抜けた瞬間の画面の乱れは小さくしている（上る様子を見せるため）
-    game->GetPostProcess()->TriggerHorrorPulse(m_StairClimb ? 0.08f : 0.18f, 0.25f);
-    Input::SetVibration(6, 0.12f);
+    game->GetPostProcess()->TriggerHorrorPulse(m_StairClimb ? StairEntryPulse : EntryPulse, EntryPulseSeconds);
+    Input::SetVibration(EntryRumbleFrames, EntryRumbleStrength);
 }
 
 // 調べるときに表示する文章（電力が戻っていなければ「電力が必要」）

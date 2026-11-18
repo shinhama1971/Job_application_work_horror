@@ -31,6 +31,29 @@ namespace Effect
     // 描き終えた画面を取り込み、ブルームを作り、露出やノイズなどの画面効果を重ねている。演出からは一時的な効果を起こせる。
     class PostProcess
     {
+    public:
+        // --- 画面効果の普段の値。シーンが終わるときは、この値へ戻している
+        static constexpr float DefaultNoiseAmount = 0.18f;
+        static constexpr float DefaultVignetteStrength = 0.55f;
+        static constexpr float DefaultLensDistortionStrength = 0.20f;
+        static constexpr float DefaultFilmGradeStrength = 0.55f;
+        static constexpr float DefaultLensDirtStrength = 0.10f;
+        static constexpr float DefaultVolumetricIntensity = 0.58f;
+        static constexpr float DefaultBloomIntensity = 0.48f;
+        static constexpr float DefaultExposure = 1.0f;
+        // Init の前（作った直後）のレンズの歪みと汚れ。どのシーンも始めに自分の値を入れ直す
+        static constexpr float StartupLensDistortionStrength = 0.32f;
+        static constexpr float StartupLensDirtStrength = 0.35f;
+        // ポーズメニューの「明るさ」で足せる範囲と、「演出の強さ」の範囲
+        static constexpr float MinUserBrightnessOffset = -0.12f;
+        static constexpr float MaxUserBrightnessOffset = 0.14f;
+        static constexpr float MinUserEffectScale = 0.65f;
+        static constexpr float MaxUserEffectScale = 1.25f;
+        // レンズの歪みの上限
+        static constexpr float MaxLensDistortionStrength = 0.80f;
+        // 恐怖で視界が狭まる強さを、渡されなくなってから保つ秒数
+        static constexpr float FearVisionHoldSeconds = 0.25f;
+
     private:
         // enable系は機能そのもののON/OFF、target系は急に変わらないよう、少しずつ近づける先の値。
         bool m_EnableNoise = true;
@@ -40,26 +63,26 @@ namespace Effect
         // 経過時間（ノイズなどを動かす）
         float m_Time = 0.0f;
         // 普段は控えめにし、停電からの復旧などのイベントのときだけ強く光らせている。
-        float m_BloomBaseIntensity = 0.48f;
-        float m_BloomIntensity = 0.48f;
+        float m_BloomBaseIntensity = DefaultBloomIntensity;
+        float m_BloomIntensity = DefaultBloomIntensity;
         // ブルームを一時的に強める量・残り秒数・長さ
         float m_BloomPulseStrength = 0.0f;
         float m_BloomPulseTimer = 0.0f;
         float m_BloomPulseDuration = 0.0f;
         // フィルムノイズの量、周辺減光の強さ（今の値と目標）、レンズの歪みの強さ
-        float m_NoiseAmount = 0.18f;
-        float m_TargetNoiseAmount = 0.18f;
-        float m_VignetteStrength = 0.55f;
-        float m_TargetVignetteStrength = 0.55f;
-        float m_LensDistortionStrength = 0.32f;
+        float m_NoiseAmount = DefaultNoiseAmount;
+        float m_TargetNoiseAmount = DefaultNoiseAmount;
+        float m_VignetteStrength = DefaultVignetteStrength;
+        float m_TargetVignetteStrength = DefaultVignetteStrength;
+        float m_LensDistortionStrength = StartupLensDistortionStrength;
         // 驚かせる演出の強さ（今・最大）、残り秒数、長さ
         float m_HorrorPulseStrength = 0.0f;
         float m_HorrorPulsePeak = 0.0f;
         float m_HorrorPulseTimer = 0.0f;
         float m_HorrorPulseDuration = 0.0f;
         // 露出（今の値と目標）、ポーズメニューの明るさと演出の強さ
-        float m_Exposure = 1.0f;
-        float m_TargetExposure = 1.0f;
+        float m_Exposure = DefaultExposure;
+        float m_TargetExposure = DefaultExposure;
         float m_UserBrightnessOffset = 0.0f;
         float m_UserEffectScale = 1.0f;
         // レンズの曇り（今・最大）、残り秒数、長さ
@@ -73,11 +96,11 @@ namespace Effect
         // ループ廊下の緊張感、光の筋の強さ（今の値と目標）
         float m_CorridorTension = 0.0f;
         float m_TargetCorridorTension = 0.0f;
-        float m_VolumetricIntensity = 0.58f;
-        float m_TargetVolumetricIntensity = 0.58f;
+        float m_VolumetricIntensity = DefaultVolumetricIntensity;
+        float m_TargetVolumetricIntensity = DefaultVolumetricIntensity;
         // 映画風の色調の強さ、レンズの汚れのにじみ、監視映像のような信号の乱れ（今の値と目標）
-        float m_FilmGradeStrength = 0.55f;
-        float m_LensDirtStrength = 0.35f;
+        float m_FilmGradeStrength = DefaultFilmGradeStrength;
+        float m_LensDirtStrength = StartupLensDirtStrength;
         float m_SignalInterference = 0.0f;
         float m_TargetSignalInterference = 0.0f;
         // 恐怖で視界が狭まる強さ（0〜1）と、心拍に合わせた脈（鳴った瞬間に1になり、約0.3秒で消える）。
@@ -242,19 +265,19 @@ namespace Effect
         void SetUserBrightnessOffset(float offset)
         {
             m_UserBrightnessOffset =
-                (std::clamp)(offset, -0.12f, 0.14f);
+                (std::clamp)(offset, MinUserBrightnessOffset, MaxUserBrightnessOffset);
         }
 
         void SetUserEffectScale(float scale)
         {
             m_UserEffectScale =
-                (std::clamp)(scale, 0.65f, 1.25f);
+                (std::clamp)(scale, MinUserEffectScale, MaxUserEffectScale);
         }
 
         // レンズの歪み・映画風の色調・レンズの汚れのにじみの強さ
         void SetLensDistortionStrength(float strength)
         {
-            m_LensDistortionStrength = (std::clamp)(strength, 0.0f, 0.80f);
+            m_LensDistortionStrength = (std::clamp)(strength, 0.0f, MaxLensDistortionStrength);
         }
 
         void SetFilmGradeStrength(float strength)
@@ -283,7 +306,7 @@ namespace Effect
         void SetFearVision(float strength, bool beat)
         {
             m_TargetFearVision = (std::clamp)(strength, 0.0f, 1.0f);
-            m_FearVisionHold = 0.25f;
+            m_FearVisionHold = FearVisionHoldSeconds;
             if (beat)
             {
                 m_FearBeat = 1.0f;

@@ -13,6 +13,10 @@
 
 namespace
 {
+    // スティックの値（-32768〜32767）を -1〜1 にする割る数（負の側・正の側）と、トリガーの値（0〜255）の最大
+    constexpr float StickNegativeRange = 32768.0f;
+    constexpr float StickPositiveRange = 32767.0f;
+    constexpr float TriggerRange = 255.0f;
 	constexpr float VibrationFramesPerSecond = 60.0f;
 	constexpr WORD MaximumMotorSpeed = (std::numeric_limits<WORD>::max)();
 
@@ -20,8 +24,8 @@ namespace
 	float NormalizeStickAxis(SHORT value, SHORT deadZone)
 	{
 		const float normalized = value < 0
-			? static_cast<float>(value) / 32768.0f
-			: static_cast<float>(value) / 32767.0f;
+			? static_cast<float>(value) / StickNegativeRange
+			: static_cast<float>(value) / StickPositiveRange;
 		const float magnitude = std::abs(normalized);
 		const float deadZoneRate = static_cast<float>(deadZone) / 32767.0f;
 
@@ -206,13 +210,13 @@ DirectX::XMFLOAT2 Input::GetRightAnalogStick(void)
 float Input::GetLeftTrigger(void)
 {
 	BYTE t = m_Instance->controllerState.Gamepad.bLeftTrigger; // 0〜255
-	return t / 255.0f;
+	return t / TriggerRange;
 }
 // 右トリガー
 float Input::GetRightTrigger(void)
 {
 	BYTE t = m_Instance->controllerState.Gamepad.bRightTrigger; // 0〜255
-	return t / 255.0f;
+	return t / TriggerRange;
 }
 
 // ボタン入力

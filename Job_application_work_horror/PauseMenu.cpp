@@ -10,6 +10,15 @@
 
 #include <algorithm>
 
+namespace
+{
+    // 項目を決めたときの振動と、選ぶ項目を動かしたときの振動
+    constexpr int ConfirmRumbleFrames = 2;
+    constexpr float ConfirmRumbleStrength = 0.045f;
+    constexpr int MoveRumbleFrames = 1;
+    constexpr float MoveRumbleStrength = 0.03f;
+}
+
 namespace Core
 {
     // 開いたときは、いつも一番上の項目（明るさ）を選んだ状態にしている
@@ -41,7 +50,7 @@ namespace Core
         {
             result.settingsChanged = true;
             result.changedItem = m_SelectedItem;
-            Input::SetVibration(2, 0.045f);
+            Input::SetVibration(ConfirmRumbleFrames, ConfirmRumbleStrength);
         }
 
         result.command = ReadCommand();
@@ -71,7 +80,7 @@ namespace Core
         const int nextIndex = (std::clamp)(
             GetSelectedIndex() + selectionDelta, 0, lastIndex);
         m_SelectedItem = static_cast<Item>(nextIndex);
-        Input::SetVibration(1, 0.03f);
+        Input::SetVibration(MoveRumbleFrames, MoveRumbleStrength);
     }
 
     bool PauseMenu::ChangeSelectedSetting(

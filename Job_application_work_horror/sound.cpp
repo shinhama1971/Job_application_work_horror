@@ -33,6 +33,10 @@ namespace
 	constexpr float SpatialCurveDistance = 30.0f;
 	// これより近い音は方向をはっきりさせず、耳元で広がるように聞かせている。
 	constexpr float SpatialInnerRadius = 6.0f;
+	// 内側の範囲の角度（この角度の中は向きに関係なく同じ聞こえ方）
+	constexpr float SpatialInnerRadiusAngle = X3DAUDIO_PI / 4.0f;
+	// 聞き手の向きを決められないとみなす長さの2乗
+	constexpr float MinimumDirectionLengthSquared = 0.0001f;
 	// 壁の向こうの音の大きさと、こもり具合（ローパスフィルターの周波数）。
 	constexpr float OccludedVolume = 0.38f;
 	constexpr float OccludedCutoffHz = 650.0f;
@@ -456,13 +460,13 @@ void Sound::ApplySpatialMix(SpatialVoice& spatial)
 
 	// 聞き手の上方向は、前方向に直交するように作り直している（X3DAudioの決まり）。
 	Vector3 forward = m_Listener.Forward;
-	if (forward.LengthSquared() < 0.0001f)
+	if (forward.LengthSquared() < MinimumDirectionLengthSquared)
 	{
 		forward = Vector3(0.0f, 0.0f, 1.0f);
 	}
 	forward.Normalize();
 	Vector3 up = Vector3(0.0f, 1.0f, 0.0f) - forward * forward.y;
-	if (up.LengthSquared() < 0.0001f)
+	if (up.LengthSquared() < MinimumDirectionLengthSquared)
 	{
 		up = Vector3(0.0f, 0.0f, 1.0f);
 	}
@@ -483,7 +487,7 @@ void Sound::ApplySpatialMix(SpatialVoice& spatial)
 	emitter.ChannelRadius = 0.0f;
 	emitter.pChannelAzimuths = channelAzimuths;
 	emitter.InnerRadius = SpatialInnerRadius;
-	emitter.InnerRadiusAngle = X3DAUDIO_PI / 4.0f;
+	emitter.InnerRadiusAngle = SpatialInnerRadiusAngle;
 	emitter.CurveDistanceScaler = SpatialCurveDistance;
 	emitter.DopplerScaler = 0.0f;
 

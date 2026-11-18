@@ -11,6 +11,19 @@
 #include "Input.h"
 #include "Stage2AnomalyPlan.h"
 
+namespace
+{
+    // 結果画面の画面効果：光の筋を消し、ノイズや歪みを弱め、少し明るく、少し光らせて始める
+    constexpr float ResultExposure = 0.94f;
+    constexpr float ResultNoiseAmount = 0.06f;
+    constexpr float ResultVignetteStrength = 0.58f;
+    constexpr float ResultLensDistortionStrength = 0.08f;
+    constexpr float ResultFilmGradeStrength = 0.62f;
+    constexpr float ResultLensDirtStrength = 0.08f;
+    constexpr float ResultBloomPeak = 0.72f;
+    constexpr float ResultBloomSeconds = 0.90f;
+}
+
 ResultScene::ResultScene()
 {
     Init();
@@ -44,12 +57,12 @@ void ResultScene::Init()
     postProcess->SetCorridorTension(0.0f);
     postProcess->SetVolumetricLight(false);
     postProcess->SetVolumetricIntensity(0.0f);
-    postProcess->SetExposure(0.94f);
-    postProcess->SetAtmosphere(0.06f, 0.58f);
-    postProcess->SetLensDistortionStrength(0.08f);
-    postProcess->SetFilmGradeStrength(0.62f);
-    postProcess->SetLensDirtStrength(0.08f);
-    postProcess->TriggerBloomPulse(0.72f, 0.90f);
+    postProcess->SetExposure(ResultExposure);
+    postProcess->SetAtmosphere(ResultNoiseAmount, ResultVignetteStrength);
+    postProcess->SetLensDistortionStrength(ResultLensDistortionStrength);
+    postProcess->SetFilmGradeStrength(ResultFilmGradeStrength);
+    postProcess->SetLensDirtStrength(ResultLensDirtStrength);
+    postProcess->TriggerBloomPulse(ResultBloomPeak, ResultBloomSeconds);
 }
 
 // 開いてから0.85秒は入力を受け付けない（クリアした勢いで押したボタンで、すぐ画面が変わらないように）
@@ -112,9 +125,9 @@ void ResultScene::Uninit()
     }
 
     Effect::PostProcess* postProcess = game->GetPostProcess();
-    postProcess->SetAtmosphere(0.18f, 0.55f);
-    postProcess->SetExposure(1.0f);
-    postProcess->SetLensDistortionStrength(0.20f);
-    postProcess->SetFilmGradeStrength(0.55f);
-    postProcess->SetLensDirtStrength(0.10f);
+    postProcess->SetAtmosphere(Effect::PostProcess::DefaultNoiseAmount, Effect::PostProcess::DefaultVignetteStrength);
+    postProcess->SetExposure(Effect::PostProcess::DefaultExposure);
+    postProcess->SetLensDistortionStrength(Effect::PostProcess::DefaultLensDistortionStrength);
+    postProcess->SetFilmGradeStrength(Effect::PostProcess::DefaultFilmGradeStrength);
+    postProcess->SetLensDirtStrength(Effect::PostProcess::DefaultLensDirtStrength);
 }

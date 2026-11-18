@@ -36,6 +36,12 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // 懐中電灯で照らしているかを調べるとき、これより近い物は向きを計算しない（0で割らないため）
+    constexpr float MinimumLitDistance = 0.001f;
+}
+
+namespace
+{
     // 人影の足もとの高さ（床 y=-100 のわずか上）
     constexpr float FootY = -99.0f;
 
@@ -1240,7 +1246,7 @@ bool StageScene::IsLitByFlashlight(const Player& player, const Vector3& target) 
     Vector3 toTarget = target - eye;
     const float distance = toTarget.Length();
     // 懐中電灯の光が届く距離（約275）より少し手前までにしている
-    if (distance < 0.001f || distance > FlashlightLitDistance)
+    if (distance < MinimumLitDistance || distance > FlashlightLitDistance)
     {
         return false;
     }

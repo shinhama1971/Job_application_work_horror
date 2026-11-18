@@ -50,6 +50,15 @@ namespace
     const Vector3 BoxSize(140.0f, 130.0f, 140.0f);
     // しぶきを出す、カメラのまわりの範囲（半分の一辺）
     constexpr float SplashRadius = 45.0f;
+    // 雨をさえぎる屋根とみなす物：地面からこの高さより上にあり、上から見た面積がこれより広く、まっすぐか横向き（誤差のラジアン）
+    constexpr float ShelterMinHeight = 15.0f;
+    constexpr float ShelterMinArea = 150.0f;
+    constexpr float AxisAlignedTolerance = 0.01f;
+    // 時間を戻す秒数（長く続けても値の細かさが落ちないように。雨の見え方が変わらない周期）
+    constexpr float TimeWrapSeconds = 3600.0f;
+    // 1粒の濃さ（最低＋雨の強さの幅）
+    constexpr float StreakIntensityBase = 0.6f;
+    constexpr float StreakIntensityRange = 0.4f;
 }
 
 void ForestRain::Init()
@@ -108,9 +117,9 @@ void ForestRain::CollectShelters()
         const float bottom = position.y - scale.y * 0.5f;
         const float area = scale.x * scale.z;
         const float yaw = std::fmod(std::fabs(wall->GetRotation().y), DirectX::XM_PI);
-        const bool straight = yaw < 0.01f || yaw > DirectX::XM_PI - 0.01f;
-        const bool quarter = std::fabs(yaw - DirectX::XM_PIDIV2) < 0.01f;
-        if (bottom < m_GroundY + 15.0f || area < 150.0f || (!straight && !quarter))
+        const bool straight = yaw < AxisAlignedTolerance || yaw > DirectX::XM_PI - AxisAlignedTolerance;
+        const bool quarter = std::fabs(yaw - DirectX::XM_PIDIV2) < AxisAlignedTolerance;
+        if (bottom < m_GroundY + ShelterMinHeight || area < ShelterMinArea || (!straight && !quarter))
         {
             continue;
         }
@@ -135,9 +144,9 @@ void ForestRain::Update()
     const float deltaTime = Application::GetDeltaTime();
     m_Time += deltaTime;
     // 長く続けても、時間の値の細かさが落ちないよう、雨の見え方が変わらない周期で戻している
-    if (m_Time > 3600.0f)
+    if (m_Time > TimeWrapSeconds)
     {
-        m_Time -= 3600.0f;
+        m_Time -= TimeWrapSeconds;
     }
     // 岩・樹皮・研究所の外壁を濡らす強さと、水の筋を流す時間を、シェーダーへ渡している（shader/forestWetness.hlsli）。
     // 弱い雨でも、降り続いた森の表面は十分に濡れているので、雨の強さ0で0.5、1で1にしている
@@ -187,7 +196,7 @@ void ForestRain::Draw(Camera* camera)
     context->RSGetViewports(&viewportCount, &viewport);
     params.PixelScale = projection._22 * viewport.Height * 0.5f;
     // 1粒の濃さは少しだけ下げる（数を減らした分で、弱さはほとんど出ている）
-    params.Intensity = 0.6f + 0.4f * m_Intensity;
+    params.Intensity = StreakIntensityBase + StreakIntensityRange * m_Intensity;
     params.SplashRadius = SplashRadius;
     params.OccluderCount = static_cast<std::uint32_t>(m_ShelterCount);
     for (int index = 0; index < m_ShelterCount; ++index)

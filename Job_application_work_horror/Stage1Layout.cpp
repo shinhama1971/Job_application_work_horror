@@ -97,7 +97,7 @@ namespace
     // 驚かせる瞬間に重ねる画面のノイズの強さ
     constexpr float ScareNoisePower = 0.7f;
     // 曲がり角の暗がりを補う通常の器具の大きさ
-    const Vector3 CornerFixtureScale(22.0f, 2.0f, 10.0f);
+    const Vector3 CornerFixtureScale = CeilingLight::StandardSize;
     // ヒューズの置き場所を選ぶ乱数の種（自動撮影・計測では毎回同じ種にする。場所ごとに決めた番号）
     constexpr unsigned int FuseRandomSeedSalt = 1107u;
 

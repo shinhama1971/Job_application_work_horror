@@ -26,6 +26,49 @@ namespace
     constexpr float LampLightHeight = 2.0f;
     constexpr float LampLightRange = 18.0f;
     constexpr float LampLightIntensity = 1.1f;
+
+    // --- 形：箱を組み合わせている（中心と大きさ。1単位は約5cm、底が y=0）
+    // 本体、上面のスピーカーの網
+    const Vector3 BodyCenter(0.0f, 0.6f, 0.0f);
+    const Vector3 BodySize(4.4f, 1.2f, 2.6f);
+    const Vector3 GrilleCenter(-0.95f, 1.22f, 0.15f);
+    const Vector3 GrilleSize(2.0f, 0.06f, 1.9f);
+    // 3つ並んだボタン（1つ目の中心から、この間隔で横に並べる）
+    constexpr int ButtonCount = 3;
+    const Vector3 FirstButtonCenter(0.75f, 1.27f, 0.45f);
+    constexpr float ButtonSpacing = 0.55f;
+    const Vector3 ButtonSize(0.42f, 0.16f, 0.7f);
+    // ランプ
+    const Vector3 LampCenter(1.75f, 1.26f, -0.85f);
+    const Vector3 LampSize(0.36f, 0.14f, 0.36f);
+
+    // --- マテリアル：環境光の色は拡散色にこの割合を掛ける。映り込みの色と光沢
+    constexpr float AmbientRatio = 0.32f;
+    const Color MaterialSpecular(0.30f, 0.30f, 0.30f, 1.0f);
+    constexpr float MaterialShininess = 40.0f;
+    // 本体：使い込んだ黒っぽい樹脂。スピーカーの網：さらに暗いざらざらの面。ボタン：灰色の樹脂。ランプ（作るとき）（色と粗さ）
+    const Color BodyDiffuse(0.060f, 0.062f, 0.066f, 1.0f);
+    constexpr float BodyRoughness = 0.46f;
+    const Color GrilleDiffuse(0.020f, 0.021f, 0.022f, 1.0f);
+    constexpr float GrilleRoughness = 0.85f;
+    const Color ButtonDiffuse(0.22f, 0.22f, 0.21f, 1.0f);
+    constexpr float ButtonRoughness = 0.55f;
+    const Color LampInitDiffuse(0.30f, 0.04f, 0.03f, 1.0f);
+    constexpr float LampRoughness = 0.25f;
+    // 描くときのランプ：地の色は光る色にこの割合を掛ける。環境光・映り込み・光沢、
+    // 光る強さ（消えていても残る光＋点滅の明るさに掛ける強さ）
+    constexpr float LampDiffuseRatio = 0.3f;
+    const Color LampAmbient(0.02f, 0.02f, 0.02f, 1.0f);
+    const Color LampSpecular(0.5f, 0.5f, 0.5f, 1.0f);
+    constexpr float LampShininess = 60.0f;
+    constexpr float LampBaseGlow = 0.08f;
+    constexpr float LampBlinkGlow = 1.6f;
+
+    // 再生ボタンを押した音（懐中電灯のスイッチの音を低くしたもの。高さと音量）と小さな振動
+    constexpr float PlayClickPitch = 0.62f;
+    constexpr float PlayClickVolume = 0.9f;
+    constexpr int PlayRumbleFrames = 3;
+    constexpr float PlayRumbleStrength = 0.06f;
 }
 
 // 箱を1つ足している。壁（Wall）と同じく、表と裏の両方の順番で三角形を並べ、どちらから見ても欠けないようにしている
@@ -90,22 +133,22 @@ void VoiceRecorder::BuildGeometry()
     };
 
     beginPart(Body);
-    AppendBox(Vector3(0.0f, 0.6f, 0.0f), Vector3(4.4f, 1.2f, 2.6f));
+    AppendBox(BodyCenter, BodySize);
     endPart(Body);
 
     beginPart(Grille);
-    AppendBox(Vector3(-0.95f, 1.22f, 0.15f), Vector3(2.0f, 0.06f, 1.9f));
+    AppendBox(GrilleCenter, GrilleSize);
     endPart(Grille);
 
     beginPart(Button);
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < ButtonCount; ++i)
     {
-        AppendBox(Vector3(0.75f + static_cast<float>(i) * 0.55f, 1.27f, 0.45f), Vector3(0.42f, 0.16f, 0.7f));
+        AppendBox(FirstButtonCenter + Vector3(static_cast<float>(i) * ButtonSpacing, 0.0f, 0.0f), ButtonSize);
     }
     endPart(Button);
 
     beginPart(Lamp);
-    AppendBox(Vector3(1.75f, 1.26f, -0.85f), Vector3(0.36f, 0.14f, 0.36f));
+    AppendBox(LampCenter, LampSize);
     endPart(Lamp);
 }
 
@@ -121,10 +164,10 @@ void VoiceRecorder::Init()
     {
         MATERIAL data{};
         data.Diffuse = diffuse;
-        data.Ambient = Color(diffuse.x * 0.32f, diffuse.y * 0.32f, diffuse.z * 0.32f, 1.0f);
-        data.Specular = Color(0.30f, 0.30f, 0.30f, 1.0f);
+        data.Ambient = Color(diffuse.x * AmbientRatio, diffuse.y * AmbientRatio, diffuse.z * AmbientRatio, 1.0f);
+        data.Specular = MaterialSpecular;
         data.Emission = emission;
-        data.Shininess = 40.0f;
+        data.Shininess = MaterialShininess;
         data.TextureEnable = FALSE;
         data.Metallic = 0.0f;
         data.Roughness = roughness;
@@ -134,11 +177,11 @@ void VoiceRecorder::Init()
     };
     const Color noEmission(0.0f, 0.0f, 0.0f, 1.0f);
     // 本体：使い込んだ黒っぽい樹脂。スピーカーの網：さらに暗いざらざらの面。ボタン：灰色の樹脂
-    m_BodyMaterial = createMaterial(Color(0.060f, 0.062f, 0.066f, 1.0f), noEmission, 0.46f);
-    m_GrilleMaterial = createMaterial(Color(0.020f, 0.021f, 0.022f, 1.0f), noEmission, 0.85f);
-    m_ButtonMaterial = createMaterial(Color(0.22f, 0.22f, 0.21f, 1.0f), noEmission, 0.55f);
+    m_BodyMaterial = createMaterial(BodyDiffuse, noEmission, BodyRoughness);
+    m_GrilleMaterial = createMaterial(GrilleDiffuse, noEmission, GrilleRoughness);
+    m_ButtonMaterial = createMaterial(ButtonDiffuse, noEmission, ButtonRoughness);
     // ランプ：光る色は描くたびに点滅に合わせて変えている
-    m_LampMaterial = createMaterial(Color(0.30f, 0.04f, 0.03f, 1.0f), noEmission, 0.25f);
+    m_LampMaterial = createMaterial(LampInitDiffuse, noEmission, LampRoughness);
 
     m_BlinkTime = 0.0f;
 }
@@ -169,8 +212,8 @@ void VoiceRecorder::Interact(Player& player)
     }
     m_Played = true;
     m_PlayRequested = true;
-    Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_FLASHLIGHT, m_Position, 0.62f, 0.9f);
-    Input::SetVibration(3, 0.06f);
+    Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_FLASHLIGHT, m_Position, PlayClickPitch, PlayClickVolume);
+    Input::SetVibration(PlayRumbleFrames, PlayRumbleStrength);
 }
 
 void VoiceRecorder::Draw(Camera* cam)
@@ -197,14 +240,14 @@ void VoiceRecorder::Draw(Camera* cam)
     const float level = GetLampLevel();
     const Color lampColor = m_Played ? PlayedLampColor : UnplayedLampColor;
     MATERIAL lamp{};
-    lamp.Diffuse = Color(lampColor.x * 0.3f, lampColor.y * 0.3f, lampColor.z * 0.3f, 1.0f);
-    lamp.Ambient = Color(0.02f, 0.02f, 0.02f, 1.0f);
-    lamp.Specular = Color(0.5f, 0.5f, 0.5f, 1.0f);
-    lamp.Emission = Color(lampColor.x * (0.08f + 1.6f * level), lampColor.y * (0.08f + 1.6f * level),
-        lampColor.z * (0.08f + 1.6f * level), 1.0f);
-    lamp.Shininess = 60.0f;
+    lamp.Diffuse = Color(lampColor.x * LampDiffuseRatio, lampColor.y * LampDiffuseRatio, lampColor.z * LampDiffuseRatio, 1.0f);
+    lamp.Ambient = LampAmbient;
+    lamp.Specular = LampSpecular;
+    const float glow = LampBaseGlow + LampBlinkGlow * level;
+    lamp.Emission = Color(lampColor.x * glow, lampColor.y * glow, lampColor.z * glow, 1.0f);
+    lamp.Shininess = LampShininess;
     lamp.TextureEnable = FALSE;
-    lamp.Roughness = 0.25f;
+    lamp.Roughness = LampRoughness;
     m_LampMaterial->SetMaterial(lamp);
     context->DrawIndexed(m_PartCount[Lamp], m_PartStart[Lamp], 0);
 }

@@ -8,6 +8,7 @@
 #include "MathUtility.h"
 
 #include "Door.h"
+#include "EventFeedback.h"
 #include "DrainValve.h"
 #include "Game.h"
 #include "PostProcess.h"
@@ -73,6 +74,47 @@ namespace
     // バルブのランプの色（回す前は赤、回したら緑）
     const Color ValveLampClosed(0.90f, 0.08f, 0.05f, 1.0f);
     const Color ValveLampOpened(0.10f, 0.85f, 0.25f, 1.0f);
+    // ランプの本体の色は、光る色にこの割合を掛けて暗くした色。光沢
+    constexpr float ValveLampDiffuseRatio = 0.6f;
+    constexpr float ValveLampShininess = 24.0f;
+    // 回している割合を百分率で見せる倍率
+    constexpr float PercentScale = 100.0f;
+    // 聞き手の向きがこれより短いときは、真後ろを決められないので決まった向きにする
+    constexpr float MinimumDirectionLengthSquared = 0.001f;
+    // バルブが開いたとき、配管の奥で鳴る低い音の高さ（バルブの位置から上へずらす）
+    constexpr float ValveOpenedKnockHeight = 20.0f;
+
+    // --- 音の高さと音量
+    using EventFeedback::PulseSpec;
+    using EventFeedback::RumbleSpec;
+    using EventFeedback::SoundSpec;
+    // 水が引ききった瞬間、奥の排水口で配管が一度大きく鳴る（画面も脈打つ）
+    constexpr SoundSpec DrainedKnock{ 0.62f, 0.95f };
+    constexpr PulseSpec DrainedPulse{ 0.22f, 0.40f };
+    // 初めて入ったときの、奥の配管を叩く音
+    constexpr SoundSpec FirstEntryKnock{ 0.82f, 0.75f };
+    // 天井から滴る水の音（高さと音量は、この範囲からランダムに選ぶ）
+    constexpr float DripMinPitch = 0.92f;
+    constexpr float DripMaxPitch = 1.08f;
+    constexpr float DripMinVolume = 0.38f;
+    constexpr float DripMaxVolume = 0.52f;
+    // バルブを回しているときの、錆びた金属がきしむ音（高さはこの範囲からランダム）
+    constexpr float CreakMinPitch = 1.45f;
+    constexpr float CreakMaxPitch = 1.70f;
+    constexpr float CreakVolume = 0.32f;
+    // バルブが開いたときの、配管の奥の低い音と振動
+    constexpr SoundSpec ValveOpenedKnock{ 0.70f, 0.85f };
+    constexpr RumbleSpec ValveOpenedRumble{ 8, 0.18f };
+    // 排水口から水が抜けていく音
+    constexpr SoundSpec DrainGurgle{ 1.0f, 0.85f };
+    // 背後で水の中を歩く音：高さ、1歩目の音量と、1歩ごとに大きくする量（近づいてくるように）
+    constexpr float WadingPitch = 0.86f;
+    constexpr float WadingFirstVolume = 0.55f;
+    constexpr float WadingVolumeStep = 0.08f;
+    // ヒューズを取った瞬間に入口の扉が勝手に閉まるとき
+    constexpr SoundSpec EntranceSlam{ 0.78f, 1.0f };
+    constexpr PulseSpec EntranceSlamPulse{ 0.32f, 0.45f };
+    constexpr RumbleSpec EntranceSlamRumble{ 10, 0.22f };
 
     // ランプの色を変えている（本体の色は光る色を暗くしたもの。照らす光の色も自動で変わる）
     void SetLampColor(Wall* lamp, const Color& color)
@@ -80,7 +122,8 @@ namespace
         if (lamp != nullptr)
         {
             lamp->SetAppearance(
-                Color(color.R() * 0.6f, color.G() * 0.6f, color.B() * 0.6f, 1.0f), color, 24.0f);
+                Color(color.R() * ValveLampDiffuseRatio, color.G() * ValveLampDiffuseRatio,
+                    color.B() * ValveLampDiffuseRatio, 1.0f), color, ValveLampShininess);
         }
     }
 }
@@ -272,10 +315,10 @@ void Stage1WestWing::Update(const Player& player, float deltaTime,
             AmbientSoundCue knock;
             knock.Label = SOUND_CUE_PIPE_KNOCK;
             knock.Position = DrainPosition;
-            knock.Pitch = 0.62f;
-            knock.Volume = 0.95f;
+            knock.Pitch = DrainedKnock.Pitch;
+            knock.Volume = DrainedKnock.Volume;
             cues.push_back(knock);
-            Core::Game::GetInstance()->GetPostProcess()->TriggerHorrorPulse(0.22f, 0.40f);
+            EventFeedback::HorrorPulse(*Core::Game::GetInstance()->GetPostProcess(), DrainedPulse);
         }
         break;
     case Step::FindFuse:
@@ -317,8 +360,8 @@ void Stage1WestWing::Update(const Player& player, float deltaTime,
         AmbientSoundCue knock;
         knock.Label = SOUND_CUE_PIPE_KNOCK;
         knock.Position = FirstEntryKnockPosition;
-        knock.Pitch = 0.82f;
-        knock.Volume = 0.75f;
+        knock.Pitch = FirstEntryKnock.Pitch;
+        knock.Volume = FirstEntryKnock.Volume;
         cues.push_back(knock);
         m_DripTimer = RandomRange(MinDripInterval, MaxDripInterval);
     }
@@ -336,8 +379,8 @@ void Stage1WestWing::Update(const Player& player, float deltaTime,
             (std::clamp)(position.x + std::cos(angle) * distance, MinX, MaxX),
             DripHeight,
             (std::clamp)(position.z + std::sin(angle) * distance, MinZ, MaxZ));
-        drip.Pitch = RandomRange(0.92f, 1.08f);
-        drip.Volume = RandomRange(0.38f, 0.52f);
+        drip.Pitch = RandomRange(DripMinPitch, DripMaxPitch);
+        drip.Volume = RandomRange(DripMinVolume, DripMaxVolume);
         cues.push_back(drip);
     }
 
@@ -374,7 +417,7 @@ void Stage1WestWing::UpdateValves(const Player& player, float deltaTime,
         const bool opened = valve->Turn(deltaTime);
         m_TurningProgress = valve->GetProgress();
         m_TurningText = "バルブを回している " +
-            std::to_string(static_cast<int>(m_TurningProgress * 100.0f)) + "%";
+            std::to_string(static_cast<int>(m_TurningProgress * PercentScale)) + "%";
         m_TurningTimer = TurningTextSeconds;
 
         // 回し始めと、回している間は0.55秒ごとに、錆びた金属がきしむ音を鳴らしている
@@ -385,8 +428,8 @@ void Stage1WestWing::UpdateValves(const Player& player, float deltaTime,
             AmbientSoundCue creak;
             creak.Label = SOUND_CUE_PIPE_KNOCK;
             creak.Position = valve->GetInteractionPosition();
-            creak.Pitch = RandomRange(1.45f, 1.70f);
-            creak.Volume = 0.32f;
+            creak.Pitch = RandomRange(CreakMinPitch, CreakMaxPitch);
+            creak.Volume = CreakVolume;
             cues.push_back(creak);
         }
 
@@ -402,11 +445,11 @@ void Stage1WestWing::UpdateValves(const Player& player, float deltaTime,
             // 配管の奥で、低い音がゆっくり遠ざかっていく（水が流れ出した合図）
             AmbientSoundCue knock;
             knock.Label = SOUND_CUE_PIPE_KNOCK;
-            knock.Position = valve->GetInteractionPosition() + Vector3(0.0f, 20.0f, 0.0f);
-            knock.Pitch = 0.70f;
-            knock.Volume = 0.85f;
+            knock.Position = valve->GetInteractionPosition() + Vector3(0.0f, ValveOpenedKnockHeight, 0.0f);
+            knock.Pitch = ValveOpenedKnock.Pitch;
+            knock.Volume = ValveOpenedKnock.Volume;
             cues.push_back(knock);
-            Input::SetVibration(8, 0.18f);
+            EventFeedback::Rumble(ValveOpenedRumble);
             // 手が離せなかった間に、背後へ何かが近づいていた
             ScheduleWading(player.GetPosition(), listenerForward);
         }
@@ -431,8 +474,8 @@ bool Stage1WestWing::UpdateWaterLevel(float deltaTime, std::vector<AmbientSoundC
             AmbientSoundCue gurgle;
             gurgle.Label = SOUND_CUE_DRAIN;
             gurgle.Position = DrainPosition;
-            gurgle.Pitch = 1.0f;
-            gurgle.Volume = 0.85f;
+            gurgle.Pitch = DrainGurgle.Pitch;
+            gurgle.Volume = DrainGurgle.Volume;
             cues.push_back(gurgle);
         }
     }
@@ -461,7 +504,7 @@ void Stage1WestWing::ScheduleWading(const Vector3& listenerPosition, const Vecto
     // 聞き手の真後ろ、少し離れた所（24）から、ゆっくり数歩（4歩）近づいて止まっている。
     Vector3 backward = -listenerForward;
     backward.y = 0.0f;
-    if (backward.LengthSquared() < 0.001f)
+    if (backward.LengthSquared() < MinimumDirectionLengthSquared)
     {
         backward = Vector3(0.0f, 0.0f, -1.0f);
     }
@@ -483,8 +526,8 @@ void Stage1WestWing::ScheduleWading(const Vector3& listenerPosition, const Vecto
         scheduled.Delay = WadingFirstDelay + static_cast<float>(index) * WadingStepInterval;
         scheduled.Cue.Label = SOUND_CUE_WATER_STEP;
         scheduled.Cue.Position = stepPosition;
-        scheduled.Cue.Pitch = 0.86f;
-        scheduled.Cue.Volume = 0.55f + static_cast<float>(index) * 0.08f;
+        scheduled.Cue.Pitch = WadingPitch;
+        scheduled.Cue.Volume = WadingFirstVolume + static_cast<float>(index) * WadingVolumeStep;
         m_Scheduled.push_back(scheduled);
     }
 }
@@ -494,7 +537,7 @@ void Stage1WestWing::SlamEntranceDoor()
     // ヒューズを取った瞬間、入口の扉が勝手に閉まる（鍵はかからず、内側から開けて戻れる）。
     Core::Game* game = Core::Game::GetInstance();
     m_Parts.door->ResetClosed(0);
-    game->PlayAudioCueAt(SOUND_CUE_DOOR, EntranceDoorPosition, 0.78f, 1.0f);
-    game->GetPostProcess()->TriggerHorrorPulse(0.32f, 0.45f);
-    Input::SetVibration(10, 0.22f);
+    game->PlayAudioCueAt(SOUND_CUE_DOOR, EntranceDoorPosition, EntranceSlam.Pitch, EntranceSlam.Volume);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), EntranceSlamPulse);
+    EventFeedback::Rumble(EntranceSlamRumble);
 }

@@ -60,14 +60,114 @@ namespace
 	// 雨漏りの水たまり：最初からある小さな濡れ跡の半径。雨漏り1か所の水滴の数
 	constexpr float LeakStartRadius = 1.2f;
 	constexpr int DropsPerLeak = 2;
+	// 雨漏りの水滴：器具ごとの乱数（中心の x・z に掛ける倍率、2粒目をずらす量）、2粒目の位置のずらし（x・z）、
+	// 落ち始める高さのばらつき、落ちる速さ（最低＋乱数の幅）、最初に待つ秒数（最低＋粒ごとにずらす秒数）
+	constexpr float LeakSeedScaleX = 0.137f;
+	constexpr float LeakSeedScaleZ = 0.311f;
+	constexpr float LeakSeedStep = 0.47f;
+	constexpr float LeakSecondDropOffsetX = 0.6f;
+	constexpr float LeakSecondDropOffsetZ = -0.4f;
+	constexpr float LeakDropHeightRange = 4.0f;
+	constexpr float LeakDropSpeed = 24.0f;
+	constexpr float LeakDropSpeedRange = 6.0f;
+	constexpr float LeakDropFirstWait = 0.3f;
+	constexpr float LeakDropWaitStep = 0.9f;
+
+	// --- fastNoise.hlsli・wetFloorPS.hlsl と同じ乱数の式の係数（変えるとシェーダーの水たまりの形とずれる）
+	constexpr float NoiseHashScale = 0.1031f;
+	constexpr float NoiseHashShift = 33.33f;
+	constexpr float Hash21FrequencyX = 127.1f;
+	constexpr float Hash21FrequencyY = 311.7f;
+	constexpr float HashAmplitude = 43758.5453f;
+	// 2つの乱数を作るときの、1つ目と2つ目のずらし
+	const Vector2 Hash22OffsetA(17.3f, 41.7f);
+	const Vector2 Hash22OffsetB(93.1f, 11.8f);
+	// マスに水たまりがあるかを決める乱数のずらし、水滴の種のずらし
+	const Vector2 PuddlePresenceOffset(53.4f, 27.9f);
+	const Vector2 DropSeedOffset(9.7f, 71.3f);
+	// 水たまりの岸のゆがみ（wetFloorPS.hlsl と同じ）：ノイズの細かさとずらし、ゆがみの大きさ、
+	// 角度に沿った2つの波（数・種の倍率・大きさ）
+	constexpr float ShoreNoiseScale = 0.052f;
+	constexpr float ShoreNoiseCellScale = 1.73f;
+	constexpr float ShoreNoiseWarp = 0.22f;
+	constexpr float ShoreWaveCountA = 5.0f;
+	constexpr float ShoreWaveSeedA = 9.0f;
+	constexpr float ShoreWaveAmountA = 0.045f;
+	constexpr float ShoreWaveCountB = 9.0f;
+	constexpr float ShoreWaveSeedB = 13.0f;
+	constexpr float ShoreWaveAmountB = 0.022f;
+	// 雨漏りの水たまりの岸（wetFloorPS.hlsl と同じ）：調べる範囲（半径の倍率）、ノイズの細かさとゆがみ、水たまりとみなす境
+	constexpr float LeakShoreSearchScale = 1.075f;
+	constexpr float LeakShoreNoiseScale = 0.35f;
+	constexpr float LeakShoreWarp = 0.35f;
+	constexpr float LeakShoreEdge = 0.90f;
+	// 0で割らないための、半径と秒数の下限
+	constexpr float MinimumRadius = 0.01f;
+	constexpr float MinimumGrowSeconds = 0.01f;
+	// この秒数より短い待ちなら、最初から落ちている
+	constexpr float ImmediateDropWait = 0.01f;
+
+	// --- 水滴の形（先が細い板の十字）：色（薄い青の半透明）、細い先・太い元の半分の幅、半分の高さ
+	const Color DropVertexColor(0.62f, 0.76f, 0.80f, 0.80f);
+	constexpr float DropTailWidth = 0.025f;
+	constexpr float DropHeadWidth = 0.14f;
+	constexpr float DropHalfHeight = 0.58f;
+	// 水滴のマテリアル：薄い青の半透明で、光沢を強くしている
+	const Color DropDiffuse(0.64f, 0.78f, 0.82f, 0.82f);
+	const Color DropAmbient(0.32f, 0.42f, 0.46f, 0.82f);
+	const Color DropEmission(0.065f, 0.10f, 0.115f, 0.0f);
+	const Color DropSpecular(0.92f, 0.98f, 1.00f, 0.82f);
+	constexpr float DropShininess = 42.0f;
+	// 波紋の形：頂点の色、分割数、内側の半径（外側は1）
+	const Color RippleVertexColor(0.62f, 0.78f, 0.82f, 0.72f);
+	constexpr int RippleSegments = 32;
+	constexpr float RippleInnerRadius = 0.76f;
+	// 波紋のマテリアル（作るとき）
+	const Color RippleInitDiffuse(0.34f, 0.48f, 0.52f, 0.70f);
+	const Color RippleInitEmission(0.035f, 0.065f, 0.075f, 0.0f);
+	const Color RippleInitSpecular(0.80f, 0.90f, 0.94f, 0.70f);
+	constexpr float RippleInitShininess = 64.0f;
+	// 描くときの波紋の色（薄れ具合を掛ける）と光沢
+	const Vector3 RippleDiffuse(0.20f, 0.34f, 0.38f);
+	const Vector3 RippleEmission(0.025f, 0.055f, 0.065f);
+	const Vector3 RippleSpecular(0.65f, 0.78f, 0.82f);
+	constexpr float RippleShininess = 72.0f;
+	// しぶきの粒の大きさ
+	const Vector3 SplashDropScale(0.28f, 0.34f, 0.28f);
+	// 画面に映るかを調べる球の半径（落ちている水滴・しぶき・着水の波紋）と、足音の波紋に足すゆとり
+	constexpr float FallingDropCullRadius = 2.0f;
+	constexpr float SplashCullRadius = 3.0f;
+	constexpr float ImpactRippleCullRadius = 4.0f;
+	constexpr float FootstepRippleCullMargin = 1.0f;
+	// 着水の波紋：始めの半径と広がる幅、強さ。足音の波紋：始めの半径と強さ
+	constexpr float ImpactRippleStartRadius = 0.35f;
+	constexpr float ImpactRippleGrowth = 2.5f;
+	constexpr float ImpactRippleStrength = 0.82f;
+	constexpr float FootstepRippleStartRadius = 0.55f;
+	constexpr float FootstepRippleStrength = 0.35f;
+
+	// --- 波のシミュレーションへ渡すおもり（半径と強さ。負は押し下げる）：水滴、走る足・歩く足
+	constexpr float DropImpulseRadius = 0.8f;
+	constexpr float DropImpulseStrength = -0.45f;
+	constexpr float SprintImpulseRadius = 1.7f;
+	constexpr float SprintImpulseStrength = -1.7f;
+	constexpr float WalkImpulseRadius = 1.4f;
+	constexpr float WalkImpulseStrength = -1.2f;
+	// 着水の音（高さは 最低＋種の幅、音量）：雨漏りの水滴・水たまりに落ちるほかの水滴
+	constexpr float LeakDropPitch = 0.94f;
+	constexpr float LeakDropPitchRange = 0.12f;
+	constexpr float LeakDropVolume = 0.75f;
+	constexpr float PuddleDropPitch = 0.88f;
+	constexpr float PuddleDropPitchRange = 0.30f;
+	constexpr float PuddleDropVolume = 0.55f;
 	// fastNoise.hlsli と同じ式で、足元でも水面の岸のゆがみを求める。
 	float PuddleEdgeNoise(const Vector2& position)
 	{
 		const auto fraction = [](float value) { return value - std::floor(value); };
 		const auto hash = [&fraction](const Vector2& cell)
 		{
-			Vector3 p(fraction(cell.x * 0.1031f), fraction(cell.y * 0.1031f), fraction(cell.x * 0.1031f));
-			const float shift = p.Dot(Vector3(p.y, p.z, p.x) + Vector3(33.33f, 33.33f, 33.33f));
+			Vector3 p(fraction(cell.x * NoiseHashScale), fraction(cell.y * NoiseHashScale), fraction(cell.x * NoiseHashScale));
+			const float shift = p.Dot(Vector3(p.y, p.z, p.x) + Vector3(NoiseHashShift, NoiseHashShift, NoiseHashShift));
 			p += Vector3(shift, shift, shift);
 			return fraction((p.x + p.y) * p.z);
 		};
@@ -88,14 +188,14 @@ void WaterEffectSystem::Init()
 	m_Leaks.clear();
 	m_DropVertices.clear();
 	m_RippleVertices.clear();
-	m_FallingDrops.reserve(24);
-	m_FootstepRipples.reserve(8);
+	m_FallingDrops.reserve(MaxPuddleDrops);
+	m_FootstepRipples.reserve(MaxFootstepRipples);
 
 	// 先が細い板を十字に組み、どの角度から見ても小さな水滴に見える形にしている。
-	const Color dropColor(0.62f, 0.76f, 0.80f, 0.80f);
-	const float tailWidth = 0.025f;
-	const float headWidth = 0.14f;
-	const float halfHeight = 0.58f;
+	const Color dropColor = DropVertexColor;
+	const float tailWidth = DropTailWidth;
+	const float headWidth = DropHeadWidth;
+	const float halfHeight = DropHalfHeight;
 	// 4頂点で四角形（三角形2つ）を追加している
 	const auto addQuad = [this, &dropColor](
 		const Vector3& a, const Vector3& b,
@@ -131,19 +231,19 @@ void WaterEffectSystem::Init()
 
 	// 水滴のマテリアル：薄い青の半透明で、光沢を強くしている
 	MATERIAL material{};
-	material.Diffuse = Color(0.64f, 0.78f, 0.82f, 0.82f);
-	material.Ambient = Color(0.32f, 0.42f, 0.46f, 0.82f);
-	material.Emission = Color(0.065f, 0.10f, 0.115f, 0.0f);
-	material.Specular = Color(0.92f, 0.98f, 1.00f, 0.82f);
-	material.Shininess = 42.0f;
+	material.Diffuse = DropDiffuse;
+	material.Ambient = DropAmbient;
+	material.Emission = DropEmission;
+	material.Specular = DropSpecular;
+	material.Shininess = DropShininess;
 	material.TextureEnable = FALSE;
 	m_DropMaterial = std::make_unique<Material>();
 	m_DropMaterial->CreateRequired(material);
 
 	// 波紋の形：内側の半径0.76・外側の半径1の細い輪を32分割で作っている（表と裏の両面）
-	const Color rippleColor(0.62f, 0.78f, 0.82f, 0.72f);
-	constexpr int rippleSegments = 32;
-	constexpr float innerRadius = 0.76f;
+	const Color rippleColor = RippleVertexColor;
+	constexpr int rippleSegments = RippleSegments;
+	constexpr float innerRadius = RippleInnerRadius;
 	for (int segment = 0; segment < rippleSegments; ++segment)
 	{
 		const float angle0 = DirectX::XM_2PI *
@@ -173,10 +273,10 @@ void WaterEffectSystem::Init()
 	m_RippleVertexBuffer.Create(m_RippleVertices);
 	// 波紋のマテリアル（色の濃さは描くときに薄れ具合で毎回変えている）
 	MATERIAL rippleMaterial{};
-	rippleMaterial.Diffuse = Color(0.34f, 0.48f, 0.52f, 0.70f);
-	rippleMaterial.Emission = Color(0.035f, 0.065f, 0.075f, 0.0f);
-	rippleMaterial.Specular = Color(0.80f, 0.90f, 0.94f, 0.70f);
-	rippleMaterial.Shininess = 64.0f;
+	rippleMaterial.Diffuse = RippleInitDiffuse;
+	rippleMaterial.Emission = RippleInitEmission;
+	rippleMaterial.Specular = RippleInitSpecular;
+	rippleMaterial.Shininess = RippleInitShininess;
 	rippleMaterial.TextureEnable = FALSE;
 	m_RippleMaterial = std::make_unique<Material>();
 	m_RippleMaterial->CreateRequired(rippleMaterial);
@@ -199,13 +299,13 @@ void WaterEffectSystem::BuildPuddles(const PuddleLayout& layout)
 	};
 	const auto hash21 = [&fraction](float x, float y)
 	{
-		return fraction(std::sin(x * 127.1f + y * 311.7f) * 43758.5453f);
+		return fraction(std::sin(x * Hash21FrequencyX + y * Hash21FrequencyY) * HashAmplitude);
 	};
 	const auto hash22 = [&hash21](float x, float y)
 	{
 		return Vector2(
-			hash21(x + 17.3f, y + 41.7f),
-			hash21(x + 93.1f, y + 11.8f));
+			hash21(x + Hash22OffsetA.x, y + Hash22OffsetA.y),
+			hash21(x + Hash22OffsetB.x, y + Hash22OffsetB.y));
 	};
 
 	// 水滴を落とす場所の候補（水たまりがあるマス）
@@ -249,7 +349,7 @@ void WaterEffectSystem::BuildPuddles(const PuddleLayout& layout)
 			{
 				const float cellX = static_cast<float>(PuddleCellMin + column);
 				const float cellZ = static_cast<float>(PuddleCellMin + row);
-				const bool hasPuddle = hash21(cellX + 53.4f, cellZ + 27.9f) >= PuddleChance;
+				const bool hasPuddle = hash21(cellX + PuddlePresenceOffset.x, cellZ + PuddlePresenceOffset.y) >= PuddleChance;
 				const Vector2 randomValue = hash22(cellX, cellZ);
 				m_PuddleCellData.Cells[row * PuddleCellCount + column] = Vector4(
 					hasPuddle ? 1.0f : 0.0f, randomValue.x, randomValue.y, 0.0f);
@@ -262,8 +362,8 @@ void WaterEffectSystem::BuildPuddles(const PuddleLayout& layout)
 			for (int cellX = -4; cellX <= 4; ++cellX)
 			{
 				const float puddleSeed = hash21(
-					static_cast<float>(cellX) + 53.4f,
-					static_cast<float>(cellZ) + 27.9f);
+					static_cast<float>(cellX) + PuddlePresenceOffset.x,
+					static_cast<float>(cellZ) + PuddlePresenceOffset.y);
 				if (puddleSeed < PuddleChance)
 				{
 					continue;
@@ -314,14 +414,14 @@ void WaterEffectSystem::BuildPuddles(const PuddleLayout& layout)
 		const Vector2& puddleCenter = candidate.PuddleCenter;
 
 		FallingDrop drop{};
-		drop.Seed = hash21(cellX + 9.7f, cellZ + 71.3f);
+		drop.Seed = hash21(cellX + DropSeedOffset.x, cellZ + DropSeedOffset.y);
 		drop.Position = Vector3(
 			puddleCenter.x + (drop.Seed - 0.5f) * DropSpread,
 			DropStartY - randomValue.y * DropStartHeightRange,
 			puddleCenter.y + (randomValue.x - 0.5f) * DropSpread);
 		drop.Speed = DropSpeed + drop.Seed * DropSpeedRange;
 		drop.WaitTimer = randomValue.x * DropFirstWaitRange;
-		drop.Active = drop.WaitTimer <= 0.01f;
+		drop.Active = drop.WaitTimer <= ImmediateDropWait;
 		m_FallingDrops.push_back(drop);
 	}
 	// 雨漏りの水滴は、水たまりを置き直しても残している
@@ -360,12 +460,12 @@ void WaterEffectSystem::UpdateFallingDrops(float deltaTime)
 			// 水たまりに落ちた水滴は、小さなおもりとして波を立てる
 			if (IsInsidePuddle(drop.Position))
 			{
-				m_RippleImpulses.emplace_back(drop.Position.x, drop.Position.z, 0.8f, -0.45f);
+				m_RippleImpulses.emplace_back(drop.Position.x, drop.Position.z, DropImpulseRadius, DropImpulseStrength);
 				const float distanceSquared = Vector3::DistanceSquared(listener, drop.Position);
 				if (drop.Audible && distanceSquared <= LeakDropHearDistance * LeakDropHearDistance)
 				{
 					// 雨漏りの水滴（雨漏り1か所につき1粒）：毎回、着水と同時に、着水した位置から鳴らしている
-					game->PlayAudioCueAt(SOUND_CUE_WATER_DROP, drop.Position, 0.94f + drop.Seed * 0.12f, 0.75f);
+					game->PlayAudioCueAt(SOUND_CUE_WATER_DROP, drop.Position, LeakDropPitch + drop.Seed * LeakDropPitchRange, LeakDropVolume);
 				}
 				else if (!drop.Audible && m_DropSoundCooldown <= 0.0f && distanceSquared <= PuddleDropHearDistance * PuddleDropHearDistance)
 				{
@@ -373,7 +473,7 @@ void WaterEffectSystem::UpdateFallingDrops(float deltaTime)
 					// 0.25〜0.5秒の間を空けて鳴らしている。位置付きの音の枠は16しかないので、続けて鳴らしすぎると、
 					// 足音や影の音の枠を奪ってしまうため。
 					// 雨漏りより少し小さく、粒ごとに高さを変えて、同じ音の繰り返しに聞こえないようにしている
-					game->PlayAudioCueAt(SOUND_CUE_WATER_DROP, drop.Position, 0.88f + drop.Seed * 0.30f, 0.55f);
+					game->PlayAudioCueAt(SOUND_CUE_WATER_DROP, drop.Position, PuddleDropPitch + drop.Seed * PuddleDropPitchRange, PuddleDropVolume);
 					m_DropSoundCooldown = DropSoundInterval + drop.Seed * DropSoundIntervalRange;
 				}
 			}
@@ -394,9 +494,9 @@ bool WaterEffectSystem::IsInsidePuddle(const Vector3& position) const
 	for (const Leak& leak : m_Leaks)
 	{
 		const float distance = (world - leak.Center).Length();
-		if (distance <= leak.Radius * 1.075f &&
-			distance / (std::max)(leak.Radius, 0.01f) +
-				(PuddleEdgeNoise(world * 0.35f + leak.Center) - 0.5f) * 0.35f <= 0.90f)
+		if (distance <= leak.Radius * LeakShoreSearchScale &&
+			distance / (std::max)(leak.Radius, MinimumRadius) +
+				(PuddleEdgeNoise(world * LeakShoreNoiseScale + leak.Center) - 0.5f) * LeakShoreWarp <= LeakShoreEdge)
 		{
 			return true;
 		}
@@ -428,9 +528,9 @@ bool WaterEffectSystem::IsInsidePuddle(const Vector3& position) const
 		return radius < PuddleShoreRadius;
 	}
 	const float polar = std::atan2(rotated.y, rotated.x);
-	const float edgeWarp = (PuddleEdgeNoise(world * 0.052f + cell * 1.73f) - 0.5f) * 0.22f +
-		std::sin(polar * 5.0f + entry.y * 9.0f) * 0.045f +
-		std::sin(polar * 9.0f + entry.z * 13.0f) * 0.022f;
+	const float edgeWarp = (PuddleEdgeNoise(world * ShoreNoiseScale + cell * ShoreNoiseCellScale) - 0.5f) * ShoreNoiseWarp +
+		std::sin(polar * ShoreWaveCountA + entry.y * ShoreWaveSeedA) * ShoreWaveAmountA +
+		std::sin(polar * ShoreWaveCountB + entry.z * ShoreWaveSeedB) * ShoreWaveAmountB;
 	return radius + edgeWarp <= PuddleShoreRadius;
 }
 
@@ -480,7 +580,7 @@ bool WaterEffectSystem::TriggerFootstepRipple(
 	// 波のシミュレーションへ、足を下ろした所を押し下げるおもりを渡している（走っているほど大きく強い）。
 	// おもりを小さく鋭くし、太い1本の波ではなく、細い輪が何重にも広がるようにしている（P.T. の水面を参考）
 	m_RippleImpulses.emplace_back(playerPosition.x, playerPosition.z,
-		sprinting ? 1.7f : 1.4f, sprinting ? -1.7f : -1.2f);
+		sprinting ? SprintImpulseRadius : WalkImpulseRadius, sprinting ? SprintImpulseStrength : WalkImpulseStrength);
 
 	// 走って水を強く蹴ったときだけ、跳ねた水が画面の下の方に小さく付く（歩いて踏んだ水は目の高さまで届かないので出さない）。
 	// 毎歩では付けず、間隔を空けている。しぶきは crtOverlayPS.hlsl で、毎回違う位置に付き、数秒で流れ落ちて乾く
@@ -511,7 +611,7 @@ void WaterEffectSystem::DrawFallingDrops(Camera* camera)
 	for (const FallingDrop& drop : m_FallingDrops)
 	{
 		if (!drop.Active ||
-			!camera->IsSphereVisible(drop.Position, 2.0f))
+			!camera->IsSphereVisible(drop.Position, FallingDropCullRadius))
 		{
 			continue;
 		}
@@ -546,7 +646,7 @@ void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 	{
 		const float impactAge = DropImpactSeconds - drop.ImpactTimer;
 		if (drop.ImpactTimer <= 0.0f || impactAge > SplashSeconds ||
-			!camera->IsSphereVisible(drop.Position, 3.0f))
+			!camera->IsSphereVisible(drop.Position, SplashCullRadius))
 		{
 			continue;
 		}
@@ -565,7 +665,7 @@ void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 				drop.Position.x + direction.x * spread,
 				SplashBaseY + height,
 				drop.Position.z + direction.y * spread);
-			Matrix world = Matrix::CreateScale(0.28f, 0.34f, 0.28f) *
+			Matrix world = Matrix::CreateScale(SplashDropScale) *
 				Matrix::CreateTranslation(splashPosition);
 			Renderer::SetWorldMatrix(&world);
 			context->Draw(static_cast<UINT>(m_DropVertices.size()), 0);
@@ -585,12 +685,12 @@ void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 		const float fade = (1.0f - progress) * strength;
 		MATERIAL material{};
 		material.Diffuse = Color(
-			0.20f * fade, 0.34f * fade, 0.38f * fade, fade);
+			RippleDiffuse.x * fade, RippleDiffuse.y * fade, RippleDiffuse.z * fade, fade);
 		material.Emission = Color(
-			0.025f * fade, 0.055f * fade, 0.065f * fade, 0.0f);
+			RippleEmission.x * fade, RippleEmission.y * fade, RippleEmission.z * fade, 0.0f);
 		material.Specular = Color(
-			0.65f * fade, 0.78f * fade, 0.82f * fade, fade);
-		material.Shininess = 72.0f;
+			RippleSpecular.x * fade, RippleSpecular.y * fade, RippleSpecular.z * fade, fade);
+		material.Shininess = RippleShininess;
 		material.TextureEnable = FALSE;
 		m_RippleMaterial->SetMaterial(material);
 		m_RippleMaterial->SetGPU();
@@ -605,7 +705,7 @@ void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 	for (const FallingDrop& drop : m_FallingDrops)
 	{
 		if (drop.ImpactTimer <= 0.0f ||
-			!camera->IsSphereVisible(drop.Position, 4.0f))
+			!camera->IsSphereVisible(drop.Position, ImpactRippleCullRadius))
 		{
 			continue;
 		}
@@ -613,14 +713,14 @@ void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 		drawRipple(
 			Vector3(drop.Position.x, RippleSurfaceY, drop.Position.z),
 			progress,
-			0.35f + progress * 2.5f,
-			0.82f);
+			ImpactRippleStartRadius + progress * ImpactRippleGrowth,
+			ImpactRippleStrength);
 	}
 
 	// 足音の波紋（足を下ろした瞬間の小さな輪。そこから広がる波は、波のシミュレーションが描いている）
 	for (const WaterRipple& ripple : m_FootstepRipples)
 	{
-		if (!camera->IsSphereVisible(ripple.Position, ripple.MaxRadius + 1.0f))
+		if (!camera->IsSphereVisible(ripple.Position, ripple.MaxRadius + FootstepRippleCullMargin))
 		{
 			continue;
 		}
@@ -628,8 +728,8 @@ void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 		drawRipple(
 			ripple.Position,
 			progress,
-			0.55f + progress * ripple.MaxRadius,
-			0.35f);
+			FootstepRippleStartRadius + progress * ripple.MaxRadius,
+			FootstepRippleStrength);
 	}
 
 	Renderer::SetBlendState(BS_NONE);
@@ -642,7 +742,7 @@ void WaterEffectSystem::Update(float deltaTime)
 	for (Leak& leak : m_Leaks)
 	{
 		leak.Age += deltaTime;
-		const float growth = (std::clamp)(leak.Age / (std::max)(leak.GrowSeconds, 0.01f), 0.0f, 1.0f);
+		const float growth = (std::clamp)(leak.Age / (std::max)(leak.GrowSeconds, MinimumGrowSeconds), 0.0f, 1.0f);
 		leak.Radius = LeakStartRadius + (leak.MaxRadius - LeakStartRadius) * MathUtility::SmoothCurve(growth);
 	}
 	UpdateFallingDrops(deltaTime);
@@ -765,13 +865,13 @@ void WaterEffectSystem::AddLeakDrops(const Leak& leak)
 	for (int index = 0; index < DropsPerLeak; ++index)
 	{
 		FallingDrop drop{};
-		drop.Seed = std::fmod(std::abs(leak.Center.x * 0.137f + leak.Center.y * 0.311f) + index * 0.47f, 1.0f);
+		drop.Seed = std::fmod(std::abs(leak.Center.x * LeakSeedScaleX + leak.Center.y * LeakSeedScaleZ) + index * LeakSeedStep, 1.0f);
 		drop.Position = Vector3(
-			leak.Center.x + (index == 0 ? 0.0f : 0.6f),
-			DropStartY - drop.Seed * 4.0f,
-			leak.Center.y + (index == 0 ? 0.0f : -0.4f));
-		drop.Speed = 24.0f + drop.Seed * 6.0f;
-		drop.WaitTimer = 0.3f + index * 0.9f;
+			leak.Center.x + (index == 0 ? 0.0f : LeakSecondDropOffsetX),
+			DropStartY - drop.Seed * LeakDropHeightRange,
+			leak.Center.y + (index == 0 ? 0.0f : LeakSecondDropOffsetZ));
+		drop.Speed = LeakDropSpeed + drop.Seed * LeakDropSpeedRange;
+		drop.WaitTimer = LeakDropFirstWait + index * LeakDropWaitStep;
 		drop.Active = false;
 		drop.Audible = index == 0;
 		m_FallingDrops.push_back(drop);

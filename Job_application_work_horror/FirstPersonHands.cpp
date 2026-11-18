@@ -65,6 +65,51 @@ namespace
     // 息で手がゆっくり上下する速さと大きさ
     constexpr float BreathFrequency = 1.15f;
     constexpr float BreathLift = 0.02f;
+    // 息で手首がわずかに起きる角度と、上下の揺れからの遅れ（ラジアン）
+    constexpr float BreathTilt = 0.006f;
+    constexpr float BreathTiltPhase = 0.6f;
+    // 電池が少ないときの手の震え（速さと大きさ）。ひねりには、この倍率で多めに効かせる
+    constexpr float TremorFrequency = 13.7f;
+    constexpr float TremorAmount = 0.004f;
+    constexpr float TremorRollScale = 1.5f;
+    // 光が一瞬暗くなったときに懐中電灯を振る動き（速さと大きさ）
+    constexpr float JoltFrequency = 38.0f;
+    constexpr float JoltAmount = 0.035f;
+    // 横の向き（ヨー）：視点を回したときの遅れ・走るとき・振る動きの効き方
+    constexpr float YawLookSwayScale = 0.6f;
+    constexpr float YawSprint = 0.25f;
+    constexpr float YawJoltScale = 0.6f;
+    // 縦の向き（ピッチ）：視点を回したときの遅れ・走る・壁が近い・スイッチ・手を下げたときの効き方
+    constexpr float PitchLookSwayScale = 0.5f;
+    constexpr float PitchSprint = 0.45f;
+    constexpr float PitchNearSurface = 0.12f;
+    constexpr float PitchClick = 0.05f;
+    constexpr float PitchLowered = 0.9f;
+    // ひねり（ロール）：歩く揺れと走るときの効き方
+    constexpr float RollBobScale = 0.25f;
+    constexpr float RollSprint = 0.2f;
+    // ここまで下げたら描かない（手が画面の外へ出きった）
+    constexpr float HiddenLowerAmount = 0.98f;
+    // 肌に描く汚れの量（viewModelSkinPS の ViewModelState.z）
+    constexpr float SkinGrimeAmount = 0.6f;
+
+    // --- 手と懐中電灯のマテリアル
+    // 少し血の気の引いた肌、色の褪せた濃い灰色の作業着
+    const Color SkinDiffuse(0.50f, 0.37f, 0.31f, 1.0f);
+    const Color SleeveDiffuse(0.115f, 0.12f, 0.11f, 1.0f);
+    // 先の金属の輪（メッキのはげかけた鋼）
+    const Color BezelDiffuse(0.72f, 0.70f, 0.66f, 1.0f);
+    constexpr float BezelRoughness = 0.24f;
+    // レンズ：点けている間だけ、この色で光る（viewModelPS が点灯の度合いを掛けている）
+    const Color LensDiffuse(0.02f, 0.02f, 0.02f, 1.0f);
+    constexpr float LensRoughness = 0.06f;
+    const Color LensEmission(2.6f, 2.5f, 2.25f, 1.0f);
+    // ゴムのスイッチ
+    const Color SwitchDiffuse(0.03f, 0.03f, 0.03f, 1.0f);
+    constexpr float SwitchRoughness = 0.78f;
+    // 本体：黒い塗装の金属（塗装は金属ではない。はげた所だけ地のアルミが出る）
+    const Color BodyDiffuse(0.055f, 0.057f, 0.06f, 1.0f);
+    constexpr float BodyRoughness = 0.42f;
 
     // 経過時間でなめらかに目標へ近づける割合
     float Approach(float current, float target, float ratePerSecond, float deltaTime)
@@ -119,40 +164,40 @@ void FirstPersonHands::Init()
         if (name == "Skin")
         {
             // 少し血の気の引いた肌
-            material.Diffuse = Color(0.50f, 0.37f, 0.31f, 1.0f);
+            material.Diffuse = SkinDiffuse;
             shader = &m_SkinShader;
         }
         else if (name == "Sleeve")
         {
             // 色の褪せた濃い灰色の作業着
-            material.Diffuse = Color(0.115f, 0.12f, 0.11f, 1.0f);
+            material.Diffuse = SleeveDiffuse;
             shader = &m_ClothShader;
         }
         else if (name == "Bezel")
         {
             // 先の金属の輪（メッキのはげかけた鋼）
-            material.Diffuse = Color(0.72f, 0.70f, 0.66f, 1.0f);
+            material.Diffuse = BezelDiffuse;
             material.Metallic = 1.0f;
-            material.Roughness = 0.24f;
+            material.Roughness = BezelRoughness;
         }
         else if (name == "Lens")
         {
             // レンズ：点けている間だけ、この色で光る（viewModelPS が点灯の度合いを掛けている）
-            material.Diffuse = Color(0.02f, 0.02f, 0.02f, 1.0f);
-            material.Roughness = 0.06f;
-            material.Emission = Color(2.6f, 2.5f, 2.25f, 1.0f);
+            material.Diffuse = LensDiffuse;
+            material.Roughness = LensRoughness;
+            material.Emission = LensEmission;
         }
         else if (name == "Switch")
         {
             // ゴムのスイッチ
-            material.Diffuse = Color(0.03f, 0.03f, 0.03f, 1.0f);
-            material.Roughness = 0.78f;
+            material.Diffuse = SwitchDiffuse;
+            material.Roughness = SwitchRoughness;
         }
         else
         {
             // 本体：黒い塗装の金属（塗装は金属ではない。はげた所だけ地のアルミが出る）
-            material.Diffuse = Color(0.055f, 0.057f, 0.06f, 1.0f);
-            material.Roughness = 0.42f;
+            material.Diffuse = BodyDiffuse;
+            material.Roughness = BodyRoughness;
         }
         auto created = std::make_unique<Material>();
         created->CreateRequired(material);
@@ -232,19 +277,19 @@ void FirstPersonHands::Update(const FrameInput& input)
         0.0f, 0.0f, 0.0f, 1.0f);
 
     // 電池が少ないと光が揺れ、光が一瞬暗くなると懐中電灯を振る（叩いて直そうとする動き）
-    const float tremor = std::sin(m_Time * 13.7f) * 0.004f * input.BatteryStress;
-    const float jolt = std::sin(m_Time * 38.0f) * 0.035f * m_Jolt;
-    const float yaw = m_LookSwayYaw.Value * 0.6f + 0.25f * m_Sprint + jolt * 0.6f + tremor;
-    const float pitch = -m_LookSwayPitch.Value * 0.5f + 0.45f * m_Sprint - 0.12f * m_NearSurface -
-        0.05f * m_Click + 0.9f * m_Lower + jolt + std::sin(m_Time * BreathFrequency + 0.6f) * 0.006f;
-    const float roll = GripRoll + m_BobX.Value * 0.25f + 0.2f * m_Sprint + tremor * 1.5f;
+    const float tremor = std::sin(m_Time * TremorFrequency) * TremorAmount * input.BatteryStress;
+    const float jolt = std::sin(m_Time * JoltFrequency) * JoltAmount * m_Jolt;
+    const float yaw = m_LookSwayYaw.Value * YawLookSwayScale + YawSprint * m_Sprint + jolt * YawJoltScale + tremor;
+    const float pitch = -m_LookSwayPitch.Value * PitchLookSwayScale + PitchSprint * m_Sprint - PitchNearSurface * m_NearSurface -
+        PitchClick * m_Click + PitchLowered * m_Lower + jolt + std::sin(m_Time * BreathFrequency + BreathTiltPhase) * BreathTilt;
+    const float roll = GripRoll + m_BobX.Value * RollBobScale + RollSprint * m_Sprint + tremor * TremorRollScale;
     m_ViewPose = Matrix::CreateFromYawPitchRoll(yaw, pitch, roll) * aim * Matrix::CreateTranslation(position);
 }
 
 // 手元だけの射影行列と、前で跳ね返った光を b9 に入れ、深度の範囲を手前に寄せて描いている
 void FirstPersonHands::Draw(Camera& camera)
 {
-    if (!m_ModelData || m_Lower > 0.98f)
+    if (!m_ModelData || m_Lower > HiddenLowerAmount)
     {
         return;
     }
@@ -267,7 +312,7 @@ void FirstPersonHands::Draw(Camera& camera)
     Vector3 front = Vector3::TransformNormal(Vector3(0.0f, 0.0f, 1.0f), inverseView);
     front.Normalize();
     buffer.BounceDirection = Vector4(front.x, front.y, front.z, 0.0f);
-    buffer.State = Vector4(m_LensGlow, m_BatteryWeakness, 0.6f, 0.0f);
+    buffer.State = Vector4(m_LensGlow, m_BatteryWeakness, SkinGrimeAmount, 0.0f);
 
     ID3D11DeviceContext* context = Renderer::GetDeviceContext();
     context->UpdateSubresource(m_ViewModelBuffer.Get(), 0, nullptr, &buffer, 0, 0);

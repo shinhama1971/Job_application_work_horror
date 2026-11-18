@@ -17,6 +17,14 @@
 
 namespace
 {
+    // Windows の標準の DPI（拡大率1のとき）
+    constexpr float StandardDpi = 96.0f;
+    // 内蔵GPUのときの描画解像度の倍率
+    constexpr float IntegratedGpuRenderScale = 0.67f;
+}
+
+namespace
+{
     constexpr auto ClassName = TEXT("SignalLostWindowClass");
     constexpr auto WindowName = TEXT("SIGNAL LOST");
     constexpr int GameplayFramesPerSecond = 60;
@@ -103,7 +111,7 @@ void Application::EnableDpiAwareness()
     // 拡大率を記録している（マウスの移動量が実際の画素単位になるため、視点の速さをそろえるのに使っている）。
     if (const HDC screen = GetDC(nullptr))
     {
-        m_DpiScale = static_cast<float>(GetDeviceCaps(screen, LOGPIXELSX)) / 96.0f;
+        m_DpiScale = static_cast<float>(GetDeviceCaps(screen, LOGPIXELSX)) / StandardDpi;
         ReleaseDC(nullptr, screen);
     }
 }
@@ -129,7 +137,7 @@ void Application::DecideRenderSize()
     if (scale <= 0.0f)
     {
         // 自動: 内蔵GPUは画素数を減らして軽くし、単体GPUはそのままの解像度で描いている。
-        scale = Renderer::IsHighPerformanceAdapterIntegrated() ? 0.67f : 1.0f;
+        scale = Renderer::IsHighPerformanceAdapterIntegrated() ? IntegratedGpuRenderScale : 1.0f;
     }
 
     // HUDの文字が潰れないよう、縦720より小さくはしていない（ポーズ画面などが収まる大きさ）。

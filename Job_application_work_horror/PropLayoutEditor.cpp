@@ -25,6 +25,31 @@ namespace
     // 床の高さ（全ステージ共通）
     constexpr float FloorY = -100.0f;
 
+    // --- 編集の窓：最初の位置（画面の右端からの距離と上からの距離）と大きさ、一覧の高さ、保存していない印の色
+    constexpr float WindowRightMargin = 440.0f;
+    constexpr float WindowTop = 20.0f;
+    constexpr float WindowWidth = 420.0f;
+    constexpr float WindowHeight = 600.0f;
+    constexpr float PropListHeight = 170.0f;
+    const Color UnsavedColor(0.95f, 0.76f, 0.25f, 1.0f);
+    // ドラッグで値を変える細かさと範囲：位置、大きさ（最小・最大）、光沢（最大）、光の届く距離（最大）と強さ（最大）
+    constexpr float PositionDragSpeed = 0.25f;
+    constexpr float SizeDragSpeed = 0.1f;
+    constexpr float MinimumSize = 0.1f;
+    constexpr float MaximumSize = 1000.0f;
+    constexpr float ShininessDragSpeed = 0.2f;
+    constexpr float MaximumShininess = 128.0f;
+    constexpr float GlowRangeDragSpeed = 0.5f;
+    constexpr float MaximumGlowRange = 300.0f;
+    constexpr float GlowStrengthDragSpeed = 0.05f;
+    constexpr float MaximumGlowStrength = 10.0f;
+    // 新しく足す小物を置く、カメラの前の距離。複製した小物を横へずらすすき間
+    constexpr float NewPropDistance = 40.0f;
+    constexpr float DuplicateGap = 2.0f;
+    // 選んだ小物を光らせる色と、点滅の速さ
+    const Color HighlightColor(0.55f, 0.42f, 0.05f, 0.0f);
+    constexpr float HighlightPulseRate = 6.0f;
+
     // 光線が箱（中心と大きさ）に当たるかを、軸ごとの出入りの範囲（スラブ法）で調べ、当たった距離を返している
     bool RayHitsBox(const Vector3& origin, const Vector3& direction, const Vector3& center, const Vector3& size, float& distance)
     {
@@ -169,14 +194,14 @@ PropLayoutEditor::Action PropLayoutEditor::Draw(
         PickAlongRay(nearPoint, direction);
     }
 
-    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - 440.0f, 20.0f), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(420.0f, 600.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - WindowRightMargin, WindowTop), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(WindowWidth, WindowHeight), ImGuiCond_FirstUseEver);
     ImGui::Begin("Prop Layout Editor");
     ImGui::TextUnformatted(m_Path.c_str());
     if (m_Dirty)
     {
         ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.95f, 0.76f, 0.25f, 1.0f), "(unsaved)");
+        ImGui::TextColored(ImVec4(UnsavedColor.R(), UnsavedColor.G(), UnsavedColor.B(), UnsavedColor.A()), "(unsaved)");
     }
     if (ImGui::Button("Save to file"))
     {
@@ -213,7 +238,7 @@ PropLayoutEditor::Action PropLayoutEditor::Draw(
 
     // 小物の一覧（名前の一部で絞り込める）
     ImGui::InputText("Filter", m_Filter, sizeof(m_Filter));
-    if (ImGui::BeginListBox("##props", ImVec2(-1.0f, 170.0f)))
+    if (ImGui::BeginListBox("##props", ImVec2(-1.0f, PropListHeight)))
     {
         for (const PropDescription& description : m_Layout.Props)
         {
@@ -241,8 +266,8 @@ PropLayoutEditor::Action PropLayoutEditor::Draw(
     {
         ImGui::SeparatorText(description->Name.c_str());
         bool changed = false;
-        changed |= ImGui::DragFloat3("Position", &description->Position.x, 0.25f);
-        changed |= ImGui::DragFloat3("Size", &description->Scale.x, 0.1f, 0.1f, 1000.0f);
+        changed |= ImGui::DragFloat3("Position", &description->Position.x, PositionDragSpeed);
+        changed |= ImGui::DragFloat3("Size", &description->Scale.x, SizeDragSpeed, MinimumSize, MaximumSize);
 
         // 色は color で付けた名前から選ぶ（ファイルに名前で書き戻すため）
         const auto colorCombo = [this, &changed](const char* label, std::string& name, Color& color)
@@ -265,14 +290,14 @@ PropLayoutEditor::Action PropLayoutEditor::Draw(
         // PBRの仕上げは色の名前で決まるので、色を選び直したら合わせている
         description->Finish = PropLayoutFile::FindFinish(m_Layout, description->DiffuseName);
         colorCombo("Emission", description->EmissionName, description->Emission);
-        changed |= ImGui::DragFloat("Shininess", &description->Shininess, 0.2f, 0.0f, 128.0f);
+        changed |= ImGui::DragFloat("Shininess", &description->Shininess, ShininessDragSpeed, 0.0f, MaximumShininess);
         changed |= ImGui::Checkbox("Collision", &description->Collision);
         ImGui::SameLine();
         changed |= ImGui::Checkbox("Shadow", &description->CastsShadow);
         ImGui::SameLine();
         changed |= ImGui::Checkbox("Weathering", &description->Weathering);
-        changed |= ImGui::DragFloat("Glow range", &description->GlowRange, 0.5f, 0.0f, 300.0f);
-        changed |= ImGui::DragFloat("Glow strength", &description->GlowStrength, 0.05f, 0.0f, 10.0f);
+        changed |= ImGui::DragFloat("Glow range", &description->GlowRange, GlowRangeDragSpeed, 0.0f, MaximumGlowRange);
+        changed |= ImGui::DragFloat("Glow strength", &description->GlowStrength, GlowStrengthDragSpeed, 0.0f, MaximumGlowStrength);
 
         if (ImGui::Button("Snap to floor"))
         {
@@ -286,8 +311,8 @@ PropLayoutEditor::Action PropLayoutEditor::Draw(
             Vector3 forward = camera.GetForward();
             forward.y = 0.0f;
             forward.Normalize();
-            description->Position.x = camera.GetPosition().x + forward.x * 40.0f;
-            description->Position.z = camera.GetPosition().z + forward.z * 40.0f;
+            description->Position.x = camera.GetPosition().x + forward.x * NewPropDistance;
+            description->Position.z = camera.GetPosition().z + forward.z * NewPropDistance;
             changed = true;
         }
         if (changed)
@@ -307,7 +332,7 @@ PropLayoutEditor::Action PropLayoutEditor::Draw(
                 copy.Name = description->Name + "_" + std::to_string(number++);
             } while (FindDescription(copy.Name) != nullptr ||
                 (builder.HasNamedObject(copy.Name) && FindWall(props, copy.Name) == nullptr));
-            copy.Position.x += std::abs(copy.Scale.x) + 2.0f;
+            copy.Position.x += std::abs(copy.Scale.x) + DuplicateGap;
             // 前に消した同じ名前の小物があれば、それを使い直している
             Wall* copyWall = FindWall(props, copy.Name);
             if (copyWall == nullptr)
@@ -349,9 +374,9 @@ PropLayoutEditor::Action PropLayoutEditor::Draw(
     wall = description != nullptr ? FindWall(props, m_Selected) : nullptr;
     if (description != nullptr && wall != nullptr)
     {
-        const float pulse = 0.5f + 0.5f * std::sin(static_cast<float>(ImGui::GetTime()) * 6.0f);
+        const float pulse = 0.5f + 0.5f * std::sin(static_cast<float>(ImGui::GetTime()) * HighlightPulseRate);
         wall->SetAppearance(description->Diffuse,
-            description->Emission + Color(0.55f, 0.42f, 0.05f, 0.0f) * pulse,
+            description->Emission + HighlightColor * pulse,
             description->Shininess);
         m_Highlighted = m_Selected;
     }

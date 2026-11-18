@@ -15,6 +15,12 @@
 // 調べると開く扉。鍵をかけておくこともでき、閉じている間はプレイヤーと音をさえぎっている。
 class Door : public Object, public Interactable
 {
+public:
+    // 開ききったときの角度（1.5ラジアン、約86度）と、1周目の開き方（1秒あたりに開く角度、開く前のための秒数）
+    static constexpr float FullOpenAngle = 1.50f;
+    static constexpr float FirstLoopOpenSpeed = 1.92f;
+    static constexpr float FirstLoopOpenDelay = 0.06f;
+
 private:
     // 頂点・インデックスとGPUのバッファ、扉本体と漏れ光のマテリアル、扉本体のインデックス数
     std::vector<VERTEX_3D> m_Vertices;
@@ -40,9 +46,9 @@ private:
     float m_OpenAngle = 0.0f;
     bool m_HauntedGap = false;
     bool m_HauntedLit = false;
-    float m_OpenSpeedPerSecond = 1.92f;
+    float m_OpenSpeedPerSecond = FirstLoopOpenSpeed;
     float m_OpenDelayTimer = 0.0f;
-    float m_OpenDelayDuration = 0.06f;
+    float m_OpenDelayDuration = FirstLoopOpenDelay;
     int m_LoopPhase = 0;
 
     // 蝶番を軸に開いた角度を含めた、扉のワールド行列を作っている
@@ -89,7 +95,7 @@ public:
     {
         m_IsOpen = true;
         m_IsOpening = false;
-        m_OpenAngle = 1.50f;
+        m_OpenAngle = FullOpenAngle;
         m_LockedRattleTimer = 0.0f;
         m_OpenDelayTimer = 0.0f;
     }

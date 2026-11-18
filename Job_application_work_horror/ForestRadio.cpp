@@ -10,12 +10,20 @@
 #include <algorithm>
 #include <iterator>
 
+namespace
+{
+    // 行が届いている間の無線の雑音の音量
+    constexpr float StaticVolume = 0.32f;
+    // 届いている間も残る、かすかな乱れ
+    constexpr float LineIdleNoise = 0.05f;
+}
+
 void ForestRadio::StartLine(int index)
 {
     m_ActiveLine = index;
     m_LineTime = 0.0f;
     // 行が届いている間だけ、無線の雑音を小さく鳴らしている
-    Core::Game::GetInstance()->PlayAudioCue(SOUND_CUE_RADIO_STATIC, 1.0f, 0.32f);
+    Core::Game::GetInstance()->PlayAudioCue(SOUND_CUE_RADIO_STATIC, 1.0f, StaticVolume);
     m_StaticPlaying = true;
 }
 
@@ -42,7 +50,7 @@ float ForestRadio::Update(float deltaTime, const DirectX::SimpleMath::Vector3& p
         const float typingSeconds = static_cast<float>(StoryText::Utf8Length(StoryText::TransmissionLines[m_ActiveLine])) /
             TypingCharactersPerSecond;
         // 行が届いた瞬間に電波が乱れ、届いている間もかすかに乱れている
-        noise = (std::max)(0.05f, 0.55f * (1.0f - m_LineTime / 0.5f));
+        noise = (std::max)(LineIdleNoise, Hud::RadioLineNoiseStrength * (1.0f - m_LineTime / Hud::RadioLineNoiseSeconds));
         if (m_LineTime > typingSeconds + HoldSeconds + FadeSeconds)
         {
             m_ActiveLine = -1;
@@ -71,9 +79,9 @@ float ForestRadio::Update(float deltaTime, const DirectX::SimpleMath::Vector3& p
     if (m_SignalLost)
     {
         m_SignalLostTime += deltaTime;
-        if (m_SignalLostTime < 1.3f)
+        if (m_SignalLostTime < Hud::RadioSignalLostNoiseSeconds)
         {
-            noise = (std::max)(noise, 1.0f - m_SignalLostTime / 1.3f);
+            noise = (std::max)(noise, 1.0f - m_SignalLostTime / Hud::RadioSignalLostNoiseSeconds);
         }
     }
     return noise;
@@ -93,12 +101,12 @@ void ForestRadio::FillView(Hud::RadioView& view) const
         view.Line = StoryText::Utf8Prefix(line, static_cast<int>(m_LineTime * TypingCharactersPerSecond));
         const float fadeStart = typingSeconds + HoldSeconds;
         view.LineAlpha = std::clamp(1.0f - (m_LineTime - fadeStart) / FadeSeconds, 0.0f, 1.0f) *
-            std::clamp(m_LineTime / 0.2f, 0.0f, 1.0f);
-        view.Noise = (std::max)(0.0f, 0.55f * (1.0f - m_LineTime / 0.5f));
+            std::clamp(m_LineTime / Hud::RadioLineFadeInSeconds, 0.0f, 1.0f);
+        view.Noise = (std::max)(0.0f, Hud::RadioLineNoiseStrength * (1.0f - m_LineTime / Hud::RadioLineNoiseSeconds));
     }
     if (m_SignalLost && m_SignalLostTime < SignalLostSeconds)
     {
-        view.SignalLostAlpha = std::clamp((SignalLostSeconds - m_SignalLostTime) / 0.6f, 0.0f, 1.0f);
-        view.Noise = (std::max)(view.Noise, (std::max)(0.0f, 1.0f - m_SignalLostTime / 1.3f));
+        view.SignalLostAlpha = std::clamp((SignalLostSeconds - m_SignalLostTime) / Hud::RadioSignalLostFadeSeconds, 0.0f, 1.0f);
+        view.Noise = (std::max)(view.Noise, (std::max)(0.0f, 1.0f - m_SignalLostTime / Hud::RadioSignalLostNoiseSeconds));
     }
 }

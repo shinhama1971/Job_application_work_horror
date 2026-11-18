@@ -17,6 +17,8 @@ class BreathHold final
 public:
     // 影がこれより近いと、息を止めていないと聞かれる距離
     static constexpr float DangerDistance = 26.0f;
+    // 息が切れた後、もう一度止められるまでの秒数
+    static constexpr float RecoverLockSeconds = 1.2f;
     // 息を止めていられる秒数、息が戻る速さ（1秒あたり）、止めずにいても見つからない猶予の秒数
     static constexpr float HoldSeconds = 6.0f;
     static constexpr float RecoverPerSecond = 0.35f;
@@ -67,7 +69,7 @@ public:
             {
                 m_Breath = 0.0f;
                 m_Holding = false;
-                m_RecoverLock = 1.2f;
+                m_RecoverLock = RecoverLockSeconds;
                 m_ExposedSeconds = 0.0f;
                 return Event::Gasped;
             }

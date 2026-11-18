@@ -27,7 +27,7 @@ namespace
     // 扉の大きさ（幅30・高さ50・厚さ4）。モデルはこの大きさを1にした空間で作っている
     const Vector3 DoorSize(30.0f, 50.0f, 4.0f);
     // 開ききったときの角度（1.5ラジアン、約86度）と、漏れ光が一番明るくなる開き具合の角度
-    constexpr float DoorOpenAngle = 1.50f;
+    constexpr float DoorOpenAngle = Door::FullOpenAngle;
     constexpr float DoorLeakFullOpenAngle = 1.20f;
 
     // 鍵のかかった扉を調べたとき：この秒数だけ、この速さ・大きさで小刻みに揺らす
@@ -55,12 +55,65 @@ namespace
     };
     constexpr OpenStyle OpenStyles[] =
     {
-        { 1.92f, 0.06f },
+        { Door::FirstLoopOpenSpeed, Door::FirstLoopOpenDelay },
         { 1.74f, 0.20f },
         { 1.38f, 0.38f },
         { 2.76f, 0.58f },
     };
     constexpr int LastLoopPhase = static_cast<int>(std::size(OpenStyles)) - 1;
+
+    // --- 見た目：鏡板・取っ手・足元の漏れ光の頂点の色
+    const Color PanelColor(0.16f, 0.055f, 0.025f, 1.0f);
+    const Color HandleColor(0.72f, 0.48f, 0.12f, 1.0f);
+    const Color LeakVertexColor(1.0f, 0.72f, 0.42f, 1.0f);
+    // 扉本体：色は頂点の色を使い、ニスの剥げかけた木として、やや粗い光沢にしている（PBR）
+    const Color WoodDiffuse(1.0f, 1.0f, 1.0f, 1.0f);
+    const Color WoodSpecular(0.08f, 0.08f, 0.06f, 1.0f);
+    constexpr float WoodShininess = 8.0f;
+    constexpr float WoodRoughness = 0.58f;
+    // 取っ手：真鍮の金属で、手で触れて少し磨かれた粗さ。手の脂と汚れの膜の分だけ、金属らしさを少し下げている
+    constexpr float HandleMetallic = 0.85f;
+    constexpr float HandleRoughness = 0.36f;
+    // 漏れ光（作るとき・描くとき）の地の色と、作るときの光る色
+    const Color LeakInitDiffuse(0.05f, 0.035f, 0.02f, 1.0f);
+    const Color LeakInitEmission(0.08f, 0.035f, 0.015f, 1.0f);
+    const Color LeakDiffuse(0.04f, 0.03f, 0.02f, 1.0f);
+    // 漏れ光の色（明るさを掛ける）：電力が戻っていれば青白、停電中は赤
+    const Vector3 LeakPoweredColor(0.72f, 0.82f, 1.00f);
+    const Vector3 LeakUnpoweredColor(1.00f, 0.24f, 0.10f);
+    // 漏れ光の明るさ：いつもの明るさ（＋周回ごと）、開いたときに足す明るさ（電力が戻った後・停電中）、ためで揺れているときに足す明るさ
+    constexpr float LeakBaseIntensity = 0.045f;
+    constexpr float LeakIntensityPerLoop = 0.025f;
+    constexpr float LeakOpenPowered = 0.62f;
+    constexpr float LeakOpenUnpowered = 0.30f;
+    constexpr float LeakRattleIntensity = 0.22f;
+    // 開く前のための秒数がこれより短いときは、0で割らないようこの値で割る
+    constexpr float MinimumDelayDuration = 0.001f;
+
+    // --- 鍵のかかった扉を調べたとき：画面の脈打ち（強さと秒数）と振動
+    constexpr float LockedPulseStrength = 0.10f;
+    constexpr float LockedPulseSeconds = 0.16f;
+    constexpr int LockedRumbleFrames = 2;
+    constexpr float LockedRumbleStrength = 0.06f;
+    // --- 開けるときの演出：周回が進むほど強くする（いつもの値＋周回ごとに足す値）
+    constexpr float OpenPulseStrength = 0.08f;
+    constexpr float OpenPulseStrengthPerLoop = 0.055f;
+    constexpr float OpenPulseSeconds = 0.18f;
+    constexpr float OpenPulseSecondsPerLoop = 0.06f;
+    constexpr float OpenBloomPeak = 0.82f;
+    constexpr float OpenBloomPeakPerLoop = 0.10f;
+    constexpr float OpenBloomSeconds = 0.20f;
+    constexpr float OpenBloomSecondsPerLoop = 0.10f;
+    // 扉の近くの天井照明（1面と2面で同じ名前）を一瞬明滅させる長さと強さ
+    constexpr const char* DoorLightName = "CeilingLight4";
+    constexpr float OpenFlickerSeconds = 0.24f;
+    constexpr float OpenFlickerSecondsPerLoop = 0.14f;
+    constexpr float OpenFlickerStrength = 0.46f;
+    constexpr float OpenFlickerStrengthPerLoop = 0.16f;
+    constexpr int OpenRumbleFrames = 3;
+    constexpr int OpenRumbleFramesPerLoop = 2;
+    constexpr float OpenRumbleStrength = 0.07f;
+    constexpr float OpenRumbleStrengthPerLoop = 0.025f;
 }
 
 // 扉の形（扉板・鏡板・縁の飾り・取っ手・足元の漏れ光）をMayaで作ったモデルから読み込み、マテリアルを用意している。
@@ -78,9 +131,9 @@ void Door::Init()
         "assets/model/props/door.fbx",
         {
             { "Wood", DoorWoodColor },
-            { "Panel", Color(0.16f, 0.055f, 0.025f, 1.0f) },
-            { "Handle", Color(0.72f, 0.48f, 0.12f, 1.0f) },
-            { "Leak", Color(1.0f, 0.72f, 0.42f, 1.0f) },
+            { "Panel", PanelColor },
+            { "Handle", HandleColor },
+            { "Leak", LeakVertexColor },
         },
         DoorSize, m_Vertices, m_Indices);
     // 取っ手は金属のマテリアルで、足元の漏れ光は別のマテリアルで描くので、インデックスの位置を覚えている。
@@ -95,26 +148,26 @@ void Door::Init()
     // 扉本体のマテリアル。色は頂点の色を使い、ニスの剥げかけた木として、やや粗い光沢にしている（PBR）
     m_Material = std::make_unique<Material>();
     MATERIAL material{};
-    material.Diffuse = Color(1.0f, 1.0f, 1.0f, 1.0f);
-    material.Specular = Color(0.08f, 0.08f, 0.06f, 1.0f);
-    material.Shininess = 8.0f;
+    material.Diffuse = WoodDiffuse;
+    material.Specular = WoodSpecular;
+    material.Shininess = WoodShininess;
     material.TextureEnable = FALSE;
-    material.Roughness = 0.58f;
+    material.Roughness = WoodRoughness;
     m_Material->CreateRequired(material);
 
     // 取っ手のマテリアル。真鍮の金属で、手で触れて少し磨かれた粗さにしている（頂点の色が映り込みの色になる）。
     // 手の脂と汚れの膜の分だけ、金属らしさを少し下げている
     m_HandleMaterial = std::make_unique<Material>();
     MATERIAL handleMaterial = material;
-    handleMaterial.Metallic = 0.85f;
-    handleMaterial.Roughness = 0.36f;
+    handleMaterial.Metallic = HandleMetallic;
+    handleMaterial.Roughness = HandleRoughness;
     m_HandleMaterial->CreateRequired(handleMaterial);
 
     // 漏れ光のマテリアル（光る色はDrawで毎回決め直している）
     m_LeakMaterial = std::make_unique<Material>();
     MATERIAL leakMaterial{};
-    leakMaterial.Diffuse = Color(0.05f, 0.035f, 0.02f, 1.0f);
-    leakMaterial.Emission = Color(0.08f, 0.035f, 0.015f, 1.0f);
+    leakMaterial.Diffuse = LeakInitDiffuse;
+    leakMaterial.Emission = LeakInitEmission;
     leakMaterial.TextureEnable = FALSE;
     m_LeakMaterial->CreateRequired(leakMaterial);
 
@@ -160,7 +213,7 @@ void Door::Update()
             m_OpenDelayTimer - deltaTime);
         const float elapsed = m_OpenDelayDuration - m_OpenDelayTimer;
         const float remaining = m_OpenDelayTimer /
-            (std::max)(m_OpenDelayDuration, 0.001f);
+            (std::max)(m_OpenDelayDuration, MinimumDelayDuration);
         const float rattleStrength =
             OpenDelayRattleAngle + static_cast<float>(m_LoopPhase) * OpenDelayRattleAnglePerLoop;
         m_OpenAngle = std::sin(
@@ -205,9 +258,9 @@ void Door::Interact(Player& player)
         Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_DOOR_LOCKED, m_Position);
         m_LockedRattleTimer = LockedRattleSeconds;
         Core::Game::GetInstance()->GetPostProcess()->TriggerHorrorPulse(
-            0.10f,
-            0.16f);
-        Input::SetVibration(2, 0.06f);
+            LockedPulseStrength,
+            LockedPulseSeconds);
+        Input::SetVibration(LockedRumbleFrames, LockedRumbleStrength);
         return;
     }
 
@@ -220,28 +273,27 @@ void Door::Interact(Player& player)
         m_IsOpening = true;
         m_OpenDelayTimer = m_OpenDelayDuration;
 
-        const float pulseStrength =
-            0.08f + static_cast<float>(m_LoopPhase) * 0.055f;
+        const float loop = static_cast<float>(m_LoopPhase);
         Core::Game::GetInstance()->GetPostProcess()->TriggerHorrorPulse(
-            pulseStrength,
-            0.18f + static_cast<float>(m_LoopPhase) * 0.06f);
+            OpenPulseStrength + loop * OpenPulseStrengthPerLoop,
+            OpenPulseSeconds + loop * OpenPulseSecondsPerLoop);
         Core::Game::GetInstance()->GetPostProcess()->TriggerBloomPulse(
-            0.82f + static_cast<float>(m_LoopPhase) * 0.10f,
-            0.20f + static_cast<float>(m_LoopPhase) * 0.10f);
+            OpenBloomPeak + loop * OpenBloomPeakPerLoop,
+            OpenBloomSeconds + loop * OpenBloomSecondsPerLoop);
 
         // 扉の近くの天井照明を一瞬明滅させている
         CeilingLight* doorLight =
-            Core::Game::GetInstance()->GetObj<CeilingLight>("CeilingLight4");
+            Core::Game::GetInstance()->GetObj<CeilingLight>(DoorLightName);
         if (doorLight != nullptr)
         {
             doorLight->TriggerEventFlicker(
-                0.24f + static_cast<float>(m_LoopPhase) * 0.14f,
-                0.46f + static_cast<float>(m_LoopPhase) * 0.16f);
+                OpenFlickerSeconds + loop * OpenFlickerSecondsPerLoop,
+                OpenFlickerStrength + loop * OpenFlickerStrengthPerLoop);
         }
 
         Input::SetVibration(
-            3 + m_LoopPhase * 2,
-            0.07f + static_cast<float>(m_LoopPhase) * 0.025f);
+            OpenRumbleFrames + m_LoopPhase * OpenRumbleFramesPerLoop,
+            OpenRumbleStrength + loop * OpenRumbleStrengthPerLoop);
     }
 }
 
@@ -444,7 +496,7 @@ void Door::Draw(Camera* camera)
     {
         const float elapsed = m_OpenDelayDuration - m_OpenDelayTimer;
         const float remaining = m_OpenDelayTimer /
-            (std::max)(m_OpenDelayDuration, 0.001f);
+            (std::max)(m_OpenDelayDuration, MinimumDelayDuration);
         rattleGlow =
             (std::sin(elapsed * OpenDelayGlowFrequency) * 0.5f + 0.5f) * remaining;
     }
@@ -453,24 +505,15 @@ void Door::Draw(Camera* camera)
     const bool powerRestored =
         Core::Game::GetInstance()->IsPowerRestored();
     const float leakIntensity =
-        0.045f + static_cast<float>(m_LoopPhase) * 0.025f +
-        openAmount * (powerRestored ? 0.62f : 0.30f) +
-        rattleGlow * 0.22f;
+        LeakBaseIntensity + static_cast<float>(m_LoopPhase) * LeakIntensityPerLoop +
+        openAmount * (powerRestored ? LeakOpenPowered : LeakOpenUnpowered) +
+        rattleGlow * LeakRattleIntensity;
 
     // 漏れ光の色：電力が戻っていれば青白、停電中は赤
     MATERIAL leakMaterial{};
-    leakMaterial.Diffuse = Color(0.04f, 0.03f, 0.02f, 1.0f);
-    leakMaterial.Emission = powerRestored
-        ? Color(
-            0.72f * leakIntensity,
-            0.82f * leakIntensity,
-            1.00f * leakIntensity,
-            1.0f)
-        : Color(
-            1.00f * leakIntensity,
-            0.24f * leakIntensity,
-            0.10f * leakIntensity,
-            1.0f);
+    leakMaterial.Diffuse = LeakDiffuse;
+    const Vector3 leakColor = (powerRestored ? LeakPoweredColor : LeakUnpoweredColor) * leakIntensity;
+    leakMaterial.Emission = Color(leakColor.x, leakColor.y, leakColor.z, 1.0f);
     leakMaterial.TextureEnable = FALSE;
     m_LeakMaterial->SetMaterial(leakMaterial);
     m_LeakMaterial->SetGPU();

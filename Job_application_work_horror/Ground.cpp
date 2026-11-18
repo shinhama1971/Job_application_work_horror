@@ -26,6 +26,50 @@ namespace
 	// 水たまり・雨漏りの多角形の辺の数
 	constexpr int PuddleOutlineSegments = 32;
 	constexpr int LeakOutlineSegments = 24;
+	// 床の格子のマス数（縦横）、床の高さ、1マスの大きさ（全体で1000x1000）
+	constexpr int GridCellCount = 50;
+	constexpr int VerticesPerCell = 6;
+	constexpr float FloorY = -100.0f;
+	constexpr float CellSize = 20.0f;
+	// 時間を戻す秒数（長く遊んでも浮動小数点の精度が落ちないように）
+	constexpr float WetTimeWrapSeconds = 10000.0f;
+	// 電力が戻ったときの水面：反射を強める速さ（戻ったとき・停電したとき）、乱れが収まる速さ（約2.4秒）、
+	// 乱れの揺れ（速さ・いつもの割合と揺れの幅）
+	constexpr float PowerBlendRiseRate = 2.2f;
+	constexpr float PowerBlendFallRate = 4.0f;
+	constexpr float PowerSurgeDecayRate = 0.42f;
+	constexpr float SurgeWaveRate = 17.0f;
+	constexpr float SurgeWaveBase = 0.55f;
+	constexpr float SurgeWaveRange = 0.45f;
+	// 波紋と反射の強さ：いつもの強さ、電力が戻ったときに足す強さ、電力が戻った瞬間の乱れで足す強さ
+	constexpr float RippleStrengthBase = 0.92f;
+	constexpr float RippleStrengthPower = 0.10f;
+	constexpr float RippleStrengthSurge = 0.18f;
+	constexpr float ReflectionStrengthBase = 0.96f;
+	constexpr float ReflectionStrengthPower = 0.22f;
+	constexpr float ReflectionStrengthSurge = 0.12f;
+	// 雨の輪：範囲の端に残す余白、一辺96の正方形あたり1秒に落とす粒の数（強い雨）と、その正方形の半分の大きさ、
+	// ためておく粒の数の上限、1フレームに出す輪の数の上限
+	constexpr float RainAreaMargin = 2.0f;
+	constexpr float RainDropsPerReferenceArea = 1600.0f;
+	constexpr float RainReferenceHalfSize = 48.0f;
+	constexpr float MaxPendingRainDrops = 400.0f;
+	constexpr int MaxRainRingsPerFrame = 12;
+	// 遠くの雨の輪を太く強くする：この距離までは近くと同じ、この幅で最大になる。最大のときの半径と強さの増し方
+	constexpr float RainFarStart = 40.0f;
+	constexpr float RainFarRange = 200.0f;
+	constexpr float RainFarRadiusBoost = 1.4f;
+	constexpr float RainFarStrengthBoost = 2.0f;
+	// 1粒の輪の半径（最低＋乱数の幅）と強さ（最低＋乱数の幅。負は押し下げる）
+	constexpr float RainRingRadius = 0.8f;
+	constexpr float RainRingRadiusRange = 0.3f;
+	constexpr float RainRingStrength = 0.3f;
+	constexpr float RainRingStrengthRange = 0.25f;
+	// 乱数（xorshift）の下位16ビットを 0〜1 にする割る数
+	constexpr float RandomMax = 65535.0f;
+	// 波を止める壁：床からこの高さより上にある壁は数えない。まっすぐ・横向きとみなす角度の誤差（ラジアン）
+	constexpr float RippleObstacleMaxHeight = 1.5f;
+	constexpr float AxisAlignedTolerance = 0.01f;
 }
 
 //=======================================
@@ -42,9 +86,9 @@ void Ground::Init()
 	m_RippleSimulation.Init();
 
 	// 頂点データ：1マスを2つの三角形（6頂点）で作り、原点を中心に並べている
-	m_SizeX = 50;
-	m_SizeZ = 50;
-	m_Vertices.resize(6 * m_SizeX * m_SizeZ);
+	m_SizeX = GridCellCount;
+	m_SizeZ = GridCellCount;
+	m_Vertices.resize(VerticesPerCell * m_SizeX * m_SizeZ);
 
 	for (int z = 0; z < m_SizeZ; z++)
 	{
@@ -164,9 +208,9 @@ void Ground::Init()
 	mtrl.TextureEnable = true;// テクスチャを使う
 	m_Material->CreateRequired(mtrl);
 	// 床の高さを-100にし、1マスを20単位に広げている（全体で1000x1000）
-	m_Position.y = -100.0f;
-	m_Scale.x = 20.0f;
-	m_Scale.z = 20.0f;
+	m_Position.y = FloorY;
+	m_Scale.x = CellSize;
+	m_Scale.z = CellSize;
 
 	// 雨漏りと浸水した範囲のメッシュの頂点バッファ（毎フレーム書き換えるので、入りきる大きさで先に作っている）
 	m_DynamicSurfaceCapacity = static_cast<unsigned int>(
@@ -441,13 +485,13 @@ void Ground::AddRainRipples(float deltaTime)
 	}
 	// 雨粒を落とす範囲（カメラから縦横にこの距離まで）。波を計算している範囲（外の森は一辺576）の全体に落とし、
 	// 範囲の端の水たまりにも、近くと同じように雨の輪を出している（端の2は、範囲の外へはみ出したおもりを捨てないための余白）
-	const float DropArea = m_RippleSimulation.GetWorldSize() * 0.5f - 2.0f;
+	const float DropArea = m_RippleSimulation.GetWorldSize() * 0.5f - RainAreaMargin;
 	// 1秒に落とす雨粒の数。水たまりの外に落ちた分は捨てるので、輪になるのは水たまりの広さの割合だけになる。
 	// 一辺96の正方形あたり1600粒（強い雨）を基準にし、範囲の面積に比例させて、1平方あたりの輪の数を一定にしている
-	const float DropsPerSecond = 1600.0f * (DropArea / 48.0f) * (DropArea / 48.0f);
-	constexpr int MaxRingsPerFrame = 12;
+	const float DropsPerSecond = RainDropsPerReferenceArea * (DropArea / RainReferenceHalfSize) * (DropArea / RainReferenceHalfSize);
+	constexpr int MaxRingsPerFrame = MaxRainRingsPerFrame;
 	// まだ落としていない雨粒の数をためている。重いフレームで一度に大量に落とさないよう、上限を400にしている
-	m_PendingRainDrops = (std::min)(m_PendingRainDrops + DropsPerSecond * m_RainIntensity * deltaTime, 400.0f);
+	m_PendingRainDrops = (std::min)(m_PendingRainDrops + DropsPerSecond * m_RainIntensity * deltaTime, MaxPendingRainDrops);
 	const DirectX::SimpleMath::Vector3 eye = Core::Game::GetInstance()->GetCamera()->GetPosition();
 	auto nextRandom = [this]()
 	{
@@ -455,7 +499,7 @@ void Ground::AddRainRipples(float deltaTime)
 		m_RainSeed ^= m_RainSeed << 13;
 		m_RainSeed ^= m_RainSeed >> 17;
 		m_RainSeed ^= m_RainSeed << 5;
-		return static_cast<float>(m_RainSeed & 0xFFFFu) / 65535.0f;
+		return static_cast<float>(m_RainSeed & 0xFFFFu) / RandomMax;
 	};
 	int rings = 0;
 	while (m_PendingRainDrops >= 1.0f && rings < MaxRingsPerFrame)
@@ -475,10 +519,10 @@ void Ground::AddRainRipples(float deltaTime)
 		// カメラから離れた雨粒ほど、輪を太く強くしている。細い輪のままだと、離れると1画素より細くなって見えなくなるため
 		// （距離40までは近くと同じ、距離240より遠くで半径が2.4倍・強さが3倍。森は1メートル ≒ 24）
 		const float distance = DirectX::SimpleMath::Vector2(drop.x - eye.x, drop.z - eye.z).Length();
-		const float farRate = std::clamp((distance - 40.0f) / 200.0f, 0.0f, 1.0f);
+		const float farRate = std::clamp((distance - RainFarStart) / RainFarRange, 0.0f, 1.0f);
 		m_RippleSimulation.AddImpulse(DirectX::SimpleMath::Vector2(drop.x, drop.z),
-			(0.8f + nextRandom() * 0.3f) * (1.0f + farRate * 1.4f),
-			-(0.3f + nextRandom() * 0.25f) * (1.0f + farRate * 2.0f));
+			(RainRingRadius + nextRandom() * RainRingRadiusRange) * (1.0f + farRate * RainFarRadiusBoost),
+			-(RainRingStrength + nextRandom() * RainRingStrengthRange) * (1.0f + farRate * RainFarStrengthBoost));
 		++rings;
 	}
 }
@@ -491,7 +535,7 @@ void Ground::Update()
 	const float deltaTime = Application::GetDeltaTime();
 	m_WetTime += deltaTime;
 	// 長く遊んでも浮動小数点の精度が落ちないよう、時間を戻している
-	if (m_WetTime > 10000.0f)
+	if (m_WetTime > WetTimeWrapSeconds)
 	{
 		m_WetTime = 0.0f;
 	}
@@ -507,13 +551,13 @@ void Ground::Update()
 
 	// 電力が戻ったら、反射をゆっくり強くしている（停電したら速く弱める）
 	const float targetBlend = powerRestored ? 1.0f : 0.0f;
-	const float response = powerRestored ? 2.2f : 4.0f;
+	const float response = powerRestored ? PowerBlendRiseRate : PowerBlendFallRate;
 	m_PowerReflectionBlend +=
 		(targetBlend - m_PowerReflectionBlend) * response * deltaTime;
 	m_PowerReflectionBlend = std::clamp(
 		m_PowerReflectionBlend, 0.0f, 1.0f);
 	// 水面の乱れは約2.4秒で収まる
-	m_PowerSurge = (std::max)(0.0f, m_PowerSurge - deltaTime * 0.42f);
+	m_PowerSurge = (std::max)(0.0f, m_PowerSurge - deltaTime * PowerSurgeDecayRate);
 	m_WaterEffects.Update(deltaTime);
 	m_Footprints.Update(deltaTime);
 	// 水たまりのメッシュ（マス目の水たまりは変わったときだけ、雨漏りと浸水した範囲は毎フレーム）
@@ -556,9 +600,9 @@ void Ground::Update()
 		const DirectX::SimpleMath::Vector3 position = wall->GetPosition();
 		const DirectX::SimpleMath::Vector3 scale = wall->GetScale();
 		const float yaw = std::fmod(std::fabs(wall->GetRotation().y), DirectX::XM_PI);
-		const bool straight = yaw < 0.01f || yaw > DirectX::XM_PI - 0.01f;
-		const bool quarter = std::fabs(yaw - DirectX::XM_PIDIV2) < 0.01f;
-		if (!wall->IsCollisionEnabled() || position.y - scale.y * 0.5f > m_Position.y + 1.5f ||
+		const bool straight = yaw < AxisAlignedTolerance || yaw > DirectX::XM_PI - AxisAlignedTolerance;
+		const bool quarter = std::fabs(yaw - DirectX::XM_PIDIV2) < AxisAlignedTolerance;
+		if (!wall->IsCollisionEnabled() || position.y - scale.y * 0.5f > m_Position.y + RippleObstacleMaxHeight ||
 			(!straight && !quarter))
 		{
 			continue;
@@ -624,12 +668,12 @@ void Ground::Draw(Camera* cam)
 	WetFloorBuffer wetFloor{};
 	wetFloor.Time = m_WetTime;
 	const float surgeWave = m_PowerSurge *
-		(0.55f + 0.45f * std::sin(m_WetTime * 17.0f));
+		(SurgeWaveBase + SurgeWaveRange * std::sin(m_WetTime * SurgeWaveRate));
 	wetFloor.RippleStrength =
-		0.92f + m_PowerReflectionBlend * 0.10f + surgeWave * 0.18f;
+		RippleStrengthBase + m_PowerReflectionBlend * RippleStrengthPower + surgeWave * RippleStrengthSurge;
 	// 技術デモで「水面の反射なし」を選んでいるときは、反射の画像を混ぜない
 	wetFloor.ReflectionStrength = Tools::TechDemo::GetReflectionMethod() != Tools::TechDemo::ReflectionMethod::Off
-		? 0.96f + m_PowerReflectionBlend * 0.22f + surgeWave * 0.12f
+		? ReflectionStrengthBase + m_PowerReflectionBlend * ReflectionStrengthPower + surgeWave * ReflectionStrengthSurge
 		: 0.0f;
 	// 水に浸かった範囲がなければ、最小(1,1)が最大(0,0)より大きい値を渡して「範囲なし」にしている
 	wetFloor.FloodRect = m_WaterEffects.HasFloodRegion()

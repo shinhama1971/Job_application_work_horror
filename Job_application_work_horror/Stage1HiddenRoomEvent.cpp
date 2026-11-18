@@ -6,6 +6,7 @@
 #include "Stage1HiddenRoomEvent.h"
 
 #include "Door.h"
+#include "EventFeedback.h"
 #include "FuseBox.h"
 #include "Game.h"
 #include "PostProcess.h"
@@ -22,12 +23,11 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
-    // 隠し部屋の広さ（壁の内側）。扉はx=45の壁（内側の面はx=47）にあり、部屋は東側に広がっている。
-    // 経路探索の格子（Stage1HiddenRoomEvent.h の m_Path）も同じ範囲にしている。
-    constexpr float RoomMinX = 47.0f;
-    constexpr float RoomMaxX = 218.0f;
-    constexpr float RoomMinZ = 42.0f;
-    constexpr float RoomMaxZ = 178.0f;
+    // 隠し部屋の広さ（壁の内側。値は Stage1HiddenRoomEvent.h。経路探索の格子も同じ範囲）
+    constexpr float RoomMinX = Stage1HiddenRoomEvent::RoomMinX;
+    constexpr float RoomMaxX = Stage1HiddenRoomEvent::RoomMaxX;
+    constexpr float RoomMinZ = Stage1HiddenRoomEvent::RoomMinZ;
+    constexpr float RoomMaxZ = Stage1HiddenRoomEvent::RoomMaxZ;
     // この線より奥まで入ったら扉を閉めている（扉のすぐ前で閉めて、プレイヤーを挟まないため）。
     constexpr float TrapLineX = 64.0f;
     // 影に触れられて電池を奪われても、この残量（%）は残す
@@ -46,6 +46,26 @@ namespace
     constexpr float ShadowGoneNoticeSeconds = 2.6f;
     constexpr float CaughtNoticeSeconds = 2.8f;
     constexpr float ShadowAppearedNoticeSeconds = 2.8f;
+    // 影が近づくとき、距離がこれより短ければ向きを計算しない（0で割らないため）
+    constexpr float MinimumMoveDistance = 0.001f;
+
+    // --- 出来事ごとの演出の強さと長さ（音の高さと音量・画面の脈打ち・振動）
+    using EventFeedback::PulseSpec;
+    using EventFeedback::RumbleSpec;
+    using EventFeedback::SoundSpec;
+    // 扉が閉まって閉じ込められたとき（扉の大きな音と驚かせる音）
+    constexpr SoundSpec TrapDoorSlam{ 0.62f, 1.8f };
+    constexpr SoundSpec TrapScare{ 0.85f, 0.7f };
+    constexpr PulseSpec TrapPulse{ 0.46f, 0.40f };
+    constexpr RumbleSpec TrapRumble{ 10, 0.26f };
+    // 鍵で扉が開いたとき
+    constexpr PulseSpec UnlockedBloom{ 0.48f, 0.24f };
+    // 影に触れられたとき
+    constexpr float CaughtVolume = 0.9f;
+    constexpr PulseSpec CaughtPulse{ 0.70f, 0.55f };
+    constexpr RumbleSpec CaughtRumble{ 14, 0.36f };
+    // 影の足音
+    constexpr SoundSpec ShadowFootstep{ 0.74f, 1.7f };
 
     // 鍵が落ちている場所の候補。部屋は書類棚（配置ファイルの PropHiddenShelf）でジグザグの通路に区切ってあり、
     // どれも入口からは棚に隠れて見えない。順に、入口の通路の南の行き止まり（低い棚の裏）、
@@ -145,10 +165,10 @@ void Stage1HiddenRoomEvent::Trap(Player& player)
 
     // 扉の閉まる大きな音と驚かせる音、画面の乱れ、振動
     Core::Game* game = Core::Game::GetInstance();
-    game->PlayAudioCueAt(SOUND_CUE_DOOR, door->GetPosition(), 0.62f, 1.8f);
-    game->PlayAudioCueAt(SOUND_CUE_SCARE, door->GetPosition(), 0.85f, 0.7f);
-    game->GetPostProcess()->TriggerHorrorPulse(0.46f, 0.40f);
-    Input::SetVibration(10, 0.26f);
+    game->PlayAudioCueAt(SOUND_CUE_DOOR, door->GetPosition(), TrapDoorSlam.Pitch, TrapDoorSlam.Volume);
+    game->PlayAudioCueAt(SOUND_CUE_SCARE, door->GetPosition(), TrapScare.Pitch, TrapScare.Volume);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), TrapPulse);
+    EventFeedback::Rumble(TrapRumble);
     ShowNotice("扉が閉まった", DoorClosedNoticeSeconds);
     UpdateKeyLamps(0.0f);
 }
@@ -177,7 +197,7 @@ void Stage1HiddenRoomEvent::UpdateTrapped(Player& player, float deltaTime,
         Door* door = m_Parts.door;
         door->SetLocked(false);
         door->Interact(player);
-        game->GetPostProcess()->TriggerBloomPulse(0.48f, 0.24f);
+        EventFeedback::BloomPulse(*game->GetPostProcess(), UnlockedBloom);
         ShowNotice("鍵で扉が開いた", UnlockedNoticeSeconds);
         return;
     }
@@ -213,9 +233,9 @@ void Stage1HiddenRoomEvent::UpdateTrapped(Player& player, float deltaTime,
         const float taken = (std::min)(BatteryPenalty, (std::max)(0.0f, player.GetBattery() - BatteryFloor));
         player.AddBattery(-taken);
         shadow->SetActive(false);
-        game->PlayAudioCue(SOUND_CUE_SCARE, 0.9f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.70f, 0.55f);
-        Input::SetVibration(14, 0.36f);
+        game->PlayAudioCue(SOUND_CUE_SCARE, CaughtVolume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), CaughtPulse);
+        EventFeedback::Rumble(CaughtRumble);
         m_ShadowWasActive = false;
         m_ShadowTimer = NextShadowDelay;
         ShowNotice("影に触れられた 電池を奪われた", CaughtNoticeSeconds);
@@ -301,7 +321,7 @@ void Stage1HiddenRoomEvent::MoveShadow(const Player& player, float deltaTime,
     Vector3 toPlayer = playerPosition - before;
     toPlayer.y = 0.0f;
     const float playerDistance = toPlayer.Length();
-    if (playerDistance < 0.001f)
+    if (playerDistance < MinimumMoveDistance)
     {
         return;
     }
@@ -309,7 +329,7 @@ void Stage1HiddenRoomEvent::MoveShadow(const Player& player, float deltaTime,
     Vector3 direction = m_Path.GetSteeringTarget(before, playerPosition) - before;
     direction.y = 0.0f;
     const float targetDistance = direction.Length();
-    if (targetDistance < 0.001f)
+    if (targetDistance < MinimumMoveDistance)
     {
         return;
     }
@@ -329,7 +349,8 @@ void Stage1HiddenRoomEvent::MoveShadow(const Player& player, float deltaTime,
     {
         m_ShadowStride -= ShadowStrideLength;
         Core::Game::GetInstance()->PlayAudioCueAt(
-            SOUND_CUE_FOOTSTEP, Vector3(next.x, before.y + ShadowFootstepHeight, next.z), 0.74f, 1.7f);
+            SOUND_CUE_FOOTSTEP, Vector3(next.x, before.y + ShadowFootstepHeight, next.z),
+            ShadowFootstep.Pitch, ShadowFootstep.Volume);
     }
 }
 

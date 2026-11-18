@@ -16,6 +16,8 @@ class PortraitAnomaly final
 public:
     // 目が開くまでに見つめ続ける秒数。
     static constexpr float RequiredStareSeconds = 2.4f;
+    // 気づいたときの知らせを出す秒数
+    static constexpr float NoticeSeconds = 2.4f;
 
 private:
     // 通知の残り秒数、見つめ続けている秒数、この周回で目が開いたか
@@ -53,7 +55,7 @@ public:
             return false;
         }
         m_ChangedThisLoop = true;
-        m_NoticeTimer = 2.4f;
+        m_NoticeTimer = NoticeSeconds;
         return true;
     }
 

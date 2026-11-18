@@ -174,6 +174,30 @@ namespace
         const float localZ = dx * footprint.Sine + dz * footprint.Cosine;
         return std::fabs(localX) < footprint.HalfSize.x && std::fabs(localZ) < footprint.HalfSize.y;
     }
+
+    // --- 草の群れ：大きなむら（細かさ・ずらし・割合）と小さなむら（細かさ・ずらし・割合）
+    constexpr float LargeClumpScale = 0.016f;
+    const Vector2 LargeClumpOffset(3.1f, -7.4f);
+    constexpr float LargeClumpWeight = 0.65f;
+    constexpr float SmallClumpScale = 0.07f;
+    const Vector2 SmallClumpOffset(-11.0f, 5.0f);
+    constexpr float SmallClumpWeight = 0.35f;
+    // 葉の高さのばらつき（最低の割合＋乱数の幅）と、小道の縁で短くする割合（最低＋離れるほど足す幅）
+    constexpr float HeightRandomMin = 0.65f;
+    constexpr float HeightRandomRange = 0.6f;
+    constexpr float PathEdgeHeightMin = 0.55f;
+    constexpr float PathEdgeHeightRange = 0.45f;
+    // 枯れ具合：ノイズの細かさとずらし、強め方と下げる量、葉ごとの乱数の幅
+    constexpr float DryNoiseScale = 0.03f;
+    constexpr float DryNoiseOffsetX = 40.0f;
+    constexpr float DryNoiseGain = 1.3f;
+    constexpr float DryNoiseBias = 0.15f;
+    constexpr float DryRandomRange = 0.3f;
+    // 色：雨に濡れた夜の草。くすんだ緑と、枯れた黄土色（地面のテクスチャに近い明るさ）。葉ごとの明るさのばらつき（最低＋幅）
+    const Vector3 GrassGreen(0.17f, 0.21f, 0.10f);
+    const Vector3 GrassStraw(0.34f, 0.29f, 0.16f);
+    constexpr float BrightnessRandomMin = 0.8f;
+    constexpr float BrightnessRandomRange = 0.4f;
 }
 
 void ForestGrass::Init()
@@ -323,8 +347,8 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
             const float z = minZ + (iz + unit(random)) * spacing;
 
             // 群れ：大きなむらと小さなむらを重ね、濃い所ほど高く生やしている（授業資料の「不均一な植え方」）
-            const float clump = ValueNoise(x * 0.016f + 3.1f, z * 0.016f - 7.4f) * 0.65f +
-                ValueNoise(x * 0.07f - 11.0f, z * 0.07f + 5.0f) * 0.35f;
+            const float clump = ValueNoise(x * LargeClumpScale + LargeClumpOffset.x, z * LargeClumpScale + LargeClumpOffset.y) * LargeClumpWeight +
+                ValueNoise(x * SmallClumpScale + SmallClumpOffset.x, z * SmallClumpScale + SmallClumpOffset.y) * SmallClumpWeight;
             // 小道の上は踏まれて生えず、縁は短くまばらにしている
             const float pathDistance = std::fabs(x - GetPathCenterX(z));
             const float pathFade = MathUtility::SmoothStep(PathBareWidth, PathFullWidth, pathDistance);
@@ -358,17 +382,17 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
             blade.Root = Vector3(x, groundY, z);
             // 高さ：群れの濃い所ほど高い（膝より少し下まで）。小道の縁は短い
             const float tall = MathUtility::SmoothStep(ClumpTallStart, ClumpTallEnd, clump);
-            blade.Height = (BladeMinHeight + tall * BladeTallExtra) * (0.65f + unit(random) * 0.6f) * (0.55f + pathFade * 0.45f);
+            blade.Height = (BladeMinHeight + tall * BladeTallExtra) * (HeightRandomMin + unit(random) * HeightRandomRange) *
+                (PathEdgeHeightMin + pathFade * PathEdgeHeightRange);
             const float angle = unit(random) * DirectX::XM_2PI;
             blade.Facing = Vector2(std::cos(angle), std::sin(angle));
             blade.Width = BladeMinWidth + unit(random) * BladeWidthRange;
             blade.Lean = (unit(random) * 2.0f - 1.0f) * BladeMaxLean;
             // 色：雨に濡れた夜の草。枯れた黄土色と、くすんだ緑を混ぜている（照らしたとき、枯れ草が多い寂しい森に見えるように）
-            const float dry = std::clamp(ValueNoise(x * 0.03f + 40.0f, z * 0.03f) * 1.3f - 0.15f + (unit(random) - 0.5f) * 0.3f, 0.0f, 1.0f);
+            const float dry = std::clamp(ValueNoise(x * DryNoiseScale + DryNoiseOffsetX, z * DryNoiseScale) * DryNoiseGain - DryNoiseBias +
+                (unit(random) - 0.5f) * DryRandomRange, 0.0f, 1.0f);
             // 地面のテクスチャに近い明るさにしている（暗すぎると、懐中電灯で照らした地面の上で草が黒い影に見えるため）
-            const Vector3 green(0.17f, 0.21f, 0.10f);
-            const Vector3 straw(0.34f, 0.29f, 0.16f);
-            blade.Color = Vector3::Lerp(green, straw, dry) * (0.8f + unit(random) * 0.4f);
+            blade.Color = Vector3::Lerp(GrassGreen, GrassStraw, dry) * (BrightnessRandomMin + unit(random) * BrightnessRandomRange);
             blade.Stiffness = BladeMinStiffness + unit(random) * BladeStiffnessRange;
             blades.push_back(blade);
         }

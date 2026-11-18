@@ -10,6 +10,7 @@
 #include "Application.h"
 #include "CeilingLight.h"
 #include "Door.h"
+#include "EventFeedback.h"
 #include "FuseBox.h"
 #include "Game.h"
 #include "PostProcess.h"
@@ -58,6 +59,53 @@ namespace
     constexpr float FeedNear = 1.0f;
     constexpr float FeedFar = 420.0f;
     constexpr float FeedHelperLightRange = 260.0f;
+    // 監視映像の背景の色（何も映らない所）、映像だけに使う環境光、カメラの位置の補助の光の色と強さ（緑がかった監視映像の光）
+    const Color FeedClearColor(0.018f, 0.028f, 0.022f, 1.0f);
+    const Color FeedAmbient(0.16f, 0.19f, 0.17f, 1.0f);
+    const Vector4 FeedHelperLightColor(0.72f, 0.92f, 0.78f, 0.52f);
+    // 確認率を百分率で見せる倍率
+    constexpr float PercentScale = 100.0f;
+    // 照らしたかを判定するとき、距離がこれより短ければ向きを計算しない（0で割らないため）
+    constexpr float MinimumLookDistance = 0.001f;
+    // 巡回をすべて終えたときの、端末の目印の緑（落ち着いた色・光る色・光沢）と、照明が明滅する部屋の照明の番号
+    const Color CompleteMarkerDiffuse(0.08f, 0.18f, 0.10f, 1.0f);
+    const Color CompleteMarkerEmission(0.16f, 0.52f, 0.22f, 1.0f);
+    constexpr float CompleteMarkerShininess = 44.0f;
+    constexpr int CompleteFlickerLightNumber = 3;
+
+    // --- 出来事ごとの演出の強さと長さ（音量・画面の脈打ち・振動・照明の明滅）
+    using EventFeedback::FlickerSpec;
+    using EventFeedback::PulseSpec;
+    using EventFeedback::RumbleSpec;
+    // 映像を開いたとき
+    constexpr float OpenFeedVolume = 0.72f;
+    constexpr PulseSpec OpenFeedPulse{ 0.12f, 0.20f };
+    // カメラの切り替え・基準映像・拡大の操作の手ごたえ
+    constexpr RumbleSpec FeedControlRumble{ 1, 0.03f };
+    // 異常ありと報告して現地へ向かうとき
+    constexpr float DispatchVolume = 0.62f;
+    // 間違えて報告したとき
+    constexpr float WrongReportVolume = 0.54f;
+    constexpr PulseSpec WrongReportPulse{ 0.22f, 0.24f };
+    constexpr RumbleSpec WrongReportRumble{ 5, 0.11f };
+    // 現地確認の残り時間が少ないときの警告
+    constexpr PulseSpec DispatchWarningPulse{ 0.16f, 0.30f };
+    constexpr RumbleSpec DispatchWarningRumble{ 4, 0.08f };
+    // 現地で異常に対処できたとき
+    constexpr PulseSpec ResolvedBloom{ 0.36f, 0.18f };
+    constexpr RumbleSpec ResolvedRumble{ 4, 0.09f };
+    // 現地確認が時間切れになったとき
+    constexpr float TimedOutVolume = 0.62f;
+    constexpr PulseSpec TimedOutPulse{ 0.32f, 0.30f };
+    // 捕まったとき
+    constexpr PulseSpec CaughtPulse{ 1.0f, 0.72f };
+    constexpr RumbleSpec CaughtRumble{ 24, 0.72f };
+    // 巡回をすべて終えたとき
+    constexpr FlickerSpec CompleteFlicker{ 0.84f, 0.92f };
+    constexpr float CompleteVolume = 0.76f;
+    constexpr PulseSpec CompletePulse{ 0.34f, 0.32f };
+    constexpr PulseSpec CompleteBloom{ 0.42f, 0.20f };
+    constexpr RumbleSpec CompleteRumble{ 9, 0.19f };
 
     // float[3]をVector3にしている
     Vector3 ToVector3(const float (&value)[3])
@@ -166,7 +214,7 @@ void StageSurveillanceController::FillObjectiveInput(
         input.patrolRemainingSeconds = static_cast<int>(
             std::ceil(m_Patrol.GetRemainingTime()));
         input.patrolConfirmPercent = static_cast<int>(
-            std::round(m_Patrol.GetConfirmRate() * 100.0f));
+            std::round(m_Patrol.GetConfirmRate() * PercentScale));
     }
     input.flashlightOn = player.IsFlashlightOn();
     input.patrolNotice = m_NoticeTimer > 0.0f;
@@ -206,8 +254,8 @@ void StageSurveillanceController::UpdateState(Player& player, float deltaTime)
         player.SetCanControl(false);
 
         Core::Game* game = Core::Game::GetInstance();
-        game->PlayAudioCue(SOUND_CUE_POWER, 0.72f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.12f, 0.20f);
+        game->PlayAudioCue(SOUND_CUE_POWER, OpenFeedVolume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), OpenFeedPulse);
         break;
     }
     case SurveillancePatrol::State::Viewing:
@@ -238,14 +286,14 @@ void StageSurveillanceController::UpdateViewing(Player& player)
         Input::GetButtonTrigger(XINPUT_LEFT_SHOULDER))
     {
         m_Patrol.SelectCamera(-1, StageSurveillanceCameraCount);
-        Input::SetVibration(1, 0.03f);
+        EventFeedback::Rumble(FeedControlRumble);
     }
     else if (Input::GetKeyTrigger(VK_RIGHT) ||
         Input::GetButtonTrigger(XINPUT_RIGHT) ||
         Input::GetButtonTrigger(XINPUT_RIGHT_SHOULDER))
     {
         m_Patrol.SelectCamera(1, StageSurveillanceCameraCount);
-        Input::SetVibration(1, 0.03f);
+        EventFeedback::Rumble(FeedControlRumble);
     }
 
     if (Input::GetKeyTrigger(VK_C) || Input::GetButtonTrigger(XINPUT_Y))
@@ -253,7 +301,7 @@ void StageSurveillanceController::UpdateViewing(Player& player)
         m_ShowReference = !m_ShowReference;
         // 記録した映像は標準の画角なので、切り替えるときにライブも同じ画角へ戻している。
         m_Zoomed = false;
-        Input::SetVibration(1, 0.03f);
+        EventFeedback::Rumble(FeedControlRumble);
     }
 
     // 広い画角で場所を把握し、必要なときだけ中央を拡大して小さな変化を調べられるようにしている。
@@ -261,7 +309,7 @@ void StageSurveillanceController::UpdateViewing(Player& player)
         (Input::GetKeyTrigger(VK_Z) || Input::GetButtonTrigger(XINPUT_X)))
     {
         m_Zoomed = !m_Zoomed;
-        Input::SetVibration(1, 0.03f);
+        EventFeedback::Rumble(FeedControlRumble);
     }
 
     // 基準映像を見ながら間違えて報告しないよう、報告はライブの画面でだけ受け付けている。
@@ -289,7 +337,7 @@ void StageSurveillanceController::UpdateViewing(Player& player)
     case SurveillancePatrol::ReportResult::Dispatched:
         m_WarningCooldown = 0.0f;
         EndViewing(player);
-        game->PlayAudioCue(SOUND_CUE_DOOR, 0.62f);
+        game->PlayAudioCue(SOUND_CUE_DOOR, DispatchVolume);
         break;
     case SurveillancePatrol::ReportResult::ClearedNoAnomaly:
         EndViewing(player);
@@ -305,9 +353,9 @@ void StageSurveillanceController::UpdateViewing(Player& player)
     case SurveillancePatrol::ReportResult::Wrong:
         game->RegisterPuzzleMistake();
         m_WrongTimer = PatrolWrongFeedbackSeconds;
-        game->PlayAudioCue(SOUND_CUE_DOOR, 0.54f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.22f, 0.24f);
-        Input::SetVibration(5, 0.11f);
+        game->PlayAudioCue(SOUND_CUE_DOOR, WrongReportVolume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), WrongReportPulse);
+        EventFeedback::Rumble(WrongReportRumble);
         break;
     case SurveillancePatrol::ReportResult::Caught:
         game->RegisterPuzzleMistake();
@@ -333,15 +381,15 @@ void StageSurveillanceController::UpdateDispatch(Player& player, float deltaTime
             m_WarningCooldown <= 0.0f)
         {
             m_WarningCooldown = WarningCooldownSeconds;
-            game->GetPostProcess()->TriggerHorrorPulse(0.16f, 0.30f);
-            Input::SetVibration(4, 0.08f);
+            EventFeedback::HorrorPulse(*game->GetPostProcess(), DispatchWarningPulse);
+            EventFeedback::Rumble(DispatchWarningRumble);
         }
         break;
     case SurveillancePatrol::DispatchResult::Resolved:
         SetAnomalyVisible(anomaly, false);
         game->RegisterAnomalyHandled();
-        game->GetPostProcess()->TriggerBloomPulse(0.36f, 0.18f);
-        Input::SetVibration(4, 0.09f);
+        EventFeedback::BloomPulse(*game->GetPostProcess(), ResolvedBloom);
+        EventFeedback::Rumble(ResolvedRumble);
         if (m_Patrol.IsCompleted())
         {
             Complete(player);
@@ -359,8 +407,8 @@ void StageSurveillanceController::UpdateDispatch(Player& player, float deltaTime
         SetAnomalyVisible(anomaly, false);
         game->RegisterPuzzleMistake();
         ShowNotice("映像の反応が途絶えた 端末へ戻る", LostNoticeSeconds);
-        game->PlayAudioCue(SOUND_CUE_SCARE, 0.62f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.32f, 0.30f);
+        game->PlayAudioCue(SOUND_CUE_SCARE, TimedOutVolume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), TimedOutPulse);
         if (FuseBox* terminal = m_Objects->evidenceTerminal)
         {
             terminal->SetManualInteractionAllowed(true);
@@ -506,7 +554,7 @@ bool StageSurveillanceController::IsIlluminatingAnomaly(const Player& player) co
     Camera* viewCamera = Core::Game::GetInstance()->GetCamera();
     Vector3 toTarget = target - viewCamera->GetPosition();
     const float distance = toTarget.Length();
-    if (distance > PatrolLookDistance || distance < 0.001f)
+    if (distance > PatrolLookDistance || distance < MinimumLookDistance)
     {
         return false;
     }
@@ -540,8 +588,8 @@ void StageSurveillanceController::StartCaught(Player& player)
     Core::Game* game = Core::Game::GetInstance();
     game->RegisterCaught();
     game->PlayAudioCue(SOUND_CUE_SCARE);
-    game->GetPostProcess()->TriggerHorrorPulse(1.0f, 0.72f);
-    Input::SetVibration(24, 0.72f);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), CaughtPulse);
+    EventFeedback::Rumble(CaughtRumble);
 }
 
 void StageSurveillanceController::UpdateCaught(Player& player, float deltaTime)
@@ -581,22 +629,19 @@ void StageSurveillanceController::Complete(Player& player)
     }
     if (Wall* marker = m_Objects->evidenceMarker)
     {
-        marker->SetAppearance(
-            Color(0.08f, 0.18f, 0.10f, 1.0f),
-            Color(0.16f, 0.52f, 0.22f, 1.0f),
-            44.0f);
+        marker->SetAppearance(CompleteMarkerDiffuse, CompleteMarkerEmission, CompleteMarkerShininess);
     }
-    if (CeilingLight* roomLight = m_Objects->CeilingLightAt(3))
+    if (CeilingLight* roomLight = m_Objects->CeilingLightAt(CompleteFlickerLightNumber))
     {
-        roomLight->TriggerEventFlicker(0.84f, 0.92f);
+        EventFeedback::Flicker(*roomLight, CompleteFlicker);
     }
 
     Core::Game* game = Core::Game::GetInstance();
     game->RegisterEvidenceCollected();
-    game->PlayAudioCue(SOUND_CUE_SCARE, 0.76f);
-    game->GetPostProcess()->TriggerHorrorPulse(0.34f, 0.32f);
-    game->GetPostProcess()->TriggerBloomPulse(0.42f, 0.20f);
-    Input::SetVibration(9, 0.19f);
+    game->PlayAudioCue(SOUND_CUE_SCARE, CompleteVolume);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), CompletePulse);
+    EventFeedback::BloomPulse(*game->GetPostProcess(), CompleteBloom);
+    EventFeedback::Rumble(CompleteRumble);
 }
 
 // 知らせの文章と、表示する秒数を決めている
@@ -641,14 +686,14 @@ void StageSurveillanceController::RenderFeeds()
             FeedAspect, FeedNear, FeedFar);
 
         output.SetRenderTarget();
-        output.Clear(0.018f, 0.028f, 0.022f, 1.0f);
+        output.Clear(FeedClearColor.R(), FeedClearColor.G(), FeedClearColor.B(), FeedClearColor.A());
         camera->SetOverrideMatrices(view, projection);
 
         // 本編の照明は変えず、監視映像だけに補助の環境光を使っている（懐中電灯の光は映さない）。
         LIGHT surveillanceLight = previousLight;
         surveillanceLight.Enable = TRUE;
         surveillanceLight.FlashlightEnabled = FALSE;
-        surveillanceLight.Ambient = Color(0.16f, 0.19f, 0.17f, 1.0f);
+        surveillanceLight.Ambient = FeedAmbient;
         Renderer::SetLight(surveillanceLight);
 
         // 光源の数の上限が大きくなったため、今の照明を押し出さずに補助の光を足せる。
@@ -656,7 +701,7 @@ void StageSurveillanceController::RenderFeeds()
         ENVIRONMENT_POINT_LIGHT helper{};
         helper.PositionRange = Vector4(
             cameraPosition.x, cameraPosition.y, cameraPosition.z, FeedHelperLightRange);
-        helper.ColorIntensity = Vector4(0.72f, 0.92f, 0.78f, 0.52f);
+        helper.ColorIntensity = FeedHelperLightColor;
         surveillanceLights.push_back(helper);
         tiledLighting->SetLights(surveillanceLights);
 

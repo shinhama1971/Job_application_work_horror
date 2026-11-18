@@ -164,6 +164,12 @@ private:
     static constexpr DirectX::SimpleMath::Vector3 BehindShelfPosition{ -183.0f, -99.0f, 89.0f };
     // 動けなくなったとみなす割合（一定時間に進めたはずの距離に対して、実際に進んだ距離がこれより小さい）
     static constexpr float StuckMoveRate = 0.3f;
+    // 影の足もとの高さ（床のわずか上）
+    static constexpr float FootY = -99.0f;
+    // 押し戻した位置がこの距離より近ければ、塞がれていないとみなす
+    static constexpr float ClearTolerance = 0.01f;
+    // 向かう先がこの距離より近ければ、向きを計算しない（0で割らないため）
+    static constexpr float MinimumMoveDistance = 0.001f;
 
     // 現れる場所の候補（部屋の四隅と棚の間の通路。棚にめり込まない位置を選んでいる）
     static constexpr std::array<DirectX::SimpleMath::Vector3, 6> SpawnPoints =
@@ -198,7 +204,7 @@ private:
             const DirectX::SimpleMath::Vector3 behindShelf = BehindShelfPosition;
             DirectX::SimpleMath::Vector3 clearPosition = behindShelf;
             resolveCollision(clearPosition, BodyRadius);
-            if (HorizontalDistance(behindShelf, clearPosition) < 0.01f)
+            if (HorizontalDistance(behindShelf, clearPosition) < ClearTolerance)
             {
                 m_Position = behindShelf;
             }
@@ -236,7 +242,7 @@ private:
         DirectX::SimpleMath::Vector3 direction = target - m_Position;
         direction.y = 0.0f;
         const float targetDistance = direction.Length();
-        if (targetDistance < 0.001f)
+        if (targetDistance < MinimumMoveDistance)
         {
             return;
         }
@@ -356,7 +362,7 @@ private:
                 center.x > RoomMinX + BodyRadius && center.x < RoomMaxX - BodyRadius &&
                 center.z > RoomMinZ + BodyRadius && center.z < RoomMaxZ - BodyRadius;
             m_Walkable[cell] = insideRoom &&
-                HorizontalDistance(center, resolved) < 0.01f;
+                HorizontalDistance(center, resolved) < ClearTolerance;
         }
         m_GridBuilt = true;
         m_PlayerCell = -1;
@@ -447,7 +453,7 @@ private:
     {
         return DirectX::SimpleMath::Vector3(
             RoomMinX + (static_cast<float>(cell % GridWidth) + 0.5f) * CellSize,
-            -99.0f,
+            FootY,
             RoomMinZ + (static_cast<float>(cell / GridWidth) + 0.5f) * CellSize);
     }
 

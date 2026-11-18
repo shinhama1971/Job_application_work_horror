@@ -47,6 +47,14 @@ namespace
 	constexpr float DisappearSeconds = 0.5f;
 	constexpr float GazeDissolveMax = 0.88f;
 	constexpr float DissolveEdgeWidth = 0.085f;
+	// 影のマテリアルの色（暗い灰色の体は、シェーダーで溶けるように描く）
+	const Color ShadowDiffuse(0.70f, 0.74f, 0.70f, 1.0f);
+	// 向きや距離を計算しないほど近いとみなす長さ（2乗・そのまま）
+	constexpr float MinimumLengthSquared = 0.0001f;
+	constexpr float MinimumDistance = 0.001f;
+	// 見られて驚かせるときの振動
+	constexpr int GazeScareRumbleFrames = 12;
+	constexpr float GazeScareRumbleStrength = 0.32f;
 }
 
 // 状態を初期化し、Mayaで作った人の形のモデルを読み込んでいる
@@ -83,7 +91,7 @@ void ShadowMan::Init()
         m_DissolveBuffer.ReleaseAndGetAddressOf(), "影の溶解演出");
 
     MATERIAL material{};
-    material.Diffuse = Color(0.70f, 0.74f, 0.70f, 1.0f);
+    material.Diffuse = ShadowDiffuse;
     material.Specular = Color(0.0f, 0.0f, 0.0f, 1.0f);
     material.Shininess = 1.0f;
     material.TextureEnable = FALSE;
@@ -115,7 +123,7 @@ void ShadowMan::Update()
         if (m_Player != nullptr)
         {
             const Vector3 toPlayer = m_Player->GetPosition() - m_Position;
-            if (toPlayer.x * toPlayer.x + toPlayer.z * toPlayer.z > 0.0001f)
+            if (toPlayer.x * toPlayer.x + toPlayer.z * toPlayer.z > MinimumLengthSquared)
             {
                 m_Rotation.y = std::atan2(toPlayer.x, toPlayer.z);
             }
@@ -156,7 +164,7 @@ void ShadowMan::Update()
         Vector3 horizontalDirection(toPlayer.x, 0.0f, toPlayer.z);
         const float horizontalDistance = horizontalDirection.Length();
         if (horizontalDistance > m_ChaseStopDistance &&
-            horizontalDistance > 0.001f)
+            horizontalDistance > MinimumDistance)
         {
             horizontalDirection /= horizontalDistance;
             const float travel = (std::min)(
@@ -183,7 +191,7 @@ void ShadowMan::Update()
         }
     }
     // いつもプレイヤーの方を向いている
-    if (toPlayer.LengthSquared() > 0.0001f)
+    if (toPlayer.LengthSquared() > MinimumLengthSquared)
     {
         m_Rotation.y = std::atan2(toPlayer.x, toPlayer.z);
     }
@@ -192,7 +200,7 @@ void ShadowMan::Update()
 	const Vector3 shadowCenter = m_Position + Vector3(0.0f, ChestHeight, 0.0f);
 	Vector3 cameraToShadow = shadowCenter - game->GetCamera()->GetPosition();
 	const float distanceToShadow = cameraToShadow.Length();
-	if (distanceToShadow > 0.001f)
+	if (distanceToShadow > MinimumDistance)
 	{
 		cameraToShadow /= distanceToShadow;
 	}
@@ -222,7 +230,7 @@ void ShadowMan::Update()
 
 			if (m_GazeScareEnabled)
 			{
-				Input::SetVibration(12, 0.32f);
+				Input::SetVibration(GazeScareRumbleFrames, GazeScareRumbleStrength);
 			}
 
 			if (m_OnObserved)

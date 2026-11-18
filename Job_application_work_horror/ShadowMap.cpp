@@ -11,6 +11,21 @@
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+    // 影の深度のずらし（影のにきびを防ぐ）：一定のずらし、面の傾きに比例するずらし、その上限
+    constexpr int DepthBias = 1100;
+    constexpr float SlopeScaledDepthBias = 1.8f;
+    constexpr float DepthBiasClamp = 0.01f;
+    // ライトから見た射影：画角（懐中電灯の円錐より少し広い）、縦横比、描く距離（手前・奥）
+    constexpr float LightFieldOfViewDegrees = 66.0f;
+    constexpr float LightAspect = 1.0f;
+    constexpr float LightNear = 2.0f;
+    constexpr float LightFar = 280.0f;
+    // シェーダーで影を比べるときのずらし
+    constexpr float ShaderDepthBias = 0.0012f;
+}
+
 namespace Effect
 {
     // 深度テクスチャと、それを読むための仕組みを作っている
@@ -91,9 +106,9 @@ namespace Effect
         rasterizerDesc.FillMode = D3D11_FILL_SOLID;
         rasterizerDesc.CullMode = D3D11_CULL_BACK;
         rasterizerDesc.DepthClipEnable = TRUE;
-        rasterizerDesc.DepthBias = 1100;
-        rasterizerDesc.SlopeScaledDepthBias = 1.8f;
-        rasterizerDesc.DepthBiasClamp = 0.01f;
+        rasterizerDesc.DepthBias = DepthBias;
+        rasterizerDesc.SlopeScaledDepthBias = SlopeScaledDepthBias;
+        rasterizerDesc.DepthBiasClamp = DepthBiasClamp;
         if (FAILED(device->CreateRasterizerState(
             &rasterizerDesc,
             m_ShadowRasterizer.ReleaseAndGetAddressOf())))
@@ -168,19 +183,19 @@ namespace Effect
             Vector3::Up);
         // 画角66度（懐中電灯の円錐より少し広い）、2〜280の範囲で影を作っている
         const Matrix lightProjection = Matrix::CreatePerspectiveFieldOfView(
-            DirectX::XMConvertToRadians(66.0f),
-            1.0f,
-            2.0f,
-            280.0f);
+            DirectX::XMConvertToRadians(LightFieldOfViewDegrees),
+            LightAspect,
+            LightNear,
+            LightFar);
 
         // 行列とパラメーターをシェーダーの形にしてb8へ送っている（電球の影の値は、前に決めたものをそのまま使う）
         ShadowBuffer& buffer = m_BufferData;
         buffer.ViewProjection = (lightView * lightProjection).Transpose();
         buffer.Parameters = Vector4(
             1.0f / static_cast<float>(ShadowResolution),
-            0.0012f,
-            2.0f,
-            280.0f);
+            ShaderDepthBias,
+            LightNear,
+            LightFar);
         buffer.Options = Vector4(
             static_cast<float>(Tools::TechDemo::DefaultShadowMode), 0.0f, 0.0f, 0.0f);
         UploadBuffer();

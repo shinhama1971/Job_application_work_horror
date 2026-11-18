@@ -163,6 +163,18 @@ powershell -ExecutionPolicy Bypass -File Job_application_work_horror\tools\make-
 - ビルドに警告が1件でもあると止まります。コンパイル済みのシェーダーが足りないときも止まります。
 - 最後に、配布用のフォルダの exe を、別のフォルダを作業フォルダにして自動撮影（森の道順）で動かし、最後まで動くかを確かめます（`-SkipTest` で省ける。`-SkipBuild` でビルドを省ける）。
 - 前に作ったフォルダは消さず、毎回新しい名前で作ります。`release\` は `.gitignore` で外しています。
+
+## 提出用のソースファイルを作る
+
+リポジトリの直下で次を実行すると、提出用のソースファイルのフォルダと zip を `release\source_<日付_時刻>\` に作ります。
+
+```bash
+powershell -ExecutionPolicy Bypass -File Job_application_work_horror\tools\make-source-package.ps1
+```
+
+- 中の形：`通信途絶_ソースファイル/SignalLost_source/`（リポジトリと同じ並び）。zip の中のフォルダの区切りは `/` で書くので、Windows 以外でも開けます。
+- 入れる物：git が管理しているファイルと、まだコミットしていない新しいファイル。ビルドで作られる物（`x64\`・`cache\`・`shader\*.cso`・`.vcxproj.user`）は入れません。
+- 最後に、zip を別の場所へ展開して Release（x64）をビルドし、警告0で通るかを確かめます（`-SkipBuild` で省ける）。
 - ゲームは、exe の隣に `assets` と `shader` があるときは、exe の場所を作業フォルダにして起動します（`main.cpp` の `UseExecutableFolderWhenPackaged`）。ショートカットなど、別の場所から起動しても素材を読めます。開発中（`x64\Release` から起動）は今までどおりです。
 - C++ の実行時ライブラリは静的にリンクしている（/MT）ので、遊ぶ人が VC++ ランタイムを入れる必要はありません。設定とベスト記録は `%LOCALAPPDATA%\SignalLost` に保存します。
 

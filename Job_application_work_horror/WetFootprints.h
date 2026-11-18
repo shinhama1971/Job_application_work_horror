@@ -21,6 +21,8 @@ class WetFootprints final
 public:
     // シェーダーへ渡す足跡の最大数（wetFloorPS の FOOTPRINT_COUNT と同じ）
     static constexpr int MaxCount = 32;
+    // 足跡の向きを決められるとみなす、進んだ向きの長さの2乗
+    static constexpr float MinimumDirectionLengthSquared = 0.01f;
     // 足跡1つ分（位置・向き・左右・裸足か・濡れ具合）
     struct Print
     {
@@ -89,7 +91,7 @@ public:
                 m_WaterExit = step;
             }
             const DirectX::SimpleMath::Vector2 direction = step - m_LastStep;
-            if (direction.LengthSquared() > 0.01f)
+            if (direction.LengthSquared() > MinimumDirectionLengthSquared)
             {
                 const float yaw = std::atan2(direction.x, direction.y);
                 // 歩いた線から、右足は右へ、左足は左へずらしている（右 = 前を時計回りに90度）

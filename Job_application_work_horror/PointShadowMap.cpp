@@ -13,6 +13,13 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // 電球の影を描く距離（手前・奥）
+    constexpr float ShadowNear = 0.5f;
+    constexpr float ShadowFar = 400.0f;
+}
+
+namespace
+{
     // キューブマップの6面（+X、-X、+Y、-Y、+Z、-Z）を撮る向きと上の向き。
     // ReflectionProbe と同じく、z を反転した向きで撮り、読むときも z を反転している（pointShadow.hlsli）。
     struct FaceDirection
@@ -130,7 +137,7 @@ namespace Effect
         // 電球の位置から面の向きを、画角90度・縦横同じで見ている（6面で全方向をすき間なく覆う）
         const FaceDirection& direction = FaceDirections[face];
         Matrix view = Matrix::CreateLookAt(lightPosition, lightPosition + direction.Forward, direction.Up);
-        Matrix projection = Matrix::CreatePerspectiveFieldOfView(DirectX::XM_PIDIV2, 1.0f, 0.5f, 400.0f);
+        Matrix projection = Matrix::CreatePerspectiveFieldOfView(DirectX::XM_PIDIV2, 1.0f, ShadowNear, ShadowFar);
         Renderer::SetViewMatrix(&view);
         Renderer::SetProjectionMatrix(&projection);
     }

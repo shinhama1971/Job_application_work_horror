@@ -123,6 +123,37 @@ namespace
     constexpr float RadioStaticAfterPowerOff = 0.08f;
     constexpr float RadioStaticOutside = 0.18f;
     constexpr float RadioStaticTraced = 0.34f;
+    // センサーに見つかったときの、配管を叩く音（高さと音量）と画面の脈打ち（強さと秒数）
+    constexpr float ObservationKnockPitch = 0.66f;
+    constexpr float ObservationKnockVolume = 1.2f;
+    constexpr float ObservationPulseStrength = 0.35f;
+    constexpr float ObservationPulseSeconds = 0.30f;
+    // 回線をつなぐ順番を間違えたときの音（高さと音量）
+    constexpr float RoutingMistakePitch = 0.78f;
+    constexpr float RoutingMistakeVolume = 0.8f;
+    // 主電源を落としたときの音量、外へ出たときの雨の音量
+    constexpr float PowerOffVolume = 0.72f;
+    constexpr float RainVolume = 0.62f;
+    // 誰かの足音（高さ・音量・壁がなくても少しこもらせる量）
+    constexpr float PhantomFootstepPitch = 0.58f;
+    constexpr float PhantomFootstepVolume = 1.1f;
+    constexpr float PhantomFootstepOcclusion = 0.12f;
+
+    // --- 3面の画面効果と描画の始めの値：露出（少し暗く）、光の筋、壁の傷み（血の跡などの恐怖の印は出さない）
+    constexpr float StartExposure = 0.95f;
+    constexpr float VolumetricIntensity = 0.36f;
+    constexpr float WallWeathering = 0.85f;
+    constexpr float WallHorrorMarks = 0.0f;
+    // 部屋の角の暗がり：床と天井の高さ、強さ
+    constexpr float RoomFloorY = -100.0f;
+    constexpr float RoomCeilingY = -48.5f;
+    constexpr float RoomOcclusionStrength = 0.52f;
+    // 監視映像だけに使う環境光と、何も映らない所の色
+    const Color FeedAmbient(0.22f, 0.26f, 0.24f, 1.0f);
+    const Color FeedClearColor(0.012f, 0.021f, 0.019f, 1.0f);
+    // 無線の文字に重ねる雑音（送信機を触るな・主電源を落とすな、の警告）
+    constexpr float RadioTestWarningNoise = 0.18f;
+    constexpr float RadioBreakerWarningNoise = 0.35f;
 
     bool IsInCommunicationRoom(const Vector3& position)
     {
@@ -300,15 +331,15 @@ Stage3Scene::Stage3Scene()
     }
 
     game.SetPowerRestored(true);
-    game.GetPostProcess()->SetAtmosphere(0.18f, 0.55f);
-    game.GetPostProcess()->SetExposure(0.95f);
+    game.GetPostProcess()->SetAtmosphere(Effect::PostProcess::DefaultNoiseAmount, Effect::PostProcess::DefaultVignetteStrength);
+    game.GetPostProcess()->SetExposure(StartExposure);
     game.GetPostProcess()->SetVolumetricLight(true);
-    game.GetPostProcess()->SetVolumetricIntensity(0.36f);
+    game.GetPostProcess()->SetVolumetricIntensity(VolumetricIntensity);
     Renderer::SetLoopDepth(0.0f);
-    Renderer::SetWallWeathering(0.85f, 0.0f);
+    Renderer::SetWallWeathering(WallWeathering, WallHorrorMarks);
     const auto roomFootprints = PropLayoutFile::CollectRoomFootprints(layout);
     Renderer::SetRoomOcclusion(roomFootprints.data(), static_cast<unsigned int>(roomFootprints.size()),
-        -100.0f, -48.5f, 0.52f);
+        RoomFloorY, RoomCeilingY, RoomOcclusionStrength);
     m_Player->Update();
     game.GetCamera()->SetCameraDirection(0.0f);
     game.GetCamera()->SetCameraPitch(0.0f);
@@ -330,7 +361,7 @@ Stage3Scene::~Stage3Scene()
     auto& game = *Core::Game::GetInstance();
     game.StopAudioCue(SOUND_CUE_RADIO_STATIC);
     game.StopAudioCue(SOUND_CUE_RAIN);
-    game.GetPostProcess()->SetExposure(1.0f);
+    game.GetPostProcess()->SetExposure(Effect::PostProcess::DefaultExposure);
     game.GetPostProcess()->SetVolumetricLight(false);
     game.GetPostProcess()->SetSignalInterference(0.0f);
     Renderer::SetWallWeathering(0.0f);
@@ -375,8 +406,8 @@ void Stage3Scene::UpdateObservationRoute(float seconds)
         m_ObservationBlocked = true;
         m_ObservationScare = ObservationScareSeconds;
         auto& game = *Core::Game::GetInstance();
-        game.PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, ObservationKnockPosition, 0.66f, 1.2f);
-        game.GetPostProcess()->TriggerHorrorPulse(0.35f, 0.30f);
+        game.PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, ObservationKnockPosition, ObservationKnockPitch, ObservationKnockVolume);
+        game.GetPostProcess()->TriggerHorrorPulse(ObservationPulseStrength, ObservationPulseSeconds);
         m_Player->AddBattery(-(std::min)(ObservationBatteryPenalty,
             (std::max)(0.0f, m_Player->GetBattery() - ObservationBatteryFloor)));
     }
@@ -450,7 +481,7 @@ void Stage3Scene::Update()
                 }
                 m_RouteProgress = 0;
                 m_RoutingFeedback = RoutingMistakeSeconds;
-                game.PlayAudioCue(SOUND_CUE_PIPE_KNOCK, 0.78f, 0.8f);
+                game.PlayAudioCue(SOUND_CUE_PIPE_KNOCK, RoutingMistakePitch, RoutingMistakeVolume);
                 break;
             }
             ++m_RouteProgress;
@@ -489,7 +520,7 @@ void Stage3Scene::Update()
             m_Monitor->SetFeed(nullptr);
             m_Release->SetManualInteractionAllowed(true);
             game.SetAudioCueVolume(SOUND_CUE_RADIO_STATIC, RadioStaticAfterPowerOff);
-            game.PlayAudioCue(SOUND_CUE_POWER, 0.72f);
+            game.PlayAudioCue(SOUND_CUE_POWER, PowerOffVolume);
             m_Step = Step::Release;
             m_StepTime = 0.0f;
         }
@@ -506,7 +537,7 @@ void Stage3Scene::Update()
         if (m_Exit->IsOpen() && position.x > OutsideX)
         {
             game.SetAudioCueVolume(SOUND_CUE_RADIO_STATIC, RadioStaticOutside);
-            game.PlayAudioCue(SOUND_CUE_RAIN, 1.0f, 0.62f);
+            game.PlayAudioCue(SOUND_CUE_RAIN, 1.0f, RainVolume);
             for (FuseBox* post : m_OutdoorPosts)
             {
                 post->SetManualInteractionAllowed(true);
@@ -571,7 +602,7 @@ void Stage3Scene::Update()
             const Vector3 footstep = leaving
                 ? Vector3(position.x - LeavingFootstepBehind, FootstepHeight, 0.0f)
                 : DeskFootstepPosition;
-            game.PlayAudioCueAt(SOUND_CUE_FOOTSTEP, footstep, 0.58f, 1.1f, 0.12f);
+            game.PlayAudioCueAt(SOUND_CUE_FOOTSTEP, footstep, PhantomFootstepPitch, PhantomFootstepVolume, PhantomFootstepOcclusion);
             m_FootstepTimer = leaving ? LeavingFootstepInterval : DeskFootstepInterval;
         }
     }
@@ -593,11 +624,11 @@ void Stage3Scene::RenderOffscreen()
     const LIGHT originalLight = Renderer::GetLight();
     LIGHT feedLight = originalLight;
     feedLight.FlashlightEnabled = FALSE;
-    feedLight.Ambient = Color(0.22f, 0.26f, 0.24f, 1.0f);
+    feedLight.Ambient = FeedAmbient;
 
     auto& output = m_Feeds[m_NextFeed];
     output.SetRenderTarget();
-    output.Clear(0.012f, 0.021f, 0.019f, 1.0f);
+    output.Clear(FeedClearColor.R(), FeedClearColor.G(), FeedClearColor.B(), FeedClearColor.A());
     camera.SetOverrideMatrices(view, projection);
     Renderer::SetLight(feedLight);
     m_Figure->SetFeedPass(true);
@@ -687,13 +718,13 @@ void Stage3Scene::Draw(Camera*)
     {
         radio.Line = "「そこは触らなくていい。送信機はそのままにしろ。」";
         radio.LineAlpha = 1.0f;
-        radio.Noise = 0.18f;
+        radio.Noise = RadioTestWarningNoise;
     }
     else if (m_Step == Step::Breaker && m_StepTime < RadioWarningSeconds)
     {
         radio.Line = "「……聞こえるか。主電源は落とすな。」";
         radio.LineAlpha = 1.0f;
-        radio.Noise = 0.35f;
+        radio.Noise = RadioBreakerWarningNoise;
     }
     else if (m_Step == Step::Trace)
     {

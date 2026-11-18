@@ -464,12 +464,16 @@ namespace
         { 101.0f, Vector3(804.0f, FloorY, 0.0f), 0.30f, -0.22f, nullptr, false },
     };
 
+    // 観測区画の道順：通常の3面の道順のうち、この秒数までを使い、観測区画を回ってから、この秒数以降へ戻る（戻った後は、この秒数だけ遅らせる）
+    constexpr float ObservationBranchSeconds = 8.0f;
+    constexpr float ObservationRejoinSeconds = 36.0f;
+    constexpr float ObservationExtraSeconds = 4.0f;
     const std::vector<Keyframe> Stage3ObservationTour = []
     {
         std::vector<Keyframe> tour;
         for (const Keyframe& pose : Stage3Tour)
         {
-            if (pose.Time <= 8.0f) tour.push_back(pose);
+            if (pose.Time <= ObservationBranchSeconds) tour.push_back(pose);
         }
         const Keyframe annex[] = {
             { 10.0f, Vector3(154.0f, FloorY, 77.0f), 0.0f, -0.08f, nullptr, false },
@@ -493,9 +497,9 @@ namespace
         tour.insert(tour.end(), std::begin(annex), std::end(annex));
         for (Keyframe pose : Stage3Tour)
         {
-            if (pose.Time >= 36.0f)
+            if (pose.Time >= ObservationRejoinSeconds)
             {
-                pose.Time += 4.0f;
+                pose.Time += ObservationExtraSeconds;
                 tour.push_back(pose);
             }
         }
@@ -611,6 +615,11 @@ namespace
     // 各段階のフレーム数。切り替えた直後はGPU時間の結果が数フレーム遅れて届くため、最初の45フレームは捨てている。
     constexpr int BenchmarkWarmupFrames = 45;
     constexpr int BenchmarkMeasureFrames = 180;
+    // --figures のとき：水たまりの人影を正面のこの距離に、見えない影を正面のこの距離の少し右に置く（足もとは床の高さ）
+    constexpr float BenchmarkPuddleFigureAhead = 26.0f;
+    constexpr float BenchmarkUnseenFigureAhead = 34.0f;
+    constexpr float BenchmarkUnseenFigureRight = 8.0f;
+    constexpr float BenchmarkFigureFloorY = -100.0f;
 
     // 1つの条件（地点×ライトの状態）で集めた値。
     struct BenchmarkSamples
@@ -875,10 +884,10 @@ namespace
         {
             const Vector3 forward(std::sin(spot.Yaw), 0.0f, std::cos(spot.Yaw));
             const Vector3 right(forward.z, 0.0f, -forward.x);
-            Vector3 puddleFoot = spot.Position + forward * 26.0f;
-            Vector3 unseenFoot = spot.Position + forward * 34.0f + right * 8.0f;
-            puddleFoot.y = -100.0f;
-            unseenFoot.y = -100.0f;
+            Vector3 puddleFoot = spot.Position + forward * BenchmarkPuddleFigureAhead;
+            Vector3 unseenFoot = spot.Position + forward * BenchmarkUnseenFigureAhead + right * BenchmarkUnseenFigureRight;
+            puddleFoot.y = BenchmarkFigureFloorY;
+            unseenFoot.y = BenchmarkFigureFloorY;
             Renderer::SetFigureOverride(true, puddleFoot, unseenFoot);
         }
 

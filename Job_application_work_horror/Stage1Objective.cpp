@@ -51,6 +51,15 @@ namespace
         }
         return in.keypadSolved ? KeypadTexts[variant] : ChoiceTexts[variant];
     }
+
+    // 演出の知らせを切り替える秒数（残り秒数がこれより多い間は前半の文章）：出口の前兆、電力が戻った直後、照らす驚き
+    constexpr float ExitOmenFirstLineSeconds = 1.75f;
+    constexpr float PowerRestoreNoticeSeconds = 4.5f;
+    constexpr float PowerRestoreFirstLineSeconds = 1.55f;
+    constexpr float ScareLightFirstLineSeconds = 2.65f;
+    // 進めないまま、この秒数がたつと強いヒント、この秒数で軽いヒントを出す
+    constexpr float StrongHintSeconds = 35.0f;
+    constexpr float LightHintSeconds = 18.0f;
 }
 
 std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
@@ -175,15 +184,15 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
     // 演出の最中の文章（出口の前兆・電力が戻った瞬間・送電中・照明の演出・ループ廊下）
     else if (in.exitOmenSeconds > 0.0f)
     {
-        objectiveText = in.exitOmenSeconds > 1.75f
+        objectiveText = in.exitOmenSeconds > ExitOmenFirstLineSeconds
             ? "何かが待っている"
             : "立ち止まらず進む";
     }
     else if (in.powerRestored &&
         in.powerRestoreActive &&
-        in.powerRestoreSeconds < 4.5f)
+        in.powerRestoreSeconds < PowerRestoreNoticeSeconds)
     {
-        objectiveText = in.powerRestoreSeconds < 1.55f
+        objectiveText = in.powerRestoreSeconds < PowerRestoreFirstLineSeconds
             ? "電力が復旧した"
             : "出口側の非常送電盤へ向かう";
     }
@@ -193,7 +202,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
     }
     else if (in.scareLightNoticeSeconds > 0.0f)
     {
-        objectiveText = in.scareLightNoticeSeconds > 2.65f
+        objectiveText = in.scareLightNoticeSeconds > ScareLightFirstLineSeconds
             ? "何かに見られている"
             : "点灯した照明をたどる";
     }
@@ -213,7 +222,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         }
     }
     // 35秒止まっていたら、場所がはっきり分かるヒントを出している
-    else if (in.progressHintSeconds >= 35.0f)
+    else if (in.progressHintSeconds >= StrongHintSeconds)
     {
         if (in.powerRestored && !in.exitPowerActivated)
         {
@@ -249,7 +258,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         }
     }
     // 18秒止まっていたら、方向を示す軽いヒントを出している
-    else if (in.progressHintSeconds >= 18.0f)
+    else if (in.progressHintSeconds >= LightHintSeconds)
     {
         if (in.powerRestored && !in.exitPowerActivated)
         {

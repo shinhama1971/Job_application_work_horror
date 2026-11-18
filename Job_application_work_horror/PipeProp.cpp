@@ -11,6 +11,17 @@
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+    // Albedo（色）のテクスチャの色をそのまま見せつつ、今のライトの拡散反射・鏡面反射を受けるマテリアル。
+    // PBR：塗装した配管（金属の上に光沢のある塗料。塗料なので金属ではなく、粗さで光沢を出している）
+    const Color PipeAmbient(0.12f, 0.12f, 0.12f, 1.0f);
+    const Color PipeDiffuse(1.0f, 1.0f, 1.0f, 1.0f);
+    const Color PipeSpecular(0.18f, 0.18f, 0.18f, 1.0f);
+    constexpr float PipeShininess = 24.0f;
+    constexpr float PipeRoughness = 0.38f;
+}
+
 // モデルをキャッシュから読み込み、色のテクスチャ（Albedo）を貼るマテリアルを作っている
 void PipeProp::Init()
 {
@@ -35,15 +46,14 @@ void PipeProp::Init()
     for (MATERIAL& materialData : importedMaterials)
     {
         // Albedoの色をそのまま見せつつ、今のライトの拡散反射・鏡面反射を受けるようにしている。
-        materialData.Ambient = Color(0.12f, 0.12f, 0.12f, 1.0f);
-        materialData.Diffuse = Color(1.0f, 1.0f, 1.0f, 1.0f);
-        materialData.Specular = Color(0.18f, 0.18f, 0.18f, 1.0f);
+        materialData.Ambient = PipeAmbient;
+        materialData.Diffuse = PipeDiffuse;
+        materialData.Specular = PipeSpecular;
         materialData.Emission = Color(0.0f, 0.0f, 0.0f, 1.0f);
-        materialData.Shininess = 24.0f;
+        materialData.Shininess = PipeShininess;
         materialData.TextureEnable = albedoLoaded ? TRUE : FALSE;
-        // PBR：塗装した配管（金属の上に光沢のある塗料。塗料なので金属ではなく、粗さで光沢を出している）
         materialData.Metallic = 0.0f;
-        materialData.Roughness = 0.38f;
+        materialData.Roughness = PipeRoughness;
 
         auto material = std::make_unique<Material>();
         material->CreateRequired(materialData);

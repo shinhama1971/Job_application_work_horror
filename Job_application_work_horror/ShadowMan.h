@@ -19,6 +19,9 @@
 class ShadowMan : public Object
 {
 private:
+    // 追いかけるとき、プレイヤーの手前で止まる距離の下限
+    static constexpr float MinimumChaseStopDistance = 8.0f;
+
     // 頂点・インデックスとGPUのバッファ、マテリアル
     std::vector<VERTEX_3D> m_Vertices;
     std::vector<unsigned int> m_Indices;
@@ -121,7 +124,7 @@ public:
     {
         m_ChaseEnabled = true;
         m_ChaseSpeed = (std::max)(speed, 0.0f);
-        m_ChaseStopDistance = (std::max)(stopDistance, 8.0f);
+        m_ChaseStopDistance = (std::max)(stopDistance, MinimumChaseStopDistance);
     }
 
     // 位置を外（シーンの状態クラス）から決める使い方にしている。trueの間は、時間切れ・追ってくる動き・

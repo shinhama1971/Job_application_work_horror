@@ -54,6 +54,26 @@ namespace
     // 警告灯とライト：光る部位（配置ファイルの色で塗って光らせる）と、光らない金属の枠
     const VisualModelPart LensPart{ "Lens", Color(1.0f, 1.0f, 1.0f, 1.0f), true, true };
     const VisualModelPart HousingPart{ "Housing", Color(0.075f, 0.08f, 0.078f, 1.0f), false };
+    // 書類棚に並ぶファイル・段ボール箱・紙の束（長い棚と短い棚で同じ色）
+    const VisualModelPart BinderPart{ "Binder", Color(0.10f, 0.12f, 0.17f, 1.0f), false };
+    const VisualModelPart BoxPart{ "Box", Color(0.30f, 0.24f, 0.16f, 1.0f), false };
+    const VisualModelPart PaperPart{ "Paper", Color(0.46f, 0.44f, 0.40f, 1.0f), false };
+
+    // --- 普段の色：くすんだ灰色、光沢は弱い
+    const Color DefaultDiffuse(0.34f, 0.36f, 0.33f, 1.0f);
+    const Color DefaultAmbient(0.03f, 0.035f, 0.03f, 1.0f);
+    const Color DefaultSpecular(0.04f, 0.04f, 0.04f, 1.0f);
+    constexpr float DefaultShininess = 4.0f;
+    // 色を指定したとき（SetAppearance）の環境光と映り込みの色、光沢の下限
+    const Color AppearanceAmbient(0.025f, 0.025f, 0.025f, 1.0f);
+    const Color AppearanceSpecular(0.10f, 0.11f, 0.10f, 1.0f);
+    constexpr float MinimumShininess = 1.0f;
+    // 崩れて消える・現れる秒数の下限（0で割らないため）
+    constexpr float MinimumDissolveSeconds = 0.01f;
+    // これより透けていない物だけを、水面と鏡に箱として映す
+    constexpr float OpaqueAlpha = 0.999f;
+    // 光る色の一番強い成分がこれ以下なら、周りを照らさない
+    constexpr float MinimumGlowPeak = 0.01f;
 
     const std::vector<VisualModel>& GetVisualModels()
     {
@@ -61,11 +81,9 @@ namespace
         {
             // 書類棚（棚板・柱・筋かいと、ファイル・段ボール箱・紙の束）
             { "shelf_long", "assets/model/props/wall_shelf_long.fbx", Vector3(90.0f, 44.0f, 6.0f), true,
-                { MainPart, { "Binder", Color(0.10f, 0.12f, 0.17f, 1.0f), false },
-                  { "Box", Color(0.30f, 0.24f, 0.16f, 1.0f), false }, { "Paper", Color(0.46f, 0.44f, 0.40f, 1.0f), false } } },
+                { MainPart, BinderPart, BoxPart, PaperPart } },
             { "shelf_short", "assets/model/props/wall_shelf_short.fbx", Vector3(30.0f, 44.0f, 10.0f), true,
-                { MainPart, { "Binder", Color(0.10f, 0.12f, 0.17f, 1.0f), false },
-                  { "Box", Color(0.30f, 0.24f, 0.16f, 1.0f), false }, { "Paper", Color(0.46f, 0.44f, 0.40f, 1.0f), false } } },
+                { MainPart, BinderPart, BoxPart, PaperPart } },
             // 机の天板（幕板と引き出し）と脚
             { "desk_top", "assets/model/props/wall_desk_top.fbx", Vector3(40.0f, 2.0f, 24.0f), false,
                 { MainPart, { "Metal", Color(0.40f, 0.38f, 0.33f, 1.0f), false } } },
@@ -222,11 +240,11 @@ void Wall::Init()
 
     m_Material = std::make_unique<Material>();
     // 普段の色：くすんだ灰色、光沢は弱い
-    m_SurfaceMaterial.Diffuse = Color(0.34f, 0.36f, 0.33f, 1.0f);
-    m_SurfaceMaterial.Ambient = Color(0.03f, 0.035f, 0.03f, 1.0f);
-    m_SurfaceMaterial.Specular = Color(0.04f, 0.04f, 0.04f, 1.0f);
+    m_SurfaceMaterial.Diffuse = DefaultDiffuse;
+    m_SurfaceMaterial.Ambient = DefaultAmbient;
+    m_SurfaceMaterial.Specular = DefaultSpecular;
     m_SurfaceMaterial.Emission = Color(0.0f, 0.0f, 0.0f, 1.0f);
-    m_SurfaceMaterial.Shininess = 4.0f;
+    m_SurfaceMaterial.Shininess = DefaultShininess;
     m_SurfaceMaterial.TextureEnable = FALSE;
     m_Material->CreateRequired(m_SurfaceMaterial);
     m_UnlitPartMaterial = std::make_unique<Material>();
@@ -276,7 +294,7 @@ void Wall::DissolveIn(float seconds)
         ApplyDissolve(1.0f);
     }
     m_DissolveTarget = 0.0f;
-    m_DissolveSpeed = 1.0f / (std::max)(seconds, 0.01f);
+    m_DissolveSpeed = 1.0f / (std::max)(seconds, MinimumDissolveSeconds);
 }
 
 void Wall::DissolveOut(float seconds)
@@ -286,7 +304,7 @@ void Wall::DissolveOut(float seconds)
         return;
     }
     m_DissolveTarget = 1.0f;
-    m_DissolveSpeed = 1.0f / (std::max)(seconds, 0.01f);
+    m_DissolveSpeed = 1.0f / (std::max)(seconds, MinimumDissolveSeconds);
 }
 
 void Wall::ApplyDissolve(float dissolve)
@@ -316,7 +334,7 @@ Matrix Wall::MakeWorldMatrix() const
 bool Wall::GetReflectionProxy(ReflectionProxy& proxy) const
 {
     if (!m_Visible || m_Dissolve > 0.0f || m_IsMirror ||
-        m_SurfaceMaterial.WeatheringSurface || m_SurfaceMaterial.Diffuse.w < 0.999f)
+        m_SurfaceMaterial.WeatheringSurface || m_SurfaceMaterial.Diffuse.w < OpaqueAlpha)
     {
         return false;
     }
@@ -557,10 +575,10 @@ void Wall::SetAppearance(
         m_SurfaceMaterial.Diffuse.y != diffuse.y || m_SurfaceMaterial.Diffuse.z != diffuse.z;
     m_SurfaceMaterial.Diffuse = diffuse;
     // 絵を計算で描く面（肖像画・時計）では、環境の色の値を絵へ渡す値として使っている（SetPortraitEyes・SetClockHands）
-    m_SurfaceMaterial.Ambient = m_HasSurfaceParams ? m_SurfaceParams : Color(0.025f, 0.025f, 0.025f, 1.0f);
-    m_SurfaceMaterial.Specular = Color(0.10f, 0.11f, 0.10f, 1.0f);
+    m_SurfaceMaterial.Ambient = m_HasSurfaceParams ? m_SurfaceParams : AppearanceAmbient;
+    m_SurfaceMaterial.Specular = AppearanceSpecular;
     m_SurfaceMaterial.Emission = emission;
-    m_SurfaceMaterial.Shininess = (std::max)(shininess, 1.0f);
+    m_SurfaceMaterial.Shininess = (std::max)(shininess, MinimumShininess);
     m_SurfaceMaterial.TextureEnable = FALSE;
 
     if (m_Material != nullptr)
@@ -756,7 +774,7 @@ void Wall::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) cons
     const Color& emission = m_SurfaceMaterial.Emission;
     // 光る色の一番強い成分で割って色だけを取り出し、強さは別に渡している
     const float peak = (std::max)(emission.R(), (std::max)(emission.G(), emission.B()));
-    if (peak <= 0.01f)
+    if (peak <= MinimumGlowPeak)
     {
         return;
     }

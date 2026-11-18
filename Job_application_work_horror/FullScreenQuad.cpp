@@ -8,6 +8,12 @@
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+    // 画面効果がこれより弱ければ、その効果の描画を省く
+    constexpr float EffectEpsilon = 0.001f;
+}
+
 namespace Graphics
 {
     // 画面と同じ大きさの四角形（左上が原点の画素単位）と、5種類の画面効果のシェーダー、定数バッファを作っている
@@ -196,7 +202,7 @@ namespace Graphics
 
         // 露出の補正の後にブルームを加算し、明るい照明のにじみを残している。
         // 大きさの違う段（t0〜t3。1/4・1/8・1/16・1/32）を合成のシェーダーで重ねている
-        if (bloomSRVs != nullptr && bloomIntensity > 0.001f)
+        if (bloomSRVs != nullptr && bloomIntensity > EffectEpsilon)
         {
             m_BloomShader.SetGPU();
             Renderer::SetBlendState(BS_ADDITIVE);
@@ -218,9 +224,9 @@ namespace Graphics
         }
 
         // CRT風の効果は半透明の重ね描きとして合成し、画面全体を黒で塗りつぶさないようにしている。
-        if (noiseAmount > 0.0f || horrorPulseStrength > 0.001f ||
-            lensMoisture > 0.001f || filmGradeStrength > 0.001f ||
-            signalInterference > 0.001f || frameHold > 0.5f || fearVision > 0.001f)
+        if (noiseAmount > 0.0f || horrorPulseStrength > EffectEpsilon ||
+            lensMoisture > EffectEpsilon || filmGradeStrength > EffectEpsilon ||
+            signalInterference > EffectEpsilon || frameHold > 0.5f || fearVision > EffectEpsilon)
         {
             m_OverlayShader.SetGPU();
             Renderer::SetBlendState(BS_ALPHABLEND);

@@ -14,6 +14,12 @@ class ScratchAnomaly final
 private:
     // 傷の表示を更新する間隔（0.05秒）
     static constexpr float UpdateInterval = 0.05f;
+    // 驚かせる条件：この周回から、ライトを点けて、この距離より近く、この向き（内積）より正面で傷を照らしたとき
+    static constexpr int ScareLoop = 2;
+    static constexpr float ScareDistance = 92.0f;
+    static constexpr float ScareFacing = 0.90f;
+    // 気づいたときの知らせを出す秒数
+    static constexpr float NoticeSeconds = 2.2f;
 
     // 通知の残り秒数、更新の間隔を数える値、驚かせる演出がこの周回で起きたか
     float m_NoticeTimer = 0.0f;
@@ -66,14 +72,14 @@ public:
         float distance,
         float facing) noexcept
     {
-        if (m_ScareTriggered || loopCount < 2 || !flashlightOn ||
-            distance >= 92.0f || facing <= 0.90f)
+        if (m_ScareTriggered || loopCount < ScareLoop || !flashlightOn ||
+            distance >= ScareDistance || facing <= ScareFacing)
         {
             return false;
         }
 
         m_ScareTriggered = true;
-        m_NoticeTimer = 2.2f;
+        m_NoticeTimer = NoticeSeconds;
         return true;
     }
 

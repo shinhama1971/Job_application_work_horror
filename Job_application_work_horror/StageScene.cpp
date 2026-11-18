@@ -146,6 +146,28 @@ namespace
     constexpr float FilmGradeTension = 0.18f;
     constexpr float LensDirtBase = 0.10f;
     constexpr float LensDirtTension = 0.12f;
+
+    // 1面の壁の傷み（パネルの継ぎ目・ひび・水の垂れた跡・カビ）の強さ
+    constexpr float Stage1WallWeathering = 1.0f;
+    // 看板やランプが周りを照らす光（届く距離と強さ）：ドアの上の表示、扉のランプと監視カメラの目印、周回の目印
+    constexpr float DoorSignGlowRange = 60.0f;
+    constexpr float DoorSignGlowIntensity = 2.2f;
+    constexpr float IndicatorGlowRange = 45.0f;
+    constexpr float IndicatorGlowIntensity = 2.0f;
+    constexpr float LoopMarkerGlowRange = 40.0f;
+    constexpr float LoopMarkerGlowIntensity = 1.8f;
+    // 空だった箱へヒューズが戻るときの画面の脈打ち
+    constexpr PulseSpec KeypadFuseReturnPulse{ 0.14f, 0.30f };
+    // 西棟の天井の人影：水面に映った人影に気づいたとき（真上から降る息づかい）
+    constexpr EventFeedback::SoundSpec CeilingFigureBreath{ 0.74f, 0.42f };
+    constexpr PulseSpec CeilingFigureSeenPulse{ 0.16f, 0.30f };
+    constexpr RumbleSpec CeilingFigureSeenRumble{ 3, 0.10f };
+    // 見上げると消えていたとき（真下の水面に落ちる滴と波紋の大きさ・強さ）
+    constexpr float CeilingFigureRippleRadius = 2.0f;
+    constexpr float CeilingFigureRippleStrength = -1.5f;
+    constexpr EventFeedback::SoundSpec CeilingFigureDrop{ 0.95f, 0.80f };
+    constexpr PulseSpec CeilingFigureVanishedPulse{ 0.26f, 0.36f };
+    constexpr RumbleSpec CeilingFigureVanishedRumble{ 5, 0.14f };
 }
 
 // 作るときに初期化している
@@ -165,11 +187,11 @@ void StageScene::Init()
 {
     Core::Game* game = Core::Game::GetInstance();
     // 1面は長く放置された施設なので、壁にパネルの継ぎ目・ひび・水の垂れた跡・カビを出している。
-    Renderer::SetWallWeathering(1.0f);
+    Renderer::SetWallWeathering(Stage1WallWeathering);
     game->GetPostProcess()->SetVolumetricLight(true);
-    game->GetPostProcess()->SetLensDistortionStrength(0.20f);
-    game->GetPostProcess()->SetFilmGradeStrength(0.52f);
-    game->GetPostProcess()->SetLensDirtStrength(0.10f);
+    game->GetPostProcess()->SetLensDistortionStrength(DistortionBase);
+    game->GetPostProcess()->SetFilmGradeStrength(FilmGradeBase);
+    game->GetPostProcess()->SetLensDirtStrength(LensDirtBase);
     // 進行の状態をすべて最初に戻している
     m_CorridorLoopCount = 0;
     m_LastFuseCount = game->GetItemCount();
@@ -244,13 +266,13 @@ void StageScene::Init()
 // 天井照明だけだった頃は、光源の数の上限（8個）のせいで足せなかった小さな光。
 void StageScene::SetupPracticalLights()
 {
-    m_Objects.exitSign->SetGlowLight(60.0f, 2.2f);
-    m_Objects.startDoorSign->SetGlowLight(60.0f, 2.2f);
-    m_Objects.doorIndicator->SetGlowLight(45.0f, 2.0f);
-    m_Objects.evidenceMarker->SetGlowLight(45.0f, 2.0f);
+    m_Objects.exitSign->SetGlowLight(DoorSignGlowRange, DoorSignGlowIntensity);
+    m_Objects.startDoorSign->SetGlowLight(DoorSignGlowRange, DoorSignGlowIntensity);
+    m_Objects.doorIndicator->SetGlowLight(IndicatorGlowRange, IndicatorGlowIntensity);
+    m_Objects.evidenceMarker->SetGlowLight(IndicatorGlowRange, IndicatorGlowIntensity);
     for (Wall* marker : m_Objects.loopMarkers)
     {
-        marker->SetGlowLight(40.0f, 1.8f);
+        marker->SetGlowLight(LoopMarkerGlowRange, LoopMarkerGlowIntensity);
     }
 }
 
@@ -331,7 +353,7 @@ void StageScene::UpdateThirdFuseRoutes()
     {
         m_KeypadFuseReturned = true;
         game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, keypadFuse->GetPosition(), KeypadFuseReturnPitch, KeypadFuseReturnVolume);
-        game->GetPostProcess()->TriggerHorrorPulse(0.14f, 0.30f);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), KeypadFuseReturnPulse);
     }
     m_WasThirdFuseStage = thirdFuseStage;
 
@@ -517,9 +539,10 @@ void StageScene::UpdateCeilingReflection(const Player& player, float deltaTime)
     if (scareEvent == CeilingReflectionScare::Event::Seen)
     {
         // 水面の人影に気づいた：真上から、かすかな息づかいが降ってくる
-        game->PlayAudioCueAt(SOUND_CUE_BREATH, position - Vector3(0.0f, CeilingReflectionScare::HeadDrop, 0.0f), 0.74f, 0.42f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.16f, 0.30f);
-        Input::SetVibration(3, 0.10f);
+        game->PlayAudioCueAt(SOUND_CUE_BREATH, position - Vector3(0.0f, CeilingReflectionScare::HeadDrop, 0.0f),
+            CeilingFigureBreath.Pitch, CeilingFigureBreath.Volume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), CeilingFigureSeenPulse);
+        EventFeedback::Rumble(CeilingFigureSeenRumble);
     }
     else if (scareEvent == CeilingReflectionScare::Event::Vanished)
     {
@@ -527,11 +550,11 @@ void StageScene::UpdateCeilingReflection(const Player& player, float deltaTime)
         const Vector3 below(position.x, CeilingReflectionScare::WaterY, position.z);
         if (ground != nullptr)
         {
-            ground->AddRippleImpulse(below, 2.0f, -1.5f);
+            ground->AddRippleImpulse(below, CeilingFigureRippleRadius, CeilingFigureRippleStrength);
         }
-        game->PlayAudioCueAt(SOUND_CUE_WATER_DROP, below, 0.95f, 0.80f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.26f, 0.36f);
-        Input::SetVibration(5, 0.14f);
+        game->PlayAudioCueAt(SOUND_CUE_WATER_DROP, below, CeilingFigureDrop.Pitch, CeilingFigureDrop.Volume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), CeilingFigureVanishedPulse);
+        EventFeedback::Rumble(CeilingFigureVanishedRumble);
     }
 }
 
@@ -891,13 +914,14 @@ void StageScene::Uninit()
     Renderer::SetWallWeathering(0.0f);
     Renderer::SetRoomOcclusion(nullptr, 0, 0.0f, 0.0f, 0.0f);
     Renderer::SetPuddleFigure(Vector3::Zero, 0.0f);
-    Core::Game::GetInstance()->GetPostProcess()->SetAtmosphere(0.18f, 0.55f);
-    Core::Game::GetInstance()->GetPostProcess()->SetExposure(1.0f);
-    Core::Game::GetInstance()->GetPostProcess()->SetCorridorTension(0.0f);
-    Core::Game::GetInstance()->GetPostProcess()->SetVolumetricLight(false);
-    Core::Game::GetInstance()->GetPostProcess()->SetLensDistortionStrength(0.20f);
-    Core::Game::GetInstance()->GetPostProcess()->SetFilmGradeStrength(0.55f);
-    Core::Game::GetInstance()->GetPostProcess()->SetLensDirtStrength(0.10f);
+    Effect::PostProcess* postProcess = Core::Game::GetInstance()->GetPostProcess();
+    postProcess->SetAtmosphere(Effect::PostProcess::DefaultNoiseAmount, Effect::PostProcess::DefaultVignetteStrength);
+    postProcess->SetExposure(Effect::PostProcess::DefaultExposure);
+    postProcess->SetCorridorTension(0.0f);
+    postProcess->SetVolumetricLight(false);
+    postProcess->SetLensDistortionStrength(Effect::PostProcess::DefaultLensDistortionStrength);
+    postProcess->SetFilmGradeStrength(Effect::PostProcess::DefaultFilmGradeStrength);
+    postProcess->SetLensDirtStrength(Effect::PostProcess::DefaultLensDirtStrength);
     m_Surveillance.Uninit();
     m_Hud.Uninit();
 

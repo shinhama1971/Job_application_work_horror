@@ -63,11 +63,11 @@ namespace
     const SignalSpec Signals[] =
     {
         { "Stage2SignalTerminalBlue", "青い信号盤を操作する", "Stage2SignalMarkerBlue",
-            Color(0.015f, 0.055f, 0.13f, 1.0f), Color(0.015f, 0.18f, 0.48f, 1.0f) },
+            Stage2SignalDiffuse[0], Stage2SignalEmission[0] },
         { "Stage2SignalTerminalAmber", "黄色い信号盤を操作する", "Stage2SignalMarkerAmber",
-            Color(0.13f, 0.075f, 0.012f, 1.0f), Color(0.40f, 0.17f, 0.008f, 1.0f) },
+            Stage2SignalDiffuse[1], Stage2SignalEmission[1] },
         { "Stage2SignalTerminalRed", "赤い信号盤を操作する", "Stage2SignalMarkerRed",
-            Color(0.13f, 0.018f, 0.012f, 1.0f), Color(0.42f, 0.018f, 0.008f, 1.0f) },
+            Stage2SignalDiffuse[2], Stage2SignalEmission[2] },
     };
     constexpr float SignalMarkerShininess = 48.0f;
 

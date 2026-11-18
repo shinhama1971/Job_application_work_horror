@@ -155,6 +155,18 @@ public:
     // 2面の右上に縦に並ぶ「状態パネル（高さ58）」と「危険ゲージ（高さ40）」に、すき間（8ずつ）を足した高さ。
     // 危険ゲージは出たり消えたりするため、出ていないときも場所を空けておき、下の表示が上下に動かないようにしている。
     static constexpr float Stage2StatusReservedHeight = 58.0f + 8.0f + 40.0f + 8.0f;
+    // 面の始まり：黒から明るくする秒数と、章のカード（DrawChapterCard）を出す秒数。カードが消えてから目的地の方向を出す
+    static constexpr float IntroFadeSeconds = 0.65f;
+    static constexpr float ChapterCardSeconds = 4.20f;
+    // 捕まったときに画面を暗くする強さ
+    static constexpr float CaughtDarkness = 0.96f;
+    // 無線の文字（森の無線・1面の無線と録音で共通）：行の文字が浮かぶ秒数、行が届いた瞬間の文字の乱れ（強さと消える秒数）、
+    // 「通信途絶」の文字が消える秒数と、強く乱れる秒数
+    static constexpr float RadioLineFadeInSeconds = 0.2f;
+    static constexpr float RadioLineNoiseStrength = 0.55f;
+    static constexpr float RadioLineNoiseSeconds = 0.5f;
+    static constexpr float RadioSignalLostFadeSeconds = 0.6f;
+    static constexpr float RadioSignalLostNoiseSeconds = 1.3f;
 
 private:
     // 1回にためられる頂点の数の上限
@@ -165,6 +177,8 @@ private:
     static constexpr float ReferenceHeight = 864.0f;
     // 文字1つの幅（文字の大きさの倍率に掛ける。5画素の字と1画素の間）
     static constexpr float GlyphAdvance = 6.0f;
+    // 文字1つの高さ（文字の大きさの倍率に掛ける。7画素の行）
+    static constexpr float GlyphRows = 7.0f;
     // キャンバスの拡大率（描画解像度の高さ÷864）、キャンバスの幅（画面の縦横比に合わせて変わる）、高さ（常に864）
     static float GetCanvasScale();
     static float GetCanvasWidth();

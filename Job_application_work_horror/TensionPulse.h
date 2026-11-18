@@ -48,6 +48,38 @@ private:
     // 心拍の速さ（1分あたりの回数）。緊張度0で RestingRate、1で RestingRate + RateRange になる。
     static constexpr float RestingRate = 62.0f;
     static constexpr float RateRange = 88.0f;
+    // 1分の秒数と、次の拍までの最短の秒数
+    static constexpr float SecondsPerMinute = 60.0f;
+    static constexpr float MinimumBeatInterval = 0.05f;
+    // 心拍の音量（最小＋大きさの幅）、隠れている間に大きくする倍率、高さ（最低＋緊張度の幅）
+    static constexpr float BeatMinVolume = 0.30f;
+    static constexpr float BeatVolumeRange = 0.70f;
+    static constexpr float HidingBeatVolumeScale = 1.15f;
+    static constexpr float BeatBasePitch = 0.94f;
+    static constexpr float BeatPitchRange = 0.12f;
+    // 心拍に合わせた振動：この緊張度から震わせ、強さは 最低＋緊張度の幅
+    static constexpr float VibrationLevel = 0.45f;
+    static constexpr float VibrationBase = 0.05f;
+    static constexpr float VibrationRange = 0.20f;
+    // 息が一番荒くなる緊張度
+    static constexpr float HeavyBreathLevel = 0.85f;
+    // 隠れた直後に息を止めておく秒数（最初の静かな呼吸まで）
+    static constexpr float HideBreathHoldSeconds = 1.4f;
+    // ロッカーから出た瞬間に吐く息（音量は 最低＋荒さの幅、高さ）
+    static constexpr float ExhaleMinVolume = 0.55f;
+    static constexpr float ExhaleVolumeRange = 0.35f;
+    static constexpr float ExhalePitch = 0.92f;
+    // 息が荒くなり始めた瞬間にすぐ鳴らすため、経過時間をこの大きな値にする
+    static constexpr float BreathDueImmediately = 1000.0f;
+    // 呼吸の間隔（最長−荒さで縮める幅）。素材は約2.1秒なので、鳴り終わる長さ以上にしている
+    static constexpr float BreathIntervalSeconds = 3.6f;
+    static constexpr float BreathIntervalShrink = 1.5f;
+    // 呼吸の音量と高さ：隠れている間（小さく低く）、普段（最低＋荒さの幅）
+    static constexpr float HidingBreathVolume = 0.22f;
+    static constexpr float HidingBreathPitch = 0.86f;
+    static constexpr float BreathMinVolume = 0.35f;
+    static constexpr float BreathVolumeRange = 0.65f;
+    static constexpr float BreathPitchRange = 0.16f;
 
     // 今の緊張度、次の心拍までの秒数
     float m_Level = 0.0f;
@@ -96,15 +128,15 @@ public:
             m_BeatTimer -= deltaTime;
             if (m_BeatTimer <= 0.0f)
             {
-                m_BeatTimer += 60.0f / GetBeatsPerMinute();
-                m_BeatTimer = (std::max)(m_BeatTimer, 0.05f);
+                m_BeatTimer += SecondsPerMinute / GetBeatsPerMinute();
+                m_BeatTimer = (std::max)(m_BeatTimer, MinimumBeatInterval);
                 const float loudness = MathUtility::SmoothStep(HeartAudibleLevel, HeartFullVolumeLevel, m_Level);
                 output.beat = true;
                 // 隠れている間は周りが静かな分、自分の心拍を少し大きく聞かせている。
-                output.beatVolume = (0.30f + 0.70f * loudness) * (hiding ? 1.15f : 1.0f);
-                output.beatPitch = 0.94f + 0.12f * m_Level;
+                output.beatVolume = (BeatMinVolume + BeatVolumeRange * loudness) * (hiding ? HidingBeatVolumeScale : 1.0f);
+                output.beatPitch = BeatBasePitch + BeatPitchRange * m_Level;
                 // 強い緊張のときだけ、心拍に合わせてコントローラーを短く震わせている。
-                output.vibration = m_Level >= 0.45f ? 0.05f + 0.20f * m_Level : 0.0f;
+                output.vibration = m_Level >= VibrationLevel ? VibrationBase + VibrationRange * m_Level : 0.0f;
             }
         }
         else
@@ -113,38 +145,38 @@ public:
         }
 
         // 呼吸。隠れている間は「息を殺す」ため、緊張度に関係なく小さくゆっくりにしている。
-        const float heavy = MathUtility::SmoothStep(BreathAudibleLevel, 0.85f, m_Level);
+        const float heavy = MathUtility::SmoothStep(BreathAudibleLevel, HeavyBreathLevel, m_Level);
         const bool breathAudible = hiding || m_Level >= BreathAudibleLevel;
         m_BreathElapsed += (std::max)(deltaTime, 0.0f);
         if (hiding && !m_WasHiding)
         {
             // 隠れた直後は息を止め、少ししてから最初の静かな呼吸をしている。
-            m_BreathElapsed = HeldBreathInterval - 1.4f;
+            m_BreathElapsed = HeldBreathInterval - HideBreathHoldSeconds;
         }
         else if (!hiding && m_WasHiding && m_Level >= HeartAudibleLevel)
         {
             // ロッカーから出た瞬間に、止めていた息を吐いている（「ふぅ」）。
             output.breath = true;
-            output.breathVolume = 0.55f + 0.35f * heavy;
-            output.breathPitch = 0.92f;
+            output.breathVolume = ExhaleMinVolume + ExhaleVolumeRange * heavy;
+            output.breathPitch = ExhalePitch;
             m_BreathElapsed = 0.0f;
         }
         else if (breathAudible && !m_WasBreathAudible)
         {
             // 息が荒くなり始めた瞬間に、1回目を鳴らしている。
-            m_BreathElapsed = 1000.0f;
+            m_BreathElapsed = BreathDueImmediately;
         }
 
         if (breathAudible && !output.breath)
         {
             // 素材は約2.1秒。高い音で鳴らすと短くなるため、間隔は素材が鳴り終わる長さ以上にしている。
-            const float interval = hiding ? HeldBreathInterval : 3.6f - 1.5f * heavy;
+            const float interval = hiding ? HeldBreathInterval : BreathIntervalSeconds - BreathIntervalShrink * heavy;
             if (m_BreathElapsed >= interval)
             {
                 m_BreathElapsed = 0.0f;
                 output.breath = true;
-                output.breathVolume = hiding ? 0.22f : 0.35f + 0.65f * heavy;
-                output.breathPitch = hiding ? 0.86f : 1.0f + 0.16f * heavy;
+                output.breathVolume = hiding ? HidingBreathVolume : BreathMinVolume + BreathVolumeRange * heavy;
+                output.breathPitch = hiding ? HidingBreathPitch : 1.0f + BreathPitchRange * heavy;
             }
         }
         m_WasBreathAudible = breathAudible;

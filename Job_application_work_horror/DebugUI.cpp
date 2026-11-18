@@ -46,15 +46,17 @@ namespace
     bool g_EnableBloom = true;
     bool g_EnableNoise = true;
     bool g_EnableVolumetricLight = false;
-    float g_VolumetricIntensity = 0.58f;
-    float g_BloomIntensity = 0.48f;
-    float g_NoiseAmount = 0.18f;
-    float g_VignetteStrength = 0.55f;
-    float g_Exposure = 1.0f;
-    float g_LensDistortion = 0.32f;
+    // 始めの値は、画面効果の普段の値（レンズの歪みは作った直後の値、レンズの汚れは調整しやすいよう少し強め）
+    constexpr float InitialLensDirtStrength = 0.16f;
+    float g_VolumetricIntensity = Effect::PostProcess::DefaultVolumetricIntensity;
+    float g_BloomIntensity = Effect::PostProcess::DefaultBloomIntensity;
+    float g_NoiseAmount = Effect::PostProcess::DefaultNoiseAmount;
+    float g_VignetteStrength = Effect::PostProcess::DefaultVignetteStrength;
+    float g_Exposure = Effect::PostProcess::DefaultExposure;
+    float g_LensDistortion = Effect::PostProcess::StartupLensDistortionStrength;
     float g_CorridorTension = 0.0f;
-    float g_FilmGradeStrength = 0.55f;
-    float g_LensDirtStrength = 0.16f;
+    float g_FilmGradeStrength = Effect::PostProcess::DefaultFilmGradeStrength;
+    float g_LensDirtStrength = InitialLensDirtStrength;
     float g_SignalInterference = 0.0f;
     // 壁の湿り気の強さ（シェーダーへ渡している）
     float g_WallDampStrength = 1.0f;
@@ -73,6 +75,16 @@ namespace
     int g_FrameTimeOffset = 0;
     // シェーダーのデバッグ表示の番号（0は通常の画面）
     int g_DebugViewMode = 0;
+    // 窓と枠の角の丸み
+    constexpr float WindowRounding = 3.0f;
+    constexpr float FrameRounding = 2.0f;
+    // 危険度を百分率で見せる倍率
+    constexpr float PercentScale = 100.0f;
+    // スライダーの上限（見た目が壊れない調整の幅）：ブルーム、ノイズ、周辺減光、壁の湿り気
+    constexpr float MaxBloomSlider = 2.0f;
+    constexpr float MaxNoiseSlider = 0.50f;
+    constexpr float MaxVignetteSlider = 1.20f;
+    constexpr float MaxWallDampSlider = 2.0f;
 #endif
 }
 
@@ -94,8 +106,8 @@ bool Debug::UI::Init(HWND window)
 
     ImGui::StyleColorsDark();
     ImGuiStyle& style = ImGui::GetStyle();
-    style.WindowRounding = 3.0f;
-    style.FrameRounding = 2.0f;
+    style.WindowRounding = WindowRounding;
+    style.FrameRounding = FrameRounding;
 
     if (!ImGui_ImplWin32_Init(window))
     {
@@ -351,7 +363,7 @@ namespace
         ImGui::Text("探す異変  1周目: %s  2周目: %s",
             sceneDebugInfo.firstAnomaly, sceneDebugInfo.secondAnomaly);
         ImGui::Text("信号 %d / 3  足音危険度 %.0f%%",
-            sceneDebugInfo.puzzleStep, sceneDebugInfo.threatLevel * 100.0f);
+            sceneDebugInfo.puzzleStep, sceneDebugInfo.threatLevel * PercentScale);
         ImGui::Text("失敗回数 %d  再試行補助 %s",
             sceneDebugInfo.puzzleMistakeCount,
             sceneDebugInfo.puzzleMistakeCount >= 2 ? "強" :
@@ -505,17 +517,17 @@ namespace
         // スライダーの範囲（下限〜上限）は、見た目が壊れない調整の幅
         ImGui::SliderFloat(
             "Volume intensity", &g_VolumetricIntensity, 0.0f, 1.0f, "%.2f");
-        ImGui::SliderFloat("Bloom", &g_BloomIntensity, 0.0f, 2.0f, "%.2f");
-        ImGui::SliderFloat("Noise", &g_NoiseAmount, 0.0f, 0.50f, "%.3f");
-        ImGui::SliderFloat("Vignette", &g_VignetteStrength, 0.0f, 1.20f, "%.2f");
+        ImGui::SliderFloat("Bloom", &g_BloomIntensity, 0.0f, MaxBloomSlider, "%.2f");
+        ImGui::SliderFloat("Noise", &g_NoiseAmount, 0.0f, MaxNoiseSlider, "%.3f");
+        ImGui::SliderFloat("Vignette", &g_VignetteStrength, 0.0f, MaxVignetteSlider, "%.2f");
         ImGui::SliderFloat("Exposure", &g_Exposure,
             Effect::PostProcess::MinimumSceneExposure, Effect::PostProcess::MaximumSceneExposure, "%.3f");
-        ImGui::SliderFloat("Lens distortion", &g_LensDistortion, 0.0f, 0.80f, "%.2f");
+        ImGui::SliderFloat("Lens distortion", &g_LensDistortion, 0.0f, Effect::PostProcess::MaxLensDistortionStrength, "%.2f");
         ImGui::SliderFloat("Corridor tension", &g_CorridorTension, 0.0f, 1.0f, "%.2f");
         ImGui::SliderFloat("Filmic split tone", &g_FilmGradeStrength, 0.0f, 1.0f, "%.2f");
         ImGui::SliderFloat("Lens dirt bloom", &g_LensDirtStrength, 0.0f, 1.0f, "%.2f");
         ImGui::SliderFloat("Signal interference", &g_SignalInterference, 0.0f, 1.0f, "%.2f");
-        ImGui::SliderFloat("Wall dampness", &g_WallDampStrength, 0.0f, 2.0f, "%.2f");
+        ImGui::SliderFloat("Wall dampness", &g_WallDampStrength, 0.0f, MaxWallDampSlider, "%.2f");
 
         if (ImGui::Button("Bloom pulse"))
         {

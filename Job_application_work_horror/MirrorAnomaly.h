@@ -31,6 +31,9 @@ class MirrorAnomaly final
 {
 public:
     // 鏡の面（左の壁から廊下の側へ向いた面）の位置と大きさ。Stage2Layout の鏡の箱と合わせている
+    // 人影の足元の高さと、向きを計算しないほど近いとみなす距離
+    static constexpr float FigureFootY = -99.0f;
+    static constexpr float MinimumDistance = 0.001f;
     static constexpr float SurfaceX = -39.3f;
     static constexpr float CenterY = -68.0f;
     static constexpr float CenterZ = 37.0f;
@@ -54,7 +57,7 @@ public:
 
 private:
     // 影の立つ位置、影を見たか、見つけたか、鏡の中の影を見続けている秒数、振り返るまでの残り秒数、通知の残り秒数
-    DirectX::SimpleMath::Vector3 m_FigurePosition = DirectX::SimpleMath::Vector3(16.0f, -99.0f, 33.0f);
+    DirectX::SimpleMath::Vector3 m_FigurePosition = DirectX::SimpleMath::Vector3(16.0f, FigureFootY, 33.0f);
     bool m_Seen = false;
     bool m_Found = false;
     float m_SeenSeconds = 0.0f;
@@ -82,7 +85,7 @@ public:
     static DirectX::SimpleMath::Vector3 FigurePositionBehind(const DirectX::SimpleMath::Vector3& playerPosition) noexcept
     {
         return DirectX::SimpleMath::Vector3(
-            (std::min)(playerPosition.x + MirrorFigureOffsetX, MirrorFigureMaxX), -99.0f, playerPosition.z - MirrorFigureOffsetZ);
+            (std::min)(playerPosition.x + MirrorFigureOffsetX, MirrorFigureMaxX), FigureFootY, playerPosition.z - MirrorFigureOffsetZ);
     }
 
     // 目の位置eyeから見て、pointが鏡に映っているかを調べている。
@@ -135,7 +138,7 @@ public:
                 }
                 DirectX::SimpleMath::Vector3 toHit = hit - eye;
                 const float distance = toHit.Length();
-                if (distance > 0.001f && distance < MirrorFoundDistance && forward.Dot(toHit / distance) > MirrorFoundFacing)
+                if (distance > MinimumDistance && distance < MirrorFoundDistance && forward.Dot(toHit / distance) > MirrorFoundFacing)
                 {
                     visible = true;
                     break;
@@ -160,7 +163,7 @@ public:
         flatForward.y = 0.0f;
         const float distance = toFigure.Length();
         const float forwardLength = flatForward.Length();
-        if (distance > 0.001f && forwardLength > 0.001f &&
+        if (distance > MinimumDistance && forwardLength > MinimumDistance &&
             (flatForward / forwardLength).Dot(toFigure / distance) > MirrorTurnFacing)
         {
             m_Found = true;

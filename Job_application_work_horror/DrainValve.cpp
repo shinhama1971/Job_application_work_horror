@@ -17,6 +17,14 @@ namespace
     // ハンドルの中心の、壁の表面からの距離と、回る速さ（ラジアン/秒）
     constexpr float WheelOffset = 5.2f;
     constexpr float WheelTurnSpeed = 2.6f;
+    // マテリアル：色は頂点の色。PBR は赤く塗ったバルブの取っ手と、塗装した配管（塗料なので金属ではなく、艶のある粗さ）
+    const Color MaterialDiffuse(1.0f, 1.0f, 1.0f, 1.0f);
+    const Color MaterialSpecular(0.16f, 0.15f, 0.13f, 1.0f);
+    constexpr float MaterialShininess = 20.0f;
+    constexpr float MaterialRoughness = 0.42f;
+    // 画面の外かの判定に使う箱（床から天井まで伸びる配管を含める。中心と半分の大きさ）
+    const Vector3 BoundsCenter(0.0f, 13.0f, -3.0f);
+    const Vector3 BoundsExtents(4.7f, 25.0f, 3.5f);
 }
 
 // 台座と配管（動かない部品）を先に、ハンドル（回る部品）を後に、Mayaで作ったモデルから読み込んでいる。
@@ -60,19 +68,18 @@ void DrainValve::Init()
 
     m_Material = std::make_unique<Material>();
     MATERIAL material{};
-    material.Diffuse = Color(1.0f, 1.0f, 1.0f, 1.0f);
-    material.Specular = Color(0.16f, 0.15f, 0.13f, 1.0f);
-    material.Shininess = 20.0f;
+    material.Diffuse = MaterialDiffuse;
+    material.Specular = MaterialSpecular;
+    material.Shininess = MaterialShininess;
     material.TextureEnable = FALSE;
-    // PBR：赤く塗ったバルブの取っ手と、塗装した配管（塗料なので金属ではなく、艶のある粗さにしている）
     material.Metallic = 0.0f;
-    material.Roughness = 0.42f;
+    material.Roughness = MaterialRoughness;
     m_Material->CreateRequired(material);
 
     // 画面の外かの判定に使う境界（床から天井まで伸びる配管を含めている）
     ModelBounds bounds;
-    bounds.Center = Vector3(0.0f, 13.0f, -3.0f);
-    bounds.Extents = Vector3(4.7f, 25.0f, 3.5f);
+    bounds.Center = BoundsCenter;
+    bounds.Extents = BoundsExtents;
     bounds.SphereRadius = bounds.Extents.Length();
     bounds.IsValid = true;
     SetModelBounds(bounds);

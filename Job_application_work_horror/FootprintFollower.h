@@ -25,6 +25,8 @@ class FootprintFollower final
 public:
     // 最初の一歩までの秒数、一歩ごとの秒数、歩幅、左右の足の幅、止まる距離、横へずらす幅、足跡の最大数
     static constexpr float StartDelaySeconds = 1.6f;
+    // 向きを計算しないほど近いとみなす距離
+    static constexpr float MinimumDistance = 0.001f;
     static constexpr float StepSeconds = 0.62f;
     static constexpr float Stride = 8.5f;
     static constexpr float SideOffset = 2.2f;
@@ -100,7 +102,7 @@ public:
         {
             DirectX::SimpleMath::Vector3 toLatest(m_Latest.x - eye.x, FootprintSurfaceY - eye.y, m_Latest.y - eye.z);
             const float distance = toLatest.Length();
-            if (distance > 0.001f && distance < FootprintLookDistance && forward.Dot(toLatest / distance) > FootprintLookFacing)
+            if (distance > MinimumDistance && distance < FootprintLookDistance && forward.Dot(toLatest / distance) > FootprintLookFacing)
             {
                 m_Active = false;
                 return Event::Lit;

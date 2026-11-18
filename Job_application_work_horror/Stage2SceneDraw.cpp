@@ -26,6 +26,28 @@ using namespace DirectX::SimpleMath;
 
 #include "Stage2SceneConstants.h"
 
+namespace
+{
+    // 危険度の進み具合（息を潜める）を出し始める危険度
+    constexpr float QuietRecoveryThreat = 0.25f;
+    // 目的地の方向の先：出口の扉が見つからないときの扉の位置、偽の扉・時計・肖像画、
+    // 確認のスイッチ、信号盤（青・黄・赤。この順に操作する）の位置
+    const Vector3 FallbackDoorTarget(0.0f, -74.0f, 140.0f);
+    const Vector3 FalseDoorTarget(-38.3f, -72.0f, 70.0f);
+    const Vector3 ClockTarget(-38.0f, -70.0f, -25.0f);
+    const Vector3 PortraitTarget(38.72f, -69.0f, -25.0f);
+    const Vector3 ConfirmationPanelTarget(35.5f, -90.0f, 112.0f);
+    const Vector3 BlueSignalTarget(35.5f, -90.0f, 82.0f);
+    const Vector3 AmberSignalTarget(-35.5f, -90.0f, 18.0f);
+    const Vector3 RedSignalTarget(35.5f, -90.0f, -108.0f);
+    // 画面を暗くする強さ：周回が変わった瞬間のまばたき、脱出の演出の後半（捕まったときは Hud::CaughtDarkness）
+    constexpr float LoopBlinkDarkness = 0.90f;
+    constexpr float EscapeDarkness = 0.90f;
+    // 脱出の演出のうち、暗くし始める進み具合と、暗くなりきるまでの幅
+    constexpr float EscapeFadeStart = 0.36f;
+    constexpr float EscapeFadeRange = 0.64f;
+}
+
 
 // 2面のHUDを、下から順に重ねて描いている（隠れている間の視界 → 普段のHUD → 状態パネル → 方向 → カード → 暗転 → ポーズ）
 void Stage2Scene::Draw(Camera* camera)
@@ -53,7 +75,7 @@ void Stage2Scene::Draw(Camera* camera)
     // 右上の状態パネルを出すときは、電池の知らせと「記録」をその下へずらして重ならないようにしている。
     const bool showStatusPanel =
         game->IsGuideEnabled() &&
-        m_VisualTimer >= 4.20f &&
+        m_VisualTimer >= Hud::ChapterCardSeconds &&
         !m_CaughtSequence.IsActive() &&
         (exit == nullptr || !exit->IsEscaping());
     m_Hud.SetTopRightOffset(showStatusPanel ? Hud::Stage2StatusReservedHeight : 0.0f);
@@ -91,7 +113,7 @@ void Stage2Scene::Draw(Camera* camera)
             !m_FinalSequence.IsPursuitActive() &&
             !m_FinalSequence.IsSequenceActive() &&
             m_LoopTransitionTimer < 0.0f &&
-            (m_NoiseThreatSystem.GetThreat() > 0.25f ||
+            (m_NoiseThreatSystem.GetThreat() > QuietRecoveryThreat ||
                 m_QuietRecovery.progress > 0.0f ||
                 m_QuietRecovery.successNotice > 0.0f || m_QuietRecovery.cooldown > 0.0f))
         {
@@ -102,21 +124,21 @@ void Stage2Scene::Draw(Camera* camera)
         }
     }
     // 目的地の方向：普段は奥の扉、異変を探す間はその場所、確認のスイッチや信号盤の段階ではその位置
-    if (m_VisualTimer >= 4.20f &&
+    if (m_VisualTimer >= Hud::ChapterCardSeconds &&
         !m_CaughtSequence.IsActive() &&
         (exit == nullptr || !exit->IsEscaping()))
     {
         Vector3 guideTarget = finalDoor != nullptr
             ? finalDoor->GetPosition()
-            : Vector3(0.0f, -74.0f, 140.0f);
+            : FallbackDoorTarget;
         const Stage2Anomaly requiredAnomaly = m_AnomalyPlan.GetRequired(m_LoopCount);
         if (requiredAnomaly != Stage2Anomaly::None && !IsRequiredAnomalyFound())
         {
             // 探すべき異変の場所を指している（偽の扉・時計・肖像画・最後に現れた血の手形・鏡・ノックの出どころ）。
             guideTarget =
-                requiredAnomaly == Stage2Anomaly::FalseDoor ? Vector3(-38.3f, -72.0f, 70.0f) :
-                requiredAnomaly == Stage2Anomaly::Clock ? Vector3(-38.0f, -70.0f, -25.0f) :
-                requiredAnomaly == Stage2Anomaly::Portrait ? Vector3(38.72f, -69.0f, -25.0f) :
+                requiredAnomaly == Stage2Anomaly::FalseDoor ? FalseDoorTarget :
+                requiredAnomaly == Stage2Anomaly::Clock ? ClockTarget :
+                requiredAnomaly == Stage2Anomaly::Portrait ? PortraitTarget :
                 requiredAnomaly == Stage2Anomaly::Handprint ? m_HandprintAnomaly.GetLatestPosition() :
                 requiredAnomaly == Stage2Anomaly::Mirror
                     ? Vector3(MirrorAnomaly::SurfaceX, MirrorAnomaly::CenterY, MirrorAnomaly::CenterZ) :
@@ -127,34 +149,34 @@ void Stage2Scene::Draw(Camera* camera)
         }
         else if (confirmationPending)
         {
-            guideTarget = Vector3(35.5f, -90.0f, 112.0f);
+            guideTarget = ConfirmationPanelTarget;
         }
         else if (m_LoopCount >= Stage2FinalLoopCount && !m_SignalPuzzle.IsComplete())
         {
             if (m_SignalPuzzle.GetStep() == 0)
             {
-                guideTarget = Vector3(35.5f, -90.0f, 82.0f);
+                guideTarget = BlueSignalTarget;
             }
             else if (m_SignalPuzzle.GetStep() == 1)
             {
-                guideTarget = Vector3(-35.5f, -90.0f, 18.0f);
+                guideTarget = AmberSignalTarget;
             }
             else
             {
-                guideTarget = Vector3(35.5f, -90.0f, -108.0f);
+                guideTarget = RedSignalTarget;
             }
         }
         m_Hud.DrawObjectiveGuide(
             *camera, player->GetPosition(), guideTarget);
     }
     // 始まりの0.65秒は、黒からだんだん明るくしている
-    if (m_VisualTimer < 0.65f)
+    if (m_VisualTimer < Hud::IntroFadeSeconds)
     {
-        const float fade = 1.0f - m_VisualTimer / 0.65f;
+        const float fade = 1.0f - m_VisualTimer / Hud::IntroFadeSeconds;
         m_Hud.DrawBlink(fade * fade);
     }
     // 始まりの4.2秒は章のカードを、周回が変わったときは周回のカードを出している
-    if (m_VisualTimer < 4.20f)
+    if (m_VisualTimer < Hud::ChapterCardSeconds)
     {
         m_Hud.DrawChapterCard(
             "2階",
@@ -186,26 +208,26 @@ void Stage2Scene::Draw(Camera* camera)
     if (m_LoopBlinkTimer > 0.0f)
     {
         const float blinkRate =
-            (std::clamp)(m_LoopBlinkTimer / 0.28f, 0.0f, 1.0f);
-        m_Hud.DrawBlink(blinkRate * blinkRate * 0.90f);
+            (std::clamp)(m_LoopBlinkTimer / Stage2LoopBlinkSeconds, 0.0f, 1.0f);
+        m_Hud.DrawBlink(blinkRate * blinkRate * LoopBlinkDarkness);
     }
 
     // 捕まったときは画面を暗くしている
     if (m_CaughtSequence.IsActive())
     {
         const float caughtFade = m_CaughtSequence.GetFadeRate();
-        m_Hud.DrawBlink(caughtFade * 0.96f);
+        m_Hud.DrawBlink(caughtFade * Hud::CaughtDarkness);
     }
 
     // 脱出の演出の後半で、画面をなめらかに暗くしている
     if (exit != nullptr && exit->IsEscaping())
     {
         const float fadeRate = (std::clamp)(
-            (exit->GetEscapeProgress() - 0.36f) / 0.64f,
+            (exit->GetEscapeProgress() - EscapeFadeStart) / EscapeFadeRange,
             0.0f, 1.0f);
         const float smoothFade =
             MathUtility::SmoothCurve(fadeRate);
-        m_Hud.DrawBlink(smoothFade * 0.90f);
+        m_Hud.DrawBlink(smoothFade * EscapeDarkness);
     }
 
     // ポーズ中はポーズメニューを重ねている（2階として表示）

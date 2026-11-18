@@ -56,7 +56,7 @@ public:
                 center.x > m_MinX + m_BodyRadius && center.x < m_MaxX - m_BodyRadius &&
                 center.z > m_MinZ + m_BodyRadius && center.z < m_MaxZ - m_BodyRadius;
             m_Walkable[static_cast<std::size_t>(cell)] = insideRoom &&
-                HorizontalDistance(center, resolved) < 0.01f;
+                HorizontalDistance(center, resolved) < ClearTolerance;
         }
         m_Built = true;
         m_PlayerCell = -1;
@@ -125,6 +125,8 @@ public:
 private:
     // 歩数が求まっていない（たどり着けない）マス
     static constexpr std::uint16_t Unreachable = (std::numeric_limits<std::uint16_t>::max)();
+    // 押し戻した位置がこの距離より近ければ、塞がれていないマスとみなす
+    static constexpr float ClearTolerance = 0.01f;
 
     // 目標のマスから幅優先探索で広げ、各マスから目標までの歩数（上下左右と斜め）を求めている
     void ComputeDistanceField(int startCell)

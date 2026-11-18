@@ -19,6 +19,12 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // PBR の粗さの下限（0に近いと、点の光が細かすぎてちらつくため）
+    constexpr float MinimumRoughness = 0.045f;
+}
+
+namespace
+{
     constexpr float LayoutPollIntervalSeconds = 0.5f;
 
     // 数を短く書いている（小数3桁まで。後ろの0と小数点は省く）
@@ -142,7 +148,7 @@ namespace PropLayoutFile
                     }
                     PropSurfaceFinish finish;
                     finish.Metallic = std::clamp(metallic, 0.0f, 1.0f);
-                    finish.Roughness = std::clamp(roughness, 0.045f, 1.0f);
+                    finish.Roughness = std::clamp(roughness, MinimumRoughness, 1.0f);
                     const auto existingFinish = std::find_if(layout.Finishes.begin(), layout.Finishes.end(),
                         [&name](const auto& entry) { return entry.first == name; });
                     if (existingFinish != layout.Finishes.end())

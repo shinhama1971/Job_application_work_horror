@@ -20,6 +20,14 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // 場面が切り替わった瞬間の画面の乱れが消える秒数
+    constexpr float CutNoiseSeconds = 0.6f;
+    // 草むらを通る「見えない何か」が草を押し倒す半径
+    constexpr float UnseenWalkerRadius = 10.0f;
+}
+
+namespace
+{
 }
 
 void ForestBackdrop::Init(const std::vector<Shot>& shots, bool loop)
@@ -98,11 +106,11 @@ void ForestBackdrop::Update(float deltaTime)
         }
     }
     ApplyCamera();
-    m_CutNoise = (std::max)(0.0f, m_CutNoise - deltaTime / 0.6f);
+    m_CutNoise = (std::max)(0.0f, m_CutNoise - deltaTime / CutNoiseSeconds);
     m_Events.Update(deltaTime, m_Player->GetPosition(), m_Props);
     if (m_Grass != nullptr)
     {
-        m_Grass->SetUnseenWalker(m_Events.GetWalkerPosition(), 10.0f, m_Events.GetWalkerStrength());
+        m_Grass->SetUnseenWalker(m_Events.GetWalkerPosition(), UnseenWalkerRadius, m_Events.GetWalkerStrength());
     }
 }
 

@@ -13,6 +13,10 @@
 class Camera
 {
 private:
+    // ポーズメニューの視点感度の倍率の範囲
+    static constexpr float MinLookSensitivityScale = 0.55f;
+    static constexpr float MaxLookSensitivityScale = 1.55f;
+
     // マウス視点で、前フレームのカーソル位置と、切り替え直後の1回目かどうか
     POINT m_LastMousePos{};
     bool m_FirstMouse = true;
@@ -50,9 +54,9 @@ public:
     // ポーズメニューの視点感度を反映している（0.55〜1.55倍に制限している）。
     void SetLookSensitivityScale(float scale)
     {
-        m_LookSensitivityScale = scale < 0.55f
-            ? 0.55f
-            : (scale > 1.55f ? 1.55f : scale);
+        m_LookSensitivityScale = scale < MinLookSensitivityScale
+            ? MinLookSensitivityScale
+            : (scale > MaxLookSensitivityScale ? MaxLookSensitivityScale : scale);
     }
 
     // フォーカスが戻ってから最初のマウス移動量は視点に反映しない。

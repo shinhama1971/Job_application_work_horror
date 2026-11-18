@@ -14,6 +14,27 @@
 #include "Input.h"
 #include "Player.h"
 
+namespace
+{
+    // 番号を変えたときの手ごたえ（高い音と、ごく短い振動）
+    constexpr float DialClickPitch = 1.35f;
+    constexpr int DialRumbleFrames = 1;
+    constexpr float DialRumbleStrength = 0.03f;
+    // この回数以上間違えると、扉の向こうの気配を強くする（配管を叩く音の高さと音量、画面の脈打ち）
+    constexpr int WarningMistakeCount = 3;
+    constexpr float WarningKnockPitch = 0.82f;
+    constexpr float WarningKnockVolume = 1.3f;
+    constexpr float WarningPulseStrength = 0.20f;
+    constexpr float WarningPulseSeconds = 0.30f;
+    // 解けたとき（電気の音の高さと音量、画面の光、振動）
+    constexpr float SolvedPowerPitch = 1.2f;
+    constexpr float SolvedPowerVolume = 0.8f;
+    constexpr float SolvedBloomPeak = 0.42f;
+    constexpr float SolvedBloomSeconds = 0.22f;
+    constexpr int SolvedRumbleFrames = 4;
+    constexpr float SolvedRumbleStrength = 0.12f;
+}
+
 #include <string>
 
 // 番号をランダムに決め、壁の手がかりの数字をその番号の画像にしている
@@ -137,8 +158,8 @@ void Stage1KeypadDoor::HandleInput(Player& player)
     // 操作するたびに、小さな音と振動で手応えを返している
     if (changed)
     {
-        game->PlayAudioCue(SOUND_CUE_FLASHLIGHT, 1.35f);
-        Input::SetVibration(1, 0.03f);
+        game->PlayAudioCue(SOUND_CUE_FLASHLIGHT, DialClickPitch);
+        Input::SetVibration(DialRumbleFrames, DialRumbleStrength);
         return;
     }
 
@@ -157,11 +178,11 @@ void Stage1KeypadDoor::HandleInput(Player& player)
     m_WrongTimer = WrongFeedbackSeconds;
     m_Lock.ResetEntry();
     m_Parts.door->Interact(player);
-    if (m_Lock.GetMistakes() >= 3)
+    if (m_Lock.GetMistakes() >= WarningMistakeCount)
     {
         // 何度も（3回以上）間違えると、扉の向こうの気配を強くしている。
-        game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, m_Parts.door->GetPosition(), 0.82f, 1.3f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.20f, 0.30f);
+        game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, m_Parts.door->GetPosition(), WarningKnockPitch, WarningKnockVolume);
+        game->GetPostProcess()->TriggerHorrorPulse(WarningPulseStrength, WarningPulseSeconds);
     }
 }
 
@@ -185,9 +206,9 @@ void Stage1KeypadDoor::Close(Player& player, bool solved)
     door->SetLocked(false);
     door->Interact(player);
     Core::Game* game = Core::Game::GetInstance();
-    game->PlayAudioCueAt(SOUND_CUE_POWER, panel->GetPosition(), 1.2f, 0.8f);
-    game->GetPostProcess()->TriggerBloomPulse(0.42f, 0.22f);
-    Input::SetVibration(4, 0.12f);
+    game->PlayAudioCueAt(SOUND_CUE_POWER, panel->GetPosition(), SolvedPowerPitch, SolvedPowerVolume);
+    game->GetPostProcess()->TriggerBloomPulse(SolvedBloomPeak, SolvedBloomSeconds);
+    Input::SetVibration(SolvedRumbleFrames, SolvedRumbleStrength);
 }
 
 // 入力画面を開いていれば、入力中の番号・選んでいる桁・不正解の点滅・間違えた回数を渡して描いている

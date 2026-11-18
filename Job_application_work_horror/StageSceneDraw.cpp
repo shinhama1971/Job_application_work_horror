@@ -4,6 +4,17 @@
 // ============================================================================
 
 #include "StageScene.h"
+
+namespace
+{
+    // 目的地の方向の先：出口の送電盤、主電源の配電盤の位置
+    const DirectX::SimpleMath::Vector3 ExitPowerPanelTarget(145.0f, -90.0f, 270.0f);
+    const DirectX::SimpleMath::Vector3 FuseBoxTarget(-180.0f, -90.0f, 35.0f);
+    // 最後のドアを指すときの高さ（ドアの中心）
+    constexpr float EndDoorTargetY = -74.0f;
+    // 主電源を戻すのに要るヒューズの数
+    constexpr int RequiredFuseCount = 3;
+}
 #include "MathUtility.h"
 #include "Game.h"
 #include "Input.h"
@@ -117,10 +128,10 @@ void StageScene::Draw(Camera* camera)
 
     // 目的地の方向：始まりの4.2秒の後、進み具合に合わせて次に行く場所を指している（普段はループ廊下の突き当たりの最後のドア）
     if (game->IsGuideEnabled() &&
-        m_StageVisualTimer >= 4.20f &&
+        m_StageVisualTimer >= Hud::ChapterCardSeconds &&
         (exitTrigger == nullptr || !exitTrigger->IsEscaping()))
     {
-        const Vector3 endDoorTarget(Stage1EndDoorX, -74.0f, Stage1EndDoorZ);
+        const Vector3 endDoorTarget(Stage1EndDoorX, EndDoorTargetY, Stage1EndDoorZ);
         Vector3 guideTarget = endDoorTarget;
         if (m_HiddenRoom.IsTrapped() && m_Objects.hiddenRoom.key != nullptr)
         {
@@ -130,7 +141,7 @@ void StageScene::Draw(Camera* camera)
         // 電力が戻った後は、出口の送電盤、次に最後のドアを指している
         else if (game->IsPowerRestored() && !exitPowerActivated)
         {
-            guideTarget = Vector3(145.0f, -90.0f, 270.0f);
+            guideTarget = ExitPowerPanelTarget;
         }
         else if (game->IsPowerRestored())
         {
@@ -160,9 +171,9 @@ void StageScene::Draw(Camera* camera)
             }
         }
         // ヒューズが3本そろったら、配電盤を指している
-        else if (fuseCount >= 3)
+        else if (fuseCount >= RequiredFuseCount)
         {
-            guideTarget = Vector3(-180.0f, -90.0f, 35.0f);
+            guideTarget = FuseBoxTarget;
         }
         m_Hud.DrawObjectiveGuide(
             *camera,
@@ -171,12 +182,12 @@ void StageScene::Draw(Camera* camera)
     }
 
     // 始まりの0.65秒は黒からだんだん明るくし、4.2秒までは章のカードを出している
-    if (m_StageVisualTimer < 0.65f)
+    if (m_StageVisualTimer < Hud::IntroFadeSeconds)
     {
-        const float fade = 1.0f - m_StageVisualTimer / 0.65f;
+        const float fade = 1.0f - m_StageVisualTimer / Hud::IntroFadeSeconds;
         m_Hud.DrawBlink(fade * fade);
     }
-    if (m_StageVisualTimer < 4.20f)
+    if (m_StageVisualTimer < Hud::ChapterCardSeconds)
     {
         m_Hud.DrawChapterCard(
             "1階", "ヒューズを集めて電力を復旧する", m_StageVisualTimer);
@@ -184,7 +195,7 @@ void StageScene::Draw(Camera* camera)
     // 監視カメラの確認で捕まったときは、画面を暗くしている
     if (m_Surveillance.IsCaughtActive())
     {
-        m_Hud.DrawBlink(m_Surveillance.GetCaughtFadeRate() * 0.96f);
+        m_Hud.DrawBlink(m_Surveillance.GetCaughtFadeRate() * Hud::CaughtDarkness);
     }
     // 最後のドアの先の階段を上っている間は、上の段へ近づくにつれて画面をなめらかに暗くし、上り切る頃に真っ暗にしている（2面へ続く）
     if (m_Objects.exitTrigger != nullptr && m_Objects.exitTrigger->IsEscaping() && m_Objects.exitTrigger->IsStairClimb())

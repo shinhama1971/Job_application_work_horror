@@ -38,6 +38,8 @@ class PuddleReflectionAnomaly final
 public:
     // 廊下の中央の大きな水たまりの中心（Stage2Layout の水たまりのマス目 (0, 0) と同じ）と、人影を立たせる奥行きのずれ
     // （1周目は水たまりの向こう側、2周目は手前寄りに立たせる）
+    // 向きを計算しないほど近いとみなす距離
+    static constexpr float MinimumDistance = 0.001f;
     static constexpr float PuddleCenterX = 9.0f;
     static constexpr float PuddleCenterZ = 9.0f;
     static constexpr float FigureDepthOffset = 13.0f;
@@ -185,7 +187,7 @@ public:
                     }
                     const DirectX::SimpleMath::Vector3 toHit = hit - eye;
                     const float distance = toHit.Length();
-                    if (distance > 0.001f && distance < PuddleFoundDistance && forward.Dot(toHit / distance) > PuddleFoundFacing)
+                    if (distance > MinimumDistance && distance < PuddleFoundDistance && forward.Dot(toHit / distance) > PuddleFoundFacing)
                     {
                         visible = true;
                         break;
@@ -213,7 +215,7 @@ public:
             DirectX::SimpleMath::Vector3 flatForward = forward;
             flatForward.y = 0.0f;
             const float forwardLength = flatForward.Length();
-            if (distance > 0.001f && forwardLength > 0.001f &&
+            if (distance > MinimumDistance && forwardLength > MinimumDistance &&
                 (flatForward / forwardLength).Dot(toFigure / distance) > PuddleLookUpFacing)
             {
                 m_Found = true;
@@ -225,7 +227,7 @@ public:
         {
             // 水面をのぞき続けている間は、水を踏みながら一歩ずつ近づいて来る
             m_StepTimer -= deltaTime;
-            if (m_StepTimer <= 0.0f && distance > 0.001f)
+            if (m_StepTimer <= 0.0f && distance > MinimumDistance)
             {
                 m_StepTimer = GetStepSeconds();
                 const float step = (std::min)(StepLength, distance);

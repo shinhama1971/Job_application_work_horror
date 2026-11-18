@@ -36,6 +36,13 @@ private:
     static constexpr float WalkAcceleration = 0.30f;
     static constexpr float SprintAcceleration = 0.24f;
     static constexpr float StopDecelerationPerFrame = 0.72f;
+    // 1フレームあたりの割合の基準にするフレームレート
+    static constexpr float ResponseReferenceFps = 60.0f;
+    // これより遅い速さは止まったとみなして0にする
+    static constexpr float StopSpeedEpsilon = 0.001f;
+    // 頭を揺らし始める速さと、動いているとみなす速さの2乗
+    static constexpr float HeadBobMinSpeed = 0.025f;
+    static constexpr float MovingSpeedSquared = 0.0025f;
 
     // 歩くときの頭の揺れ：位相の進む速さ（走る・歩く）、遅いときに速さを落とす割合、上下の揺れの大きさ（走る・歩く）、
     // 上下の揺れの中心を下げる割合（足を着いたときに沈む形にする）、左右の揺れの大きさと速さ（上下の半分）、
@@ -56,7 +63,7 @@ private:
     static float GetResponse(float responseAt60Fps, float deltaTime)
     {
         return 1.0f - std::pow(
-            1.0f - responseAt60Fps, deltaTime * 60.0f);
+            1.0f - responseAt60Fps, deltaTime * ResponseReferenceFps);
     }
 
     // 速度、スタミナ、回復を始めるまでの待ち、頭の揺れの位相と上下・左右のずれ、スタミナ切れで走れない状態か、走っているか
@@ -148,11 +155,11 @@ public:
         // 入力がなければ、速度を少しずつ0へ近づけて止めている
         else
         {
-            const float deceleration = std::pow(StopDecelerationPerFrame, deltaTime * 60.0f);
+            const float deceleration = std::pow(StopDecelerationPerFrame, deltaTime * ResponseReferenceFps);
             m_Velocity.x *= deceleration;
             m_Velocity.z *= deceleration;
-            if (std::abs(m_Velocity.x) < 0.001f) m_Velocity.x = 0.0f;
-            if (std::abs(m_Velocity.z) < 0.001f) m_Velocity.z = 0.0f;
+            if (std::abs(m_Velocity.x) < StopSpeedEpsilon) m_Velocity.x = 0.0f;
+            if (std::abs(m_Velocity.z) < StopSpeedEpsilon) m_Velocity.z = 0.0f;
         }
 
         // 重力で下向きの速度を増やしている（床より下に行かないようにするのはPlayerが担当している）
@@ -167,7 +174,7 @@ public:
         const float horizontalSpeed = std::sqrt(
             m_Velocity.x * m_Velocity.x + m_Velocity.z * m_Velocity.z);
         // 動いている間：速いほど大きく速く揺らし、上下は足を着くたびに沈む形（sinの絶対値）、左右はその半分の速さで揺らしている
-        if (horizontalSpeed > 0.025f)
+        if (horizontalSpeed > HeadBobMinSpeed)
         {
             const float speedRate = (std::min)(
                 horizontalSpeed / GetMaximumHorizontalSpeed(), 1.0f);
@@ -230,6 +237,6 @@ public:
     bool IsMovingHorizontally() const
     {
         return m_Velocity.x * m_Velocity.x +
-            m_Velocity.z * m_Velocity.z > 0.0025f;
+            m_Velocity.z * m_Velocity.z > MovingSpeedSquared;
     }
 };

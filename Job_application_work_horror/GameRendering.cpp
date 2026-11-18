@@ -32,6 +32,13 @@
 
 namespace
 {
+    // 影を落とす物の範囲に足すゆとり（影の端が切れないように）と、反射に映す物の画面の外の判定のゆとり
+    constexpr float ShadowBoundsMargin = 3.0f;
+    constexpr float ReflectionCullMargin = 18.0f;
+}
+
+namespace
+{
     // カリングに使う境界球を、見える側に寄せて大きめに作っている
     WorldBoundingSphere GetConservativeCullingBounds(const Object& object)
     {
@@ -39,7 +46,7 @@ namespace
         {
             WorldBoundingSphere bounds = object.GetWorldBoundingSphere();
             // 画面端の余白を残し、実際のモデルの大きさを使った境界球でも急に消えないようにしている。
-            bounds.Radius += 3.0f;
+            bounds.Radius += ShadowBoundsMargin;
             return bounds;
         }
 
@@ -48,7 +55,7 @@ namespace
         bounds.Center = object.GetPosition();
         // コードで頂点を作ったメッシュは、大きさ（Scale）の対角線の半分に余白を足した半径にしている。
         bounds.Radius = 0.5f * std::sqrt(
-            scale.x * scale.x + scale.y * scale.y + scale.z * scale.z) + 3.0f;
+            scale.x * scale.x + scale.y * scale.y + scale.z * scale.z) + ShadowBoundsMargin;
         return bounds;
     }
 
@@ -83,7 +90,7 @@ namespace
         const float distanceSquared =
             offset.x * offset.x + offset.y * offset.y + offset.z * offset.z;
         return distanceSquared <= shadowRange * shadowRange &&
-            camera.IsSphereVisible(bounds.Center, radius + 18.0f, false);
+            camera.IsSphereVisible(bounds.Center, radius + ReflectionCullMargin, false);
     }
 
     // 水面の反射に映す価値があるかを、距離で判定している

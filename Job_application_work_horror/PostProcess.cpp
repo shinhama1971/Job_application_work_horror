@@ -32,6 +32,60 @@ namespace
     // シーン露出にプレイヤーの明るさ設定を足した後に適用する範囲。
     constexpr float MinCompositeExposure = 0.75f;
     constexpr float MaxCompositeExposure = 1.34f;
+
+    // コマ落ちの最初の待ち秒数
+    constexpr float InitialFrameHoldCooldown = 1.0f;
+
+    // --- 目標へ近づく割合（60fpsで1フレームあたり）。ResponseReferenceFps を基準に、フレームレートが違っても同じ速さにする
+    constexpr float ResponseReferenceFps = 60.0f;
+    // 暗い所で目を慣らす（ゆっくり）・明るい所へ戻る（速く）
+    constexpr float DarkExposureResponse = 0.012f;
+    constexpr float BrightExposureResponse = 0.065f;
+    // 廊下の緊張・光の筋・電波の乱れ・恐怖で視界が狭まる・普段のブルームへ戻る・驚かせた後に戻る・レンズの曇りが晴れる
+    constexpr float CorridorTensionResponse = 0.035f;
+    constexpr float VolumetricResponse = 0.055f;
+    constexpr float SignalInterferenceResponse = 0.085f;
+    constexpr float FearVisionResponse = 0.05f;
+    constexpr float BloomRecoverResponse = 0.12f;
+    constexpr float HorrorRecoverResponse = 0.18f;
+    constexpr float LensMoistureClearResponse = 0.035f;
+    // 心臓の鼓動に合わせた視界の脈が、1秒で弱まる量
+    constexpr float FearBeatDecayPerSecond = 3.2f;
+
+    // --- コマ落ち：起き始める強さと、そこから最大になるまでの幅、止まる秒数（最短＋強さの幅）、
+    // 映像のずれ（強さに掛ける幅）、次までの間（最長−強さの幅、乱数で 最低＋幅 倍）、弱いときに残す最短の間
+    constexpr float FrameHoldThreshold = 0.22f;
+    constexpr float FrameHoldRange = 0.23f;
+    constexpr float FrameHoldMinSeconds = 0.05f;
+    constexpr float FrameHoldExtraSeconds = 0.05f;
+    constexpr float FrameHoldOffsetRange = 0.10f;
+    constexpr float FrameHoldMaxCooldown = 3.2f;
+    constexpr float FrameHoldCooldownShrink = 2.2f;
+    constexpr float FrameHoldCooldownMinScale = 0.6f;
+    constexpr float FrameHoldCooldownRandomScale = 0.8f;
+    constexpr float FrameHoldIdleCooldown = 0.8f;
+
+    // --- 演出の長さの下限（0で割らないため）：ブルームと驚かせる演出、レンズの曇り
+    constexpr float MinimumPulseSeconds = 0.01f;
+    constexpr float MinimumMoistureSeconds = 0.05f;
+    // レンズのしぶきの経過秒数の上限（数え続けて大きくなりすぎないように）と、乱数の種を進める量（黄金比 0.618…）
+    constexpr float MaxLensDropAge = 60.0f;
+    constexpr float GoldenRatioFraction = 0.6180339f;
+    // 自動露出の1フレームの時間の上限（長い停止の後に一気に慣れないように）
+    constexpr float MaxAutoExposureDeltaTime = 0.1f;
+    // 「演出の強さ」を下げても残す周辺減光の強さ
+    constexpr float BaseVignetteStrength = 0.45f;
+
+    // --- ブルームのコンピュートシェーダーの1グループの大きさ（シェーダーの numthreads と同じ）。
+    // 明るい部分の抽出と縮小は8x8画素、横と縦のぼかしは1行（1列）の128画素
+    constexpr UINT BloomTileGroupSize = 8;
+    constexpr UINT BloomBlurGroupSize = 128;
+
+    // 画素の数を、1グループの大きさで割って切り上げた、グループの数
+    constexpr UINT GroupCount(UINT pixels, UINT groupSize)
+    {
+        return (pixels + groupSize - 1) / groupSize;
+    }
 }
 
 namespace Effect
@@ -42,29 +96,29 @@ namespace Effect
         m_EnableNoise = true;
         m_EnableBloom = true;
         m_Time = 0.0f;
-        m_NoiseAmount = 0.18f;
-        m_TargetNoiseAmount = 0.18f;
-        m_VignetteStrength = 0.55f;
-        m_TargetVignetteStrength = 0.55f;
+        m_NoiseAmount = DefaultNoiseAmount;
+        m_TargetNoiseAmount = DefaultNoiseAmount;
+        m_VignetteStrength = DefaultVignetteStrength;
+        m_TargetVignetteStrength = DefaultVignetteStrength;
         m_HorrorPulseStrength = 0.0f;
         m_HorrorPulseTimer = 0.0f;
-        m_Exposure = 1.0f;
-        m_TargetExposure = 1.0f;
+        m_Exposure = DefaultExposure;
+        m_TargetExposure = DefaultExposure;
         m_LensMoisture = 0.0f;
         m_LensMoisturePeak = 0.0f;
         m_LensMoistureTimer = 0.0f;
         m_LensMoistureDuration = 0.0f;
         m_CorridorTension = 0.0f;
         m_TargetCorridorTension = 0.0f;
-        m_VolumetricIntensity = 0.58f;
-        m_TargetVolumetricIntensity = 0.58f;
-        m_FilmGradeStrength = 0.55f;
-        m_LensDirtStrength = 0.10f;
+        m_VolumetricIntensity = DefaultVolumetricIntensity;
+        m_TargetVolumetricIntensity = DefaultVolumetricIntensity;
+        m_FilmGradeStrength = DefaultFilmGradeStrength;
+        m_LensDirtStrength = DefaultLensDirtStrength;
         m_SignalInterference = 0.0f;
         m_TargetSignalInterference = 0.0f;
         m_PresenceStatic = 0.0f;
         m_FrameHoldTimer = 0.0f;
-        m_FrameHoldCooldown = 1.0f;
+        m_FrameHoldCooldown = InitialFrameHoldCooldown;
         m_FearVision = 0.0f;
         m_TargetFearVision = 0.0f;
         m_FearBeat = 0.0f;
@@ -201,7 +255,7 @@ namespace Effect
         const auto response = [deltaTime](float responseAt60Fps)
         {
             return 1.0f - std::pow(
-                1.0f - responseAt60Fps, deltaTime * 60.0f);
+                1.0f - responseAt60Fps, deltaTime * ResponseReferenceFps);
         };
         m_Time += deltaTime;
 
@@ -214,23 +268,23 @@ namespace Effect
         // 暗い所へ入った後はゆっくり目を慣らし、懐中電灯や照明が戻ったときは
         // 素早く普段の露出へ戻すことで、人の目の慣れ方に近づけている。
         const float exposureResponse = response(
-            m_TargetExposure > m_Exposure ? 0.012f : 0.065f);
+            m_TargetExposure > m_Exposure ? DarkExposureResponse : BrightExposureResponse);
         m_Exposure +=
             (m_TargetExposure - m_Exposure) * exposureResponse;
         m_CorridorTension +=
-            (m_TargetCorridorTension - m_CorridorTension) * response(0.035f);
+            (m_TargetCorridorTension - m_CorridorTension) * response(CorridorTensionResponse);
         m_VolumetricIntensity +=
-            (m_TargetVolumetricIntensity - m_VolumetricIntensity) * response(0.055f);
+            (m_TargetVolumetricIntensity - m_VolumetricIntensity) * response(VolumetricResponse);
         m_SignalInterference +=
-            (m_TargetSignalInterference - m_SignalInterference) * response(0.085f);
+            (m_TargetSignalInterference - m_SignalInterference) * response(SignalInterferenceResponse);
         // 恐怖で視界が狭まる：Scene から渡されなくなったら0へ戻す。狭まるのも戻るのも、1秒ほどかけてなめらかにしている
         m_FearVisionHold -= deltaTime;
         if (m_FearVisionHold <= 0.0f)
         {
             m_TargetFearVision = 0.0f;
         }
-        m_FearVision += (m_TargetFearVision - m_FearVision) * response(0.05f);
-        m_FearBeat = (std::max)(0.0f, m_FearBeat - deltaTime * 3.2f);
+        m_FearVision += (m_TargetFearVision - m_FearVision) * response(FearVisionResponse);
+        m_FearBeat = (std::max)(0.0f, m_FearBeat - deltaTime * FearBeatDecayPerSecond);
 
         // コマ落ち：影が近く、ラジオの雑音が強いほど、短い間隔で映像が一瞬（0.05〜0.1秒）止まる。
         // ポーズメニューの「演出の強さ」を下げると起きにくくなり、0なら起きない。自動撮影と計測では、画像と数字がぶれないよう起こさない
@@ -239,20 +293,21 @@ namespace Effect
         {
             m_FrameHoldTimer = (std::max)(0.0f, m_FrameHoldTimer - deltaTime);
         }
-        else if (frameHoldStrength > 0.22f)
+        else if (frameHoldStrength > FrameHoldThreshold)
         {
             m_FrameHoldCooldown -= deltaTime;
             if (m_FrameHoldCooldown <= 0.0f)
             {
-                const float rate = (std::min)(1.0f, (frameHoldStrength - 0.22f) / 0.23f);
-                m_FrameHoldTimer = 0.05f + 0.05f * rate;
-                m_FrameHoldOffset = (NextFrameHoldRandom() - 0.5f) * 0.10f * rate;
-                m_FrameHoldCooldown = (3.2f - 2.2f * rate) * (0.6f + NextFrameHoldRandom() * 0.8f);
+                const float rate = (std::min)(1.0f, (frameHoldStrength - FrameHoldThreshold) / FrameHoldRange);
+                m_FrameHoldTimer = FrameHoldMinSeconds + FrameHoldExtraSeconds * rate;
+                m_FrameHoldOffset = (NextFrameHoldRandom() - 0.5f) * FrameHoldOffsetRange * rate;
+                m_FrameHoldCooldown = (FrameHoldMaxCooldown - FrameHoldCooldownShrink * rate) *
+                    (FrameHoldCooldownMinScale + NextFrameHoldRandom() * FrameHoldCooldownRandomScale);
             }
         }
         else
         {
-            m_FrameHoldCooldown = (std::max)(m_FrameHoldCooldown, 0.8f);
+            m_FrameHoldCooldown = (std::max)(m_FrameHoldCooldown, FrameHoldIdleCooldown);
         }
 
         // ブルームの一時的な強まり：残り時間の2乗で弱めている（始めは急に、終わりはゆっくり戻る）
@@ -268,7 +323,7 @@ namespace Effect
         else
         {
             m_BloomIntensity +=
-                (m_BloomBaseIntensity - m_BloomIntensity) * response(0.12f);
+                (m_BloomBaseIntensity - m_BloomIntensity) * response(BloomRecoverResponse);
         }
 
         // 驚かせる演出の強さ：同じく残り時間の2乗で弱めている
@@ -284,12 +339,12 @@ namespace Effect
         else
         {
             m_HorrorPulseStrength +=
-                (0.0f - m_HorrorPulseStrength) * response(0.18f);
+                (0.0f - m_HorrorPulseStrength) * response(HorrorRecoverResponse);
         }
 
         // レンズのしぶきが付いてからの秒数を進めている（crtOverlayPS.hlsl が、粒の流れ落ちた量と縦の伸びに使う）。
         // しぶきがない間も数え続けるので、大きくなりすぎないよう60秒で止めている
-        m_LensDropAge = (std::min)(m_LensDropAge + deltaTime, 60.0f);
+        m_LensDropAge = (std::min)(m_LensDropAge + deltaTime, MaxLensDropAge);
         // レンズの曇り：なめらかな曲線（smoothstep）で消している
         if (m_LensMoistureTimer > 0.0f && m_LensMoistureDuration > 0.0f)
         {
@@ -302,14 +357,14 @@ namespace Effect
         }
         else
         {
-            m_LensMoisture += (0.0f - m_LensMoisture) * response(0.035f);
+            m_LensMoisture += (0.0f - m_LensMoisture) * response(LensMoistureClearResponse);
         }
     }
 
     // ブルームを一時的に強めている（peakIntensityは普段の強さを含めた最大値）
     void PostProcess::TriggerBloomPulse(float peakIntensity, float duration)
     {
-        m_BloomPulseDuration = (std::max)(duration, 0.01f);
+        m_BloomPulseDuration = (std::max)(duration, MinimumPulseSeconds);
         m_BloomPulseTimer = m_BloomPulseDuration;
         m_BloomPulseStrength =
             (std::max)(0.0f, peakIntensity - m_BloomBaseIntensity);
@@ -319,7 +374,7 @@ namespace Effect
     // 驚かせる演出を始めている
     void PostProcess::TriggerHorrorPulse(float strength, float duration)
     {
-        m_HorrorPulseDuration = (std::max)(duration, 0.01f);
+        m_HorrorPulseDuration = (std::max)(duration, MinimumPulseSeconds);
         m_HorrorPulseTimer = m_HorrorPulseDuration;
         m_HorrorPulsePeak = (std::max)(strength, 0.0f);
         m_HorrorPulseStrength = m_HorrorPulsePeak;
@@ -329,13 +384,13 @@ namespace Effect
     void PostProcess::TriggerLensMoisture(float strength, float duration)
     {
         const float clampedStrength = (std::clamp)(strength, 0.0f, 1.0f);
-        m_LensMoistureDuration = (std::max)(duration, 0.05f);
+        m_LensMoistureDuration = (std::max)(duration, MinimumMoistureSeconds);
         m_LensMoistureTimer = m_LensMoistureDuration;
         m_LensMoisturePeak = (std::max)(m_LensMoisture, clampedStrength);
         m_LensMoisture = m_LensMoisturePeak;
         // 新しいしぶき：粒の位置・大きさ・速さを決める乱数の種を進め、流れ落ちる時間を0から数え直している。
         // 種は黄金比（0.618…）ずつずらしているので、続けてしぶきが付いても、前と似た位置に並ばない
-        m_LensDropSeed = std::fmod(m_LensDropSeed + 0.6180339f, 1.0f);
+        m_LensDropSeed = std::fmod(m_LensDropSeed + GoldenRatioFraction, 1.0f);
         m_LensDropAge = 0.0f;
     }
 
@@ -403,15 +458,15 @@ namespace Effect
             m_BloomExtractShader,
             m_RenderTexture.GetSRV(),
             m_BloomExtractTexture.GetUAV(),
-            (bloomWidth + 7) / 8,
-            (bloomHeight + 7) / 8);
+            GroupCount(bloomWidth, BloomTileGroupSize),
+            GroupCount(bloomHeight, BloomTileGroupSize));
 
         // 横のぼかし（1行を128画素ずつのグループで処理している）
         dispatchPass(
             m_BloomHorizontalShader,
             m_BloomExtractTexture.GetSRV(),
             m_BloomHorizontalTexture.GetUAV(),
-            (bloomWidth + 127) / 128,
+            GroupCount(bloomWidth, BloomBlurGroupSize),
             bloomHeight);
 
         // 縦のぼかし（1列を128画素ずつのグループで処理している）
@@ -420,12 +475,10 @@ namespace Effect
             m_BloomHorizontalTexture.GetSRV(),
             m_BloomVerticalTexture.GetUAV(),
             bloomWidth,
-            (bloomHeight + 127) / 128);
+            GroupCount(bloomHeight, BloomBlurGroupSize));
 
         // 広くにじむ段：1つ上の段のぼかした画像を縦横半分に縮め（8x8画素を1グループ）、横と縦にぼかしている。
         // 同じ9画素のぼかしでも、段が小さいほど画面の上では広くにじむ
-        constexpr UINT downsampleGroupSize = 8;
-        constexpr UINT blurGroupSize = 128;
         ID3D11ShaderResourceView* previousLevel = m_BloomVerticalTexture.GetSRV();
         for (unsigned int level = 0; level < WideBloomLevelCount; ++level)
         {
@@ -435,20 +488,20 @@ namespace Effect
                 m_BloomDownsampleShader,
                 previousLevel,
                 m_WideBloomDownsampled[level].GetUAV(),
-                (levelWidth + downsampleGroupSize - 1) / downsampleGroupSize,
-                (levelHeight + downsampleGroupSize - 1) / downsampleGroupSize);
+                GroupCount(levelWidth, BloomTileGroupSize),
+                GroupCount(levelHeight, BloomTileGroupSize));
             dispatchPass(
                 m_BloomHorizontalShader,
                 m_WideBloomDownsampled[level].GetSRV(),
                 m_WideBloomHorizontal[level].GetUAV(),
-                (levelWidth + blurGroupSize - 1) / blurGroupSize,
+                GroupCount(levelWidth, BloomBlurGroupSize),
                 levelHeight);
             dispatchPass(
                 m_BloomVerticalShader,
                 m_WideBloomHorizontal[level].GetSRV(),
                 m_WideBloomBlurred[level].GetUAV(),
                 levelWidth,
-                (levelHeight + blurGroupSize - 1) / blurGroupSize);
+                GroupCount(levelHeight, BloomBlurGroupSize));
             previousLevel = m_WideBloomBlurred[level].GetSRV();
         }
 
@@ -464,7 +517,7 @@ namespace Effect
 
         AutoExposureParams params{};
         // ポーズ中なども時間は進めている。ただし長い停止の後に一気に慣れないよう、1フレームの時間に上限を付けている
-        params.DeltaTime = (std::min)(Application::GetDeltaTime(), 0.1f);
+        params.DeltaTime = (std::min)(Application::GetDeltaTime(), MaxAutoExposureDeltaTime);
         // 目標の明るさ。1面の懐中電灯を点けた廊下（画面の明るさの平均が0.06〜0.12）で、倍率がほぼ1になる値にしている
         params.TargetLuminance = AutoExposureTargetLuminance;
         // 倍率の範囲：暗い所では最大8%明るくし、懐中電灯で近くの壁を照らしているときは、シーン側の持ち上げを少し弱める
@@ -531,7 +584,7 @@ namespace Effect
             m_BloomIntensity * (BloomBaseScale + effectScale * BloomEffectScaleWeight),
             0.0f, MaxAdjustedBloom);
         const float adjustedVignette = (std::clamp)(
-            0.45f + (m_VignetteStrength - 0.45f) * effectScale,
+            BaseVignetteStrength + (m_VignetteStrength - BaseVignetteStrength) * effectScale,
             0.0f, 1.0f);
         // 軽い設定では、全画面の光の筋の描画を止めている。ブルームと懐中電灯そのものは
         // 残るため見やすさは変わらず、古いGPUで最も重い追加の描画だけを省ける。

@@ -30,6 +30,14 @@ class Stage1HiddenRoomEvent final
 {
 public:
     static constexpr std::size_t KeySpotCount = 3;
+    // 隠し部屋の広さ（壁の内側）。扉はx=45の壁（内側の面はx=47）にあり、部屋は東側に広がっている。経路探索の格子も同じ範囲
+    static constexpr float RoomMinX = 47.0f;
+    static constexpr float RoomMaxX = 218.0f;
+    static constexpr float RoomMinZ = 42.0f;
+    static constexpr float RoomMaxZ = 178.0f;
+    // 経路探索のマスの大きさと、影の足元の高さ
+    static constexpr float PathCellSize = 4.0f;
+    static constexpr float ShadowFootY = -99.0f;
 
     // 配置（Stage1Layout）から受け取るObject。扉は暗証番号の扉と同じもの。
     struct Parts
@@ -93,7 +101,7 @@ private:
     std::size_t m_KeySpot = 0;
     float m_KeyLampTime = 0.0f;
     // 部屋の経路探索の格子（壁の内側、4単位のマス、体の半径、影の足元の高さ）と、影の足音までの距離
-    RoomPathGrid m_Path{ 47.0f, 218.0f, 42.0f, 178.0f, 4.0f, ShadowBodyRadius, -99.0f };
+    RoomPathGrid m_Path{ RoomMinX, RoomMaxX, RoomMinZ, RoomMaxZ, PathCellSize, ShadowBodyRadius, ShadowFootY };
     float m_ShadowStride = 0.0f;
     // 知らせの文章とその残り秒数、乱数
     std::string_view m_NoticeText;

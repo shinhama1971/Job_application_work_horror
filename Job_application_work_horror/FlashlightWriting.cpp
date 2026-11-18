@@ -16,6 +16,14 @@
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+    // ほとんど見えていないとみなす浮かび具合、塗料の粗さ（つやのない塗料）、向きを計算しないほど近い距離
+    constexpr float MinimumPresence = 0.001f;
+    constexpr float WritingRoughness = 0.85f;
+    constexpr float MinimumReadDistance = 0.001f;
+}
+
 void FlashlightWriting::Init()
 {
     // 原点を中心にした1x1の板。法線は-Z向きで、+Z向きに見たとき文字が正しく読めるUVにしている。
@@ -113,7 +121,7 @@ void FlashlightWriting::Update()
 // 文字の板を描いている。濃さは透明度として、経過時間はEmissionのxに入れてシェーダーへ渡している
 void FlashlightWriting::Draw(Camera* cam)
 {
-    if (m_Presence <= 0.001f)
+    if (m_Presence <= MinimumPresence)
     {
         return;
     }
@@ -123,7 +131,7 @@ void FlashlightWriting::Draw(Camera* cam)
     MATERIAL material{};
     material.Diffuse = Color(m_InkColor.R(), m_InkColor.G(), m_InkColor.B(), m_Presence);
     material.Emission = Color(m_PrintedSurface ? 0.0f : m_Time, 0.0f, 0.0f, 0.0f);
-    material.Roughness = 0.85f;
+    material.Roughness = WritingRoughness;
     // 印刷物は貼り付けた壁までの距離を使って暗がりを付ける。
     material.Ambient.x = m_PrintedSurface ? SurfaceOffset : 0.0f;
     material.TextureEnable = TRUE;
@@ -189,7 +197,7 @@ bool FlashlightWriting::IsBeingRead(
 
     Vector3 toWriting = m_Position - cameraPosition;
     const float distance = toWriting.Length();
-    if (distance > ReadDistance || distance < 0.001f)
+    if (distance > ReadDistance || distance < MinimumReadDistance)
     {
         return false;
     }

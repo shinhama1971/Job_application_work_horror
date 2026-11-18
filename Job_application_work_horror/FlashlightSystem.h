@@ -33,6 +33,34 @@ private:
     // 電池の最大値（%）と、点けている間に1秒あたり減る量（約83秒で空になる）
     static constexpr float MaxBattery = 100.0f;
     static constexpr float ConsumptionPerSecond = 1.2f;
+    // 電池が少ない警告の段階：20%以下（1段目）、10%以下（2段目）。25%より多くなったら、もう一度出せるようにする
+    static constexpr float LowBatteryLevel = 20.0f;
+    static constexpr float CriticalBatteryLevel = 10.0f;
+    static constexpr float WarningResetLevel = 25.0f;
+    // 電池を拾ったことを知らせる秒数
+    static constexpr float BatteryNoticeSeconds = 2.2f;
+    // 点灯の度合いが目標へ近づく割合（60fpsで1フレームあたり。点けるとき・消すとき）と、消えたとみなす度合い
+    static constexpr float PowerOnResponse = 0.22f;
+    static constexpr float PowerOffResponse = 0.34f;
+    static constexpr float ResponseReferenceFps = 60.0f;
+    static constexpr float PowerBlendEpsilon = 0.002f;
+    // 電池が少ないときの電圧の揺らぎ：ゆっくりした揺れ（速さ・揺れの速さを揺らす速さと深さ）、安定器の雑音（2つの速さ）、
+    // 揺らいだときの光の強さ（中心・ゆっくりした揺れの幅・雑音の幅）
+    static constexpr float SlowVoltageRate = 7.1f;
+    static constexpr float SlowVoltageWobbleRate = 1.7f;
+    static constexpr float SlowVoltageWobbleDepth = 1.8f;
+    static constexpr float BallastNoiseRateA = 13.7f;
+    static constexpr float BallastNoiseRateB = 4.3f;
+    static constexpr float UnstableOutputCenter = 0.93f;
+    static constexpr float SlowVoltageAmount = 0.025f;
+    static constexpr float BallastNoiseAmount = 0.015f;
+    // 一瞬暗くなる：間隔（最長−電池の少なさで縮める幅）、暗い秒数（最短＋電池の少なさで足す幅）、そのときの光の強さ（最大−幅）
+    static constexpr float DropCycleSeconds = 3.7f;
+    static constexpr float DropCycleShrink = 1.45f;
+    static constexpr float DropSeconds = 0.025f;
+    static constexpr float DropExtraSeconds = 0.060f;
+    static constexpr float DropOutput = 0.80f;
+    static constexpr float DropOutputRange = 0.10f;
 
     // 点いているか、電池の残り、電池を拾ったときの通知の残り秒数、点灯の度合い
     bool m_IsOn = true;
@@ -86,16 +114,16 @@ public:
             }
         }
 
-        const int warningLevel = m_Battery <= 10.0f
+        const int warningLevel = m_Battery <= CriticalBatteryLevel
             ? 2
-            : (m_Battery <= 20.0f ? 1 : 0);
+            : (m_Battery <= LowBatteryLevel ? 1 : 0);
         if (warningLevel > m_LowBatteryWarningLevel)
         {
             m_LowBatteryWarningLevel = warningLevel;
             return warningLevel;
         }
         // 電池が25%より多くなったら、警告をもう一度出せるようにしている
-        if (m_Battery > 25.0f)
+        if (m_Battery > WarningResetLevel)
         {
             m_LowBatteryWarningLevel = 0;
         }
@@ -110,45 +138,45 @@ public:
 
         // 点灯の度合いを目標（点灯なら1、消灯なら0）へ近づけている。60fpsを基準にして、フレームレートが違っても同じ速さにしている
         const float blendTarget = state.visible ? 1.0f : 0.0f;
-        const float responseAt60Fps = state.visible ? 0.22f : 0.34f;
+        const float responseAt60Fps = state.visible ? PowerOnResponse : PowerOffResponse;
         const float blendResponse = 1.0f - std::pow(
-            1.0f - responseAt60Fps, deltaTime * 60.0f);
+            1.0f - responseAt60Fps, deltaTime * ResponseReferenceFps);
         m_PowerBlend += (blendTarget - m_PowerBlend) * blendResponse;
-        if (m_PowerBlend < 0.002f)
+        if (m_PowerBlend < PowerBlendEpsilon)
         {
             m_PowerBlend = 0.0f;
         }
         state.powerBlend = m_PowerBlend;
-        state.render = state.visible || m_PowerBlend > 0.002f;
+        state.render = state.visible || m_PowerBlend > PowerBlendEpsilon;
 
         bool voltageDrop = false;
         // 電池が20%以下：少ないほど光を不安定に揺らし、ときどき一瞬暗くしている
-        if (m_IsOn && m_Battery <= 20.0f)
+        if (m_IsOn && m_Battery <= LowBatteryLevel)
         {
             m_FlickerTime += deltaTime;
-            state.batteryStress = (20.0f - m_Battery) / 20.0f;
+            state.batteryStress = (LowBatteryLevel - m_Battery) / LowBatteryLevel;
 
             // 周期の違う揺れを重ね、規則的すぎない電圧の揺らぎにしている。
             const float flickerTime = m_FlickerTime;
             const float slowVoltage = std::sin(
-                flickerTime * 7.1f + std::sin(flickerTime * 1.7f) * 1.8f);
+                flickerTime * SlowVoltageRate + std::sin(flickerTime * SlowVoltageWobbleRate) * SlowVoltageWobbleDepth);
             const float ballastNoise =
-                std::sin(flickerTime * 13.7f) *
-                std::sin(flickerTime * 4.3f);
+                std::sin(flickerTime * BallastNoiseRateA) *
+                std::sin(flickerTime * BallastNoiseRateB);
             const float unstableOutput =
-                0.93f + slowVoltage * 0.025f + ballastNoise * 0.015f;
+                UnstableOutputCenter + slowVoltage * SlowVoltageAmount + ballastNoise * BallastNoiseAmount;
             state.output = 1.0f +
                 (unstableOutput - 1.0f) * state.batteryStress;
 
             // 一瞬暗くなる間隔：電池が少ないほど短く、暗い時間は長くしている
-            const float dropCycle = 3.7f - state.batteryStress * 1.45f;
+            const float dropCycle = DropCycleSeconds - state.batteryStress * DropCycleShrink;
             const float dropPhase = std::fmod(flickerTime, dropCycle);
             const float dropDuration =
-                0.025f + state.batteryStress * 0.060f;
+                DropSeconds + state.batteryStress * DropExtraSeconds;
             if (dropPhase < dropDuration)
             {
                 voltageDrop = true;
-                state.output *= 0.80f - state.batteryStress * 0.10f;
+                state.output *= DropOutput - state.batteryStress * DropOutputRange;
             }
         }
         else
@@ -169,8 +197,8 @@ public:
         {
             m_Battery = MaxBattery;
         }
-        m_BatteryNoticeTimer = 2.2f;
-        m_LowBatteryWarningLevel = m_Battery <= 20.0f ? 1 : 0;
+        m_BatteryNoticeTimer = BatteryNoticeSeconds;
+        m_LowBatteryWarningLevel = m_Battery <= LowBatteryLevel ? 1 : 0;
     }
 
     // 点いているか、電池の残り、通知の残り秒数を返している

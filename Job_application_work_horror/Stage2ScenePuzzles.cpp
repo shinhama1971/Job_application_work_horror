@@ -180,7 +180,6 @@ namespace
     // --- 周回を進めたとき：次の判定までの秒数、案内の点滅までの秒数、入口の暗転の秒数、裸電球の揺れ
     constexpr float LoopCooldownSeconds = 1.0f;
     constexpr float GuidancePulseCooldownSeconds = 1.2f;
-    constexpr float LoopBlinkSeconds = 0.28f;
     constexpr float LoopStartBulbKick = 0.5f;
     // 周回の始まりの危険度、次の警告・次の影までの秒数
     constexpr float LoopStartThreat = 0.12f;
@@ -621,7 +620,7 @@ void Stage2Scene::AdvanceLoop(Player& player)
     m_LoopCooldown = LoopCooldownSeconds;
     m_ProgressHintTimer = 0.0f;
     m_GuidancePulseCooldown = GuidancePulseCooldownSeconds;
-    m_LoopBlinkTimer = LoopBlinkSeconds;
+    m_LoopBlinkTimer = Stage2LoopBlinkSeconds;
     m_LoopTransitionTimer = 0.0f;
     m_Notices.loop = Stage2LongNoticeSeconds;
     m_LightZoneProgress.Reset();
@@ -977,18 +976,8 @@ void Stage2Scene::ResetSignalPuzzle()
 void Stage2Scene::UpdateSignalPuzzle()
 {
     Core::Game* game = Core::Game::GetInstance();
-    const Color baseDiffuse[] =
-    {
-        Color(0.015f, 0.055f, 0.13f, 1.0f),
-        Color(0.13f, 0.075f, 0.012f, 1.0f),
-        Color(0.13f, 0.018f, 0.012f, 1.0f)
-    };
-    const Color baseEmission[] =
-    {
-        Color(0.015f, 0.18f, 0.48f, 1.0f),
-        Color(0.40f, 0.17f, 0.008f, 1.0f),
-        Color(0.42f, 0.018f, 0.008f, 1.0f)
-    };
+    const auto& baseDiffuse = Stage2SignalDiffuse;
+    const auto& baseEmission = Stage2SignalEmission;
 
     const bool puzzleActive =
         m_LoopCount >= Stage2FinalLoopCount && !m_SignalPuzzle.IsComplete();

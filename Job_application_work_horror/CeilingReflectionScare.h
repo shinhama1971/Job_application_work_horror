@@ -30,6 +30,18 @@ public:
     // 水面の人影を見続ける秒数、見た後に見上げるのを待つ秒数（過ぎたら黙って消える）
     static constexpr float RequiredSeenSeconds = 0.5f;
     static constexpr float LookUpWindowSeconds = 7.0f;
+    // 人影が浮かぶ秒数と消える秒数
+    static constexpr float FadeInSeconds = 0.8f;
+    static constexpr float FadeOutSeconds = 0.2f;
+    // 人影を置くとき、水の範囲の端から離す距離
+    static constexpr float EdgeMargin = 10.0f;
+    // 足元をのぞき込んでいるとみなす視線の下向き、見上げたとみなす上向き（視線の y）
+    static constexpr float LookDownThreshold = -0.42f;
+    static constexpr float LookUpThreshold = 0.15f;
+    // 水面に映った人影が見えたとみなす距離（下限・上限）と、視線の中心からの近さ（内積）
+    static constexpr float MinimumSightDistance = 0.001f;
+    static constexpr float MaximumSightDistance = 90.0f;
+    static constexpr float SightAlignment = 0.88f;
 
     // Updateの結果（何も起きていない・水面の人影を見た・見上げると消えていた）
     enum class Event
@@ -90,8 +102,8 @@ public:
     {
         const bool shown = m_State == State::Reflected || m_State == State::Seen;
         m_Visibility = shown
-            ? (std::min)(1.0f, m_Visibility + deltaTime / 0.8f)
-            : (std::max)(0.0f, m_Visibility - deltaTime / 0.2f);
+            ? (std::min)(1.0f, m_Visibility + deltaTime / FadeInSeconds)
+            : (std::max)(0.0f, m_Visibility - deltaTime / FadeOutSeconds);
 
         if (m_State == State::Waiting)
         {
@@ -113,7 +125,7 @@ public:
             return Event::None;
         }
 
-        const bool lookingDown = forward.y < -0.42f;
+        const bool lookingDown = forward.y < LookDownThreshold;
         if (m_State == State::Reflected)
         {
             // 見ていない間は、プレイヤーの少し先の天井へ張り付き直している（のぞいている最中は動かさない）
@@ -126,8 +138,8 @@ public:
                 }
                 const DirectX::SimpleMath::Vector3 ahead = eye + flat * AheadDistance;
                 m_Position = DirectX::SimpleMath::Vector3(
-                    (std::clamp)(ahead.x, minimum.x + 10.0f, maximum.x - 10.0f), CeilingY,
-                    (std::clamp)(ahead.z, minimum.y + 10.0f, maximum.y - 10.0f));
+                    (std::clamp)(ahead.x, minimum.x + EdgeMargin, maximum.x - EdgeMargin), CeilingY,
+                    (std::clamp)(ahead.z, minimum.y + EdgeMargin, maximum.y - EdgeMargin));
             }
             // 足元をのぞき込み、水面に映った人影の胸か頭が、視線の中心の近くに見えているか
             bool visible = false;
@@ -141,8 +153,8 @@ public:
                     const DirectX::SimpleMath::Vector3 waterHit = eye + (mirrored - eye) * t;
                     const DirectX::SimpleMath::Vector3 toHit = waterHit - eye;
                     const float distance = toHit.Length();
-                    if (isInWater(waterHit) && distance > 0.001f && distance < 90.0f &&
-                        forward.Dot(toHit / distance) > 0.88f)
+                    if (isInWater(waterHit) && distance > MinimumSightDistance && distance < MaximumSightDistance &&
+                        forward.Dot(toHit / distance) > SightAlignment)
                     {
                         visible = true;
                         break;
@@ -160,7 +172,7 @@ public:
         }
 
         // 見た後：見上げる（上を向く）と、天井には何もいない
-        if (forward.y > 0.15f)
+        if (forward.y > LookUpThreshold)
         {
             m_State = State::Done;
             return Event::Vanished;

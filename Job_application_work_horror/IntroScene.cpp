@@ -31,6 +31,27 @@ namespace
     {
         { Vector3(0.0f, -99.0f, 95.0f), Vector3(0.0f, -99.0f, 165.0f), 0.0f, 0.0f, 0.03f, 0.07f, 45.0f },
     };
+    // 目的の画面に移った瞬間の乱れ（強さと、消えるまでの秒数）
+    constexpr float MissionCutNoise = 0.5f;
+    constexpr float MissionCutNoiseSeconds = 0.5f;
+    // ふだんの、かすかな乱れ（遠くの無線を受けているように）
+    constexpr float IdleNoise = 0.06f;
+    // 行が始まる少し前から乱し始める秒数、乱れの強さと続く秒数
+    constexpr float LineNoiseLead = 0.3f;
+    constexpr float LineNoiseStrength = 0.55f;
+    constexpr float LineNoiseSeconds = 0.5f;
+    // 「通信途絶」で強く乱れる秒数
+    constexpr float SignalLostNoiseSeconds = 1.3f;
+    // 乱れを、画面全体の電波障害とラジオの雑音の乱れへ渡す割合
+    constexpr float InterferenceScale = 0.8f;
+    constexpr float PresenceStaticScale = 0.5f;
+    // 目的の画面で、押し間違えないよう入力を待つ秒数
+    constexpr float MissionInputDelay = 0.6f;
+    // 文字が浮かぶ秒数（見出し・「通信途絶」・目的）
+    constexpr float HeaderFadeSeconds = 0.6f;
+    constexpr float SignalLostFadeSeconds = 0.15f;
+    constexpr float MissionFadeSeconds = 0.5f;
+
     float Fade(float time, float start, float length)
     {
         return std::clamp((time - start) / length, 0.0f, 1.0f);
@@ -87,24 +108,24 @@ float IntroScene::GetNoise() const
     if (m_ShowingMission)
     {
         // 目的の画面に移った瞬間だけ、少し乱している
-        return (std::max)(0.0f, 0.5f - m_MissionTimer / 0.5f * 0.5f);
+        return (std::max)(0.0f, MissionCutNoise - m_MissionTimer / MissionCutNoiseSeconds * MissionCutNoise);
     }
     // ふだんも、かすかに乱れている（遠くの無線を受けているように）
-    float noise = 0.06f;
+    float noise = IdleNoise;
     // 行が始まる瞬間に、電波が乱れる
     for (float start : LineStartTimes)
     {
-        const float since = m_Time - (start - 0.3f);
-        if (since >= 0.0f && since < 0.5f)
+        const float since = m_Time - (start - LineNoiseLead);
+        if (since >= 0.0f && since < LineNoiseSeconds)
         {
-            noise = (std::max)(noise, 0.55f * (1.0f - since / 0.5f));
+            noise = (std::max)(noise, LineNoiseStrength * (1.0f - since / LineNoiseSeconds));
         }
     }
     // 「通信途絶」で、強く乱れる
     const float sinceLost = m_Time - SignalLostTime;
-    if (sinceLost >= 0.0f && sinceLost < 1.3f)
+    if (sinceLost >= 0.0f && sinceLost < SignalLostNoiseSeconds)
     {
-        noise = (std::max)(noise, 1.0f - sinceLost / 1.3f);
+        noise = (std::max)(noise, 1.0f - sinceLost / SignalLostNoiseSeconds);
     }
     return noise;
 }
@@ -132,8 +153,8 @@ void IntroScene::Update()
 
     const float noise = GetNoise();
     Effect::PostProcess* postProcess = Core::Game::GetInstance()->GetPostProcess();
-    postProcess->SetSignalInterference(noise * 0.8f);
-    postProcess->SetPresenceStatic(noise * 0.5f);
+    postProcess->SetSignalInterference(noise * InterferenceScale);
+    postProcess->SetPresenceStatic(noise * PresenceStaticScale);
 
     // Enter（A・START）：受信記録の途中なら目的の画面へ飛ばし、目的の画面なら1面を始める（押し間違えないよう、少し待ってから）
     if (Input::GetKeyTrigger(VK_RETURN) || Input::GetKeyTrigger(VK_SPACE) ||
@@ -143,7 +164,7 @@ void IntroScene::Update()
         {
             ShowMission();
         }
-        else if (m_MissionTimer > 0.6f)
+        else if (m_MissionTimer > MissionInputDelay)
         {
             Core::Game::GetInstance()->RequestSceneChange(SceneName::Stage);
         }
@@ -158,7 +179,7 @@ void IntroScene::Draw(Camera* camera)
     view.Noise = GetNoise();
     view.HideBackdrop = m_StartAtMission;
     view.Header = TransmissionHeader;
-    view.HeaderAlpha = m_ShowingMission ? 0.0f : Fade(m_Time, HeaderTime, 0.6f);
+    view.HeaderAlpha = m_ShowingMission ? 0.0f : Fade(m_Time, HeaderTime, HeaderFadeSeconds);
     static_assert(std::size(TransmissionLines) == std::size(LineStartTimes), "LineStartTimes must match StoryText");
     for (std::size_t index = 0; index < std::size(TransmissionLines); ++index)
     {
@@ -167,10 +188,10 @@ void IntroScene::Draw(Camera* camera)
     }
     view.LinesAlpha = m_ShowingMission ? 0.0f : 1.0f;
     view.SignalLost = SignalLost;
-    view.SignalLostAlpha = m_ShowingMission ? 0.0f : Fade(m_Time, SignalLostTime, 0.15f);
+    view.SignalLostAlpha = m_ShowingMission ? 0.0f : Fade(m_Time, SignalLostTime, SignalLostFadeSeconds);
     view.MissionLead = MissionLead;
     view.MissionGoal = MissionGoal;
-    view.MissionAlpha = m_ShowingMission ? Fade(m_MissionTimer, 0.0f, 0.5f) : 0.0f;
+    view.MissionAlpha = m_ShowingMission ? Fade(m_MissionTimer, 0.0f, MissionFadeSeconds) : 0.0f;
     m_Hud.DrawIntro(view);
     // ポーズ中はポーズメニューを重ねている（受信記録の途中でも、ESC でゲームを終えたりタイトルへ戻ったりできるように）
     Core::Game* game = Core::Game::GetInstance();

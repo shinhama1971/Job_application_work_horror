@@ -50,9 +50,56 @@ namespace
     constexpr float FearFadeSeconds = 3.0f;
     constexpr float WalkerFear = 0.30f;
 
+    // sin を使う決まった式で 0〜1 の値を作る係数
+    constexpr float HashFrequency = 12.9898f;
+    constexpr float HashAmplitude = 43758.5453f;
+    // 不安定な時間：来る速さ（1秒あたり）と灯ごとのずらし、来る確率（最低＋不安定さの幅）
+    constexpr float BurstRate = 0.6f;
+    constexpr float BurstSeedScale = 3.1f;
+    constexpr float BurstChance = 0.25f;
+    constexpr float BurstChanceRange = 0.45f;
+    // 電球の小さなうなり（中心・幅・速さ・灯ごとのずらし）
+    constexpr float HumCenter = 0.94f;
+    constexpr float HumDepth = 0.06f;
+    constexpr float HumRate = 47.0f;
+    constexpr float HumSeedScale = 5.0f;
+    // 不安定な時間の中で、途切れるかを決める回数（1秒あたり）と灯ごとのずらし、途切れる確率の倍率
+    constexpr float DropoutStepsPerSecond = 14.0f;
+    constexpr float DropoutSeedScale = 7.0f;
+    constexpr float DropoutHashScale = 1.37f;
+    constexpr float DropoutChanceScale = 0.55f;
+    // 途切れたときに残る光（最低＋乱数の幅）、途切れないときの明るさ（最低＋乱数の幅）。乱数を引くときのずらし
+    constexpr float DropoutGlow = 0.06f;
+    constexpr float DropoutGlowRange = 0.12f;
+    constexpr float SteadyGlow = 0.75f;
+    constexpr float SteadyGlowRange = 0.25f;
+    constexpr float DropoutGlowHashOffset = 0.5f;
+    constexpr float SteadyGlowHashOffset = 2.0f;
+    // 消える前の激しいまたたき：乱数の倍率、消えている間の明るさ
+    constexpr float DyingHashScale = 2.3f;
+    constexpr float DyingOffBrightness = 0.05f;
+    // 灯が消える瞬間の「カチッ」（懐中電灯のスイッチの音を低くして使う。高さと音量）：街灯、窓の明かり
+    constexpr float LampClickPitch = 0.55f;
+    constexpr float LampClickVolume = 0.9f;
+    constexpr float WindowClickPitch = 0.70f;
+    constexpr float WindowClickVolume = 1.0f;
+    // 近づいたときの街灯の不安定さ（最低＋近さの幅）
+    constexpr float LampMinInstability = 0.15f;
+    constexpr float LampInstabilityRange = 0.85f;
+    // 窓の明かりの乱数の種、玄関の灯の乱数の種と不安定さ（最低＋近さの幅）
+    constexpr float WindowSeed = 9.1f;
+    constexpr float PorchSeed = 17.0f;
+    constexpr float PorchMinInstability = 0.3f;
+    constexpr float PorchInstabilityRange = 0.6f;
+    // 「見えない何か」の足音（高さと音量）
+    constexpr float WalkerStepPitch = 0.70f;
+    constexpr float WalkerStepVolume = 1.0f;
+    // 灯が消えた後の恐怖の強さ（2乗に掛ける割合）
+    constexpr float LampFearScale = 0.55f;
+
     float Hash(float value)
     {
-        const float s = std::sin(value * 12.9898f) * 43758.5453f;
+        const float s = std::sin(value * HashFrequency) * HashAmplitude;
         return s - std::floor(s);
     }
 }
@@ -72,18 +119,20 @@ Wall* ForestEvents::Find(const PropLayoutFile::SpawnedProps& props, const char* 
 float ForestEvents::Flicker(float time, float seed, float instability)
 {
     // ちらつきは、ときどき来る「不安定な時間」の中だけで起きる（ずっとまたたくと、ただの点滅に見えるため）
-    const float burstWindow = std::floor(time * 0.6f + seed * 3.1f);
-    const bool burst = Hash(burstWindow + seed) < 0.25f + instability * 0.45f;
+    const float burstWindow = std::floor(time * BurstRate + seed * BurstSeedScale);
+    const bool burst = Hash(burstWindow + seed) < BurstChance + instability * BurstChanceRange;
     // 電球の小さなうなり（ほとんど分からない程度の明るさの揺れ）
-    const float hum = 0.94f + 0.06f * std::sin(time * 47.0f + seed * 5.0f);
+    const float hum = HumCenter + HumDepth * std::sin(time * HumRate + seed * HumSeedScale);
     if (!burst)
     {
         return hum;
     }
     // 不安定な時間の中では、1秒に14回、乱数で途切れるかを決めている（途切れたときも少しだけ光が残る）
-    const float step = std::floor(time * 14.0f + seed * 7.0f);
-    const bool dropout = Hash(step * 1.37f + seed) < instability * 0.55f;
-    return dropout ? 0.06f + Hash(step + 0.5f) * 0.12f : hum * (0.75f + 0.25f * Hash(step + 2.0f));
+    const float step = std::floor(time * DropoutStepsPerSecond + seed * DropoutSeedScale);
+    const bool dropout = Hash(step * DropoutHashScale + seed) < instability * DropoutChanceScale;
+    return dropout
+        ? DropoutGlow + Hash(step + DropoutGlowHashOffset) * DropoutGlowRange
+        : hum * (SteadyGlow + SteadyGlowRange * Hash(step + SteadyGlowHashOffset));
 }
 
 float ForestEvents::DyingBrightness(float elapsed, float seed)
@@ -94,7 +143,7 @@ float ForestEvents::DyingBrightness(float elapsed, float seed)
         return 0.0f;
     }
     const float step = std::floor(elapsed * LampDyingFlickersPerSecond);
-    return Hash(step * 2.3f + seed) < 0.5f ? 0.05f : 1.0f;
+    return Hash(step * DyingHashScale + seed) < 0.5f ? DyingOffBrightness : 1.0f;
 }
 
 float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const PropLayoutFile::SpawnedProps& props)
@@ -128,7 +177,7 @@ float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const
             if (!lamp.ClickPlayed && elapsed >= LampDyingSeconds)
             {
                 lamp.ClickPlayed = true;
-                game->PlayAudioCueAt(SOUND_CUE_FLASHLIGHT, wall->GetPosition(), 0.55f, 0.9f);
+                game->PlayAudioCueAt(SOUND_CUE_FLASHLIGHT, wall->GetPosition(), LampClickPitch, LampClickVolume);
             }
         }
         else
@@ -136,7 +185,7 @@ float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const
             // 近づくほど不安定にしている（遠くからは、ほぼ普通の灯りに見える）
             const Vector2 offset(playerPosition.x - wall->GetPosition().x, playerPosition.z - wall->GetPosition().z);
             const float t = std::clamp((LampUnstableDistance - offset.Length()) / LampUnstableRange, 0.0f, 1.0f);
-            const float instability = 0.15f + 0.85f * MathUtility::SmoothCurve(t);
+            const float instability = LampMinInstability + LampInstabilityRange * MathUtility::SmoothCurve(t);
             brightness = Flicker(m_Time, seed, instability);
         }
         wall->SetEmissionScale(brightness);
@@ -156,11 +205,11 @@ float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const
             const float elapsed = m_WindowOffTimer - WindowDelay;
             if (elapsed >= 0.0f)
             {
-                brightness = DyingBrightness(elapsed, 9.1f);
+                brightness = DyingBrightness(elapsed, WindowSeed);
                 if (!m_WindowClickPlayed && elapsed >= LampDyingSeconds)
                 {
                     m_WindowClickPlayed = true;
-                    game->PlayAudioCueAt(SOUND_CUE_FLASHLIGHT, window->GetPosition(), 0.70f, 1.0f);
+                    game->PlayAudioCueAt(SOUND_CUE_FLASHLIGHT, window->GetPosition(), WindowClickPitch, WindowClickVolume);
                     m_Fear = 1.0f;
                 }
             }
@@ -172,7 +221,8 @@ float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const
     if (Wall* porch = Find(props, "LabPorchLight"))
     {
         const float instability = std::clamp((playerPosition.z - PorchUnstableZ) / PorchUnstableRange, 0.0f, 1.0f);
-        porch->SetEmissionScale(instability > 0.0f ? Flicker(m_Time, 17.0f, 0.3f + instability * 0.6f) : 1.0f);
+        porch->SetEmissionScale(instability > 0.0f
+            ? Flicker(m_Time, PorchSeed, PorchMinInstability + instability * PorchInstabilityRange) : 1.0f);
     }
 
     // --- 草むらを通る「見えない何か」：前方の草むらを、左から右へ横切る
@@ -202,12 +252,13 @@ float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const
         if (m_NextWalkerStep <= 0.0f)
         {
             m_NextWalkerStep += WalkerStepInterval;
-            game->PlayAudioCueAt(SOUND_CUE_FOREST_STEP, Vector3(m_WalkerPosition.x, playerPosition.y, m_WalkerPosition.y), 0.70f, 1.0f);
+            game->PlayAudioCueAt(SOUND_CUE_FOREST_STEP, Vector3(m_WalkerPosition.x, playerPosition.y, m_WalkerPosition.y),
+                WalkerStepPitch, WalkerStepVolume);
         }
         walkerFear = WalkerFear * m_WalkerStrength;
     }
 
     // 恐怖の画面効果は、窓が消えた瞬間に強く出し、3秒ほどで消している
     m_Fear = (std::max)(0.0f, m_Fear - deltaTime / FearFadeSeconds);
-    return (std::max)(m_Fear * m_Fear * 0.55f, walkerFear);
+    return (std::max)(m_Fear * m_Fear * LampFearScale, walkerFear);
 }

@@ -21,6 +21,12 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // 画面を消すときの色（ほとんど黒の、わずかに青い夜の色）
+    const Color ClearColor(0.003f, 0.005f, 0.008f, 1.0f);
+}
+
+namespace
+{
 	// 高性能なGPUを探している。内蔵GPUと単体GPUの両方を持つノートPCでは、何も指定しないと
 	// 消費電力の少ない内蔵GPUで描画されることがあり、ライトや画面効果で大きく重くなるためである。
 	// 見つからない（古いWindowsなど）ときはnullptrを返し、前と同じく既定のGPUを使っている。
@@ -622,7 +628,7 @@ void Renderer::Uninit()
 void Renderer::DrawStart()
 {
 	// 画面を塗りつぶす色
-	float clearColor[4] = { 0.003f, 0.005f, 0.008f, 1.0f }; // 背景色（わずかに青みのある黒）
+	float clearColor[4] = { ClearColor.R(), ClearColor.G(), ClearColor.B(), ClearColor.A() }; // 背景色（わずかに青みのある黒）
 
 	// 本描画はHDRの描き先へ描く（画面効果の最後のトーンマッピングで、バックバッファへ移す）
 	BeginHdrScene();
