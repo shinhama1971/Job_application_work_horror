@@ -31,6 +31,11 @@ using namespace DirectX::SimpleMath;
 
 #include "Stage2SceneConstants.h"
 
+namespace
+{
+    constexpr float RoomOcclusionCeilingY = -48.5f;
+    constexpr float RoomOcclusionStrength = 0.55f;
+}
 
 // 作るときに初期化している
 Stage2Scene::Stage2Scene()
@@ -172,7 +177,7 @@ void Stage2Scene::Init()
     Renderer::SetRoomOcclusion(
         m_Objects.wallFootprints.data(),
         static_cast<unsigned int>(m_Objects.wallFootprints.size()),
-        -100.0f, -48.5f, 0.55f);
+        Stage2FloorY, RoomOcclusionCeilingY, RoomOcclusionStrength);
 
     // 2面は、廊下の入口から北（+z）の奥を向いて始めている。
     // カメラは前のシーンから持ち越されるので、1面の最後に向いていた向き（階段を上った東向きなど）のままにならないよう、ここで決めている
@@ -232,21 +237,25 @@ void Stage2Scene::ReloadPropLayout()
     if (!layout.IsValid())
     {
         m_LayoutNotice = "配置のファイルの" + std::to_string(layout.ErrorLine) + "行目が読めない " + layout.Error;
-        m_LayoutNoticeTimer = 6.0f;
+        m_LayoutNoticeTimer = PropLayoutFile::LayoutErrorNoticeSeconds;
         return;
     }
     SceneLayoutBuilder builder(*Core::Game::GetInstance(), m_Objects.objectNames);
-    PropLayoutFile::Reload(builder, layout, m_Objects.layoutProps);
+    if (!PropLayoutFile::Reload(builder, layout, m_Objects.layoutProps, m_LayoutNotice))
+    {
+        m_LayoutNoticeTimer = PropLayoutFile::LayoutErrorNoticeSeconds;
+        return;
+    }
     // プレイヤーの位置は、遊んでいる途中の状態なので変えない
     const int placed = PropLayoutFile::ReapplyPlacements(layout, m_Objects.placementBindings);
     m_Objects.wallFootprints = PropLayoutFile::CollectRoomFootprints(layout);
     Renderer::SetRoomOcclusion(
         m_Objects.wallFootprints.data(),
         static_cast<unsigned int>(m_Objects.wallFootprints.size()),
-        -100.0f, -48.5f, 0.55f);
+        Stage2FloorY, RoomOcclusionCeilingY, RoomOcclusionStrength);
     m_LayoutNotice = "配置のファイルを読み直した（建物 " + std::to_string(layout.Props.size()) + "個・置き場所 " +
         std::to_string(placed) + "個）";
-    m_LayoutNoticeTimer = 3.0f;
+    m_LayoutNoticeTimer = PropLayoutFile::LayoutSuccessNoticeSeconds;
 }
 
 void Stage2Scene::Update()

@@ -33,6 +33,7 @@ public:
 
     // ファイルから読んだ配置を受け取っている（作ったときと、F5・Reloadで読み直したとき）
     void SetLayout(const PropLayout& layout);
+    bool HasUnsavedChanges() const { return m_Dirty; }
 
     // デバッグ画面を開いている間、窓を描いて小物を編集している。新しく足した小物はbuilderで作り、propsに加える
     Action Draw(SceneLayoutBuilder& builder, PropLayoutFile::SpawnedProps& props, const Camera& camera);

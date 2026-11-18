@@ -4,11 +4,21 @@
 // ============================================================================
 
 #include "ObjectManager.h"
+#include "utility.h"
 
 #include <algorithm>
 
 namespace Core
 {
+    void ObjectManager::CheckNameAvailable(const std::string& name) const
+    {
+        const auto existing = m_NamedObjects.find(name);
+        if (existing != m_NamedObjects.end() && !existing->second->IsDestroy())
+        {
+            utility::ReportFatalError("同じ名前の Object を登録できない: " + name);
+        }
+    }
+
     // 破棄を予約されていないObjectを、追加した順に更新している
     void ObjectManager::UpdateAll()
     {
@@ -39,38 +49,21 @@ namespace Core
             }
         }
 
-        // 破棄を予約されたObjectだけUninitしてから、配列から取り除いている（unique_ptrが実体を解放する）
-        std::erase_if(
-            m_Objects,
-            [](const std::unique_ptr<Object>& object)
-            {
-                if (!object->IsDestroy())
-                {
-                    return false;
-                }
-                object->Uninit();
-                return true;
-            });
-    }
-
-    // 破棄を予約し、同じObjectを指している名前をすべて外している
-    void ObjectManager::DeleteObject(Object* object)
-    {
-        if (object == nullptr)
+        // 一覧の並び替えを終えてから Uninit を呼ぶ。Uninit から検索しても、移動途中の要素に触れない。
+        std::vector<std::unique_ptr<Object>> destroyed;
+        for (auto& object : m_Objects)
         {
-            return;
-        }
-        object->Destroy();
-        for (auto it = m_NamedObjects.begin();
-            it != m_NamedObjects.end();)
-        {
-            if (it->second == object)
+            if (object->IsDestroy())
             {
-                it = m_NamedObjects.erase(it);
+                destroyed.emplace_back(std::move(object));
             }
-            else
+        }
+        if (!destroyed.empty())
+        {
+            std::erase(m_Objects, nullptr);
+            for (auto& object : destroyed)
             {
-                ++it;
+                object->Uninit();
             }
         }
     }
@@ -97,14 +90,9 @@ namespace Core
         {
             object->Uninit();
         }
-        m_Objects.clear();
-        m_NamedObjects.clear();
-    }
-
-    // 予約された追加を捨てている
-    void ObjectManager::ClearPendingCommands()
-    {
         m_PendingCommands.clear();
+        m_NamedObjects.clear();
+        m_Objects.clear();
     }
 
     // 更新中に予約された追加を処理の後に実行し、m_Objectsが並べ直されて

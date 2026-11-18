@@ -9,9 +9,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace
 {
+	constexpr float VibrationFramesPerSecond = 60.0f;
+	constexpr WORD MaximumMotorSpeed = (std::numeric_limits<WORD>::max)();
+
 	// スティックの値を-1〜1にし、中心付近の遊び（デッドゾーン）を0、その外側を0〜1に広げ直している
 	float NormalizeStickAxis(SHORT value, SHORT deadZone)
 	{
@@ -51,11 +55,14 @@ void Input::Create()
 void Input::Update()
 {
 	// 前のフレームの入力を覚えておいている（押した瞬間・離した瞬間の判定に使う）
-	for (int i = 0; i < 256; i++) { m_Instance->keyState_old[i] = m_Instance->keyState[i]; }
+	CopyMemory(m_Instance->keyState_old, m_Instance->keyState, sizeof(m_Instance->keyState));
 	m_Instance->controllerState_old = m_Instance->controllerState;
 
 	// キーの状態を読み直している
-	GetKeyboardState(m_Instance->keyState);
+	if (!GetKeyboardState(m_Instance->keyState))
+	{
+		ZeroMemory(m_Instance->keyState, sizeof(m_Instance->keyState));
+	}
 
 	// コントローラーの状態を読み直している（XInput）
 	XINPUT_STATE nextControllerState{};
@@ -82,6 +89,10 @@ void Input::Update()
 		}
 	}
 
+	if (connectedIndex != m_Instance->controllerIndex && m_Instance->VibrationTimeSeconds > 0.0f)
+	{
+		m_Instance->StopVibration();
+	}
 	m_Instance->controllerConnected = connectedIndex < XUSER_MAX_COUNT;
 	m_Instance->controllerIndex = connectedIndex;
 	if (m_Instance->controllerConnected)
@@ -93,19 +104,42 @@ void Input::Update()
 		ZeroMemory(&m_Instance->controllerState, sizeof(XINPUT_STATE));
 	}
 
+	// 復帰直後は、その時点で押されているキーやボタンを基準にする。
+	if (m_Instance->m_ResyncOnNextUpdate)
+	{
+		CopyMemory(m_Instance->keyState_old, m_Instance->keyState, sizeof(m_Instance->keyState));
+		m_Instance->controllerState_old = m_Instance->controllerState;
+		m_Instance->m_ResyncOnNextUpdate = false;
+	}
+
 	// 振動を続ける残り時間を減らしている
 	if (m_Instance->VibrationTimeSeconds > 0.0f) {
 		m_Instance->VibrationTimeSeconds -= Application::GetDeltaTime();
 		if (m_Instance->VibrationTimeSeconds <= 0.0f) { // 時間が過ぎたら振動を止めている
-			XINPUT_VIBRATION vibration;
-			ZeroMemory(&vibration, sizeof(XINPUT_VIBRATION));
-			vibration.wLeftMotorSpeed = 0;
-			vibration.wRightMotorSpeed = 0;
-			if (m_Instance->controllerConnected)
-			{
-				XInputSetState(m_Instance->controllerIndex, &vibration);
-			}
+			m_Instance->StopVibration();
 		}
+	}
+}
+
+void Input::OnFocusLost()
+{
+	if (m_Instance)
+	{
+		if (m_Instance->VibrationTimeSeconds > 0.0f)
+		{
+			m_Instance->StopVibration();
+		}
+		m_Instance->m_ResyncOnNextUpdate = true;
+	}
+}
+
+void Input::StopVibration()
+{
+	VibrationTimeSeconds = 0.0f;
+	if (controllerIndex < XUSER_MAX_COUNT)
+	{
+		XINPUT_VIBRATION vibration{};
+		XInputSetState(controllerIndex, &vibration);
 	}
 }
 
@@ -196,21 +230,23 @@ bool Input::GetButtonRelease(WORD btn) // 離した瞬間だけtrue
 }
 
 // 振動を始めている
-void Input::SetVibration(int frame, float powor)
+void Input::SetVibration(int frame, float strength)
 {
-	// 振動の設定
-	XINPUT_VIBRATION vibration;
-	ZeroMemory(&vibration, sizeof(XINPUT_VIBRATION));
-
-	// 左右のモーターの強さを設定している（0〜65535）
-	vibration.wLeftMotorSpeed = (WORD)(powor * 65535.0f);
-	vibration.wRightMotorSpeed = (WORD)(powor * 65535.0f);
-	if (m_Instance->controllerConnected)
+	if (!m_Instance || !m_Instance->controllerConnected)
 	{
-		XInputSetState(m_Instance->controllerIndex, &vibration);
+		return;
+	}
+	if (frame <= 0 || strength <= 0.0f || !std::isfinite(strength))
+	{
+		m_Instance->StopVibration();
+		return;
 	}
 
+	const WORD motorSpeed = static_cast<WORD>((std::min)(strength, 1.0f) * MaximumMotorSpeed);
+	XINPUT_VIBRATION vibration{ motorSpeed, motorSpeed };
+	XInputSetState(m_Instance->controllerIndex, &vibration);
+
 	// 振動を続ける秒数を入れている（frameを60fpsのフレーム数として秒に直している）
-	m_Instance->VibrationTimeSeconds = static_cast<float>(frame) / 60.0f;
+	m_Instance->VibrationTimeSeconds = static_cast<float>(frame) / VibrationFramesPerSecond;
 }
 

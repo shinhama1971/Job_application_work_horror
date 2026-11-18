@@ -229,7 +229,6 @@
     <ClCompile Include="external\imgui\backends\imgui_impl_win32.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)'=='Release'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="Collision.cpp" />
     <ClCompile Include="ComputeShader.cpp" />
     <ClCompile Include="Door.cpp" />
     <ClCompile Include="ExitTrigger.cpp" />
@@ -342,7 +341,6 @@
     <ClInclude Include="external\imgui\backends\imgui_impl_dx11.h" />
     <ClInclude Include="external\imgui\backends\imgui_impl_win32.h" />
     <ClInclude Include="CeilingLight.h" />
-    <ClInclude Include="Collision.h" />
     <ClInclude Include="ComputeShader.h" />
     <ClInclude Include="Door.h" />
     <ClInclude Include="ExitTrigger.h" />

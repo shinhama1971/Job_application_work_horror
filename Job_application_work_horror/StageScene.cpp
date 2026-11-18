@@ -29,6 +29,10 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    constexpr float RoomOcclusionFloorY = -100.0f;
+    constexpr float RoomOcclusionCeilingY = -48.5f;
+    constexpr float RoomOcclusionStrength = 0.55f;
+
     // --- 1面の進行の値
     // 最初に開始地点のドアを叩く音が鳴るまでの秒数
     constexpr float StartDoorFirstKnockSeconds = 4.0f;
@@ -133,7 +137,7 @@ void StageScene::Init()
     Renderer::SetRoomOcclusion(
         m_Objects.wallFootprints.data(),
         static_cast<unsigned int>(m_Objects.wallFootprints.size()),
-        -100.0f, -48.5f, 0.55f);
+        RoomOcclusionFloorY, RoomOcclusionCeilingY, RoomOcclusionStrength);
 
     // シーンを変えた後の最初の描画の前に、カメラとライトを更新している。
     // ImGuiでゲームを止めた場合も、面全体が黒くなるのを防いでいる。
@@ -164,17 +168,24 @@ void StageScene::SetupPracticalLights()
 
 // 配置のファイルを読み直し、今の小物と、扉・照明などの置き場所を置き直している（Debug版の F5 と、ファイルが書き換わったとき）。
 // 書き間違いがあれば置き直さず、何行目が読めなかったかを画面の左上に出している。
-void StageScene::ReloadPropLayout()
+bool StageScene::ReloadPropLayout()
 {
     const PropLayout layout = PropLayoutFile::Load(Stage1Layout::PropLayoutPath);
     if (!layout.IsValid())
     {
         m_LayoutNotice = "配置のファイルの" + std::to_string(layout.ErrorLine) + "行目が読めない " + layout.Error;
-        m_LayoutNoticeTimer = 6.0f;
-        return;
+        m_LayoutNoticeTimer = PropLayoutFile::LayoutErrorNoticeSeconds;
+        return false;
     }
-    SceneLayoutBuilder builder(*Core::Game::GetInstance(), m_Objects.objectNames);
-    PropLayoutFile::Reload(builder, layout, m_Objects.layoutProps);
+    Core::Game& game = *Core::Game::GetInstance();
+    SceneLayoutBuilder builder(game, m_Objects.objectNames);
+    if (!PropLayoutFile::Reload(builder, layout, m_Objects.layoutProps, m_LayoutNotice))
+    {
+        m_LayoutNoticeTimer = PropLayoutFile::LayoutErrorNoticeSeconds;
+        return false;
+    }
+    // 読み直しで増えた壁も、影の視線と移動を遮る。
+    m_StalkerWalls = game.GetObjects<Wall>();
     // 扉・照明・電池など place 行で置いた物も置き直し、部屋の形（room の壁）を部屋の角の暗がりへ渡し直している。
     // プレイヤーの位置と、プレイごとに選ぶヒューズ・鍵の場所（spot）は、遊んでいる途中の状態なので変えない
     const int placed = PropLayoutFile::ReapplyPlacements(layout, m_Objects.placementBindings);
@@ -182,11 +193,12 @@ void StageScene::ReloadPropLayout()
     Renderer::SetRoomOcclusion(
         m_Objects.wallFootprints.data(),
         static_cast<unsigned int>(m_Objects.wallFootprints.size()),
-        -100.0f, -48.5f, 0.55f);
+        RoomOcclusionFloorY, RoomOcclusionCeilingY, RoomOcclusionStrength);
     m_PropLayoutEditor.SetLayout(layout);
     m_LayoutNotice = "配置のファイルを読み直した（小物 " + std::to_string(layout.Props.size()) + "個・置き場所 " +
         std::to_string(placed) + "個）";
-    m_LayoutNoticeTimer = 3.0f;
+    m_LayoutNoticeTimer = PropLayoutFile::LayoutSuccessNoticeSeconds;
+    return true;
 }
 
 bool StageScene::IsThirdFuseStage() const
@@ -491,7 +503,9 @@ void StageScene::Update()
     // Debug版だけ：F5 を押したとき、または配置のファイル（assets/layout/stage1_props.txt）が書き換わったとき
     // （Unity のマップエディターで書き出したときなど）に読み直し、ゲームを動かしたまま置き直している。
     // 位置を少し直すたびにビルドし直さずに済むようにするため（Release版では効かない）。
-    if (Input::GetKeyTrigger(VK_F5) || m_LayoutWatcher.HasChanged(Stage1Layout::PropLayoutPath, deltaTime))
+    // 未保存の編集がある間は、自動読み直しを止める。F5 は明示的な破棄として扱う。
+    if (Input::GetKeyTrigger(VK_F5) ||
+        (!m_PropLayoutEditor.HasUnsavedChanges() && m_LayoutWatcher.HasChanged(Stage1Layout::PropLayoutPath, deltaTime)))
     {
         ReloadPropLayout();
     }

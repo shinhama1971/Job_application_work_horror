@@ -5,6 +5,7 @@
 
 #pragma once
 #include <array>
+#include <cstdint>
 #include <functional>
 #include <memory>
 
@@ -125,15 +126,16 @@ private:
 		DirectX::SimpleMath::Vector3 Position;
 		float Occlusion = 0.0f;		// 急に切り替わらないよう、毎フレーム目標の値へ近づけている
 		float MinimumOcclusion = 0.0f;	// 壁の判定に関係なく、最低でもこれだけこもらせている（天井裏の音など）
+		std::uint64_t StartOrder = 0;
 	};
 
 	// X3DAudioの準備、使えるか、出力のチャンネル数
 	X3DAUDIO_HANDLE m_X3DAudio{};
 	bool m_X3DAudioReady = false;
 	UINT32 m_OutputChannels = 2;
-	// 位置付きの音の枠、次に使う枠、聞き手、さえぎる物の判定の関数
+	// 位置付きの音の枠、再生順、聞き手、さえぎる物の判定の関数
 	std::array<SpatialVoice, MaxSpatialVoices> m_SpatialVoices{};
-	size_t m_NextSpatialVoice = 0;
+	std::uint64_t m_SpatialPlayOrder = 0;
 	SoundListener m_Listener;
 	OcclusionQuery m_OcclusionQuery;
 
@@ -141,6 +143,7 @@ private:
 	float QueryOcclusion(const DirectX::SimpleMath::Vector3& emitter) const;
 	void ApplySpatialMix(SpatialVoice& spatial);
 	static void ReleaseSpatialVoice(SpatialVoice& spatial);
+	void StopAllSpatial();
 
 public:
 	Sound() = default;
@@ -164,9 +167,6 @@ public:
 	// 鳴っている音の大きさを変えている（ループする音を、鳴らしたまま強弱させるのに使う）。volume は素材ごとの音量に掛ける倍率
 	void SetVolume(SOUND_LABEL label, float volume);
 
-	// 指定した音の再生を、止めた所から再開している
-	void Resume(SOUND_LABEL label);
-
 	// 全部の音に共通で掛かる音量を設定している。0.0で消音、1.0で素材の設定どおり。
 	void SetMasterVolume(float volume);
 
@@ -186,8 +186,8 @@ public:
 	// さえぎる物の判定の関数を登録している（Gameが壁と扉で判定する関数を渡している）
 	void SetOcclusionQuery(OcclusionQuery query) { m_OcclusionQuery = std::move(query); }
 
-	// シーンを切り替えるときに、前の場所で鳴っていた位置付きの音を止めている。
-	void StopAllSpatial();
+	// シーンを切り替えるときに、前の場所で鳴っていた音をすべて止める。
+	void StopAll();
 
 	// 今鳴っている位置付きの音の数を返している（デバッグ画面用）
 	size_t GetActiveSpatialVoiceCount() const;

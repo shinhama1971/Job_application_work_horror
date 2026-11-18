@@ -205,20 +205,8 @@ namespace Core
         }
 
         // --- Objectの生成・破棄・検索（実体はObjectManagerが所有している） ---
-        // 破棄の予約。実体はUpdateの破棄処理（RemoveDestroyed）で解放している。
-        void DeleteObject(Object* pt);
         // 名前で指定して破棄を予約している。
         void DestroyObj(const std::string& name);
-        // 全Objectをその場で解放している。シーンの切り替え時とGameの終了時だけ使っている。
-        void DeleteAllObject();
-
-        // その場で生成している。更新ループの外（SceneのInitなど）で使っている。
-        template<typename T>
-        T* AddObject()
-        {
-            return m_ObjectManager.AddObject<T>();
-        }
-
         // 更新ループの中から生成したいときの予約。setupは生成した直後に呼ばれる。
         template<typename T, typename Setup>
         void RequestAddObject(Setup&& setup)

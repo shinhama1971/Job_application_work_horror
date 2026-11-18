@@ -203,6 +203,13 @@ HRESULT Renderer::Init()
     }
     if (FAILED(hr)) return hr;
 
+    // ボーダーレス表示を維持する。描画解像度は起動時に決め、最小化や復帰でバッファを作り直さない。
+    Microsoft::WRL::ComPtr<IDXGIFactory> factory;
+    hr = m_pSwapChain->GetParent(IID_PPV_ARGS(factory.GetAddressOf()));
+    if (FAILED(hr)) return hr;
+    hr = factory->MakeWindowAssociation(Application::GetWindow(), DXGI_MWA_NO_ALT_ENTER);
+    if (FAILED(hr)) return hr;
+
 	// 描画先・深度バッファを作っている
 	hr = CreateRenderAndDepthResources();
 	if (FAILED(hr)) return hr;
@@ -614,51 +621,4 @@ void Renderer::DrawEnd()
 	}
 }
 
-//--------------------------------------------------------------------------------------
-// ウィンドウの大きさに合わせて、バックバッファと深度バッファを作り直している
-//--------------------------------------------------------------------------------------
-HRESULT Renderer::ResizeWindow(int width, int height)
-{
-	// スワップチェーンが無い場合は何もしない
-	if (!m_pSwapChain)return S_FALSE;
-
-	// デバイスコンテキストも今のバックバッファを参照しているため、
-	// ResizeBuffersの前に設定を外して、すべての参照を手放している。
-	m_pDeviceContext->OMSetRenderTargets(0, nullptr, nullptr);
-	m_pDeviceContext->Flush();
-
-	// 今の描画先のビューを解放している（バックバッファを指すビューを全部手放さないと、ResizeBuffersが失敗する）
-	m_pRenderTargetView.Reset();
-	m_pSwapChainRenderTargetView.Reset();
-	m_pSceneHdrShaderResourceView.Reset();
-	m_pSceneHdrRenderTargetView.Reset();
-	m_pSceneHdrTexture.Reset();
-
-	// 今の深度ステンシルビューを解放している
-	m_pDepthStencilView.Reset();
-	m_pDepthShaderResourceView.Reset();
-
-	// バッファは描画解像度のままにしている。画面効果やHUDのテクスチャも同じ大きさで作っているため、
-	// ウィンドウの大きさに合わせると大きさが食い違う。ウィンドウへの引き伸ばしは表示のときに行われる。
-	(void)width;
-	(void)height;
-	HRESULT hr = m_pSwapChain->ResizeBuffers(
-		0, Application::GetWidth(), Application::GetHeight(), DXGI_FORMAT_UNKNOWN, 0);
-	if (FAILED(hr)) return hr;
-
-	// 描画先・深度バッファを作り直している
-	hr = CreateRenderAndDepthResources();
-	if (FAILED(hr)) return hr;
-
-	D3D11_VIEWPORT vi = {};
-	vi.Width = static_cast<float>(Application::GetWidth());
-	vi.Height = static_cast<float>(Application::GetHeight());
-	vi.MinDepth = 0.0f;
-	vi.MaxDepth = 1.0f;
-
-	// ビューポートを設定し直している
-	m_pDeviceContext->RSSetViewports(1, &vi);
-
-	return S_OK;
-}
 // Rendererのデバイスまわりの処理はここまで（描画の状態の設定はRendererState.cpp、資源の作成はRendererResources.cpp）。

@@ -13,9 +13,6 @@
     <Filter Include="ソース ファイル\Camera">
       <UniqueIdentifier>{f466daf0-c5a0-48f8-8a08-553df4a288c8}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ソース ファイル\Collision">
-      <UniqueIdentifier>{cccb4df6-8111-4919-8b56-4838b998b42f}</UniqueIdentifier>
-    </Filter>
     <Filter Include="ソース ファイル\Core">
       <UniqueIdentifier>{26151065-303b-41b8-ab9e-3bd2230c9f47}</UniqueIdentifier>
     </Filter>
@@ -75,9 +72,6 @@
     </Filter>
     <Filter Include="ヘッダー ファイル\Camera">
       <UniqueIdentifier>{DA208DC3-1213-461E-86F2-6801F63D53E9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\Collision">
-      <UniqueIdentifier>{D85637AF-1392-4615-8ABF-F72B0AB88A18}</UniqueIdentifier>
     </Filter>
     <Filter Include="ヘッダー ファイル\Core">
       <UniqueIdentifier>{A542B343-82E8-4243-94F8-1C1D8DB6909B}</UniqueIdentifier>
@@ -158,9 +152,6 @@
     </ClCompile>
     <ClCompile Include="Camera.cpp">
       <Filter>ソース ファイル\Camera</Filter>
-    </ClCompile>
-    <ClCompile Include="Collision.cpp">
-      <Filter>ソース ファイル\Collision</Filter>
     </ClCompile>
     <ClCompile Include="Application.cpp">
       <Filter>ソース ファイル\Core</Filter>
@@ -496,9 +487,6 @@
     </ClInclude>
     <ClInclude Include="Camera.h">
       <Filter>ヘッダー ファイル\Camera</Filter>
-    </ClInclude>
-    <ClInclude Include="Collision.h">
-      <Filter>ヘッダー ファイル\Collision</Filter>
     </ClInclude>
     <ClInclude Include="Application.h">
       <Filter>ヘッダー ファイル\Core</Filter>

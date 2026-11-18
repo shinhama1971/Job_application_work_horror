@@ -302,7 +302,7 @@ namespace MapLayout.Editor
             sphere.transform.localPosition = ReadVector(line, 2);
             sphere.transform.localScale = new Vector3(3.0f, 3.0f, 3.0f);
             sphere.GetComponent<MeshRenderer>().sharedMaterial = GetMaterial(materials, "#spot", SpotColor, SpotColor * 0.5f);
-            AddItem(sphere, MapLayoutKind.Spot, index, group);
+            AddItem(sphere, MapLayoutKind.Spot, index, group).SpotSourceLine = line.Content.Trim();
         }
 
         // ---------------------------------------------------------------------
@@ -318,6 +318,7 @@ namespace MapLayout.Editor
             var usedLines = new HashSet<int>();
             var appended = new List<(int after, MapLayoutDocument.Line line)>();
             var written = new List<(MapLayoutItem item, MapLayoutDocument.Line line, string newKey)>();
+            var unresolvedSpotGroups = new HashSet<string>();
             // 新しい行の名前は、ファイルにある名前とも重ならないようにしている（ゲームは同じ名前の行があると読めない）
             var names = new HashSet<string>(document.Lines
                 .Where(line => (line.Command == "prop" || line.Command == "place") && line.Tokens.Count > 1)
@@ -330,6 +331,10 @@ namespace MapLayout.Editor
                 var lineIndex = lineIndices[item];
                 if (lineIndex < 0)
                 {
+                    if (item.Kind == MapLayoutKind.Spot)
+                    {
+                        unresolvedSpotGroups.Add(item.Key);
+                    }
                     Debug.LogWarning("配置ファイルに行が見つからないので書き出していません（読み込み直してください）: " + item.name);
                     continue;
                 }
@@ -394,6 +399,10 @@ namespace MapLayout.Editor
                 {
                     Debug.LogWarning("読み込んだ後に足された行なので、そのまま残しています（シーンに出すには読み込み直してください）: " + line.Text.Trim());
                 }
+                else if (command == "spot" && unresolvedSpotGroups.Contains(line.Tokens[1].Text))
+                {
+                    continue;
+                }
                 else if (command == "place" && !IsRepeatablePlace(line.Tokens[1].Text))
                 {
                     keptPlaces.Add(line.Tokens[1].Text);
@@ -436,13 +445,21 @@ namespace MapLayout.Editor
                 foreach (var (item, line, newKey) in written)
                 {
                     item.LineIndex = document.Lines.IndexOf(line);
+                    if (item.Kind == MapLayoutKind.Spot)
+                    {
+                        item.SpotSourceLine = line.Content.Trim();
+                    }
                     if (newKey != null)
                     {
                         item.Key = newKey;
                     }
                     EditorUtility.SetDirty(item);
                 }
-                root.KnownLines = CollectItemLines(document);
+                // 外部で追加された行は、書き出しを繰り返してもシーンの管理対象に入れない。
+                root.KnownLines = document.Lines
+                    .Where(line => writtenLines.Contains(line) || knownLines.Contains(line.Content.Trim()))
+                    .Select(line => line.Content.Trim())
+                    .ToList();
                 EditorUtility.SetDirty(root);
                 if (!Application.isBatchMode)
                 {
@@ -468,19 +485,10 @@ namespace MapLayout.Editor
 
         // 印ごとに、今のファイルの何行目に当たるかを求めている。
         // 読み込んだときの行番号は、書き出しで行が増えたときや、ゲームの配置エディター・手でファイルを書き換えたときにずれるので、
-        // その行が同じ種類・同じ名前でなければ、名前で探し直している（spot は同じ組の何番目かで探す）
+        // その行が同じ種類・同じ名前でなければ、名前で探し直している。spot は行の内容で探す。
         static Dictionary<MapLayoutItem, int> ResolveLines(MapLayoutDocument document, IEnumerable<MapLayoutItem> items)
         {
             var result = new Dictionary<MapLayoutItem, int>();
-            var spotOrder = new Dictionary<MapLayoutItem, int>();
-            foreach (var group in items.Where(item => item.Kind == MapLayoutKind.Spot).GroupBy(item => item.Key))
-            {
-                var ordered = group.Where(item => !IsCopy(item)).OrderBy(item => item.LineIndex).ToList();
-                for (var order = 0; order < ordered.Count; ++order)
-                {
-                    spotOrder[ordered[order]] = order;
-                }
-            }
 
             foreach (var item in items)
             {
@@ -492,10 +500,22 @@ namespace MapLayout.Editor
 
                 if (item.Kind == MapLayoutKind.Spot)
                 {
-                    // spot のコピーは書き出さないが、元の行を探しておき、書き出しの方で知らせる
-                    var order = spotOrder.TryGetValue(item, out var value) ? value : 0;
-                    var candidates = Enumerable.Range(0, document.Lines.Count).Where(Matches).ToList();
-                    result[item] = order < candidates.Count ? candidates[order] : -1;
+                    // 古いシーンには元の行の内容がないので、記録されている行番号を使う。
+                    if (string.IsNullOrEmpty(item.SpotSourceLine))
+                    {
+                        result[item] = Matches(item.LineIndex) ? item.LineIndex : -1;
+                        continue;
+                    }
+                    bool MatchesSource(int index) =>
+                        Matches(index) && document.Lines[index].Content.Trim() == item.SpotSourceLine;
+
+                    if (MatchesSource(item.LineIndex))
+                    {
+                        result[item] = item.LineIndex;
+                        continue;
+                    }
+                    var matches = Enumerable.Range(0, document.Lines.Count).Where(MatchesSource).Take(2).ToArray();
+                    result[item] = matches.Length == 1 ? matches[0] : -1;
                 }
                 else if (Matches(item.LineIndex))
                 {

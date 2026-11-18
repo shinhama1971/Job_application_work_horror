@@ -27,17 +27,6 @@ private:
     DirectX::SimpleMath::Vector3 m_Position =
         DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
 
-    // 回転と大きさ（カメラでは使っていないが、Objectと同じ形にそろえている）
-    DirectX::SimpleMath::Vector3 m_Rotation =
-        DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);
-
-    DirectX::SimpleMath::Vector3 m_Scale =
-        DirectX::SimpleMath::Vector3(1.0f, 1.0f, 1.0f);
-
-    // 注視点と、最後に作ったビュー行列
-    DirectX::SimpleMath::Vector3 m_Target{};
-    DirectX::SimpleMath::Matrix m_ViewMatrix{};
-
     // 反射・監視カメラの映像を描く間だけ使う、差し替え用の行列
     bool m_UseOverrideMatrices = false;
     DirectX::SimpleMath::Matrix m_OverrideView =
@@ -66,8 +55,8 @@ public:
             : (scale > 1.55f ? 1.55f : scale);
     }
 
-    // 注視点を直接設定している
-    void SetTarget(DirectX::SimpleMath::Vector3 target);
+    // フォーカスが戻ってから最初のマウス移動量は視点に反映しない。
+    void ResetMouseLook() { m_FirstMouse = true; }
 
     // プレイヤー視点のビュー・射影行列を返している（左手系、画角60度、near 1、far 1000）。
     // タイルベースのライトカリングも同じ行列を使っている。
@@ -113,6 +102,10 @@ public:
     // falseの間はマウスで視点を動かさない（自動撮影モードで使っている）。
     void SetMouseLookEnabled(bool enabled)
     {
+        if (enabled != m_MouseLookEnable)
+        {
+            ResetMouseLook();
+        }
         m_MouseLookEnable = enabled;
     }
 

@@ -264,13 +264,8 @@ public:
 	static bool IsHighPerformanceAdapterIntegrated();
 	// バックバッファと深度バッファを消し、本描画の描画先にしている。
 	static void DrawStart();
-	// 描いた画面を表示している（垂直同期あり。速い画面では約60fpsに抑える。計測モードは垂直同期なし）。
+	// 描いた画面を表示している。通常プレイの周期は Application で決める。
 	static void DrawEnd();
-	// 約60fpsにするために、垂直同期を何回待つか（画面の速さ ÷ 60 を四捨五入、1〜4）
-
-	// ウィンドウの大きさが変わったときに、バックバッファと深度バッファを作り直している。
-	// バッファは描画解像度のままにし、ウィンドウへの引き伸ばしは表示（Present）に任せている。
-	static HRESULT ResizeWindow(int width, int height);
 
 	// falseでも深度テストは続け、深度の書き込みだけを止めている（半透明・加算合成の描画用）。
 	static void SetDepthEnable(bool Enable);

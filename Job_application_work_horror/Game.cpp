@@ -38,7 +38,7 @@ namespace Core
     // 残っているObjectをすべて解放している
     Game::~Game()
     {
-        DeleteAllObject();
+        m_ObjectManager.DeleteAll();
     }
 
     // 描画・入力・音などの仕組みを、依存する順に初期化し、最初のタイトルシーンを作っている。
@@ -119,7 +119,14 @@ namespace Core
     // 自動撮影・計測の間は、決めた道順を止めないよう何もしない。
     void Game::OnFocusLost()
     {
-        if (!m_Instance || Tools::CaptureMode::IsActive() || m_Instance->m_PauseMenu.IsOpen())
+        if (!m_Instance || Tools::CaptureMode::IsActive())
+        {
+            return;
+        }
+
+        Input::OnFocusLost();
+        m_Instance->m_Camera.ResetMouseLook();
+        if (m_Instance->m_PauseMenu.IsOpen())
         {
             return;
         }
@@ -220,16 +227,10 @@ namespace Core
             m_Instance->m_Sound.UpdateListener(listener, Application::GetDeltaTime());
         }
 
-        // シーンの切り替えが予約されていれば、予約された追加を捨ててから切り替えている
+        // シーンの切り替えと予約の後始末は ChangeScene に任せている
         if (m_Instance->m_PendingScene.has_value())
         {
-            m_Instance->m_ObjectManager.ClearPendingCommands();
-
-            const SceneName nextScene =
-                m_Instance->m_PendingScene.value();
-
-            m_Instance->m_PendingScene.reset();
-            m_Instance->ChangeScene(nextScene);
+            m_Instance->ChangeScene(*m_Instance->m_PendingScene);
             return;
         }
 
@@ -384,9 +385,8 @@ namespace Core
         const SceneName previousScene = m_CurrentScene;
         const bool introFromForest = sName == SceneName::Intro && previousScene == SceneName::Forest;
         // リザルト画面へ移るときは、プレイを終えた記録を付けてベスト記録を保存している
-        if (sName == SceneName::Result)
+        if (sName == SceneName::Result && m_State.CompleteRun(!Tools::CaptureMode::IsActive()))
         {
-            m_State.CompleteRun();
             SaveBestRecord();
         }
 
@@ -399,10 +399,10 @@ namespace Core
         m_ShadowFrameIndex = 0;
         // 前の画面の明るさに慣れたままにならないよう、自動露出は新しいシーンの最初の画面にすぐ合わせている。
         m_PostProcess.ResetAutoExposure();
-        // 前の場所で鳴っていた位置付きの音（足音・扉など）を持ち越さないよう止めている。
+        // 前の場所の効果音と環境音を止めてから、新しいシーンの音を始める。
         if (m_SoundReady)
         {
-            m_Sound.StopAllSpatial();
+            m_Sound.StopAll();
         }
         m_PostProcess.SetPresenceStatic(0.0f);
         // 前の場所の景色を金属に映さないよう、環境マップを次の描画で6面とも撮り直させている
@@ -411,7 +411,8 @@ namespace Core
         // 光の筋の揺らぎの時間も最初に戻している（前のシーン（タイトルの後ろの森など）の長さで、次のシーンの見え方が変わらないように）
         m_LightShafts->ResetTime();
 
-        DeleteAllObject();
+        m_ObjectManager.DeleteAll();
+        m_PendingScene.reset();
 
         // 新しいシーンを作っている。1面の開始でプレイ全体の記録を始め、2面の開始で2面の開始時点を覚えている。
         // タイトルで2面を選んで始めたときは、そこで記録を始めている（ベスト記録には残さないプレイにしている）
@@ -462,10 +463,6 @@ namespace Core
         // 階ごとに違う環境音へ切り替え、タイトルとリザルトでは止めている。
         if (m_SoundReady)
         {
-            m_Sound.Stop(SOUND_CUE_AMBIENCE_STAGE1);
-            m_Sound.Stop(SOUND_CUE_AMBIENCE_STAGE2);
-            m_Sound.Stop(SOUND_CUE_RADIO_STATIC);
-            m_Sound.Stop(SOUND_CUE_RAIN);
             // 外の森が映る画面（タイトルの後ろ・導入・外の森）では、雨音をループさせている（ForestRain と同じ雨）
             const bool showTransmission = sName == SceneName::Intro && !introFromForest;
             const bool forestOnScreen = sName == SceneName::Title || sName == SceneName::Forest || showTransmission;
@@ -482,7 +479,7 @@ namespace Core
                 }
             }
             // 導入の受信記録の間は、無線の雑音を小さく鳴らしている（「通信途絶」で IntroScene が止める）。
-            // シーンを作った後にここで前の雑音を止めるので、鳴らし始めもここでしている
+            // 新しいシーンの環境音と同じタイミングで鳴らし始めている。
             if (showTransmission)
             {
                 m_Sound.Play(SOUND_CUE_RADIO_STATIC, 1.0f, 0.35f);
@@ -504,21 +501,10 @@ namespace Core
     }
 
 
-    // Objectの破棄を予約している（解放はUpdateの破棄処理で行っている）
-    void Game::DeleteObject(Object* pt)
-    {
-        m_ObjectManager.DeleteObject(pt);
-    }
-
     // 名前で指定してObjectの破棄を予約している
     void Game::DestroyObj(const std::string& name)
     {
         m_ObjectManager.DestroyNamedObject(name);
     }
 
-    // 全Objectをその場で解放している
-    void Game::DeleteAllObject()
-    {
-        m_ObjectManager.DeleteAll();
-    }
 }

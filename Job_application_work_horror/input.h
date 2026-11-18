@@ -66,6 +66,9 @@ private:
 
 	// 振動を止めるまでの残り秒数
 	float VibrationTimeSeconds;
+	bool m_ResyncOnNextUpdate = false;
+
+	void StopVibration();
 
 public:
 	Input() = default;
@@ -74,6 +77,7 @@ public:
 
 	static void Create(); // インスタンスを作っている
 	static void Update(); // 毎フレームの最初に、キーとコントローラーの状態を読み直している
+	static void OnFocusLost();
 	// コントローラーがつながっているか
 	static bool IsControllerConnected();
 	static void Release(); // 振動を止めて解放している
@@ -98,7 +102,7 @@ public:
 
 	// コントローラーを振動させている
 	// frame：振動を続ける時間（60fpsで数えたフレーム数。実際は秒に直して使っている）
-	// powor：振動の強さ（0〜1）
-	static void SetVibration(int frame = 1, float powor = 1);
+	// strength：振動の強さ（0〜1）
+	static void SetVibration(int frame = 1, float strength = 1.0f);
 };
 

@@ -51,19 +51,19 @@ namespace Core
             return dynamic_cast<T*>(object);
         }
 
-    public:
-        // その場で生成してInitまで行っている。UpdateAllで順に処理している途中で呼ぶとm_Objectsが並べ直されるため、
-        // SceneのInitなど、更新ループの外でだけ使っている。更新中はRequestAddObjectを使っている。
+        // Initを呼ぶ前に所有権を受け取っている。
         template<typename T>
-        T* AddObject()
+        T* StoreObject()
         {
             auto object = std::make_unique<T>();
             T* result = object.get();
             m_Objects.emplace_back(std::move(object));
-            result->Init();
             return result;
         }
 
+        void CheckNameAvailable(const std::string& name) const;
+
+    public:
         // 更新ループの中で生成したいときの予約。FlushPendingCommandsで処理の後に生成し、
         // setupで位置などを設定している。シーンを切り替えるフレームの予約は捨てている。
         template<typename T, typename Setup>
@@ -72,7 +72,8 @@ namespace Core
             m_PendingCommands.emplace_back(
                 [this, setup = std::forward<Setup>(setup)]() mutable
                 {
-                    T* object = AddObject<T>();
+                    T* object = StoreObject<T>();
+                    object->Init();
                     setup(*object);
                 });
         }
@@ -81,8 +82,10 @@ namespace Core
         template<typename T>
         T* CreateNamedObject(const std::string& name)
         {
-            T* result = AddObject<T>();
-            m_NamedObjects[name] = result;
+            CheckNameAvailable(name);
+            T* result = StoreObject<T>();
+            m_NamedObjects.insert_or_assign(name, result);
+            result->Init();
             return result;
         }
 
@@ -91,7 +94,7 @@ namespace Core
         T* FindNamedObject(const std::string& name)
         {
             const auto it = m_NamedObjects.find(name);
-            if (it == m_NamedObjects.end())
+            if (it == m_NamedObjects.end() || it->second == nullptr || it->second->IsDestroy())
             {
                 return nullptr;
             }
@@ -122,14 +125,10 @@ namespace Core
         void UpdateAll();
         // Destroy済みのObjectをUninitして、実体を解放している。UpdateAllの後に呼んでいる。
         void RemoveDestroyed();
-        // 破棄を予約し、名前の検索からも外している。実体はRemoveDestroyedで解放される。
-        void DeleteObject(Object* object);
-        // 名前で指定して破棄を予約している（DeleteObjectの名前版）。
+        // 名前で指定して破棄を予約している。実体はRemoveDestroyedで解放される。
         void DestroyNamedObject(const std::string& name);
-        // 全Objectをその場でUninitして解放している。シーンの切り替え時だけ使っている。
+        // 全Objectをその場でUninitし、実体と生成予約を解放している。
         void DeleteAll();
-        // 予約された追加を捨てている（シーンを切り替えるフレームで使っている）
-        void ClearPendingCommands();
         // RequestAddObjectで予約された生成を実行している。
         void FlushPendingCommands();
 

@@ -5,7 +5,9 @@
 
 #pragma once
 #include	<filesystem>
+#include	<functional>
 #include	<string>
+#include	<string_view>
 
 namespace utility
 {
@@ -13,12 +15,24 @@ namespace utility
     // 起動したときの作業フォルダに左右されず、書き込み権限のある場所に保存するためである。
     std::filesystem::path GetSaveDirectory();
 
-    // 前の版が作業フォルダの下の save フォルダへ保存していたファイルのパスを返している。
-    // 新しい保存先にファイルが無い場合だけ、読み込み元として使っている。
-    std::filesystem::path GetLegacySavePath(std::string const& fileName);
-
     // 読み込み用のパスを返している。新しい保存先にあればそれを、無ければ前の保存先を返している。
     std::filesystem::path ResolveSaveFileForRead(std::string const& fileName);
+
+    enum class AtomicWriteResult
+    {
+        Success,
+        TemporaryFileFailed,
+        WriteFailed,
+        DestinationChanged,
+        ReplaceFailed
+    };
+
+    // 隣の一時ファイルを閉じてから差し替える。差し替え直前に元のファイルを再確認する処理も渡せる。
+    AtomicWriteResult WriteTextAtomically(const std::filesystem::path& path, std::string_view text,
+        const std::function<bool()>& canReplace = {});
+
+    // 保存フォルダを作り、完成した内容でセーブファイルを差し替える。
+    void WriteSaveFile(std::string const& fileName, std::string_view text);
 
 	// 文字コードの変換（UTF-16→Shift-JIS、UTF-8→UTF-16、UTF-8→Shift-JIS）
 	std::string wide_to_multi_winapi(std::wstring const& src);

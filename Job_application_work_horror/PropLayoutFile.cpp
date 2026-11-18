@@ -19,6 +19,8 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    constexpr float LayoutPollIntervalSeconds = 0.5f;
+
     // 数を短く書いている（小数3桁まで。後ろの0と小数点は省く）
     std::string FormatNumber(float value)
     {
@@ -40,6 +42,7 @@ namespace
             a.DiffuseName == b.DiffuseName && a.EmissionName == b.EmissionName &&
             a.Shininess == b.Shininess && a.Collision == b.Collision &&
             a.CastsShadow == b.CastsShadow && a.Weathering == b.Weathering && a.Facade == b.Facade &&
+            a.Room == b.Room && a.Model == b.Model &&
             a.GlowRange == b.GlowRange && a.GlowStrength == b.GlowStrength;
     }
 
@@ -83,6 +86,7 @@ namespace PropLayoutFile
         while (std::getline(file, text))
         {
             ++lineNumber;
+            layout.SourceLines.push_back(text);
             // # から行の終わりまでは読まない
             const size_t comment = text.find('#');
             if (comment != std::string::npos)
@@ -294,6 +298,10 @@ namespace PropLayoutFile
                 return fail(lineNumber, "知らない行: " + command);
             }
         }
+        if (file.bad() || !file.eof())
+        {
+            return fail(lineNumber + 1, "ファイルを最後まで読めない: " + path);
+        }
         return layout;
     }
 
@@ -359,7 +367,7 @@ namespace PropLayoutFile
         {
             return false;
         }
-        m_Timer = 0.5f;
+        m_Timer = LayoutPollIntervalSeconds;
         std::error_code error;
         const auto lastWrite = std::filesystem::last_write_time(path, error);
         if (error)
@@ -399,8 +407,18 @@ namespace PropLayoutFile
         return props;
     }
 
-    void Reload(SceneLayoutBuilder& builder, const PropLayout& layout, SpawnedProps& props)
+    bool Reload(SceneLayoutBuilder& builder, const PropLayout& layout, SpawnedProps& props, std::string& error)
     {
+        for (const PropDescription& description : layout.Props)
+        {
+            if (builder.HasNamedObject(description.Name) &&
+                std::ranges::find(props, description.Name, &SpawnedProps::value_type::first) == props.end())
+            {
+                error = "配置のファイルの" + std::to_string(description.Line) + "行目で既存の名前と重複: " + description.Name;
+                return false;
+            }
+        }
+
         // いったん全部を隠し、ファイルにある名前の物だけを置き直して表示している（ファイルから消えた物は隠れたまま）
         for (auto& [name, wall] : props)
         {
@@ -422,6 +440,7 @@ namespace PropLayoutFile
                 props.emplace_back(description.Name, wall);
             }
         }
+        return true;
     }
 
     PropSurfaceFinish FindFinish(const PropLayout& layout, const std::string& name)
@@ -495,19 +514,12 @@ namespace PropLayoutFile
             error = "保存する前のファイルの" + std::to_string(current.ErrorLine) + "行目が読めない " + current.Error;
             return false;
         }
-        std::vector<std::string> lines;
+        if (current.SourceLines != layout.SourceLines)
         {
-            std::ifstream file(path);
-            std::string text;
-            while (std::getline(file, text))
-            {
-                if (!text.empty() && text.back() == '\r')
-                {
-                    text.pop_back();
-                }
-                lines.push_back(text);
-            }
+            error = "編集中に配置のファイルが更新された。Reload file で読み直してください: " + path;
+            return false;
         }
+        const auto& lines = current.SourceLines;
 
         std::unordered_map<std::string, const PropDescription*> before;
         for (const PropDescription& prop : current.Props)
@@ -579,13 +591,29 @@ namespace PropLayoutFile
             }
         }
 
-        const std::string text = output.str();
-        std::ofstream file(path, std::ios::binary | std::ios::trunc);
-        if (!file || !file.write(text.data(), static_cast<std::streamsize>(text.size())))
+        using utility::AtomicWriteResult;
+        const auto result = utility::WriteTextAtomically(path, output.str(), [&]
         {
-            error = "ファイルに書けない: " + path;
-            return false;
+            const PropLayout latest = Load(path);
+            return latest.IsValid() && latest.SourceLines == current.SourceLines;
+        });
+        switch (result)
+        {
+        case AtomicWriteResult::Success:
+            return true;
+        case AtomicWriteResult::TemporaryFileFailed:
+            error = "保存用の一時ファイルを作れない: " + path;
+            break;
+        case AtomicWriteResult::WriteFailed:
+            error = "配置を最後まで書き込めない: " + path;
+            break;
+        case AtomicWriteResult::DestinationChanged:
+            error = "保存中に配置のファイルが更新された: " + path;
+            break;
+        case AtomicWriteResult::ReplaceFailed:
+            error = "配置のファイルを置き換えられない: " + path;
+            break;
         }
-        return true;
+        return false;
     }
 }

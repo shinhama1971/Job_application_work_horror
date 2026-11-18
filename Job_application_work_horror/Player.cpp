@@ -62,7 +62,6 @@ namespace
     // --- 三人称（デバッグ用）の視点：プレイヤーの後ろ・上の距離と、見る高さ
     constexpr float ThirdPersonDistance = 45.0f;
     constexpr float ThirdPersonHeight = 28.0f;
-    constexpr float ThirdPersonTargetHeight = 18.0f;
     // 開発用の電池の回復量（Debug と 3面の確認中の B キー）
     constexpr float DebugBatteryRefill = 50.0f;
 
@@ -541,17 +540,6 @@ void Player::Update()
     if (m_IsFPS)
     {
         cam->SetPosition(eyePos);
-
-        float pitch = cam->GetCameraPitch();
-        float cp = cosf(pitch);
-
-        Vector3 lookDir(
-            sinf(yaw) * cp,
-            sinf(pitch),
-            cosf(yaw) * cp
-        );
-
-        cam->SetTarget(eyePos + lookDir);
     }
     else
     {
@@ -564,10 +552,6 @@ void Player::Update()
         camPos.y += height;
 
         cam->SetPosition(camPos);
-
-        Vector3 target = m_Position;
-        target.y += ThirdPersonTargetHeight;
-        cam->SetTarget(target);
     }
 
 
@@ -858,8 +842,6 @@ void Player::UpdateStairClimb(float deltaTime)
     Vector3 eye = m_Position;
     eye.y += m_CameraHeightOffset - settings.EyeDrop + height + bob;
     camera->SetPosition(eye);
-    const float cosPitch = std::cos(pitch);
-    camera->SetTarget(eye + Vector3(std::sin(yaw) * cosPitch, std::sin(pitch), std::cos(yaw) * cosPitch));
 
     // 上っている間は、懐中電灯を持った手を下げている（手すりにつかまって上るような姿勢）
     FirstPersonHands::FrameInput handInput;

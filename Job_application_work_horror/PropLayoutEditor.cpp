@@ -305,7 +305,8 @@ PropLayoutEditor::Action PropLayoutEditor::Draw(
             do
             {
                 copy.Name = description->Name + "_" + std::to_string(number++);
-            } while (FindDescription(copy.Name) != nullptr);
+            } while (FindDescription(copy.Name) != nullptr ||
+                (builder.HasNamedObject(copy.Name) && FindWall(props, copy.Name) == nullptr));
             copy.Position.x += std::abs(copy.Scale.x) + 2.0f;
             // 前に消した同じ名前の小物があれば、それを使い直している
             Wall* copyWall = FindWall(props, copy.Name);

@@ -354,13 +354,12 @@ void Application::MainLoop()
 }
 
 //-----------------------------------------------------------------------------
-// ウィンドウプロシージャ：終了確認・切り替え時の最小化・大きさの変更などのメッセージを処理している
+// ウィンドウプロシージャ：終了確認と、別のウィンドウへ切り替えたときの最小化を処理している
 //-----------------------------------------------------------------------------
 LRESULT CALLBACK Application::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     // ゲームは常に全画面なので、別のウィンドウへ切り替えたときは最小化している。
     // isMessageBoxShowedは、終了確認の表示中に最小化しないためのフラグ。
-    static bool isFullscreen = true;
     static bool isMessageBoxShowed = false;
     // Debug構成ではImGuiが先にメッセージを受け取り、使った場合はここで処理を終えている。
     if (Debug::UI::HandleWindowMessage(hWnd, uMsg, wParam, lParam))
@@ -396,14 +395,10 @@ LRESULT CALLBACK Application::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
     break;
 
     case WM_ACTIVATE:
-        if (wParam == WA_INACTIVE) {
-            // 遊んでいる途中なら、ポーズメニューを開いてゲームと音を止めている（終了確認の表示中は除く）
-            if (!isMessageBoxShowed)
-            {
-                Core::Game::OnFocusLost();
-            }
-            // 全画面表示で、終了確認も出していないときだけ
-            if (isFullscreen && !isMessageBoxShowed)
+        if (LOWORD(wParam) == WA_INACTIVE && !isMessageBoxShowed && !Tools::CaptureMode::IsActive())
+        {
+            Core::Game::OnFocusLost();
+            if (!IsIconic(hWnd))
             {
                 // ウィンドウを最小化している（Alt+Tabで切り替えたとき、ゲーム画面が背後に残って邪魔にならないように）
                 ShowWindow(hWnd, SW_MINIMIZE);
@@ -411,17 +406,6 @@ LRESULT CALLBACK Application::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
         }
         // アクティブ化の標準処理はWindowsに任せている
         return DefWindowProc(hWnd, uMsg, wParam, lParam);
-
-    case WM_SIZE: // ウィンドウの大きさが変わった
-
-        if (wParam != SIZE_MINIMIZED)
-        {
-            int width = LOWORD(lParam); // 新しい横幅
-            int height = HIWORD(lParam); // 新しい縦幅
-            // スワップチェーンのバックバッファを新しい大きさで作り直している
-            Renderer::ResizeWindow(width, height);
-        }
-        break;
 
     default:
         // それ以外のメッセージは、Windowsの標準処理に任せている

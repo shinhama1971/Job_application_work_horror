@@ -227,17 +227,21 @@ void ForestScene::ReloadPropLayout()
     if (!layout.IsValid())
     {
         m_Notice = "配置のファイルの" + std::to_string(layout.ErrorLine) + "行目が読めない " + layout.Error;
-        m_NoticeTimer = 6.0f;
+        m_NoticeTimer = PropLayoutFile::LayoutErrorNoticeSeconds;
         return;
     }
     SceneLayoutBuilder builder(*Core::Game::GetInstance(), m_ObjectNames);
-    PropLayoutFile::Reload(builder, layout, m_LayoutProps);
+    if (!PropLayoutFile::Reload(builder, layout, m_LayoutProps, m_Notice))
+    {
+        m_NoticeTimer = PropLayoutFile::LayoutErrorNoticeSeconds;
+        return;
+    }
     // プレイヤーの位置は、歩いている途中の状態なので変えない
     const int placed = PropLayoutFile::ReapplyPlacements(layout, m_PlacementBindings);
     if (m_Grass != nullptr) m_Grass->Rebuild();
     m_Notice = "配置のファイルを読み直した（小物 " + std::to_string(layout.Props.size()) + "個・置き場所 " +
         std::to_string(placed) + "個）";
-    m_NoticeTimer = 3.0f;
+    m_NoticeTimer = PropLayoutFile::LayoutSuccessNoticeSeconds;
 }
 
 void ForestScene::UpdateLightning(float deltaTime, const Vector3& forward)

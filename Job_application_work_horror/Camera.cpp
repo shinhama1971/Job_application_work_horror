@@ -18,8 +18,6 @@ using namespace DirectX::SimpleMath;
 void Camera::Init()
 {
     m_Position = Vector3(0.0f, 20.0f, -50.0f);
-    m_Target = Vector3(0.0f, 0.0f, 0.0f);
-
     // ヨー（水平の向き）。約πなので、最初は-Z方向を向いている
     m_CameraDirection = 3.14f;
     m_CameraPitch = 0.0f;
@@ -34,12 +32,13 @@ void Camera::Init()
 void Camera::Update()
 {
     const float deltaTime = Application::GetDeltaTime();
+    // 上下は約±69度までに制限している。
+    constexpr float MaxPitch = 1.2f;
 
     // ESCでマウス視点のON/OFFを切り替え、OFFの間はカーソルを表示している
     if (Input::GetKeyTrigger(VK_ESCAPE))
     {
-        m_MouseLookEnable = !m_MouseLookEnable;
-        m_FirstMouse = true;
+        SetMouseLookEnabled(!m_MouseLookEnable);
 
         if (m_MouseLookEnable)
         {
@@ -52,18 +51,13 @@ void Camera::Update()
     }
 
     // マウス視点：前フレームからのカーソルの移動量を視点の回転に変えている
-    if (m_MouseLookEnable)
+    const HWND window = Application::GetWindow();
+    RECT client{};
+    POINT mousePos{};
+    if (m_MouseLookEnable && window != nullptr && window == GetForegroundWindow() &&
+        GetClientRect(window, &client) && GetCursorPos(&mousePos))
     {
-        POINT mousePos;
-        GetCursorPos(&mousePos);
-
-        // 切り替えた直後の1回目は、基準の位置を覚えるだけにしている（視点が飛ばないように）
-        if (m_FirstMouse)
-        {
-            m_LastMousePos = mousePos;
-            m_FirstMouse = false;
-        }
-        else
+        if (!m_FirstMouse)
         {
             float dx = (float)(mousePos.x - m_LastMousePos.x);
             float dy = (float)(mousePos.y - m_LastMousePos.y);
@@ -77,32 +71,22 @@ void Camera::Update()
             m_CameraDirection += dx * sensitivity;
             m_CameraPitch += dy * sensitivity;
 
-            // 上下は約±69度までに制限し、真上・真下を向いてひっくり返らないようにしている
-            const float maxPitch = 1.2f;
-            const float minPitch = -1.2f;
-
-            if (m_CameraPitch > maxPitch) m_CameraPitch = maxPitch;
-            if (m_CameraPitch < minPitch) m_CameraPitch = minPitch;
+            m_CameraPitch = std::clamp(m_CameraPitch, -MaxPitch, MaxPitch);
         }
 
         // マウスカーソルをウィンドウ中央へ戻し、端で止まらずに回り続けられるようにしている（カーソルはウィンドウの座標なので、描画解像度ではなくウィンドウの大きさを使っている）
-        const int screenWidth = static_cast<int>(Application::GetWindowWidth());
-        const int screenHeight = static_cast<int>(Application::GetWindowHeight());
-
         POINT screenCenter =
         {
-            screenWidth / 2,
-            screenHeight / 2
+            (client.left + client.right) / 2,
+            (client.top + client.bottom) / 2
         };
 
-        HWND hWnd = GetActiveWindow();
-
-        if (hWnd)
-        {
-            ClientToScreen(hWnd, &screenCenter);
-            SetCursorPos(screenCenter.x, screenCenter.y);
-            m_LastMousePos = screenCenter;
-        }
+        m_FirstMouse = !(ClientToScreen(window, &screenCenter) && SetCursorPos(screenCenter.x, screenCenter.y));
+        m_LastMousePos = screenCenter;
+    }
+    else
+    {
+        ResetMouseLook();
     }
 
     // コントローラーの右スティックで視点を回している。十字キーも同じ操作として扱っている
@@ -150,11 +134,7 @@ void Camera::Update()
     }
 
     // どの入力で動かしても、上下の向きは同じ範囲に制限している
-    const float maxPitch = 1.2f;
-    const float minPitch = -1.2f;
-
-    if (m_CameraPitch > maxPitch) m_CameraPitch = maxPitch;
-    if (m_CameraPitch < minPitch) m_CameraPitch = minPitch;
+    m_CameraPitch = std::clamp(m_CameraPitch, -MaxPitch, MaxPitch);
 }
 
 // 描画に使う行列をシェーダーへ設定している（mode 0は3D、それ以外はHUD用の2D）。
@@ -170,12 +150,10 @@ void Camera::SetCamera(int mode)
             return;
         }
 
-        // 視線の先の点を、位置＋向きから求めている
-        m_Target = m_Position + GetForward();
-
+        Matrix viewMatrix;
         Matrix projectionMatrix;
-        GetMainMatrices(m_ViewMatrix, projectionMatrix);
-        Renderer::SetViewMatrix(&m_ViewMatrix);
+        GetMainMatrices(viewMatrix, projectionMatrix);
+        Renderer::SetViewMatrix(&viewMatrix);
         Renderer::SetProjectionMatrix(&projectionMatrix);
     }
     else
@@ -203,12 +181,6 @@ void Camera::SetCamera(int mode)
 void Camera::Uninit()
 {
     ShowCursor(TRUE);
-}
-
-// 注視点を直接設定している（現在は描画にはGetForwardの向きを使っている）
-void Camera::SetTarget(Vector3 target)
-{
-    m_Target = target;
 }
 
 // プレイヤー視点の本描画に使うビュー・射影行列を作っている（画角は縦60度、描く距離は1〜1000）。

@@ -30,6 +30,11 @@ public:
         return m_Game.CreateObj<T>(name);
     }
 
+    bool HasNamedObject(const std::string& name) const
+    {
+        return m_Game.GetObj<Object>(name) != nullptr;
+    }
+
 private:
     Core::Game& m_Game;
     std::vector<std::string>& m_CreatedNames;

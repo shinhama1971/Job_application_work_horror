@@ -55,7 +55,7 @@ private:
     // 3本目を探す段階か（ヒューズ2本・ループのドアを2回通った・電力はまだ）
     bool IsThirdFuseStage() const;
     // 小物の配置のファイルを読み直して置き直している（Debug版の F5）
-    void ReloadPropLayout();
+    bool ReloadPropLayout();
     // 目的表示の文章を選ぶために、今の状態を集めている（StageSceneDraw.cpp）。
     Stage1ObjectiveInput MakeObjectiveInput() const;
     // 姿の見えない物音を鳴らしてよいか（台本の演出や監視映像と重ならないか）を判断している。

@@ -7,7 +7,9 @@
 
 #include	<cstdlib>
 #include	<filesystem>
+#include	<fstream>
 #include	<string>
+#include	<vector>
 #include	<Windows.h>
 #include	<ShlObj.h>
 
@@ -88,12 +90,6 @@ namespace utility {
         return directory;
     }
 
-    // 前の版の保存先（作業フォルダの下の save）のパスを返している
-    std::filesystem::path GetLegacySavePath(std::string const& fileName)
-    {
-        return std::filesystem::path(L"save") / fileName;
-    }
-
     // 新しい保存先にファイルがあればそれを、無ければ前の保存先のパスを返している
     std::filesystem::path ResolveSaveFileForRead(std::string const& fileName)
     {
@@ -103,7 +99,59 @@ namespace utility {
         {
             return current;
         }
-        return GetLegacySavePath(fileName);
+        return std::filesystem::path(L"save") / fileName;
+    }
+
+    AtomicWriteResult WriteTextAtomically(const std::filesystem::path& path, std::string_view text,
+        const std::function<bool()>& canReplace)
+    {
+        const auto directory = path.has_parent_path() ? path.parent_path() : std::filesystem::path(L".");
+        wchar_t temporaryName[MAX_PATH]{};
+        if (::GetTempFileNameW(directory.c_str(), L"slt", 0, temporaryName) == 0)
+        {
+            return AtomicWriteResult::TemporaryFileFailed;
+        }
+        struct TemporaryFile
+        {
+            const wchar_t* name;
+            ~TemporaryFile()
+            {
+                if (name != nullptr)
+                {
+                    ::DeleteFileW(name);
+                }
+            }
+        } temporary{temporaryName};
+
+        std::ofstream file(std::filesystem::path(temporary.name), std::ios::binary | std::ios::trunc);
+        file.write(text.data(), static_cast<std::streamsize>(text.size()));
+        file.close();
+        if (!file)
+        {
+            return AtomicWriteResult::WriteFailed;
+        }
+        if (canReplace && !canReplace())
+        {
+            return AtomicWriteResult::DestinationChanged;
+        }
+        if (!::MoveFileExW(temporary.name, path.c_str(), MOVEFILE_REPLACE_EXISTING))
+        {
+            return AtomicWriteResult::ReplaceFailed;
+        }
+        temporary.name = nullptr;
+        return AtomicWriteResult::Success;
+    }
+
+    void WriteSaveFile(std::string const& fileName, std::string_view text)
+    {
+        const auto directory = GetSaveDirectory();
+        const auto path = directory / fileName;
+        std::error_code error;
+        std::filesystem::create_directories(directory, error);
+        if (error || WriteTextAtomically(path, text) != AtomicWriteResult::Success)
+        {
+            ::OutputDebugStringW((L"セーブファイルを書き込めない: " + path.wstring() + L"\n").c_str());
+        }
     }
 
     // 出力ウィンドウとダイアログにエラーを出し、すぐにプロセスを終えている

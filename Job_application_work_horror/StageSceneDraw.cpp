@@ -54,13 +54,14 @@ void StageScene::Draw(Camera* camera)
         switch (m_PropLayoutEditor.Draw(builder, m_Objects.layoutProps, *camera))
         {
         case PropLayoutEditor::Action::Saved:
-            ReloadPropLayout();
-            m_LayoutNotice = "配置のファイルに書き戻した";
-            m_LayoutNoticeTimer = 3.0f;
+            if (ReloadPropLayout())
+            {
+                m_LayoutNotice = "配置のファイルに書き戻した";
+            }
             break;
         case PropLayoutEditor::Action::SaveFailed:
             m_LayoutNotice = m_PropLayoutEditor.GetError();
-            m_LayoutNoticeTimer = 6.0f;
+            m_LayoutNoticeTimer = PropLayoutFile::LayoutErrorNoticeSeconds;
             break;
         case PropLayoutEditor::Action::ReloadFile:
             ReloadPropLayout();

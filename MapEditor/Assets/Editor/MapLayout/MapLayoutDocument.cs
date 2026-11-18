@@ -118,6 +118,8 @@ namespace MapLayout.Editor
         private const float NumberChangeTolerance = 0.0005f;
         private const int SaveRetryCount = 10;
         private const int SaveRetryDelayMilliseconds = 50;
+        private string sourcePath;
+        private string sourceText;
 
         public readonly List<Line> Lines = new List<Line>();
         // color 行の名前と色（光らない none は、ゲームと同じく最初から黒）
@@ -127,6 +129,8 @@ namespace MapLayout.Editor
         {
             var document = new MapLayoutDocument();
             var text = File.ReadAllText(path, Encoding.UTF8);
+            document.sourcePath = Path.GetFullPath(path);
+            document.sourceText = text;
             var lineNumber = 0;
             foreach (var raw in text.Replace("\r\n", "\n").Split('\n'))
             {
@@ -161,26 +165,49 @@ namespace MapLayout.Editor
         // 隣の一時ファイルに書き終えてから差し替えている。ゲームがちょうど読んでいて差し替えられないときは、少し待ってやり直す
         public void Save(string path)
         {
-            var temporary = path + ".tmp";
-            File.WriteAllText(temporary, ToText(), new UTF8Encoding(false));
-            for (var attempt = 0; ; ++attempt)
+            path = Path.GetFullPath(path);
+            var writesSource = string.Equals(path, sourcePath, StringComparison.OrdinalIgnoreCase);
+            var text = ToText();
+            var temporary = Path.Combine(Path.GetDirectoryName(path), Path.GetRandomFileName());
+            var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write);
+            try
             {
-                try
+                using (stream)
+                using (var writer = new StreamWriter(stream, new UTF8Encoding(false)))
                 {
-                    if (File.Exists(path))
-                    {
-                        File.Replace(temporary, path, null);
-                    }
-                    else
-                    {
-                        File.Move(temporary, path);
-                    }
-                    return;
+                    writer.Write(text);
                 }
-                catch (IOException) when (attempt < SaveRetryCount)
+                for (var attempt = 0; ; ++attempt)
                 {
-                    System.Threading.Thread.Sleep(SaveRetryDelayMilliseconds);
+                    try
+                    {
+                        if (writesSource && File.ReadAllText(path, Encoding.UTF8) != sourceText)
+                        {
+                            throw new InvalidOperationException("書き出し中に配置ファイルが更新されました: " + path);
+                        }
+                        if (File.Exists(path))
+                        {
+                            File.Replace(temporary, path, null);
+                        }
+                        else
+                        {
+                            File.Move(temporary, path);
+                        }
+                        if (writesSource)
+                        {
+                            sourceText = text;
+                        }
+                        return;
+                    }
+                    catch (IOException) when (attempt < SaveRetryCount)
+                    {
+                        System.Threading.Thread.Sleep(SaveRetryDelayMilliseconds);
+                    }
                 }
+            }
+            finally
+            {
+                File.Delete(temporary);
             }
         }
 

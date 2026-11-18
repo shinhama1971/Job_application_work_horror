@@ -6,8 +6,10 @@
 #include "sound.h"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <limits>
+#include <mmsystem.h>
 
 // X3DAudioInitialize / X3DAudioCalculate は XAudio2 2.9 のライブラリに含まれている。
 #pragma comment(lib, "xaudio2.lib")
@@ -16,6 +18,16 @@ using DirectX::SimpleMath::Vector3;
 
 namespace
 {
+	constexpr DWORD RiffChunkId = mmioFOURCC('R', 'I', 'F', 'F');
+	constexpr DWORD DataChunkId = mmioFOURCC('d', 'a', 't', 'a');
+	constexpr DWORD FormatChunkId = mmioFOURCC('f', 'm', 't', ' ');
+	constexpr DWORD WaveFormatId = mmioFOURCC('W', 'A', 'V', 'E');
+	constexpr UINT32 MaxSpatialChannels = 8;
+	constexpr float MinCuePitch = 0.70f;
+	constexpr float MaxCuePitch = 1.35f;
+	constexpr float MinSpatialPitch = 0.50f;
+	constexpr float MaxSpatialPitch = 1.50f;
+
 	// 1ワールド単位はおよそ4cm（目の高さが40）。この距離までは小さくならず、その先は距離に反比例して小さくなる。
 	constexpr float SpatialCurveDistance = 30.0f;
 	// これより近い音は方向をはっきりさせず、耳元で広がるように聞かせている。
@@ -39,36 +51,45 @@ namespace
 		result.z = value.z;
 		return result;
 	}
-}
 
-#ifdef _XBOX // Xbox（ビッグエンディアン）用のチャンクの名前
-#define fourccRIFF 'RIFF'
-#define fourccDATA 'data'
-#define fourccFMT 'fmt '
-#define fourccWAVE 'WAVE'
-#define fourccXWMA 'XWMA'
-#define fourccDPDS 'dpds'
-#endif
+	void ResetCue(IXAudio2SourceVoice*& voice)
+	{
+		if (voice == nullptr)
+		{
+			return;
+		}
+		if (SUCCEEDED(voice->Stop()) && SUCCEEDED(voice->FlushSourceBuffers()))
+		{
+			XAUDIO2_VOICE_STATE state{};
+			voice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
+			if (state.BuffersQueued == 0)
+			{
+				return;
+			}
+		}
+
+		// 停止がまだ反映されていないボイスは壊し、古いバッファを次の再生へ持ち越さない。
+		voice->DestroyVoice();
+		voice = nullptr;
+	}
+}
 
 // 壊すときに解放している
 Sound::~Sound()
 {
 	Uninit();
 }
-#ifndef _XBOX // Windows（リトルエンディアン）用のチャンクの名前。4文字を逆順に並べている
-#define fourccRIFF 'FFIR'
-#define fourccDATA 'atad'
-#define fourccFMT ' tmf'
-#define fourccWAVE 'EVAW'
-#define fourccXWMA 'AMWX'
-#define fourccDPDS 'sdpd'
-#endif
 
 //=============================================================================
 // 初期化：COMとXAudio2を準備し、全部の素材のWAVを読み込んでいる
 //=============================================================================
 HRESULT Sound::Init()
 {
+	if (m_pXAudio2)
+	{
+		return S_OK;
+	}
+
 	HRESULT hr;
 
 	HANDLE hFile;
@@ -104,15 +125,14 @@ HRESULT Sound::Init()
 	// 立体音響だけが使えない環境でも、普通の再生は続けられるようにしている。
 	{
 		DWORD channelMask = 0;
-		if (FAILED(m_pMasteringVoice->GetChannelMask(&channelMask)) || channelMask == 0)
-		{
-			channelMask = SPEAKER_STEREO;
-		}
 		XAUDIO2_VOICE_DETAILS masterDetails{};
 		m_pMasteringVoice->GetVoiceDetails(&masterDetails);
-		m_OutputChannels = (std::max)(masterDetails.InputChannels, 1u);
-		m_X3DAudioReady = SUCCEEDED(
-			X3DAudioInitialize(channelMask, X3DAUDIO_SPEED_OF_SOUND, m_X3DAudio));
+		m_OutputChannels = masterDetails.InputChannels;
+		// マスクのスピーカー数と実際の出力数が一致するときだけ、振り分け行列を計算する。
+		m_X3DAudioReady = SUCCEEDED(m_pMasteringVoice->GetChannelMask(&channelMask)) &&
+			m_OutputChannels > 0 && m_OutputChannels <= MaxSpatialChannels &&
+			static_cast<UINT32>(std::popcount(channelMask)) == m_OutputChannels &&
+			SUCCEEDED(X3DAudioInitialize(channelMask, X3DAUDIO_SPEED_OF_SOUND, m_X3DAudio));
 	}
 
 	// 全部の素材を、WAVファイルから読み込んでいる
@@ -130,7 +150,7 @@ HRESULT Sound::Init()
 		}
 
 		// ファイルの形式がWAVEであることを確かめている。
-		hr = FindChunk(hFile, fourccRIFF, dwChunkSize, dwChunkPosition);
+		hr = FindChunk(hFile, RiffChunkId, dwChunkSize, dwChunkPosition);
 		if (FAILED(hr) || hr == S_FALSE)
 		{
 			CloseHandle(hFile);
@@ -144,14 +164,14 @@ HRESULT Sound::Init()
 			Uninit();
 			return hr;
 		}
-		if (filetype != fourccWAVE) {
+		if (filetype != WaveFormatId) {
 			CloseHandle(hFile);
 			Uninit();
 			return E_FAIL;
 		}
 
 		// 音声の形式（fmtチャンク）を読み込んでいる
-		hr = FindChunk(hFile, fourccFMT, dwChunkSize, dwChunkPosition);
+		hr = FindChunk(hFile, FormatChunkId, dwChunkSize, dwChunkPosition);
 		if (FAILED(hr) || hr == S_FALSE || dwChunkSize < offsetof(WAVEFORMATEX, cbSize) ||
 			dwChunkSize == offsetof(WAVEFORMATEX, cbSize) + 1 || dwChunkSize > sizeof(m_wfx[i]) ||
 			FAILED(ReadChunkData(hFile, &m_wfx[i], dwChunkSize, dwChunkPosition)))
@@ -170,7 +190,7 @@ HRESULT Sound::Init()
 		}
 
 		// 音声データ（dataチャンク）の中身を、再生用のバッファへ読み込んでいる。
-		hr = FindChunk(hFile, fourccDATA, dwChunkSize, dwChunkPosition);
+		hr = FindChunk(hFile, DataChunkId, dwChunkSize, dwChunkPosition);
 		if (FAILED(hr) || hr == S_FALSE || dwChunkSize == 0 || dwChunkSize > XAUDIO2_MAX_BUFFER_BYTES)
 		{
 			CloseHandle(hFile);
@@ -258,88 +278,40 @@ void Sound::Uninit(void)
 //=============================================================================
 void Sound::Play(SOUND_LABEL label, float pitch, float volume)
 {
-	if (!IsValidLabel(label))
+	if (!IsValidLabel(label) || m_pXAudio2 == nullptr)
 	{
 		return;
 	}
 
-	if (m_pXAudio2 == nullptr)
+	IXAudio2SourceVoice*& voice = m_pSourceVoice[label];
+	// 初期化時に作ったボイスを使い、前の再生を止めてバッファを空にする。
+	ResetCue(voice);
+	if (voice == nullptr && FAILED(m_pXAudio2->CreateSourceVoice(&voice, &m_wfx[label].Format)))
 	{
 		return;
 	}
-
-	// 前のソースボイスを壊して、新しく作り直している
-	IXAudio2SourceVoice*& pSV = m_pSourceVoice[(int)label];
-
-	if (pSV != nullptr)
+	if (voice == nullptr || FAILED(voice->SubmitSourceBuffer(&m_buffer[label])))
 	{
-		pSV->DestroyVoice();
-		pSV = nullptr;
-	}
-
-	// ソースボイスを作っている
-	HRESULT hr = m_pXAudio2->CreateSourceVoice(
-		&pSV,
-		&(m_wfx[(int)label].Format)
-	);
-	if (FAILED(hr) || pSV == nullptr)
-	{
-		pSV = nullptr;
-		return;
-	}
-
-	hr = pSV->SubmitSourceBuffer(&(m_buffer[(int)label]));
-	if (FAILED(hr))
-	{
-		pSV->DestroyVoice();
-		pSV = nullptr;
 		return;
 	}
 
 	// WAVごとの音の大きさの差を吸収し、環境音が効果音を覆い隠さないようにしている。
-	pSV->SetVolume(m_param[(int)label].volume * (std::max)(volume, 0.0f));
-	// 音の高さ（再生速度）は0.70〜1.35倍に制限している
-	pSV->SetFrequencyRatio((std::clamp)(pitch, 0.70f, 1.35f));
-
-	// 再生を始めている
-	pSV->Start(0);
-
+	voice->SetVolume(m_param[label].volume * (std::max)(volume, 0.0f));
+	voice->SetFrequencyRatio((std::clamp)(pitch, MinCuePitch, MaxCuePitch));
+	if (FAILED(voice->Start()))
+	{
+		ResetCue(voice);
+	}
 }
 
 //=============================================================================
-// 停止（音声データが残っていれば止めている）
+// 停止（現在の再生と再生待ちのバッファを消している）
 //=============================================================================
 void Sound::Stop(SOUND_LABEL label)
 {
-	if (!IsValidLabel(label))
+	if (IsValidLabel(label))
 	{
-		return;
-	}
-
-	if (m_pSourceVoice[(int)label] == NULL) return;
-
-	XAUDIO2_VOICE_STATE xa2state;
-	m_pSourceVoice[(int)label]->GetState(&xa2state);
-	if (xa2state.BuffersQueued)
-	{
-		m_pSourceVoice[(int)label]->Stop(0);
-	}
-}
-
-//=============================================================================
-// 再開（Stopで止めた音を続きから鳴らしている）
-//=============================================================================
-void Sound::Resume(SOUND_LABEL label)
-{
-	if (!IsValidLabel(label))
-	{
-		return;
-	}
-
-	IXAudio2SourceVoice*& pSV = m_pSourceVoice[(int)label];
-	if (pSV != nullptr)
-	{
-		pSV->Start();
+		ResetCue(m_pSourceVoice[label]);
 	}
 }
 
@@ -365,13 +337,6 @@ void Sound::PlayAt(
 	{
 		return;
 	}
-	if (!m_X3DAudioReady)
-	{
-		// 立体音響が使えない環境では、位置を持たない普通の再生に切り替えている。
-		Play(label, pitch);
-		return;
-	}
-
 	// 鳴り終わった枠を探している。全部使っていれば、一番古く鳴らした音を止めて使っている。
 	SpatialVoice* slot = nullptr;
 	for (SpatialVoice& spatial : m_SpatialVoices)
@@ -392,15 +357,14 @@ void Sound::PlayAt(
 	}
 	if (slot == nullptr)
 	{
-		slot = &m_SpatialVoices[m_NextSpatialVoice];
-		m_NextSpatialVoice = (m_NextSpatialVoice + 1) % MaxSpatialVoices;
+		slot = &*std::ranges::min_element(m_SpatialVoices, {}, &SpatialVoice::StartOrder);
 		ReleaseSpatialVoice(*slot);
 	}
 
-	// こもらせるためのローパスフィルターを使えるボイスとして作っている。
+	// 立体音響が使えない場合も同じ枠で管理し、通常のスピーカー振り分けで鳴らす。
 	const int index = static_cast<int>(label);
 	HRESULT hr = m_pXAudio2->CreateSourceVoice(
-		&slot->Voice, &m_wfx[index].Format, XAUDIO2_VOICE_USEFILTER);
+		&slot->Voice, &m_wfx[index].Format, m_X3DAudioReady ? XAUDIO2_VOICE_USEFILTER : 0);
 	if (FAILED(hr) || slot->Voice == nullptr)
 	{
 		slot->Voice = nullptr;
@@ -420,25 +384,27 @@ void Sound::PlayAt(
 
 	slot->Label = label;
 	slot->Position = position;
-	// 鳴り始めから壁の向こうの音として聞こえるよう、最初のさえぎる物の量はその場で求めている。
-	slot->MinimumOcclusion = (std::clamp)(minimumOcclusion, 0.0f, 1.0f);
-	slot->Occlusion = (std::max)(QueryOcclusion(position), slot->MinimumOcclusion);
 	slot->Voice->SetVolume(m_param[index].volume * (std::max)(volume, 0.0f));
-	// 音の高さは0.50〜1.50倍に制限している（位置なしの再生より広い範囲にしている）
-	slot->Voice->SetFrequencyRatio((std::clamp)(pitch, 0.50f, 1.50f));
-	ApplySpatialMix(*slot);
-	slot->Voice->Start(0);
+	slot->Voice->SetFrequencyRatio((std::clamp)(pitch, MinSpatialPitch, MaxSpatialPitch));
+	if (m_X3DAudioReady)
+	{
+		// 鳴り始めから壁の向こうの音として聞こえるよう、最初のさえぎる物の量はその場で求める。
+		slot->MinimumOcclusion = (std::clamp)(minimumOcclusion, 0.0f, 1.0f);
+		slot->Occlusion = (std::max)(QueryOcclusion(position), slot->MinimumOcclusion);
+		ApplySpatialMix(*slot);
+	}
+	if (FAILED(slot->Voice->Start()))
+	{
+		ReleaseSpatialVoice(*slot);
+		return;
+	}
+	slot->StartOrder = ++m_SpatialPlayOrder;
 }
 
 // 聞き手を更新し、鳴り終わった音を片付け、鳴っている音のさえぎる物の量と聞こえ方を更新している
 void Sound::UpdateListener(const SoundListener& listener, float deltaTime)
 {
 	m_Listener = listener;
-	if (!m_X3DAudioReady)
-	{
-		return;
-	}
-
 	const float response = 1.0f - std::exp(-OcclusionResponsePerSecond * (std::max)(deltaTime, 0.0f));
 	for (SpatialVoice& spatial : m_SpatialVoices)
 	{
@@ -451,6 +417,10 @@ void Sound::UpdateListener(const SoundListener& listener, float deltaTime)
 		if (state.BuffersQueued == 0)
 		{
 			ReleaseSpatialVoice(spatial);
+			continue;
+		}
+		if (!m_X3DAudioReady)
+		{
 			continue;
 		}
 
@@ -476,8 +446,12 @@ float Sound::QueryOcclusion(const Vector3& emitter) const
 void Sound::ApplySpatialMix(SpatialVoice& spatial)
 {
 	const WAVEFORMATEX& format = m_wfx[static_cast<int>(spatial.Label)].Format;
-	const UINT32 sourceChannels = (std::clamp)(static_cast<UINT32>(format.nChannels), 1u, 8u);
-	const UINT32 outputChannels = (std::min)(m_OutputChannels, 8u);
+	const UINT32 sourceChannels = format.nChannels;
+	if (sourceChannels == 0 || sourceChannels > MaxSpatialChannels)
+	{
+		return;
+	}
+	const UINT32 outputChannels = m_OutputChannels;
 
 	// 聞き手の上方向は、前方向に直交するように作り直している（X3DAudioの決まり）。
 	Vector3 forward = m_Listener.Forward;
@@ -499,7 +473,7 @@ void Sound::ApplySpatialMix(SpatialVoice& spatial)
 	listener.Position = ToX3DAudio(m_Listener.Position);
 
 	// ステレオの素材も、すべてのチャンネルを同じ1点から鳴らしている。
-	float channelAzimuths[8] = {};
+	float channelAzimuths[MaxSpatialChannels] = {};
 	X3DAUDIO_EMITTER emitter{};
 	emitter.Position = ToX3DAudio(spatial.Position);
 	emitter.OrientFront = ToX3DAudio(Vector3(0.0f, 0.0f, 1.0f));
@@ -512,7 +486,7 @@ void Sound::ApplySpatialMix(SpatialVoice& spatial)
 	emitter.CurveDistanceScaler = SpatialCurveDistance;
 	emitter.DopplerScaler = 0.0f;
 
-	float matrix[8 * 8] = {};
+	float matrix[MaxSpatialChannels * MaxSpatialChannels] = {};
 	X3DAUDIO_DSP_SETTINGS dsp{};
 	dsp.SrcChannelCount = sourceChannels;
 	dsp.DstChannelCount = outputChannels;
@@ -556,8 +530,7 @@ void Sound::ReleaseSpatialVoice(SpatialVoice& spatial)
 		spatial.Voice->DestroyVoice();
 		spatial.Voice = nullptr;
 	}
-	spatial.Occlusion = 0.0f;
-	spatial.MinimumOcclusion = 0.0f;
+	spatial = {};
 }
 
 // 位置付きの音を全部止めている
@@ -567,7 +540,16 @@ void Sound::StopAllSpatial()
 	{
 		ReleaseSpatialVoice(spatial);
 	}
-	m_NextSpatialVoice = 0;
+	m_SpatialPlayOrder = 0;
+}
+
+void Sound::StopAll()
+{
+	StopAllSpatial();
+	for (int index = 0; index < SOUND_LABEL_MAX; ++index)
+	{
+		Stop(static_cast<SOUND_LABEL>(index));
+	}
 }
 
 // 今鳴っている位置付きの音の数を数えている
@@ -608,11 +590,11 @@ HRESULT Sound::FindChunk(HANDLE hFile, DWORD fourcc, DWORD& dwChunkSize, DWORD& 
 
 	const auto riffEnd = sizeof(riff) + static_cast<ULONGLONG>(riff.Size);
 	constexpr auto maxOffset = (std::numeric_limits<DWORD>::max)();
-	if (riff.Id != fourccRIFF || riff.Size < sizeof(DWORD) ||
+	if (riff.Id != RiffChunkId || riff.Size < sizeof(DWORD) ||
 		riffEnd > static_cast<ULONGLONG>(fileSize.QuadPart) || riffEnd > maxOffset)
 		return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
 
-	if (fourcc == fourccRIFF)
+	if (fourcc == RiffChunkId)
 	{
 		dwChunkSize = sizeof(DWORD); // 親チャンクの先頭に WAVE の形式識別子がある。
 		dwChunkDataPosition = sizeof(riff);

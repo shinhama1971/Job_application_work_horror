@@ -22,6 +22,8 @@ namespace MapLayout
         public MapLayoutKind Kind;
         public int LineIndex;
         public string Key;
+        // spot は同じ組の名前が並ぶため、元の行の内容も覚えておく。
+        public string SpotSourceLine;
         // place 行に向き（yaw）・大きさ（size）が書いてあったか
         public bool HasYaw;
         public bool HasSize;

@@ -91,6 +91,8 @@ struct PropLayout
     std::vector<std::pair<std::string, DirectX::SimpleMath::Color>> Colors;
     // 色の名前ごとのPBRの仕上げ（metal・rough を付けた色だけ）
     std::vector<std::pair<std::string, PropSurfaceFinish>> Finishes;
+    // 編集を始めたときのファイルの内容。保存時に、外部で更新されていないか確かめる。
+    std::vector<std::string> SourceLines;
     std::string Error;
     int ErrorLine = 0;
     bool IsValid() const { return Error.empty(); }
@@ -98,6 +100,9 @@ struct PropLayout
 
 namespace PropLayoutFile
 {
+    inline constexpr float LayoutSuccessNoticeSeconds = 3.0f;
+    inline constexpr float LayoutErrorNoticeSeconds = 6.0f;
+
     // ファイルを読み、小物の一覧を返している
     PropLayout Load(const std::string& path);
     // 作った小物（名前とWall）。読み直すときは、同じ名前の物を置き直している
@@ -174,8 +179,8 @@ namespace PropLayoutFile
     std::vector<DirectX::SimpleMath::Vector4> CollectRoomFootprints(const PropLayout& layout);
     // 小物を作り（builderで名前を記録する）、作った小物を返している
     SpawnedProps Spawn(SceneLayoutBuilder& builder, const PropLayout& layout);
-    // ファイルを読み直した結果で、今の小物を置き直している（同じ名前は置き直し、新しい名前は作り、ファイルから消えた物は隠す）
-    void Reload(SceneLayoutBuilder& builder, const PropLayout& layout, SpawnedProps& props);
+    // 既存の小物を置き直す。別の Object と名前が衝突する場合は、配置を変更せず error に理由を入れる。
+    bool Reload(SceneLayoutBuilder& builder, const PropLayout& layout, SpawnedProps& props, std::string& error);
     // 1つのWallに、設定（位置・大きさ・色・当たり判定・影・古さ・光）を当てはめている（作るときと読み直すときの両方で使う）
     void Apply(Wall& wall, const PropDescription& description);
     // 色の名前から色を探している（見つからなければnullptr）

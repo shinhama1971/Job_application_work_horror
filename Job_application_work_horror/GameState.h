@@ -82,16 +82,16 @@ namespace Core
         }
 
         // リザルト画面に入る瞬間に一度だけ、今回の結果とベスト記録を確定している。
-        void CompleteRun()
+        bool CompleteRun(bool recordEligible)
         {
             // クリアタイムが短い・捕まった回数が少ない方をベストとして残している（初めてのクリアなら両方ベスト）
             m_LastClearTimeSeconds = m_Run.RunTimeSeconds;
             // 2面から始めたプレイは1面の分だけ短くなるため、ベスト記録とは比べず、記録も付けない
-            if (!m_Run.FullRun)
+            if (!recordEligible || !m_Run.FullRun)
             {
                 m_LastRunBestTime = false;
                 m_LastRunBestCaught = false;
-                return;
+                return false;
             }
             m_LastRunBestTime = !m_HasClearRecord ||
                 m_LastClearTimeSeconds < m_BestClearTimeSeconds;
@@ -106,6 +106,7 @@ namespace Core
                 m_BestCaughtCount = m_Run.CaughtCount;
             }
             m_HasClearRecord = true;
+            return true;
         }
 
         // 保存ファイルから読んだベスト記録を反映している。
