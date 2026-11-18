@@ -279,6 +279,9 @@
     <ClCompile Include="DDGIVolume.cpp">
       <Filter>ソース ファイル\Rendering\Effects</Filter>
     </ClCompile>
+    <ClCompile Include="LightShafts.cpp">
+      <Filter>ソース ファイル\Rendering\Effects</Filter>
+    </ClCompile>
     <ClCompile Include="PointShadowMap.cpp">
       <Filter>ソース ファイル\Rendering\Effects</Filter>
     </ClCompile>
@@ -632,6 +635,9 @@
     <ClInclude Include="DDGIVolume.h">
       <Filter>ヘッダー ファイル\Rendering\Effects</Filter>
     </ClInclude>
+    <ClInclude Include="GIUpdateSettings.h">
+      <Filter>ヘッダー ファイル\Rendering\Effects</Filter>
+    </ClInclude>
     <ClInclude Include="LightShafts.h">
       <Filter>ヘッダー ファイル\Rendering\Effects</Filter>
     </ClInclude>
@@ -962,6 +968,15 @@
     <ClInclude Include="shader\horrorMist.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
+    <ClInclude Include="shader\tiledLightingConfig.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\postProcessBuffer.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\lightShaftSegment.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
     <ClInclude Include="shader\pbrLighting.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
@@ -1091,9 +1106,6 @@
       <Filter>リソース ファイル\Shader\Pixel</Filter>
     </FxCompile>
     <FxCompile Include="shader\rockPS.hlsl">
-      <Filter>リソース ファイル\Shader\Pixel</Filter>
-    </FxCompile>
-    <FxCompile Include="shader\shadowDepthPS.hlsl">
       <Filter>リソース ファイル\Shader\Pixel</Filter>
     </FxCompile>
     <FxCompile Include="shader\shadowDissolvePS.hlsl">

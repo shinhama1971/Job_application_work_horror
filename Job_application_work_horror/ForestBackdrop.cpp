@@ -62,12 +62,17 @@ void ForestBackdrop::ApplyCamera()
     const float progress = SmoothStep(m_ShotTime / shot.Seconds);
     m_Player->SetPosition(Vector3::Lerp(shot.From, shot.To, progress));
     // 手持ちのカメラのように、ほんの少し揺らしている
-    const float sway = std::sin(m_Time * 0.7f) * 0.012f + std::sin(m_Time * 1.9f) * 0.004f;
+    constexpr float SlowSwayRadiansPerSecond = 0.7f;
+    constexpr float FastSwayRadiansPerSecond = 1.9f;
+    constexpr float SlowSwayAmplitude = 0.012f;
+    constexpr float FastSwayAmplitude = 0.004f;
+    const float sway = std::sin(m_Time * SlowSwayRadiansPerSecond) * SlowSwayAmplitude +
+        std::sin(m_Time * FastSwayRadiansPerSecond) * FastSwayAmplitude;
     Camera* camera = Core::Game::GetInstance()->GetCamera();
     camera->SetCameraDirection(shot.YawFrom + (shot.YawTo - shot.YawFrom) * progress + sway);
     camera->SetCameraPitch(shot.PitchFrom + (shot.PitchTo - shot.PitchFrom) * progress + sway * 0.5f);
     // 懐中電灯の電池が切れないようにしている
-    m_Player->AddBattery(100.0f);
+    m_Player->RefillBattery();
 }
 
 void ForestBackdrop::Update(float deltaTime)

@@ -89,7 +89,7 @@ void CeilingLight::Init()
 
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
-    m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+    m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
     // 本体のマテリアル：くすんだ灰色の金属
     MATERIAL body{};
@@ -98,14 +98,14 @@ void CeilingLight::Init()
     body.Shininess = 12.0f;
     body.TextureEnable = FALSE;
     m_BodyMaterial = std::make_unique<Material>();
-    m_BodyMaterial->Create(body);
+    m_BodyMaterial->CreateRequired(body);
 
     // 発光パネルのマテリアル。光る色は明るさに合わせてDrawで毎回変えている
     MATERIAL panel{};
     panel.Diffuse = Color(0.25f, 0.24f, 0.20f, 1.0f);
     panel.TextureEnable = FALSE;
     m_LightMaterial = std::make_unique<Material>();
-    m_LightMaterial->Create(panel);
+    m_LightMaterial->CreateRequired(panel);
 }
 
 // 進む先の灯は、不ぞろいな間隔で少し長く2回光る。器具と周囲の赤い光だまりに同じ明暗を付ける。

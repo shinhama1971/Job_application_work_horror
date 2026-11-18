@@ -78,7 +78,7 @@ float Hud::GetCanvasHeight()
 // HUD用のシェーダーと、最大の頂点数分のバッファを作っている（毎フレーム中身を書き換えて使っている）
 void Hud::Init()
 {
-    m_Shader.Create("shader/hudVS.hlsl", "shader/hudPS.hlsl");
+    m_Shader.CreateRequired("shader/hudVS.hlsl", "shader/hudPS.hlsl");
     std::vector<VERTEX_3D> initialVertices(MaxVertices);
     m_VertexBuffer.Create(initialVertices);
     m_Vertices.reserve(MaxVertices);

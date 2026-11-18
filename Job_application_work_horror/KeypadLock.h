@@ -64,8 +64,7 @@ public:
         return SubmitResult::Wrong;
     }
 
-    // 正解の番号・入力中の番号・選んでいる桁・間違えた回数・解けたかを返している
-    const Digits& GetCode() const noexcept { return m_Code; }
+    // 入力中の番号・選んでいる桁・間違えた回数・解けたかを返している
     const Digits& GetEntered() const noexcept { return m_Entered; }
     int GetCursor() const noexcept { return m_Cursor; }
     int GetMistakes() const noexcept { return m_Mistakes; }

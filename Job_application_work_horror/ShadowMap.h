@@ -42,7 +42,6 @@ namespace Effect
         Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_ShadowRasterizer;
         Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_PreviousRasterizer;
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_ShadowBuffer;
-		Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_TwoSidedRasterizer;// （今は使っていない）
 
         // 影を描く前のビューポート（終わったら戻す）
         D3D11_VIEWPORT m_PreviousViewport{};
@@ -58,7 +57,7 @@ namespace Effect
 
     public:
         // テクスチャ・サンプラー・ラスタライザー・定数バッファ・シェーダーを作る／解放する
-        void Init();
+        bool Init();
         void Uninit();
         // 影を描き始めている：描画先を深度テクスチャにし、カメラの位置から見た行列を設定している
         void Begin(const Camera& camera);

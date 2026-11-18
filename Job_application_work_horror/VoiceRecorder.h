@@ -66,7 +66,6 @@ public:
     // 録音の番号（StoryText::Recordings の並び）
     void SetRecordingIndex(int index) { m_RecordingIndex = index; }
     int GetRecordingIndex() const { return m_RecordingIndex; }
-    bool IsPlayed() const { return m_Played; }
     // 調べられたフレームの後、Scene が一度だけ true を受け取り、字幕を流し始めている
     bool TakePlayRequest()
     {

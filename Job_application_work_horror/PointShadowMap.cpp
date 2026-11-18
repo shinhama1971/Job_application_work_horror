@@ -35,7 +35,7 @@ namespace
 
 namespace Effect
 {
-    void PointShadowMap::Init()
+    bool PointShadowMap::Init()
     {
         ID3D11Device* device = Renderer::GetDevice();
 
@@ -84,10 +84,11 @@ namespace Effect
             SUCCEEDED(device->CreateDepthStencilView(m_DepthTexture.Get(), nullptr, m_DepthView.ReleaseAndGetAddressOf()));
         if (!created)
         {
-            utility::ReportFatalError("電球の影のキューブマップの作成に失敗しました。");
+            MessageBoxW(nullptr, L"電球の影のキューブマップを作成できません。", L"描画エラー", MB_OK | MB_ICONERROR);
+            return false;
         }
 
-        m_Shader.Create("shader/pointShadowVS.hlsl", "shader/pointShadowPS.hlsl");
+        return m_Shader.Create("shader/pointShadowVS.hlsl", "shader/pointShadowPS.hlsl");
     }
 
     void PointShadowMap::Uninit()

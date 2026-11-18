@@ -6,7 +6,6 @@
 #pragma once
 
 #include <algorithm>
-#include <iostream>
 #include <vector>
 #include <memory>
 #include <string>
@@ -21,8 +20,6 @@
 #include "ReflectionProbe.h"
 #include "PointShadowMap.h"
 #include "AmbientOcclusion.h"
-#include "DDGIVolume.h"
-#include "LightShafts.h"
 #include "ScreenSpaceReflection.h"
 #include "TiledLighting.h"
 #include "FigureVolumes.h"
@@ -48,6 +45,8 @@ enum class SceneName
 };
 
 class Scene;
+
+namespace Effect { class DDGIVolume; class LightShafts; }
 
 namespace Core
 {
@@ -77,8 +76,8 @@ namespace Core
         // 画面空間の環境遮蔽（SSAO）。本描画の直前に深度プリパスの深度から作り、t15 で読ませている
         Effect::AmbientOcclusion m_AmbientOcclusion;
         // DDGI：壁や床で跳ね返った間接光（プローブの格子と、画面の間接光の画像）
-        Effect::DDGIVolume m_GlobalIllumination;
-        Effect::LightShafts m_LightShafts;
+        std::unique_ptr<Effect::DDGIVolume> m_GlobalIllumination;
+        std::unique_ptr<Effect::LightShafts> m_LightShafts;
         unsigned int m_EnvironmentQualityFrame = 0;
         Effect::ScreenSpaceReflection m_ScreenSpaceReflection;
         Effect::TiledLighting m_TiledLighting;
@@ -228,7 +227,7 @@ namespace Core
                 std::forward<Setup>(setup));
         }
 
-        // 名前付きで生成している。SceneのInitで配置し、RequireObjで取得し直して使っている。
+        // 名前付きで生成している。配置後は戻り値を保持するか、GetObjで検索できる。
         template<typename T>
         T* CreateObj(const std::string& name)
         {
@@ -236,25 +235,10 @@ namespace Core
         }
 
         // 見つからなくてもよい場合の名前の検索（無い場合はnullptrを返している）。
-        // 必ずあるはずのObjectにはRequireObjを使い、名前の打ち間違いを起動時に見つけている。
         template<typename T>
         T* GetObj(const std::string& name)
         {
             return m_ObjectManager.FindNamedObject<T>(name);
-        }
-
-        // Sceneの初期化時に、その後使い続けるObjectを取得している。
-        // 名前の打ち間違いや生成し忘れがあれば、その場でObjectの名前を表示して終了している。
-        template<typename T>
-        T* RequireObj(const std::string& name)
-        {
-            T* object = m_ObjectManager.FindNamedObject<T>(name);
-            if (object == nullptr)
-            {
-                utility::ReportFatalError(
-                    "シーンに必要なObjectが見つかりません: " + name);
-            }
-            return object;
         }
 
         // 指定した型のObjectをすべて返している。全Objectを調べるため、何度も使う場合は結果を覚えておいて使っている。

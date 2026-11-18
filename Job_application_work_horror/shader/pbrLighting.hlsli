@@ -124,7 +124,7 @@ MetalWear GetMetalWear(float3 baseColor, float metallic, float roughness, float3
 
         // 錆：大きなまだらの染みに、床に近いほど濃くなる分（水と湿気が溜まる）を足している。
         // 錆は鉄の上にできた酸化物なので、金属ではなく、ざらざらで光らない
-        const float floorDamp = saturate(1.0f - (worldPosition.y + 100.0f) / 45.0f);
+        const float floorDamp = saturate(1.0f - (worldPosition.y - SCENE_BASE_FLOOR_Y) / 45.0f);
         const float rustPatches = FastFractalNoise3(uv * 0.11f + 17.3f) + floorDamp * 0.15f;
         const float rustMask = smoothstep(0.57f, 0.76f, rustPatches);
         const float rustGrain = FastValueNoise(uv * 1.7f + 5.3f);

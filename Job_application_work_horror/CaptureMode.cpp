@@ -5,6 +5,8 @@
 // ============================================================================
 
 #include "CaptureMode.h"
+#include "GIUpdateSettings.h"
+#include "PostProcess.h"
 
 #include "Application.h"
 #include "Camera.h"
@@ -863,7 +865,7 @@ namespace
         const BenchmarkSpot& spot = GetBenchmarkSpots()[g_BenchmarkSpot];
         player->SetPosition(spot.Position);
         player->SetFlashlightOn(lightOn);
-        player->AddBattery(100.0f);    // 電池切れの点滅で結果が揺れないよう、電池を満タンに保っている
+        player->RefillBattery();    // 電池切れの点滅で結果が揺れないよう、電池を満タンに保っている
         camera->SetMouseLookEnabled(false);
         camera->SetCameraDirection(spot.Yaw);
         camera->SetCameraPitch(spot.Pitch);
@@ -896,14 +898,13 @@ namespace Tools::CaptureMode
     int GetEffectLevelOverride() { return g_EffectOverride; }
     int g_ReflectionOverride = -1;
     int GetReflectionMethodOverride() { return g_ReflectionOverride; }
-    // トーンマッピングの曲線の番号（Effect::ToneMapMode。0 = ACES、1 = HDRにする前に近い曲線）
-    constexpr int ToneMapAcesNumber = 0;
-    constexpr int ToneMapLegacyNumber = 1;
-    int g_ToneMapOverride = -1;
-    int GetToneMapOverride() { return g_ToneMapOverride; }
+    std::optional<Effect::ToneMapMode> g_ToneMapOverride;
+    std::optional<Effect::ToneMapMode> GetToneMapOverride() { return g_ToneMapOverride; }
     // DDGI の間接光を使うか（--ddgi off で止める）
     bool g_UsesGlobalIllumination = true;
     bool UsesGlobalIllumination() { return g_UsesGlobalIllumination; }
+    int g_GIUpdateFramesOverride = 0;
+    int GetGIUpdateFramesOverride() { return g_GIUpdateFramesOverride; }
 
     void ConfigureFromCommandLine()
     {
@@ -945,11 +946,22 @@ namespace Tools::CaptureMode
                 if (option == L"--reflection" && value.size() == 1 && value[0] >= L'0' && value[0] <= L'3')
                     g_ReflectionOverride = static_cast<int>(value[0] - L'0');
                 if (option == L"--tonemap" && value == L"aces")
-                    g_ToneMapOverride = ToneMapAcesNumber;
+                    g_ToneMapOverride = Effect::ToneMapMode::Aces;
                 if (option == L"--tonemap" && value == L"legacy")
-                    g_ToneMapOverride = ToneMapLegacyNumber;
+                    g_ToneMapOverride = Effect::ToneMapMode::Legacy;
+                if (option == L"--tonemap" && value == L"reinhard")
+                    g_ToneMapOverride = Effect::ToneMapMode::Reinhard;
                 if (option == L"--ddgi" && value == L"off")
                     g_UsesGlobalIllumination = false;
+                if (option == L"--gi-update-frames" && value.size() == 1)
+                {
+                    const int frames = static_cast<int>(value[0] - L'0');
+                    if (frames >= Effect::GIUpdateSettings::MinFrames &&
+                        frames <= Effect::GIUpdateSettings::MaxFrames)
+                    {
+                        g_GIUpdateFramesOverride = frames;
+                    }
+                }
             }
             for (int i = 1; i < argumentCount; ++i)
             {
@@ -1279,7 +1291,7 @@ namespace Tools::CaptureMode
             player->SetPosition(pose.Position);
         }
         // 道順の途中で電池が切れて懐中電灯が消えないよう、電池を満タンに保っている（計測モードと同じ）
-        player->AddBattery(100.0f);
+        player->RefillBattery();
         // 2面の最後の場面だけ、電池を25%にして、弱った懐中電灯の光（暗く黄色い光と、輪のむら）を写している
         if (scene == SceneName::Stage2 && g_TourTime >= LowBatteryTime && g_TourTime < LowBatteryEndTime)
         {

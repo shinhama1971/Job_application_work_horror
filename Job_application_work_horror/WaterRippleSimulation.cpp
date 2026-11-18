@@ -51,7 +51,7 @@ void WaterRippleSimulation::Init(int resolution, float worldSize)
     m_WorldSize = worldSize;
     for (Graphics::RenderTexture& state : m_States)
     {
-        state.Init(m_Resolution, m_Resolution, DXGI_FORMAT_R32G32_FLOAT, true);
+        state.InitRequired(m_Resolution, m_Resolution, "水たまりの波", DXGI_FORMAT_R32G32_FLOAT, true);
         state.Clear(0.0f, 0.0f, 0.0f, 0.0f);
     }
     m_CurrentState = 0;

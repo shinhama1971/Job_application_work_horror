@@ -750,7 +750,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 部屋全体を一様に白くせず、床の近くに霧を集めている。
     // 2面の周回が進むほど、霧が近くから濃くなる（LoopDepth。horrorGrade.hlsli）
     const float distanceFog = GetHorrorDistanceFog(distanceFromCamera, LoopDepth);
-    const float heightFromFloor = max(input.worldPos.y + 100.0f, 0.0f);
+    const float heightFromFloor = max(input.worldPos.y - SCENE_BASE_FLOOR_Y, 0.0f);
     const float heightDensity = exp(-heightFromFloor * 0.055f);
     const float nearSuppression =
         smoothstep(35.0f, 150.0f, distanceFromCamera);

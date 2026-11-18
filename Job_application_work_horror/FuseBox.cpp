@@ -53,7 +53,7 @@ void FuseBox::Init()
 
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
-    m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+    m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
     m_Material = std::make_unique<Material>();
     MATERIAL material{};
@@ -64,7 +64,7 @@ void FuseBox::Init()
     // PBR：塗装が擦れて地の鋼が少し出た配電盤（塗装の光沢に、わずかに金属の映り込みを混ぜている）
     material.Metallic = 0.30f;
     material.Roughness = 0.48f;
-    m_Material->Create(material);
+    m_Material->CreateRequired(material);
 
     m_Scale = Vector3(12.0f, 18.0f, 4.0f);
 }

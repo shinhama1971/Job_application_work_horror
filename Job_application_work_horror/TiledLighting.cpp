@@ -24,6 +24,8 @@ namespace
     constexpr UINT PointLightSlot = 10;
     constexpr UINT TileIndexSlot = 11;
     constexpr UINT TileCountSlot = 12;
+    static_assert(TileIndexSlot == PointLightSlot + 1);
+    static_assert(TileCountSlot == TileIndexSlot + 1);
     constexpr UINT ShadingParamsSlot = 6;
     // ライトごとの壁の印（common.hlsl の g_PointLightWallMasks）
     constexpr UINT WallMaskSlot = 19;

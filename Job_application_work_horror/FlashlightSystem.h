@@ -176,5 +176,7 @@ public:
     // 点いているか、電池の残り、通知の残り秒数を返している
     bool IsOn() const { return m_IsOn; }
     float GetBattery() const { return m_Battery; }
+    bool IsBatteryFull() const { return m_Battery >= MaxBattery; }
+    void RefillBattery() { AddBattery(MaxBattery); }
     float GetBatteryNoticeTimer() const { return m_BatteryNoticeTimer; }
 };

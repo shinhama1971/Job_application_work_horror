@@ -44,9 +44,8 @@ public:
         bool flashlightOn,
         bool powerRestored);
 
-    // 読んだ文字の数、ループ廊下の文字が書き換わったかを返している
+    // 読んだ文字の数を返す。
     int GetReadCount() const;
-    bool HasTurnChanged() const { return m_TurnChanged; }
 
 private:
     // ライトを当てて、この秒数だけ読み続けると読んだことにしている（一瞬なでただけでは読んだことにしない）。

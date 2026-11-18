@@ -11,6 +11,7 @@
 #include	"Renderer.h"
 #include	"Shader.h"
 #include	"Texture.h"
+#include "utility.h"
 
 class Shader;
 class Texture;
@@ -43,18 +44,10 @@ public:
 		m_pShader(nullptr),
 		m_pTexture(nullptr)
 	{
-		Create(mtrl);
+		CreateRequired(mtrl);
 	}
-	// 定数バッファはComPtrなので、ここで解放する必要はない
-	~Material() {
-		Uninit();
-	}
-
 	// 定数バッファを作り、値を入れてGPUへ送っている
-	bool Create(MATERIAL mtrl) {
-
-		ID3D11Device* dev;
-		dev = Renderer::GetDevice();
+	[[nodiscard]] bool Create(MATERIAL mtrl) {
 
 		// 定数バッファを作っている
 		bool sts = Renderer::CreateConstantBuffer(
@@ -65,42 +58,23 @@ public:
 			return false;
 		}
 
-		m_Material.Ambient = mtrl.Ambient;
-		m_Material.Diffuse = mtrl.Diffuse;
-		m_Material.Specular = mtrl.Specular;
-		m_Material.Emission = mtrl.Emission;
-		m_Material.Shininess = mtrl.Shininess;
-		m_Material.TextureEnable = mtrl.TextureEnable;
-		m_Material.Metallic = mtrl.Metallic;
-		m_Material.Roughness = mtrl.Roughness;
+		m_Material = mtrl;
 
 		Update();
 
 		return true;
 	}
 
-	// 今の値を定数バッファへ送り、b4に設定している
+	void CreateRequired(MATERIAL mtrl) {
+		if (!Create(mtrl))
+		{
+			utility::ReportFatalError("マテリアルの定数バッファを作成できません。");
+		}
+	}
+
+	// 保持する値は Update、一時的な値は SetMaterial から送る。
 	void Update() {
-		ConstantBufferMaterial		cb{};
-
-		cb.Material = m_Material;
-
-		ID3D11DeviceContext* devcontext;
-		devcontext = Renderer::GetDeviceContext();
-
-		devcontext->UpdateSubresource(
-			m_pConstantBufferMaterial.Get(),
-			0,
-			nullptr,
-			&cb,
-			0, 0);
-
-		// 定数バッファをb4レジスタへ設定している（頂点シェーダー用）
-		devcontext->VSSetConstantBuffers(4, 1, m_pConstantBufferMaterial.GetAddressOf());
-
-		// 定数バッファをb4レジスタへ設定している（ピクセルシェーダー用）
-		devcontext->PSSetConstantBuffers(4, 1, m_pConstantBufferMaterial.GetAddressOf());
-
+		SetMaterial(m_Material);
 	}
 
 	// 描く直前に呼び、シェーダー・テクスチャ（あれば）・定数バッファを設定している
@@ -119,10 +93,9 @@ public:
 		ID3D11DeviceContext* devcontext;
 		devcontext = Renderer::GetDeviceContext();
 
-		// 定数バッファをb4レジスタへ設定している（頂点シェーダー用）
+		// 頂点と画素の両方が同じマテリアルの b4 を読む。
 		devcontext->VSSetConstantBuffers(4, 1, m_pConstantBufferMaterial.GetAddressOf());
 
-		// 定数バッファをb4レジスタへ設定している（ピクセルシェーダー用）
 		devcontext->PSSetConstantBuffers(4, 1, m_pConstantBufferMaterial.GetAddressOf());
 	}
 
@@ -142,39 +115,14 @@ public:
 			&cb,
 			0, 0);
 
-		// 定数バッファをb4レジスタへ設定している（頂点シェーダー用）
+		// 頂点と画素の両方が同じマテリアルの b4 を読む。
 		devcontext->VSSetConstantBuffers(4, 1, m_pConstantBufferMaterial.GetAddressOf());
 
-		// 定数バッファをb4レジスタへ設定している（ピクセルシェーダー用）
 		devcontext->PSSetConstantBuffers(4, 1, m_pConstantBufferMaterial.GetAddressOf());
 
 	}
 
-	// 解放するものはない
-	void Uninit() {
-	}
-
 	// 各値を書き換えている（GPUへ送るのは次のUpdateを呼んだとき）
-	void SetDiffuse(DirectX::XMFLOAT4 diffuse) {
-		m_Material.Diffuse = diffuse;
-	}
-
-	void SetAmbient(DirectX::XMFLOAT4 ambient) {
-		m_Material.Ambient = ambient;
-	}
-
-	void SetSpecular(DirectX::XMFLOAT4 specular) {
-		m_Material.Specular = specular;
-	}
-
-	void SetEmission(DirectX::XMFLOAT4 emission) {
-		m_Material.Emission = emission;
-	}
-
-	void SetShininess(float shininess) {
-		m_Material.Shininess = shininess;
-	}
-
 	// PBRの金属らしさ（0〜1）と粗さ（0は指定なし）
 	void SetSurfaceFinish(float metallic, float roughness) {
 		m_Material.Metallic = metallic;
@@ -190,8 +138,4 @@ public:
 		m_pTexture = texture;
 	}
 
-	// テクスチャを使う設定か
-	bool isTextureEnable() {
-		return m_Material.TextureEnable == TRUE;
-	}
 };

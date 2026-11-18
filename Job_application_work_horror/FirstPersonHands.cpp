@@ -101,10 +101,10 @@ void FirstPersonHands::Spring::Update(float target, float stiffness, float dampi
 void FirstPersonHands::Init()
 {
     m_ModelData = ModelCache::Load("assets/model/flashlight_hand/flashlight_hand.fbx", "assets/model/flashlight_hand");
-    m_FlashlightShader.Create("shader/viewModelVS.hlsl", "shader/viewModelPS.hlsl");
-    m_SkinShader.Create("shader/viewModelVS.hlsl", "shader/viewModelSkinPS.hlsl");
-    m_ClothShader.Create("shader/viewModelVS.hlsl", "shader/viewModelClothPS.hlsl");
-    Renderer::CreateConstantBuffer(sizeof(VIEW_MODEL_BUFFER), m_ViewModelBuffer.ReleaseAndGetAddressOf());
+    m_FlashlightShader.CreateRequired("shader/viewModelVS.hlsl", "shader/viewModelPS.hlsl");
+    m_SkinShader.CreateRequired("shader/viewModelVS.hlsl", "shader/viewModelSkinPS.hlsl");
+    m_ClothShader.CreateRequired("shader/viewModelVS.hlsl", "shader/viewModelClothPS.hlsl");
+    Renderer::CreateRequiredConstantBuffer(sizeof(VIEW_MODEL_BUFFER), m_ViewModelBuffer.ReleaseAndGetAddressOf(), "一人称の手と懐中電灯");
 
     // サブセットからマテリアルの番号と名前の対応を作っている（FBXのマテリアルの名前は build_flashlight_hand.py で付けている）
     std::vector<std::string> names(m_ModelData->Materials.size());
@@ -165,7 +165,7 @@ void FirstPersonHands::Init()
             material.Roughness = 0.42f;
         }
         auto created = std::make_unique<Material>();
-        created->Create(material);
+        created->CreateRequired(material);
         created->SetShader(shader);
         m_Materials.emplace_back(std::move(created));
     }

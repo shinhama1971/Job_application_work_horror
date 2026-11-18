@@ -13,9 +13,9 @@
 
 // ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
 #include "fastNoise.hlsli"
+#include "lightShaftSegment.hlsli"
 
 // 床の高さ、霧が薄くなる高さ（この高さ上がるごとに約1/3）、濃さ
-#define MIST_FLOOR_Y (-100.0f)
 #define MIST_HEIGHT_SCALE 13.0f
 #define MIST_DENSITY 0.016f
 // 部屋全体に漂う薄い霧の濃さ（サイレントヒルのように、懐中電灯を向けた先が白くかすみ、遠くまで見通せない）
@@ -40,8 +40,8 @@ float3 ApplyHorrorMist(float3 color, float3 worldPosition, float3 viewPosition, 
     }
 
     // 視線に沿って、高さで薄くなる霧の量を積分している（exp の高さの式は、視線の高さの変化で割れば解ける）
-    const float heightEye = (eye.y - MIST_FLOOR_Y) / MIST_HEIGHT_SCALE;
-    const float heightPixel = (worldPosition.y - MIST_FLOOR_Y) / MIST_HEIGHT_SCALE;
+    const float heightEye = (eye.y - SCENE_BASE_FLOOR_Y) / MIST_HEIGHT_SCALE;
+    const float heightPixel = (worldPosition.y - SCENE_BASE_FLOOR_Y) / MIST_HEIGHT_SCALE;
     const float heightChange = heightEye - heightPixel;
     const float layer = abs(heightChange) > 0.001f
         ? (exp(-heightPixel) - exp(-heightEye)) / heightChange
@@ -83,10 +83,6 @@ float3 ApplyHorrorMist(float3 color, float3 worldPosition, float3 viewPosition, 
 // 点光源の一覧は、その画素のタイルの一覧を使っている（タイルの一覧は、画面の奥の面より手前の光源をすべて含む）。
 // 光の筋の調べる点の数と、霧が光を散らす濃さ
 #define LIGHT_SHAFT_SAMPLES 5
-#define LIGHT_SHAFT_DENSITY 0.0018f
-// 光の筋を出す光源の高さの下限。天井の近くの照明（天井の器具・吊るした電球）だけにし、壁の表示や肖像画の光のように
-// 面に付いた光源は除いている（光源が面の上にあると、その面に向かう視線の終わりで光の筋が強く出すぎるため）
-#define LIGHT_SHAFT_MIN_HEIGHT (-58.0f)
 
 Texture2D<float4> g_HalfLightShafts : register(t16);
 float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCount, float2 pixelPosition)
@@ -131,31 +127,9 @@ float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCoun
         {
             continue;
         }
-        // 視線が光の届く球を通る区間（球と直線の交わり）を、カメラから画素までの間に切り詰めている
-        const float closest = dot(center - eye, rayDirection);
-        const float3 offsetFromRay = center - (eye + rayDirection * closest);
-        const float missSquared = dot(offsetFromRay, offsetFromRay);
-        [branch]
-        if (missSquared >= range * range)
-        {
-            continue;
-        }
-        const float halfChord = sqrt(range * range - missSquared);
-        float segmentStart = max(closest - halfChord, 0.0f);
-        float segmentEnd = min(closest + halfChord, rayLength);
-        // 光の円錐は照明より下にしかないので、視線が照明の高さより上を通る部分は調べない
-        if (abs(rayDirection.y) > 0.0001f)
-        {
-            const float crossing = (center.y - eye.y) / rayDirection.y;
-            if (eye.y < center.y)
-            {
-                segmentEnd = rayDirection.y > 0.0f ? min(segmentEnd, crossing) : segmentEnd;
-            }
-            else
-            {
-                segmentStart = rayDirection.y < 0.0f ? max(segmentStart, crossing) : segmentEnd;
-            }
-        }
+        const float2 segment = GetLightShaftSegment(eye, rayDirection, rayLength, center, range);
+        const float segmentStart = segment.x;
+        const float segmentEnd = segment.y;
         [branch]
         if (segmentEnd <= segmentStart)
         {
@@ -177,8 +151,7 @@ float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCoun
             float attenuation = saturate(1.0f - lightDistance / range);
             attenuation *= attenuation;
             // 天井の器具から下へ広がる円錐の中だけを光らせている（真下ほど濃く、約60度より横では消える）
-            const float downward = saturate(toLight.y / max(lightDistance, 0.001f));
-            const float cone = smoothstep(0.55f, 0.92f, downward);
+            const float cone = GetLightShaftConeWeight(toLight, lightDistance);
             // 光源のすぐそばは、照明そのものの明るさに任せて薄くしている
             const float awayFromFixture = smoothstep(2.0f, 9.0f, lightDistance);
             lightScatter += attenuation * cone * awayFromFixture;

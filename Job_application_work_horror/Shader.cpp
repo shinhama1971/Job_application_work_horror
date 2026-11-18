@@ -7,6 +7,7 @@
 #include	"Renderer.h"
 
 #include <unordered_map>
+#include "utility.h"
 
 namespace
 {
@@ -24,7 +25,7 @@ namespace
 //=======================================
 // シェーダーを作っている
 //=======================================
-void Shader::Create(std::string vs, std::string ps, bool procedural)
+bool Shader::Create(std::string vs, std::string ps, bool procedural)
 {
 	// 頂点シェーダーとピクセルシェーダーのファイル名を改行でつないだものをキーにしている
 	const std::string cacheKey = vs + '\n' + ps + (procedural ? "\nprocedural" : "\nmesh");
@@ -34,7 +35,7 @@ void Shader::Create(std::string vs, std::string ps, bool procedural)
 		m_pVertexShader = cachedShader->second.VertexShader;
 		m_pPixelShader = cachedShader->second.PixelShader;
 		m_pVertexLayout = cachedShader->second.VertexLayout;
-		return;
+		return true;
 	}
 
 	// 頂点データの並び方（VERTEX_3Dと同じ：位置・法線・色・テクスチャ座標）
@@ -58,18 +59,19 @@ void Shader::Create(std::string vs, std::string ps, bool procedural)
 		);
 	if (FAILED(hr)) {
 		MessageBox(nullptr, "CreateVertexShader error", "error", MB_OK);
-		return;
+		return false;
 	}
 
-	// ピクセルシェーダーを作っている
-
-	hr = Renderer::CreatePixelShader(			// ピクセルシェーダーを作っている
-		m_pPixelShader.ReleaseAndGetAddressOf(),
-		ps.c_str()
-		);
-	if (FAILED(hr)) {
-		MessageBox(nullptr, "CreatePixelShader error", "error", MB_OK);
-		return;
+	// 深度のみのパスではピクセルシェーダーを作らない。
+	m_pPixelShader.Reset();
+	if (!ps.empty())
+	{
+		hr = Renderer::CreatePixelShader(m_pPixelShader.GetAddressOf(), ps.c_str());
+		if (FAILED(hr))
+		{
+			MessageBox(nullptr, "CreatePixelShader error", "error", MB_OK);
+			return false;
+		}
 	}
 
 	// 作ったシェーダーを覚えておいている
@@ -80,12 +82,20 @@ void Shader::Create(std::string vs, std::string ps, bool procedural)
 			m_pPixelShader,
 			m_pVertexLayout });
 
-	return;
+	return true;
 }
 
 //=======================================
 // シェーダーをGPUへ設定している
 //=======================================
+void Shader::CreateRequired(const char* vs, const char* ps, bool procedural)
+{
+	if (!Create(vs, ps, procedural))
+	{
+		utility::ReportFatalError(std::string("描画シェーダーを作成できません: ") + vs + " / " + ps);
+	}
+}
+
 void Shader::SetGPU()
 {
 	ID3D11DeviceContext* devicecontext = Renderer::GetDeviceContext();

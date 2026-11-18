@@ -41,8 +41,6 @@ public:
     // プレイヤーが操作できない間も呼ぶ必要がある（入力画面を閉じるため）。
     void Update(Player& player, float deltaTime);
 
-    // 入力画面を開いているか、解けたか
-    bool IsInputOpen() const { return m_InputOpen; }
     bool IsSolved() const { return m_Lock.IsSolved(); }
 
     // 入力画面を開いていれば、HUDで入力盤を描いている

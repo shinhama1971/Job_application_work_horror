@@ -104,7 +104,11 @@ Copy-Item (Join-Path $projectDir "assets") (Join-Path $packageDir "assets") -Rec
 # シェーダーは .cso だけ（ゲームは .hlsl がなければ .cso を読む。RendererResources.cpp の CompileShader）
 $packageShaderDir = Join-Path $packageDir "shader"
 New-Item -ItemType Directory -Force $packageShaderDir | Out-Null
-Get-ChildItem $shaderDir -Filter *.cso -File | Copy-Item -Destination $packageShaderDir
+# ソースを移動した後に残った古い .cso は配布物へ含めない。
+foreach ($shaderSource in $shaderSources) {
+    $compiledShader = [IO.Path]::ChangeExtension($shaderSource.FullName, ".cso")
+    Copy-Item -LiteralPath $compiledShader -Destination $packageShaderDir
+}
 
 # 変換済みのモデル（あれば）。元のモデルの大きさと更新日時が合わないときは、ゲームが作り直す
 $cacheDir = Join-Path $projectDir "cache"

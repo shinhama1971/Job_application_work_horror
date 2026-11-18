@@ -21,7 +21,7 @@ struct PS_IN
 // FullScreenQuad.cppのToneMapBufferと同じ並び（b0）
 cbuffer ToneMapBuffer : register(b0)
 {
-    uint ToneMapMode;   // 0 = ACES、1 = HDRにする前に近い曲線、2 = 曲線なし（デバッグ表示。Effect::ToneMapMode）
+    uint ToneMapMode;   // 0 = ACES、1 = HDRにする前に近い曲線、2 = 曲線なし（デバッグ表示）、3 = Reinhard（Effect::ToneMapMode）
     uint3 ToneMapPadding;
 };
 
@@ -30,6 +30,7 @@ Texture2D hdrScene : register(t0);
 
 static const uint TONE_MAP_MODE_LEGACY = 1;
 static const uint TONE_MAP_MODE_PASSTHROUGH = 2;
+static const uint TONE_MAP_MODE_REINHARD = 3;
 
 // HDRにする前の曲線：ACES を混ぜていた割合
 static const float LEGACY_ACES_BLEND = 0.28f;
@@ -45,6 +46,13 @@ float4 main(PS_IN input) : SV_TARGET
     if (ToneMapMode == TONE_MAP_MODE_LEGACY)
     {
         return float4(saturate(lerp(color, AcesFilmic(color), LEGACY_ACES_BLEND)), 1.0f);
+    }
+    if (ToneMapMode == TONE_MAP_MODE_REINHARD)
+    {
+        // ACESと入力の倍率をそろえ、RGB比を保ったまま輝度 L を L/(1+L) に圧縮する。
+        const float3 exposed = color * ACES_EXPOSURE;
+        const float luminance = dot(exposed, TONE_MAP_LUMINANCE_WEIGHTS);
+        return float4(saturate(exposed / (1.0f + luminance)), 1.0f);
     }
     return float4(ToneMapAces(color), 1.0f);
 }

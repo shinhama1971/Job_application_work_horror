@@ -14,7 +14,7 @@ using namespace DirectX::SimpleMath;
 namespace Effect
 {
     // 深度テクスチャと、それを読むための仕組みを作っている
-    void ShadowMap::Init()
+    bool ShadowMap::Init()
     {
         ID3D11Device* device = Renderer::GetDevice();
 
@@ -30,29 +30,41 @@ namespace Effect
         textureDesc.BindFlags =
             D3D11_BIND_DEPTH_STENCIL |
             D3D11_BIND_SHADER_RESOURCE;
-        device->CreateTexture2D(
+        if (FAILED(device->CreateTexture2D(
             &textureDesc,
             nullptr,
-            m_Texture.ReleaseAndGetAddressOf());
+            m_Texture.ReleaseAndGetAddressOf())))
+        {
+            MessageBoxW(nullptr, L"シャドウマップの深度テクスチャを作成できません。", L"描画エラー", MB_OK | MB_ICONERROR);
+            return false;
+        }
 
         // 書き込むときは32ビットの深度として扱っている
         D3D11_DEPTH_STENCIL_VIEW_DESC depthViewDesc{};
         depthViewDesc.Format = DXGI_FORMAT_D32_FLOAT;
         depthViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-        device->CreateDepthStencilView(
+        if (FAILED(device->CreateDepthStencilView(
             m_Texture.Get(),
             &depthViewDesc,
-            m_DepthView.ReleaseAndGetAddressOf());
+            m_DepthView.ReleaseAndGetAddressOf())))
+        {
+            MessageBoxW(nullptr, L"シャドウマップの深度ビューを作成できません。", L"描画エラー", MB_OK | MB_ICONERROR);
+            return false;
+        }
 
         // 読むときは32ビットの浮動小数点として扱っている
         D3D11_SHADER_RESOURCE_VIEW_DESC resourceViewDesc{};
         resourceViewDesc.Format = DXGI_FORMAT_R32_FLOAT;
         resourceViewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
         resourceViewDesc.Texture2D.MipLevels = 1;
-        device->CreateShaderResourceView(
+        if (FAILED(device->CreateShaderResourceView(
             m_Texture.Get(),
             &resourceViewDesc,
-            m_ShaderResourceView.ReleaseAndGetAddressOf());
+            m_ShaderResourceView.ReleaseAndGetAddressOf())))
+        {
+            MessageBoxW(nullptr, L"シャドウマップの読み取りビューを作成できません。", L"描画エラー", MB_OK | MB_ICONERROR);
+            return false;
+        }
 
         // 比較サンプラー：テクスチャの深度と比べた結果（影かどうか）を、周りと混ぜて柔らかく返している。範囲の外は「影ではない」にしている
         D3D11_SAMPLER_DESC samplerDesc{};
@@ -66,9 +78,13 @@ namespace Effect
         samplerDesc.BorderColor[2] = 1.0f;
         samplerDesc.BorderColor[3] = 1.0f;
         samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
-        device->CreateSamplerState(
+        if (FAILED(device->CreateSamplerState(
             &samplerDesc,
-            m_ComparisonSampler.ReleaseAndGetAddressOf());
+            m_ComparisonSampler.ReleaseAndGetAddressOf())))
+        {
+            MessageBoxW(nullptr, L"シャドウマップの比較サンプラーを作成できません。", L"描画エラー", MB_OK | MB_ICONERROR);
+            return false;
+        }
 
         // 影を描くときは深度を少しずらし（バイアス）、面が自分自身の影で黒くなる「シャドウアクネ」を防いでいる
         D3D11_RASTERIZER_DESC rasterizerDesc{};
@@ -78,17 +94,23 @@ namespace Effect
         rasterizerDesc.DepthBias = 1100;
         rasterizerDesc.SlopeScaledDepthBias = 1.8f;
         rasterizerDesc.DepthBiasClamp = 0.01f;
-        device->CreateRasterizerState(
+        if (FAILED(device->CreateRasterizerState(
             &rasterizerDesc,
-            m_ShadowRasterizer.ReleaseAndGetAddressOf());
+            m_ShadowRasterizer.ReleaseAndGetAddressOf())))
+        {
+            MessageBoxW(nullptr, L"シャドウマップのラスタライザーを作成できません。", L"描画エラー", MB_OK | MB_ICONERROR);
+            return false;
+        }
 
-        Renderer::CreateConstantBuffer(
+        if (!Renderer::CreateConstantBuffer(
             sizeof(ShadowBuffer),
-            m_ShadowBuffer.ReleaseAndGetAddressOf());
+            m_ShadowBuffer.ReleaseAndGetAddressOf()))
+        {
+            MessageBoxW(nullptr, L"シャドウマップの定数バッファを作成できません。", L"描画エラー", MB_OK | MB_ICONERROR);
+            return false;
+        }
 
-        m_DepthShader.Create(
-            "shader/shadowDepthVS.hlsl",
-            "shader/shadowDepthPS.hlsl");
+        return m_DepthShader.Create("shader/shadowDepthVS.hlsl", {});
     }
 
     // 作った物を解放している
@@ -160,7 +182,7 @@ namespace Effect
             2.0f,
             280.0f);
         buffer.Options = Vector4(
-            static_cast<float>(Tools::TechDemo::GetShadowMode()), 0.0f, 0.0f, 0.0f);
+            static_cast<float>(Tools::TechDemo::DefaultShadowMode), 0.0f, 0.0f, 0.0f);
         UploadBuffer();
     }
 
@@ -229,8 +251,6 @@ namespace Effect
         }
         m_DepthShader.SetGPU();
 
-        // 影の描画は深度だけを書き込んでいる。普通のピクセルシェーダーが残っていると、
-        // 入出力の形や描画先の不足でエラーになるため、ピクセルシェーダーを外している。
-        Renderer::GetDeviceContext()->PSSetShader(nullptr, nullptr, 0);
+
     }
 }

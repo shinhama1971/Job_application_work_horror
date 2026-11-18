@@ -4,6 +4,8 @@
 // ============================================================================
 
 #include "Game.h"
+#include "DDGIVolume.h"
+#include "LightShafts.h"
 #include "Renderer.h"
 #include "Input.h"
 #include "Scene.h"
@@ -83,15 +85,20 @@ namespace Core
         m_Instance->m_ReflectionProbe.Init();
         m_Instance->m_EnvironmentProbe.Init(14, true);
         m_Instance->m_EnvironmentProbe.SetClearColor(DirectX::SimpleMath::Color(0.012f, 0.013f, 0.014f, 1.0f));
-        m_Instance->m_PointShadowMap.Init();
         m_Instance->m_FigureVolumes.Init();
-        m_Instance->m_LightShafts.Init(static_cast<int>(Application::GetWidth()), static_cast<int>(Application::GetHeight()));
+        m_Instance->m_LightShafts = std::make_unique<Effect::LightShafts>();
+        m_Instance->m_LightShafts->Init(static_cast<int>(Application::GetWidth()), static_cast<int>(Application::GetHeight()));
         m_Instance->m_AmbientOcclusion.Init(static_cast<int>(Application::GetWidth()), static_cast<int>(Application::GetHeight()));
-        m_Instance->m_GlobalIllumination.Init(static_cast<int>(Application::GetWidth()), static_cast<int>(Application::GetHeight()));
+        m_Instance->m_GlobalIllumination = std::make_unique<Effect::DDGIVolume>();
+        m_Instance->m_GlobalIllumination->Init(static_cast<int>(Application::GetWidth()), static_cast<int>(Application::GetHeight()));
         m_Instance->m_ScreenSpaceReflection.Init(Application::GetWidth(), Application::GetHeight());
-        m_Instance->m_ShadowMap.Init();
-        m_Instance->m_PostProcess.Init();
         m_Instance->m_TiledLighting.Init();
+        if (!m_Instance->m_ShadowMap.Init() || !m_Instance->m_PointShadowMap.Init() ||
+            !m_Instance->m_PostProcess.Init())
+        {
+            Uninit();
+            return false;
+        }
         if (Tools::CaptureMode::GetEffectLevelOverride() >= 0)
             m_Instance->m_Settings.SetEffectLevel(Tools::CaptureMode::GetEffectLevelOverride());
         m_Instance->ApplyVisualSettings();
@@ -249,7 +256,7 @@ namespace Core
         m_Instance->m_EnvironmentProbe.Uninit();
         m_Instance->m_PointShadowMap.Uninit();
         m_Instance->m_AmbientOcclusion.Uninit();
-        m_Instance->m_GlobalIllumination.Uninit();
+        m_Instance->m_GlobalIllumination->Uninit();
         m_Instance->m_ScreenSpaceReflection.Uninit();
 
         m_Instance->m_Sound.Uninit();
@@ -402,7 +409,7 @@ namespace Core
         m_EnvironmentProbe.Invalidate();
         m_ScreenSpaceReflection.Invalidate();
         // 光の筋の揺らぎの時間も最初に戻している（前のシーン（タイトルの後ろの森など）の長さで、次のシーンの見え方が変わらないように）
-        m_LightShafts.ResetTime();
+        m_LightShafts->ResetTime();
 
         DeleteAllObject();
 
@@ -466,8 +473,12 @@ namespace Core
             {
                 if (forestOnScreen)
                 {
-                    // 雨音は雨の強さに合わせて小さくしている（強さ1で素材の大きさ、0でも35%は残す。強さ0.35で約6割）
-                    m_Sound.Play(SOUND_CUE_RAIN, 1.0f, 0.35f + 0.65f * ForestScene::RainStrength);
+                    // 雨音は雨の強さに合わせて小さくしている（強さ0で素材の18%、1で50%。強さ0.35で約3割）。
+                    // 素材のままだと大きく、足音や物音が埋もれるので、全体を素材の半分以下に抑えている
+                    constexpr float RainVolumeAtNoRain = 0.18f;
+                    constexpr float RainVolumeAtDownpour = 0.50f;
+                    const float rainVolume = RainVolumeAtNoRain + (RainVolumeAtDownpour - RainVolumeAtNoRain) * ForestScene::RainStrength;
+                    m_Sound.Play(SOUND_CUE_RAIN, 1.0f, rainVolume);
                 }
             }
             // 導入の受信記録の間は、無線の雑音を小さく鳴らしている（「通信途絶」で IntroScene が止める）。

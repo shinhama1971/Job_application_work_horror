@@ -109,7 +109,6 @@ float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const
         m_Lamps[0].StartTime = m_Time;
         m_Lamps[1].StartTime = m_Time + SecondLampDelay;
     }
-    m_LampsTurnedOff = 0;
     for (int index = 0; index < 2; ++index)
     {
         DyingLamp& lamp = m_Lamps[index];
@@ -129,10 +128,6 @@ float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const
             {
                 lamp.ClickPlayed = true;
                 game->PlayAudioCueAt(SOUND_CUE_FLASHLIGHT, wall->GetPosition(), 0.55f, 0.9f);
-            }
-            if (elapsed >= LampDyingSeconds)
-            {
-                ++m_LampsTurnedOff;
             }
         }
         else

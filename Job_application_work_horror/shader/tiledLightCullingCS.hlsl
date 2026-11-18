@@ -12,8 +12,9 @@
 // ============================================================================
 
 // タイルの大きさ、1タイルに入れる光源の上限、1タイルのスレッド数（TiledLighting.hと同じ値）
-#define TILE_SIZE 16
-#define MAX_LIGHTS_PER_TILE 64
+#include "tiledLightingConfig.hlsli"
+#define TILE_SIZE SIGNAL_LOST_LIGHT_TILE_SIZE
+#define MAX_LIGHTS_PER_TILE SIGNAL_LOST_MAX_LIGHTS_PER_TILE
 #define THREADS_PER_TILE 64
 
 struct POINT_LIGHT
@@ -108,16 +109,22 @@ void main(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
     // 平面ができるまで、グループの全スレッドを待たせている
     GroupMemoryBarrierWithGroupSync();
 
-    // タイルの256画素（16x16）を64スレッドで4画素ずつ読み、一番奥の深度を求めている
+    // タイル内の画素をスレッドに配り、端数も含めて一番奥の深度を求める。
     if (UseDepthBounds != 0)
     {
         const int2 tileOrigin = int2(ViewportOffset) + int2(groupId.xy * TILE_SIZE);
         const int2 lastPixel = int2(ViewportOffset + ViewportSize) - 1;
+        const uint pixelsPerTile = TILE_SIZE * TILE_SIZE;
+        const uint samplesPerThread = (pixelsPerTile + THREADS_PER_TILE - 1) / THREADS_PER_TILE;
         float threadMaxDepth = 0.0f;
         [unroll]
-        for (uint i = 0; i < (TILE_SIZE * TILE_SIZE) / THREADS_PER_TILE; ++i)
+        for (uint i = 0; i < samplesPerThread; ++i)
         {
             const uint localIndex = threadId.x + i * THREADS_PER_TILE;
+            if ((pixelsPerTile % THREADS_PER_TILE) != 0 && localIndex >= pixelsPerTile)
+            {
+                continue;
+            }
             const int2 pixel = min(
                 tileOrigin + int2(localIndex % TILE_SIZE, localIndex / TILE_SIZE),
                 lastPixel);

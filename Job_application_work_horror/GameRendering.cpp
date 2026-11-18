@@ -4,6 +4,8 @@
 // ============================================================================
 
 #include "Game.h"
+#include "DDGIVolume.h"
+#include "LightShafts.h"
 #include "Application.h"
 #include "Scene.h"
 #include "Renderer.h"
@@ -117,25 +119,27 @@ namespace Core
         m_Instance->m_GpuTimer.BeginFrame(context);
         const int quality = m_Instance->m_Settings.GetEffectLevel();
         ++m_Instance->m_EnvironmentQualityFrame;
-        m_Instance->m_TiledLighting.SetLightShaftsDisabled(quality == 0 || !Tools::TechDemo::UsesLightShafts());
+        m_Instance->m_TiledLighting.SetLightShaftsDisabled(quality == 0 || !Tools::TechDemo::UseLightShafts);
         // PBRを止めたとき、壁と小物のシェーダーは拡散反射だけで描く（技術デモの比較用。印はb8で渡している）
-        m_Instance->m_ShadowMap.SetPbrEnabled(Tools::TechDemo::UsesPbr());
+        m_Instance->m_ShadowMap.SetPbrEnabled(Tools::TechDemo::UsePbr);
         // 画面空間の環境遮蔽は本描画の直前に作るまで使わせない（反射・環境マップ・影など、先に描くほかの視点では使わない）
         m_Instance->m_TiledLighting.SetAmbientOcclusionActive(false);
         m_Instance->m_TiledLighting.SetLightShaftsActive(false);
-        m_Instance->m_LightShafts.Unbind();
+        m_Instance->m_LightShafts->Unbind();
 
         // 水面の光の揺らぎ（壁のピクセルシェーダー）で使う、プレイヤーの視点のビュー行列を渡している。
         // 懐中電灯はこの視点から照らしているため、反射を描くときも同じ行列を使う。
         // 水面の反射の方式（0=なし、1=キューブマップ、2=SSR、3=レイ反射（普段）。撮影・計測では --reflection で指定する）も、ここで床のシェーダーへ渡している。
         // SSRとレイ反射は、深度プリパスの深度と前のフレームの画面を使う（レイ反射は、使えないときは部屋の形との交差だけで映す）。
         // 2面の壁の鏡は、方式に関係なく、いつもレイ反射で映している（mirrorPS）
-        const int reflectionMethod = Tools::TechDemo::GetReflectionMethod();
-        const bool usesScreenSpaceRays = reflectionMethod >= 2 && Tools::TechDemo::UsesDepthPrepass();
+        const auto reflectionMethod = Tools::TechDemo::GetReflectionMethod();
+        const bool usesScreenSpaceRays = Tools::TechDemo::UseDepthPrepass &&
+            (reflectionMethod == Tools::TechDemo::ReflectionMethod::ScreenSpace ||
+                reflectionMethod == Tools::TechDemo::ReflectionMethod::RoomRay);
         DirectX::SimpleMath::Matrix reflectionView, reflectionProjection;
         m_Instance->m_Camera.GetMainMatrices(reflectionView, reflectionProjection);
         Renderer::SetWaterCausticsView(reflectionView);
-        Renderer::SetReflectionMode(reflectionMethod, reflectionProjection);
+        Renderer::SetReflectionMode(static_cast<int>(reflectionMethod), reflectionProjection);
         // 画面の外の小物（棚・ロッカー・柱・2面の廊下の壁）も、水面のレイ反射と壁の鏡に映すため、
         // カメラに近い小物の箱を選んで床と鏡のシェーダーへ渡している
         {
@@ -165,7 +169,8 @@ namespace Core
                     const float dx = (std::max)(std::abs(localOffset.x) - half.x, 0.0f);
                     const float dz = (std::max)(std::abs(localOffset.y) - half.z, 0.0f);
                     const float distanceSquared = dx * dx + dz * dz;
-                    if (distanceSquared > 120.0f * 120.0f)
+                    constexpr float ReflectionPropMaxDistance = 120.0f;
+                    if (distanceSquared > ReflectionPropMaxDistance * ReflectionPropMaxDistance)
                     {
                         continue;
                     }
@@ -278,7 +283,7 @@ namespace Core
                 }
             }
 
-            if (shadowBulb != nullptr && quality >= 2 && Tools::TechDemo::UsesBulbShadow())
+            if (shadowBulb != nullptr && quality >= 2 && Tools::TechDemo::UseBulbShadow)
             {
                 m_Instance->m_GpuTimer.BeginPass(GpuPass::BulbShadow, context);
                 const DirectX::SimpleMath::Vector3 lightPosition = shadowBulb->GetBulbPosition();
@@ -328,11 +333,11 @@ namespace Core
             m_Instance->m_CurrentScene == SceneName::Forest ||
             m_Instance->m_CurrentScene == SceneName::Title ||
             m_Instance->m_CurrentScene == SceneName::Intro;
-        if (reflectionMethod != 1)
+        if (reflectionMethod != Tools::TechDemo::ReflectionMethod::CubeMap)
         {
             m_Instance->m_ReflectionProbe.Invalidate();
         }
-        if (hasWetFloor && reflectionMethod == 1)
+        if (hasWetFloor && reflectionMethod == Tools::TechDemo::ReflectionMethod::CubeMap)
         {
             m_Instance->m_GpuTimer.BeginPass(GpuPass::Reflection, context);
             const int faceCount = m_Instance->m_ReflectionProbe.HasAllFaces() ? 1 : 6;
@@ -365,7 +370,7 @@ namespace Core
         const bool updateEnvironment = quality >= 2 || !m_Instance->m_EnvironmentProbe.HasAllFaces() ||
             (m_Instance->m_EnvironmentQualityFrame % 4u) == 0u;
         // PBRを止めているとき（技術デモ）は映り込みを使わないので、環境マップも撮らない
-        const bool usesEnvironment = hasWetFloor && quality >= 1 && Tools::TechDemo::UsesPbr();
+        const bool usesEnvironment = hasWetFloor && quality >= 1 && Tools::TechDemo::UsePbr;
         if (usesEnvironment && updateEnvironment)
         {
             m_Instance->m_GpuTimer.BeginPass(GpuPass::EnvironmentProbe, context);
@@ -442,7 +447,7 @@ namespace Core
         // 本描画と同じカリングの判定を使い、本描画で描かない物の深度は書かないようにしている。
         // 技術デモでは、深度プリパスとタイルベースライティングを、使わない方式と見比べられるようにしている。
         Renderer::SetDepthEnable(true);
-        const bool useDepthPrepass = Tools::TechDemo::UsesDepthPrepass();
+        const bool useDepthPrepass = Tools::TechDemo::UseDepthPrepass;
         if (useDepthPrepass)
         {
             for (auto& o : m_Instance->m_ObjectManager.GetAllObjects())
@@ -457,7 +462,7 @@ namespace Core
         }
         // 画面空間の環境遮蔽（SSAO）：深度プリパスの深度から、物と物の隙間や壁の根元など光が届きにくい所を求めている（1面・2面）。
         // 結果は t15 に設定し、下のライトリストの準備で、本描画のときだけ使う印をシェーダーへ送っている。
-        if (useDepthPrepass && hasWetFloor && quality >= 1 && Tools::TechDemo::UsesAmbientOcclusion())
+        if (useDepthPrepass && hasWetFloor && quality >= 1 && Tools::TechDemo::UseAmbientOcclusion)
         {
             m_Instance->m_GpuTimer.BeginPass(GpuPass::AmbientOcclusion, context);
             DirectX::SimpleMath::Matrix occlusionView;
@@ -479,7 +484,7 @@ namespace Core
         // DDGI の間接光：部屋に並べたプローブから光線を飛ばして跳ね返った光を更新し、画面の各画素の間接光を t18 に設定している。
         // 壁と床のシェーダーは、SSAO と同じく本描画のときだけ読む（環境遮蔽を求めたフレームだけ使う）
         const bool useGlobalIllumination = useDepthPrepass && hasWetFloor && quality >= 1 &&
-            Tools::TechDemo::UsesAmbientOcclusion() &&
+            Tools::TechDemo::UseAmbientOcclusion &&
             Debug::UI::IsGlobalIlluminationEnabled() && Tools::CaptureMode::UsesGlobalIllumination();
         if (useGlobalIllumination)
         {
@@ -490,33 +495,35 @@ namespace Core
             UINT viewportCount = 1;
             D3D11_VIEWPORT viewport{};
             context->RSGetViewports(&viewportCount, &viewport);
-            if (m_Instance->m_GlobalIllumination.Update(
+            const int giUpdateOverride = Tools::CaptureMode::GetGIUpdateFramesOverride();
+            const int giUpdateFrames = giUpdateOverride > 0 ? giUpdateOverride : Debug::UI::GetGIUpdateFrames();
+            if (m_Instance->m_GlobalIllumination->Update(
                     m_Instance->m_TiledLighting.GetLightSRV(), m_Instance->m_TiledLighting.GetLightCount(),
-                    Renderer::GetLight(), m_Instance->m_Camera.GetPosition(), giView))
+                    Renderer::GetLight(), m_Instance->m_Camera.GetPosition(), giView, static_cast<uint32_t>(giUpdateFrames)))
             {
-                m_Instance->m_GlobalIllumination.Apply(giView, giProjection, viewport);
+                m_Instance->m_GlobalIllumination->Apply(giView, giProjection, viewport);
             }
             m_Instance->m_GpuTimer.EndPass(GpuPass::GlobalIllumination, context);
         }
         else
         {
-            m_Instance->m_GlobalIllumination.Unbind();
+            m_Instance->m_GlobalIllumination->Unbind();
             m_Instance->m_GpuTimer.SkipPass(GpuPass::GlobalIllumination);
         }
         bool halfShafts = false;
-        if (useDepthPrepass && hasWetFloor && quality >= 1 && Tools::TechDemo::UsesLightShafts())
+        if (useDepthPrepass && hasWetFloor && quality >= 1 && Tools::TechDemo::UseLightShafts)
         {
             DirectX::SimpleMath::Matrix view, projection;
             m_Instance->m_Camera.GetMainMatrices(view, projection);
             UINT count = 1; D3D11_VIEWPORT viewport{};
             context->RSGetViewports(&count, &viewport);
-            halfShafts = m_Instance->m_LightShafts.Compute(view, projection, viewport,
+            halfShafts = m_Instance->m_LightShafts->Compute(view, projection, viewport,
                 m_Instance->m_TiledLighting.GetLights(), Application::GetDeltaTime());
         }
         m_Instance->m_TiledLighting.SetLightShaftsActive(halfShafts);
         // プレイヤー視点のタイルごとのライトリストを、Compute Shaderで作ってから描いている。
         // 使わない方式では、全部の光源を画素ごとに順に計算させている。
-        if (Tools::TechDemo::UsesTiledLighting())
+        if constexpr (Tools::TechDemo::UseTiledLighting)
         {
             m_Instance->m_TiledLighting.BuildTiles(m_Instance->m_Camera, useDepthPrepass);
         }

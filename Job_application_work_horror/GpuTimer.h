@@ -100,9 +100,4 @@ public:
     void SkipPass(GpuPass pass);
     // 最後に測れたその段階の結果を返している
     GpuTiming GetTiming(GpuPass pass) const;
-    // 同時に使うフレームの数を返している
-    static constexpr std::size_t GetQueryFrameCount()
-    {
-        return QueryFrameCount;
-    }
 };

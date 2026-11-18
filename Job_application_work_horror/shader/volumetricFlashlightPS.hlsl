@@ -11,21 +11,7 @@ struct PS_IN
 };
 
 // 画面効果の値（FullScreenQuad.cppのTimeBufferと同じ並びの前半）
-cbuffer PostProcessBuffer : register(b0)
-{
-    float time;
-    float bloomIntensity;
-    float noiseAmount;
-    float vignetteStrength;
-    float screenAspect;
-    float volumeIntensity;
-    float lensDistortionStrength;
-    float horrorPulseStrength;
-    float exposure;
-    float lensMoisture;
-    float corridorTension;
-    float exposurePadding;
-};
+#include "postProcessBuffer.hlsli"
 
 // 懐中電灯（common.hlslのLIGHTと同じ並び。b3）
 struct LIGHT

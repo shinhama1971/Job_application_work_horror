@@ -39,7 +39,7 @@ void Item::Init()
 
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
-    m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+    m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
     m_Material = std::make_unique<Material>();
     MATERIAL material{};
@@ -51,7 +51,7 @@ void Item::Init()
     // PBR：ヒューズの金属の口金とガラス（半分ほど金属。懐中電灯で照らすと芯が光る）
     material.Metallic = 0.50f;
     material.Roughness = 0.30f;
-    m_Material->Create(material);
+    m_Material->CreateRequired(material);
 
     m_Scale = Vector3(5.0f, 5.0f, 5.0f);
     m_BaseY = m_Position.y;

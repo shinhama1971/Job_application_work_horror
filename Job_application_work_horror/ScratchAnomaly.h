@@ -84,6 +84,5 @@ public:
     }
 
     // この周回で演出が起きたか、通知の残り秒数を返している
-    bool WasScareTriggered() const noexcept { return m_ScareTriggered; }
     float GetNoticeTimer() const noexcept { return m_NoticeTimer; }
 };

@@ -465,7 +465,9 @@ void StageScene::Update()
         Input::GetButtonTrigger(XINPUT_LEFT_SHOULDER))
     {
         m_ProgressHintTimer = (std::max)(m_ProgressHintTimer, RequestedHintSeconds);
-        Input::SetVibration(2, 0.04f);
+        constexpr int HintVibrationStrength = 2;
+        constexpr float HintVibrationSeconds = 0.04f;
+        Input::SetVibration(HintVibrationStrength, HintVibrationSeconds);
     }
 
     // 光の安全地帯：暖かい灯りの下で、ライトを消して休んでいる間は電池が少しずつ戻る。
@@ -505,12 +507,19 @@ void StageScene::Update()
         m_LastFuseCount = currentFuseCount;
         m_ProgressHintTimer = 0.0f;
         m_FuseNoticeTimer = FuseNoticeSeconds;
+        constexpr float FusePickupBloomBase = 0.48f;
+        constexpr float FusePickupBloomPerFuse = 0.12f;
+        constexpr float FusePickupBloomSeconds = 0.28f;
+        constexpr int FusePickupVibrationBase = 4;
+        constexpr int FusePickupVibrationPerFuse = 2;
+        constexpr float FusePickupVibrationSeconds = 0.10f;
+        constexpr float FusePickupVibrationSecondsPerFuse = 0.025f;
+        const float fuseCount = static_cast<float>(currentFuseCount);
         game->GetPostProcess()->TriggerBloomPulse(
-            0.48f + static_cast<float>(currentFuseCount) * 0.12f,
-            0.28f);
+            FusePickupBloomBase + fuseCount * FusePickupBloomPerFuse, FusePickupBloomSeconds);
         Input::SetVibration(
-            4 + currentFuseCount * 2,
-            0.10f + static_cast<float>(currentFuseCount) * 0.025f);
+            FusePickupVibrationBase + currentFuseCount * FusePickupVibrationPerFuse,
+            FusePickupVibrationSeconds + fuseCount * FusePickupVibrationSecondsPerFuse);
         StartFuseWatcher(currentFuseCount);
     }
 
@@ -532,16 +541,25 @@ void StageScene::Update()
         m_ChargerNoticeTimer = ChargerNoticeSeconds;
         player->AddBattery(ChargerBattery);
         game->RegisterChargerUsed();
-        StartFuseWatcher(2);
+        // 充電器の物音には、ヒューズ2本目と同じ強さの影を使う。
+        constexpr int ChargerWatcherFuseCount = 2;
+        constexpr int ChargerCeilingLightIndex = 2;
+        StartFuseWatcher(ChargerWatcherFuseCount);
 
         CeilingLight* chargerLight =
-            m_Objects.CeilingLightAt(2);
+            m_Objects.CeilingLightAt(ChargerCeilingLightIndex);
         if (chargerLight != nullptr)
         {
-            chargerLight->TriggerEventFlicker(0.92f, 0.84f);
+            constexpr float ChargerFlickerSeconds = 0.92f;
+            constexpr float ChargerFlickerStrength = 0.84f;
+            chargerLight->TriggerEventFlicker(ChargerFlickerSeconds, ChargerFlickerStrength);
         }
-        game->GetPostProcess()->TriggerBloomPulse(0.66f, 0.24f);
-        Input::SetVibration(6, 0.14f);
+        constexpr float ChargerBloomPeak = 0.66f;
+        constexpr float ChargerBloomSeconds = 0.24f;
+        constexpr int ChargerVibrationStrength = 6;
+        constexpr float ChargerVibrationSeconds = 0.14f;
+        game->GetPostProcess()->TriggerBloomPulse(ChargerBloomPeak, ChargerBloomSeconds);
+        Input::SetVibration(ChargerVibrationStrength, ChargerVibrationSeconds);
     }
 
     // 各演出と仕組みを順に更新している

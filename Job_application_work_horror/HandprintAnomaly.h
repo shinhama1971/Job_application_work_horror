@@ -111,8 +111,7 @@ public:
         return Event::Found;
     }
 
-    // 現れている手形の数、手形の見え方（0〜1）、最後に現れた手形の位置、見つけたか、手形をたどっている途中か、通知の残り秒数
-    int GetRevealedCount() const noexcept { return m_RevealedCount; }
+    // 手形の見え方（0〜1）、最後に現れた手形の位置、見つけたか、手形をたどっている途中か、通知の残り秒数
     float GetVisibility(int index) const noexcept { return m_Visibility[static_cast<std::size_t>(index)]; }
     DirectX::SimpleMath::Vector3 GetLatestPosition() const noexcept
     {

@@ -19,6 +19,9 @@
 
 #include <d3d11.h>
 #include <string>
+#include <optional>
+
+namespace Effect { enum class ToneMapMode : unsigned int; }
 
 namespace Tools::CaptureMode
 {
@@ -38,10 +41,11 @@ namespace Tools::CaptureMode
     int GetEffectLevelOverride();
     // --reflection <0〜3> で水面の反射の方式（0 なし・1 キューブマップ・2 SSR・3 レイ反射）を上書きする（方式どうしを計測で比べるため）。未指定は-1。
     int GetReflectionMethodOverride();
-    // --tonemap <aces|legacy> でトーンマッピングの曲線（Effect::ToneMapMode の番号）を上書きする（HDRの前後を撮影で比べるため）。未指定は-1。
-    int GetToneMapOverride();
+    // --tonemap <aces|legacy|reinhard> が指定された場合だけ曲線を上書きする。
+    std::optional<Effect::ToneMapMode> GetToneMapOverride();
     // --ddgi off で DDGI の間接光を止める（間接光の前後を撮影と計測で比べるため）。指定がなければ true。
     bool UsesGlobalIllumination();
+    int GetGIUpdateFramesOverride();
     // --capture-features は固定条件で4周目のドアと見えない影を撮る。通常プレイには影響しない。
 
     // 撮影中のウィンドウと動画の大きさ（720p）。

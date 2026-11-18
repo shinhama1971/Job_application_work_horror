@@ -90,7 +90,7 @@ void HangingBulb::Init()
 
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
-    m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+    m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
     MATERIAL cord{};
     cord.Diffuse = Color(0.05f, 0.045f, 0.04f, 1.0f);
@@ -99,13 +99,13 @@ void HangingBulb::Init()
     cord.Shininess = 12.0f;
     cord.TextureEnable = FALSE;
     m_CordMaterial = std::make_unique<Material>();
-    m_CordMaterial->Create(cord);
+    m_CordMaterial->CreateRequired(cord);
 
     MATERIAL bulb = cord;
     bulb.Diffuse = Color(0.9f, 0.85f, 0.75f, 1.0f);
     bulb.Emission = BulbColor * 1.6f;
     m_BulbMaterial = std::make_unique<Material>();
-    m_BulbMaterial->Create(bulb);
+    m_BulbMaterial->CreateRequired(bulb);
 }
 
 void HangingBulb::Place(const Vector3& anchor, float seed)

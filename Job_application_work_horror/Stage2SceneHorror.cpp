@@ -336,12 +336,16 @@ void Stage2Scene::UpdateFinalSequence(float deltaTime)
     }
 
     // 最初の1.65秒は、画面を強く明滅させている
-    if (m_FinalSequence.GetSequenceTimer() < 1.65f)
+    constexpr float FinalFlickerSeconds = 1.65f;
+    constexpr float FinalFlickerRadiansPerSecond = 22.0f;
+    constexpr float FinalFlickerMinimumExposure = Effect::PostProcess::MinimumSceneExposure;
+    constexpr float FinalFlickerExposureAmplitude = 0.17f;
+    if (m_FinalSequence.GetSequenceTimer() < FinalFlickerSeconds)
     {
         const float pulse =
-            std::sin(m_FinalSequence.GetSequenceTimer() * 22.0f) *
+            std::sin(m_FinalSequence.GetSequenceTimer() * FinalFlickerRadiansPerSecond) *
                 0.5f + 0.5f;
-        game->GetPostProcess()->SetExposure(0.76f + pulse * 0.17f);
+        game->GetPostProcess()->SetExposure(FinalFlickerMinimumExposure + pulse * FinalFlickerExposureAmplitude);
         game->GetPostProcess()->SetAtmosphere(0.43f, 0.88f);
         game->GetPostProcess()->SetLensDistortionStrength(
             0.68f + pulse * 0.08f);
@@ -482,7 +486,9 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
         game->GetPostProcess()->SetLensDistortionStrength(
             0.66f + penalty * 0.14f);
         game->GetPostProcess()->SetLensDirtStrength(0.32f + penalty * 0.36f);
-        game->GetPostProcess()->SetExposure(0.91f + (1.0f - penalty) * 0.06f);
+        constexpr float PenaltyMinimumExposure = 0.91f;
+        constexpr float PenaltyExposureRange = 0.06f;
+        game->GetPostProcess()->SetExposure(PenaltyMinimumExposure + (1.0f - penalty) * PenaltyExposureRange);
     }
 
     // 近いほど短い間隔で、振動と画面の脈動を出している

@@ -41,7 +41,6 @@ public:
 
     // 雨の強さ（0 = 降らない、1 = 強い雨）。弱い雨ほど、雨粒としぶきの数が減り、少しゆっくり落ちて筋が短くなる
     void SetIntensity(float intensity) { m_Intensity = (std::clamp)(intensity, 0.0f, 1.0f); }
-    float GetIntensity() const { return m_Intensity; }
     // 地面の高さ（これより下の雨粒は描かない。しぶきはこの高さに出す）
     void SetGroundHeight(float groundY) { m_GroundY = groundY; }
 

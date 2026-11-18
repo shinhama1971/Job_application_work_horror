@@ -180,8 +180,8 @@
       <AdditionalDependencies>DirectXTK_SimpleMath-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <!-- 同梱したSimpleMathのlibはPDB（約20MB）を含めないため、PDBが見つからない警告LNK4099だけを抑制します -->
       <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
-      <!-- リンク時の最適化（LTCG）を、変わった関数だけ作り直す差分の方式（/LTCG:INCREMENTAL）にしている。できる実行ファイルの速さは同じ -->
-      <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <!-- 増分ビルドで LNK1103 が繰り返し発生したため、リンク時の最適化は毎回行う。 -->
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
@@ -270,6 +270,7 @@
     <ClCompile Include="ShadowMap.cpp" />
     <ClCompile Include="AmbientOcclusion.cpp" />
     <ClCompile Include="DDGIVolume.cpp" />
+    <ClCompile Include="LightShafts.cpp" />
     <ClCompile Include="PointShadowMap.cpp" />
     <ClCompile Include="sound.cpp" />
     <ClCompile Include="StageScene.cpp" />
@@ -409,6 +410,7 @@
     <ClInclude Include="ShadowMap.h" />
     <ClInclude Include="AmbientOcclusion.h" />
     <ClInclude Include="DDGIVolume.h" />
+    <ClInclude Include="GIUpdateSettings.h" />
     <ClInclude Include="PointShadowMap.h" />
     <ClInclude Include="sound.h" />
     <ClInclude Include="StageScene.h" />
@@ -502,6 +504,9 @@
     <ClInclude Include="shader\horrorGrade.hlsli" />
     <ClInclude Include="shader\toneMapping.hlsli" />
     <ClInclude Include="shader\horrorMist.hlsli" />
+    <ClInclude Include="shader\tiledLightingConfig.hlsli" />
+    <ClInclude Include="shader\postProcessBuffer.hlsli" />
+    <ClInclude Include="shader\lightShaftSegment.hlsli" />
     <ClInclude Include="shader\surfaceDetail.hlsli" />
   </ItemGroup>
   <ItemGroup>
@@ -509,9 +514,6 @@
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\volumetricFlashlightPS.hlsl">
-      <ExcludedFromBuild>true</ExcludedFromBuild>
-    </FxCompile>
-    <FxCompile Include="shader\shadowDepthPS.hlsl">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\shadowDepthVS.hlsl">

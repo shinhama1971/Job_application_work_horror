@@ -231,9 +231,8 @@ public:
         return m_Active && GetHorizontalDistance(playerPosition) < PassingDistance * 1.6f;
     }
     bool IsActive() const noexcept { return m_Active; }
-    // 懐中電灯で照らされて、このフレームで新しく気づいたか／気づいてプレイヤーへ向かっている途中か
+    // 懐中電灯で照らされて、このフレームで新しく気づいたか。
     bool WasNoticedThisFrame() const noexcept { return m_NoticedThisFrame; }
-    bool IsAlerted() const noexcept { return m_Active && m_AlertTimer > 0.0f; }
     bool WasFound() const noexcept { return m_Found; }
     float GetNoticeTimer() const noexcept { return m_NoticeTimer; }
 };

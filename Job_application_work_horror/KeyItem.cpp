@@ -29,7 +29,7 @@ void KeyItem::Init()
     BuildGeometry();
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
-    m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+    m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
     // くすんだ真鍮。暗い部屋でもライトを当てれば光るよう、弱い自己発光と強い鏡面反射を持たせている。
     MATERIAL material{};
@@ -43,7 +43,7 @@ void KeyItem::Init()
     material.Metallic = 1.0f;
     material.Roughness = 0.32f;
     m_Material = std::make_unique<Material>();
-    m_Material->Create(material);
+    m_Material->CreateRequired(material);
 
     // 置き場所の高さを、上下に浮く動きの中心として覚えている
     m_Scale = Vector3(4.0f, 4.0f, 4.0f);

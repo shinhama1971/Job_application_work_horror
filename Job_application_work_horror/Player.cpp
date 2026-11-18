@@ -100,7 +100,7 @@ void Player::Init()
 
     SetModelBounds(staticmesh.GetModelBounds());
     m_MeshRenderer.Init(staticmesh);
-    m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+    m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
     m_subsets = staticmesh.GetSubsets();
     m_Textures = staticmesh.GetTextures();
@@ -111,7 +111,7 @@ void Player::Init()
     for (int i = 0; i < materials.size(); i++)
     {
         std::unique_ptr<Material> m = std::make_unique<Material>();
-        m->Create(materials[i]);
+        m->CreateRequired(materials[i]);
         m->SetShader(&m_Shader);
         m_Materials.push_back(std::move(m));
     }
@@ -132,7 +132,6 @@ void Player::Init()
     m_FootstepTimer = 0.0f;
     m_FootstepIndex = 0;
     m_SurfaceNoisePulse = 0.0f;
-    m_WetSurfaceOverride = false;
     m_Hands.Init();
 }
 
@@ -256,7 +255,7 @@ void Player::Update()
     {
         // 波紋と同じ判定で、足元が水の中なら歩き・走りそれぞれの水音を鳴らす。
         const bool sprinting = m_Movement.IsSprinting();
-        bool wetStep = m_WetSurfaceOverride;
+        bool wetStep = false;
         for (Ground* ground : Core::Game::GetInstance()->GetObjects<Ground>())
         {
             wetStep = ground->TriggerFootstepRipple(
@@ -285,7 +284,6 @@ void Player::Update()
         ++m_FootstepIndex;
         m_FootstepTimer = sprinting ? SprintFootstepInterval : WalkFootstepInterval;
     }
-    m_WetSurfaceOverride = false;
 
 // デバッグ用：一人称と三人称の切り替え（Debug構成で、さらにENABLE_CAMERA_MODE_SHORTCUTSを定義したときだけ）
 #if defined(_DEBUG) && defined(ENABLE_CAMERA_MODE_SHORTCUTS)
@@ -430,12 +428,19 @@ void Player::Update()
     light.Range = (FlashlightRange - m_FlashlightNearSurfaceBlend * FlashlightNearSurfaceRangeCut) * (1.0f - batteryWeakness * FlashlightWeakRangeCut);
     // 手で持ったライトの小さな揺れを加えている。電池が少ないときは視点は動かさず、
     // 光だけに電気的・機械的な不安定さを足している。
+    constexpr float FlashlightSwayBase = 0.0035f;
+    constexpr float FlashlightSwayBatteryStress = 0.0065f;
+    constexpr float FlashlightSwayHorizontalRadiansPerSecond = 1.37f;
+    constexpr float FlashlightSwayVerticalRadiansPerSecond = 1.91f;
+    constexpr float FlashlightSwayVerticalPhase = 1.2f;
+    constexpr float FlashlightSwayVerticalScale = 0.72f;
     const float flashlightSway = renderFlashlight
-        ? 0.0035f + batteryStress * 0.0065f
+        ? FlashlightSwayBase + batteryStress * FlashlightSwayBatteryStress
         : 0.0f;
     Vector3 flashlightDirection(
-        sinf(m_AmbienceTimer * 1.37f) * flashlightSway,
-        sinf(m_AmbienceTimer * 1.91f + 1.2f) * flashlightSway * 0.72f,
+        sinf(m_AmbienceTimer * FlashlightSwayHorizontalRadiansPerSecond) * flashlightSway,
+        sinf(m_AmbienceTimer * FlashlightSwayVerticalRadiansPerSecond + FlashlightSwayVerticalPhase) *
+            flashlightSway * FlashlightSwayVerticalScale,
         1.0f);
     flashlightDirection.Normalize();
     light.Direction = Vector4(

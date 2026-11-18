@@ -45,7 +45,9 @@ void ExitTrigger::Update()
     // 0.28秒：画面を明るく光らせ、振動させている
     if (m_EscapePhase == 0 && m_EscapeTimer >= 0.28f)
     {
-        game->GetPostProcess()->TriggerBloomPulse(0.92f, 0.52f);
+        constexpr float InitialBloomPeak = 0.92f;
+        constexpr float InitialBloomSeconds = 0.52f;
+        game->GetPostProcess()->TriggerBloomPulse(InitialBloomPeak, InitialBloomSeconds);
         Input::SetVibration(7, 0.13f);
         m_EscapePhase = 1;
     }

@@ -56,7 +56,7 @@ void DrainValve::Init()
     BuildGeometry();
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
-    m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+    m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
     m_Material = std::make_unique<Material>();
     MATERIAL material{};
@@ -67,7 +67,7 @@ void DrainValve::Init()
     // PBR：赤く塗ったバルブの取っ手と、塗装した配管（塗料なので金属ではなく、艶のある粗さにしている）
     material.Metallic = 0.0f;
     material.Roughness = 0.42f;
-    m_Material->Create(material);
+    m_Material->CreateRequired(material);
 
     // 画面の外かの判定に使う境界（床から天井まで伸びる配管を含めている）
     ModelBounds bounds;

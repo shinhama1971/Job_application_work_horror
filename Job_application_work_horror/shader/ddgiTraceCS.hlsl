@@ -129,7 +129,7 @@ float3 GetDirectLight(float3 position, float3 normal)
 [numthreads(DDGI_MAX_RAYS, 1, 1)]
 void main(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
 {
-    const uint probeIndex = groupId.x;
+    const uint probeIndex = GetUpdatingProbeIndex(groupId.x);
     const uint rayIndex = threadId.x;
     if (probeIndex >= GetProbeCount() || rayIndex >= RaysPerProbe)
     {
@@ -157,7 +157,12 @@ void main(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
     const float3 albedo = hitNormal.y > 0.5f ? DDGI_FLOOR_ALBEDO
         : (hitNormal.y < -0.5f ? DDGI_CEILING_ALBEDO : DDGI_WALL_ALBEDO);
     // 直接光に、前のフレームの間接光（プローブから読む）を足して、2回目以降の跳ね返りも少しずつ積み重ねている
-    const float3 incoming = GetDirectLight(hitPosition, hitNormal) +
-        GetDDGIIrradiance(hitPosition, hitNormal, 0.0f, false) * BounceStrength;
+    float3 incoming = GetDirectLight(hitPosition, hitNormal);
+    // 格子を作り直した最初のフレームは、まだ書き込んでいないマップを読まない。
+    [branch]
+    if (ResetHistory < 0.5f)
+    {
+        incoming += GetDDGIIrradiance(hitPosition, hitNormal, 0.0f, false) * BounceStrength;
+    }
     RayResults[uint2(rayIndex, probeIndex)] = float4(albedo * incoming, hitDistance);
 }

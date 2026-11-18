@@ -10,7 +10,7 @@
 void SkyBackdrop::Init()
 {
     // 頂点は頂点シェーダーが番号から作るので、入力レイアウトは作らない
-    m_Shader.Create("shader/skyBackdropVS.hlsl", "shader/skyBackdropPS.hlsl", true);
+    m_Shader.CreateRequired("shader/skyBackdropVS.hlsl", "shader/skyBackdropPS.hlsl", true);
 }
 
 void SkyBackdrop::Draw(Camera* camera)

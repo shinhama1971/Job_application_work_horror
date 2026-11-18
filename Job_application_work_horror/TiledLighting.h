@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include "shader/tiledLightingConfig.hlsli"
+
 #include "ComputeShader.h"
 #include "Renderer.h"
 
@@ -26,8 +28,8 @@ namespace Effect
     public:
         // シェーダー側（common.hlsl / tiledLightCullingCS.hlsl）と同じ値にしている。
         // タイルの大きさ（16x16画素）、1タイルに入れるライトの上限、ライトの数の上限
-        static constexpr uint32_t TileSize = 16;
-        static constexpr uint32_t MaxLightsPerTile = 64;
+        static constexpr uint32_t TileSize = SIGNAL_LOST_LIGHT_TILE_SIZE;
+        static constexpr uint32_t MaxLightsPerTile = SIGNAL_LOST_MAX_LIGHTS_PER_TILE;
         static constexpr uint32_t MaxLights = 256;
 
         // バッファとシェーダーを作る／解放する

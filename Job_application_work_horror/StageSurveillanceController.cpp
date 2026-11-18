@@ -98,14 +98,14 @@ void StageSurveillanceController::Init(const StageObjects& objects)
     m_NoticeText = "";
     m_CompletedThisFrame = false;
 
-    m_Shader.Create(
+    m_Shader.CreateRequired(
         "shader/unlitTextureVS.hlsl",
         "shader/surveillanceFeedPS.hlsl");
     // 大きく表示しても、異常の輪郭が潰れない解像度を確保している。
-    m_Feed.Init(960, 540);
+    m_Feed.InitRequired(960, 540, "監視カメラの映像");
     for (Graphics::RenderTexture& reference : m_References)
     {
-        reference.Init(960, 540);
+        reference.InitRequired(960, 540, "監視カメラの比較画像");
     }
 }
 

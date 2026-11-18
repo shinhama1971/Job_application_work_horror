@@ -4,6 +4,9 @@
 // ============================================================================
 
 // ワールド・ビュー・射影の行列（b0〜b2。Renderer::SetWorldMatrixなどが転置して送っている）
+// 既存の床・霧・濡れの高さをそろえるための基準。部屋ごとの遮蔽には RoomFloorY を使う。
+static const float SCENE_BASE_FLOOR_Y = -100.0f;
+
 cbuffer WorldBuffer : register(b0)
 {
 	matrix World;
@@ -128,8 +131,9 @@ StructuredBuffer<uint> g_TileLightCounts : register(t12);
 StructuredBuffer<uint> g_PointLightWallMasks : register(t19);
 
 // タイルの大きさと、1タイルに入れる光源の上限（TiledLighting.hと同じ値）
-static const uint LIGHT_TILE_SIZE = 16;
-static const uint MAX_LIGHTS_PER_TILE = 64;
+#include "tiledLightingConfig.hlsli"
+static const uint LIGHT_TILE_SIZE = SIGNAL_LOST_LIGHT_TILE_SIZE;
+static const uint MAX_LIGHTS_PER_TILE = SIGNAL_LOST_MAX_LIGHTS_PER_TILE;
 
 // この画素で計算する光源の数と、タイルごとのリストの先頭の位置を返している。
 uint GetPixelLightCount(float2 pixelPosition, out uint listOffset)

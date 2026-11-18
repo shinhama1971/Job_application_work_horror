@@ -25,6 +25,7 @@ namespace Effect
         Legacy = 1,
         // 曲線を掛けず1で切るだけ。デバッグ表示（法線・光源のタイル・SSAOなど）の色を、そのまま見せるときに使う
         Passthrough = 2,
+        Reinhard = 3,
     };
 
     // 描き終えた画面を取り込み、ブルームを作り、露出やノイズなどの画面効果を重ねている。演出からは一時的な効果を起こせる。
@@ -152,7 +153,7 @@ namespace Effect
 
     public:
         // 作業用テクスチャとシェーダーを作る／解放する／値を目標へ近づける
-        void Init();
+        bool Init();
         void Uninit();
         void Update();
 
@@ -217,11 +218,6 @@ namespace Effect
             m_ToneMapMode = mode;
         }
 
-        ToneMapMode GetToneMapMode() const
-        {
-            return m_ToneMapMode;
-        }
-
         // ブルームとフィルムノイズのON/OFF
         void SetBloomEnabled(bool enable)
         {
@@ -234,9 +230,12 @@ namespace Effect
         }
 
         // 露出の目標値（0.85〜1.20）
+        static constexpr float MinimumSceneExposure = 0.76f;
+        static constexpr float MaximumSceneExposure = 1.20f;
+
         void SetExposure(float exposure)
         {
-            m_TargetExposure = (std::clamp)(exposure, 0.85f, 1.20f);
+            m_TargetExposure = (std::clamp)(exposure, MinimumSceneExposure, MaximumSceneExposure);
         }
 
         // ポーズメニューの「明るさ」「演出の強さ」の設定値。
@@ -289,12 +288,6 @@ namespace Effect
             {
                 m_FearBeat = 1.0f;
             }
-        }
-
-        // フィルムノイズが有効か
-        bool IsNoiseEnable() const
-        {
-            return m_EnableNoise;
         }
 
         // デバッグ画面からの調整用。目標値ではなく、その場で値を変えている。

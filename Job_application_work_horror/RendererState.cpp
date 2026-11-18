@@ -11,11 +11,11 @@
 using namespace DirectX::SimpleMath;
 
 //--------------------------------------------------------------------------------------
-// 懐中電灯と環境光を定数バッファ（b3）へ送っている。Enableは SetLightEnable の状態を優先している
+// 懐中電灯と環境光を定数バッファ（b3）へ送っている。懐中電灯の点灯は FlashlightEnabled で切り替える
 void Renderer::SetLight(LIGHT Light)
 {
 	m_Light = Light;
-	m_Light.Enable = m_LightEnable;
+	m_Light.Enable = TRUE;
 	m_pDeviceContext->UpdateSubresource(
 		m_pLightBuffer.Get(), 0, NULL, &m_Light, 0, 0);
 
@@ -328,25 +328,6 @@ void Renderer::UploadDebugViewBuffer()
 		m_pDebugViewBuffer.Get(), 0, NULL, &m_DebugView, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
 		7, 1, m_pDebugViewBuffer.GetAddressOf());
-}
-
-//--------------------------------------------------------------------------------------
-// ライトの計算をするかを切り替えている（2Dの描画など、照明を使わない描画で切っている）
-//--------------------------------------------------------------------------------------
-void Renderer::SetLightEnable(bool Enable)
-{
-	m_LightEnable = Enable;
-	m_Light.Enable = Enable;
-	m_pDeviceContext->UpdateSubresource(
-		m_pLightBuffer.Get(), 0, NULL, &m_Light, 0, 0);
-}
-
-//--------------------------------------------------------------------------------------
-// ライトの計算をするかを返している
-//--------------------------------------------------------------------------------------
-bool Renderer::GetLightEnable()
-{
-	return m_LightEnable;
 }
 
 //--------------------------------------------------------------------------------------

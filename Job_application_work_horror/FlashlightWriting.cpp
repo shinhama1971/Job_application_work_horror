@@ -46,13 +46,13 @@ void FlashlightWriting::Init()
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
     // 照らした部分だけ文字を見せる専用のピクセルシェーダーを使っている
-    m_Shader.Create("shader/litTextureVS.hlsl", "shader/flashlightRevealPS.hlsl");
+    m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/flashlightRevealPS.hlsl");
 
     MATERIAL material{};
     material.Diffuse = m_InkColor;
     material.TextureEnable = TRUE;
     m_Material = std::make_unique<Material>();
-    m_Material->Create(material);
+    m_Material->CreateRequired(material);
 }
 
 // 文字の画像を読み込んでいる（書き換え用の画像は、指定があって読み込めたときだけ使っている）
@@ -66,7 +66,7 @@ void FlashlightWriting::SetTextures(const std::string& primaryPath, const std::s
 void FlashlightWriting::SetPrintedSurface()
 {
     m_PrintedSurface = true;
-    m_Shader.Create("shader/litTextureVS.hlsl", "shader/printedSurfacePS.hlsl");
+    m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/printedSurfacePS.hlsl");
 }
 
 // 壁の表面に合わせて、位置・向き・大きさを決めている（法線は水平にそろえている）

@@ -56,6 +56,4 @@ public:
 
     // 追跡の最中など、隠れさせたくない場面ではfalseにしている。
     void SetUsable(bool usable) { m_Usable = usable; }
-    // 誰かが中に隠れているか
-    bool IsOccupied() const { return m_Occupant != nullptr; }
 };

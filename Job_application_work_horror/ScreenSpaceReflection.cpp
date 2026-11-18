@@ -14,6 +14,8 @@ namespace
     constexpr UINT SceneSlot = 4;
     constexpr UINT DepthSlot = 8;
     constexpr UINT PreviousDepthSlot = 17;
+    // rayReflection.hlsli の SSR_HISTORY_MAX_BLUR_LOD に対応する LOD 0〜3。
+    constexpr UINT HistoryMipLevels = 4;
 }
 
 namespace Effect
@@ -72,9 +74,9 @@ namespace Effect
                 return;
             }
         }
-        // 縮小画像は、GenerateMips で作るため、描画先にもできるテクスチャにしている（0 = 1画素まで全部の段）
+        // SSRが読むのは最大LOD 3。使わない小さい段は作らない。
         D3D11_TEXTURE2D_DESC desc = sourceDesc;
-        desc.MipLevels = 0;
+        desc.MipLevels = HistoryMipLevels;
         desc.ArraySize = 1;
         desc.SampleDesc.Count = 1;
         desc.SampleDesc.Quality = 0;

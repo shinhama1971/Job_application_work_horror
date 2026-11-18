@@ -12,12 +12,11 @@
 class FalseDoorAnomaly final
 {
 private:
-    // 気づいたときの通知を出す残り秒数、偽の扉を見たか、反対側へ移ったか、表示しているか、右側の壁にあるか
+    // 気づいたときの通知を出す残り秒数、偽の扉を見たか、反対側へ移ったか、表示しているか
     float m_NoticeTimer = 0.0f;
     bool m_Observed = false;
     bool m_Moved = false;
     bool m_Visible = false;
-    bool m_RightSide = false;
 
 public:
     // 何も起きていない状態に戻している
@@ -27,7 +26,6 @@ public:
         m_Observed = false;
         m_Moved = false;
         m_Visible = false;
-        m_RightSide = false;
     }
 
     // 周回が切り替わるときは、通知の時間は止めずに、進み具合だけを戻している。
@@ -37,11 +35,10 @@ public:
         m_Moved = false;
     }
 
-    // 表示するか、どちらの壁に出すかを決めている
-    void SetVisualState(bool visible, bool rightSide) noexcept
+    // 扉の位置は Stage2Scene が決める。ここには表示状態を保持する。
+    void SetVisible(bool visible) noexcept
     {
         m_Visible = visible;
-        m_RightSide = rightSide;
     }
 
     // 偽の扉を見たことを記録している
@@ -52,7 +49,7 @@ public:
     {
         m_Moved = true;
         m_NoticeTimer = 2.8f;
-        SetVisualState(true, true);
+        SetVisible(true);
     }
 
     // 通知を出す残り秒数を減らしている
@@ -61,11 +58,10 @@ public:
         m_NoticeTimer = (std::max)(0.0f, m_NoticeTimer - deltaTime);
     }
 
-    // 見たか、移ったか、表示しているか、右側にあるか、通知の残り秒数を返している
+    // 見たか、移ったか、表示しているか、通知の残り秒数を返している
     bool WasObserved() const noexcept { return m_Observed; }
     bool HasMoved() const noexcept { return m_Moved; }
     bool IsVisible() const noexcept { return m_Visible; }
-    bool IsOnRightSide() const noexcept { return m_RightSide; }
     float GetNoticeTimer() const noexcept { return m_NoticeTimer; }
     // 通知を消している
     void ClearNotice() noexcept { m_NoticeTimer = 0.0f; }

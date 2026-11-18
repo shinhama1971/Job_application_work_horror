@@ -184,13 +184,15 @@ namespace MapLayout.Editor
                 var allowed = tokens[0] == "prop"
                     ? new[] { "noshadow", "weathering", "room", "glow", "model" }
                     : new[] { "yaw", "size" };
-                var options = tokens.Skip(tokens[0] == "prop" ? 12 : 5).Where(token => !float.TryParse(token,
+                const int PropOptionsStart = 12;
+                const int PlaceOptionsStart = 5;
+                var options = tokens.Skip(tokens[0] == "prop" ? PropOptionsStart : PlaceOptionsStart).Where(token => !float.TryParse(token,
                     System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _));
                 foreach (var option in options.Where(option => !allowed.Contains(option) && tokens[0] == "place"))
                 {
                     problems.Add($"{index + 1}行目: place の知らない指定 {option}");
                 }
-                if (tokens[0] == "prop" && tokens.Skip(12).Contains("yaw"))
+                if (tokens[0] == "prop" && tokens.Skip(PropOptionsStart).Contains("yaw"))
                 {
                     problems.Add($"{index + 1}行目: prop に yaw が書かれた");
                 }

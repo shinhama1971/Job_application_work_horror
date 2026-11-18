@@ -216,7 +216,7 @@ void Wall::Init()
     m_IndexBuffer.Create(m_Indices);
     m_BoxVertices = m_Vertices;
     m_BoxIndices = m_Indices;
-    m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+    m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
     m_NaturalSurface = NaturalSurface::None;
 
     m_Material = std::make_unique<Material>();
@@ -227,9 +227,9 @@ void Wall::Init()
     m_SurfaceMaterial.Emission = Color(0.0f, 0.0f, 0.0f, 1.0f);
     m_SurfaceMaterial.Shininess = 4.0f;
     m_SurfaceMaterial.TextureEnable = FALSE;
-    m_Material->Create(m_SurfaceMaterial);
+    m_Material->CreateRequired(m_SurfaceMaterial);
     m_UnlitPartMaterial = std::make_unique<Material>();
-    m_UnlitPartMaterial->Create(m_SurfaceMaterial);
+    m_UnlitPartMaterial->CreateRequired(m_SurfaceMaterial);
 }
 
 // 崩れて現れる・消える途中なら、崩れ具合を進めている（消え終わったら非表示にしている）
@@ -640,7 +640,7 @@ void Wall::SetVisualModel(const std::string& name)
     if (surface != m_NaturalSurface)
     {
         m_NaturalSurface = surface;
-        m_Shader.Create("shader/litTextureVS.hlsl",
+        m_Shader.CreateRequired("shader/litTextureVS.hlsl",
             surface == NaturalSurface::Rock ? "shader/rockPS.hlsl"
             : surface == NaturalSurface::Bark ? "shader/barkPS.hlsl"
             : surface == NaturalSurface::Facade ? "shader/facadePS.hlsl" : "shader/litTexturePS.hlsl");

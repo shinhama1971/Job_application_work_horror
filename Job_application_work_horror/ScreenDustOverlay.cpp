@@ -37,7 +37,7 @@ void ScreenDustOverlay::Init()
     m_Indices = { 0, 1, 2, 3 };
     m_IndexBuffer.Create(m_Indices);
 
-    m_Shader.Create(
+    m_Shader.CreateRequired(
         "shader/unlitTextureVS.hlsl",
         "shader/PS_HorrorDust.hlsl"
     );
@@ -48,12 +48,11 @@ void ScreenDustOverlay::Init()
     mtrl.Diffuse = Color(1, 1, 1, 1);
     mtrl.TextureEnable = false;
 
-    m_Material->Create(mtrl);
+    m_Material->CreateRequired(mtrl);
 
-    Renderer::CreateConstantBuffer(
+    Renderer::CreateRequiredConstantBuffer(
         sizeof(TimeBuffer),
-        m_TimeBuffer.ReleaseAndGetAddressOf()
-    );
+        m_TimeBuffer.ReleaseAndGetAddressOf(), "埃の画面演出");
 }
 
 // 表示している間だけ時間を進め、残り秒数が尽きたら消している

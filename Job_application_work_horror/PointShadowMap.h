@@ -25,7 +25,7 @@ namespace Effect
         // 1面の大きさ（画素）
         static constexpr int FaceSize = 256;
 
-        void Init();
+        bool Init();
         void Uninit();
         // face番目（0〜5）の面を描き始めている：描画先をその面にし、電球の位置から面の向きを見る行列に差し替えている
         void BeginFace(int face, const DirectX::SimpleMath::Vector3& lightPosition);

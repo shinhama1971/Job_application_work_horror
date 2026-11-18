@@ -134,18 +134,18 @@ void Ground::Init()
 	m_IndexBuffer.Create(m_Indices);
 
 	// 濡れた床のピクセルシェーダーを使うシェーダーを作っている
-	m_Shader.Create("shader/litTextureVS.hlsl", "shader/wetFloorPS.hlsl");
+	m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/wetFloorPS.hlsl");
 
 	// 濡れた床の値を渡す定数バッファを作っている
-	Renderer::CreateConstantBuffer(
+	Renderer::CreateRequiredConstantBuffer(
 		sizeof(WetFloorBuffer),
-		m_WetFloorBuffer.ReleaseAndGetAddressOf());
+		m_WetFloorBuffer.ReleaseAndGetAddressOf(), "濡れた床");
 
 	// 水たまりの表を渡す定数バッファを作り、WaterEffectSystemで決めた値を書き込んでいる
 	const WaterEffectSystem::PuddleCellBufferData& puddleCells = m_WaterEffects.GetPuddleCellData();
-	Renderer::CreateConstantBuffer(
+	Renderer::CreateRequiredConstantBuffer(
 		static_cast<unsigned int>(sizeof(puddleCells)),
-		m_PuddleCellBuffer.ReleaseAndGetAddressOf());
+		m_PuddleCellBuffer.ReleaseAndGetAddressOf(), "水たまりのセル");
 	Renderer::GetDeviceContext()->UpdateSubresource(
 		m_PuddleCellBuffer.Get(), 0, nullptr, &puddleCells, 0, 0);
 
@@ -162,7 +162,7 @@ void Ground::Init()
 	MATERIAL mtrl;
 	mtrl.Diffuse = Color(1, 1, 1, 1);
 	mtrl.TextureEnable = true;// テクスチャを使う
-	m_Material->Create(mtrl);
+	m_Material->CreateRequired(mtrl);
 	// 床の高さを-100にし、1マスを20単位に広げている（全体で1000x1000）
 	m_Position.y = -100.0f;
 	m_Scale.x = 20.0f;
@@ -352,7 +352,7 @@ Ground::WaterLevel Ground::SelectWaterLevel(const WaterSurface& surface, Camera*
 	}
 	const float distance = (std::max)(0.0f, Vector3::Distance(cam->GetPosition(), center) - surface.Radius);
 	// 比較用の描画設定で「メッシュ（LODなし）」を選んでいるときは、見えている水たまりをすべて一番細かく描く
-	if (distance < NearWaterDistance || Tools::TechDemo::GetPuddleMeshMode() == 1)
+	if (distance < NearWaterDistance || Tools::TechDemo::DefaultPuddleMeshMode == Tools::TechDemo::PuddleMeshMode::DetailedMesh)
 	{
 		return WaterLevel::Near;
 	}
@@ -532,7 +532,7 @@ void Ground::Update()
 		floodRect,
 		m_Position.y + m_DrainTrace.w,
 		m_WetTime,
-		(hasFlood ? 1.0f : 0.0f) * Tools::TechDemo::GetWaterCausticsScale(),
+		(hasFlood ? 1.0f : 0.0f) * Tools::TechDemo::WaterCausticsScale,
 		m_DrainTrace);
 
 	// 足音と水滴のおもりを、水たまりの波へ渡している。波を進めるのは描画の最初（RunGpuSimulation）で、
@@ -583,7 +583,7 @@ void Ground::RunGpuSimulation()
 	const float seconds = m_PendingRippleSeconds;
 	m_PendingRippleSeconds = 0.0f;
 	// 比較用の描画設定で「水たまりの波：なし」を選んでいるときは、波を計算も表示もしない
-	if (!Tools::TechDemo::UsesWaterRipples())
+	if (!Tools::TechDemo::UseWaterRipples)
 	{
 		Renderer::SetWaterRipples(nullptr, DirectX::SimpleMath::Vector2::Zero, 0.0f, 0.0f);
 		return;
@@ -628,7 +628,7 @@ void Ground::Draw(Camera* cam)
 	wetFloor.RippleStrength =
 		0.92f + m_PowerReflectionBlend * 0.10f + surgeWave * 0.18f;
 	// 技術デモで「水面の反射なし」を選んでいるときは、反射の画像を混ぜない
-	wetFloor.ReflectionStrength = Tools::TechDemo::GetReflectionMethod() != 0
+	wetFloor.ReflectionStrength = Tools::TechDemo::GetReflectionMethod() != Tools::TechDemo::ReflectionMethod::Off
 		? 0.96f + m_PowerReflectionBlend * 0.22f + surgeWave * 0.12f
 		: 0.0f;
 	// 水に浸かった範囲がなければ、最小(1,1)が最大(0,0)より大きい値を渡して「範囲なし」にしている
@@ -647,12 +647,12 @@ void Ground::Draw(Camera* cam)
 		const WaterEffectSystem::Leak& leak = leaks[static_cast<std::size_t>(leakIndex)];
 		wetFloor.Leaks[leakIndex] = DirectX::SimpleMath::Vector4(leak.Center.x, leak.Center.y, leak.Radius, 0.0f);
 	}
-	const int puddleMeshMode = Tools::TechDemo::GetPuddleMeshMode();
+	constexpr auto puddleMeshMode = Tools::TechDemo::DefaultPuddleMeshMode;
 	wetFloor.LeakInfo = DirectX::SimpleMath::Vector4(
-		static_cast<float>(leakCount), puddleMeshMode == 2 ? 1.0f : 0.0f, 0.0f, 0.0f);
+		static_cast<float>(leakCount), puddleMeshMode == Tools::TechDemo::PuddleMeshMode::MeshLod ? 1.0f : 0.0f, 0.0f, 0.0f);
 	// 床の本体は乾いた床として描き、水たまりは後でそのメッシュに描き重ねる（DrawWaterSurfaces）。
 	// 比較用の描画設定で「床全体で計算」を選んでいるときは、前の方式（床の全部の画素で水たまりを計算し、メッシュは描かない）にしている
-	const bool drawsPuddleMeshes = puddleMeshMode != 0;
+	const bool drawsPuddleMeshes = puddleMeshMode != Tools::TechDemo::PuddleMeshMode::FullFloor;
 	wetFloor.WaterSurfaceLevel = static_cast<float>(drawsPuddleMeshes ? WaterLevel::DryFloor : WaterLevel::Near);
 	devicecontext->UpdateSubresource(
 		m_WetFloorBuffer.Get(), 0, nullptr, &wetFloor, 0, 0);
@@ -710,7 +710,7 @@ void Ground::DrawDepthPrepass(Camera* cam)
 	// 床の計算と水たまりの計算が同じ画素で二重に動かない
 	// （技術デモで「床全体で計算」を選んでいるときは、本描画でもメッシュを描かないので、深度も描かない）
 	RebuildPuddleSurfacesIfChanged();
-	if (Tools::TechDemo::GetPuddleMeshMode() != 0)
+	if constexpr (Tools::TechDemo::DefaultPuddleMeshMode != Tools::TechDemo::PuddleMeshMode::FullFloor)
 	{
 		DrawWaterSurfaces(cam, true, nullptr);
 	}

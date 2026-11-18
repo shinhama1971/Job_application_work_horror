@@ -1,5 +1,6 @@
 // 光の筋だけを半解像度で積分する。wには奥行きを持ち、拡大時の光漏れを防ぐ。
 #include "fastNoise.hlsli"
+#include "lightShaftSegment.hlsli"
 struct ENVIRONMENT_POINT_LIGHT { float4 PositionRange; float4 ColorIntensity; };
 cbuffer ShaftParameters : register(b0) {
  matrix InverseViewProjection; float4 EyeTime; float4 Viewport; uint LightCount; float3 Padding;
@@ -15,16 +16,14 @@ float3 GetMistEyePosition() { return EyeTime.xyz; }
 #define FIGURE_SHADOW_WITHOUT_PLAYER_BODY
 #include "figureShadow.hlsli"
 #define CausticTime EyeTime.w
-ENVIRONMENT_POINT_LIGHT GetPixelLight(uint offset, uint i) { return Lights[i]; }
 // 半分の解像度で計算しているので、画素ごとに調べる位置をずらす（ノイズ）代わりに、調べる点を増やしてなめらかにしている。
 // 2画素おきの座標でずらすと、ずらし方の模様が斜めの縞になり、拡大したときに斜めの線として見えたため。
 #define LIGHT_SHAFT_SAMPLES 10
-#define LIGHT_SHAFT_DENSITY 0.0018f
-// 光の筋を出す光源の高さの下限。天井の近くの照明（天井の器具・吊るした電球）だけにし、壁の表示や肖像画の光のように
-// 面に付いた光源は除いている（光源が面の上にあると、その面に向かう視線の終わりで光の筋が強く出すぎるため）
-#define LIGHT_SHAFT_MIN_HEIGHT (-58.0f)
+// 詳しい影計算は、人影の胸から床へ伸びる影の近くを通る視線に絞る。
+static const float SHAFT_FIGURE_CHEST_HEIGHT = 19.0f;
+static const float SHAFT_FIGURE_SHADOW_TEST_RADIUS = 28.0f;
 
-float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCount, float2 pixelPosition)
+float3 GetLightShafts(float3 worldPosition, uint lightCount)
 {
     const float3 eye = GetMistEyePosition();
     const float3 toPixel = worldPosition - eye;
@@ -38,7 +37,7 @@ float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCoun
     [loop]
     for (uint i = 0; i < lightCount; ++i)
     {
-        const ENVIRONMENT_POINT_LIGHT pointLight = GetPixelLight(lightListOffset, i);
+        const ENVIRONMENT_POINT_LIGHT pointLight = Lights[i];
         const float3 center = pointLight.PositionRange.xyz;
         const float range = max(pointLight.PositionRange.w, 0.001f);
         [branch]
@@ -46,31 +45,9 @@ float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCoun
         {
             continue;
         }
-        // 視線が光の届く球を通る区間（球と直線の交わり）を、カメラから画素までの間に切り詰めている
-        const float closest = dot(center - eye, rayDirection);
-        const float3 offsetFromRay = center - (eye + rayDirection * closest);
-        const float missSquared = dot(offsetFromRay, offsetFromRay);
-        [branch]
-        if (missSquared >= range * range)
-        {
-            continue;
-        }
-        const float halfChord = sqrt(range * range - missSquared);
-        float segmentStart = max(closest - halfChord, 0.0f);
-        float segmentEnd = min(closest + halfChord, rayLength);
-        // 光の円錐は照明より下にしかないので、視線が照明の高さより上を通る部分は調べない
-        if (abs(rayDirection.y) > 0.0001f)
-        {
-            const float crossing = (center.y - eye.y) / rayDirection.y;
-            if (eye.y < center.y)
-            {
-                segmentEnd = rayDirection.y > 0.0f ? min(segmentEnd, crossing) : segmentEnd;
-            }
-            else
-            {
-                segmentStart = rayDirection.y < 0.0f ? max(segmentStart, crossing) : segmentEnd;
-            }
-        }
+        const float2 segment = GetLightShaftSegment(eye, rayDirection, rayLength, center, range);
+        const float segmentStart = segment.x;
+        const float segmentEnd = segment.y;
         [branch]
         if (segmentEnd <= segmentStart)
         {
@@ -84,14 +61,14 @@ float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCoun
         [branch]
         if (UnseenFigure.w > 0.001f)
         {
-            const float3 figureCenter = UnseenFigure.xyz + float3(0.0f, 19.0f, 0.0f);
+            const float3 figureCenter = UnseenFigure.xyz + float3(0.0f, SHAFT_FIGURE_CHEST_HEIGHT, 0.0f);
             const float3 away = figureCenter - center;
             const float3 shadowEnd = away.y < -0.001f
                 ? figureCenter + away * ((UnseenFigure.y - figureCenter.y) / away.y)
                 : figureCenter + normalize(away) * range;
             float unused;
             figureInRange = SegmentSegmentDistance(eye + rayDirection * segmentStart, eye + rayDirection * segmentEnd,
-                figureCenter, shadowEnd, unused) < 28.0f;
+                figureCenter, shadowEnd, unused) < SHAFT_FIGURE_SHADOW_TEST_RADIUS;
         }
         // 霧のむら：ゆっくり流れるノイズで、光の筋の中に濃い所と薄い所を作っている（区間の真ん中で1回だけ求めている）
         const float3 middlePoint = eye + rayDirection * ((segmentStart + segmentEnd) * 0.5f);
@@ -109,8 +86,7 @@ float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCoun
             float attenuation = saturate(1.0f - lightDistance / range);
             attenuation *= attenuation;
             // 天井の器具から下へ広がる円錐の中だけを光らせている（真下ほど濃く、約60度より横では消える）
-            const float downward = saturate(toLight.y / max(lightDistance, 0.001f));
-            const float cone = smoothstep(0.55f, 0.92f, downward);
+            const float cone = GetLightShaftConeWeight(toLight, lightDistance);
             // 光源のすぐそばは、照明そのものの明るさに任せて薄くしている
             const float awayFromFixture = smoothstep(2.0f, 9.0f, lightDistance);
             // 霧はぼんやり見えるだけなので、床や壁より軽い、頭まで1本のカプセルで遮っている。
@@ -140,5 +116,5 @@ void main(uint3 id : SV_DispatchThreadID) {
  float2 uv=(float2(pixel)+0.5f)/Viewport.xy;
  float4 world=mul(float4(uv.x*2-1,1-uv.y*2,depth,1),InverseViewProjection);
  world.xyz/=world.w;
- Output[id.xy]=float4(GetLightShafts(world.xyz,0,LightCount,float2(pixel)),length(world.xyz-EyeTime.xyz));
+ Output[id.xy]=float4(GetLightShafts(world.xyz, LightCount),length(world.xyz-EyeTime.xyz));
 }

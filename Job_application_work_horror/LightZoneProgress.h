@@ -29,10 +29,4 @@ public:
         m_VisitedMask |= zoneBit;
         return true;
     }
-
-    // その区画を通ったかを返している
-    bool HasVisited(int zoneIndex) const noexcept
-    {
-        return (m_VisitedMask & (1u << zoneIndex)) != 0u;
-    }
 };

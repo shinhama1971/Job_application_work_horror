@@ -13,10 +13,30 @@
 #include <algorithm>
 #include <cmath>
 
+namespace
+{
+    // 1面でライトを点けた廊下の測光値を基準とし、順応の強さを抑えて暗さを残す。
+    constexpr float AutoExposureTargetLuminance = 0.075f;
+    constexpr float AutoExposureMinGain = 0.95f;
+    constexpr float AutoExposureMaxGain = 1.08f;
+    constexpr float DarkAdaptationRatePerSecond = 0.35f;
+    constexpr float LightAdaptationRatePerSecond = 2.5f;
+    constexpr float LightShaftsDisabledEffectScale = 0.75f;
+    constexpr float LightShaftsFullEffectScale = 1.0f;
+    constexpr float AtmosphereResponseSeconds = 0.075f;
+    // 演出強度が低くても、照明のにじみを一部残す。
+    constexpr float BloomBaseScale = 0.72f;
+    constexpr float BloomEffectScaleWeight = 0.28f;
+    constexpr float MaxAdjustedBloom = 1.25f;
+    // シーン露出にプレイヤーの明るさ設定を足した後に適用する範囲。
+    constexpr float MinCompositeExposure = 0.75f;
+    constexpr float MaxCompositeExposure = 1.34f;
+}
+
 namespace Effect
 {
     // 作業用のRenderTextureと各シェーダーを一度だけ作っている。
-    void PostProcess::Init()
+    bool PostProcess::Init()
     {
         m_EnableNoise = true;
         m_EnableBloom = true;
@@ -50,11 +70,15 @@ namespace Effect
         m_FearVisionHold = 0.0f;
 
         // 本描画のHDRの描き先を、そのまま写せるよう同じ形式にしている
-        m_RenderTexture.Init(
+        if (!m_RenderTexture.Init(
             Application::GetWidth(),
             Application::GetHeight(),
             Renderer::SceneHdrFormat
-        );
+        ))
+        {
+            MessageBoxW(nullptr, L"画面効果の描画テクスチャを作成できません。", L"描画エラー", MB_OK | MB_ICONERROR);
+            return false;
+        }
 
         // ブルームは縦横1/4の解像度で処理している。元の画面は拡大しないため、
         // 物の輪郭そのものははっきりしたまま、光っている部分だけが外側へにじむ。
@@ -63,9 +87,13 @@ namespace Effect
         // 明るさが1を超える値も残せるよう、16ビットの浮動小数点のテクスチャにしている（コンピュートシェーダーから書けるようUAV付き）
         constexpr DXGI_FORMAT bloomFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
-        m_BloomExtractTexture.Init(bloomWidth, bloomHeight, bloomFormat, true);
-        m_BloomHorizontalTexture.Init(bloomWidth, bloomHeight, bloomFormat, true);
-        m_BloomVerticalTexture.Init(bloomWidth, bloomHeight, bloomFormat, true);
+        if (!m_BloomExtractTexture.Init(bloomWidth, bloomHeight, bloomFormat, true) ||
+            !m_BloomHorizontalTexture.Init(bloomWidth, bloomHeight, bloomFormat, true) ||
+            !m_BloomVerticalTexture.Init(bloomWidth, bloomHeight, bloomFormat, true))
+        {
+            MessageBoxW(nullptr, L"画面効果の描画テクスチャを作成できません。", L"描画エラー", MB_OK | MB_ICONERROR);
+            return false;
+        }
 
         // 広くにじむ段は、1つ上の段の縦横半分（1/8・1/16・1/32）。小さくなりすぎないよう1画素で止める
         int levelWidth = bloomWidth;
@@ -74,18 +102,25 @@ namespace Effect
         {
             levelWidth = (std::max)(1, (levelWidth + 1) / 2);
             levelHeight = (std::max)(1, (levelHeight + 1) / 2);
-            m_WideBloomDownsampled[level].Init(levelWidth, levelHeight, bloomFormat, true);
-            m_WideBloomHorizontal[level].Init(levelWidth, levelHeight, bloomFormat, true);
-            m_WideBloomBlurred[level].Init(levelWidth, levelHeight, bloomFormat, true);
+            if (!m_WideBloomDownsampled[level].Init(levelWidth, levelHeight, bloomFormat, true) ||
+                !m_WideBloomHorizontal[level].Init(levelWidth, levelHeight, bloomFormat, true) ||
+                !m_WideBloomBlurred[level].Init(levelWidth, levelHeight, bloomFormat, true))
+            {
+                MessageBoxW(nullptr, L"画面効果の描画テクスチャを作成できません。", L"描画エラー", MB_OK | MB_ICONERROR);
+                return false;
+            }
         }
 
-        m_BloomExtractShader.Create("shader/bloomExtractCS.hlsl");
-        m_BloomHorizontalShader.Create("shader/bloomBlurHorizontalCS.hlsl");
-        m_BloomVerticalShader.Create("shader/bloomBlurVerticalCS.hlsl");
-        m_BloomDownsampleShader.Create("shader/bloomDownsampleCS.hlsl");
+        if (!m_BloomExtractShader.Create("shader/bloomExtractCS.hlsl") ||
+            !m_BloomHorizontalShader.Create("shader/bloomBlurHorizontalCS.hlsl") ||
+            !m_BloomVerticalShader.Create("shader/bloomBlurVerticalCS.hlsl") ||
+            !m_BloomDownsampleShader.Create("shader/bloomDownsampleCS.hlsl") ||
+            !m_AutoExposureShader.Create("shader/autoExposureCS.hlsl"))
+        {
+            return false;
+        }
 
-        // 自動露出：慣れた明るさ（対数）と倍率の2つの値を、Compute Shaderが書き、露出のシェーダーが読むバッファに置いている
-        m_AutoExposureShader.Create("shader/autoExposureCS.hlsl");
+        // 自動露出の順応状態と倍率は GPU 内で更新し、露出の PS と共有する。
         {
             ID3D11Device* device = Renderer::GetDevice();
             D3D11_BUFFER_DESC stateDesc{};
@@ -129,7 +164,7 @@ namespace Effect
         }
         m_ResetAutoExposure = true;
 
-        m_FullScreenQuad.Init();
+        return m_FullScreenQuad.Init();
     }
 
     // 作った物を解放している
@@ -171,9 +206,9 @@ namespace Effect
 
         // 走ったときや電池の警告の強さをなめらかにし、画面効果が一瞬で切り替わらないようにしている。
         m_NoiseAmount +=
-            (m_TargetNoiseAmount - m_NoiseAmount) * response(0.075f);
+            (m_TargetNoiseAmount - m_NoiseAmount) * response(AtmosphereResponseSeconds);
         m_VignetteStrength +=
-            (m_TargetVignetteStrength - m_VignetteStrength) * response(0.075f);
+            (m_TargetVignetteStrength - m_VignetteStrength) * response(AtmosphereResponseSeconds);
 
         // 暗い所へ入った後はゆっくり目を慣らし、懐中電灯や照明が戻ったときは
         // 素早く普段の露出へ戻すことで、人の目の慣れ方に近づけている。
@@ -431,13 +466,13 @@ namespace Effect
         // ポーズ中なども時間は進めている。ただし長い停止の後に一気に慣れないよう、1フレームの時間に上限を付けている
         params.DeltaTime = (std::min)(Application::GetDeltaTime(), 0.1f);
         // 目標の明るさ。1面の懐中電灯を点けた廊下（画面の明るさの平均が0.06〜0.12）で、倍率がほぼ1になる値にしている
-        params.TargetLuminance = 0.075f;
+        params.TargetLuminance = AutoExposureTargetLuminance;
         // 倍率の範囲：暗い所では最大8%明るくし、懐中電灯で近くの壁を照らしているときは、シーン側の持ち上げを少し弱める
-        params.MinGain = 0.95f;
-        params.MaxGain = 1.08f;
+        params.MinGain = AutoExposureMinGain;
+        params.MaxGain = AutoExposureMaxGain;
         // 暗い所へは約3秒かけてゆっくり、明るい所へは約0.4秒で素早く慣れる
-        params.DarkAdaptSpeed = 0.35f;
-        params.LightAdaptSpeed = 2.5f;
+        params.DarkAdaptSpeed = DarkAdaptationRatePerSecond;
+        params.LightAdaptSpeed = LightAdaptationRatePerSecond;
         params.Enabled = m_EnableAutoExposure ? 1.0f : 0.0f;
         params.ResetAdaptation = m_ResetAutoExposure ? 1.0f : 0.0f;
         m_ResetAutoExposure = false;
@@ -493,15 +528,16 @@ namespace Effect
         // ポーズメニューの「演出の強さ」を、各効果の強さに掛けている
         const float effectScale = m_UserEffectScale;
         const float adjustedBloom = (std::clamp)(
-            m_BloomIntensity * (0.72f + effectScale * 0.28f),
-            0.0f, 1.25f);
+            m_BloomIntensity * (BloomBaseScale + effectScale * BloomEffectScaleWeight),
+            0.0f, MaxAdjustedBloom);
         const float adjustedVignette = (std::clamp)(
             0.45f + (m_VignetteStrength - 0.45f) * effectScale,
             0.0f, 1.0f);
         // 軽い設定では、全画面の光の筋の描画を止めている。ブルームと懐中電灯そのものは
         // 残るため見やすさは変わらず、古いGPUで最も重い追加の描画だけを省ける。
         const float volumeQuality = (std::clamp)(
-            (effectScale - 0.75f) / 0.25f, 0.0f, 1.0f);
+            (effectScale - LightShaftsDisabledEffectScale) /
+                (LightShaftsFullEffectScale - LightShaftsDisabledEffectScale), 0.0f, 1.0f);
         // ブルームの段（1/4・1/8・1/16・1/32）を、合成のシェーダーへまとめて渡している
         std::array<ID3D11ShaderResourceView*, Graphics::FullScreenQuad::BloomLevelCount> bloomLevels{};
         bloomLevels[0] = m_BloomVerticalTexture.GetSRV();
@@ -523,7 +559,7 @@ namespace Effect
             m_LensDistortionStrength * effectScale,
             m_HorrorPulseStrength * effectScale,
             (std::clamp)(
-                m_Exposure + m_UserBrightnessOffset, 0.75f, 1.34f),
+                m_Exposure + m_UserBrightnessOffset, MinCompositeExposure, MaxCompositeExposure),
             m_LensMoisture,
             (std::clamp)(m_CorridorTension * effectScale, 0.0f, 1.0f),
             (std::clamp)(m_FilmGradeStrength * effectScale, 0.0f, 1.0f),
@@ -537,11 +573,11 @@ namespace Effect
             m_LensDropAge);
 
         // 最後に、HDRの画面を曲線で0〜1へ移して、バックバッファへ描いている（自動撮影・計測では --tonemap で曲線を選べる）
-        const int toneMapOverride = Tools::CaptureMode::GetToneMapOverride();
+        const auto toneMapOverride = Tools::CaptureMode::GetToneMapOverride();
         // デバッグ表示の間は、色分けがずれないよう曲線を掛けない
         const ToneMapMode toneMapMode = Renderer::GetDebugViewMode() != 0
             ? ToneMapMode::Passthrough
-            : (toneMapOverride >= 0 ? static_cast<ToneMapMode>(toneMapOverride) : m_ToneMapMode);
+            : toneMapOverride.value_or(m_ToneMapMode);
         Renderer::EndHdrScene();
         m_FullScreenQuad.DrawToneMap(Renderer::GetSceneHdrSRV(), static_cast<unsigned int>(toneMapMode));
     }

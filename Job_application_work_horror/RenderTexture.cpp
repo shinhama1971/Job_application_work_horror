@@ -4,10 +4,11 @@
 // ============================================================================
 
 #include "RenderTexture.h"
+#include "utility.h"
 
 namespace Graphics
 {
-    void RenderTexture::Init(
+    bool RenderTexture::Init(
         int width,
         int height,
         DXGI_FORMAT format,
@@ -15,8 +16,11 @@ namespace Graphics
     {
         ID3D11Device* device = Renderer::GetDevice();
 
-        m_Width = width;
-        m_Height = height;
+        Uninit();
+        if (device == nullptr || width <= 0 || height <= 0)
+        {
+            return false;
+        }
 
         // 描画先にもシェーダーの入力にもなるテクスチャを作っている（ミップマップなし、マルチサンプルなし）
         D3D11_TEXTURE2D_DESC texDesc{};
@@ -36,33 +40,14 @@ namespace Graphics
             texDesc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
         }
 
-        m_UAV.Reset();
-        m_DepthView.Reset();
-        m_DepthTexture.Reset();
-        device->CreateTexture2D(
-            &texDesc,
-            nullptr,
-            m_Texture.ReleaseAndGetAddressOf());
-
-        device->CreateRenderTargetView(
-            m_Texture.Get(),
-            nullptr,
-            m_RTV.ReleaseAndGetAddressOf()
-        );
-
-        device->CreateShaderResourceView(
-            m_Texture.Get(),
-            nullptr,
-            m_SRV.ReleaseAndGetAddressOf()
-        );
-
-        if (enableUnorderedAccess)
+        if (FAILED(device->CreateTexture2D(&texDesc, nullptr, m_Texture.GetAddressOf())) ||
+            FAILED(device->CreateRenderTargetView(m_Texture.Get(), nullptr, m_RTV.GetAddressOf())) ||
+            FAILED(device->CreateShaderResourceView(m_Texture.Get(), nullptr, m_SRV.GetAddressOf())) ||
+            (enableUnorderedAccess &&
+                FAILED(device->CreateUnorderedAccessView(m_Texture.Get(), nullptr, m_UAV.GetAddressOf()))))
         {
-            device->CreateUnorderedAccessView(
-                m_Texture.Get(),
-                nullptr,
-                m_UAV.ReleaseAndGetAddressOf()
-            );
+            Uninit();
+            return false;
         }
 
         // 描画先と深度バッファは同じ大きさで作っている。
@@ -78,16 +63,26 @@ namespace Graphics
             depthDesc.SampleDesc.Count = 1;
             depthDesc.Usage = D3D11_USAGE_DEFAULT;
             depthDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-            device->CreateTexture2D(
-                &depthDesc,
-                nullptr,
-                m_DepthTexture.ReleaseAndGetAddressOf());
-            device->CreateDepthStencilView(
-                m_DepthTexture.Get(),
-                nullptr,
-                m_DepthView.ReleaseAndGetAddressOf());
+            if (FAILED(device->CreateTexture2D(&depthDesc, nullptr, m_DepthTexture.GetAddressOf())) ||
+                FAILED(device->CreateDepthStencilView(m_DepthTexture.Get(), nullptr, m_DepthView.GetAddressOf())))
+            {
+                Uninit();
+                return false;
+            }
         }
 
+        m_Width = width;
+        m_Height = height;
+        return true;
+    }
+
+    void RenderTexture::InitRequired(int width, int height, const char* purpose,
+        DXGI_FORMAT format, bool enableUnorderedAccess)
+    {
+        if (!Init(width, height, format, enableUnorderedAccess))
+        {
+            utility::ReportFatalError(std::string("描画テクスチャを作成できません: ") + purpose);
+        }
     }
 
     void RenderTexture::Uninit()

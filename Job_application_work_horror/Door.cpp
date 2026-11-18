@@ -87,7 +87,7 @@ void Door::Init()
 
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
-    m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+    m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
     // 扉本体のマテリアル。色は頂点の色を使い、ニスの剥げかけた木として、やや粗い光沢にしている（PBR）
     m_Material = std::make_unique<Material>();
@@ -97,7 +97,7 @@ void Door::Init()
     material.Shininess = 8.0f;
     material.TextureEnable = FALSE;
     material.Roughness = 0.58f;
-    m_Material->Create(material);
+    m_Material->CreateRequired(material);
 
     // 取っ手のマテリアル。真鍮の金属で、手で触れて少し磨かれた粗さにしている（頂点の色が映り込みの色になる）。
     // 手の脂と汚れの膜の分だけ、金属らしさを少し下げている
@@ -105,7 +105,7 @@ void Door::Init()
     MATERIAL handleMaterial = material;
     handleMaterial.Metallic = 0.85f;
     handleMaterial.Roughness = 0.36f;
-    m_HandleMaterial->Create(handleMaterial);
+    m_HandleMaterial->CreateRequired(handleMaterial);
 
     // 漏れ光のマテリアル（光る色はDrawで毎回決め直している）
     m_LeakMaterial = std::make_unique<Material>();
@@ -113,7 +113,7 @@ void Door::Init()
     leakMaterial.Diffuse = Color(0.05f, 0.035f, 0.02f, 1.0f);
     leakMaterial.Emission = Color(0.08f, 0.035f, 0.015f, 1.0f);
     leakMaterial.TextureEnable = FALSE;
-    m_LeakMaterial->Create(leakMaterial);
+    m_LeakMaterial->CreateRequired(leakMaterial);
 
     // 扉の大きさ（幅30・高さ50・厚さ4）
     m_Scale = DoorSize;

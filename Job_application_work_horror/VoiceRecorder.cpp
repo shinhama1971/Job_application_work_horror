@@ -114,7 +114,7 @@ void VoiceRecorder::Init()
     BuildGeometry();
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
-    m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+    m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
     // 金属でない物のマテリアルを1つ作る関数（PBRの粗さを指定している）
     const auto createMaterial = [](const Color& diffuse, const Color& emission, float roughness)
@@ -129,7 +129,7 @@ void VoiceRecorder::Init()
         data.Metallic = 0.0f;
         data.Roughness = roughness;
         auto material = std::make_unique<Material>();
-        material->Create(data);
+        material->CreateRequired(data);
         return material;
     };
     const Color noEmission(0.0f, 0.0f, 0.0f, 1.0f);

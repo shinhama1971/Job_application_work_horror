@@ -23,11 +23,26 @@ Texture2D<float> g_PreviousSsrDepth : register(t17);
 // 環境マップ（t14。カメラの位置から6方向を撮った本物の景色。GameRendering の EnvironmentProbe。pbrLighting.hlsli と同じ物）。
 // 水たまりのレイ反射で、画面の外の物の色に使っている。撮れているときだけ ReflectionParams.w が1
 TextureCube g_RayEnvironmentProbe : register(t14);
-static const float RAY_ENVIRONMENT_MIP_COUNT = 9.0f; // 256画素から1画素まで（ReflectionProbe::FaceSize と合わせている）
 // 環境マップで読む一番小さい段（256画素の3段下 = 32画素。これより小さい段を引き伸ばすと四角いブロックが見える）
 static const float RAY_ENVIRONMENT_MAX_BLUR_MIP = 3.0f;
+static const float RAY_ENVIRONMENT_BLUR_ROUGHNESS_WEIGHT = 0.45f;
+static const float RAY_ENVIRONMENT_BLUR_DISTANCE = 400.0f;
+static const float RAY_ENVIRONMENT_MISS_BLUR = 0.6f;
 // SSRでぶつかった位置を、1つ前の歩幅との間で半分ずつ詰める回数（7回で歩幅の1/128まで詰まる）
 static const int SSR_REFINE_STEPS = 7;
+// 厚みと履歴の許容差はビュー空間の距離、画面端の幅は UV の割合。
+static const float SSR_MIN_HIT_THICKNESS = 3.0f;
+static const float SSR_HIT_THICKNESS_PER_DISTANCE = 0.06f;
+static const float SSR_MIN_HISTORY_TOLERANCE = 0.85f;
+static const float SSR_HISTORY_TOLERANCE_PER_DEPTH = 0.008f;
+static const float SSR_EDGE_FADE_UV = 0.13f;
+static const float SSR_HISTORY_FADE_START_RATIO = 0.45f;
+static const float SSR_HIT_HEIGHT_FADE_WIDTH = 1.5f;
+static const float SSR_STEP_FADE_START_RATIO = 0.65f;
+// スクリーン履歴の段数は ScreenSpaceReflection.cpp の HistoryMipLevels と合わせる。
+static const float SSR_HISTORY_MAX_BLUR_LOD = 3.0f;
+// ぼかしが小さい場合は、4方向のサンプリングを省いて元の画像を読む。
+static const float SSR_SINGLE_SAMPLE_BLUR_LIMIT = 0.35f;
 
 // SSR：反射の光線をビュー空間で少しずつ（だんだん大きな歩幅で）進め、画面の深度より奥へ入った所を「ぶつかった」とし、
 // 当たった面を前のフレームのカメラへ投影し直して、同じ位置の色を読む。前の画面で隠れていた面は使わない。
@@ -58,6 +73,8 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
     const float forwardSign = CausticProjection[2][3];
     float distance = 1.5f;
     float previousDistance = 0.0f;
+    // 出発点そのものは反射面。最初の試料を基準にし、自分自身を交差と判定しない。
+    float previousBehind = 1.0f;
     [loop]
     for (int step = 0; step < stepCount; ++step)
     {
@@ -78,13 +95,20 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
         const float sceneViewZ = depthOffset / (forwardSign * sceneDepth - depthScale);
         // 光線が面より奥に入り、その差が面の厚みとみなせる範囲なら、ぶつかったとしている（前方の符号を掛けて、カメラからの奥行きの差にしている）
         const float behind = (rayPosition.z - sceneViewZ) * forwardSign;
-        if (behind > 0.0f && behind < 3.0f + distance * 0.06f)
+        // 面の手前から奥へ入った区間だけを詰める。粗い歩幅で厚みを飛び越えても判定できる。
+        const bool crossed = previousBehind <= 0.0f && behind > 0.0f && sceneDepth < 1.0f;
+        const float bracketStart = previousDistance;
+        previousDistance = distance;
+        previousBehind = behind;
+        if (crossed)
         {
             // ぶつかった位置を、1つ前の歩幅との間で半分ずつ詰めている（二分探索）。
             // 大きな歩幅のまま色を読むと、映る物の位置がずれて階段状にぼやけるため
-            float nearDistance = previousDistance;
+            float nearDistance = bracketStart;
             float farDistance = distance;
-            float2 hitUv = uv;
+            const int2 pixel = int2(uv * dimensions);
+            float2 hitUv = (float2(pixel) + 0.5f) / dimensions;
+            float hitViewZ = sceneViewZ;
             [unroll]
             for (int refine = 0; refine < SSR_REFINE_STEPS; ++refine)
             {
@@ -100,6 +124,7 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
                 {
                     farDistance = middle;
                     hitUv = (float2(middlePixel) + 0.5f) / dimensions;
+                    hitViewZ = middleSceneZ;
                 }
                 else
                 {
@@ -108,8 +133,15 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
             }
             // 今の深度から当たった面のワールド位置を戻し、前のカメラでその点が見えていた画素を求める。
             const float2 hitNdc = float2(hitUv.x * 2.0f - 1.0f, 1.0f - hitUv.y * 2.0f);
-            const float hitDepth = g_SsrDepth.Load(int3(hitUv * dimensions, 0));
-            const float hitViewZ = depthOffset / (forwardSign * hitDepth - depthScale);
+            // 物体の縁で深度が急に変わっただけなら、詰めても面までの差が残る。
+            const float thickness = SSR_MIN_HIT_THICKNESS + farDistance * SSR_HIT_THICKNESS_PER_DISTANCE;
+            const float residual = abs((viewPosition.z + rayDirection.z * farDistance - hitViewZ) * forwardSign);
+            const float thicknessConfidence = 1.0f - smoothstep(thickness * 0.5f, thickness, residual);
+            if (thicknessConfidence <= 0.001f)
+            {
+                distance *= stepGrowth;
+                continue;
+            }
             // 投影の w は「前方の符号 × z」（カメラからの奥行き）なので、それを掛けて画面の位置からビュー空間の x・y を戻している
             const float hitViewW = forwardSign * hitViewZ;
             const float3 hitView = float3(
@@ -121,7 +153,6 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
             if (heightAboveMinimum <= 0.0f)
             {
                 // 水面近くの床を拾っても、光線の先にある壁や物を探し続ける。
-                previousDistance = distance;
                 distance *= stepGrowth;
                 continue;
             }
@@ -142,13 +173,13 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
             const float previousForwardSign = PreviousReflectionDepth.z;
             const float previousSceneDistance = previousForwardSign * PreviousReflectionDepth.y /
                 (previousForwardSign * previousDepth - PreviousReflectionDepth.x);
-            const float tolerance = 0.85f + previousClip.w * 0.008f;
-            const float depthConfidence = 1.0f - smoothstep(tolerance * 0.45f, tolerance,
+            const float tolerance = SSR_MIN_HISTORY_TOLERANCE + previousClip.w * SSR_HISTORY_TOLERANCE_PER_DEPTH;
+            const float depthConfidence = 1.0f - smoothstep(tolerance * SSR_HISTORY_FADE_START_RATIO, tolerance,
                 abs(previousSceneDistance - previousClip.w));
             const float2 edge = min(min(hitUv, 1.0f - hitUv), min(sampleUv, 1.0f - sampleUv));
-            const float fade = smoothstep(0.0f, 0.13f, min(edge.x, edge.y)) * depthConfidence *
-                smoothstep(0.0f, 1.5f, heightAboveMinimum) *
-                (1.0f - smoothstep(0.65f, 1.0f, float(step) / float(stepCount)));
+            const float fade = smoothstep(0.0f, SSR_EDGE_FADE_UV, min(edge.x, edge.y)) * depthConfidence * thicknessConfidence *
+                smoothstep(0.0f, SSR_HIT_HEIGHT_FADE_WIDTH, heightAboveMinimum) *
+                (1.0f - smoothstep(SSR_STEP_FADE_START_RATIO, 1.0f, float(step) / float(stepCount)));
             if (fade <= 0.001f)
             {
                 return 0.0f;
@@ -156,10 +187,10 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
             // 映る物までの距離（反射する面から）に合わせて、ぼかしている（最大3段 = 1/8 の大きさ相当）。
             // 小さい縮小画像を1点だけ読んで引き伸ばすと、四角いブロックが見えてかくかくするので、
             // 1段細かい縮小画像を、ぼかしの大きさの分だけ4方向にずらして読み、平均している（なめらかなぼけになる）
-            const float blurLevel = min(baseBlur + farDistance * blurPerDistance, 3.0f);
+            const float blurLevel = min(baseBlur + farDistance * blurPerDistance, SSR_HISTORY_MAX_BLUR_LOD);
             float3 reflected;
             [branch]
-            if (blurLevel < 0.35f)
+            if (blurLevel < SSR_SINGLE_SAMPLE_BLUR_LIMIT)
             {
                 reflected = g_SsrScene.SampleLevel(g_SamplerState, sampleUv, 0.0f).rgb;
             }
@@ -175,7 +206,6 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
             }
             return float4(reflected, fade);
         }
-        previousDistance = distance;
         distance *= stepGrowth;
     }
     return 0.0f;
@@ -432,7 +462,8 @@ float3 TraceRoomReflection(float3 origin, float3 direction, float roughness,
         const float3 probeDirection = hit ? normalize(hitPosition - probeCenter) : direction;
         // 離れた所ほど、粗い水面ほど、少しぼやけた段を読んでいる（遠くの映り込みのぼけ）。
         // 環境マップは1面256画素なので、32画素の段（3段目）より小さい段は読まない（四角いブロックが見えるため）
-        const float environmentBlur = saturate(roughness * 0.45f + (hit ? hitDistance / 400.0f : 0.6f));
+        const float environmentBlur = saturate(roughness * RAY_ENVIRONMENT_BLUR_ROUGHNESS_WEIGHT +
+            (hit ? hitDistance / RAY_ENVIRONMENT_BLUR_DISTANCE : RAY_ENVIRONMENT_MISS_BLUR));
         const float mipLevel = environmentBlur * RAY_ENVIRONMENT_MAX_BLUR_MIP;
         // キューブマップの面は左手系、このゲームの座標は右手系なので、z を反転して読んでいる（ReflectionProbe.cpp）
         const float3 environment = g_RayEnvironmentProbe.SampleLevel(g_SamplerState,

@@ -50,7 +50,7 @@ struct LIGHT
 	DirectX::SimpleMath::Vector4 Direction;	// ビュー空間での光の向き（手ぶれで少し揺れる）
 	DirectX::SimpleMath::Color Diffuse;		// 懐中電灯の光の色
 	DirectX::SimpleMath::Color Ambient;		// 環境光（光が当たらない場所の最低限の明るさ）
-	DirectX::SimpleMath::Vector4 SpotParams; // x=内側の円錐のcos、y=外側の円錐のcos、z=縁のぼかし指数、w=未使用
+	DirectX::SimpleMath::Vector4 SpotParams; // x=内側の円錐のcos、y=外側の円錐のcos、z=縁のぼかし指数、w=電池の弱り（0〜1）
 };
 
 // HLSLの定数バッファと同じ大きさになっているかを、コンパイル時に確かめている
@@ -239,7 +239,6 @@ private:
 	static DirectX::SimpleMath::Vector3 m_UnseenFigureOverride;
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pMaterialBuffer;
 	static LIGHT m_Light;
-	static bool m_LightEnable;
 
 	// UVの行列の定数バッファ
 	static Microsoft::WRL::ComPtr<ID3D11Buffer> m_pTextureBuffer;
@@ -268,7 +267,6 @@ public:
 	// 描いた画面を表示している（垂直同期あり。速い画面では約60fpsに抑える。計測モードは垂直同期なし）。
 	static void DrawEnd();
 	// 約60fpsにするために、垂直同期を何回待つか（画面の速さ ÷ 60 を四捨五入、1〜4）
-	static UINT GetPresentInterval();
 
 	// ウィンドウの大きさが変わったときに、バックバッファと深度バッファを作り直している。
 	// バッファは描画解像度のままにし、ウィンドウへの引き伸ばしは表示（Present）に任せている。
@@ -310,11 +308,11 @@ public:
 	static bool CreateVertexBufferWrite(unsigned int stride, unsigned int vertexnum, void* vertexdata, ID3D11Buffer** pVertexBuffer);
 
 	// 定数バッファを作っている（UpdateSubresourceで書き換える）
-	static bool CreateConstantBuffer(unsigned int bytesize, ID3D11Buffer** pConstantBuffer);
+	[[nodiscard]] static bool CreateConstantBuffer(unsigned int bytesize, ID3D11Buffer** pConstantBuffer);
+	static void CreateRequiredConstantBuffer(unsigned int bytesize, ID3D11Buffer** buffer, const char* purpose);
 	// CPUからMapで書き換える定数バッファ（DYNAMIC）を作っている。
-	static bool CreateConstantBufferWrite(unsigned int bytesize, ID3D11Buffer** pConstantBuffer);
 
-	// 懐中電灯と環境光を設定している。Enableは SetLightEnable の状態を優先している。
+	// 懐中電灯と環境光を設定している。懐中電灯の点灯は FlashlightEnabled で切り替える。
 	static void SetLight(LIGHT Light);
 	static LIGHT GetLight() { return m_Light; }
 	// デバッグ用のシェーダーの表示（法線・光源のタイルなど）を切り替えている。0で普段の表示。
@@ -375,8 +373,6 @@ public:
 	static void SetPlayerBody(const DirectX::SimpleMath::Vector3& footPosition, const DirectX::SimpleMath::Vector3& forward,
 		float swing, bool castsShadow);
 	// ライトの計算をするかを切り替える・返している
-	static void SetLightEnable(bool Enable);
-	static bool GetLightEnable();
 	// マテリアルを直接設定している
 	static void SetMaterial(MATERIAL Material);
 	// テクスチャのUVを拡大・移動する行列を設定している（スプライトの切り出し用）。

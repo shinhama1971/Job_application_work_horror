@@ -39,7 +39,7 @@ void BatteryItem::Init()
     BuildGeometry();
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
-    m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+    m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
     // 拡散色から環境光の色（拡散色の32%）を作り、マテリアルを1つ作る関数
     const auto createMaterial = [](
@@ -60,7 +60,7 @@ void BatteryItem::Init()
         data.Emission = emission;
         data.Shininess = shininess;
         data.TextureEnable = FALSE;
-        material->Create(data);
+        material->CreateRequired(data);
         return material;
     };
 
@@ -101,7 +101,7 @@ void BatteryItem::Update()
 // 電池が満タンのときは拾わない（後で必要になったときのために残している）
 void BatteryItem::Interact(Player& player)
 {
-    if (!m_IsActive || m_IsCollected || player.GetBattery() >= 100.0f)
+    if (!m_IsActive || m_IsCollected || player.IsBatteryFull())
     {
         return;
     }

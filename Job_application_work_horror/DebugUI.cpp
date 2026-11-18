@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "DebugUI.h"
+#include "GIUpdateSettings.h"
 
 #include "Game.h"
 #include "Ground.h"
@@ -59,6 +60,7 @@ namespace
     bool g_TileDepthBounds = true;
     // DDGI の間接光を使うか（使わない場合との比較用）
     bool g_GlobalIllumination = true;
+    int g_GIUpdateFrames = Effect::GIUpdateSettings::DefaultFrames;
     // 画面の明るさから目の慣れの倍率を求める自動露出を使うか（使わない場合との比較用）
     bool g_AutoExposure = true;
     // トーンマッピングの曲線（0 = ACES、1 = HDRにする前に近い曲線。Effect::ToneMapMode の番号）
@@ -287,6 +289,11 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
             // 深度プリパスの深度で、タイルの一番奥より奥の光源を外すか（Light tilesの表示で効果を比べられる）
             ImGui::Checkbox("Tile depth bounds (cull lights behind walls)", &g_TileDepthBounds);
             ImGui::Checkbox("DDGI indirect light (probes)", &g_GlobalIllumination);
+            if (g_GlobalIllumination)
+            {
+                ImGui::SliderInt("GI update over N frames", &g_GIUpdateFrames,
+                    Effect::GIUpdateSettings::MinFrames, Effect::GIUpdateSettings::MaxFrames);
+            }
             ImGui::Text("Spatial voices: %zu / %zu (X3DAudio)",
                 currentGame->GetActiveSpatialVoiceCount(),
                 Sound::MaxSpatialVoices);
@@ -494,6 +501,8 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         ImGui::RadioButton("Tone map: ACES (HDR)", &g_ToneMapMode, static_cast<int>(Effect::ToneMapMode::Aces));
         ImGui::SameLine();
         ImGui::RadioButton("Legacy (before HDR)", &g_ToneMapMode, static_cast<int>(Effect::ToneMapMode::Legacy));
+        ImGui::SameLine();
+        ImGui::RadioButton("Reinhard", &g_ToneMapMode, static_cast<int>(Effect::ToneMapMode::Reinhard));
         // 画面効果の値を1つずつ調整するスライダー（上書きをオンにしたときだけ操作できる）
         ImGui::Checkbox("Override post process", &g_OverridePostProcess);
         ImGui::BeginDisabled(!g_OverridePostProcess);
@@ -505,7 +514,8 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         ImGui::SliderFloat("Bloom", &g_BloomIntensity, 0.0f, 2.0f, "%.2f");
         ImGui::SliderFloat("Noise", &g_NoiseAmount, 0.0f, 0.50f, "%.3f");
         ImGui::SliderFloat("Vignette", &g_VignetteStrength, 0.0f, 1.20f, "%.2f");
-        ImGui::SliderFloat("Exposure", &g_Exposure, 0.85f, 1.20f, "%.3f");
+        ImGui::SliderFloat("Exposure", &g_Exposure,
+            Effect::PostProcess::MinimumSceneExposure, Effect::PostProcess::MaximumSceneExposure, "%.3f");
         ImGui::SliderFloat("Lens distortion", &g_LensDistortion, 0.0f, 0.80f, "%.2f");
         ImGui::SliderFloat("Corridor tension", &g_CorridorTension, 0.0f, 1.0f, "%.2f");
         ImGui::SliderFloat("Filmic split tone", &g_FilmGradeStrength, 0.0f, 1.0f, "%.2f");
@@ -590,6 +600,15 @@ bool Debug::UI::IsGlobalIlluminationEnabled()
     return g_GlobalIllumination;
 #else
     return true;
+#endif
+}
+
+int Debug::UI::GetGIUpdateFrames()
+{
+#if defined(ENABLE_IMGUI)
+    return g_GIUpdateFrames;
+#else
+    return Effect::GIUpdateSettings::DefaultFrames;
 #endif
 }
 

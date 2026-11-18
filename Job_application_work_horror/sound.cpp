@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 // X3DAudioInitialize / X3DAudioCalculate は XAudio2 2.9 のライブラリに含まれている。
 #pragma comment(lib, "xaudio2.lib")
@@ -127,12 +128,6 @@ HRESULT Sound::Init()
 			Uninit();
 			return hr;
 		}
-		if (SetFilePointer(hFile, 0, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER) {
-			hr = HRESULT_FROM_WIN32(GetLastError());
-			CloseHandle(hFile);
-			Uninit();
-			return hr;
-		}
 
 		// ファイルの形式がWAVEであることを確かめている。
 		hr = FindChunk(hFile, fourccRIFF, dwChunkSize, dwChunkPosition);
@@ -157,7 +152,8 @@ HRESULT Sound::Init()
 
 		// 音声の形式（fmtチャンク）を読み込んでいる
 		hr = FindChunk(hFile, fourccFMT, dwChunkSize, dwChunkPosition);
-		if (FAILED(hr) || hr == S_FALSE || dwChunkSize > sizeof(m_wfx[i]) ||
+		if (FAILED(hr) || hr == S_FALSE || dwChunkSize < offsetof(WAVEFORMATEX, cbSize) ||
+			dwChunkSize == offsetof(WAVEFORMATEX, cbSize) + 1 || dwChunkSize > sizeof(m_wfx[i]) ||
 			FAILED(ReadChunkData(hFile, &m_wfx[i], dwChunkSize, dwChunkPosition)))
 		{
 			CloseHandle(hFile);
@@ -165,9 +161,17 @@ HRESULT Sound::Init()
 			return FAILED(hr) ? hr : E_FAIL;
 		}
 
+		if (dwChunkSize >= sizeof(WAVEFORMATEX) &&
+			m_wfx[i].Format.cbSize > dwChunkSize - sizeof(WAVEFORMATEX))
+		{
+			CloseHandle(hFile);
+			Uninit();
+			return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+		}
+
 		// 音声データ（dataチャンク）の中身を、再生用のバッファへ読み込んでいる。
 		hr = FindChunk(hFile, fourccDATA, dwChunkSize, dwChunkPosition);
-		if (FAILED(hr) || hr == S_FALSE || dwChunkSize == 0)
+		if (FAILED(hr) || hr == S_FALSE || dwChunkSize == 0 || dwChunkSize > XAUDIO2_MAX_BUFFER_BYTES)
 		{
 			CloseHandle(hFile);
 			Uninit();
@@ -588,57 +592,71 @@ size_t Sound::GetActiveSpatialVoiceCount() const
 // RIFFの中のチャンクを先頭から順に見ていき、指定した種類（fourcc）のチャンクの大きさと位置を探している
 HRESULT Sound::FindChunk(HANDLE hFile, DWORD fourcc, DWORD& dwChunkSize, DWORD& dwChunkDataPosition)
 {
-	HRESULT hr = S_OK;
-	if (INVALID_SET_FILE_POINTER == SetFilePointer(hFile, 0, NULL, FILE_BEGIN))
+	dwChunkSize = 0;
+	dwChunkDataPosition = 0;
+	struct ChunkHeader { DWORD Id; DWORD Size; };
+	static_assert(sizeof(ChunkHeader) == 2 * sizeof(DWORD));
+
+	LARGE_INTEGER fileSize{};
+	if (!GetFileSizeEx(hFile, &fileSize))
 		return HRESULT_FROM_WIN32(GetLastError());
-	DWORD dwChunkType;
-	DWORD dwChunkDataSize;
-	DWORD dwRIFFDataSize = 0;
-	DWORD dwFileType;
-	DWORD bytesRead = 0;
-	DWORD dwOffset = 0;
-	while (hr == S_OK)
+
+	ChunkHeader riff{};
+	const HRESULT headerResult = ReadChunkData(hFile, &riff, sizeof(riff), 0);
+	if (FAILED(headerResult))
+		return headerResult;
+
+	const auto riffEnd = sizeof(riff) + static_cast<ULONGLONG>(riff.Size);
+	constexpr auto maxOffset = (std::numeric_limits<DWORD>::max)();
+	if (riff.Id != fourccRIFF || riff.Size < sizeof(DWORD) ||
+		riffEnd > static_cast<ULONGLONG>(fileSize.QuadPart) || riffEnd > maxOffset)
+		return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+
+	if (fourcc == fourccRIFF)
 	{
-		DWORD dwRead;
-		if (0 == ReadFile(hFile, &dwChunkType, sizeof(DWORD), &dwRead, NULL))
-			hr = HRESULT_FROM_WIN32(GetLastError());
-		if (0 == ReadFile(hFile, &dwChunkDataSize, sizeof(DWORD), &dwRead, NULL))
-			hr = HRESULT_FROM_WIN32(GetLastError());
-		switch (dwChunkType)
+		dwChunkSize = sizeof(DWORD); // 親チャンクの先頭に WAVE の形式識別子がある。
+		dwChunkDataPosition = sizeof(riff);
+		return S_OK;
+	}
+
+	// RIFF の境界の内側だけを調べ、奇数長のチャンクに続くパディングを飛ばす。
+	for (ULONGLONG offset = sizeof(riff) + sizeof(DWORD); offset < riffEnd;)
+	{
+		if (riffEnd - offset < sizeof(ChunkHeader))
+			return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+
+		ChunkHeader chunk{};
+		const HRESULT result = ReadChunkData(hFile, &chunk, sizeof(chunk), static_cast<DWORD>(offset));
+		if (FAILED(result))
+			return result;
+
+		const auto dataOffset = offset + sizeof(chunk);
+		const auto dataEnd = dataOffset + chunk.Size;
+		if (dataEnd > riffEnd)
+			return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+		if (chunk.Id == fourcc)
 		{
-		case fourccRIFF:
-			dwRIFFDataSize = dwChunkDataSize;
-			dwChunkDataSize = 4;
-			if (0 == ReadFile(hFile, &dwFileType, sizeof(DWORD), &dwRead, NULL))
-				hr = HRESULT_FROM_WIN32(GetLastError());
-			break;
-		default:
-			if (INVALID_SET_FILE_POINTER == SetFilePointer(hFile, dwChunkDataSize, NULL, FILE_CURRENT))
-				return HRESULT_FROM_WIN32(GetLastError());
-		}
-		dwOffset += sizeof(DWORD) * 2;
-		if (dwChunkType == fourcc)
-		{
-			dwChunkSize = dwChunkDataSize;
-			dwChunkDataPosition = dwOffset;
+			dwChunkSize = chunk.Size;
+			dwChunkDataPosition = static_cast<DWORD>(dataOffset);
 			return S_OK;
 		}
-		dwOffset += dwChunkDataSize;
-		if (bytesRead >= dwRIFFDataSize) return S_FALSE;
+		offset = dataEnd + (chunk.Size & 1u);
 	}
-	return S_OK;
+	return S_FALSE;
 }
 
-// 指定した位置から、指定した大きさだけデータを読み込んでいる
+// ReadFile は EOF でも成功を返すことがあるため、要求した長さまで読めたか確認する。
 HRESULT Sound::ReadChunkData(HANDLE hFile, void* buffer, DWORD buffersize, DWORD bufferoffset)
 {
-	HRESULT hr = S_OK;
-	if (INVALID_SET_FILE_POINTER == SetFilePointer(hFile, bufferoffset, NULL, FILE_BEGIN))
+	LARGE_INTEGER offset{};
+	offset.QuadPart = bufferoffset;
+	if (!SetFilePointerEx(hFile, offset, nullptr, FILE_BEGIN))
 		return HRESULT_FROM_WIN32(GetLastError());
-	DWORD dwRead;
-	if (0 == ReadFile(hFile, buffer, buffersize, &dwRead, NULL))
-		hr = HRESULT_FROM_WIN32(GetLastError());
-	return hr;
+
+	DWORD bytesRead = 0;
+	if (!ReadFile(hFile, buffer, buffersize, &bytesRead, nullptr))
+		return HRESULT_FROM_WIN32(GetLastError());
+	return bytesRead == buffersize ? S_OK : HRESULT_FROM_WIN32(ERROR_HANDLE_EOF);
 }
 
 //=============================================================================

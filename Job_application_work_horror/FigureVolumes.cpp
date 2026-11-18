@@ -93,7 +93,10 @@ namespace Effect
         sampler.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
         sampler.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
         sampler.MaxLOD = D3D11_FLOAT32_MAX;
-        Renderer::GetDevice()->CreateSamplerState(&sampler, m_Sampler.GetAddressOf());
+        if (FAILED(Renderer::GetDevice()->CreateSamplerState(&sampler, m_Sampler.ReleaseAndGetAddressOf())))
+        {
+            utility::ReportFatalError("距離場のサンプラーを作成できません。");
+        }
     }
 
     void FigureVolumes::Bind() const

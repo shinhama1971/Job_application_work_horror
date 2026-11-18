@@ -104,7 +104,6 @@ Vector3 Renderer::m_PuddleFigureOverride;
 Vector3 Renderer::m_UnseenFigureOverride;
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pMaterialBuffer;
 LIGHT Renderer::m_Light{};
-bool Renderer::m_LightEnable = true;
 // UVの行列の定数バッファ（b5）
 Microsoft::WRL::ComPtr<ID3D11Buffer> Renderer::m_pTextureBuffer;
 // 深度の書き込みあり・なしの状態
@@ -571,42 +570,6 @@ void Renderer::DrawStart()
 }
 
 //--------------------------------------------------------------------------------------
-// 垂直同期を何回待って画面を出すか（Presentの第1引数）を、ウィンドウがある画面の速さから決めている。
-// 画面の速さ ÷ 60 を四捨五入した回数を待つので、60Hzでは毎回（60fps）、120Hzでは2回に1回（60fps）、
-// 144Hzでは2回に1回（72fps）になる。ウィンドウを別の画面へ移しても合うよう、約1秒ごとに画面の速さを読み直している
-UINT Renderer::GetPresentInterval()
-{
-	constexpr UINT targetFramesPerSecond = 60;
-	constexpr UINT maximumInterval = 4;         // Presentが受け付ける最大の待つ回数
-	constexpr int framesBetweenRefreshCheck = 60;
-	static UINT interval = 1;
-	static int framesUntilCheck = 0;
-	if (--framesUntilCheck > 0)
-	{
-		return interval;
-	}
-	framesUntilCheck = framesBetweenRefreshCheck;
-
-	MONITORINFOEXW monitorInfo{};
-	monitorInfo.cbSize = sizeof(monitorInfo);
-	DEVMODEW displayMode{};
-	displayMode.dmSize = sizeof(displayMode);
-	const HMONITOR monitor = MonitorFromWindow(Application::GetWindow(), MONITOR_DEFAULTTONEAREST);
-	// 画面の速さが読めないとき（0や1は「既定の速さ」の意味）は、毎回待つ（これまでと同じ）
-	if (!GetMonitorInfoW(monitor, &monitorInfo) ||
-		!EnumDisplaySettingsW(monitorInfo.szDevice, ENUM_CURRENT_SETTINGS, &displayMode) ||
-		displayMode.dmDisplayFrequency <= 1)
-	{
-		interval = 1;
-		return interval;
-	}
-	const UINT refreshRate = displayMode.dmDisplayFrequency;
-	interval = (refreshRate + targetFramesPerSecond / 2) / targetFramesPerSecond;
-	interval = (std::min)((std::max)(interval, 1u), maximumInterval);
-	return interval;
-}
-
-//--------------------------------------------------------------------------------------
 //描画終了
 // 描画終了：描いた画面を表示している
 void Renderer::DrawEnd()
@@ -621,7 +584,6 @@ void Renderer::DrawEnd()
 		}
 	}
 
-	// ダブルバッファを入れ替えて画面を更新している（普段は垂直同期を待っている）。
 	// 計測モード（--benchmark）は垂直同期を待たず、本来の処理時間を測れるようにしている（--vsync を付けたときは待つ）。
 	if (Tools::CaptureMode::IsBenchmark())
 	{
@@ -631,9 +593,9 @@ void Renderer::DrawEnd()
 			std::chrono::steady_clock::now() - presentStart).count());
 		return;
 	}
-	// 画面の速さが60Hzより速いとき（120Hz・144Hzなど）は、垂直同期を2回以上待って、毎秒60枚前後に抑えている
-	// （GPUの仕事が半分ほどになり、ノートPCのファンの音と熱が減る。ゆっくり歩くホラーなので、60fpsでも遊びやすさは変わらない）
-	const HRESULT presentResult = m_pSwapChain->Present(GetPresentInterval(), 0);
+	// 通常プレイの周期はApplicationで決める。Presentでは垂直同期を待たない。
+	// 自動撮影の動画時間はCaptureModeが管理する。
+	const HRESULT presentResult = m_pSwapChain->Present(Tools::CaptureMode::IsActive() ? 1 : 0, 0);
 
 	// GPUのドライバーが再起動した（デバイスの消失）ときは、そのまま描き続けても画面が止まったままになる。
 	// 原因の候補を一度だけ伝えて、ゲームを終わらせている。

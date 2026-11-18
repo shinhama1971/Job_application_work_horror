@@ -12,25 +12,7 @@ struct PS_IN
 };
 
 // 画面効果の値（FullScreenQuad.cppのTimeBufferと同じ並び。ここではブルームの強さ・縦横比・レンズの汚れを使っている）
-cbuffer BloomCompositeBuffer : register(b0)
-{
-    float time;
-    float bloomIntensity;
-    float noiseAmount;
-    float vignetteStrength;
-    float screenAspect;
-    float volumeIntensity;
-    float lensDistortionStrength;
-    float horrorPulseStrength;
-    float exposure;
-    float lensMoisture;
-    float corridorTension;
-    float filmGradeStrength;
-    float lensDirtStrength;
-    float postProcessPadding0;
-    float postProcessPadding1;
-    float postProcessPadding2;
-};
+#include "postProcessBuffer.hlsli"
 
 // レンズの汚れのむらを、sinを重ねた模様で作っている（0〜1）
 float LensDirtWave(float2 uv)

@@ -126,7 +126,7 @@ public:
     // 信号盤の目印のように、専用のピクセルシェーダー（signalPanelPS）で模様を描く面にするか
     void SetSignalSurface(bool enabled)
     {
-        m_Shader.Create(
+        m_Shader.CreateRequired(
             "shader/litTextureVS.hlsl",
             enabled
                 ? "shader/signalPanelPS.hlsl"
@@ -137,7 +137,7 @@ public:
     void SetPortraitSurface()
     {
         m_HasSurfaceParams = true;
-        m_Shader.Create("shader/litTextureVS.hlsl", "shader/portraitPS.hlsl");
+        m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/portraitPS.hlsl");
     }
     // 肖像画の目の状態（開き具合0〜1、瞳の向き-1〜1の横と縦、瞳の赤い光0〜1）を設定している。
     // 絵のシェーダーには、肖像画では使っていないマテリアルの環境の色（Ambient）に入れて渡している
@@ -146,7 +146,7 @@ public:
     void SetClockSurface()
     {
         m_HasSurfaceParams = true;
-        m_Shader.Create("shader/litTextureVS.hlsl", "shader/clockPS.hlsl");
+        m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/clockPS.hlsl");
     }
     // 時計の針の角度（12時が0、右回りが+）を設定している（文字盤のシェーダーが針を描く）
     void SetClockHands(float hourAngle, float minuteAngle);
@@ -154,7 +154,7 @@ public:
     void SetDoorSurface()
     {
         m_HasSurfaceParams = true;
-        m_Shader.Create("shader/litTextureVS.hlsl", "shader/doorPS.hlsl");
+        m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/doorPS.hlsl");
     }
     // 絵を計算で描く面へ渡す値（肖像画は目の状態、時計は針の角度、扉は取っ手の側）を設定している。
     // シェーダーには、これらの面では使っていないマテリアルの環境の色（Ambient）に入れて渡している
@@ -165,7 +165,7 @@ public:
     void SetMirrorSurface()
     {
         m_IsMirror = true;
-        m_Shader.Create("shader/litTextureVS.hlsl", "shader/mirrorPS.hlsl");
+        m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/mirrorPS.hlsl");
     }
 
     // 見た目を、Mayaで作ったモデル（tools/maya/build_wall_props.py）にしている。空の名前なら箱に戻している。
@@ -203,7 +203,6 @@ public:
     // 光る色と、照らす点光源の強さに掛ける倍率（0 = 消えている、1 = 配置ファイルのまま）。
     // 外の森の街灯のちらつきや、研究所の窓の明かりが消える演出（ForestEvents）で使っている
     void SetEmissionScale(float scale);
-    float GetEmissionScale() const { return m_EmissionScale; }
 
     // 照らす設定なら、点光源を1つ登録している
     void CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const override;

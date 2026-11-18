@@ -29,9 +29,11 @@ namespace MapLayout.Editor
             public string Command => Tokens.Count > 0 ? Tokens[0].Text : string.Empty;
             public string Text => Content + Comment;
 
-            public static Line Parse(string text)
+            private string SourceLocation { get; set; }
+
+            public static Line Parse(string text, string sourcePath = null, int lineNumber = 0)
             {
-                var line = new Line();
+                var line = new Line { SourceLocation = sourcePath == null ? "配置行" : $"{sourcePath}:{lineNumber}" };
                 var hash = text.IndexOf('#');
                 line.Content = hash >= 0 ? text.Substring(0, hash) : text;
                 line.Comment = hash >= 0 ? text.Substring(hash) : string.Empty;
@@ -44,13 +46,21 @@ namespace MapLayout.Editor
 
             public float Number(int index)
             {
-                return float.Parse(Tokens[index].Text, CultureInfo.InvariantCulture);
+                if (index < 0 || index >= Tokens.Count)
+                    throw new FormatException($"{SourceLocation} {Command}: {index + 1}列目の数値がありません。");
+
+                var token = Tokens[index].Text;
+                if (!float.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ||
+                    float.IsNaN(value) || float.IsInfinity(value))
+                    throw new FormatException($"{SourceLocation} {Command}: {index + 1}列目の「{token}」は有限の数値ではありません。");
+
+                return value;
             }
 
             // index 番目の値を書き換えている（数値が同じなら、元の書き方のまま残す）
             public void SetNumber(int index, float value)
             {
-                if (Mathf.Abs(Number(index) - value) < 0.0005f)
+                if (Mathf.Abs(Number(index) - value) < NumberChangeTolerance)
                 {
                     return;
                 }
@@ -104,6 +114,11 @@ namespace MapLayout.Editor
             public string Text;
         }
 
+        // 3桁で丸めて保存するため、末尾桁の半分未満の差では元の表記を維持する。
+        private const float NumberChangeTolerance = 0.0005f;
+        private const int SaveRetryCount = 10;
+        private const int SaveRetryDelayMilliseconds = 50;
+
         public readonly List<Line> Lines = new List<Line>();
         // color 行の名前と色（光らない none は、ゲームと同じく最初から黒）
         public readonly Dictionary<string, Color> Colors = new Dictionary<string, Color> { { "none", Color.black } };
@@ -112,12 +127,15 @@ namespace MapLayout.Editor
         {
             var document = new MapLayoutDocument();
             var text = File.ReadAllText(path, Encoding.UTF8);
+            var lineNumber = 0;
             foreach (var raw in text.Replace("\r\n", "\n").Split('\n'))
             {
-                var line = Line.Parse(raw);
+                var line = Line.Parse(raw, path, ++lineNumber);
                 document.Lines.Add(line);
-                if (line.Command == "color" && line.Tokens.Count >= 5)
+                if (line.Command == "color")
                 {
+                    if (line.Tokens.Count < 5)
+                        throw new FormatException($"{path}:{lineNumber} color: 名前と RGB の3値が必要です。");
                     document.Colors[line.Tokens[1].Text] = new Color(line.Number(2), line.Number(3), line.Number(4));
                 }
             }
@@ -159,9 +177,9 @@ namespace MapLayout.Editor
                     }
                     return;
                 }
-                catch (IOException) when (attempt < 10)
+                catch (IOException) when (attempt < SaveRetryCount)
                 {
-                    System.Threading.Thread.Sleep(50);
+                    System.Threading.Thread.Sleep(SaveRetryDelayMilliseconds);
                 }
             }
         }

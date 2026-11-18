@@ -20,7 +20,7 @@ void PipeProp::Init()
         modelDirectory + "/Pipe90_DefaultMaterial_AlbedoTransparency.jpg");
 
     SetModelBounds(m_ModelData->LocalBounds);
-    m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+    m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
     // FBXの中の高度なマテリアルは今のRendererでは扱えないので、Albedo（色）のテクスチャだけをはっきり指定して使っている。
     const bool albedoLoaded = m_ModelData->AlbedoOverride != nullptr;
@@ -45,7 +45,7 @@ void PipeProp::Init()
         materialData.Roughness = 0.38f;
 
         auto material = std::make_unique<Material>();
-        material->Create(materialData);
+        material->CreateRequired(materialData);
         material->SetShader(&m_Shader);
         if (albedoLoaded)
         {

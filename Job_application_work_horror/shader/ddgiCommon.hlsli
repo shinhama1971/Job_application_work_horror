@@ -40,7 +40,9 @@ cbuffer DDGIBuffer : register(b0)
     float2 OutputSize;
     float2 ViewportOffset;
     float MaxRayDistance;       // 光線を追う一番遠い距離（どこにも当たらなければこの距離）
-    float DDGIPadding;
+    uint ProbeUpdateStride;     // 全プローブを何フレームに分けて更新するか
+    uint ProbeUpdatePhase;      // このフレームで更新する、通し番号の余り
+    uint3 DDGIPadding;
 };
 
 // 放射照度の画像（1プローブ = 8x8画素 + まわり1画素の縁）と、距離の画像（16x16画素 + 縁。x = 平均、y = 2乗の平均）。
@@ -172,9 +174,9 @@ uint GetProbeCount()
 }
 
 // プローブの格子の位置（x・y・z）と通し番号の行き来
-uint GetProbeIndex(uint3 grid)
+uint GetUpdatingProbeIndex(uint groupIndex)
 {
-    return grid.x + ProbeCounts.x * (grid.y + ProbeCounts.y * grid.z);
+    return groupIndex * ProbeUpdateStride + ProbeUpdatePhase;
 }
 
 uint3 GetProbeGrid(uint index)

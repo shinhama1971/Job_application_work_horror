@@ -143,7 +143,7 @@ public:
         const VERTEX_3D bottomLeft{ Vector3(-MonitorHalfWidth, -MonitorHalfHeight, 0.0f), normal, white, Vector2(0.0f, 1.0f) };
         const VERTEX_3D bottomRight{ Vector3(MonitorHalfWidth, -MonitorHalfHeight, 0.0f), normal, white, Vector2(1.0f, 1.0f) };
         m_VertexBuffer.Create({ topLeft, topRight, bottomLeft, bottomLeft, topRight, bottomRight });
-        m_Shader.Create("shader/litTextureVS.hlsl", "shader/surveillanceFeedPS.hlsl");
+        m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/surveillanceFeedPS.hlsl");
     }
     void Update() override {}
     void Uninit() override {}
@@ -296,7 +296,7 @@ Stage3Scene::Stage3Scene()
     m_Rain->SetIntensity(0.0f);
     for (auto& feed : m_Feeds)
     {
-        feed.Init(FeedWidth, FeedHeight);
+        feed.InitRequired(FeedWidth, FeedHeight, "通信室の監視映像");
     }
 
     game.SetPowerRestored(true);

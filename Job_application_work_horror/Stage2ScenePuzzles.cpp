@@ -473,7 +473,10 @@ void Stage2Scene::AdvanceLoop(Player& player)
     game->GetPostProcess()->TriggerBloomPulse(
         0.46f + static_cast<float>(m_LoopCount) * 0.08f,
         0.26f);
-    Input::SetVibration(6 + m_LoopCount * 3, 0.18f);
+    constexpr int LoopVibrationStrength = 6;
+    constexpr int VibrationIncreasePerLoop = 3;
+    constexpr float LoopVibrationSeconds = 0.18f;
+    Input::SetVibration(LoopVibrationStrength + m_LoopCount * VibrationIncreasePerLoop, LoopVibrationSeconds);
 
     // 周回の数だけ、入口の右の壁に傷の印を出している
     for (int markIndex = 0; markIndex < 3; ++markIndex)
@@ -1040,9 +1043,12 @@ void Stage2Scene::UpdateSignalStalker()
 // 偽の扉の表示と位置を切り替えている。右側に移るときは、入口寄り（z=-88）の右の壁に置いている
 void Stage2Scene::SetFalseDoorState(bool visible, bool rightSide)
 {
-    m_FalseDoorAnomaly.SetVisualState(visible, rightSide);
-    const float surfaceX = rightSide ? 39.3f : -39.3f;
-    const float frameX = rightSide ? 39.0f : -39.0f;
+    m_FalseDoorAnomaly.SetVisible(visible);
+    // パネルと枠を少しずらして、表面が重ならないように配置する。
+    constexpr float FalseDoorSurfaceOffsetX = 39.3f;
+    constexpr float FalseDoorFrameOffsetX = 39.0f;
+    const float surfaceX = rightSide ? FalseDoorSurfaceOffsetX : -FalseDoorSurfaceOffsetX;
+    const float frameX = rightSide ? FalseDoorFrameOffsetX : -FalseDoorFrameOffsetX;
     const float handleX = rightSide ? Stage2FalseDoorHandleX : -Stage2FalseDoorHandleX;
     const float centerZ = rightSide ? Stage2FalseDoorRightZ : Stage2FalseDoorLeftZ;
 

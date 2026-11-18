@@ -186,7 +186,7 @@ void ForestGrass::Init()
     wchar_t disabled[2]{};
     m_Disabled = GetEnvironmentVariableW(L"SIGNAL_LOST_DISABLE_FOREST_GRASS", disabled, 2) == 1 && disabled[0] == L'1';
     if (m_Disabled) return;
-    m_Shader.Create("shader/grassVS.hlsl", "shader/grassPS.hlsl", true);
+    m_Shader.CreateRequired("shader/grassVS.hlsl", "shader/grassPS.hlsl", true);
     if (!m_SimulationShader.Create("shader/grassCS.hlsl"))
     {
         utility::ReportFatalError("草の Compute Shader の作成に失敗しました。");
@@ -601,8 +601,8 @@ void ForestGrass::Draw(Camera* camera)
 
     // 草のLODの描画設定：0 = LODなし（全部の葉を5節で）、1 = LODあり（普段）、2 = LODを色で表示。
     // 「草をカメラの上方向へ曲げる」：上から見下ろしたとき、葉の面を見せる（授業資料 p.23）
-    const int lodMode = Tools::TechDemo::GetGrassLodMode();
-    const float cameraBend = Tools::TechDemo::UsesGrassCameraBend() ? 1.0f : 0.0f;
+    constexpr auto lodMode = Tools::TechDemo::DefaultGrassLodMode;
+    const float cameraBend = Tools::TechDemo::UseGrassCameraBend ? 1.0f : 0.0f;
     const Vector3 eye = camera->GetPosition();
     for (const Chunk& chunk : m_Chunks)
     {
@@ -616,7 +616,7 @@ void ForestGrass::Draw(Camera* camera)
         float fraction = 1.0f;
         std::uint32_t segments = NearSegments;
         std::uint32_t lodLevel = 1;
-        if (lodMode == 0)
+        if constexpr (lodMode == Tools::TechDemo::GrassLodMode::Off)
         {
             // LODなし：遠くまで全部の葉を一番細かく描く（比べるための方式）
         }
@@ -643,7 +643,7 @@ void ForestGrass::Draw(Camera* camera)
         params.CameraPosition = eye;
         params.FadeEnd = FadeEnd;
         params.LodLevel = lodLevel;
-        params.ShowLodColors = lodMode == 2 ? 1u : 0u;
+        params.ShowLodColors = lodMode == Tools::TechDemo::GrassLodMode::DebugColors ? 1u : 0u;
         params.CameraBend = cameraBend;
         context->UpdateSubresource(m_DrawParams.Get(), 0, nullptr, &params, 0, 0);
         // 葉1本 = 1インスタンス。節が n なら、左右の頂点 2n 個と、とがった先の1個の三角形の帯

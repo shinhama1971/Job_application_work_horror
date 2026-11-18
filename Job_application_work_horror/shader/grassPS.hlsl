@@ -75,7 +75,7 @@ float4 main(GRASS_PS_IN input) : SV_TARGET
     lighting += GetFlashlightSpillLight(input.viewPos, viewNormal);
     float3 color = input.color * lighting + specular;
     const float distanceFog = GetHorrorDistanceFog(distanceFromCamera, LoopDepth);
-    const float heightDensity = exp(-max(input.worldPos.y + 100.0f, 0.0f) * 0.055f);
+    const float heightDensity = exp(-max(input.worldPos.y - SCENE_BASE_FLOOR_Y, 0.0f) * 0.055f);
     const float heightFog = heightDensity * smoothstep(35.0f, 150.0f, distanceFromCamera) *
         (0.78f + FastValueNoise(input.worldPos.xz * 0.018f + 21.0f) * 0.22f) * 0.22f * GetHorrorHeightFogScale(LoopDepth);
     color = lerp(color, GetHorrorFogColor(Light.Ambient.rgb, LoopDepth), saturate(distanceFog + heightFog));

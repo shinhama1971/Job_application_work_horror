@@ -136,7 +136,6 @@ private:
 public:
     // 雨漏りを足す（最大 MaxLeakCount 個）・すべて消す・今の雨漏りの一覧
     void AddLeak(const DirectX::SimpleMath::Vector2& center, float maxRadius, float growSeconds);
-    void ClearLeaks() { m_Leaks.clear(); }
     const std::vector<Leak>& GetLeaks() const { return m_Leaks; }
 
     const PuddleCellBufferData& GetPuddleCellData() const { return m_PuddleCellData; }

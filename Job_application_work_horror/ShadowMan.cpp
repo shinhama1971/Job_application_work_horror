@@ -73,13 +73,13 @@ void ShadowMan::Init()
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
     // 崩れて消える表現のピクセルシェーダーを使っている
-    m_Shader.Create(
+    m_Shader.CreateRequired(
         "shader/litTextureVS.hlsl",
         "shader/shadowDissolvePS.hlsl");
 
-    Renderer::CreateConstantBuffer(
+    Renderer::CreateRequiredConstantBuffer(
         sizeof(DissolveBuffer),
-        m_DissolveBuffer.ReleaseAndGetAddressOf());
+        m_DissolveBuffer.ReleaseAndGetAddressOf(), "影の溶解演出");
 
     MATERIAL material{};
     material.Diffuse = Color(0.70f, 0.74f, 0.70f, 1.0f);
@@ -87,7 +87,7 @@ void ShadowMan::Init()
     material.Shininess = 1.0f;
     material.TextureEnable = FALSE;
     m_Material = std::make_unique<Material>();
-    m_Material->Create(material);
+    m_Material->CreateRequired(material);
 
     // 人の背丈くらいの大きさ（高さ16倍で約30）
     m_Scale = ShadowSize;

@@ -42,6 +42,7 @@ namespace Debug
         static bool IsTileDepthBoundsEnabled();
         // DDGI の間接光を使うか（使わない場合との比較用。Release 版ではいつも使う）
         static bool IsGlobalIlluminationEnabled();
+        static int GetGIUpdateFrames();
         // 描いた物と省いた物の数を受け取っている（デバッグ画面に表示するため）
         static void SetCullingStats(
             unsigned int mainDrawn,

@@ -5,6 +5,7 @@
 
 #include "Renderer.h"
 #include "Application.h"
+#include "utility.h"
 
 #include <algorithm>
 #include <execution>
@@ -29,8 +30,8 @@ namespace
 	std::unordered_map<std::wstring, std::filesystem::file_time_type> g_SourceTimes;
 
 	// source と、そこから #include "名前" で読んでいるファイル（読む側のファイルと同じフォルダから探す。D3DCompileFromFile と同じ）の
-	// うち、一番新しい更新時刻を返している。ファイルがなければ一番古い時刻を返す（配布用のフォルダには .hlsl を入れないため、
-	// そのときは .cso をそのまま使える）。visiting は、今たどっている途中のファイル（互いに読み合うファイルで止まらないため）
+	// うち、一番新しい更新時刻を返す。読み取れない依存先があればコンパイラに原因を報告させる。
+	// visiting は循環参照を止めるため、今たどっているファイルだけを保持する。
 	std::filesystem::file_time_type GetShaderSourceTime(
 		const std::filesystem::path& source, std::vector<std::wstring>& visiting)
 	{
@@ -47,8 +48,7 @@ namespace
 		std::filesystem::file_time_type newest = std::filesystem::last_write_time(source, error);
 		if (error)
 		{
-			// （Windows の min マクロと区別するため、括弧で囲んでいる）
-			return (std::filesystem::file_time_type::min)();
+			return (std::filesystem::file_time_type::max)();
 		}
 		if (std::find(visiting.begin(), visiting.end(), key) != visiting.end())
 		{
@@ -57,6 +57,11 @@ namespace
 		visiting.push_back(key);
 		// 行の頭の #include "名前" を探し、読んでいるファイルの時刻も比べている（コメントの中の #include は、行の頭にないので数えない）
 		std::ifstream file(source);
+		if (!file)
+		{
+			visiting.pop_back();
+			return (std::filesystem::file_time_type::max)();
+		}
 		std::string line;
 		while (std::getline(file, line))
 		{
@@ -76,7 +81,10 @@ namespace
 		}
 		visiting.pop_back();
 		std::lock_guard<std::mutex> lock(g_SourceTimeMutex);
-		g_SourceTimes.emplace(key, newest);
+		if (newest != (std::filesystem::file_time_type::max)())
+		{
+			g_SourceTimes.emplace(key, newest);
+		}
 		return newest;
 	}
 
@@ -91,7 +99,14 @@ namespace
 			return false;
 		}
 		std::vector<std::wstring> visiting;
-		return compiledTime >= GetShaderSourceTime(sourcePath, visiting);
+		// 配布版はルートのソースを同梱しない。開発版では依存先も検証する。
+		const bool hasSource = std::filesystem::exists(sourcePath, error);
+		if (error || !hasSource)
+		{
+			return !error;
+		}
+		const auto sourceTime = GetShaderSourceTime(sourcePath, visiting);
+		return sourceTime != (std::filesystem::file_time_type::max)() && compiledTime >= sourceTime;
 	}
 
 	// .hlsl を1つコンパイルし、成功したら隣に .cso として保存している。画面にも共有の変数にも触らないので、
@@ -488,6 +503,14 @@ bool Renderer::CreateConstantBuffer(
 	return true;
 }
 
+void Renderer::CreateRequiredConstantBuffer(unsigned int bytesize, ID3D11Buffer** buffer, const char* purpose)
+{
+	if (!CreateConstantBuffer(bytesize, buffer))
+	{
+		utility::ReportFatalError(std::string("定数バッファを作成できません: ") + purpose);
+	}
+}
+
 // 描画先をバックバッファに戻し、ビューポートを描画解像度の全体にしている
 void Renderer::SetBackBufferRenderTarget()
 {
@@ -542,29 +565,4 @@ void Renderer::ClearDepth()
 		1.0f,
 		0
 	);
-}
-
-//--------------------------------------------------------------------------------------
-// 定数バッファを作っている（CPUからMapで書き換えられる）
-//--------------------------------------------------------------------------------------
-bool Renderer::CreateConstantBufferWrite(
-	unsigned int bytesize,					// 定数バッファの大きさ（16バイトの倍数）
-	ID3D11Buffer** pConstantBuffer) {			// 作ったバッファを受け取る場所
-
-	// 定数バッファの設定
-	D3D11_BUFFER_DESC bd;
-
-	ZeroMemory(&bd, sizeof(bd));
-	bd.Usage = D3D11_USAGE_DYNAMIC;							// CPUから毎フレーム書き換える
-	bd.ByteWidth = bytesize;									// バッファの大きさ
-	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;					// 定数バッファとして使う
-	bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;					// CPUから書き込める
-
-	HRESULT hr = m_pDevice->CreateBuffer(&bd, nullptr, pConstantBuffer);
-	if (FAILED(hr)) {
-		MessageBox(nullptr, "CreateBuffer(constant buffer) error", "Error", MB_OK);
-		return false;
-	}
-
-	return true;
 }

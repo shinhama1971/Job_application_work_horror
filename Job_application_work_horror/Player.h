@@ -19,11 +19,9 @@ class Player : public Object
 {
 private:
     // ===== 移動と当たり判定 =====
-    // 座標の単位はステージ共通。PLAYER_HEIGHTはカメラではなく、当たり判定の体の高さ。
     PlayerMovement m_Movement;
-    // 当たり判定の半径・体の高さ・足元の最低の高さ（床の高さ）
+    // 当たり判定の半径と、足元の最低位置。
     static constexpr float PLAYER_RADIUS = 4.0f;
-    static constexpr float PLAYER_HEIGHT = 34.0f;
     static constexpr float MIN_Y_POSITION = -99.0f;
 
     // 当たり判定の半径、経過時間（手持ちライトの揺れ・呼吸の揺れに使っている）、次の足音までの秒数、足音の番号（左右で音の高さを変える）
@@ -33,7 +31,6 @@ private:
     int m_FootstepIndex = 0;
     // 直前の足音の大きさ（2面の危険度に使っている）、Sceneから知らされた水の床の上か
     float m_SurfaceNoisePulse = 0.0f;
-    bool m_WetSurfaceOverride = false;
 
     // ===== 懐中電灯と電池 =====
     // 電池の残りがしきい値を下回ると、完全に消える前に不安定な点滅へ移っている。
@@ -51,17 +48,8 @@ private:
     float m_LightDiffuseR = 1.72f;
     float m_LightDiffuseG = 1.62f;
     float m_LightDiffuseB = 1.42f;
-    float m_LightAmbientR = 0.1f;
-    float m_LightAmbientG = 0.1f;
-    float m_LightAmbientB = 0.12f;
 
     // 消灯しているときの色。真っ暗で進めなくならないための、最低限の明るさを持っている。
-    float m_DarkDiffuseR = 0.3f;
-    float m_DarkDiffuseG = 0.3f;
-    float m_DarkDiffuseB = 0.35f;
-    float m_DarkAmbientR = 0.06f;
-    float m_DarkAmbientG = 0.06f;
-    float m_DarkAmbientB = 0.08f;
     // 足元から目までの高さ
     float m_CameraHeightOffset = 40.0f;
 
@@ -76,7 +64,6 @@ private:
 
     // ===== カメラと操作の状態 =====
     bool m_IsFPS = true;                    // trueなら一人称視点
-    bool m_SpawnAdjusted = false;           // 最初の位置の床への補正が終わったか
     // 操作できるか、走ってよいか
     bool m_CanControl = true;
     // タイトル画面の後ろで映すときの、入力を読まない状態（SetAttractMode）
@@ -179,6 +166,9 @@ public:
         m_Flashlight.AddBattery(value);
     }
     // HUDとアイテムの判定が参照する、今の電池の残り（0〜100）を返している。
+    bool IsBatteryFull() const { return m_Flashlight.IsBatteryFull(); }
+    void RefillBattery() { m_Flashlight.RefillBattery(); }
+
     float GetBattery() const
     {
         return m_Flashlight.GetBattery();
@@ -198,7 +188,6 @@ public:
     }
     
     // 一人称視点か
-    bool IsFPS() const { return m_IsFPS; }
 
     // falseの間はPlayerの更新を止め、移動と操作を受け付けない（捕まった演出や監視映像を見ている間など）。
     void SetCanControl(bool enable)
@@ -242,7 +231,6 @@ public:
     }
 
     // Groundの水たまり以外の、Sceneが持つ特別な濡れた床の上にいることを、次のUpdateへ伝えている。
-    void SetWetSurface(bool wet) { m_WetSurfaceOverride = wet; }
     // 直前の足音がどれだけ大きかったか（0〜1）。水たまりや走っているときに大きくなり、2面の危険度に足されている。
     float GetSurfaceNoisePulse() const { return m_SurfaceNoisePulse; }
 

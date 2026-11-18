@@ -39,9 +39,7 @@ public:
     // 影が鏡に映っているのを見続ける秒数、見てから振り返るまでの猶予の秒数
     static constexpr float RequiredSeenSeconds = 0.5f;
     static constexpr float TurnWindowSeconds = 8.0f;
-    // 影の大きさ（プレイヤーと同じ背の高さにし、鏡の中で自分の顔のすぐ横に顔が並ぶようにしている）と、頭と胸の高さ
-    static constexpr float FigureScaleXZ = 9.0f;
-    static constexpr float FigureScaleY = 21.0f;
+    // 鏡に映る影の頭と胸の高さ。
     static constexpr float FigureHeadY = -60.0f;
     static constexpr float FigureChestY = -73.0f;
 

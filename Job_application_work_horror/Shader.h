@@ -19,7 +19,8 @@ public:
 	~Shader() {}
 	// 頂点シェーダーとピクセルシェーダーのファイルから作っている（作成済みの組み合わせならそれを使う）
 	// 頂点番号から形を作るときは、入力レイアウトを作らずに使える。
-	void Create(std::string vs, std::string ps, bool procedural = false);
+	[[nodiscard]] bool Create(std::string vs, std::string ps, bool procedural = false);
+	void CreateRequired(const char* vs, const char* ps, bool procedural = false);
 	// このシェーダーを次の描画で使うよう設定している
 	void SetGPU();
 	// 使い回し用に覚えているシェーダーを全部手放している（D3Dデバイスを壊す前に呼んでいる）

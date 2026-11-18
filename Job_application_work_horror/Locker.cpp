@@ -47,7 +47,7 @@ void Locker::Init()
     BuildGeometry();
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
-    m_Shader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+    m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
     // 色は頂点の色で付けるため、マテリアルは白にしている（シェーダーは頂点の色×マテリアルの色で塗っている）。
     MATERIAL material{};
@@ -60,7 +60,7 @@ void Locker::Init()
     material.Metallic = 0.50f;
     material.Roughness = 0.45f;
     m_Material = std::make_unique<Material>();
-    m_Material->Create(material);
+    m_Material->CreateRequired(material);
 }
 
 // 扉の位置と向きを決め、隠れる位置と出る位置を扉の前に決めている。

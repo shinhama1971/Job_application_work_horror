@@ -77,7 +77,7 @@ namespace Core
                 });
         }
 
-        // 名前付きで生成している。SceneはInitでこの名前をRequireObjに渡し、ポインタを持ち続けている。
+        // 名前付きで生成し、シーンから名前で検索できるようにする。
         template<typename T>
         T* CreateNamedObject(const std::string& name)
         {
@@ -134,11 +134,6 @@ namespace Core
         void FlushPendingCommands();
 
         // 全Objectの一覧を返している（描画で順に処理するのに使っている）
-        std::vector<std::unique_ptr<Object>>& GetAllObjects()
-        {
-            return m_Objects;
-        }
-
         const std::vector<std::unique_ptr<Object>>& GetAllObjects() const
         {
             return m_Objects;

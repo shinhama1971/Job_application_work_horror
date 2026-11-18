@@ -32,6 +32,7 @@ public:
 
     // 心拍が聞こえ始める緊張度。これより低いときは鳴らさない（いつも鳴っていると慣れてしまうため）。
     static constexpr float HeartAudibleLevel = 0.18f;
+    static constexpr float HeartFullVolumeLevel = 0.75f;
     // 荒い呼吸が聞こえ始める緊張度。
     static constexpr float BreathAudibleLevel = 0.32f;
     // 隠れている間の最低の緊張度。静かな中で、自分の心拍だけが聞こえる状態にしている。
@@ -102,7 +103,7 @@ public:
             {
                 m_BeatTimer += 60.0f / GetBeatsPerMinute();
                 m_BeatTimer = (std::max)(m_BeatTimer, 0.05f);
-                const float loudness = SmoothStep(HeartAudibleLevel, 0.75f, m_Level);
+                const float loudness = SmoothStep(HeartAudibleLevel, HeartFullVolumeLevel, m_Level);
                 output.beat = true;
                 // 隠れている間は周りが静かな分、自分の心拍を少し大きく聞かせている。
                 output.beatVolume = (0.30f + 0.70f * loudness) * (hiding ? 1.15f : 1.0f);

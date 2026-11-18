@@ -19,6 +19,7 @@ namespace
 {
     constexpr auto ClassName = TEXT("SignalLostWindowClass");
     constexpr auto WindowName = TEXT("SIGNAL LOST");
+    constexpr int GameplayFramesPerSecond = 60;
     // 1フレームの経過時間の上限。ウィンドウのドラッグや停止から戻った直後に、大きな経過時間で
     // プレイヤーや演出が一気に進まないよう、0.25秒より長いフレームは0.25秒として扱っている。
     constexpr auto MaximumFrameTime = std::chrono::duration<double>(0.25);
@@ -36,7 +37,7 @@ int        Application::m_LaunchResolutionLevel = 0;
 // 画面の拡大率（100%なら1.0、125%なら1.25）
 float      Application::m_DpiScale = 1.0f;
 // 前フレームからの経過秒。最初のフレームは60fps相当の値にしている。
-float      Application::m_DeltaTime = 1.0f / 60.0f;
+float      Application::m_DeltaTime = 1.0f / GameplayFramesPerSecond;
 
 //-----------------------------------------------------------------------------
 // コンストラクタ：Sleepやタイマーの精度を1ミリ秒に上げている
@@ -64,17 +65,20 @@ void Application::Run()
 
     // 起動オプション --capture <出力フォルダ>（または --benchmark）があれば、自動撮影・計測モードにしている。
     Tools::CaptureMode::ConfigureFromCommandLine();
-    if (Tools::CaptureMode::IsActive())
+    // WICと動画出力が使う初期化回数を、音声側とは別に管理する。
+    const bool captureComInitialized = Tools::CaptureMode::IsActive() &&
+        SUCCEEDED(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
+
+    if (InitApp())
     {
-        // スクリーンショットの保存（WIC）がCOMを使うため、撮影モードのときだけCOMを初期化している。
-        (void)CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        MainLoop();
     }
+    UninitApp();
 
-    // ウィンドウを作り、成功したときだけメインループへ進んでいる
-    bool okfg = InitApp();
-    if (okfg) { MainLoop(); }
-
-    UninitApp(); // 失敗した場合も含めて、登録したウィンドウクラスを解除している
+    if (captureComInitialized)
+    {
+        CoUninitialize();
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -272,7 +276,12 @@ void Application::MainLoop()
 
     // 経過時間は、システム時刻の変更に影響されないsteady_clockで測っている。
     using Clock = std::chrono::steady_clock;
+    constexpr auto framePeriod = std::chrono::ceil<Clock::duration>(
+        std::chrono::duration<int, std::ratio<1, GameplayFramesPerSecond>>(1));
+    // 撮影とベンチマークはどちらも CaptureMode の起動モード。
+    const bool limitFrameRate = !Tools::CaptureMode::IsActive();
     auto previousTime = Clock::now();
+    auto nextFrameTime = previousTime + framePeriod;
     bool running = true;
 
     while (running)
@@ -301,7 +310,24 @@ void Application::MainLoop()
         {
             WaitMessage();
             previousTime = Clock::now();
+            nextFrameTime = previousTime + framePeriod;
             continue;
+        }
+
+        if (limitFrameRate)
+        {
+            // モニターのHzではなく時刻で待つ。短い待機のずれは次の予定時刻に持ち越さない。
+            const auto now = Clock::now();
+            if (now < nextFrameTime)
+            {
+                std::this_thread::sleep_until(nextFrameTime);
+            }
+            else
+            {
+                // 描画が間に合わなかった分を、連続描画で取り戻さない。
+                nextFrameTime = now;
+            }
+            nextFrameTime += framePeriod;
         }
 
         // 前フレームからの経過時間を測り、上限（0.25秒）を超えたら切り詰めている。

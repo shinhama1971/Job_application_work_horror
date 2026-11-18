@@ -3,6 +3,7 @@
 // ============================================================================
 
 #include "DDGIVolume.h"
+#include "GIUpdateSettings.h"
 
 #include "CaptureMode.h"
 #include "Renderer.h"
@@ -22,6 +23,7 @@ namespace
     constexpr UINT RayResultsSlot = 1;
     constexpr UINT IrradianceAtlasSlot = 2;
     constexpr UINT DistanceAtlasSlot = 3;
+    static_assert(DistanceAtlasSlot == IrradianceAtlasSlot + 1);
     constexpr UINT PreviousAtlasSlot = 4;
     constexpr UINT DepthSlot = 5;
     // 部屋の形の定数バッファ（roomOcclusion.hlsli の b11）
@@ -178,6 +180,7 @@ namespace Effect
         }
         m_Current = 0;
         m_ResetHistory = true;
+        m_UpdatePhase = 0;
         m_HasGrid = true;
         return true;
     }
@@ -188,7 +191,7 @@ namespace Effect
     }
 
     bool DDGIVolume::Update(ID3D11ShaderResourceView* pointLights, uint32_t lightCount,
-        const LIGHT& light, const Vector3& cameraPosition, const Matrix& view)
+        const LIGHT& light, const Vector3& cameraPosition, const Matrix& view, uint32_t updateFrames)
     {
         if (m_RoomVersion != Renderer::GetRoomOcclusionVersion())
         {
@@ -221,7 +224,13 @@ namespace Effect
         p.ProbeOrigin = m_ProbeOrigin;
         p.RaysPerProbe = RaysPerProbe;
         p.ProbeSpacing = m_ProbeSpacing;
-        p.Hysteresis = ProbeHysteresis;
+        // 初回は全プローブを作る。以降は通し番号の余りで均等に分ける。
+        p.ProbeUpdateStride = m_ResetHistory ? 1u : (std::clamp)(updateFrames,
+            static_cast<uint32_t>(GIUpdateSettings::MinFrames), static_cast<uint32_t>(GIUpdateSettings::MaxFrames));
+        p.ProbeUpdatePhase = m_UpdatePhase % p.ProbeUpdateStride;
+        m_UpdatePhase = (p.ProbeUpdatePhase + 1u) % p.ProbeUpdateStride;
+        // 同じ時間で古い値の重みが同程度に減るよう、更新しないフレーム数も含める。
+        p.Hysteresis = std::pow(ProbeHysteresis, static_cast<float>(p.ProbeUpdateStride));
         p.ProbeCounts[0] = m_ProbeCounts[0];
         p.ProbeCounts[1] = m_ProbeCounts[1];
         p.ProbeCounts[2] = m_ProbeCounts[2];
@@ -262,15 +271,20 @@ namespace Effect
         context->CSSetShaderResources(PointLightsSlot, 4, traceInputs);
         ID3D11UnorderedAccessView* rayUAV = m_RayResults.UAV.Get();
         context->CSSetUnorderedAccessViews(0, 1, &rayUAV, nullptr);
-        context->Dispatch(GetProbeCount(), 1, 1);
+        const UINT probeGroups =
+            (GetProbeCount() - p.ProbeUpdatePhase + p.ProbeUpdateStride - 1u) / p.ProbeUpdateStride;
+        context->Dispatch(probeGroups, 1, 1);
         context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
         context->CSSetShaderResources(0, 6, nullSRVs);
 
         // 2. 八面体マップを更新する（t1 = 光線の結果、t4 = 前の画像、u0 = 新しい画像）。1グループ = 1プローブの区画
-        const UINT groupsX = m_ProbeCounts[0] * m_ProbeCounts[1];
-        const UINT groupsY = m_ProbeCounts[2];
         const auto runUpdate = [&](const ComputeShader& shader, const GpuTexture& previousAtlas, const GpuTexture& nextAtlas)
         {
+            // 更新しない区画を引き継ぐ。読み取り・書き込みにバインドする前にコピーする。
+            if (p.ProbeUpdateStride > 1u)
+            {
+                context->CopyResource(nextAtlas.Texture.Get(), previousAtlas.Texture.Get());
+            }
             shader.SetGPU();
             ID3D11ShaderResourceView* rays = m_RayResults.SRV.Get();
             ID3D11ShaderResourceView* previousSRV = previousAtlas.SRV.Get();
@@ -278,7 +292,7 @@ namespace Effect
             context->CSSetShaderResources(PreviousAtlasSlot, 1, &previousSRV);
             ID3D11UnorderedAccessView* output = nextAtlas.UAV.Get();
             context->CSSetUnorderedAccessViews(0, 1, &output, nullptr);
-            context->Dispatch(groupsX, groupsY, 1);
+            context->Dispatch(probeGroups, 1, 1);
             context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
             context->CSSetShaderResources(0, 6, nullSRVs);
         };

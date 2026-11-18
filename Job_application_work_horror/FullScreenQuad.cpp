@@ -11,7 +11,7 @@ using namespace DirectX::SimpleMath;
 namespace Graphics
 {
     // 画面と同じ大きさの四角形（左上が原点の画素単位）と、5種類の画面効果のシェーダー、定数バッファを作っている
-    void FullScreenQuad::Init()
+    bool FullScreenQuad::Init()
     {
         m_Vertices.resize(4);
 
@@ -44,35 +44,16 @@ namespace Graphics
 
         m_IndexBuffer.Create(m_Indices);
 
-        // ブルーム（明るい部分のにじみ）を足すシェーダー
-        m_BloomShader.Create(
-            "shader/unlitTextureVS.hlsl",
-            "shader/bloomCompositePS.hlsl"
-        );
-
-        // 懐中電灯の光の筋（空気中のちりで光が見える効果）を足すシェーダー
-        m_VolumeShader.Create(
-            "shader/unlitTextureVS.hlsl",
-            "shader/volumetricFlashlightPS.hlsl"
-        );
-
-        // ノイズ・周辺減光・画面の乱れなどを重ねるシェーダー
-        m_OverlayShader.Create(
-            "shader/unlitTextureVS.hlsl",
-            "shader/crtOverlayPS.hlsl"
-        );
-
-        // 目が暗さ・明るさに慣れる効果（露出の補正）を足すシェーダー
-        m_ExposureShader.Create(
-            "shader/unlitTextureVS.hlsl",
-            "shader/exposurePS.hlsl"
-        );
-
-        // HDRの画面を0〜1へ移すシェーダー（画面効果の最後）
-        m_ToneMapShader.Create(
-            "shader/unlitTextureVS.hlsl",
-            "shader/toneMapPS.hlsl"
-        );
+        // どの段も後続の描画で使うため、読み込めなければ描画開始前に終了する。
+        constexpr auto fullScreenVertexShader = "shader/unlitTextureVS.hlsl";
+        if (!m_BloomShader.Create(fullScreenVertexShader, "shader/bloomCompositePS.hlsl") ||
+            !m_VolumeShader.Create(fullScreenVertexShader, "shader/volumetricFlashlightPS.hlsl") ||
+            !m_OverlayShader.Create(fullScreenVertexShader, "shader/crtOverlayPS.hlsl") ||
+            !m_ExposureShader.Create(fullScreenVertexShader, "shader/exposurePS.hlsl") ||
+            !m_ToneMapShader.Create(fullScreenVertexShader, "shader/toneMapPS.hlsl"))
+        {
+            return false;
+        }
 
         m_Material = std::make_unique<Material>();
 
@@ -80,17 +61,10 @@ namespace Graphics
         mtrl.Diffuse = Color(1, 1, 1, 1);
         mtrl.TextureEnable = true;
 
-        m_Material->Create(mtrl);
-
-        // 画面効果の値を渡す定数バッファ
-        Renderer::CreateConstantBuffer(
-            sizeof(TimeBuffer),
-            m_TimeBuffer.ReleaseAndGetAddressOf()
-        );
-        Renderer::CreateConstantBuffer(
-            sizeof(ToneMapBuffer),
-            m_ToneMapBuffer.ReleaseAndGetAddressOf()
-        );
+        // 描画前に、使用する定数バッファがすべて作れたことを確認する。
+        return m_Material->Create(mtrl) &&
+            Renderer::CreateConstantBuffer(sizeof(TimeBuffer), m_TimeBuffer.ReleaseAndGetAddressOf()) &&
+            Renderer::CreateConstantBuffer(sizeof(ToneMapBuffer), m_ToneMapBuffer.ReleaseAndGetAddressOf());
     }
 
     // 定数バッファを解放している

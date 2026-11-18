@@ -30,6 +30,11 @@ cbuffer AutoExposureBuffer : register(b0)
 Texture2D<float4> SceneTexture : register(t0);              // 画面効果を掛ける前の、描いた画面
 RWStructuredBuffer<float> ExposureState : register(u0);     // [0] 慣れた明るさ（対数）、[1] 露出の倍率
 
+// 輝度比をそのまま補正すると暗がりが明るくなりすぎるため、1未満の指数で圧縮する。
+static const float AUTO_EXPOSURE_GAIN_EXPONENT = 0.35f;
+// log(0) を避けるために足し、線形値へ戻すときに同じ値を引く。
+static const float AUTO_EXPOSURE_LOG_OFFSET = 0.002f;
+
 // 各スレッドの、重みを掛けた明るさの対数の合計と、重みの合計
 groupshared float g_LogLuminance[THREAD_COUNT];
 groupshared float g_Weight[THREAD_COUNT];
@@ -65,7 +70,7 @@ void main(uint3 threadId : SV_GroupThreadID, uint threadIndex : SV_GroupIndex)
             const float weight = max(1.0f - length(centered) / 0.9f, 0.15f);
 
             // 真っ黒（0）の対数は求められないため、小さな値を足している
-            logSum += weight * log(luminance + 0.002f);
+            logSum += weight * log(luminance + AUTO_EXPOSURE_LOG_OFFSET);
             weightSum += weight;
         }
     }
@@ -105,9 +110,9 @@ void main(uint3 threadId : SV_GroupThreadID, uint threadIndex : SV_GroupIndex)
 
     // 慣れた明るさが目標より暗いほど倍率を上げている。0.35乗にして、明るさの差をそのまま埋めずに控えめにしている
     // （ホラーの暗さを残しつつ、真っ暗な場所でも少しだけ見えるようになる程度にとどめている）。
-    const float adaptedLuminance = max(exp(adaptedLogLuminance) - 0.002f, 0.0001f);
+    const float adaptedLuminance = max(exp(adaptedLogLuminance) - AUTO_EXPOSURE_LOG_OFFSET, 0.0001f);
     const float luminanceRatio = max(TargetLuminance / adaptedLuminance, 0.0001f);
-    float gain = clamp(pow(luminanceRatio, 0.35f), MinGain, MaxGain);
+    float gain = clamp(pow(luminanceRatio, AUTO_EXPOSURE_GAIN_EXPONENT), MinGain, MaxGain);
     if (Enabled < 0.5f)
     {
         gain = 1.0f;

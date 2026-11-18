@@ -25,7 +25,7 @@ namespace Effect
     {
     public:
         // 1面の大きさ（画素）。60fpsに抑えて空いたGPUの時間で、128から256へ上げ、水たまりと金属に映る画面の外の景色を細かくしている。
-        // 縮小画像の段の数（256画素から1画素まで9段）は、シェーダーの PBR_ENVIRONMENT_MIP_COUNT・RAY_ENVIRONMENT_MIP_COUNT と合わせている
+        // 縮小画像の段の数（256画素から1画素まで9段）は、シェーダーの PBR_ENVIRONMENT_MIP_COUNT と合わせている
         static constexpr int FaceSize = 256;
 
         // slot はキューブマップを設定するテクスチャの番号。withMipChain なら、描くたびに縮小画像（ミップ）も作っている

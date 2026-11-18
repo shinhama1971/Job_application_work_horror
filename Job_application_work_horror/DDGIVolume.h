@@ -16,6 +16,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstddef>
 #include <random>
 
 #include <SimpleMath.h>
@@ -44,14 +45,13 @@ namespace Effect
         // pointLights・lightCount は点光源の一覧（TiledLighting）、light は懐中電灯（ビュー空間の向き）、view はプレイヤーの視点
         bool Update(ID3D11ShaderResourceView* pointLights, uint32_t lightCount,
             const LIGHT& light, const DirectX::SimpleMath::Vector3& cameraPosition,
-            const DirectX::SimpleMath::Matrix& view);
+            const DirectX::SimpleMath::Matrix& view, uint32_t updateFrames);
         // 深度プリパスの深度から、画面の各画素の間接光を求め、ピクセルシェーダーの t18 に設定している（Update が true のフレームだけ）
         void Apply(const DirectX::SimpleMath::Matrix& view, const DirectX::SimpleMath::Matrix& projection,
             const D3D11_VIEWPORT& viewport);
         // t18 から外している（本描画以外の視点の描画の前と、使わない場面）
         void Unbind();
 
-        bool IsActive() const { return m_Active; }
         uint32_t GetProbeCount() const { return m_ProbeCounts[0] * m_ProbeCounts[1] * m_ProbeCounts[2]; }
 
     private:
@@ -82,9 +82,15 @@ namespace Effect
             DirectX::SimpleMath::Vector2 OutputSize;
             DirectX::SimpleMath::Vector2 ViewportOffset;
             float MaxRayDistance;
-            float Padding;
+            uint32_t ProbeUpdateStride;
+            uint32_t ProbeUpdatePhase;
+            uint32_t Padding[3];
         };
-        static_assert(sizeof(DDGIParameters) == 352, "DDGIParameters must match ddgiCommon.hlsli");
+        static_assert(sizeof(DDGIParameters) == 368);
+        static_assert(offsetof(DDGIParameters, RayRotation) == 48);
+        static_assert(offsetof(DDGIParameters, InverseProjection) == 192);
+        static_assert(offsetof(DDGIParameters, ProbeUpdateStride) == 348);
+        static_assert(offsetof(DDGIParameters, ProbeUpdatePhase) == 352);
 
         // Compute Shader が書けて、ほかのシェーダーが読める画像1枚
         struct GpuTexture
@@ -121,6 +127,7 @@ namespace Effect
         GpuTexture m_IndirectLight;
         // 今の（読む）八面体マップの番号（0か1）
         int m_Current = 0;
+        uint32_t m_UpdatePhase = 0;
 
         Microsoft::WRL::ComPtr<ID3D11Buffer> m_ParameterBuffer;
         Microsoft::WRL::ComPtr<ID3D11SamplerState> m_LinearClamp;

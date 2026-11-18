@@ -55,7 +55,7 @@ namespace
 void ForestRain::Init()
 {
     // 頂点は頂点シェーダーが番号から作るので、入力レイアウトは作らない
-    m_Shader.Create("shader/rainVS.hlsl", "shader/rainPS.hlsl", true);
+    m_Shader.CreateRequired("shader/rainVS.hlsl", "shader/rainPS.hlsl", true);
 
     ID3D11Device* device = Renderer::GetDevice();
     D3D11_BUFFER_DESC paramsDesc{};

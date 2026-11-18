@@ -4,23 +4,11 @@
 
 namespace Tools::TechDemo
 {
-    bool UsesTiledLighting() { return true; }
-    bool UsesDepthPrepass() { return true; }
-
-    int GetReflectionMethod()
+    ReflectionMethod GetReflectionMethod()
     {
         const int reflectionOverride = Tools::CaptureMode::GetReflectionMethodOverride();
-        return reflectionOverride >= 0 ? reflectionOverride : 3;
+        return reflectionOverride >= 0
+            ? static_cast<ReflectionMethod>(reflectionOverride)
+            : DefaultReflectionMethod;
     }
-
-    int GetShadowMode() { return 2; }
-    float GetWaterCausticsScale() { return 1.0f; }
-    bool UsesWaterRipples() { return true; }
-    int GetPuddleMeshMode() { return 2; }
-    bool UsesAmbientOcclusion() { return true; }
-    bool UsesPbr() { return true; }
-    bool UsesLightShafts() { return true; }
-    bool UsesBulbShadow() { return true; }
-    int GetGrassLodMode() { return 1; }
-    bool UsesGrassCameraBend() { return true; }
 }

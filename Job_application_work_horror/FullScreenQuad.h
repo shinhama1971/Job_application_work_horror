@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <wrl/client.h>
 #include "Renderer.h"
 #include "VertexBuffer.h"
@@ -54,6 +55,10 @@ namespace Graphics
             float lensDropAge;
         };
 
+        static_assert(sizeof(TimeBuffer) == 80);
+        static_assert(offsetof(TimeBuffer, exposure) == 32);
+        static_assert(offsetof(TimeBuffer, fearVision) == 64);
+
         // 四角形の頂点・インデックスとGPUのバッファ
         std::vector<VERTEX_3D> m_Vertices;
         std::vector<unsigned int> m_Indices;
@@ -84,7 +89,7 @@ namespace Graphics
 
     public:
         // 四角形・シェーダー・定数バッファを作る／解放する
-        void Init();
+        bool Init();
         void Uninit();
 
         // sceneSRVは描画済みの画面、bloomSRVsはぼかした明るい部分の段（BloomLevelCount個の配列。使わないときはnullptr）、

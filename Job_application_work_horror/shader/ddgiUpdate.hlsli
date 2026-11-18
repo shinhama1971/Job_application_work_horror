@@ -78,9 +78,9 @@ uint2 GetBorderTexel(uint index)
 [numthreads(DDGI_TILE_TEXELS, DDGI_TILE_TEXELS, 1)]
 void main(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
 {
-    // グループの位置（x = プローブの x と y の段、y = z）からプローブを決めている
-    const uint3 grid = uint3(groupId.x % ProbeCounts.x, groupId.x / ProbeCounts.x, groupId.y);
-    const uint probeIndex = GetProbeIndex(grid);
+    // 光線を飛ばした区画だけ更新する。初回以外は他の区画がコピー済み。
+    const uint probeIndex = GetUpdatingProbeIndex(groupId.x);
+    const uint3 grid = GetProbeGrid(probeIndex);
     const uint2 tileOrigin = GetProbeTileOrigin(grid, DDGI_TILE_TEXELS);
     const uint2 local = threadId.xy;
     const uint2 texel = tileOrigin + DDGI_BORDER + local;

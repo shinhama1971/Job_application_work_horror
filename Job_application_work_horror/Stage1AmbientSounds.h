@@ -66,9 +66,6 @@ public:
         const DirectX::SimpleMath::Vector3& listenerPosition,
         const DirectX::SimpleMath::Vector3& listenerForward);
 
-    // デバッグ表示用。次の物音までの秒数を返している。
-    float GetSecondsUntilNext() const { return m_WaitTimer; }
-
 private:
     // 鳴らすまでの残り秒数が付いた1音。足音や続けて叩く音を、時間をずらして鳴らすために使っている。
     struct ScheduledCue

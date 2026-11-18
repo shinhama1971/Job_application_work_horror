@@ -27,9 +27,6 @@ public:
     float Update(float deltaTime, const DirectX::SimpleMath::Vector3& playerPosition,
         const PropLayoutFile::SpawnedProps& props);
 
-    // 演出の段階（デバッグ表示と確認用）
-    int GetLampsTurnedOff() const { return m_LampsTurnedOff; }
-    bool IsWindowOff() const { return m_WindowOffTimer >= 0.0f; }
     // 草むらを通る「見えない何か」の足元（x・z）と、押し倒す強さ（0 なら通っていない）。ForestScene が草（ForestGrass）へ渡している
     DirectX::SimpleMath::Vector2 GetWalkerPosition() const { return m_WalkerPosition; }
     float GetWalkerStrength() const { return m_WalkerStrength; }
@@ -53,7 +50,6 @@ private:
     float m_Time = 0.0f;
     // 街灯：南の街灯（小道で先に通る）と北の街灯。北の街灯を通り過ぎると、南から順に消える
     DyingLamp m_Lamps[2] = { { "PathLampBulb_1" }, { "PathLampBulb" } };
-    int m_LampsTurnedOff = 0;
     // 研究所の窓が消え始めてからの秒数（まだなら負）と、その音を鳴らしたか
     float m_WindowOffTimer = -1.0f;
     bool m_WindowClickPlayed = false;

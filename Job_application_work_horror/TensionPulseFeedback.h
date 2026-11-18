@@ -20,8 +20,10 @@ inline void ShowFearVision(const TensionPulse& tension, const TensionPulse::Outp
     {
         return;
     }
+    constexpr float FullFearVisionLevel = 0.85f;
     const float strength = (std::clamp)(
-        (tension.GetLevel() - TensionPulse::HeartAudibleLevel) / (0.85f - TensionPulse::HeartAudibleLevel), 0.0f, 1.0f);
+        (tension.GetLevel() - TensionPulse::HeartAudibleLevel) /
+        (FullFearVisionLevel - TensionPulse::HeartAudibleLevel), 0.0f, 1.0f);
     game->GetPostProcess()->SetFearVision(strength, pulse.beat && strength > 0.0f);
 }
 
@@ -38,7 +40,8 @@ inline void PlayTensionPulse(const TensionPulse::Output& pulse)
         game->PlayAudioCue(SOUND_CUE_HEARTBEAT, pulse.beatPitch, pulse.beatVolume);
         if (pulse.vibration > 0.0f)
         {
-            Input::SetVibration(5, pulse.vibration);
+            constexpr int HeartbeatVibrationStrength = 5;
+            Input::SetVibration(HeartbeatVibrationStrength, pulse.vibration);
         }
     }
     if (pulse.breath)

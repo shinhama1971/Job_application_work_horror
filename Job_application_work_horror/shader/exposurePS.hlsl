@@ -13,21 +13,7 @@ struct PS_IN
 };
 
 // 画面効果の値（FullScreenQuad.cppのTimeBufferと同じ並びの前半だけを使っている）
-cbuffer TimeBuffer : register(b0)
-{
-    float time;
-    float bloomIntensity;
-    float noiseAmount;
-    float vignetteStrength;
-    float screenAspect;
-    float volumeIntensity;
-    float lensDistortionStrength;
-    float horrorPulseStrength;
-    float exposure;
-    float lensMoisture;
-    float corridorTension;
-    float exposurePadding;
-};
+#include "postProcessBuffer.hlsli"
 
 // 描いた画面（t0）とサンプラー（s0）
 Texture2D sceneTexture : register(t0);
@@ -61,13 +47,15 @@ float4 main(PS_IN input) : SV_TARGET
             0.0f).rgb) * (1.0f / 3.0f);
 
     // シーンが決めた露出（演出の意図）に、実際の画面の明るさから求めた目の慣れの倍率を掛けている。
-    const float adaptedExposure = exposure * AutoExposureState[1];
+    const float autoGain = AutoExposureState[1];
+    const float adaptedExposure = exposure * (autoGain > 0.0f ? autoGain : 1.0f);
 
-    // 驚かせる演出の間は、画面を一瞬明るくしている。上限を設けて、
-    // 目の慣れでこの後に描くUIが白く飛ばないようにしている。
-    const float eventExposure = horrorPulseStrength * 0.08f;
+    // HDRターゲットへの加算で C + C*(gain-1) = C*gain とする。1未満の倍率では加算値が負になる。
+    // 驚かせる演出のフラッシュもこの倍率に含め、後から描くUIには掛けない。
+    static const float HORROR_PULSE_EXPOSURE_GAIN = 0.08f;
+    const float eventExposure = horrorPulseStrength * HORROR_PULSE_EXPOSURE_GAIN;
     const float exposureGain =
-        max(adaptedExposure + eventExposure - 1.0f, 0.0f);
+        adaptedExposure + eventExposure - 1.0f;
     const float3 adaptationLight = scene * exposureGain;
 
     // 緊張が高まるほど、深い影の一部だけを持ち上げている。これで冷たい霧のように

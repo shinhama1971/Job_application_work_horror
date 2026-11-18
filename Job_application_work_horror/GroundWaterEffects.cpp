@@ -125,7 +125,7 @@ void WaterEffectSystem::Init()
 		Vector3(1.0f, 0.0f, 0.0f));
 
 	m_DropVertexBuffer.Create(m_DropVertices);
-	m_DropShader.Create("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
+	m_DropShader.CreateRequired("shader/litTextureVS.hlsl", "shader/litTexturePS.hlsl");
 
 	// 水滴のマテリアル：薄い青の半透明で、光沢を強くしている
 	MATERIAL material{};
@@ -136,7 +136,7 @@ void WaterEffectSystem::Init()
 	material.Shininess = 42.0f;
 	material.TextureEnable = FALSE;
 	m_DropMaterial = std::make_unique<Material>();
-	m_DropMaterial->Create(material);
+	m_DropMaterial->CreateRequired(material);
 
 	// 波紋の形：内側の半径0.76・外側の半径1の細い輪を32分割で作っている（表と裏の両面）
 	const Color rippleColor(0.62f, 0.78f, 0.82f, 0.72f);
@@ -177,7 +177,7 @@ void WaterEffectSystem::Init()
 	rippleMaterial.Shininess = 64.0f;
 	rippleMaterial.TextureEnable = FALSE;
 	m_RippleMaterial = std::make_unique<Material>();
-	m_RippleMaterial->Create(rippleMaterial);
+	m_RippleMaterial->CreateRequired(rippleMaterial);
 
 	// 水たまりは、床全体のマス目に乱数で置いている（1面）。2面は Ground::SetPuddleLayout で置き直している
 	BuildPuddles(PuddleLayout{});
