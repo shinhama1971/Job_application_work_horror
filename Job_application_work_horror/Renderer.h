@@ -253,6 +253,12 @@ private:
 
 	// バックバッファの描画先と深度バッファを作っている
 	static HRESULT CreateRenderAndDepthResources();
+	// 初期化の段階（Init から順に呼んでいる）：デバイスとスワップチェーン、ビューポート、描画の状態、ブレンドの状態、定数バッファ
+	static HRESULT CreateDeviceAndSwapChain();
+	static void SetFullViewport();
+	static HRESULT CreatePipelineStates();
+	static HRESULT CreateBlendStates();
+	static HRESULT CreateConstantBuffers();
 
 public:
 

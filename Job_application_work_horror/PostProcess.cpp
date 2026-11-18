@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "PostProcess.h"
+#include "MathUtility.h"
 #include "GpuTimer.h"
 #include "Renderer.h"
 #include "Application.h"
@@ -296,8 +297,7 @@ namespace Effect
                 0.0f, m_LensMoistureTimer - deltaTime);
             const float remaining =
                 m_LensMoistureTimer / m_LensMoistureDuration;
-            const float easedRemaining = remaining * remaining *
-                (3.0f - 2.0f * remaining);
+            const float easedRemaining = MathUtility::SmoothCurve(remaining);
             m_LensMoisture = m_LensMoisturePeak * easedRemaining;
         }
         else

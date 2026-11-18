@@ -455,14 +455,16 @@ void Hud::AddLetterA(float x, float y, float size, const Color& color)
     AddRectangle(x, y + size * 0.5f - stroke * 0.5f, size, stroke, color);
 }
 
-// 文字列を1文字ずつ、四角形の集まりとしてためている
-void Hud::AddText(
-    float x,
-    float y,
-    std::string_view text,
-    float pixelSize,
-    const Color& color)
+namespace
 {
+    // 英数字のドット絵の大きさ（横5点・縦7点）
+    constexpr int AsciiGlyphColumnCount = 5;
+    constexpr std::size_t AsciiGlyphRowCount = 7;
+    // 日本語の文字の大きさ：基準の18pxのフォントを pixelSize*0.34 倍し、5x7の英字と見た目の高さと送り幅をそろえる。小さくなりすぎないよう、この画素の高さより小さくしない
+    constexpr float JapaneseFontReferencePixels = 18.0f;
+    constexpr float JapaneseFontScaleToAscii = 0.34f;
+    constexpr int MinimumJapaneseFontHeight = 6;
+
     // GDIで作った1文字分の画像（幅・高さ・次の文字までの送り幅・ずれ・白黒の画素）
     struct RasterGlyph
     {
@@ -623,9 +625,9 @@ void Hud::AddText(
     };
 
     // 英数字と記号の5x7のドット絵。各行の下位5ビットが左から右の点を表している
-    const auto getRows = [](char character)
+    std::array<std::uint8_t, AsciiGlyphRowCount> GetAsciiGlyphRows(char character)
     {
-        using Glyph = std::array<std::uint8_t, 7>;
+        using Glyph = std::array<std::uint8_t, AsciiGlyphRowCount>;
 
         switch (character)
         {
@@ -680,10 +682,24 @@ void Hud::AddText(
         case '+': return Glyph{ 0x00, 0x04, 0x04, 0x1F, 0x04, 0x04, 0x00 };
         default: return Glyph{};
         }
-    };
+    }
 
-    // 文字の画像は一度作ったら使い回すため、関数の中のstaticにしている
-    static JapaneseGlyphCache japaneseGlyphs;
+    // 文字の画像は一度作ったら使い回す（初めて使うときに作り、プログラムの終わりに片付ける）
+    JapaneseGlyphCache& GetJapaneseGlyphs()
+    {
+        static JapaneseGlyphCache japaneseGlyphs;
+        return japaneseGlyphs;
+    }
+}
+
+// 文字列を1文字ずつ、四角形の集まりとしてためている（日本語はフォントの画像、英数字は5x7のドット絵）
+void Hud::AddText(
+    float x,
+    float y,
+    std::string_view text,
+    float pixelSize,
+    const Color& color)
+{
     float cursorX = x;
     for (size_t textIndex = 0; textIndex < text.size();)
     {
@@ -711,77 +727,83 @@ void Hud::AddText(
                     (static_cast<unsigned char>(text[textIndex + byteIndex]) & 0x3Fu);
             }
             textIndex += static_cast<size_t>(sequenceLength);
-
-            // 5x7の英字フォントの見た目の高さと送り幅に合わせ、18pxのフォントを pixelSize*0.34 倍した大きさにしている。
-            // 日本語とASCIIが混ざっても、今あるHUDのパネルの中へ収めるためである。
-            // その大きさを実際の画素に直したフォントで画像を作り、1ドットを1画素（キャンバス単位では1/scale）で描いている。
-            const float canvasScale = GetCanvasScale();
-            const int fontHeight = (std::max)(6,
-                static_cast<int>(std::lround(18.0f * pixelSize * 0.34f * canvasScale)));
-            const RasterGlyph& glyph = japaneseGlyphs.Get(
-                static_cast<wchar_t>(codePoint), fontHeight);
-            const float glyphPixelSize = 1.0f / canvasScale;
-            // 文字の位置を画素の境目にそろえ、ドットが2画素にまたがってにじまないようにしている。
-            const float glyphX = std::round(cursorX * canvasScale) / canvasScale +
-                static_cast<float>(glyph.offsetX) * glyphPixelSize;
-            const float glyphY = std::round(y * canvasScale) / canvasScale +
-                static_cast<float>(glyph.offsetY) * glyphPixelSize;
-            // 横に続く点はまとめて1つの横長の四角形にし、頂点の数を減らしている
-            for (unsigned int row = 0; row < glyph.height; ++row)
-            {
-                unsigned int column = 0;
-                while (column < glyph.width)
-                {
-                    while (column < glyph.width &&
-                        glyph.bitmap[row * glyph.width + column] == 0)
-                    {
-                        ++column;
-                    }
-                    const unsigned int runStart = column;
-                    while (column < glyph.width &&
-                        glyph.bitmap[row * glyph.width + column] != 0)
-                    {
-                        ++column;
-                    }
-                    if (column > runStart)
-                    {
-                        AddRectangle(
-                            glyphX + static_cast<float>(runStart) * glyphPixelSize,
-                            glyphY + static_cast<float>(row) * glyphPixelSize,
-                            static_cast<float>(column - runStart) * glyphPixelSize,
-                            glyphPixelSize,
-                            color);
-                    }
-                }
-            }
-            cursorX += static_cast<float>(glyph.advance) * glyphPixelSize;
+            cursorX += AddJapaneseCharacter(cursorX, y, static_cast<wchar_t>(codePoint), pixelSize, color);
             continue;
         }
 
-        // 英数字：小文字は大文字として扱い、5x7のドット絵の点を四角形で描いている
-        char character = static_cast<char>(firstByte);
+        AddAsciiCharacter(cursorX, y, static_cast<char>(firstByte), pixelSize, color);
         ++textIndex;
-        if (character >= 'a' && character <= 'z')
+        cursorX += pixelSize * GlyphAdvance;
+    }
+}
+
+// 日本語の1文字を、画面に出る大きさのフォントの白黒の画像から、横に続く点をまとめた四角形で描いている。進む幅を返している
+float Hud::AddJapaneseCharacter(float x, float y, wchar_t character, float pixelSize, const Color& color)
+{
+    // 5x7の英字フォントの見た目の高さと送り幅に合わせた大きさにしている（日本語とASCIIが混ざっても、今あるHUDのパネルの中へ収めるため）。
+    // その大きさを実際の画素に直したフォントで画像を作り、1ドットを1画素（キャンバス単位では1/scale）で描いている。
+    const float canvasScale = GetCanvasScale();
+    const int fontHeight = (std::max)(MinimumJapaneseFontHeight,
+        static_cast<int>(std::lround(JapaneseFontReferencePixels * pixelSize * JapaneseFontScaleToAscii * canvasScale)));
+    const RasterGlyph& glyph = GetJapaneseGlyphs().Get(character, fontHeight);
+    const float glyphPixelSize = 1.0f / canvasScale;
+    // 文字の位置を画素の境目にそろえ、ドットが2画素にまたがってにじまないようにしている。
+    const float glyphX = std::round(x * canvasScale) / canvasScale +
+        static_cast<float>(glyph.offsetX) * glyphPixelSize;
+    const float glyphY = std::round(y * canvasScale) / canvasScale +
+        static_cast<float>(glyph.offsetY) * glyphPixelSize;
+    // 横に続く点はまとめて1つの横長の四角形にし、頂点の数を減らしている
+    for (unsigned int row = 0; row < glyph.height; ++row)
+    {
+        unsigned int column = 0;
+        while (column < glyph.width)
         {
-            character = static_cast<char>(character - 'a' + 'A');
-        }
-        const std::array<std::uint8_t, 7> rows = getRows(character);
-        for (size_t row = 0; row < rows.size(); ++row)
-        {
-            for (int column = 0; column < 5; ++column)
+            while (column < glyph.width &&
+                glyph.bitmap[row * glyph.width + column] == 0)
             {
-                if ((rows[row] & (1u << (4 - column))) != 0)
-                {
-                    AddRectangle(
-                        cursorX + static_cast<float>(column) * pixelSize,
-                        y + static_cast<float>(row) * pixelSize,
-                        pixelSize,
-                        pixelSize,
-                        color);
-                }
+                ++column;
+            }
+            const unsigned int runStart = column;
+            while (column < glyph.width &&
+                glyph.bitmap[row * glyph.width + column] != 0)
+            {
+                ++column;
+            }
+            if (column > runStart)
+            {
+                AddRectangle(
+                    glyphX + static_cast<float>(runStart) * glyphPixelSize,
+                    glyphY + static_cast<float>(row) * glyphPixelSize,
+                    static_cast<float>(column - runStart) * glyphPixelSize,
+                    glyphPixelSize,
+                    color);
             }
         }
+    }
+    return static_cast<float>(glyph.advance) * glyphPixelSize;
+}
 
-        cursorX += pixelSize * GlyphAdvance;
+// 英数字の1文字：小文字は大文字として扱い、5x7のドット絵の点を四角形で描いている
+void Hud::AddAsciiCharacter(float x, float y, char character, float pixelSize, const Color& color)
+{
+    if (character >= 'a' && character <= 'z')
+    {
+        character = static_cast<char>(character - 'a' + 'A');
+    }
+    const std::array<std::uint8_t, AsciiGlyphRowCount> rows = GetAsciiGlyphRows(character);
+    for (size_t row = 0; row < rows.size(); ++row)
+    {
+        for (int column = 0; column < AsciiGlyphColumnCount; ++column)
+        {
+            if ((rows[row] & (1u << (AsciiGlyphColumnCount - 1 - column))) != 0)
+            {
+                AddRectangle(
+                    x + static_cast<float>(column) * pixelSize,
+                    y + static_cast<float>(row) * pixelSize,
+                    pixelSize,
+                    pixelSize,
+                    color);
+            }
+        }
     }
 }

@@ -3,6 +3,7 @@
 // ============================================================================
 
 #include "DDGIVolume.h"
+#include "MathUtility.h"
 #include "GIUpdateSettings.h"
 
 #include "CaptureMode.h"
@@ -47,7 +48,7 @@ namespace
     // 光線の向きを毎フレーム回す乱数の、自動撮影と計測のときの種
     constexpr unsigned int CaptureRandomSeed = 1301;
     // 円周率（光線の向きの乱数に使う）
-    constexpr float Pi = 3.14159265f;
+    constexpr float Pi = MathUtility::Pi;
     // 間接光の画像を縦横何分の1の解像度で作るか、Compute Shader の1グループの縦横の数
     constexpr int OutputDownscale = 2;
     constexpr UINT ApplyGroupSize = 8;

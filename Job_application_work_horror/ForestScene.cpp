@@ -42,6 +42,34 @@ namespace
     constexpr float LightningFacing = 0.78f;
     // 草むらを通る「見えない何か」が草を押し倒す半径
     constexpr float WalkerGrassRadius = 10.0f;
+    // 稲光の色（月明かりより青白い、少し冷たい白）
+    const Vector3 LightningColor(0.67f, 0.82f, 1.0f);
+    // 稲光の光り方：立ち上がる時間と、全体で光っている時間（立ち上がりだけ鋭く、後半は滑らかに消す）
+    constexpr float LightningRiseSeconds = 0.05f;
+    constexpr float LightningFlashSeconds = 0.46f;
+
+    // 夜の森の画面の見え方：少し暗めにし、ノイズと周辺減光を強めて、照明の下の光の筋をやや控えめに出している
+    constexpr float ForestExposure = 0.92f;
+    constexpr float ForestNoiseAmount = 0.20f;
+    constexpr float ForestVignetteStrength = 0.62f;
+    constexpr float ForestVolumetricIntensity = 0.42f;
+    // 森を出るときに戻す、建物の中の見え方（PostProcess の初期値と同じ）
+    constexpr float IndoorExposure = 1.0f;
+    constexpr float IndoorNoiseAmount = 0.18f;
+    constexpr float IndoorVignetteStrength = 0.55f;
+    constexpr float IndoorVolumetricIntensity = 0.58f;
+
+    // 雨の輪を広げる波の計算：マス目の数と、計算する範囲の一辺（マス目の大きさ 0.75 を変えずに、カメラから前後左右に約12メートル）
+    constexpr int ForestRippleResolution = 768;
+    constexpr float ForestRippleWorldSize = 576.0f;
+
+    // 怖さがこれだけ急に上がったら、視界の乱れを一瞬強める
+    constexpr float FearSpikeThreshold = 0.1f;
+    // 無線の雑音の強さを、画面の電波の乱れと、何かがいる気配のちらつきに分ける割合
+    constexpr float RadioNoiseToInterference = 0.7f;
+    constexpr float RadioNoiseToPresenceStatic = 0.45f;
+    // 玄関から入るときの暗転は、場面を切り替える少し前（この割合の時間）に真っ暗にしている
+    constexpr float EnterFadeCompleteRatio = 0.85f;
 }
 
 // 稲光の間だけ既存の点光源リストに光を足す。光源自体の形や影は描かない。
@@ -60,7 +88,7 @@ public:
         if (m_Strength > 0.0f)
         {
             lights.push_back({ Vector4(m_Position.x, m_Position.y, m_Position.z, LightningRange),
-                Vector4(0.67f, 0.82f, 1.0f, m_Strength) });
+                Vector4(LightningColor.x, LightningColor.y, LightningColor.z, m_Strength) });
         }
     }
 
@@ -94,10 +122,10 @@ void ForestScene::ApplyAtmosphere()
     // 夜の森：電力の状態は使わない（灯りは配置ファイルの glow の付いた物だけ）。少し暗めにし、照明の下の霧の光の筋を出している
     game->SetPowerRestored(false);
     game->GetPostProcess()->SetCorridorTension(0.0f);
-    game->GetPostProcess()->SetExposure(0.92f);
-    game->GetPostProcess()->SetAtmosphere(0.20f, 0.62f);
+    game->GetPostProcess()->SetExposure(ForestExposure);
+    game->GetPostProcess()->SetAtmosphere(ForestNoiseAmount, ForestVignetteStrength);
     game->GetPostProcess()->SetVolumetricLight(true);
-    game->GetPostProcess()->SetVolumetricIntensity(0.42f);
+    game->GetPostProcess()->SetVolumetricIntensity(ForestVolumetricIntensity);
     // 地面に建物の床の目地やひびが出ないよう、壁と床の古さは描かない。屋外なので、部屋の角の暗がりも使わない
     Renderer::SetWallWeathering(0.0f);
     Renderer::SetRoomOcclusion(nullptr, 0, 0.0f, 0.0f, 0.0f);
@@ -111,10 +139,10 @@ void ForestScene::RestoreAtmosphere()
     {
         return;
     }
-    game->GetPostProcess()->SetAtmosphere(0.18f, 0.55f);
-    game->GetPostProcess()->SetExposure(1.0f);
+    game->GetPostProcess()->SetAtmosphere(IndoorNoiseAmount, IndoorVignetteStrength);
+    game->GetPostProcess()->SetExposure(IndoorExposure);
     game->GetPostProcess()->SetVolumetricLight(false);
-    game->GetPostProcess()->SetVolumetricIntensity(0.58f);
+    game->GetPostProcess()->SetVolumetricIntensity(IndoorVolumetricIntensity);
 }
 
 PropLayout ForestScene::LoadLayout()
@@ -153,9 +181,8 @@ ForestScene::World ForestScene::BuildWorld(SceneLayoutBuilder& builder, const Pr
         rain->SetGroundHeight(world.GroundObject->GetPosition().y);
         rain->SetIntensity(RainStrength);
         world.GroundObject->SetRainIntensity(RainStrength);
-        // 波を計算する範囲を、マス目の大きさ（0.75）を変えずに一辺576（カメラから前後左右に約12メートル）まで広げ、
-        // 少し離れた水たまりにも雨の輪が広がるようにしている
-        world.GroundObject->SetRippleArea(768, 576.0f);
+        // 波を計算する範囲を広げ、少し離れた水たまりにも雨の輪が広がるようにしている
+        world.GroundObject->SetRippleArea(ForestRippleResolution, ForestRippleWorldSize);
     }
     return world;
 }
@@ -246,7 +273,7 @@ void ForestScene::ReloadPropLayout()
 
 void ForestScene::UpdateLightning(float deltaTime, const Vector3& forward)
 {
-    constexpr float flashSeconds = 0.46f;
+    constexpr float flashSeconds = LightningFlashSeconds;
     if (!RainEnabled || m_EnterTimer >= 0.0f || Tools::CaptureMode::IsBenchmark())
     {
         m_Lightning->SetStrength(0.0f);
@@ -277,7 +304,7 @@ void ForestScene::UpdateLightning(float deltaTime, const Vector3& forward)
     }
 
     // 立ち上がりだけ鋭く、後半は滑らかに消す。連続点滅はさせない。
-    constexpr float riseSeconds = 0.05f;
+    constexpr float riseSeconds = LightningRiseSeconds;
     const float rise = (std::min)(1.0f, m_LightningTime / riseSeconds);
     const float tail = (std::min)(1.0f, (flashSeconds - m_LightningTime) / (flashSeconds - riseSeconds));
     m_Lightning->SetStrength(LightningStrength * rise * tail * tail);
@@ -294,7 +321,7 @@ void ForestScene::Update()
     }
     // 街灯のちらつき・後ろの街灯が消える・研究所の窓の明かりが消える・草むらを何かが通る（ForestEvents）
     const float fear = m_Events.Update(deltaTime, m_Player->GetPosition(), m_LayoutProps);
-    game->GetPostProcess()->SetFearVision(fear, fear > m_LastFear + 0.1f);
+    game->GetPostProcess()->SetFearVision(fear, fear > m_LastFear + FearSpikeThreshold);
     m_LastFear = fear;
     // 草むらを通る「見えない何か」の足元の草を、草の Compute Shader で押し倒している
     if (m_Grass != nullptr)
@@ -304,8 +331,8 @@ void ForestScene::Update()
 
     // 研究棟からの無線：小道を進むと、受信記録が1行ずつ届き、研究所が見えてくると途絶える。行が届く瞬間に画面も乱れる
     const float radioNoise = m_EnterTimer < 0.0f ? m_Radio.Update(deltaTime, m_Player->GetPosition()) : 0.0f;
-    game->GetPostProcess()->SetSignalInterference(radioNoise * 0.7f);
-    game->GetPostProcess()->SetPresenceStatic(radioNoise * 0.45f);
+    game->GetPostProcess()->SetSignalInterference(radioNoise * RadioNoiseToInterference);
+    game->GetPostProcess()->SetPresenceStatic(radioNoise * RadioNoiseToPresenceStatic);
 
     if (m_EnterTimer < 0.0f)
     {
@@ -358,7 +385,7 @@ void ForestScene::Draw(Camera* camera)
     // 玄関から入るときの暗転
     if (m_EnterTimer >= 0.0f)
     {
-        const float fade = (std::min)(1.0f, m_EnterTimer / (EnterFadeSeconds * 0.85f));
+        const float fade = (std::min)(1.0f, m_EnterTimer / (EnterFadeSeconds * EnterFadeCompleteRatio));
         m_Hud.DrawBlink(fade, 1.0f);
     }
     // ポーズ中はポーズメニューを重ねている（ESC・P・START で開くのは Game::Update。ここで描かないと、止まっただけに見える）

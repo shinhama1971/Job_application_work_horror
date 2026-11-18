@@ -4,8 +4,10 @@
 // ============================================================================
 
 #include "Ground.h"
+#include "MathUtility.h"
 
 #include "Game.h"
+#include "PostProcess.h"
 #include "Player.h"
 
 #include <algorithm>
@@ -71,8 +73,8 @@ namespace
 		};
 		const Vector2 cell(std::floor(position.x), std::floor(position.y));
 		const Vector2 fractionInCell = position - cell;
-		const float x = fractionInCell.x * fractionInCell.x * (3.0f - 2.0f * fractionInCell.x);
-		const float y = fractionInCell.y * fractionInCell.y * (3.0f - 2.0f * fractionInCell.y);
+		const float x = MathUtility::SmoothCurve(fractionInCell.x);
+		const float y = MathUtility::SmoothCurve(fractionInCell.y);
 		return std::lerp(
 			std::lerp(hash(cell), hash(cell + Vector2(1.0f, 0.0f)), x),
 			std::lerp(hash(cell + Vector2(0.0f, 1.0f)), hash(cell + Vector2(1.0f, 1.0f)), x), y);
@@ -641,7 +643,7 @@ void WaterEffectSystem::Update(float deltaTime)
 	{
 		leak.Age += deltaTime;
 		const float growth = (std::clamp)(leak.Age / (std::max)(leak.GrowSeconds, 0.01f), 0.0f, 1.0f);
-		leak.Radius = LeakStartRadius + (leak.MaxRadius - LeakStartRadius) * growth * growth * (3.0f - 2.0f * growth);
+		leak.Radius = LeakStartRadius + (leak.MaxRadius - LeakStartRadius) * MathUtility::SmoothCurve(growth);
 	}
 	UpdateFallingDrops(deltaTime);
 	UpdateFootstepRipples(deltaTime);

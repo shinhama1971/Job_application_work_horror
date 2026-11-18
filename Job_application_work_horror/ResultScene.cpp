@@ -7,6 +7,7 @@
 #include "Application.h"
 
 #include "Game.h"
+#include "PostProcess.h"
 #include "Input.h"
 #include "Stage2AnomalyPlan.h"
 

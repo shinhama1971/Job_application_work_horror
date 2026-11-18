@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include "MathUtility.h"
 
 // 見えない影の動きの値：遠くにいる間のふらつく速さと幅、プレイヤーへ寄る速さ（気づかれた・近くで歩いている・近くで止まっている・遠く）、
 // 近いとみなす奥行きの距離、動ける x の範囲、近さを危険度にする範囲（この距離から、この幅で遠ざかるほど弱く）、知らせの秒数
@@ -223,7 +224,7 @@ public:
         {
             return 0.0f;
         }
-        return 1.0f - (std::clamp)((GetHorizontalDistance(playerPosition) - UnseenThreatNearDistance) / UnseenThreatRange, 0.0f, 1.0f);
+        return MathUtility::Proximity(GetHorizontalDistance(playerPosition), UnseenThreatNearDistance, UnseenThreatRange);
     }
     // すぐそばまで来ているか（目的表示で「動かずにやり過ごす」と出すため）
     bool IsNear(const DirectX::SimpleMath::Vector3& playerPosition) const noexcept

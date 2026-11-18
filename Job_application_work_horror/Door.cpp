@@ -4,10 +4,13 @@
 // ============================================================================
 
 #include "Door.h"
+#include "MathUtility.h"
 #include "Application.h"
 
 #include "CeilingLight.h"
 #include "Game.h"
+#include "PostProcess.h"
+#include "ShadowMap.h"
 #include "Input.h"
 #include "Player.h"
 #include "PropModel.h"
@@ -434,8 +437,7 @@ void Door::Draw(Camera* camera)
 
     // 開き具合（0〜1）をなめらかな曲線（smoothstep）に変えている
     const float normalizedOpen = (std::clamp)(m_OpenAngle / DoorLeakFullOpenAngle, 0.0f, 1.0f);
-    const float openAmount = normalizedOpen * normalizedOpen *
-        (3.0f - 2.0f * normalizedOpen);
+    const float openAmount = MathUtility::SmoothCurve(normalizedOpen);
     // 開く前のためで揺れている間は、漏れ光もちらつかせている
     float rattleGlow = 0.0f;
     if (m_OpenDelayTimer > 0.0f)

@@ -383,3 +383,10 @@ Claude Code（Anthropic）が、審査会の指摘（HDR・ブルーム・トー
 続けて Claude Code（Anthropic）が、審査会の指摘（影が当たっていない所がおかしい）を受けた作者の指示で、天井の照明の接触影を SSAO の Compute Shader の中に入れました（mbientOcclusionCS.hlsl）。壁と床のシェーダーで点光源ごとに求める最初の方式は重く、四角いむらと誤った影が出たので、差を拡大した画像と計測で原因を確かめて作り直しました。
 続けて Claude Code（Anthropic）が、審査会の指摘（グローバルイルミネーション、エヌビディア DDGI）を受けた作者の指示で、DDGI を DirectX 11 の Compute Shader で作りました（DDGIVolume、ddgi*.hlsl）。RTXGI が DX12・DXR 前提で使えないことを確かめ、論文の方式（プローブ・八面体マップ・チェビシェフの不等式）を、部屋の形との交差で光線を求める形にしました。DDGI ありとなしの自動撮影と計測で、明るさと重さを確かめました。
 続けて Claude Code（Anthropic）が、作者の録画（光が後ろの壁に漏れている）から静止画を取り出して確かめ、DDGI を止めた撮影と比べて、点光源が壁を抜けていることを突き止めました。点光源ごとに壁との交差を調べる判定を入れ、重くなった分を、光源ごとに調べる壁を CPU で絞る方法で軽くしました。
+
+Claude Code（Anthropic）が、作者の指示（AIっぽさ・マジックナンバー・英語のコメント・設計の確認）でコード全体を調べて報告し、作者が選んだ「関数の引数に直接書いた数」から直しました。照明の明滅・画面の脈打ち・振動・音の「強さと長さ」の組に名前を付けるための `EventFeedback.h` を作り、`StageSceneEvents.cpp`・`Stage2SceneHorror.cpp`・`Stage2ScenePuzzles.cpp`・`ForestScene.cpp`・`Game.cpp` の数を、出来事ごとの名前の付いた定数に置き換えました。値は変えておらず、変更の前後で数の値が消えたり増えたりしていないことを、ファイルごとに機械的に比べて確かめました。
+続けて Claude Code（Anthropic）が、作者が選んだ「Game.h の依存」を直しました。`Game` が値で持っていた描画のクラスを `std::unique_ptr` と前方宣言に替え、使う側のファイルに必要な `#include` を足しました。読み込みの関係をたどって、ヘッダーを変えたときに作り直しになる .cpp の数を前後で数えて確かめました。
+続けて Claude Code（Anthropic）が、作者が選んだ「重複の整理」として、円周率・smoothstep・距離から近さを求める式・角度を -π〜π に直す処理を `MathUtility.h` にまとめ、17ファイルの重複を置き換えました。
+続けて Claude Code（Anthropic）が、作者が選んだ「長い関数の分割」として、`Game::Draw`・`Player::Update`・`Stage2Scene::Update` を、中身の順番を変えずに段階ごとの関数へ分けました。移した所の数に名前を付け、変更の前後で数の値の一覧を比べて確かめました。
+続けて Claude Code（Anthropic）が、`StageScene::Update`・`Debug::UI::Draw`・`SelectStage2Objective` も同じように分けました。目的表示は、99種類の文章が前後で同じであることを機械的に比べて確かめました。
+続けて Claude Code（Anthropic）が、作者の「残りも分ける」という指示で、`Renderer::Init`・`Hud::AddText`・`Hud::DrawResult`・`CaptureMode` の撮影の道順・`StageScene::UpdateRouteLights`、1面と2面の配置を組み立てる `Build` を分けました。配置は、物を作る順番を変えずに場所ごとの手順へ分け、数の値と文字列の一覧が前後で同じであることを機械的に比べて確かめました。

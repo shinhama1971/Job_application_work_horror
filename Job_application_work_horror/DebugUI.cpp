@@ -7,6 +7,8 @@
 #include "GIUpdateSettings.h"
 
 #include "Game.h"
+#include "TiledLighting.h"
+#include "GpuTimer.h"
 #include "Ground.h"
 #include "ForestGrass.h"
 #include "ModelCache.h"
@@ -65,8 +67,9 @@ namespace
     bool g_AutoExposure = true;
     // トーンマッピングの曲線（0 = ACES、1 = HDRにする前に近い曲線。Effect::ToneMapMode の番号）
     int g_ToneMapMode = static_cast<int>(Effect::ToneMapMode::Aces);
-    // 直近120フレームのフレーム時間（グラフ表示用）と、次に書く位置
-    float g_FrameTimes[120]{};
+    // 直近のフレーム時間（グラフ表示用。この数だけ覚えている）と、次に書く位置
+    constexpr int FrameHistoryCount = 120;
+    float g_FrameTimes[FrameHistoryCount]{};
     int g_FrameTimeOffset = 0;
     // シェーダーのデバッグ表示の番号（0は通常の画面）
     int g_DebugViewMode = 0;
@@ -187,101 +190,107 @@ void Debug::UI::ApplyTuning(Effect::PostProcess& postProcess)
 #endif
 }
 
-// デバッグ画面の中身を作って描いている（性能・カリング・2面の進行・表示の切り替え・画面効果の調整）
-void Debug::UI::Draw(Effect::PostProcess& postProcess)
-{
 #if defined(ENABLE_IMGUI)
-    if (!g_Initialized)
-    {
-        return;
-    }
+// デバッグ画面の区切りごとの中身（Debug::UI::Draw から順に呼んでいる）
+namespace
+{
+    // 画面の最初の幅、プリセットのボタンの幅
+    constexpr float PanelWidth = 430.0f;
+    constexpr float PresetButtonWidth = 196.0f;
+    // FPS の色分け：これ以上なら緑、次の値以上なら黄、それ未満は赤
+    constexpr float GoodFps = 57.0f;
+    constexpr float AcceptableFps = 45.0f;
+    const ImVec4 GoodFpsColor(0.38f, 0.90f, 0.48f, 1.0f);
+    const ImVec4 AcceptableFpsColor(0.95f, 0.76f, 0.25f, 1.0f);
+    const ImVec4 SlowFpsColor(0.95f, 0.30f, 0.28f, 1.0f);
+    // フレーム時間のグラフ：縦軸の一番上（30fps の1フレーム）と、グラフの高さ
+    constexpr float MillisecondsPerSecond = 1000.0f;
+    constexpr float FrameGraphMaxMilliseconds = 33.33f;
+    constexpr float FrameGraphHeight = 72.0f;
+    // 森の草の LOD を色で見せるデバッグ表示の番号（common.hlsl の番号と同じ）
+    constexpr int GrassLodDebugView = 12;
+    // 画面効果の演出を試しに再生する強さと長さ
+    constexpr float TestBloomPeak = 1.65f;
+    constexpr float TestBloomSeconds = 0.65f;
+    constexpr float TestHorrorStrength = 0.85f;
+    constexpr float TestHorrorSeconds = 0.75f;
+    constexpr float TestLensMoistureStrength = 0.75f;
+    constexpr float TestLensMoistureSeconds = 2.5f;
 
-    if (g_Visible)
+    // FPSとフレーム時間（60fps近くは緑、45fps以上は黄、それ未満は赤）、フレーム時間のグラフ、描画の段階ごとのGPU時間
+    void DrawPerformanceSection(Core::Game* game)
     {
-        ImGui::SetNextWindowSize(ImVec2(430.0f, 0.0f), ImGuiCond_FirstUseEver);
-        ImGui::Begin("SIGNAL LOST - Runtime Tuning", &g_Visible);
-        ImGui::Text("F1: close tuning panel");
-        ImGui::Checkbox(
-            "Pause gameplay while tuning", &g_PauseGameplay);
-
-        // FPSとフレーム時間。60fps近くは緑、45fps以上は黄、それ未満は赤で表示している
         const float currentFps = ImGui::GetIO().Framerate;
-        const float currentFrameMs = 1000.0f * ImGui::GetIO().DeltaTime;
+        const float currentFrameMs = MillisecondsPerSecond * ImGui::GetIO().DeltaTime;
         g_FrameTimes[g_FrameTimeOffset] = currentFrameMs;
-        g_FrameTimeOffset = (g_FrameTimeOffset + 1) % 120;
-        const ImVec4 performanceColor = currentFps >= 57.0f
-            ? ImVec4(0.38f, 0.90f, 0.48f, 1.0f)
-            : (currentFps >= 45.0f
-                ? ImVec4(0.95f, 0.76f, 0.25f, 1.0f)
-                : ImVec4(0.95f, 0.30f, 0.28f, 1.0f));
+        g_FrameTimeOffset = (g_FrameTimeOffset + 1) % FrameHistoryCount;
+        const ImVec4 performanceColor = currentFps >= GoodFps
+            ? GoodFpsColor
+            : (currentFps >= AcceptableFps ? AcceptableFpsColor : SlowFpsColor);
         ImGui::TextColored(performanceColor, "FPS %.1f  Frame %.2f ms",
             currentFps,
-            1000.0f / (ImGui::GetIO().Framerate > 0.0f
+            MillisecondsPerSecond / (ImGui::GetIO().Framerate > 0.0f
                 ? ImGui::GetIO().Framerate
                 : 1.0f));
-        ImGui::PlotLines("##FrameTimes", g_FrameTimes, 120,
+        ImGui::PlotLines("##FrameTimes", g_FrameTimes, FrameHistoryCount,
             g_FrameTimeOffset, "Frame time (16.67 ms = 60 FPS)",
-            0.0f, 33.33f, ImVec2(-1.0f, 72.0f));
-        Core::Game* game = Core::Game::GetInstance();
+            0.0f, FrameGraphMaxMilliseconds, ImVec2(-1.0f, FrameGraphHeight));
         // 描画の段階ごとのGPU時間（タイムスタンプのクエリで測っている）
-        if (ImGui::CollapsingHeader(
-            "GPU Performance", ImGuiTreeNodeFlags_DefaultOpen))
+        if (!ImGui::CollapsingHeader("GPU Performance", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            ImGui::Text("CPU frame       %.2f ms", currentFrameMs);
-            // 測れた時間・省いた・測れない・待っている、のどれかを表示する関数
-            const auto drawGpuTiming = [](const char* label, GpuTiming timing)
-            {
-                switch (timing.Status)
-                {
-                case GpuTimingStatus::Available:
-                    ImGui::Text("%-15s %.3f ms", label, timing.Milliseconds);
-                    break;
-                case GpuTimingStatus::Skipped:
-                    ImGui::Text("%-15s Skipped", label);
-                    break;
-                case GpuTimingStatus::Invalid:
-                    ImGui::Text("%-15s N/A", label);
-                    break;
-                default:
-                    ImGui::Text("%-15s Waiting", label);
-                    break;
-                }
-            };
-
-            GpuTimer* gpuTimer = game == nullptr ? nullptr : game->GetGpuTimer();
-            if (gpuTimer != nullptr)
-            {
-                drawGpuTiming("GPU total", gpuTimer->GetTiming(GpuPass::Total));
-                drawGpuTiming("Shadow", gpuTimer->GetTiming(GpuPass::Shadow));
-                drawGpuTiming(
-                    "Reflection", gpuTimer->GetTiming(GpuPass::Reflection));
-                drawGpuTiming(
-                    "Main scene", gpuTimer->GetTiming(GpuPass::MainScene));
-                drawGpuTiming("Bloom", gpuTimer->GetTiming(GpuPass::Bloom));
-                drawGpuTiming(
-                    "PostProcess", gpuTimer->GetTiming(GpuPass::PostProcess));
-                drawGpuTiming(
-                    "Water ripples", gpuTimer->GetTiming(GpuPass::WaterRipples));
-                drawGpuTiming(
-                    "Environment probe", gpuTimer->GetTiming(GpuPass::EnvironmentProbe));
-                drawGpuTiming(
-                    "Bulb shadow", gpuTimer->GetTiming(GpuPass::BulbShadow));
-                drawGpuTiming(
-                    "Ambient occlusion", gpuTimer->GetTiming(GpuPass::AmbientOcclusion));
-                drawGpuTiming(
-                    "DDGI indirect light", gpuTimer->GetTiming(GpuPass::GlobalIllumination));
-                ImGui::TextDisabled("4-frame query ring / no GPU wait");
-            }
+            return;
         }
-        // カリングの結果（描いた数と省いた数）
+        ImGui::Text("CPU frame       %.2f ms", currentFrameMs);
+        // 測れた時間・省いた・測れない・待っている、のどれかを表示する関数
+        const auto drawGpuTiming = [](const char* label, GpuTiming timing)
+        {
+            switch (timing.Status)
+            {
+            case GpuTimingStatus::Available:
+                ImGui::Text("%-15s %.3f ms", label, timing.Milliseconds);
+                break;
+            case GpuTimingStatus::Skipped:
+                ImGui::Text("%-15s Skipped", label);
+                break;
+            case GpuTimingStatus::Invalid:
+                ImGui::Text("%-15s N/A", label);
+                break;
+            default:
+                ImGui::Text("%-15s Waiting", label);
+                break;
+            }
+        };
+
+        GpuTimer* gpuTimer = game == nullptr ? nullptr : game->GetGpuTimer();
+        if (gpuTimer == nullptr)
+        {
+            return;
+        }
+        drawGpuTiming("GPU total", gpuTimer->GetTiming(GpuPass::Total));
+        drawGpuTiming("Shadow", gpuTimer->GetTiming(GpuPass::Shadow));
+        drawGpuTiming("Reflection", gpuTimer->GetTiming(GpuPass::Reflection));
+        drawGpuTiming("Main scene", gpuTimer->GetTiming(GpuPass::MainScene));
+        drawGpuTiming("Bloom", gpuTimer->GetTiming(GpuPass::Bloom));
+        drawGpuTiming("PostProcess", gpuTimer->GetTiming(GpuPass::PostProcess));
+        drawGpuTiming("Water ripples", gpuTimer->GetTiming(GpuPass::WaterRipples));
+        drawGpuTiming("Environment probe", gpuTimer->GetTiming(GpuPass::EnvironmentProbe));
+        drawGpuTiming("Bulb shadow", gpuTimer->GetTiming(GpuPass::BulbShadow));
+        drawGpuTiming("Ambient occlusion", gpuTimer->GetTiming(GpuPass::AmbientOcclusion));
+        drawGpuTiming("DDGI indirect light", gpuTimer->GetTiming(GpuPass::GlobalIllumination));
+        ImGui::TextDisabled("4-frame query ring / no GPU wait");
+    }
+
+    // カリングの結果・光源とタイルの数・DDGIの切り替え・音の数・モデルの使い回し・森の草の本数と、外の森を開くボタン
+    void DrawSceneStats(Core::Game* game)
+    {
         ImGui::Text("Main objects: %u drawn / %u culled",
             g_MainDrawn, g_MainCulled);
         ImGui::Text("Shadow casters: %u drawn / %u culled",
             g_ShadowDrawn, g_ShadowCulled);
-        if (Core::Game* currentGame = Core::Game::GetInstance())
+        if (game != nullptr)
         {
             // タイルベースライティング: 光源の数と、Compute Shaderで判定したタイルの数を表示している。
-            const Effect::TiledLighting* tiledLighting = currentGame->GetTiledLighting();
+            const Effect::TiledLighting* tiledLighting = game->GetTiledLighting();
             ImGui::Text("Point lights: %u / %u   Light tiles: %u (16x16)",
                 tiledLighting->GetLightCount(),
                 Effect::TiledLighting::MaxLights,
@@ -295,7 +304,7 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
                     Effect::GIUpdateSettings::MinFrames, Effect::GIUpdateSettings::MaxFrames);
             }
             ImGui::Text("Spatial voices: %zu / %zu (X3DAudio)",
-                currentGame->GetActiveSpatialVoiceCount(),
+                game->GetActiveSpatialVoiceCount(),
                 Sound::MaxSpatialVoices);
         }
         // モデルの読み込みを使い回せた回数（同じモデルを2回読まないようにしている効果の確認用）
@@ -310,192 +319,177 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         ImGui::Text("Reflection probe objects: %u drawn", g_ReflectionDrawn);
         ImGui::Separator();
 
+        if (game == nullptr)
+        {
+            return;
+        }
         // 外の森を開く（タイトルで選ぶか、--forest で起動しても開ける）
-        if (game != nullptr && ImGui::Button("外の森を開く"))
+        if (ImGui::Button("外の森を開く"))
         {
             game->RequestSceneChange(SceneName::Forest);
         }
-
         // LODと区画のカリングで、本数がどれだけ減ったかを確認する。
-        if (game != nullptr)
+        if (const ForestGrass* grass = game->GetObj<ForestGrass>("ForestGrass"))
         {
-            if (const ForestGrass* grass = game->GetObj<ForestGrass>("ForestGrass"))
-                ImGui::Text("森の草: %u 本 / 描画 %u 本 / %u 区画",
-                    grass->GetBladeCount(), grass->GetDrawnBladeCount(), grass->GetDrawnChunkCount());
+            ImGui::Text("森の草: %u 本 / 描画 %u 本 / %u 区画",
+                grass->GetBladeCount(), grass->GetDrawnBladeCount(), grass->GetDrawnChunkCount());
         }
-        // 2面の進行の確認と、イベントをすぐ再生するボタン（2面の間だけ表示している）
+    }
+
+    // 2面の進行の確認と、イベントをすぐ再生するボタン（2面の間だけ表示している）。
+    // ボタンの操作はすぐ実行せず、次のゲームの更新の始めに実行している（描画中に状態を変えないため）
+    void DrawStage2EventSection(Core::Game* game)
+    {
         Scene* scene = game == nullptr ? nullptr : game->GetScene();
         SceneDebugInfo sceneDebugInfo{};
-        if (scene != nullptr && scene->TryGetDebugInfo(sceneDebugInfo) &&
-            ImGui::CollapsingHeader(
-            "2面 イベント確認", ImGuiTreeNodeFlags_DefaultOpen))
+        if (scene == nullptr || !scene->TryGetDebugInfo(sceneDebugInfo) ||
+            !ImGui::CollapsingHeader("2面 イベント確認", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            ImGui::Text("ループ %d / 3", sceneDebugInfo.progressionStep);
-            ImGui::Text("探す異変  1周目: %s  2周目: %s",
-                sceneDebugInfo.firstAnomaly, sceneDebugInfo.secondAnomaly);
-            ImGui::Text("信号 %d / 3  足音危険度 %.0f%%",
-                sceneDebugInfo.puzzleStep, sceneDebugInfo.threatLevel * 100.0f);
-            ImGui::Text("失敗回数 %d  再試行補助 %s",
-                sceneDebugInfo.puzzleMistakeCount,
-                sceneDebugInfo.puzzleMistakeCount >= 2 ? "強" :
-                    (sceneDebugInfo.puzzleMistakeCount == 1 ? "弱" : "なし"));
-            ImGui::Text("最終イベント: %s  出口: %s",
-                sceneDebugInfo.finalSequenceArmed ? "準備済み" : "待機中",
-                sceneDebugInfo.exitReady ? "解錠" : "施錠");
-            // ボタンの操作はすぐ実行せず、次のゲームの更新の始めに実行している（描画中に状態を変えないため）
-            if (ImGui::Button("ループを1回進める"))
-            {
-                scene->RequestDebugAction(
-                    SceneDebugAction::AdvanceProgression);
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("最終停電を再生"))
-            {
-                scene->RequestDebugAction(
-                    SceneDebugAction::PlayFinalSequence);
-            }
-            if (ImGui::Button("視線ライト演出を再生"))
-            {
-                scene->RequestDebugAction(
-                    SceneDebugAction::PlayLightingEvent);
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("鏡の異変を出す"))
-            {
-                scene->RequestDebugAction(
-                    SceneDebugAction::ShowMirrorAnomaly);
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("肖像画の異変を出す"))
-            {
-                scene->RequestDebugAction(
-                    SceneDebugAction::ShowPortraitAnomaly);
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("偽の扉の異変を出す"))
-            {
-                scene->RequestDebugAction(
-                    SceneDebugAction::ShowFalseDoorAnomaly);
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("見えない影の異変を出す"))
-            {
-                scene->RequestDebugAction(
-                    SceneDebugAction::ShowUnseenAnomaly);
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("水たまりの異変を出す"))
-            {
-                scene->RequestDebugAction(
-                    SceneDebugAction::ShowPuddleAnomaly);
-            }
-            if (ImGui::Button("西棟の天井の人影を出す（1面）"))
-            {
-                scene->RequestDebugAction(
-                    SceneDebugAction::ShowCeilingReflection);
-            }
-            ImGui::TextDisabled(
-                "操作は次のゲーム更新開始時に安全に実行されます。");
-            ImGui::Separator();
+            return;
         }
+        ImGui::Text("ループ %d / 3", sceneDebugInfo.progressionStep);
+        ImGui::Text("探す異変  1周目: %s  2周目: %s",
+            sceneDebugInfo.firstAnomaly, sceneDebugInfo.secondAnomaly);
+        ImGui::Text("信号 %d / 3  足音危険度 %.0f%%",
+            sceneDebugInfo.puzzleStep, sceneDebugInfo.threatLevel * 100.0f);
+        ImGui::Text("失敗回数 %d  再試行補助 %s",
+            sceneDebugInfo.puzzleMistakeCount,
+            sceneDebugInfo.puzzleMistakeCount >= 2 ? "強" :
+                (sceneDebugInfo.puzzleMistakeCount == 1 ? "弱" : "なし"));
+        ImGui::Text("最終イベント: %s  出口: %s",
+            sceneDebugInfo.finalSequenceArmed ? "準備済み" : "待機中",
+            sceneDebugInfo.exitReady ? "解錠" : "施錠");
 
+        // ボタンの文字と、押したときに頼む操作。sameLine が true のボタンは、前のボタンと同じ行に並べる
+        struct ActionButton
+        {
+            const char* Label;
+            SceneDebugAction Action;
+            bool SameLine;
+        };
+        const ActionButton buttons[] =
+        {
+            { "ループを1回進める", SceneDebugAction::AdvanceProgression, false },
+            { "最終停電を再生", SceneDebugAction::PlayFinalSequence, true },
+            { "視線ライト演出を再生", SceneDebugAction::PlayLightingEvent, false },
+            { "鏡の異変を出す", SceneDebugAction::ShowMirrorAnomaly, true },
+            { "肖像画の異変を出す", SceneDebugAction::ShowPortraitAnomaly, true },
+            { "偽の扉の異変を出す", SceneDebugAction::ShowFalseDoorAnomaly, true },
+            { "見えない影の異変を出す", SceneDebugAction::ShowUnseenAnomaly, true },
+            { "水たまりの異変を出す", SceneDebugAction::ShowPuddleAnomaly, true },
+            { "西棟の天井の人影を出す（1面）", SceneDebugAction::ShowCeilingReflection, false },
+        };
+        for (const ActionButton& button : buttons)
+        {
+            if (button.SameLine)
+            {
+                ImGui::SameLine();
+            }
+            if (ImGui::Button(button.Label))
+            {
+                scene->RequestDebugAction(button.Action);
+            }
+        }
+        ImGui::TextDisabled("操作は次のゲーム更新開始時に安全に実行されます。");
+        ImGui::Separator();
+    }
+
+    // シェーダーのデバッグ表示の選択と、水たまりのメッシュのうちこのフレームに描いた数（細かさごと）
+    void DrawShaderDebugView(Core::Game* game)
+    {
         // 表示の順番は common.hlsl のデバッグ表示番号に合わせている。
         const char* debugViews[] = { "Final", "World normals", "Flashlight shadow", "Lighting only", "Puddle mask + mesh LOD (green=near yellow=middle red=far)", "Floor reflection", "Wall damp mask", "Light tiles (lights per 16x16 tile)", "Fullbright (照明・影・霧なしで全体を明るく)", "PBR material (R=metallic G=roughness B=wet)", "Ambient occlusion (SSAO)", "室内を明るく＋水たまりの反射", "森の草LODを色で表示" };
         ImGui::Combo("Shader debug view", &g_DebugViewMode,
             debugViews, IM_ARRAYSIZE(debugViews));
-        if (g_DebugViewMode == 12)
+        if (g_DebugViewMode == GrassLodDebugView)
         {
             ImGui::TextUnformatted("草のLOD  緑: 近距離 / 黄: 中距離 / 赤: 遠距離");
         }
-        // 水たまりのメッシュのうち、このフレームに描いた数（細かさごと。画面の外の物は描いていない）
-        if (game != nullptr)
+        if (game == nullptr)
         {
-            for (Ground* ground : game->GetObjects<Ground>())
+            return;
+        }
+        // 画面の外の物は描いていない。細かさの番号は 3 = 近い、2 = 中くらい、1 = 遠い
+        constexpr int NearLod = 3;
+        constexpr int MiddleLod = 2;
+        constexpr int FarLod = 1;
+        for (Ground* ground : game->GetObjects<Ground>())
+        {
+            ImGui::Text("Puddle meshes: near %d / middle %d / far %d (total %d)",
+                ground->GetDrawnWaterSurfaceCount(NearLod), ground->GetDrawnWaterSurfaceCount(MiddleLod),
+                ground->GetDrawnWaterSurfaceCount(FarLod), ground->GetWaterSurfaceTotal());
+        }
+    }
+
+    // 画面効果の値をまとめて切り替えるプリセット（1つのボタンで、上書きの値を全部入れ替える）
+    struct VisualPreset
+    {
+        const char* Label;
+        bool Bloom;
+        bool VolumetricLight;
+        float VolumetricIntensity;
+        float BloomIntensity;
+        float NoiseAmount;
+        float VignetteStrength;
+        float Exposure;
+        float LensDistortion;
+        float CorridorTension;
+        float FilmGradeStrength;
+        float LensDirtStrength;
+        float SignalInterference;
+        float WallDampStrength;
+    };
+
+    void ApplyVisualPreset(const VisualPreset& preset)
+    {
+        g_OverridePostProcess = true;
+        g_EnableBloom = preset.Bloom;
+        g_EnableNoise = true;
+        g_EnableVolumetricLight = preset.VolumetricLight;
+        g_VolumetricIntensity = preset.VolumetricIntensity;
+        g_BloomIntensity = preset.BloomIntensity;
+        g_NoiseAmount = preset.NoiseAmount;
+        g_VignetteStrength = preset.VignetteStrength;
+        g_Exposure = preset.Exposure;
+        g_LensDistortion = preset.LensDistortion;
+        g_CorridorTension = preset.CorridorTension;
+        g_FilmGradeStrength = preset.FilmGradeStrength;
+        g_LensDirtStrength = preset.LensDirtStrength;
+        g_SignalInterference = preset.SignalInterference;
+        g_WallDampStrength = preset.WallDampStrength;
+    }
+
+    // 見やすさ重視・雰囲気重視・怖さ重視・軽さ重視の4つ（2つずつ同じ行に並べる）
+    void DrawVisualPresets()
+    {
+        static constexpr VisualPreset Presets[] =
+        {
+            // 名前                 ブルーム 光の筋 光の筋の強さ ブルーム ノイズ 周辺減光 露出 歪み 緊張 色調 汚れ 乱れ 壁の湿り
+            { "Readable gameplay", true, false, 0.42f, 0.55f, 0.10f, 0.42f, 1.05f, 0.18f, 0.15f, 0.38f, 0.12f, 0.0f, 0.65f },
+            { "Moody corridor", true, true, 0.58f, 0.78f, 0.18f, 0.62f, 0.98f, 0.32f, 0.45f, 0.62f, 0.22f, 0.18f, 1.0f },
+            { "Scare showcase", true, true, 0.78f, 1.05f, 0.30f, 0.78f, 0.96f, 0.48f, 0.75f, 0.78f, 0.32f, 0.56f, 1.35f },
+            { "Performance", false, false, 0.0f, 0.45f, 0.06f, 0.35f, 1.06f, 0.10f, 0.10f, 0.30f, 0.0f, 0.0f, 0.45f },
+        };
+        constexpr int PresetsPerRow = 2;
+        ImGui::TextUnformatted("Visual presets");
+        for (int index = 0; index < IM_ARRAYSIZE(Presets); ++index)
+        {
+            if (index % PresetsPerRow != 0)
             {
-                ImGui::Text("Puddle meshes: near %d / middle %d / far %d (total %d)",
-                    ground->GetDrawnWaterSurfaceCount(3), ground->GetDrawnWaterSurfaceCount(2),
-                    ground->GetDrawnWaterSurfaceCount(1), ground->GetWaterSurfaceTotal());
+                ImGui::SameLine();
+            }
+            if (ImGui::Button(Presets[index].Label, ImVec2(PresetButtonWidth, 0.0f)))
+            {
+                ApplyVisualPreset(Presets[index]);
             }
         }
-
-        // 画面効果の値をまとめて切り替えるプリセット：見やすさ重視・雰囲気重視・怖さ重視・軽さ重視
-        ImGui::TextUnformatted("Visual presets");
-        if (ImGui::Button("Readable gameplay", ImVec2(196.0f, 0.0f)))
-        {
-            g_OverridePostProcess = true;
-            g_EnableBloom = true;
-            g_EnableNoise = true;
-            g_EnableVolumetricLight = false;
-            g_VolumetricIntensity = 0.42f;
-            g_BloomIntensity = 0.55f;
-            g_NoiseAmount = 0.10f;
-            g_VignetteStrength = 0.42f;
-            g_Exposure = 1.05f;
-            g_LensDistortion = 0.18f;
-            g_CorridorTension = 0.15f;
-            g_FilmGradeStrength = 0.38f;
-            g_LensDirtStrength = 0.12f;
-            g_SignalInterference = 0.0f;
-            g_WallDampStrength = 0.65f;
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Moody corridor", ImVec2(196.0f, 0.0f)))
-        {
-            g_OverridePostProcess = true;
-            g_EnableBloom = true;
-            g_EnableNoise = true;
-            g_EnableVolumetricLight = true;
-            g_VolumetricIntensity = 0.58f;
-            g_BloomIntensity = 0.78f;
-            g_NoiseAmount = 0.18f;
-            g_VignetteStrength = 0.62f;
-            g_Exposure = 0.98f;
-            g_LensDistortion = 0.32f;
-            g_CorridorTension = 0.45f;
-            g_FilmGradeStrength = 0.62f;
-            g_LensDirtStrength = 0.22f;
-            g_SignalInterference = 0.18f;
-            g_WallDampStrength = 1.0f;
-        }
-        if (ImGui::Button("Scare showcase", ImVec2(196.0f, 0.0f)))
-        {
-            g_OverridePostProcess = true;
-            g_EnableBloom = true;
-            g_EnableNoise = true;
-            g_EnableVolumetricLight = true;
-            g_VolumetricIntensity = 0.78f;
-            g_BloomIntensity = 1.05f;
-            g_NoiseAmount = 0.30f;
-            g_VignetteStrength = 0.78f;
-            g_Exposure = 0.96f;
-            g_LensDistortion = 0.48f;
-            g_CorridorTension = 0.75f;
-            g_FilmGradeStrength = 0.78f;
-            g_LensDirtStrength = 0.32f;
-            g_SignalInterference = 0.56f;
-            g_WallDampStrength = 1.35f;
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Performance", ImVec2(196.0f, 0.0f)))
-        {
-            g_OverridePostProcess = true;
-            g_EnableBloom = false;
-            g_EnableNoise = true;
-            g_EnableVolumetricLight = false;
-            g_VolumetricIntensity = 0.0f;
-            g_BloomIntensity = 0.45f;
-            g_NoiseAmount = 0.06f;
-            g_VignetteStrength = 0.35f;
-            g_Exposure = 1.06f;
-            g_LensDistortion = 0.10f;
-            g_CorridorTension = 0.10f;
-            g_FilmGradeStrength = 0.30f;
-            g_LensDirtStrength = 0.0f;
-            g_SignalInterference = 0.0f;
-            g_WallDampStrength = 0.45f;
-        }
         ImGui::Separator();
+    }
 
+    // 自動露出・トーンマッピングの切り替えと、画面効果の値を1つずつ調整するスライダー（上書きをオンにしたときだけ操作できる）、
+    // 画面効果の演出を試しに再生するボタン
+    void DrawPostProcessControls(Effect::PostProcess& postProcess)
+    {
         // 自動露出（画面の明るさを測って目の慣れを決める）は、上書きとは別にいつでも切り替えられる
         ImGui::Checkbox("Auto exposure (measure scene luminance)", &g_AutoExposure);
         ImGui::RadioButton("Tone map: ACES (HDR)", &g_ToneMapMode, static_cast<int>(Effect::ToneMapMode::Aces));
@@ -503,12 +497,12 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         ImGui::RadioButton("Legacy (before HDR)", &g_ToneMapMode, static_cast<int>(Effect::ToneMapMode::Legacy));
         ImGui::SameLine();
         ImGui::RadioButton("Reinhard", &g_ToneMapMode, static_cast<int>(Effect::ToneMapMode::Reinhard));
-        // 画面効果の値を1つずつ調整するスライダー（上書きをオンにしたときだけ操作できる）
         ImGui::Checkbox("Override post process", &g_OverridePostProcess);
         ImGui::BeginDisabled(!g_OverridePostProcess);
         ImGui::Checkbox("Bloom compute", &g_EnableBloom);
         ImGui::Checkbox("Film noise", &g_EnableNoise);
         ImGui::Checkbox("Volumetric light", &g_EnableVolumetricLight);
+        // スライダーの範囲（下限〜上限）は、見た目が壊れない調整の幅
         ImGui::SliderFloat(
             "Volume intensity", &g_VolumetricIntensity, 0.0f, 1.0f, "%.2f");
         ImGui::SliderFloat("Bloom", &g_BloomIntensity, 0.0f, 2.0f, "%.2f");
@@ -523,22 +517,49 @@ void Debug::UI::Draw(Effect::PostProcess& postProcess)
         ImGui::SliderFloat("Signal interference", &g_SignalInterference, 0.0f, 1.0f, "%.2f");
         ImGui::SliderFloat("Wall dampness", &g_WallDampStrength, 0.0f, 2.0f, "%.2f");
 
-        // 画面効果の演出を試しに再生するボタン
         if (ImGui::Button("Bloom pulse"))
         {
-            postProcess.TriggerBloomPulse(1.65f, 0.65f);
+            postProcess.TriggerBloomPulse(TestBloomPeak, TestBloomSeconds);
         }
         ImGui::SameLine();
         if (ImGui::Button("Horror pulse"))
         {
-            postProcess.TriggerHorrorPulse(0.85f, 0.75f);
+            postProcess.TriggerHorrorPulse(TestHorrorStrength, TestHorrorSeconds);
         }
         ImGui::SameLine();
         if (ImGui::Button("Lens moisture"))
         {
-            postProcess.TriggerLensMoisture(0.75f, 2.5f);
+            postProcess.TriggerLensMoisture(TestLensMoistureStrength, TestLensMoistureSeconds);
         }
         ImGui::EndDisabled();
+    }
+}
+#endif
+
+// デバッグ画面の中身を作って描いている（性能・カリング・2面の進行・表示の切り替え・画面効果の調整）。区切りごとの中身は上の関数
+void Debug::UI::Draw(Effect::PostProcess& postProcess)
+{
+#if defined(ENABLE_IMGUI)
+    if (!g_Initialized)
+    {
+        return;
+    }
+
+    if (g_Visible)
+    {
+        ImGui::SetNextWindowSize(ImVec2(PanelWidth, 0.0f), ImGuiCond_FirstUseEver);
+        ImGui::Begin("SIGNAL LOST - Runtime Tuning", &g_Visible);
+        ImGui::Text("F1: close tuning panel");
+        ImGui::Checkbox(
+            "Pause gameplay while tuning", &g_PauseGameplay);
+
+        Core::Game* game = Core::Game::GetInstance();
+        DrawPerformanceSection(game);
+        DrawSceneStats(game);
+        DrawStage2EventSection(game);
+        DrawShaderDebugView(game);
+        DrawVisualPresets();
+        DrawPostProcessControls(postProcess);
         ImGui::End();
     }
 

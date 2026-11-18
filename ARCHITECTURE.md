@@ -62,7 +62,7 @@ Application
 
 ### 描画パスの初期化と定数バッファ
 
-DDGI と半解像度の光の筋は Game が単一所有し、型の定義は Game の実装側で読み込みます。GPUへ渡す構造体の変更が Game.h を読む他のコードへ波及しにくくなります。画面効果に必要な描画テクスチャ、シェーダー、定数バッファを作れなかった場合は PostProcess から Game へ失敗を返し、最初の描画より前に終了します。オブジェクトの初期化など失敗を返す入口がない箇所は CreateRequired などを使い、失敗した資源の用途やシェーダー名を表示して停止します。RenderTexture は途中で失敗した場合に作成済みのビューも解放します。
+DDGI と半解像度の光の筋は Game が単一所有し、型の定義は Game の実装側で読み込みます。GPUへ渡す構造体の変更が Game.h を読む他のコードへ波及しにくくなります。同じ理由で、画面効果（PostProcess）・影（ShadowMap・PointShadowMap）・反射（ReflectionProbe 2つ・ScreenSpaceReflection）・人の形の距離場（FigureVolumes）・SSAO（AmbientOcclusion）・タイルベースライティング（TiledLighting）・GPU時間の計測（GpuTimer）も `std::unique_ptr` で持ち、Game.h には前方宣言だけを書いています（中身は Game.cpp・GameRendering.cpp が読む）。`GetPostProcess()` などを使うファイルは、使うヘッダーを自分で読みます。これで、描画のヘッダーを1つ変えたときに作り直しになる .cpp が、55個から3〜32個に減りました（PostProcess.h は演出から多く使うので32個、ほかは3〜6個）。1フレームの描画（`Game::Draw`、GameRendering.cpp）は、段階ごとの関数（`DrawShadowPass`・`DrawBulbShadowPass`・`DrawReflectionProbe`・`DrawEnvironmentProbe`・`DrawDepthPrepass`・`ComputeAmbientOcclusion`・`ComputeGlobalIllumination`・`ComputeLightShafts`・`DrawMainSceneObjects` など）を順に呼ぶ形にしています。画面効果に必要な描画テクスチャ、シェーダー、定数バッファを作れなかった場合は PostProcess から Game へ失敗を返し、最初の描画より前に終了します。オブジェクトの初期化など失敗を返す入口がない箇所は CreateRequired などを使い、失敗した資源の用途やシェーダー名を表示して停止します。RenderTexture は途中で失敗した場合に作成済みのビューも解放します。
 
 露出・ブルーム・光の筋・CRT は同じ postProcessBuffer.hlsli から画面効果用の b0 を読みます。TimeBuffer、光の筋の計算用バッファ、DDGI の C++ 側は、サイズと主要なメンバーのバイト位置を static_assert で確認しています。HLSL 側の宣言を変えるときは C++ 側の宣言と検査値も合わせて更新します。
 
@@ -145,6 +145,8 @@ DDGI と半解像度の光の筋は Game が単一所有し、型の定義は Ga
 - `KnockingAnomaly`: 壁の向こうのノック異変（音の出どころの選択、ノックの間隔、出どころの壁の前で耳を澄ませた時間）
 - `HandprintAnomaly`: 血の手形の異変（現れた手形の数、照らし続けた時間、少しずつ浮かぶ見え方）。手形の場所と見え方は `Renderer::SetWallHandprints`（b12）で壁のシェーダーへ渡し、`litTexturePS` が1面の血の跡と同じ `HorrorHandprint` の式で描く
 - `TensionPulse`: 自分の心拍音と呼吸音をいつ・どれくらいの大きさで鳴らすかを、危険度と「隠れているか」から決める（入力や描画に依存しない状態クラス）。危険度は2面では危険ゲージと同じ`Stage2Scene::ComputeThreatRate`、1面では近くの影までの距離（`StageScene::ComputeThreatRate`）から渡す。鳴らす処理は1面・2面共通の`TensionPulseFeedback.h`
+- `MathUtility.h`: いろいろなファイルで同じ式を書いていた小さな数学の値と関数（円周率 `Pi`・`TwoPi`・`HalfPi`、なめらかな曲線 `SmoothCurve`・`SmoothStep01`・`SmoothStep`（HLSL の smoothstep と同じ式）、距離から近さ（0〜1）を求める `Proximity`、角度を -π〜π に直す `WrapAngle`）
+- `EventFeedback.h`: 演出の「照明の明滅（長さ・強さ）・画面の脈打ち（強さ・長さ）・振動（フレーム数・強さ）・音（高さ・音量）」を1つの型にまとめ、出来事ごとの名前の付いた定数として各ファイルの先頭に並べるための型と、渡すための関数（1面・2面の演出で共通）
 - `ScratchAnomaly`: 引っかき傷メッセージ
 - `ObservedScareSequence`: 注視時の照明演出
 - `CaughtSequence`: 捕獲後の暗転と復帰
@@ -166,6 +168,7 @@ DDGI と半解像度の光の筋は Game が単一所有し、型の定義は Ga
 
 - 配置は `Stage1Layout` / `Stage2Layout` に分離しています。`Build` がObjectを生成して配置し、
   生成したポインタをそのまま `StageObjects` / `Stage2Objects` に入れて返します。
+  `Build` の中は、場所ごとの手順（`Stage1Builder`・`Stage2Builder` の `BuildPlayerAndGround`・`BuildMirror` など）に分けて、前と同じ順番で呼んでいます（作る順番が描く順番と置き直しの登録の順番になるため）。
 - 名前を書くのは生成時の1か所だけです（`SceneLayoutBuilder` が生成と同時に名前を記録します）。
   Sceneの終了時はその一覧で破棄するため、生成・取得・破棄で名前の一覧が食い違うことはありません。
 - 破棄を名前で行うのは、すでに破棄されたObjectに対しても安全だからです。将来、途中で破棄される

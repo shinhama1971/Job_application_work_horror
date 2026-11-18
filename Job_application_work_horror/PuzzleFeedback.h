@@ -11,10 +11,23 @@
 // 間違えたとき・ヒントを出すときに、画面へ出す知らせの種類と残り時間を持っている。
 class PuzzleFeedback final
 {
+public:
+    // 知らせの種類（目的表示の文章を選ぶのに使う。SelectStage2Objective）
+    static constexpr int NoFeedback = 0;
+    static constexpr int FalseDoorNeedsLight = 1;     // 偽の扉をライトを消したまま見た
+    static constexpr int ClockNeedsDark = 2;          // 時計をライトを点けたまま見た
+    static constexpr int SignalWrongOrder = 3;        // 信号盤の順番が違う
+    static constexpr int SignalNoiseReset = 4;        // 走る音で危険度が最大になり、信号盤がやり直しになった
+    static constexpr int SignalStalkerCaught = 5;     // 信号盤の間に来る影に追いつかれた
+    static constexpr int SignalStalkerRepelled = 6;   // 信号盤の間に来る影をライトで追い払った
+    // 間違えたときの知らせを出す秒数と、数える間違いの回数の上限（この回数で一番強く知らせる）
+    static constexpr float MistakeNoticeSeconds = 2.2f;
+    static constexpr int MaxMistakeCount = 3;
+
 private:
     // 知らせの残り秒数、知らせの種類（0はなし）、間違えた回数（3回まで数えている）
     float m_Timer = 0.0f;
-    int m_Type = 0;
+    int m_Type = NoFeedback;
     int m_MistakeCount = 0;
 
 public:
@@ -22,7 +35,7 @@ public:
     void Reset() noexcept
     {
         m_Timer = 0.0f;
-        m_Type = 0;
+        m_Type = NoFeedback;
         m_MistakeCount = 0;
     }
 
@@ -41,8 +54,8 @@ public:
         }
 
         m_Type = type;
-        m_Timer = 2.2f;
-        m_MistakeCount = (std::min)(m_MistakeCount + 1, 3);
+        m_Timer = MistakeNoticeSeconds;
+        m_MistakeCount = (std::min)(m_MistakeCount + 1, MaxMistakeCount);
         return true;
     }
 
@@ -59,7 +72,7 @@ public:
     // 知らせを消している
     void Clear() noexcept
     {
-        m_Type = 0;
+        m_Type = NoFeedback;
         m_Timer = 0.0f;
     }
 

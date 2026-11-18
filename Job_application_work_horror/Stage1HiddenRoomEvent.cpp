@@ -8,6 +8,7 @@
 #include "Door.h"
 #include "FuseBox.h"
 #include "Game.h"
+#include "PostProcess.h"
 #include "Input.h"
 #include "KeyItem.h"
 #include "Player.h"

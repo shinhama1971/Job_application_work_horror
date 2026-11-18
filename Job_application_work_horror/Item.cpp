@@ -6,6 +6,7 @@
 #include "Item.h"
 #include "Application.h"
 #include "Game.h"
+#include "PostProcess.h"
 #include "Input.h"
 #include "Player.h"
 #include "ShadowMan.h"

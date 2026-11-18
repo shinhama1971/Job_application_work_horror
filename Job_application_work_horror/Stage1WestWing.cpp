@@ -5,10 +5,12 @@
 // ============================================================================
 
 #include "Stage1WestWing.h"
+#include "MathUtility.h"
 
 #include "Door.h"
 #include "DrainValve.h"
 #include "Game.h"
+#include "PostProcess.h"
 #include "Ground.h"
 #include "Input.h"
 #include "Item.h"
@@ -326,7 +328,7 @@ void Stage1WestWing::Update(const Player& player, float deltaTime,
     if (m_DripTimer <= 0.0f)
     {
         m_DripTimer = RandomRange(MinDripInterval, MaxDripInterval);
-        const float angle = RandomRange(0.0f, 6.2831853f);
+        const float angle = RandomRange(0.0f, MathUtility::TwoPi);
         const float distance = RandomRange(DripMinDistance, DripMaxDistance);
         AmbientSoundCue drip;
         drip.Label = SOUND_CUE_WATER_DROP;

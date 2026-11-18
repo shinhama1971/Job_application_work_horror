@@ -4,8 +4,17 @@
 // ============================================================================
 
 #include "Game.h"
+#include "AmbientOcclusion.h"
 #include "DDGIVolume.h"
+#include "FigureVolumes.h"
+#include "GpuTimer.h"
 #include "LightShafts.h"
+#include "PointShadowMap.h"
+#include "PostProcess.h"
+#include "ReflectionProbe.h"
+#include "ScreenSpaceReflection.h"
+#include "ShadowMap.h"
+#include "TiledLighting.h"
 #include "Renderer.h"
 #include "Input.h"
 #include "Scene.h"
@@ -24,12 +33,39 @@
 #include "Wall.h"
 #include "Door.h"
 
+namespace
+{
+    // 環境マップ（キューブマップ）を設定するテクスチャの番号（シェーダーの t14）
+    constexpr UINT EnvironmentProbeTextureSlot = 14;
+    // 環境マップで何も描かれない所の色。闇に溶けるよう、ほとんど黒にわずかな青みを残している
+    const DirectX::SimpleMath::Color EnvironmentProbeClearColor(0.012f, 0.013f, 0.014f, 1.0f);
+    // ポーズを開け閉めしたときの、コントローラーの短く弱い振動（60fpsで数えたフレーム数と強さ）
+    constexpr int PauseToggleVibrationFrames = 2;
+    constexpr float PauseToggleVibrationStrength = 0.06f;
+    // 聞き手と音源の間の壁と閉じた扉の数による、音のこもり具合。1枚でほぼこもり、この枚数からは完全に向こう側の音にしている
+    constexpr int FullyMuffledBlockerCount = 2;
+    constexpr float SingleBlockerMuffle = 0.8f;
+    constexpr float FullMuffle = 1.0f;
+    // 導入の受信記録の間に、後ろで小さく鳴らす無線の雑音の音量
+    constexpr float IntroRadioStaticVolume = 0.35f;
+}
+
 namespace Core
 {
     std::unique_ptr<Game> Game::m_Instance;
 
-    // 作った時点で、ベスト記録と設定ファイルを読み込んでいる
+    // 描画の仕組みの入れ物を作り（中身の初期化はデバイスができた後の Init）、ベスト記録と設定ファイルを読み込んでいる
     Game::Game()
+        : m_PostProcess(std::make_unique<Effect::PostProcess>()),
+          m_ShadowMap(std::make_unique<Effect::ShadowMap>()),
+          m_ReflectionProbe(std::make_unique<Effect::ReflectionProbe>()),
+          m_EnvironmentProbe(std::make_unique<Effect::ReflectionProbe>()),
+          m_PointShadowMap(std::make_unique<Effect::PointShadowMap>()),
+          m_FigureVolumes(std::make_unique<Effect::FigureVolumes>()),
+          m_AmbientOcclusion(std::make_unique<Effect::AmbientOcclusion>()),
+          m_ScreenSpaceReflection(std::make_unique<Effect::ScreenSpaceReflection>()),
+          m_TiledLighting(std::make_unique<Effect::TiledLighting>()),
+          m_GpuTimer(std::make_unique<GpuTimer>())
     {
         LoadBestRecord();
         m_Settings.Load();
@@ -59,7 +95,7 @@ namespace Core
             return false;
         }
         // GPU時間の計測とデバッグ画面は、デバイスができた後に作っている
-        m_Instance->m_GpuTimer.Init(Renderer::GetDevice());
+        m_Instance->m_GpuTimer->Init(Renderer::GetDevice());
         Debug::UI::Init(Application::GetWindow());
 
 
@@ -82,19 +118,19 @@ namespace Core
 
         // カメラ・水面の反射・影・画面効果・タイルベースライティングを作り、設定を反映してからタイトルを始めている
         m_Instance->m_Camera.Init();
-        m_Instance->m_ReflectionProbe.Init();
-        m_Instance->m_EnvironmentProbe.Init(14, true);
-        m_Instance->m_EnvironmentProbe.SetClearColor(DirectX::SimpleMath::Color(0.012f, 0.013f, 0.014f, 1.0f));
-        m_Instance->m_FigureVolumes.Init();
+        m_Instance->m_ReflectionProbe->Init();
+        m_Instance->m_EnvironmentProbe->Init(EnvironmentProbeTextureSlot, true);
+        m_Instance->m_EnvironmentProbe->SetClearColor(EnvironmentProbeClearColor);
+        m_Instance->m_FigureVolumes->Init();
         m_Instance->m_LightShafts = std::make_unique<Effect::LightShafts>();
         m_Instance->m_LightShafts->Init(static_cast<int>(Application::GetWidth()), static_cast<int>(Application::GetHeight()));
-        m_Instance->m_AmbientOcclusion.Init(static_cast<int>(Application::GetWidth()), static_cast<int>(Application::GetHeight()));
+        m_Instance->m_AmbientOcclusion->Init(static_cast<int>(Application::GetWidth()), static_cast<int>(Application::GetHeight()));
         m_Instance->m_GlobalIllumination = std::make_unique<Effect::DDGIVolume>();
         m_Instance->m_GlobalIllumination->Init(static_cast<int>(Application::GetWidth()), static_cast<int>(Application::GetHeight()));
-        m_Instance->m_ScreenSpaceReflection.Init(Application::GetWidth(), Application::GetHeight());
-        m_Instance->m_TiledLighting.Init();
-        if (!m_Instance->m_ShadowMap.Init() || !m_Instance->m_PointShadowMap.Init() ||
-            !m_Instance->m_PostProcess.Init())
+        m_Instance->m_ScreenSpaceReflection->Init(Application::GetWidth(), Application::GetHeight());
+        m_Instance->m_TiledLighting->Init();
+        if (!m_Instance->m_ShadowMap->Init() || !m_Instance->m_PointShadowMap->Init() ||
+            !m_Instance->m_PostProcess->Init())
         {
             Uninit();
             return false;
@@ -173,7 +209,7 @@ namespace Core
                 pauseMenu.Open();
             }
             m_Instance->ApplyAudioVolume(pauseMenu.IsOpen());
-            Input::SetVibration(2, 0.06f);
+            Input::SetVibration(PauseToggleVibrationFrames, PauseToggleVibrationStrength);
             return;
         }
 
@@ -187,8 +223,8 @@ namespace Core
         // デバッグ画面で「調整中はゲームを止める」にしているときは、画面効果だけを更新している
         if (Debug::UI::ShouldPauseGameplay())
         {
-            Debug::UI::ApplyTuning(m_Instance->m_PostProcess);
-            m_Instance->m_PostProcess.Update();
+            Debug::UI::ApplyTuning(*m_Instance->m_PostProcess);
+            m_Instance->m_PostProcess->Update();
             return;
         }
 
@@ -206,10 +242,10 @@ namespace Core
         }
 
         // デバッグ画面の調整値を反映し、カメラと画面効果を更新している
-        Debug::UI::ApplyTuning(m_Instance->m_PostProcess);
+        Debug::UI::ApplyTuning(*m_Instance->m_PostProcess);
 
         m_Instance->m_Camera.Update();
-        m_Instance->m_PostProcess.Update();
+        m_Instance->m_PostProcess->Update();
 
         // 自動撮影モード（--capture）のときだけ、プレイヤーと視点を決めた道順で動かしている。
         Tools::CaptureMode::UpdateBeforeObjects();
@@ -250,22 +286,22 @@ namespace Core
         m_Instance->m_Scene.reset();
 
         m_Instance->m_ObjectManager.DeleteAll();
-        m_Instance->m_TiledLighting.Uninit();
-        m_Instance->m_PostProcess.Uninit();
-        m_Instance->m_ShadowMap.Uninit();
-        m_Instance->m_ReflectionProbe.Uninit();
-        m_Instance->m_EnvironmentProbe.Uninit();
-        m_Instance->m_PointShadowMap.Uninit();
-        m_Instance->m_AmbientOcclusion.Uninit();
+        m_Instance->m_TiledLighting->Uninit();
+        m_Instance->m_PostProcess->Uninit();
+        m_Instance->m_ShadowMap->Uninit();
+        m_Instance->m_ReflectionProbe->Uninit();
+        m_Instance->m_EnvironmentProbe->Uninit();
+        m_Instance->m_PointShadowMap->Uninit();
+        m_Instance->m_AmbientOcclusion->Uninit();
         m_Instance->m_GlobalIllumination->Uninit();
-        m_Instance->m_ScreenSpaceReflection.Uninit();
+        m_Instance->m_ScreenSpaceReflection->Uninit();
 
         m_Instance->m_Sound.Uninit();
         m_Instance->m_SoundReady = false;
 
         Input::Release();
         Debug::UI::Uninit();
-        m_Instance->m_GpuTimer.Uninit();
+        m_Instance->m_GpuTimer->Uninit();
 
         // D3Dデバイスが有効な間に、キャッシュとGameが持つGPUリソースを解放している。
         // こうしておくと、Renderer::Uninitのデバッグ出力が、Gameに残った参照ではなく
@@ -325,8 +361,8 @@ namespace Core
     // 明るさ・演出の強さ・視点の感度の設定を、画面効果とカメラへ反映している
     void Game::ApplyVisualSettings()
     {
-        m_PostProcess.SetUserBrightnessOffset(m_Settings.GetBrightnessOffset());
-        m_PostProcess.SetUserEffectScale(m_Settings.GetEffectScale());
+        m_PostProcess->SetUserBrightnessOffset(m_Settings.GetBrightnessOffset());
+        m_PostProcess->SetUserEffectScale(m_Settings.GetEffectScale());
         m_Camera.SetLookSensitivityScale(m_Settings.GetLookSensitivityScale());
     }
 
@@ -358,25 +394,25 @@ namespace Core
         const DirectX::SimpleMath::Vector3 end =
             listener + toEmitter * (distance - EmitterClearance);
 
-        // 壁1枚でほぼこもり（0.8）、2枚以上で完全に向こう側の音（1.0）にしている。
+        // 壁1枚でほぼこもり、FullyMuffledBlockerCount 枚以上で完全に向こう側の音にしている。
         int blockers = 0;
         for (const Wall* wall : GetObjects<Wall>())
         {
             float hitDistance = 0.0f;
             if (wall->IntersectsInteractionSegment(listener, end, hitDistance) &&
-                ++blockers >= 2)
+                ++blockers >= FullyMuffledBlockerCount)
             {
-                return 1.0f;
+                return FullMuffle;
             }
         }
         for (const Door* door : GetObjects<Door>())
         {
-            if (door->BlocksSoundSegment(listener, end) && ++blockers >= 2)
+            if (door->BlocksSoundSegment(listener, end) && ++blockers >= FullyMuffledBlockerCount)
             {
-                return 1.0f;
+                return FullMuffle;
             }
         }
-        return blockers == 0 ? 0.0f : 0.8f;
+        return blockers == 0 ? 0.0f : SingleBlockerMuffle;
     }
 
     // 今のSceneとObjectを終了してから、指定された次のSceneを1つだけ作っている。
@@ -398,16 +434,16 @@ namespace Core
         m_Scene.reset();
         m_ShadowFrameIndex = 0;
         // 前の画面の明るさに慣れたままにならないよう、自動露出は新しいシーンの最初の画面にすぐ合わせている。
-        m_PostProcess.ResetAutoExposure();
+        m_PostProcess->ResetAutoExposure();
         // 前の場所の効果音と環境音を止めてから、新しいシーンの音を始める。
         if (m_SoundReady)
         {
             m_Sound.StopAll();
         }
-        m_PostProcess.SetPresenceStatic(0.0f);
+        m_PostProcess->SetPresenceStatic(0.0f);
         // 前の場所の景色を金属に映さないよう、環境マップを次の描画で6面とも撮り直させている
-        m_EnvironmentProbe.Invalidate();
-        m_ScreenSpaceReflection.Invalidate();
+        m_EnvironmentProbe->Invalidate();
+        m_ScreenSpaceReflection->Invalidate();
         // 光の筋の揺らぎの時間も最初に戻している（前のシーン（タイトルの後ろの森など）の長さで、次のシーンの見え方が変わらないように）
         m_LightShafts->ResetTime();
 
@@ -482,7 +518,7 @@ namespace Core
             // 新しいシーンの環境音と同じタイミングで鳴らし始めている。
             if (showTransmission)
             {
-                m_Sound.Play(SOUND_CUE_RADIO_STATIC, 1.0f, 0.35f);
+                m_Sound.Play(SOUND_CUE_RADIO_STATIC, 1.0f, IntroRadioStaticVolume);
             }
             if (sName == SceneName::Stage)
             {

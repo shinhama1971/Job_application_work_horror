@@ -7,6 +7,7 @@
 #include "Application.h"
 #include "Camera.h"
 #include "Game.h"
+#include "ShadowMap.h"
 #include "Renderer.h"
 #include "PropModel.h"
 #include "utility.h"

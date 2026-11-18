@@ -182,6 +182,11 @@ private:
         std::string_view text,
         float pixelSize,
         const DirectX::SimpleMath::Color& color);
+    // 文字列を、画面の横の中央に置いてためている
+    void AddCenteredText(float y, std::string_view text, float pixelSize, const DirectX::SimpleMath::Color& color);
+    // 日本語の1文字（進む幅を返す）と、英数字の1文字をためている（AddText から呼んでいる）
+    float AddJapaneseCharacter(float x, float y, wchar_t character, float pixelSize, const DirectX::SimpleMath::Color& color);
+    void AddAsciiCharacter(float x, float y, char character, float pixelSize, const DirectX::SimpleMath::Color& color);
     // ためた頂点をGPUへ送り、まとめて描いている
     void Flush();
     // テクスチャ（監視カメラの映像など）を四角形に貼ってすぐに描いている

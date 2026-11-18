@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "Stage2Scene.h"
+#include "MathUtility.h"
 
 #include "BatteryItem.h"
 #include "CeilingLight.h"
@@ -11,6 +12,7 @@
 #include "ExitTrigger.h"
 #include "FuseBox.h"
 #include "Game.h"
+#include "PostProcess.h"
 #include "Input.h"
 #include "Player.h"
 #include "ShadowMan.h"
@@ -18,6 +20,7 @@
 #include "Ground.h"
 #include "HangingBulb.h"
 #include "TensionPulseFeedback.h"
+#include "EventFeedback.h"
 #include "Wall.h"
 
 #include <SimpleMath.h>
@@ -94,6 +97,309 @@ namespace
 
     // --- 背後の気配：真後ろに置けないときに、次の機会へ回す秒数
     constexpr float BehindPresenceRetrySeconds = 3.0f;
+
+    // ------------------------------------------------------------------------
+    // 演出の強さと長さ（照明の明滅・画面の脈打ち・振動・音）と、怖さに合わせて画面効果を変える範囲
+    // ------------------------------------------------------------------------
+    using EventFeedback::FlickerSpec;
+    using EventFeedback::PulseSpec;
+    using EventFeedback::RumbleSpec;
+    using EventFeedback::SoundSpec;
+
+    // 方向を求めるとき、長さがこれ以下なら向きを決めない（ゼロ除算を避ける）
+    constexpr float MinimumDirectionLength = 0.001f;
+    // 奥の扉の上の照明を、異変を見つけたときに揺らす明滅（いくつもの異変で同じ揺らし方にそろえている）
+    constexpr FlickerSpec DoorLightAlertFlicker{ 0.90f, 0.76f };
+
+    // 偽の扉が右の壁へ移ったとき
+    constexpr PulseSpec FalseDoorMovedBloom{ 0.58f, 0.24f };
+    constexpr FlickerSpec FalseDoorOldLightFlicker{ 0.72f, 0.68f };
+    constexpr PulseSpec FalseDoorMovedPulse{ 0.32f, 0.34f };
+    constexpr RumbleSpec FalseDoorMovedRumble{ 8, 0.20f };
+
+    // 影を見てしまったとき：驚かせる一撃と、奥から入口へ照明が順に明滅する拍（拍ごとの照明と強さ、光の脈打ちの強さの式）
+    constexpr PulseSpec ObservedScarePulse{ 0.72f, 0.52f };
+    constexpr RumbleSpec ObservedScareRumble{ 15, 0.34f };
+    constexpr float ObservedScareFlickerSeconds = 0.82f;
+    constexpr float ObservedScareDoorLightStrength = 0.94f;
+    constexpr float ObservedScareLight3Strength = 0.90f;
+    constexpr float ObservedScareLight2Strength = 0.86f;
+    constexpr float ObservedScareLight1Strength = 0.80f;
+    constexpr float ObservedScareBloomBase = 0.26f;
+    constexpr float ObservedScareBloomPerStrength = 0.25f;
+    constexpr float ObservedScareBloomSeconds = 0.16f;
+    // 演出の間だけ、ノイズと周辺減光を強める（演出の強さ0〜1で、基本＋この分）
+    constexpr float ObservedScareSeconds = 1.35f;
+    constexpr float ObservedScareNoiseBase = 0.30f;
+    constexpr float ObservedScareNoiseRange = 0.16f;
+    constexpr float ObservedScareVignetteBase = 0.76f;
+    constexpr float ObservedScareVignetteRange = 0.12f;
+
+    // 最後の停電：始まりに裸電球を大きく揺らし、壁の傷を全部赤く光らせて、強く驚かせる
+    constexpr float FinalStartBulbKick = 0.9f;
+    constexpr float FinalStartScratchEmission = 0.34f;
+    constexpr PulseSpec FinalStartPulse{ 0.82f, 0.72f };
+    constexpr RumbleSpec FinalStartRumble{ 18, 0.42f };
+    // 追跡中に影を見てしまった罰：照明が一斉に明滅し、画面が強く乱れる
+    constexpr FlickerSpec GazePenaltyFlicker{ 0.72f, 0.92f };
+    constexpr PulseSpec GazePenaltyPulse{ 0.92f, 0.64f };
+    constexpr PulseSpec GazePenaltyBloom{ 0.62f, 0.22f };
+    constexpr RumbleSpec GazePenaltyRumble{ 16, 0.45f };
+    // 拍ごとに入口側から非常灯を点ける：点滅の周期のずらし（基本＋拍ごと）、点けた瞬間の明滅と光
+    constexpr float FinalBeatEmergencyOffsetBase = 9.0f;
+    constexpr float FinalBeatEmergencyOffsetStep = 0.7f;
+    constexpr FlickerSpec FinalBeatFlicker{ 1.0f, 0.96f };
+    constexpr PulseSpec FinalBeatBloom{ 0.48f, 0.18f };
+    // 停電の明滅の間の画面（ノイズ・周辺減光・レンズの歪み・光の筋は、明滅に合わせて基本＋この分）
+    constexpr float FinalFlickerNoise = 0.43f;
+    constexpr float FinalFlickerVignette = 0.88f;
+    constexpr float FinalFlickerDistortionBase = 0.68f;
+    constexpr float FinalFlickerDistortionRange = 0.08f;
+    constexpr float FinalFlickerVolumetricBase = 0.62f;
+    constexpr float FinalFlickerVolumetricRange = 0.12f;
+    // 出口の扉の鍵が外れたとき：扉の上のランプを緑にし、光で知らせる
+    const Color DoorIndicatorOpenDiffuse(0.025f, 0.22f, 0.055f, 1.0f);
+    const Color DoorIndicatorOpenEmission(0.005f, 0.30f, 0.025f, 1.0f);
+    constexpr float DoorIndicatorOpenShininess = 30.0f;
+    constexpr PulseSpec FinalDoorReadyBloom{ 0.88f, 0.62f };
+    constexpr RumbleSpec FinalDoorReadyRumble{ 9, 0.24f };
+    // 追いつかれ直して出口の扉を閉め直すとき：扉の開き方の段階と、赤いランプ
+    constexpr int FinalDoorRetryOpeningPhase = 3;
+    const Color DoorIndicatorLockedDiffuse(0.24f, 0.012f, 0.008f, 1.0f);
+    const Color DoorIndicatorLockedEmission(0.18f, 0.001f, 0.0f, 1.0f);
+    constexpr float DoorIndicatorLockedShininess = 24.0f;
+
+    // 最後の追跡：この距離まで追いつかれたら捕まる。影が照明をこれだけ越えたら、その照明を消す（消える音の高さと音量）
+    constexpr float PursuitCatchDistance = 31.5f;
+    constexpr float PursuitLightPassMargin = 4.0f;
+    constexpr SoundSpec PursuitLightOffSound{ 0.55f, 0.9f };
+    // 影の近さ（0〜1）：この距離から、この幅で遠ざかるほど0に近づく
+    constexpr float PursuitNearDistance = 30.0f;
+    constexpr float PursuitProximityRange = 72.0f;
+    // 近いほど速く脈打つ（基本の速さ＋近さ1のときに足す速さ、ラジアン毎秒）
+    constexpr float PursuitPulseSpeedBase = 6.0f;
+    constexpr float PursuitPulseSpeedRange = 5.0f;
+    // 近さに合わせた画面：廊下の緊張と、扉が開いた後の各効果（基本＋近さ1のときに足す分、脈打ちで足す分）
+    constexpr float PursuitTensionBase = 0.74f;
+    constexpr float PursuitTensionRange = 0.16f;
+    constexpr float PursuitNoiseBase = 0.30f;
+    constexpr float PursuitNoiseRange = 0.085f;
+    constexpr float PursuitNoisePulse = 0.018f;
+    constexpr float PursuitVignetteBase = 0.76f;
+    constexpr float PursuitVignetteRange = 0.135f;
+    constexpr float PursuitDistortionBase = 0.46f;
+    constexpr float PursuitDistortionRange = 0.18f;
+    constexpr float PursuitDistortionPulse = 0.025f;
+    constexpr float PursuitVolumetricBase = 0.50f;
+    constexpr float PursuitVolumetricRange = 0.12f;
+    constexpr float PursuitFilmGradeBase = 0.78f;
+    constexpr float PursuitFilmGradeRange = 0.18f;
+    constexpr float PursuitLensDirtBase = 0.20f;
+    constexpr float PursuitLensDirtRange = 0.22f;
+    constexpr float PursuitExposureDrop = 0.055f;
+    constexpr float PursuitExposurePulse = 0.025f;
+    // 影を見てしまった罰の間の画面（基本＋罰の強さ1のときに足す分）
+    constexpr float GazePenaltyNoiseBase = 0.43f;
+    constexpr float GazePenaltyNoiseRange = 0.12f;
+    constexpr float GazePenaltyVignetteBase = 0.88f;
+    constexpr float GazePenaltyVignetteRange = 0.08f;
+    constexpr float GazePenaltyDistortionBase = 0.66f;
+    constexpr float GazePenaltyDistortionRange = 0.14f;
+    constexpr float GazePenaltyLensDirtBase = 0.32f;
+    constexpr float GazePenaltyLensDirtRange = 0.36f;
+    // 近いほど長く強い振動（基本＋近さ1のときに足す分）。この近さを超えたら画面も脈打たせる
+    constexpr RumbleSpec PursuitRumbleBase{ 3, 0.08f };
+    constexpr RumbleSpec PursuitRumbleRange{ 7, 0.17f };
+    constexpr float PursuitPulseMinProximity = 0.34f;
+    constexpr PulseSpec PursuitPulseBase{ 0.045f, 0.16f };
+    constexpr float PursuitPulseStrengthRange = 0.075f;
+
+    // 捕まったとき：一番強い一撃と、入口へ戻した後の余韻
+    constexpr PulseSpec CaughtPulse{ 1.0f, 0.72f };
+    constexpr PulseSpec CaughtBloom{ 0.18f, 0.16f };
+    constexpr RumbleSpec CaughtRumble{ 24, 0.72f };
+    constexpr PulseSpec CaughtRecoveredPulse{ 0.34f, 0.42f };
+    constexpr RumbleSpec CaughtRecoveredRumble{ 8, 0.18f };
+    // 暗転していく間の画面（基本＋暗さ1のときに変える分）
+    constexpr float CaughtExposureBase = 0.92f;
+    constexpr float CaughtExposureDrop = 0.38f;
+    constexpr float CaughtNoiseBase = 0.46f;
+    constexpr float CaughtNoiseRange = 0.18f;
+    constexpr float CaughtVignetteBase = 0.90f;
+    constexpr float CaughtVignetteRange = 0.08f;
+    constexpr float CaughtDistortionBase = 0.72f;
+    constexpr float CaughtDistortionRange = 0.18f;
+
+    // 壁の傷：3本ごとに少しずつ色を変える量、新しく浮かび上がる秒数、地の赤と自己発光の色、光沢
+    constexpr int ScratchColorCycle = 3;
+    constexpr float ScratchColorVariation = 0.018f;
+    constexpr float ScratchDissolveSeconds = 1.4f;
+    constexpr float ScratchDiffuseRed = 0.20f;
+    constexpr float ScratchDiffuseGreen = 0.008f;
+    constexpr float ScratchDiffuseBlue = 0.004f;
+    constexpr float ScratchEmissionGreen = 0.001f;
+    constexpr float ScratchShininess = 18.0f;
+
+    // 照明の区画：廊下を進むと照明を明滅させる位置（z）
+    constexpr float LightZone1Z = -88.0f;
+    constexpr float LightZone2Z = -14.0f;
+    constexpr float LightZone3Z = 60.0f;
+    constexpr float LightZoneDoorZ = 108.0f;
+    // 明滅の強さ：周回ごとに強め、奥の区画ほど少し強め、上限を超えない
+    constexpr float LightZoneLoopStrength = 0.17f;
+    constexpr float LightZoneBaseStrength = 0.40f;
+    constexpr float LightZoneIndexStrength = 0.035f;
+    constexpr float LightZoneMaxStrength = 0.92f;
+    constexpr float LightZoneFlickerBaseSeconds = 0.48f;
+    // 区画に入ったときの光・画面の乱れ・振動（基本＋強さや周回で足す分）
+    constexpr float LightZoneBloomBase = 0.20f;
+    constexpr float LightZoneBloomPerStrength = 0.20f;
+    constexpr float LightZoneBloomSeconds = 0.15f;
+    constexpr float LightZonePulseBase = 0.08f;
+    constexpr float LightZonePulsePerLoop = 0.24f;
+    constexpr float LightZonePulseSeconds = 0.16f;
+    constexpr RumbleSpec LightZoneRumbleBase{ 2, 0.08f };
+    constexpr float LightZoneRumblePerLoop = 0.18f;
+
+    // 壁の傷の脈打ち：心臓の鼓動のような速さ（基本＋周回ごと）、追跡中の上乗せ、光る強さ（基本＋周回ごと、照らしたときの分）
+    constexpr float ScratchHeartbeatSpeedBase = 2.4f;
+    constexpr float ScratchHeartbeatSpeedPerLoop = 0.45f;
+    constexpr float ScratchFinalBoost = 0.16f;
+    constexpr float ScratchEmissionBase = 0.07f;
+    constexpr float ScratchEmissionPerLoop = 0.035f;
+    constexpr float ScratchLitEmissionBase = 0.10f;
+    constexpr float ScratchLitEmissionHeartbeat = 0.16f;
+    // 近くで正面から照らしたときに一度だけ驚かせる（画面の乱れは周回ごとに強める）
+    constexpr float ScratchScarePulseBase = 0.24f;
+    constexpr float ScratchScarePulsePerLoop = 0.08f;
+    constexpr float ScratchScarePulseSeconds = 0.32f;
+    constexpr PulseSpec ScratchScareBloom{ 0.48f, 0.24f };
+    constexpr RumbleSpec ScratchScareRumble{ 7, 0.20f };
+
+    // 血の手形：次の手形が現れたときと、最後の手形を照らして見つけたとき
+    constexpr SoundSpec HandprintAppearSound{ 0.55f, 0.9f };
+    constexpr FlickerSpec HandprintAppearFlicker{ 0.45f, 0.30f };
+    constexpr PulseSpec HandprintAppearPulse{ 0.14f, 0.22f };
+    constexpr RumbleSpec HandprintAppearRumble{ 3, 0.08f };
+    constexpr SoundSpec HandprintFoundSound{ 0.62f, 1.4f };
+    constexpr PulseSpec HandprintFoundPulse{ 0.30f, 0.40f };
+    constexpr PulseSpec HandprintFoundBloom{ 0.40f, 0.20f };
+    constexpr RumbleSpec HandprintFoundRumble{ 7, 0.18f };
+
+    // 鏡：鏡の中の人影に気づいたときと、振り返って見つけたとき
+    constexpr SoundSpec MirrorSeenBreathSound{ 0.82f, 0.42f };
+    constexpr PulseSpec MirrorSeenPulse{ 0.16f, 0.30f };
+    constexpr RumbleSpec MirrorSeenRumble{ 3, 0.10f };
+    constexpr float MirrorFoundBulbKick = 0.55f;
+    constexpr FlickerSpec MirrorFoundFlicker{ 0.80f, 0.70f };
+    constexpr SoundSpec MirrorFoundKnockSound{ 0.70f, 0.50f };
+    constexpr PulseSpec MirrorFoundPulse{ 0.32f, 0.42f };
+    constexpr RumbleSpec MirrorFoundRumble{ 6, 0.16f };
+
+    // 水たまり：人影の息づかいを鳴らす頭の高さ、気づいたとき・一歩近づくとき・すぐそばまで来たとき・見つけたとき
+    constexpr float PuddleFigureHeadHeight = 36.0f;
+    constexpr SoundSpec PuddleSeenBreathSound{ 0.78f, 0.40f };
+    constexpr PulseSpec PuddleSeenPulse{ 0.16f, 0.30f };
+    constexpr RumbleSpec PuddleSeenRumble{ 3, 0.10f };
+    // 水面の波紋の強さ（足もとを押し下げる量）と、広がりの速さ（負の値ほど速く沈む）
+    constexpr float PuddleStepRippleStrength = 1.6f;
+    constexpr float PuddleStepRippleSpeed = -1.3f;
+    constexpr SoundSpec PuddleStepSound{ 0.70f, 0.75f };
+    constexpr RumbleSpec PuddleStepRumble{ 1, 0.05f };
+    constexpr SoundSpec PuddleCaughtScareSound{ 1.0f, 0.75f };
+    constexpr PulseSpec PuddleCaughtPulse{ 0.55f, 0.45f };
+    constexpr float PuddleCaughtBulbKick = 0.45f;
+    constexpr FlickerSpec PuddleCaughtFlicker{ 0.90f, 0.60f };
+    constexpr RumbleSpec PuddleCaughtRumble{ 8, 0.22f };
+    constexpr float PuddleFoundRippleStrength = 2.2f;
+    constexpr float PuddleFoundRippleSpeed = -1.6f;
+    constexpr float PuddleFoundBulbKick = 0.55f;
+    constexpr FlickerSpec PuddleFoundFlicker{ 0.80f, 0.70f };
+    constexpr SoundSpec PuddleFoundStepSound{ 0.62f, 0.85f };
+    constexpr PulseSpec PuddleFoundPulse{ 0.32f, 0.42f };
+    constexpr RumbleSpec PuddleFoundRumble{ 6, 0.16f };
+
+    // 肖像画：見開いた目が赤く光るときの絵の色と光沢、近くの照明の明滅、画面と振動
+    constexpr float PortraitOpenedEmission = 0.28f;
+    constexpr float PortraitOpenedEmissionScale = 0.12f;
+    const Color PortraitOpenedDiffuse(0.10f, 0.014f, 0.009f, 1.0f);
+    constexpr float PortraitOpenedShininess = 12.0f;
+    constexpr FlickerSpec PortraitNearbyFlicker{ 0.82f, 0.72f };
+    constexpr PulseSpec PortraitOpenedPulse{ 0.36f, 0.30f };
+    constexpr RumbleSpec PortraitOpenedRumble{ 6, 0.17f };
+    // 絵の中の目：見つめている間にかすかに開きかける大きさ、開く・閉じる速さ、瞳の光が点く・消える速さ（毎秒）
+    constexpr float PortraitStareOpen = 0.30f;
+    constexpr float PortraitEyeOpenSpeed = 1.4f;
+    constexpr float PortraitEyeCloseSpeed = 5.0f;
+    constexpr float PortraitEyeGlowRiseSpeed = 1.0f;
+    constexpr float PortraitEyeGlowFallSpeed = 3.0f;
+
+    // 壁の向こうのノック：耳を澄ます位置（廊下の内側の壁の手前のx）、叩く音の高さの幅と音量、聞き当てたときの一撃
+    constexpr float KnockListenX = 38.0f;
+    constexpr float KnockMinPitch = 0.58f;
+    constexpr float KnockMaxPitch = 0.68f;
+    constexpr float KnockVolume = 1.6f;
+    constexpr SoundSpec KnockFoundSound{ 0.52f, 2.2f };
+    constexpr FlickerSpec KnockFoundFlicker{ 0.82f, 0.72f };
+    constexpr PulseSpec KnockFoundPulse{ 0.34f, 0.32f };
+    constexpr RumbleSpec KnockFoundRumble{ 7, 0.18f };
+    // 向きを比べるときに、水平の前向きがほぼ真上・真下で使えないとみなす長さの2乗
+    constexpr float MinimumHorizontalForwardSquared = 0.0001f;
+
+    // 見えない影：水たまりを踏んだときの波紋と水音、濡れた足跡の濃さ（水から離れるほど薄く：最後の一歩の濃さ＋水に触れた直後に足す分）
+    constexpr float UnseenRippleStrength = 1.6f;
+    constexpr float UnseenRippleSpeed = -1.3f;
+    constexpr SoundSpec UnseenWaterStepSound{ 0.72f, 0.60f };
+    constexpr float UnseenFootprintMinOpacity = 0.35f;
+    constexpr float UnseenFootprintOpacityRange = 0.65f;
+    // 照らして気づかれたときと、すれ違えたとき
+    constexpr SoundSpec UnseenNoticedBreathSound{ 0.70f, 0.55f };
+    constexpr float UnseenNoticedBulbKick = 0.35f;
+    constexpr PulseSpec UnseenNoticedPulse{ 0.22f, 0.30f };
+    constexpr RumbleSpec UnseenNoticedRumble{ 3, 0.10f };
+    constexpr FlickerSpec UnseenPassedFlicker{ 0.86f, 0.70f };
+    constexpr float UnseenPassedBulbKick = 0.7f;
+    constexpr SoundSpec UnseenPassedStepSound{ 0.62f, 1.4f };
+    constexpr PulseSpec UnseenPassedPulse{ 0.30f, 0.34f };
+    constexpr RumbleSpec UnseenPassedRumble{ 6, 0.20f };
+
+    // 背後の気配：まだ出ていないときの距離（どの判定にも入らない遠さ）、見ているかを調べる胸の高さ、
+    // 見つめても消えない時間の余裕、追ってきて止まる距離、振り向いたときと追いつかれたとき
+    constexpr float PresenceFarDistance = 1000.0f;
+    constexpr float PresenceChestHeight = 17.0f;
+    constexpr float PresenceGazeExtraSeconds = 10.0f;
+    constexpr float PresenceChaseStopDistance = 8.0f;
+    constexpr PulseSpec PresenceSeenPulse{ 0.14f, 0.18f };
+    constexpr RumbleSpec PresenceSeenRumble{ 2, 0.05f };
+    constexpr FlickerSpec PresenceReachedFlicker{ 0.60f, 0.86f };
+    constexpr SoundSpec PresenceReachedScareSound{ 0.58f, 1.0f };
+    constexpr PulseSpec PresenceReachedPulse{ 0.62f, 0.42f };
+    constexpr RumbleSpec PresenceReachedRumble{ 10, 0.26f };
+
+    // 心拍に使う危険度：足音の危険度・見えない影の近さ・観察の間違いを、それぞれこの割合で使う。間違いはこの回数で最大
+    constexpr float NoiseThreatToHeartbeat = 0.78f;
+    constexpr float UnseenProximityToHeartbeat = 0.85f;
+    constexpr float MistakeDangerToHeartbeat = 0.72f;
+    constexpr float MistakeCountForFullDanger = 3.0f;
+    // 影の近さを危険度にする距離（この距離から、この幅で遠ざかるほど0に近づく）：最後の追跡の影・足音の影・ラジオの雑音
+    constexpr float PursuitDangerNearDistance = 18.0f;
+    constexpr float PursuitDangerRange = 92.0f;
+    constexpr float NoiseShadowDangerNearDistance = 14.0f;
+    constexpr float NoiseShadowDangerRange = 72.0f;
+    constexpr float RadioPresenceNearDistance = 14.0f;
+    constexpr float RadioPresenceRange = 96.0f;
+
+    // 誰かの濡れた足跡：水音、照らして止めたとき、すぐ近くまで来たとき（息づかいは聞き手の後ろのこの距離から）
+    constexpr SoundSpec FollowerWaterStepSound{ 0.78f, 0.55f };
+    constexpr PulseSpec FollowerLitPulse{ 0.14f, 0.26f };
+    constexpr RumbleSpec FollowerLitRumble{ 2, 0.08f };
+    constexpr float FollowerReachedBulbKick = 0.45f;
+    constexpr FlickerSpec FollowerReachedFlicker{ 0.70f, 0.60f };
+    constexpr float FollowerBreathBehindDistance = 10.0f;
+    constexpr SoundSpec FollowerBreathSound{ 0.85f, 0.45f };
+    constexpr PulseSpec FollowerReachedPulse{ 0.30f, 0.40f };
+    constexpr RumbleSpec FollowerReachedRumble{ 5, 0.14f };
+
 }
 
 
@@ -110,7 +416,7 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
     Core::Game* game = Core::Game::GetInstance();
     Vector3 cameraToDoor = FalseDoorCenter - game->GetCamera()->GetPosition();
     const float distance = cameraToDoor.Length();
-    if (distance > 0.001f)
+    if (distance > MinimumDirectionLength)
     {
         cameraToDoor /= distance;
     }
@@ -121,7 +427,7 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
     {
         if (!player.IsFlashlightOn())
         {
-            RegisterPuzzleMistake(1);
+            RegisterPuzzleMistake(PuzzleFeedback::FalseDoorNeedsLight);
             return;
         }
         m_FalseDoorAnomaly.MarkObserved();
@@ -145,18 +451,18 @@ void Stage2Scene::UpdateFalseDoorAnomaly(const Player& player)
         m_Objects.Light(Stage2Light::DoorLight);
     if (doorLight != nullptr)
     {
-        doorLight->TriggerEventFlicker(0.90f, 0.76f);
+        EventFeedback::Flicker(*doorLight, DoorLightAlertFlicker);
     }
-    game->GetPostProcess()->TriggerBloomPulse(0.58f, 0.24f);
+    EventFeedback::BloomPulse(*game->GetPostProcess(), FalseDoorMovedBloom);
 
     CeilingLight* oldDoorLight =
         m_Objects.Light(Stage2Light::Light3);
     if (oldDoorLight != nullptr)
     {
-        oldDoorLight->TriggerEventFlicker(0.72f, 0.68f);
+        EventFeedback::Flicker(*oldDoorLight, FalseDoorOldLightFlicker);
     }
-    game->GetPostProcess()->TriggerHorrorPulse(0.32f, 0.34f);
-    Input::SetVibration(8, 0.20f);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), FalseDoorMovedPulse);
+    EventFeedback::Rumble(FalseDoorMovedRumble);
 }
 
 // 影を見てしまったときの演出を始めている（驚かせる音・画面・振動）
@@ -169,8 +475,8 @@ void Stage2Scene::StartObservedScare()
 
     Core::Game* game = Core::Game::GetInstance();
     game->PlayAudioCue(SOUND_CUE_SCARE);
-    game->GetPostProcess()->TriggerHorrorPulse(0.72f, 0.52f);
-    Input::SetVibration(15, 0.34f);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), ObservedScarePulse);
+    EventFeedback::Rumble(ObservedScareRumble);
 }
 
 // 影を見たときの演出を進めている：奥の扉の照明から入口の照明へ、順に明滅させている
@@ -192,10 +498,10 @@ void Stage2Scene::UpdateObservedScare(float deltaTime)
 
     constexpr LightBeat beats[] =
     {
-        { Stage2Light::DoorLight, 0.94f },
-        { Stage2Light::Light3, 0.90f },
-        { Stage2Light::Light2, 0.86f },
-        { Stage2Light::Light1, 0.80f }
+        { Stage2Light::DoorLight, ObservedScareDoorLightStrength },
+        { Stage2Light::Light3, ObservedScareLight3Strength },
+        { Stage2Light::Light2, ObservedScareLight2Strength },
+        { Stage2Light::Light1, ObservedScareLight1Strength }
     };
 
     int pendingBeat = m_ObservedScareSequence.ConsumePendingBeat();
@@ -205,22 +511,22 @@ void Stage2Scene::UpdateObservedScare(float deltaTime)
         CeilingLight* light = m_Objects.Light(beat.Light);
         if (light != nullptr)
         {
-            light->TriggerEventFlicker(0.82f, beat.Strength);
+            light->TriggerEventFlicker(ObservedScareFlickerSeconds, beat.Strength);
         }
 
         game->GetPostProcess()->TriggerBloomPulse(
-            0.26f + beat.Strength * 0.25f,
-            0.16f);
+            ObservedScareBloomBase + beat.Strength * ObservedScareBloomPerStrength,
+            ObservedScareBloomSeconds);
         pendingBeat = m_ObservedScareSequence.ConsumePendingBeat();
     }
 
-    if (m_ObservedScareSequence.GetTimer() < 1.35f)
+    if (m_ObservedScareSequence.GetTimer() < ObservedScareSeconds)
     {
         const float intensity =
             m_ObservedScareSequence.GetAtmosphereIntensity();
         game->GetPostProcess()->SetAtmosphere(
-            0.30f + intensity * 0.16f,
-            0.76f + intensity * 0.12f);
+            ObservedScareNoiseBase + intensity * ObservedScareNoiseRange,
+            ObservedScareVignetteBase + intensity * ObservedScareVignetteRange);
     }
     else
     {
@@ -232,7 +538,7 @@ void Stage2Scene::UpdateObservedScare(float deltaTime)
 void Stage2Scene::StartFinalSequence()
 {
     m_FinalSequence.Start();
-    KickHangingBulbs(0.9f);
+    KickHangingBulbs(FinalStartBulbKick);
     m_NoiseThreatSystem.SetThreat(0.0f);
     m_NoiseThreatSystem.SetWarningTimer(0.0f);
     m_Notices.loop = Stage2NoticeSeconds;
@@ -280,12 +586,12 @@ void Stage2Scene::StartFinalSequence()
                 {
                     if (light != nullptr)
                     {
-                        light->TriggerEventFlicker(0.72f, 0.92f);
+                        EventFeedback::Flicker(*light, GazePenaltyFlicker);
                     }
                 }
-                game->GetPostProcess()->TriggerHorrorPulse(0.92f, 0.64f);
-                game->GetPostProcess()->TriggerBloomPulse(0.62f, 0.22f);
-                Input::SetVibration(16, 0.45f);
+                EventFeedback::HorrorPulse(*game->GetPostProcess(), GazePenaltyPulse);
+                EventFeedback::BloomPulse(*game->GetPostProcess(), GazePenaltyBloom);
+                EventFeedback::Rumble(GazePenaltyRumble);
             });
     }
     // 影が通り過ぎて消した照明を、やり直したときのために点け直し、影の足跡を数え直している
@@ -303,9 +609,9 @@ void Stage2Scene::StartFinalSequence()
     m_PursuitStepDistance = 0.0f;
     m_PursuitStepSide = 1.0f;
     // 壁の傷を全部見せ、強く驚かせている
-    RevealScratchPieces(0, Stage2ScratchCount, 0.34f);
-    game->GetPostProcess()->TriggerHorrorPulse(0.82f, 0.72f);
-    Input::SetVibration(18, 0.42f);
+    RevealScratchPieces(0, Stage2ScratchCount, FinalStartScratchEmission);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), FinalStartPulse);
+    EventFeedback::Rumble(FinalStartRumble);
 }
 
 // 最後の停電の演出を進め、終わったら出口の扉の鍵を外している
@@ -328,10 +634,10 @@ void Stage2Scene::UpdateFinalSequence(float deltaTime)
         {
             light->SetEmergencyLight(
                 true,
-                9.0f + static_cast<float>(pendingBeat) * 0.7f);
-            light->TriggerEventFlicker(1.0f, 0.96f);
+                FinalBeatEmergencyOffsetBase + static_cast<float>(pendingBeat) * FinalBeatEmergencyOffsetStep);
+            EventFeedback::Flicker(*light, FinalBeatFlicker);
         }
-        game->GetPostProcess()->TriggerBloomPulse(0.48f, 0.18f);
+        EventFeedback::BloomPulse(*game->GetPostProcess(), FinalBeatBloom);
         pendingBeat = m_FinalSequence.ConsumePendingBeat();
     }
 
@@ -346,11 +652,11 @@ void Stage2Scene::UpdateFinalSequence(float deltaTime)
             std::sin(m_FinalSequence.GetSequenceTimer() * FinalFlickerRadiansPerSecond) *
                 0.5f + 0.5f;
         game->GetPostProcess()->SetExposure(FinalFlickerMinimumExposure + pulse * FinalFlickerExposureAmplitude);
-        game->GetPostProcess()->SetAtmosphere(0.43f, 0.88f);
+        game->GetPostProcess()->SetAtmosphere(FinalFlickerNoise, FinalFlickerVignette);
         game->GetPostProcess()->SetLensDistortionStrength(
-            0.68f + pulse * 0.08f);
+            FinalFlickerDistortionBase + pulse * FinalFlickerDistortionRange);
         game->GetPostProcess()->SetVolumetricIntensity(
-            0.62f + pulse * 0.12f);
+            FinalFlickerVolumetricBase + pulse * FinalFlickerVolumetricRange);
         return;
     }
 
@@ -375,12 +681,11 @@ void Stage2Scene::UpdateFinalSequence(float deltaTime)
     if (doorIndicator != nullptr)
     {
         doorIndicator->SetAppearance(
-            Color(0.025f, 0.22f, 0.055f, 1.0f),
-            Color(0.005f, 0.30f, 0.025f, 1.0f), 30.0f);
+            DoorIndicatorOpenDiffuse, DoorIndicatorOpenEmission, DoorIndicatorOpenShininess);
     }
 
-    game->GetPostProcess()->TriggerBloomPulse(0.88f, 0.62f);
-    Input::SetVibration(9, 0.24f);
+    EventFeedback::BloomPulse(*game->GetPostProcess(), FinalDoorReadyBloom);
+    EventFeedback::Rumble(FinalDoorReadyRumble);
 }
 
 // 最後の追跡：影に追いつかれたら捕まり、近いほど画面を乱し、振動を強くしている
@@ -409,8 +714,8 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
     const Vector3 offset = player->GetPosition() - shadow->GetPosition();
     const float horizontalDistance =
         std::sqrt(offset.x * offset.x + offset.z * offset.z);
-    // 31.5以内まで追いつかれたら捕まっている
-    if (horizontalDistance <= 31.5f)
+    // ここまで追いつかれたら捕まっている
+    if (horizontalDistance <= PursuitCatchDistance)
     {
         StartCaughtSequence(*player, CaughtSequence::Reason::FinalPursuit);
         return;
@@ -424,7 +729,7 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
         m_PursuitLastShadowPosition = shadow->GetPosition();
         m_PursuitStepDistance += travel;
         Ground* ground = m_Objects.ground;
-        if (ground != nullptr && travel > 0.001f && m_PursuitStepDistance >= FootprintFollower::Stride)
+        if (ground != nullptr && travel > MinimumDirectionLength && m_PursuitStepDistance >= FootprintFollower::Stride)
         {
             m_PursuitStepDistance -= FootprintFollower::Stride;
             const float yaw = std::atan2(moved.x, moved.z);
@@ -439,41 +744,39 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
     for (CeilingLight* light : m_Objects.lights)
     {
         if (light != nullptr && !light->IsForcedOff() &&
-            shadow->GetPosition().z > light->GetPosition().z + 4.0f)
+            shadow->GetPosition().z > light->GetPosition().z + PursuitLightPassMargin)
         {
             light->SetForcedOff(true);
-            game->PlayAudioCueAt(SOUND_CUE_FLASHLIGHT, light->GetPosition(), 0.55f, 0.9f);
+            game->PlayAudioCueAt(SOUND_CUE_FLASHLIGHT, light->GetPosition(),
+                PursuitLightOffSound.Pitch, PursuitLightOffSound.Volume);
         }
     }
 
-    // 近さ（0〜1）：30〜102の距離で、近いほど1に近づく
-    const float proximity = 1.0f - (std::clamp)(
-        (horizontalDistance - 30.0f) / 72.0f,
-        0.0f,
-        1.0f);
+    // 近さ（0〜1）：近いほど1に近づく
+    const float proximity = MathUtility::Proximity(horizontalDistance, PursuitNearDistance, PursuitProximityRange);
     const float dangerPulse =
-        std::sin(m_VisualTimer * (6.0f + proximity * 5.0f)) *
+        std::sin(m_VisualTimer * (PursuitPulseSpeedBase + proximity * PursuitPulseSpeedRange)) *
         0.5f + 0.5f;
 
     game->GetPostProcess()->SetCorridorTension(
-        0.74f + proximity * 0.16f);
+        PursuitTensionBase + proximity * PursuitTensionRange);
     if (m_FinalDoorReady)
     {
         game->GetPostProcess()->SetAtmosphere(
-            0.30f + proximity * 0.085f + dangerPulse * 0.018f,
-            0.76f + proximity * 0.135f);
+            PursuitNoiseBase + proximity * PursuitNoiseRange + dangerPulse * PursuitNoisePulse,
+            PursuitVignetteBase + proximity * PursuitVignetteRange);
         game->GetPostProcess()->SetLensDistortionStrength(
-            0.46f + proximity * 0.18f +
-            dangerPulse * proximity * 0.025f);
+            PursuitDistortionBase + proximity * PursuitDistortionRange +
+            dangerPulse * proximity * PursuitDistortionPulse);
         game->GetPostProcess()->SetVolumetricIntensity(
-            0.50f + proximity * 0.12f);
+            PursuitVolumetricBase + proximity * PursuitVolumetricRange);
         game->GetPostProcess()->SetFilmGradeStrength(
-            0.78f + proximity * 0.18f);
+            PursuitFilmGradeBase + proximity * PursuitFilmGradeRange);
         game->GetPostProcess()->SetLensDirtStrength(
-            0.20f + proximity * 0.22f);
+            PursuitLensDirtBase + proximity * PursuitLensDirtRange);
         game->GetPostProcess()->SetExposure(
-            1.0f - proximity * 0.055f -
-            dangerPulse * proximity * 0.025f);
+            1.0f - proximity * PursuitExposureDrop -
+            dangerPulse * proximity * PursuitExposurePulse);
     }
 
     // 影を見てしまった罰の間は、画面を暗く乱している
@@ -481,11 +784,11 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
     {
         const float penalty = m_FinalSequence.GetGazePenaltyRate();
         game->GetPostProcess()->SetAtmosphere(
-            0.43f + penalty * 0.12f,
-            0.88f + penalty * 0.08f);
+            GazePenaltyNoiseBase + penalty * GazePenaltyNoiseRange,
+            GazePenaltyVignetteBase + penalty * GazePenaltyVignetteRange);
         game->GetPostProcess()->SetLensDistortionStrength(
-            0.66f + penalty * 0.14f);
-        game->GetPostProcess()->SetLensDirtStrength(0.32f + penalty * 0.36f);
+            GazePenaltyDistortionBase + penalty * GazePenaltyDistortionRange);
+        game->GetPostProcess()->SetLensDirtStrength(GazePenaltyLensDirtBase + penalty * GazePenaltyLensDirtRange);
         constexpr float PenaltyMinimumExposure = 0.91f;
         constexpr float PenaltyExposureRange = 0.06f;
         game->GetPostProcess()->SetExposure(PenaltyMinimumExposure + (1.0f - penalty) * PenaltyExposureRange);
@@ -498,15 +801,15 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
     }
 
     const int vibrationFrames =
-        3 + static_cast<int>(proximity * 7.0f);
+        PursuitRumbleBase.Frames + static_cast<int>(proximity * static_cast<float>(PursuitRumbleRange.Frames));
     Input::SetVibration(
         vibrationFrames,
-        0.08f + proximity * 0.17f);
-    if (proximity > 0.34f)
+        PursuitRumbleBase.Strength + proximity * PursuitRumbleRange.Strength);
+    if (proximity > PursuitPulseMinProximity)
     {
         game->GetPostProcess()->TriggerHorrorPulse(
-            0.045f + proximity * 0.075f,
-            0.16f);
+            PursuitPulseBase.Strength + proximity * PursuitPulseStrengthRange,
+            PursuitPulseBase.Seconds);
     }
     m_FinalSequence.SchedulePursuitPulse(proximity);
 }
@@ -545,9 +848,9 @@ void Stage2Scene::StartCaughtSequence(
     m_Objects.presence->SetActive(false);
     m_BehindPresence.Postpone(BehindPresence::MaxInterval);
 
-    game->GetPostProcess()->TriggerHorrorPulse(1.0f, 0.72f);
-    game->GetPostProcess()->TriggerBloomPulse(0.18f, 0.16f);
-    Input::SetVibration(24, 0.72f);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), CaughtPulse);
+    EventFeedback::BloomPulse(*game->GetPostProcess(), CaughtBloom);
+    EventFeedback::Rumble(CaughtRumble);
 }
 
 // 捕まった演出を進め、暗転した後に入口へ戻している
@@ -560,12 +863,12 @@ void Stage2Scene::UpdateCaughtSequence(Player& player, float deltaTime)
     {
         const float darkness = m_CaughtSequence.GetFadeRate();
         game->GetPostProcess()->SetExposure(
-            0.92f - darkness * 0.38f);
+            CaughtExposureBase - darkness * CaughtExposureDrop);
         game->GetPostProcess()->SetAtmosphere(
-            0.46f + darkness * 0.18f,
-            0.90f + darkness * 0.08f);
+            CaughtNoiseBase + darkness * CaughtNoiseRange,
+            CaughtVignetteBase + darkness * CaughtVignetteRange);
         game->GetPostProcess()->SetLensDistortionStrength(
-            0.72f + darkness * 0.18f);
+            CaughtDistortionBase + darkness * CaughtDistortionRange);
         return;
     }
 
@@ -593,7 +896,7 @@ void Stage2Scene::UpdateCaughtSequence(Player& player, float deltaTime)
     Door* door = m_Objects.door;
     if (door != nullptr && !wasNoiseCatch)
     {
-        door->ResetClosed(3);
+        door->ResetClosed(FinalDoorRetryOpeningPhase);
         door->SetLocked(true);
     }
 
@@ -607,13 +910,11 @@ void Stage2Scene::UpdateCaughtSequence(Player& player, float deltaTime)
     if (indicator != nullptr && !wasNoiseCatch)
     {
         indicator->SetAppearance(
-            Color(0.24f, 0.012f, 0.008f, 1.0f),
-            Color(0.18f, 0.001f, 0.0f, 1.0f),
-            24.0f);
+            DoorIndicatorLockedDiffuse, DoorIndicatorLockedEmission, DoorIndicatorLockedShininess);
     }
 
-    game->GetPostProcess()->TriggerHorrorPulse(0.34f, 0.42f);
-    Input::SetVibration(8, 0.18f);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), CaughtRecoveredPulse);
+    EventFeedback::Rumble(CaughtRecoveredRumble);
 }
 
 // 指定の範囲の傷を表示し、少しずつ色を変えて赤く光らせている
@@ -630,16 +931,16 @@ void Stage2Scene::RevealScratchPieces(int first, int last, float emission)
             continue;
         }
 
-        const float variation = static_cast<float>(index % 3) * 0.018f;
+        const float variation = static_cast<float>(index % ScratchColorCycle) * ScratchColorVariation;
         // 新しく出る傷は、焦げた縁が広がるように壁へ浮かび上がらせている
         if (!scratch->IsVisible())
         {
-            scratch->DissolveIn(1.4f);
+            scratch->DissolveIn(ScratchDissolveSeconds);
         }
         scratch->SetAppearance(
-            Color(0.20f + variation, 0.008f, 0.004f, 1.0f),
-            Color(emission + variation, 0.001f, 0.0f, 1.0f),
-            18.0f);
+            Color(ScratchDiffuseRed + variation, ScratchDiffuseGreen, ScratchDiffuseBlue, 1.0f),
+            Color(emission + variation, ScratchEmissionGreen, 0.0f, 1.0f),
+            ScratchShininess);
     }
 }
 
@@ -658,10 +959,10 @@ void Stage2Scene::UpdateLightZones(const Player& player)
     };
     constexpr LightZone zones[] =
     {
-        { -88.0f, Stage2Light::Light1 },
-        { -14.0f, Stage2Light::Light2 },
-        {  60.0f, Stage2Light::Light3 },
-        { 108.0f, Stage2Light::DoorLight }
+        { LightZone1Z, Stage2Light::Light1 },
+        { LightZone2Z, Stage2Light::Light2 },
+        { LightZone3Z, Stage2Light::Light3 },
+        { LightZoneDoorZ, Stage2Light::DoorLight }
     };
     constexpr int zoneCount =
         static_cast<int>(sizeof(zones) / sizeof(zones[0]));
@@ -675,14 +976,14 @@ void Stage2Scene::UpdateLightZones(const Player& player)
             continue;
         }
         CeilingLight* light = m_Objects.Light(zones[index].Light);
-        const float loopStrength = static_cast<float>(m_LoopCount) * 0.17f;
+        const float loopStrength = static_cast<float>(m_LoopCount) * LightZoneLoopStrength;
         const float strength = (std::clamp)(
-            0.40f + loopStrength + static_cast<float>(index) * 0.035f,
+            LightZoneBaseStrength + loopStrength + static_cast<float>(index) * LightZoneIndexStrength,
             0.0f,
-            0.92f);
+            LightZoneMaxStrength);
         if (light != nullptr)
         {
-            light->TriggerEventFlicker(0.48f + loopStrength, strength);
+            light->TriggerEventFlicker(LightZoneFlickerBaseSeconds + loopStrength, strength);
         }
 
         // 2周目以降はプレイヤーの背後から照明を消し、暗闇が迫るように見せている。
@@ -697,15 +998,16 @@ void Stage2Scene::UpdateLightZones(const Player& player)
         }
 
         game->GetPostProcess()->TriggerBloomPulse(
-            0.20f + strength * 0.20f,
-            0.15f);
+            LightZoneBloomBase + strength * LightZoneBloomPerStrength,
+            LightZoneBloomSeconds);
         if (m_LoopCount > 0 && index >= 1)
         {
             game->GetPostProcess()->TriggerHorrorPulse(
-                0.08f + loopStrength * 0.24f,
-                0.16f);
+                LightZonePulseBase + loopStrength * LightZonePulsePerLoop,
+                LightZonePulseSeconds);
         }
-        Input::SetVibration(2 + m_LoopCount, 0.08f + loopStrength * 0.18f);
+        Input::SetVibration(LightZoneRumbleBase.Frames + m_LoopCount,
+            LightZoneRumbleBase.Strength + loopStrength * LightZoneRumblePerLoop);
     }
 }
 
@@ -728,7 +1030,7 @@ void Stage2Scene::UpdateScratchMessage(
     Vector3 cameraToMessage =
         ScratchMessageCenter - game->GetCamera()->GetPosition();
     const float distance = cameraToMessage.Length();
-    if (distance > 0.001f)
+    if (distance > MinimumDirectionLength)
     {
         cameraToMessage /= distance;
     }
@@ -737,10 +1039,7 @@ void Stage2Scene::UpdateScratchMessage(
     const float facing = (std::max)(
         game->GetCamera()->GetForward().Dot(cameraToMessage),
         0.0f);
-    const float proximity = 1.0f - (std::clamp)(
-        (distance - ScratchNearDistance) / ScratchFadeRange,
-        0.0f,
-        1.0f);
+    const float proximity = MathUtility::Proximity(distance, ScratchNearDistance, ScratchFadeRange);
     const float gaze = (std::clamp)(
         (facing - ScratchGazeStartFacing) / ScratchGazeRange,
         0.0f,
@@ -748,14 +1047,14 @@ void Stage2Scene::UpdateScratchMessage(
     const float flashlightResponse =
         player.IsFlashlightOn() ? gaze * proximity : 0.0f;
     const float heartbeat =
-        std::sin(m_VisualTimer * (2.4f + m_LoopCount * 0.45f)) *
+        std::sin(m_VisualTimer * (ScratchHeartbeatSpeedBase + m_LoopCount * ScratchHeartbeatSpeedPerLoop)) *
         0.5f + 0.5f;
     const float finalBoost =
         (m_FinalSequence.IsSequenceActive() && !m_FinalDoorReady)
-            ? 0.16f : 0.0f;
+            ? ScratchFinalBoost : 0.0f;
     const float emission =
-        0.07f + static_cast<float>(m_LoopCount) * 0.035f +
-        flashlightResponse * (0.10f + heartbeat * 0.16f) + finalBoost;
+        ScratchEmissionBase + static_cast<float>(m_LoopCount) * ScratchEmissionPerLoop +
+        flashlightResponse * (ScratchLitEmissionBase + heartbeat * ScratchLitEmissionHeartbeat) + finalBoost;
 
     // 周回に合わせた数の傷を見せ、2周目以降に近くで正面から照らしたら一度だけ驚かせている
     const int visibleCount = m_ScratchAnomaly.GetVisiblePieceCount(
@@ -766,10 +1065,10 @@ void Stage2Scene::UpdateScratchMessage(
         m_LoopCount, player.IsFlashlightOn(), distance, facing))
     {
         game->GetPostProcess()->TriggerHorrorPulse(
-            0.24f + static_cast<float>(m_LoopCount) * 0.08f,
-            0.32f);
-        game->GetPostProcess()->TriggerBloomPulse(0.48f, 0.24f);
-        Input::SetVibration(7, 0.20f);
+            ScratchScarePulseBase + static_cast<float>(m_LoopCount) * ScratchScarePulsePerLoop,
+            ScratchScarePulseSeconds);
+        EventFeedback::BloomPulse(*game->GetPostProcess(), ScratchScareBloom);
+        EventFeedback::Rumble(ScratchScareRumble);
     }
 }
 
@@ -787,7 +1086,7 @@ void Stage2Scene::UpdateHandprintAnomaly(const Player& player, float deltaTime)
     {
         Vector3 toPrint = m_HandprintAnomaly.GetLatestPosition() - game->GetCamera()->GetPosition();
         const float distance = toPrint.Length();
-        if (distance > 0.001f)
+        if (distance > MinimumDirectionLength)
         {
             toPrint /= distance;
             litLatest = distance < HandprintLitDistance &&
@@ -800,23 +1099,24 @@ void Stage2Scene::UpdateHandprintAnomaly(const Player& player, float deltaTime)
     {
         // 次の手形が現れた所で、濡れた手を壁に押し付けたような低い水音を鳴らし、近くの照明を一瞬揺らしている
         const Vector3 nextPrint = m_HandprintAnomaly.GetLatestPosition();
-        game->PlayAudioCueAt(SOUND_CUE_WATER_STEP, nextPrint, 0.55f, 0.9f);
+        game->PlayAudioCueAt(SOUND_CUE_WATER_STEP, nextPrint, HandprintAppearSound.Pitch, HandprintAppearSound.Volume);
         CeilingLight* nearbyLight = m_Objects.Light(Stage2NearestLight(nextPrint.z));
         if (nearbyLight != nullptr)
         {
-            nearbyLight->TriggerEventFlicker(0.45f, 0.30f);
+            EventFeedback::Flicker(*nearbyLight, HandprintAppearFlicker);
         }
-        game->GetPostProcess()->TriggerHorrorPulse(0.14f, 0.22f);
-        Input::SetVibration(3, 0.08f);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), HandprintAppearPulse);
+        EventFeedback::Rumble(HandprintAppearRumble);
     }
     else if (handprintEvent == HandprintAnomaly::Event::Found)
     {
         // 最後の手形を照らした：奥の確認スイッチが押せるようになる
         m_Notices.loop = Stage2NoticeSeconds;
-        game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, m_HandprintAnomaly.GetLatestPosition(), 0.62f, 1.4f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.30f, 0.40f);
-        game->GetPostProcess()->TriggerBloomPulse(0.40f, 0.20f);
-        Input::SetVibration(7, 0.18f);
+        game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, m_HandprintAnomaly.GetLatestPosition(),
+            HandprintFoundSound.Pitch, HandprintFoundSound.Volume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), HandprintFoundPulse);
+        EventFeedback::BloomPulse(*game->GetPostProcess(), HandprintFoundBloom);
+        EventFeedback::Rumble(HandprintFoundRumble);
     }
 
     // 壁のシェーダーへ、手形の場所と見え方を渡している（この周回でなければ描かない）
@@ -858,25 +1158,27 @@ void Stage2Scene::UpdateMirrorAnomaly(const Player& player, float deltaTime)
     if (mirrorEvent == MirrorAnomaly::Event::Seen)
     {
         // 鏡の中の人影に気づいた：すぐ後ろから、かすかな息づかいが聞こえ、心拍がひとつ跳ねる
-        game->PlayAudioCueAt(SOUND_CUE_BREATH, m_MirrorAnomaly.GetFigurePosition(), 0.82f, 0.42f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.16f, 0.30f);
-        Input::SetVibration(3, 0.10f);
+        game->PlayAudioCueAt(SOUND_CUE_BREATH, m_MirrorAnomaly.GetFigurePosition(),
+            MirrorSeenBreathSound.Pitch, MirrorSeenBreathSound.Volume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), MirrorSeenPulse);
+        EventFeedback::Rumble(MirrorSeenRumble);
     }
     else if (mirrorEvent == MirrorAnomaly::Event::Found)
     {
         // 振り返ると誰もいない：鏡の上の照明が一瞬揺れ、奥の確認スイッチが押せるようになる
         m_Notices.loop = Stage2NoticeSeconds;
-        KickHangingBulbs(0.55f);
+        KickHangingBulbs(MirrorFoundBulbKick);
         CeilingLight* mirrorLight = m_Objects.Light(Stage2NearestLight(MirrorAnomaly::CenterZ));
         if (mirrorLight != nullptr)
         {
-            mirrorLight->TriggerEventFlicker(0.80f, 0.70f);
+            EventFeedback::Flicker(*mirrorLight, MirrorFoundFlicker);
         }
         game->PlayAudioCueAt(
             SOUND_CUE_PIPE_KNOCK,
-            Vector3(MirrorAnomaly::SurfaceX, MirrorAnomaly::CenterY, MirrorAnomaly::CenterZ), 0.70f, 0.50f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.32f, 0.42f);
-        Input::SetVibration(6, 0.16f);
+            Vector3(MirrorAnomaly::SurfaceX, MirrorAnomaly::CenterY, MirrorAnomaly::CenterZ),
+            MirrorFoundKnockSound.Pitch, MirrorFoundKnockSound.Volume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), MirrorFoundPulse);
+        EventFeedback::Rumble(MirrorFoundRumble);
     }
 }
 
@@ -916,32 +1218,33 @@ void Stage2Scene::UpdatePuddleAnomaly(const Player& player, float deltaTime)
     if (puddleEvent == PuddleReflectionAnomaly::Event::Seen)
     {
         // 水面の人影に気づいた：水たまりの向こうから、かすかな息づかいが聞こえ、心拍がひとつ跳ねる
-        game->PlayAudioCueAt(SOUND_CUE_BREATH, figurePosition + Vector3(0.0f, 36.0f, 0.0f), 0.78f, 0.40f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.16f, 0.30f);
-        Input::SetVibration(3, 0.10f);
+        game->PlayAudioCueAt(SOUND_CUE_BREATH, figurePosition + Vector3(0.0f, PuddleFigureHeadHeight, 0.0f),
+            PuddleSeenBreathSound.Pitch, PuddleSeenBreathSound.Volume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), PuddleSeenPulse);
+        EventFeedback::Rumble(PuddleSeenRumble);
     }
     else if (puddleEvent == PuddleReflectionAnomaly::Event::Step)
     {
         // 水面をのぞき続けている：人影が水を踏んで一歩近づく（足もとから波紋が広がり、ぺたりと水音が鳴る）
         if (m_Objects.ground != nullptr)
         {
-            m_Objects.ground->AddRippleImpulse(figurePosition, 1.6f, -1.3f);
+            m_Objects.ground->AddRippleImpulse(figurePosition, PuddleStepRippleStrength, PuddleStepRippleSpeed);
         }
-        game->PlayAudioCueAt(SOUND_CUE_WATER_STEP, figurePosition, 0.70f, 0.75f);
-        Input::SetVibration(1, 0.05f);
+        game->PlayAudioCueAt(SOUND_CUE_WATER_STEP, figurePosition, PuddleStepSound.Pitch, PuddleStepSound.Volume);
+        EventFeedback::Rumble(PuddleStepRumble);
     }
     else if (puddleEvent == PuddleReflectionAnomaly::Event::Caught)
     {
         // すぐそばまで来られた：照明が揺れて驚かされ、人影はまた水たまりの向こうに立ち直す
-        game->PlayAudioCue(SOUND_CUE_SCARE, 1.0f, 0.75f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.55f, 0.45f);
-        KickHangingBulbs(0.45f);
+        game->PlayAudioCue(SOUND_CUE_SCARE, PuddleCaughtScareSound.Pitch, PuddleCaughtScareSound.Volume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), PuddleCaughtPulse);
+        KickHangingBulbs(PuddleCaughtBulbKick);
         CeilingLight* puddleLight = m_Objects.Light(Stage2NearestLight(PuddleReflectionAnomaly::PuddleCenterZ));
         if (puddleLight != nullptr)
         {
-            puddleLight->TriggerEventFlicker(0.90f, 0.60f);
+            EventFeedback::Flicker(*puddleLight, PuddleCaughtFlicker);
         }
-        Input::SetVibration(8, 0.22f);
+        EventFeedback::Rumble(PuddleCaughtRumble);
     }
     else if (puddleEvent == PuddleReflectionAnomaly::Event::Found)
     {
@@ -949,17 +1252,18 @@ void Stage2Scene::UpdatePuddleAnomaly(const Player& player, float deltaTime)
         m_Notices.loop = Stage2NoticeSeconds;
         if (m_Objects.ground != nullptr)
         {
-            m_Objects.ground->AddRippleImpulse(figurePosition, 2.2f, -1.6f);
+            m_Objects.ground->AddRippleImpulse(figurePosition, PuddleFoundRippleStrength, PuddleFoundRippleSpeed);
         }
-        KickHangingBulbs(0.55f);
+        KickHangingBulbs(PuddleFoundBulbKick);
         CeilingLight* puddleLight = m_Objects.Light(Stage2NearestLight(PuddleReflectionAnomaly::PuddleCenterZ));
         if (puddleLight != nullptr)
         {
-            puddleLight->TriggerEventFlicker(0.80f, 0.70f);
+            EventFeedback::Flicker(*puddleLight, PuddleFoundFlicker);
         }
-        game->PlayAudioCueAt(SOUND_CUE_WATER_STEP, figurePosition, 0.62f, 0.85f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.32f, 0.42f);
-        Input::SetVibration(6, 0.16f);
+        game->PlayAudioCueAt(SOUND_CUE_WATER_STEP, figurePosition,
+            PuddleFoundStepSound.Pitch, PuddleFoundStepSound.Volume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), PuddleFoundPulse);
+        EventFeedback::Rumble(PuddleFoundRumble);
     }
 }
 
@@ -978,7 +1282,7 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player, float deltaTime)
     Vector3 cameraToPortrait =
         PortraitCenter - game->GetCamera()->GetPosition();
     const float distance = cameraToPortrait.Length();
-    if (distance > 0.001f)
+    if (distance > MinimumDirectionLength)
     {
         cameraToPortrait /= distance;
     }
@@ -996,29 +1300,28 @@ void Stage2Scene::UpdatePortraitAnomaly(const Player& player, float deltaTime)
 
     // 見つめ続けた: 絵の中で目が見開かれ、赤く光る瞳がこちらを追い始める。奥の確認スイッチが押せるようになる。
     m_Notices.loop = Stage2NoticeSeconds;
-    constexpr float emission = 0.28f;
     Wall* portrait = m_Objects.portrait;
     if (portrait != nullptr)
     {
         portrait->SetAppearance(
-            Color(0.10f, 0.014f, 0.009f, 1.0f),
-            Color(emission * 0.12f, 0.0f, 0.0f, 1.0f),
-            12.0f);
+            PortraitOpenedDiffuse,
+            Color(PortraitOpenedEmission * PortraitOpenedEmissionScale, 0.0f, 0.0f, 1.0f),
+            PortraitOpenedShininess);
     }
 
     // 肖像画は時計の向かい（z=-25）にあるため、近くの照明と奥の扉の照明を揺らしている。
     CeilingLight* nearbyLight = m_Objects.Light(Stage2Light::Light2);
     if (nearbyLight != nullptr)
     {
-        nearbyLight->TriggerEventFlicker(0.82f, 0.72f);
+        EventFeedback::Flicker(*nearbyLight, PortraitNearbyFlicker);
     }
     CeilingLight* doorLight = m_Objects.Light(Stage2Light::DoorLight);
     if (doorLight != nullptr)
     {
-        doorLight->TriggerEventFlicker(0.90f, 0.76f);
+        EventFeedback::Flicker(*doorLight, DoorLightAlertFlicker);
     }
-    game->GetPostProcess()->TriggerHorrorPulse(0.36f, 0.30f);
-    Input::SetVibration(6, 0.17f);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), PortraitOpenedPulse);
+    EventFeedback::Rumble(PortraitOpenedRumble);
 }
 
 // 肖像画の絵の中の目：普段は閉じている。肖像画の異変の周回で見つめている間はかすかに開きかけ（目を離すとすぐ閉じる）、
@@ -1036,13 +1339,13 @@ void Stage2Scene::UpdatePortraitEyes(float deltaTime)
     const bool opened = (required && m_PortraitAnomaly.HasChangedThisLoop()) || finalEvent;
     const float targetOpen = opened
         ? 1.0f
-        : (required && m_PortraitAnomaly.IsStaring() ? 0.30f * m_PortraitAnomaly.GetStareRate() : 0.0f);
+        : (required && m_PortraitAnomaly.IsStaring() ? PortraitStareOpen * m_PortraitAnomaly.GetStareRate() : 0.0f);
     // 開くときはゆっくり、閉じるときはすばやく（目を離した瞬間に閉じる）
-    const float openSpeed = targetOpen > m_PortraitEyeOpen ? 1.4f : 5.0f;
+    const float openSpeed = targetOpen > m_PortraitEyeOpen ? PortraitEyeOpenSpeed : PortraitEyeCloseSpeed;
     m_PortraitEyeOpen = targetOpen > m_PortraitEyeOpen
         ? (std::min)(targetOpen, m_PortraitEyeOpen + openSpeed * deltaTime)
         : (std::max)(targetOpen, m_PortraitEyeOpen - openSpeed * deltaTime);
-    m_PortraitEyeGlow = (std::clamp)(m_PortraitEyeGlow + (opened ? 1.0f : -3.0f) * deltaTime, 0.0f, 1.0f);
+    m_PortraitEyeGlow = (std::clamp)(m_PortraitEyeGlow + (opened ? PortraitEyeGlowRiseSpeed : -PortraitEyeGlowFallSpeed) * deltaTime, 0.0f, 1.0f);
 
     // 瞳の向き：絵の目の高さ・位置から見たカメラの方向（絵の面からの距離で割った横と縦のずれ）
     const Vector3 toCamera = Core::Game::GetInstance()->GetCamera()->GetPosition() - PortraitEyeCenter;
@@ -1074,7 +1377,7 @@ namespace
 Vector3 Stage2Scene::GetKnockListenPoint() const
 {
     const Vector3 spot = GetKnockSpot(m_KnockingAnomaly.GetSpot());
-    return Vector3(spot.x > 0.0f ? 38.0f : -38.0f, spot.y, spot.z);
+    return Vector3(spot.x > 0.0f ? KnockListenX : -KnockListenX, spot.y, spot.z);
 }
 
 // ノックの異変：決まったリズムで壁の裏から叩く音を鳴らし、聞き当てたかを判定している
@@ -1091,8 +1394,8 @@ void Stage2Scene::UpdateKnockingAnomaly(const Player& player, float deltaTime)
     if (m_KnockingAnomaly.UpdateKnock(deltaTime))
     {
         // 配管の音より低くし、木の扉を拳で叩くような鈍い音にしている。
-        std::uniform_real_distribution<float> pitch(0.58f, 0.68f);
-        game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, spot, pitch(m_PresenceRandom), 1.6f);
+        std::uniform_real_distribution<float> pitch(KnockMinPitch, KnockMaxPitch);
+        game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, spot, pitch(m_PresenceRandom), KnockVolume);
     }
 
     // 壁の手前（廊下の内側）の位置と、プレイヤーとの距離・向きで「耳を澄ませているか」を判定している（立ち止まっていることも条件）。
@@ -1103,7 +1406,7 @@ void Stage2Scene::UpdateKnockingAnomaly(const Player& player, float deltaTime)
     const float distance = toSpot.Length();
     Vector3 forward = camera->GetForward();
     forward.y = 0.0f;
-    const bool facing = distance > 0.001f && forward.LengthSquared() > 0.0001f &&
+    const bool facing = distance > MinimumDirectionLength && forward.LengthSquared() > MinimumHorizontalForwardSquared &&
         forward.Dot(toSpot / distance) / forward.Length() > KnockListenFacing;
     const bool listening = distance < KnockListenDistance && facing &&
         !player.IsMovingHorizontally();
@@ -1113,20 +1416,20 @@ void Stage2Scene::UpdateKnockingAnomaly(const Player& player, float deltaTime)
     }
 
     // 聞き当てた: 壁のすぐ向こうで一度だけ強く叩き、音が止まる。
-    game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, spot, 0.52f, 2.2f);
+    game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, spot, KnockFoundSound.Pitch, KnockFoundSound.Volume);
     m_Notices.loop = Stage2NoticeSeconds;
     CeilingLight* nearbyLight = m_Objects.Light(Stage2NearestLight(spot.z));
     if (nearbyLight != nullptr)
     {
-        nearbyLight->TriggerEventFlicker(0.82f, 0.72f);
+        EventFeedback::Flicker(*nearbyLight, KnockFoundFlicker);
     }
     CeilingLight* doorLight = m_Objects.Light(Stage2Light::DoorLight);
     if (doorLight != nullptr)
     {
-        doorLight->TriggerEventFlicker(0.90f, 0.76f);
+        EventFeedback::Flicker(*doorLight, DoorLightAlertFlicker);
     }
-    game->GetPostProcess()->TriggerHorrorPulse(0.34f, 0.32f);
-    Input::SetVibration(7, 0.18f);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), KnockFoundPulse);
+    EventFeedback::Rumble(KnockFoundRumble);
 }
 
 // 見えない影の異変：姿の見えない影を廊下の奥から歩かせ、近づかれたら捕まえ、すれ違えたら見つけたことにしている。
@@ -1142,7 +1445,7 @@ void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
         const Camera* camera = Core::Game::GetInstance()->GetCamera();
         const Vector3 toChest = m_UnseenPresence.GetPosition() + Vector3(0.0f, UnseenChestHeight, 0.0f) - camera->GetPosition();
         const float distance = toChest.Length();
-        lit = distance > 0.001f && distance < UnseenLitDistance &&
+        lit = distance > MinimumDirectionLength && distance < UnseenLitDistance &&
             camera->GetForward().Dot(toChest / distance) > UnseenLitFacing;
     }
     const UnseenPresenceAnomaly::Result result = m_UnseenPresence.Update(
@@ -1174,8 +1477,9 @@ void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
             // （遠くからでも「あの水たまりを今通った」と分かる手がかり）
             if (ground->IsInsidePuddle(position))
             {
-                ground->AddRippleImpulse(Vector3(position.x, FloorY, position.z), 1.6f, -1.3f);
-                Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_WATER_STEP, position, 0.72f, 0.60f);
+                ground->AddRippleImpulse(Vector3(position.x, FloorY, position.z), UnseenRippleStrength, UnseenRippleSpeed);
+                Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_WATER_STEP, position,
+                    UnseenWaterStepSound.Pitch, UnseenWaterStepSound.Volume);
             }
             if (m_UnseenWetSteps > 0)
             {
@@ -1183,7 +1487,7 @@ void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
                 // 濡れた足跡は、水から離れるほど薄くしている（最初の一歩で1、最後の一歩で約0.4）
                 ground->AddFootprint(Vector2(position.x, position.z) + right * (UnseenFootOffset * m_UnseenFootSide),
                     yaw, m_UnseenFootSide, true,
-                    0.35f + 0.65f * m_UnseenWetSteps / static_cast<float>(UnseenWetStepCount));
+                    UnseenFootprintMinOpacity + UnseenFootprintOpacityRange * m_UnseenWetSteps / static_cast<float>(UnseenWetStepCount));
                 --m_UnseenWetSteps;
                 m_UnseenFootSide = -m_UnseenFootSide;
             }
@@ -1204,10 +1508,11 @@ void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
     if (m_UnseenPresence.WasNoticedThisFrame())
     {
         // 照らして気づかれた：影のいる所から短い息づかいが聞こえ、吊るした裸電球が揺れ、心拍が跳ねる
-        game->PlayAudioCueAt(SOUND_CUE_BREATH, m_UnseenPresence.GetPosition() + Vector3(0.0f, UnseenHeadHeight, 0.0f), 0.70f, 0.55f);
-        KickHangingBulbs(0.35f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.22f, 0.30f);
-        Input::SetVibration(3, 0.10f);
+        game->PlayAudioCueAt(SOUND_CUE_BREATH, m_UnseenPresence.GetPosition() + Vector3(0.0f, UnseenHeadHeight, 0.0f),
+            UnseenNoticedBreathSound.Pitch, UnseenNoticedBreathSound.Volume);
+        KickHangingBulbs(UnseenNoticedBulbKick);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), UnseenNoticedPulse);
+        EventFeedback::Rumble(UnseenNoticedRumble);
     }
     if (result == UnseenPresenceAnomaly::Result::Caught)
     {
@@ -1225,17 +1530,17 @@ void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
     CeilingLight* passedLight = m_Objects.Light(Stage2NearestLight(presencePosition.z));
     if (passedLight != nullptr)
     {
-        passedLight->TriggerEventFlicker(0.86f, 0.70f);
+        EventFeedback::Flicker(*passedLight, UnseenPassedFlicker);
     }
     CeilingLight* doorLight = m_Objects.Light(Stage2Light::DoorLight);
     if (doorLight != nullptr)
     {
-        doorLight->TriggerEventFlicker(0.90f, 0.76f);
+        EventFeedback::Flicker(*doorLight, DoorLightAlertFlicker);
     }
-    KickHangingBulbs(0.7f);
-    game->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, presencePosition, 0.62f, 1.4f);
-    game->GetPostProcess()->TriggerHorrorPulse(0.30f, 0.34f);
-    Input::SetVibration(6, 0.20f);
+    KickHangingBulbs(UnseenPassedBulbKick);
+    game->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, presencePosition, UnseenPassedStepSound.Pitch, UnseenPassedStepSound.Volume);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), UnseenPassedPulse);
+    EventFeedback::Rumble(UnseenPassedRumble);
 }
 
 // ----------------------------------------------------------------------------
@@ -1282,17 +1587,17 @@ void Stage2Scene::UpdateBehindPresence(Player& player, float deltaTime)
     const Camera* camera = game->GetCamera();
 
     bool looking = false;
-    float distance = 1000.0f;
+    float distance = PresenceFarDistance;
     if (m_BehindPresence.IsFollowing())
     {
         Vector3 toPlayer = player.GetPosition() - presence->GetPosition();
         toPlayer.y = 0.0f;
         distance = toPlayer.Length();
 
-        Vector3 toPresence = presence->GetPosition() + Vector3(0.0f, 17.0f, 0.0f) -
+        Vector3 toPresence = presence->GetPosition() + Vector3(0.0f, PresenceChestHeight, 0.0f) -
             camera->GetPosition();
         const float viewDistance = toPresence.Length();
-        if (viewDistance > 0.001f && viewDistance < PresenceLookDistance)
+        if (viewDistance > MinimumDirectionLength && viewDistance < PresenceLookDistance)
         {
             toPresence /= viewDistance;
             looking = camera->GetForward().Dot(toPresence) > PresenceLookAlignment;
@@ -1313,7 +1618,7 @@ void Stage2Scene::UpdateBehindPresence(Player& player, float deltaTime)
         // カメラの真後ろへ置いている。廊下の外に出る場合は、次の機会（3秒後）に回している。
         Vector3 backward = -camera->GetForward();
         backward.y = 0.0f;
-        if (backward.LengthSquared() < 0.001f)
+        if (backward.LengthSquared() < MinimumDirectionLength)
         {
             m_BehindPresence.Postpone(BehindPresenceRetrySeconds);
             break;
@@ -1329,28 +1634,28 @@ void Stage2Scene::UpdateBehindPresence(Player& player, float deltaTime)
 
         presence->SetPosition(spawn.x, FootY, spawn.z);
         presence->SetActive(true);
-        presence->EnableGazeScare(BehindPresence::MaxFollowSeconds + 10.0f);
-        presence->EnableChase(PresenceCreepSpeed, 8.0f);
+        presence->EnableGazeScare(BehindPresence::MaxFollowSeconds + PresenceGazeExtraSeconds);
+        presence->EnableChase(PresenceCreepSpeed, PresenceChaseStopDistance);
         break;
     }
     case BehindPresence::Event::Seen:
         // 振り向いた瞬間に消し、見間違いだったのかと思わせる程度の反応にとどめている。
         presence->SetActive(false);
-        game->GetPostProcess()->TriggerHorrorPulse(0.14f, 0.18f);
-        Input::SetVibration(2, 0.05f);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), PresenceSeenPulse);
+        EventFeedback::Rumble(PresenceSeenRumble);
         break;
     // 気づかずに追いつかれた：照明が一斉に明滅し、危険度が上がる
     case BehindPresence::Event::Reached:
         presence->SetActive(false);
         for (CeilingLight* light : m_Objects.lights)
         {
-            light->TriggerEventFlicker(0.60f, 0.86f);
+            EventFeedback::Flicker(*light, PresenceReachedFlicker);
         }
         m_NoiseThreatSystem.SetThreat((std::min)(
             1.0f, m_NoiseThreatSystem.GetThreat() + PresenceReachThreat));
-        game->PlayAudioCue(SOUND_CUE_SCARE, 0.58f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.62f, 0.42f);
-        Input::SetVibration(10, 0.26f);
+        game->PlayAudioCue(SOUND_CUE_SCARE, PresenceReachedScareSound.Pitch, PresenceReachedScareSound.Volume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), PresenceReachedPulse);
+        EventFeedback::Rumble(PresenceReachedRumble);
         break;
     case BehindPresence::Event::Vanished:
         presence->SetActive(false);
@@ -1361,14 +1666,14 @@ void Stage2Scene::UpdateBehindPresence(Player& player, float deltaTime)
 // 今の危険度（0〜1）を求めている。足音の危険度、観察の間違い（必要なとき）、最後の追跡の影、足音の影のうち、一番高いものを使っている
 float Stage2Scene::ComputeThreatRate(const Player& player, bool includeMistakes) const
 {
-    float threatRate = m_NoiseThreatSystem.GetThreat() * 0.78f;
+    float threatRate = m_NoiseThreatSystem.GetThreat() * NoiseThreatToHeartbeat;
     // 見えない影が近いほど、心拍も速くなる
-    threatRate = (std::max)(threatRate, m_UnseenPresence.GetProximity(player.GetPosition()) * 0.85f);
+    threatRate = (std::max)(threatRate, m_UnseenPresence.GetProximity(player.GetPosition()) * UnseenProximityToHeartbeat);
     if (includeMistakes && (m_LoopCount == 1 || m_LoopCount == 2))
     {
         const float observationDanger =
-            static_cast<float>(m_PuzzleFeedback.GetMistakeCount()) / 3.0f;
-        threatRate = (std::max)(threatRate, observationDanger * 0.72f);
+            static_cast<float>(m_PuzzleFeedback.GetMistakeCount()) / MistakeCountForFullDanger;
+        threatRate = (std::max)(threatRate, observationDanger * MistakeDangerToHeartbeat);
     }
     if (m_FinalSequence.IsPursuitActive())
     {
@@ -1378,8 +1683,7 @@ float Stage2Scene::ComputeThreatRate(const Player& player, bool includeMistakes)
             Vector3 toShadow = shadow->GetPosition() - player.GetPosition();
             toShadow.y = 0.0f;
             const float distance = toShadow.Length();
-            threatRate = 1.0f - (std::clamp)(
-                (distance - 18.0f) / 92.0f, 0.0f, 1.0f);
+            threatRate = MathUtility::Proximity(distance, PursuitDangerNearDistance, PursuitDangerRange);
         }
     }
     const ShadowMan* noiseShadow = m_Objects.noiseShadow;
@@ -1388,8 +1692,8 @@ float Stage2Scene::ComputeThreatRate(const Player& player, bool includeMistakes)
         Vector3 toShadow = noiseShadow->GetPosition() - player.GetPosition();
         toShadow.y = 0.0f;
         const float distance = toShadow.Length();
-        const float noiseShadowDanger = 1.0f - (std::clamp)(
-            (distance - 14.0f) / 72.0f, 0.0f, 1.0f);
+        const float noiseShadowDanger =
+            MathUtility::Proximity(distance, NoiseShadowDangerNearDistance, NoiseShadowDangerRange);
         threatRate = (std::max)(threatRate, noiseShadowDanger);
     }
     return threatRate;
@@ -1414,7 +1718,8 @@ void Stage2Scene::UpdateTensionPulse(const Player& player, float deltaTime)
         }
         Vector3 toFigure = figure->GetPosition() - player.GetPosition();
         toFigure.y = 0.0f;
-        presence = (std::max)(presence, 1.0f - (std::clamp)((toFigure.Length() - 14.0f) / 96.0f, 0.0f, 1.0f));
+        presence = (std::max)(presence,
+            MathUtility::Proximity(toFigure.Length(), RadioPresenceNearDistance, RadioPresenceRange));
     }
     // 見えない影の異変の周回では、姿の見えない影の近さも雑音に含めている（手がかりはこの雑音だけ）
     presence = (std::max)(presence, m_UnseenPresence.GetProximity(player.GetPosition()));
@@ -1460,29 +1765,30 @@ void Stage2Scene::UpdateFootprintFollower(const Player& player, float deltaTime)
     {
         // 裸足の濡れた足跡を床に残し、その場所から、ぺたりと濡れた足音を鳴らしている
         ground->AddFootprint(step.Position, step.Yaw, step.Side, true, 1.0f);
-        game->PlayAudioCueAt(SOUND_CUE_WATER_STEP, Vector3(step.Position.x, -99.0f, step.Position.y), 0.78f, 0.55f);
+        game->PlayAudioCueAt(SOUND_CUE_WATER_STEP, Vector3(step.Position.x, FootY, step.Position.y),
+            FollowerWaterStepSound.Pitch, FollowerWaterStepSound.Volume);
     }
     else if (followerEvent == FootprintFollower::Event::Lit)
     {
         // 照らされて止まった：心拍がひとつ跳ねるだけにしている
-        game->GetPostProcess()->TriggerHorrorPulse(0.14f, 0.26f);
-        Input::SetVibration(2, 0.08f);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), FollowerLitPulse);
+        EventFeedback::Rumble(FollowerLitRumble);
     }
     else if (followerEvent == FootprintFollower::Event::Reached)
     {
         // すぐ近くまで来た：近くの照明が揺れ、すぐ後ろで息づかいが聞こえる
-        KickHangingBulbs(0.45f);
+        KickHangingBulbs(FollowerReachedBulbKick);
         const Vector3 playerPosition = player.GetPosition();
         CeilingLight* nearbyLight = m_Objects.Light(Stage2NearestLight(playerPosition.z));
         if (nearbyLight != nullptr)
         {
-            nearbyLight->TriggerEventFlicker(0.70f, 0.60f);
+            EventFeedback::Flicker(*nearbyLight, FollowerReachedFlicker);
         }
-        Vector3 behind = playerPosition - camera->GetForward() * 10.0f;
+        Vector3 behind = playerPosition - camera->GetForward() * FollowerBreathBehindDistance;
         behind.y = playerPosition.y;
-        game->PlayAudioCueAt(SOUND_CUE_BREATH, behind, 0.85f, 0.45f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.30f, 0.40f);
-        Input::SetVibration(5, 0.14f);
+        game->PlayAudioCueAt(SOUND_CUE_BREATH, behind, FollowerBreathSound.Pitch, FollowerBreathSound.Volume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), FollowerReachedPulse);
+        EventFeedback::Rumble(FollowerReachedRumble);
     }
 }
 

@@ -5,6 +5,7 @@
 // ============================================================================
 
 #include "CaptureMode.h"
+#include "MathUtility.h"
 #include "GIUpdateSettings.h"
 #include "PostProcess.h"
 
@@ -66,7 +67,7 @@ namespace
     };
 
     // 円周率と、床の高さ（プレイヤーの足元のy）
-    constexpr float Pi = 3.14159265f;
+    constexpr float Pi = MathUtility::Pi;
     constexpr float FloorY = -99.0f;
 
     // (fromX, fromZ)から(toX, toZ)の方を向くヨー角を求めている
@@ -1001,7 +1002,308 @@ namespace Tools::CaptureMode
         g_LastPresentMs = milliseconds;
     }
 
-    // 1フレーム分、道順に沿ってプレイヤーと視点を動かしている（計測モードでは地点に立たせている）
+    namespace
+    {
+        // --- 道順の撮影の進め方（UpdateBeforeObjects とその下の関数）
+        // タイトル：この数のフレームで1枚撮り、この数のフレームで1面へ進む
+        constexpr int TitleShotFrame = 20;
+        constexpr int TitleExitFrame = 30;
+        // 最後の1枚を書き出す画面を描くために、終了を待つフレームの数
+        constexpr int QuitDelayFrames = 3;
+        // 機能の撮影（--capture-features）で、最初に場面を用意する時刻（秒）
+        constexpr float FeatureSetupTime = 0.2f;
+        // 位置を直接動かすと足音が出ないため、この距離を歩くごとに足元へ水たまりの波だけを立てる。
+        // 場面を切り替える瞬間移動（1回でこの距離より長い）は歩いた扱いにしない
+        constexpr float TourStepDistance = 9.0f;
+        constexpr float TourTeleportDistance = 30.0f;
+        constexpr float TourStepRippleStrength = 1.4f;
+        constexpr float TourStepRippleSpeed = -1.2f;
+        // 2面の最後の場面だけ電池を25%にして、弱った懐中電灯の光を写す（満タンからこの量を引く）
+        constexpr float TourLowBatteryDrain = 75.0f;
+        // 機能の撮影：3面で懐中電灯を消している時間、1面で点けている時間、1面のドアを形が分かる全体を明るい表示で見せる時間
+        constexpr float FeatureStage3FlashlightOffStart = 17.3f;
+        constexpr float FeatureStage3FlashlightOffEnd = 29.0f;
+        constexpr float FeatureStage1FlashlightOnStart = 10.0f;
+        constexpr float FeatureStage1FlashlightOnEnd = 13.0f;
+        constexpr float FeatureStage1FullbrightEnd = 21.0f;
+        constexpr int FullbrightDebugView = 8;           // common.hlsl のデバッグ表示の番号（照明・影・霧なしで全体を明るく）
+        constexpr int NormalDebugView = 0;
+        // 機能の撮影では、3面の観測の場面を足す分だけ、後半の操作の時刻を遅らせる
+        constexpr float FeatureStage3RouteDelay = 4.0f;
+
+        // 道順の決まった時刻に、デバッグ画面と同じ操作を一度だけ頼む（異変を出す・扉を開ける・周回を進めるなど）
+        struct TourAction
+        {
+            SceneName Scene;
+            float Time;
+            SceneDebugAction Action;
+            bool* Requested;
+            const char* LogText;
+        };
+
+        // 3面の撮影で、決まった時刻に調べる操作の対象（名前と時刻）
+        struct Stage3TourStep
+        {
+            const char* Name;
+            float Time;
+        };
+
+        // 道順の状態を、新しい場面の最初へ戻している
+        void ResetTourState(SceneName scene)
+        {
+            g_TourScene = scene;
+            g_TourTime = 0.0f;
+            g_NextShot = 0;
+            g_FeatureActionRequested = false;
+            g_MirrorAnomalyRequested = false;
+            g_EndDoorOpenRequested = false;
+            g_SecondLoopRequested = false;
+            g_PortraitAnomalyRequested = false;
+            g_FalseDoorRequested = false;
+            g_PuddleAnomalyRequested = false;
+            g_CeilingReflectionRequested = false;
+            g_UnseenAnomalyRequested = false;
+            g_FinalSequenceRequested = false;
+            Log(std::string("start tour: ") + SceneLabel(scene));
+        }
+
+        // タイトルは、始める面の選択が写るよう1枚撮ってから抜け、1面から始めている（計測モードはすぐに抜ける）。
+        // 視点はマウスで動かさないようにしている。
+        void UpdateTitleTour(Core::Game* game)
+        {
+            game->GetCamera()->SetMouseLookEnabled(false);
+            ++g_TitleFrames;
+            if (!g_Benchmark && g_TitleFrames == TitleShotFrame)
+            {
+                g_Recording = true;
+                g_PendingShot = L"00_タイトル";
+            }
+            if (g_Benchmark || g_TitleFrames >= TitleExitFrame)
+            {
+                game->RequestSceneChange(SceneName::Stage);
+            }
+        }
+
+        // 道順の時間を1フレーム分進めている。最後まで来たら、1面は2面へ切り替え、2面なら終了して false を返している
+        bool AdvanceTourTime(Core::Game* game, SceneName scene, const std::vector<Keyframe>& tour)
+        {
+            g_TourTime += FrameSeconds;
+            if (g_TourTime <= tour.back().Time)
+            {
+                return true;
+            }
+            if (scene == SceneName::Stage)
+            {
+                game->RequestSceneChange(SceneName::Stage2);
+            }
+            else
+            {
+                g_Finished = true;
+                g_QuitCountdown = QuitDelayFrames;
+                Log("finished tour");
+            }
+            return false;
+        }
+
+        // 名前の付いたキーフレームの時刻を過ぎたら、次に描いた画面を保存するよう予約している。
+        void QueueTourShots(const std::vector<Keyframe>& tour)
+        {
+            while (g_NextShot < tour.size() && tour[g_NextShot].Time <= g_TourTime)
+            {
+                if (tour[g_NextShot].Shot != nullptr)
+                {
+                    g_PendingShot = tour[g_NextShot].Shot;
+                }
+                ++g_NextShot;
+            }
+        }
+
+        // 道順の決まった時刻に、場面の操作（異変を出す・扉を開ける・周回を進める・最後の停電）を一度だけ頼んでいる
+        void RequestTourActions(Core::Game* game, SceneName scene)
+        {
+            if (g_FeatureTour && (scene == SceneName::Stage || scene == SceneName::Stage2) &&
+                !g_FeatureActionRequested && g_TourTime >= FeatureSetupTime)
+            {
+                g_FeatureActionRequested = true;
+                if (Scene* current = game->GetScene())
+                    current->RequestDebugAction(scene == SceneName::Stage
+                        ? SceneDebugAction::ShowHauntedStartDoor : SceneDebugAction::ShowUnseenAnomaly);
+                Log("feature setup");
+            }
+
+            const TourAction actions[] =
+            {
+                // 1面: 西棟の水の中で、天井の人影を出している（水面をのぞいたときだけ映る）
+                { SceneName::Stage, CeilingReflectionRequestTime, SceneDebugAction::ShowCeilingReflection, &g_CeilingReflectionRequested, "show ceiling reflection" },
+                // 1面: 最後に、突き当たりの最後のドアを開けている（開けた瞬間に、開始地点の奥のドアの裏側へ移る）
+                { SceneName::Stage, Stage1EndDoorOpenTime, SceneDebugAction::OpenStage1EndDoor, &g_EndDoorOpenRequested, "open stage 1 end door" },
+                // 2面: 鏡の前に立った後で、鏡の異変を出している（鏡の中にだけ、すぐ後ろの人影が映る）
+                { SceneName::Stage2, MirrorAnomalyRequestTime, SceneDebugAction::ShowMirrorAnomaly, &g_MirrorAnomalyRequested, "show mirror anomaly" },
+                // 2面: 濡れた足跡の場面の前に、2周目へ進めている
+                { SceneName::Stage2, SecondLoopRequestTime, SceneDebugAction::AdvanceProgression, &g_SecondLoopRequested, "advance to second loop" },
+                // 2面: 肖像画・偽の扉・見えない影・水たまりの場面の前に、それぞれの異変を出している
+                { SceneName::Stage2, PortraitAnomalyRequestTime, SceneDebugAction::ShowPortraitAnomaly, &g_PortraitAnomalyRequested, "show portrait anomaly" },
+                { SceneName::Stage2, FalseDoorRequestTime, SceneDebugAction::ShowFalseDoorAnomaly, &g_FalseDoorRequested, "show false door anomaly" },
+                { SceneName::Stage2, UnseenAnomalyRequestTime, SceneDebugAction::ShowUnseenAnomaly, &g_UnseenAnomalyRequested, "show unseen anomaly" },
+                { SceneName::Stage2, PuddleAnomalyRequestTime, SceneDebugAction::ShowPuddleAnomaly, &g_PuddleAnomalyRequested, "show puddle anomaly" },
+                // 2面: 最後の停電と追跡を始めている
+                { SceneName::Stage2, FinalSequenceRequestTime, SceneDebugAction::PlayFinalSequence, &g_FinalSequenceRequested, "play final sequence" },
+            };
+            for (const TourAction& action : actions)
+            {
+                if (scene != action.Scene || *action.Requested || g_TourTime < action.Time)
+                {
+                    continue;
+                }
+                *action.Requested = true;
+                if (Scene* currentScene = game->GetScene())
+                {
+                    currentScene->RequestDebugAction(action.Action);
+                    Log(action.LogText);
+                }
+            }
+        }
+
+        // 3面の撮影では、普段の操作対象を順に調べて進める（ちょうどその時刻を過ぎたフレームで一度だけ）
+        void OperateStage3Tour(Core::Game* game, Player& player)
+        {
+            const auto justPassed = [](float start)
+            {
+                return g_TourTime >= start && g_TourTime - FrameSeconds < start;
+            };
+            const auto operate = [&](const char* name, float start)
+            {
+                if (justPassed(start))
+                {
+                    if (FuseBox* control = game->GetObj<FuseBox>(name);
+                        control != nullptr && control->IsInteractionEnabled())
+                    {
+                        control->Interact(player);
+                    }
+                }
+            };
+            const auto openDoor = [&](const char* name, float start)
+            {
+                if (justPassed(start))
+                {
+                    if (Door* door = game->GetObj<Door>(name);
+                        door != nullptr && door->IsInteractionEnabled())
+                    {
+                        door->Interact(player);
+                    }
+                }
+            };
+
+            // 前半：中継器のあと、普段は記録・送信・監視・受信、機能の撮影では観測を見せる
+            static constexpr Stage3TourStep RegularFirstHalf[] =
+            {
+                { "Stage3Relay", 7.5f },
+                { "Stage3Log", 14.8f },
+                { "Stage3Transmit", 24.3f },
+                { "Stage3MonitorChannel", 26.8f },
+                { "Stage3Receive", 28.7f },
+                { "Stage3Transmit", 29.3f },
+            };
+            static constexpr Stage3TourStep FeatureFirstHalf[] =
+            {
+                { "Stage3Relay", 7.5f },
+                { "Stage3ObservationStart", 12.25f },
+                { "Stage3ObservationEnd", 28.3f },
+            };
+            // 後半：試験・遮断器・解放・北と南の柱（機能の撮影では FeatureStage3RouteDelay だけ遅らせる）
+            static constexpr Stage3TourStep SecondHalf[] =
+            {
+                { "Stage3Test", 39.3f },
+                { "Stage3Breaker", 42.6f },
+                { "Stage3Release", 50.2f },
+                { "Stage3PostNorth", 60.2f },
+                { "Stage3PostSouth", 68.1f },
+            };
+            constexpr float TapeChoiceTime = 81.5f;
+            constexpr float ObservationDoorTime = 31.6f;
+            constexpr float ExitDoorTime = 51.2f;
+            constexpr float RoadGateTime = 95.0f;
+
+            if (g_FeatureTour)
+            {
+                for (const Stage3TourStep& step : FeatureFirstHalf) operate(step.Name, step.Time);
+            }
+            else
+            {
+                for (const Stage3TourStep& step : RegularFirstHalf) operate(step.Name, step.Time);
+            }
+            const float routeDelay = g_FeatureTour ? FeatureStage3RouteDelay : 0.0f;
+            for (const Stage3TourStep& step : SecondHalf) operate(step.Name, step.Time + routeDelay);
+            operate(g_FeatureTour ? "Stage3EraseTape" : "Stage3KeepTape", TapeChoiceTime + routeDelay);
+            if (g_FeatureTour) openDoor("Stage3ObservationDoor", ObservationDoorTime);
+            openDoor("Stage3Exit", ExitDoorTime + routeDelay);
+            openDoor("Stage3RoadGate", RoadGateTime + routeDelay);
+        }
+
+        // 道順の位置にプレイヤーを置き、ロッカー・電池・懐中電灯・視点を道順に合わせている
+        void ApplyTourPose(Core::Game* game, SceneName scene, Player& player, Camera& camera, const Keyframe& pose)
+        {
+            // 2面のロッカー: 隠れる区間に入ったら右のロッカーに入り、区間を出たら外へ出ている。
+            if (pose.Hide && !player.IsHiding())
+            {
+                if (Locker* locker = game->GetObj<Locker>("Stage2LockerRight"))
+                {
+                    locker->Interact(player);
+                }
+            }
+            else if (!pose.Hide && player.IsHiding())
+            {
+                player.ForceExitHiding();
+            }
+
+            // 隠れている間は位置をロッカーの中に固定し、向きだけを道順に合わせている
+            if (!player.IsHiding())
+            {
+                const float stepDistance = Vector3::Distance(g_LastStepPosition, pose.Position);
+                if (stepDistance > TourTeleportDistance)
+                {
+                    g_LastStepPosition = pose.Position;
+                }
+                else if (stepDistance > TourStepDistance)
+                {
+                    g_LastStepPosition = pose.Position;
+                    for (Ground* ground : game->GetObjects<Ground>())
+                    {
+                        ground->AddRippleImpulse(pose.Position, TourStepRippleStrength, TourStepRippleSpeed);
+                        ground->RecordFootstep(pose.Position);
+                    }
+                }
+                player.SetPosition(pose.Position);
+            }
+            // 道順の途中で電池が切れて懐中電灯が消えないよう、電池を満タンに保っている（計測モードと同じ）
+            player.RefillBattery();
+            if (scene == SceneName::Stage2 && g_TourTime >= LowBatteryTime && g_TourTime < LowBatteryEndTime)
+            {
+                player.AddBattery(-TourLowBatteryDrain);
+            }
+            // 懐中電灯は、道順で消すと決めた区間のほかは常に点けている
+            player.SetFlashlightOn(!(scene == SceneName::Stage &&
+                g_TourTime >= Stage1FlashlightOffStart && g_TourTime < Stage1FlashlightOffEnd) &&
+                !(scene == SceneName::Stage2 && !g_Benchmark &&
+                g_TourTime >= Stage2FlashlightOffStart && g_TourTime < Stage2FlashlightOffEnd));
+            if (g_FeatureTour && scene == SceneName::Stage3 &&
+                g_TourTime >= FeatureStage3FlashlightOffStart && g_TourTime < FeatureStage3FlashlightOffEnd)
+                player.SetFlashlightOn(false);
+            if (g_FeatureTour && scene == SceneName::Stage)
+                player.SetFlashlightOn((g_TourTime >= FeatureStage1FlashlightOnStart && g_TourTime < FeatureStage1FlashlightOnEnd) ||
+                    g_TourTime >= FeatureStage1FullbrightEnd);
+            // ドア検証の間は Fullbright で形を見せる。通常表示の資料画像には使わない。
+            if (g_FeatureTour && g_ViewOverride < 0)
+                Renderer::SetDebugViewMode(scene == SceneName::Stage && g_TourTime < FeatureStage1FullbrightEnd
+                    ? FullbrightDebugView : NormalDebugView);
+            // 視点はこの道順だけで決める（タイトル画面が終わるときにマウスの視点操作を戻すので、ここで毎回止めている。矢印キーの視点操作は、前からの道順と同じく止めない）
+            camera.SetMouseLookEnabled(false);
+            camera.SetCameraDirection(pose.Yaw);
+            camera.SetCameraPitch(pose.Pitch);
+        }
+    }
+
+    // 1フレーム分、道順に沿ってプレイヤーと視点を動かしている（計測モードでは地点に立たせている）。段階ごとの中身は上の関数
     void UpdateBeforeObjects()
     {
         if (!g_Active)
@@ -1022,21 +1324,9 @@ namespace Tools::CaptureMode
 
         Core::Game* game = Core::Game::GetInstance();
         const SceneName scene = game->GetCurrentSceneName();
-        // タイトルは、始める面の選択が写るよう1枚撮ってから抜け、1面から始めている（計測モードはすぐに抜ける）。
-        // 視点はマウスで動かさないようにしている。
         if (scene == SceneName::Title)
         {
-            game->GetCamera()->SetMouseLookEnabled(false);
-            ++g_TitleFrames;
-            if (!g_Benchmark && g_TitleFrames == 20)
-            {
-                g_Recording = true;
-                g_PendingShot = L"00_タイトル";
-            }
-            if (g_Benchmark || g_TitleFrames >= 30)
-            {
-                game->RequestSceneChange(SceneName::Stage);
-            }
+            UpdateTitleTour(game);
             return;
         }
         if (g_Benchmark)
@@ -1053,149 +1343,16 @@ namespace Tools::CaptureMode
         // シーンが変わったら、そのシーンの道順を最初から始めている
         if (scene != g_TourScene)
         {
-            g_TourScene = scene;
-            g_TourTime = 0.0f;
-            g_NextShot = 0;
-            g_FeatureActionRequested = false;
-            g_MirrorAnomalyRequested = false;
-            g_EndDoorOpenRequested = false;
-            g_SecondLoopRequested = false;
-            g_PortraitAnomalyRequested = false;
-            g_FalseDoorRequested = false;
-            g_PuddleAnomalyRequested = false;
-            g_CeilingReflectionRequested = false;
-            g_UnseenAnomalyRequested = false;
-            g_FinalSequenceRequested = false;
-            Log(std::string("start tour: ") + SceneLabel(scene));
+            ResetTourState(scene);
         }
         g_Recording = true;
 
-        // 道順の時間を1フレーム分進め、最後まで来たら1面は2面へ切り替え、2面なら終了している
-        g_TourTime += FrameSeconds;
-        if (g_TourTime > tour->back().Time)
+        if (!AdvanceTourTime(game, scene, *tour))
         {
-            if (scene == SceneName::Stage)
-            {
-                game->RequestSceneChange(SceneName::Stage2);
-            }
-            else
-            {
-                g_Finished = true;
-                g_QuitCountdown = 3;
-                Log("finished tour");
-            }
             return;
         }
-
-        // 名前の付いたキーフレームの時刻を過ぎたら、次に描いた画面を保存するよう予約している。
-        while (g_NextShot < tour->size() && (*tour)[g_NextShot].Time <= g_TourTime)
-        {
-            if ((*tour)[g_NextShot].Shot != nullptr)
-            {
-                g_PendingShot = (*tour)[g_NextShot].Shot;
-            }
-            ++g_NextShot;
-        }
-
-        if (g_FeatureTour && (scene == SceneName::Stage || scene == SceneName::Stage2) &&
-            !g_FeatureActionRequested && g_TourTime >= 0.2f)
-        {
-            g_FeatureActionRequested = true;
-            if (Scene* current = game->GetScene())
-                current->RequestDebugAction(scene == SceneName::Stage
-                    ? SceneDebugAction::ShowHauntedStartDoor : SceneDebugAction::ShowUnseenAnomaly);
-            Log("feature setup");
-        }
-        // 1面: 西棟の水の中で、天井の人影を出している（水面をのぞいたときだけ映る）
-        if (scene == SceneName::Stage && !g_CeilingReflectionRequested && g_TourTime >= CeilingReflectionRequestTime)
-        {
-            g_CeilingReflectionRequested = true;
-            if (Scene* currentScene = game->GetScene())
-            {
-                currentScene->RequestDebugAction(SceneDebugAction::ShowCeilingReflection);
-                Log("show ceiling reflection");
-            }
-        }
-        // 1面: 最後に、突き当たりの最後のドアを開けている（開けた瞬間に、開始地点の奥のドアの裏側へ移る）
-        if (scene == SceneName::Stage && !g_EndDoorOpenRequested && g_TourTime >= Stage1EndDoorOpenTime)
-        {
-            g_EndDoorOpenRequested = true;
-            if (Scene* currentScene = game->GetScene())
-            {
-                currentScene->RequestDebugAction(SceneDebugAction::OpenStage1EndDoor);
-                Log("open stage 1 end door");
-            }
-        }
-        // 2面: 鏡の前に立った後で、鏡の異変を出している（鏡の中にだけ、すぐ後ろの人影が映る）
-        if (scene == SceneName::Stage2 && !g_MirrorAnomalyRequested && g_TourTime >= MirrorAnomalyRequestTime)
-        {
-            g_MirrorAnomalyRequested = true;
-            if (Scene* currentScene = game->GetScene())
-            {
-                currentScene->RequestDebugAction(SceneDebugAction::ShowMirrorAnomaly);
-                Log("show mirror anomaly");
-            }
-        }
-        // 2面: 濡れた足跡の場面の前に、2周目へ進めている
-        if (scene == SceneName::Stage2 && !g_SecondLoopRequested && g_TourTime >= SecondLoopRequestTime)
-        {
-            g_SecondLoopRequested = true;
-            if (Scene* currentScene = game->GetScene())
-            {
-                currentScene->RequestDebugAction(SceneDebugAction::AdvanceProgression);
-                Log("advance to second loop");
-            }
-        }
-        // 2面: 肖像画の場面の前に、肖像画の異変を出している
-        if (scene == SceneName::Stage2 && !g_PortraitAnomalyRequested && g_TourTime >= PortraitAnomalyRequestTime)
-        {
-            g_PortraitAnomalyRequested = true;
-            if (Scene* currentScene = game->GetScene())
-            {
-                currentScene->RequestDebugAction(SceneDebugAction::ShowPortraitAnomaly);
-                Log("show portrait anomaly");
-            }
-        }
-        // 2面: 偽の扉の場面の前に、偽の扉の異変を出している
-        if (scene == SceneName::Stage2 && !g_FalseDoorRequested && g_TourTime >= FalseDoorRequestTime)
-        {
-            g_FalseDoorRequested = true;
-            if (Scene* currentScene = game->GetScene())
-            {
-                currentScene->RequestDebugAction(SceneDebugAction::ShowFalseDoorAnomaly);
-                Log("show false door anomaly");
-            }
-        }
-        // 2面: 見えない影の場面の前に、見えない影の異変を出している
-        if (scene == SceneName::Stage2 && !g_UnseenAnomalyRequested && g_TourTime >= UnseenAnomalyRequestTime)
-        {
-            g_UnseenAnomalyRequested = true;
-            if (Scene* currentScene = game->GetScene())
-            {
-                currentScene->RequestDebugAction(SceneDebugAction::ShowUnseenAnomaly);
-                Log("show unseen anomaly");
-            }
-        }
-        // 2面: 水たまりの場面の前に、水たまりの異変を出している
-        if (scene == SceneName::Stage2 && !g_PuddleAnomalyRequested && g_TourTime >= PuddleAnomalyRequestTime)
-        {
-            g_PuddleAnomalyRequested = true;
-            if (Scene* currentScene = game->GetScene())
-            {
-                currentScene->RequestDebugAction(SceneDebugAction::ShowPuddleAnomaly);
-                Log("show puddle anomaly");
-            }
-        }
-        // 2面: 最後の停電と追跡を始めている
-        if (scene == SceneName::Stage2 && !g_FinalSequenceRequested && g_TourTime >= FinalSequenceRequestTime)
-        {
-            g_FinalSequenceRequested = true;
-            if (Scene* currentScene = game->GetScene())
-            {
-                currentScene->RequestDebugAction(SceneDebugAction::PlayFinalSequence);
-                Log("play final sequence");
-            }
-        }
+        QueueTourShots(*tour);
+        RequestTourActions(game, scene);
 
         Player* player = game->GetObj<Player>("Player");
         Camera* camera = game->GetCamera();
@@ -1203,115 +1360,11 @@ namespace Tools::CaptureMode
         {
             return;
         }
-
         if (scene == SceneName::Stage3)
         {
-            // 3面の撮影では、普段の操作対象を順に調べて進める。
-            const auto operate = [&](const char* name, float start)
-            {
-                if (g_TourTime >= start && g_TourTime - FrameSeconds < start)
-                {
-                    if (FuseBox* control = game->GetObj<FuseBox>(name);
-                        control != nullptr && control->IsInteractionEnabled())
-                    {
-                        control->Interact(*player);
-                    }
-                }
-            };
-            operate("Stage3Relay", 7.5f);
-            if (g_FeatureTour)
-            {
-                operate("Stage3ObservationStart", 12.25f);
-                operate("Stage3ObservationEnd", 28.3f);
-            }
-            else
-            {
-                operate("Stage3Log", 14.8f);
-                operate("Stage3Transmit", 24.3f);
-                operate("Stage3MonitorChannel", 26.8f);
-                operate("Stage3Receive", 28.7f);
-                operate("Stage3Transmit", 29.3f);
-            }
-            const float routeDelay = g_FeatureTour ? 4.0f : 0.0f;
-            operate("Stage3Test", 39.3f + routeDelay);
-            operate("Stage3Breaker", 42.6f + routeDelay);
-            operate("Stage3Release", 50.2f + routeDelay);
-            operate("Stage3PostNorth", 60.2f + routeDelay);
-            operate("Stage3PostSouth", 68.1f + routeDelay);
-            operate(g_FeatureTour ? "Stage3EraseTape" : "Stage3KeepTape", 81.5f + routeDelay);
-            const auto openDoor = [&](const char* name, float start)
-            {
-                if (g_TourTime >= start && g_TourTime - FrameSeconds < start)
-                {
-                    if (Door* door = game->GetObj<Door>(name);
-                        door != nullptr && door->IsInteractionEnabled())
-                    {
-                        door->Interact(*player);
-                    }
-                }
-            };
-            if (g_FeatureTour) openDoor("Stage3ObservationDoor", 31.6f);
-            openDoor("Stage3Exit", 51.2f + routeDelay);
-            openDoor("Stage3RoadGate", 95.0f + routeDelay);
+            OperateStage3Tour(game, *player);
         }
-
-        const Keyframe pose = Sample(*tour, g_TourTime);
-        // 2面のロッカー: 隠れる区間に入ったら右のロッカーに入り、区間を出たら外へ出ている。
-        if (pose.Hide && !player->IsHiding())
-        {
-            if (Locker* locker = game->GetObj<Locker>("Stage2LockerRight"))
-            {
-                locker->Interact(*player);
-            }
-        }
-        else if (!pose.Hide && player->IsHiding())
-        {
-            player->ForceExitHiding();
-        }
-
-        // 隠れている間は位置をロッカーの中に固定し、向きだけを道順に合わせている。懐中電灯は常に点けている
-        if (!player->IsHiding())
-        {
-            // 位置を直接動かすと足音が出ないため、9歩分（9.0）進むごとに足元へ水たまりの波だけを立てている。
-            // 場面を切り替える瞬間移動（1回で30以上）は歩いた扱いにしない。
-            const float stepDistance = Vector3::Distance(g_LastStepPosition, pose.Position);
-            if (stepDistance > 30.0f)
-            {
-                g_LastStepPosition = pose.Position;
-            }
-            else if (stepDistance > 9.0f)
-            {
-                g_LastStepPosition = pose.Position;
-                for (Ground* ground : game->GetObjects<Ground>())
-                {
-                    ground->AddRippleImpulse(pose.Position, 1.4f, -1.2f);
-                ground->RecordFootstep(pose.Position);
-                }
-            }
-            player->SetPosition(pose.Position);
-        }
-        // 道順の途中で電池が切れて懐中電灯が消えないよう、電池を満タンに保っている（計測モードと同じ）
-        player->RefillBattery();
-        // 2面の最後の場面だけ、電池を25%にして、弱った懐中電灯の光（暗く黄色い光と、輪のむら）を写している
-        if (scene == SceneName::Stage2 && g_TourTime >= LowBatteryTime && g_TourTime < LowBatteryEndTime)
-        {
-            player->AddBattery(-75.0f);
-        }
-        player->SetFlashlightOn(!(scene == SceneName::Stage &&
-            g_TourTime >= Stage1FlashlightOffStart && g_TourTime < Stage1FlashlightOffEnd) &&
-            !(scene == SceneName::Stage2 && !g_Benchmark &&
-            g_TourTime >= Stage2FlashlightOffStart && g_TourTime < Stage2FlashlightOffEnd));
-        if (g_FeatureTour && scene == SceneName::Stage3 && g_TourTime >= 17.3f && g_TourTime < 29.0f)
-            player->SetFlashlightOn(false);
-        if (g_FeatureTour && scene == SceneName::Stage)
-            player->SetFlashlightOn((g_TourTime >= 10.0f && g_TourTime < 13.0f) || g_TourTime >= 21.0f);
-        // ドア検証の20秒まではFullbrightで形を見せる。通常表示の資料画像には使わない。
-        if (g_FeatureTour && g_ViewOverride < 0)
-            Renderer::SetDebugViewMode(scene == SceneName::Stage && g_TourTime < 21.0f ? 8 : 0);
-        // 視点はこの道順だけで決める（タイトル画面が終わるときにマウスの視点操作を戻すので、ここで毎回止めている。矢印キーの視点操作は、前からの道順と同じく止めない）
-        camera->SetMouseLookEnabled(false);
-        camera->SetCameraDirection(pose.Yaw);
-        camera->SetCameraPitch(pose.Pitch);
+        ApplyTourPose(game, scene, *player, *camera, Sample(*tour, g_TourTime));
     }
 
     // 描き終えた画面をGPUからCPUへ読み戻し、動画のフレームとスクリーンショットとして保存している

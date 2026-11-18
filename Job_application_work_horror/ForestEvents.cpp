@@ -3,6 +3,7 @@
 // ============================================================================
 
 #include "ForestEvents.h"
+#include "MathUtility.h"
 
 #include "Game.h"
 #include "Wall.h"
@@ -135,7 +136,7 @@ float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const
             // 近づくほど不安定にしている（遠くからは、ほぼ普通の灯りに見える）
             const Vector2 offset(playerPosition.x - wall->GetPosition().x, playerPosition.z - wall->GetPosition().z);
             const float t = std::clamp((LampUnstableDistance - offset.Length()) / LampUnstableRange, 0.0f, 1.0f);
-            const float instability = 0.15f + 0.85f * t * t * (3.0f - 2.0f * t);
+            const float instability = 0.15f + 0.85f * MathUtility::SmoothCurve(t);
             brightness = Flicker(m_Time, seed, instability);
         }
         wall->SetEmissionScale(brightness);

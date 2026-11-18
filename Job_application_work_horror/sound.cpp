@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "sound.h"
+#include "MathUtility.h"
 
 #include <algorithm>
 #include <bit>
@@ -512,7 +513,7 @@ void Sound::ApplySpatialMix(SpatialVoice& spatial)
 	filter.Type = LowPassFilter;
 	// XAudio2のフィルターの周波数は 2 * sin(π * 周波数 / サンプリング周波数) で表している
 	// （xaudio2.h の XAudio2CutoffFrequencyToRadians と同じ式）。
-	constexpr float Pi = 3.14159265f;
+	constexpr float Pi = MathUtility::Pi;
 	const float sampleRate = static_cast<float>((std::max)(format.nSamplesPerSec, 1ul));
 	const float radians = 2.0f * std::sin(Pi * (std::min)(cutoffHz / sampleRate, 0.5f));
 	filter.Frequency = (std::min)(radians, XAUDIO2_MAX_FILTER_FREQUENCY);

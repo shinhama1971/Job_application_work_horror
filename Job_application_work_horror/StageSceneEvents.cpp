@@ -4,8 +4,10 @@
 // ============================================================================
 
 #include "StageScene.h"
+#include "MathUtility.h"
 #include "Application.h"
 #include "Game.h"
+#include "PostProcess.h"
 #include "Input.h"
 
 #include "Player.h"
@@ -24,6 +26,7 @@
 #include "Camera.h"
 #include "TensionPulseFeedback.h"
 #include "VoiceRecorder.h"
+#include "EventFeedback.h"
 #include <SimpleMath.h>
 #include <algorithm>
 #include <cmath>
@@ -114,6 +117,151 @@ namespace
     constexpr float ArchiveStalkerNoticeSeconds = 2.6f;
     constexpr float ArchiveStalkerCaughtNoticeSeconds = 2.8f;
     constexpr float ArchiveStalkerBatteryFloor = 5.0f;
+
+    // ------------------------------------------------------------------------
+    // 演出の強さと長さ（照明の明滅・画面の脈打ち・振動・音）。出来事の流れの順に並べている
+    // ------------------------------------------------------------------------
+    using EventFeedback::FlickerSpec;
+    using EventFeedback::PulseSpec;
+    using EventFeedback::RumbleSpec;
+    using EventFeedback::SoundSpec;
+
+    // 1面の天井の照明の番号（StageObjects::CeilingLightAt）
+    constexpr int StartRoomLightIndex = 1;
+    constexpr int StorageLightIndex = 2;
+    constexpr int MiddleCorridorLightIndex = 4;
+    constexpr int CentralHallLightIndex = 5;
+    constexpr int LoopExitLightIndex = 7;
+    constexpr int CornerLightIndex = 8;
+
+    // 入口：踏み込んだ瞬間に後ろの照明、少し後に前の照明、最後にもう一度後ろの照明を弱く明滅させる
+    constexpr FlickerSpec EntranceFirstFlicker{ 0.38f, 0.52f };
+    constexpr PulseSpec EntranceFirstPulse{ 0.075f, 0.14f };
+    constexpr RumbleSpec EntranceFirstRumble{ 3, 0.07f };
+    constexpr FlickerSpec EntranceAheadFlicker{ 0.62f, 0.72f };
+    constexpr PulseSpec EntranceAheadPulse{ 0.10f, 0.18f };
+    constexpr RumbleSpec EntranceAheadRumble{ 4, 0.09f };
+    constexpr FlickerSpec EntranceBehindFlicker{ 0.20f, 0.28f };
+
+    // 左の倉庫：先に低い扉の物音と照明で背後を意識させ、影を見たら強めに反応する
+    constexpr SoundSpec StorageNoiseDoorSound{ 0.68f, 1.0f };
+    constexpr FlickerSpec StorageNoiseFlicker{ 0.42f, 0.62f };
+    constexpr FlickerSpec StorageObservedFlicker{ 0.75f, 0.88f };
+    constexpr SoundSpec StorageObservedScareSound{ 0.82f, 1.0f };
+    constexpr PulseSpec StorageObservedPulse{ 0.24f, 0.26f };
+    constexpr RumbleSpec StorageObservedRumble{ 7, 0.15f };
+
+    // 開始地点の奥のドアを叩く音：1回に叩く数（最小＋叩いた回数で巡る分）、叩くほど少しずつ高くなる音、音量
+    constexpr int StartDoorKnockMinCount = 2;
+    constexpr int StartDoorKnockCountCycle = 3;
+    constexpr float StartDoorKnockBasePitch = 0.58f;
+    constexpr float StartDoorKnockPitchStep = 0.03f;
+    constexpr float StartDoorKnockVolume = 1.5f;
+
+    // ループ廊下：周回の段階の上限（これより先は同じ見た目）と、開始地点へ移った後に次の判定をするまでの秒数
+    constexpr int MaxCorridorLoopPhase = 3;
+    constexpr float CorridorLoopCooldownSeconds = 1.0f;
+    // 周回の数だけ出す壁の赤い印：地の色、自己発光の赤（印ごとに少しずつ強く）、光沢
+    const Color LoopMarkerDiffuse(0.26f, 0.012f, 0.008f, 1.0f);
+    constexpr float LoopMarkerGlowBase = 0.14f;
+    constexpr float LoopMarkerGlowStep = 0.055f;
+    constexpr float LoopMarkerGlowGreen = 0.002f;
+    constexpr float LoopMarkerGlowBlue = 0.001f;
+    constexpr float LoopMarkerShininess = 24.0f;
+    // 周回を進めたときの画面の脈打ちと振動（基本＋周回の段階ごとに強める量）
+    constexpr PulseSpec CorridorLoopPulseBase{ 0.24f, 0.42f };
+    constexpr PulseSpec CorridorLoopPulseStep{ 0.13f, 0.10f };
+    constexpr RumbleSpec CorridorLoopRumbleBase{ 7, 0.18f };
+    constexpr RumbleSpec CorridorLoopRumbleStep{ 3, 0.04f };
+
+    // 非常灯の点滅の周期を、器具ごとにずらす値（同じ値だとそろって点滅し、機械的に見えるため）
+    // 周回ごとの配置
+    constexpr float MiddleLoop1EmergencyOffset = 2.4f;
+    constexpr float MiddleLoop2EmergencyOffset = 5.8f;
+    constexpr float CornerLoop2EmergencyOffset = 1.1f;
+    // 3周目以降と、照明の連鎖が始まる前の配置
+    constexpr float StartRoomEmergencyOffset = 0.35f;
+    constexpr float MiddleIdleEmergencyOffset = 8.2f;
+    constexpr float HallIdleEmergencyOffset = 3.1f;
+    constexpr float CornerIdleEmergencyOffset = 4.3f;
+    constexpr float LoopExitIdleEmergencyOffset = 4.5f;
+    // 照明の連鎖で赤い非常灯が移っていく間（すぐに点くよう、小さくずらしている）
+    constexpr float MiddleChaseEmergencyOffset = 0.75f;
+    constexpr float HallChaseEmergencyOffset = 0.42f;
+    constexpr float CornerChaseEmergencyOffset = 0.18f;
+    constexpr float LoopExitChaseEmergencyOffset = 0.08f;
+    // 連鎖の最後に廊下を赤い非常灯に戻すとき
+    constexpr float MiddleFinalEmergencyOffset = 2.6f;
+
+    // 照明の連鎖の1拍ごとの画面の脈打ちと振動（出口へ近づくほど強める）
+    constexpr PulseSpec ScareChasePulse1{ 0.13f, 0.18f };
+    constexpr RumbleSpec ScareChaseRumble1{ 5, 0.10f };
+    constexpr PulseSpec ScareChasePulse2{ 0.14f, 0.18f };
+    constexpr RumbleSpec ScareChaseRumble2{ 6, 0.13f };
+    constexpr PulseSpec ScareChasePulse3{ 0.16f, 0.20f };
+    constexpr RumbleSpec ScareChaseRumble3{ 7, 0.16f };
+    constexpr PulseSpec ScareChasePulse4{ 0.19f, 0.22f };
+    constexpr RumbleSpec ScareChaseRumble4{ 8, 0.19f };
+    constexpr RumbleSpec ScareChaseFinalRumble{ 4, 0.09f };
+
+    // ヒューズの後の影：見たときの反応と、出たときの画面の脈打ち（3本目のほうが強い）
+    constexpr FlickerSpec FuseWatcherObservedFlicker{ 0.72f, 0.74f };
+    constexpr PulseSpec FuseWatcherObservedBloom{ 0.42f, 0.18f };
+    constexpr RumbleSpec FuseWatcherObservedRumble{ 7, 0.16f };
+    constexpr PulseSpec FuseWatcherSecondPulse{ 0.20f, 0.30f };
+    constexpr PulseSpec FuseWatcherThirdPulse{ 0.32f, 0.30f };
+
+    // 電力が戻る演出の3拍：強い光、短い乱れ、余韻の光
+    constexpr PulseSpec PowerRestoreFlashBloom{ 1.18f, 0.55f };
+    constexpr RumbleSpec PowerRestoreFlashRumble{ 9, 0.16f };
+    constexpr PulseSpec PowerRestoreJoltPulse{ 0.12f, 0.22f };
+    constexpr RumbleSpec PowerRestoreJoltRumble{ 6, 0.11f };
+    constexpr PulseSpec PowerRestoreAfterglowBloom{ 0.48f, 0.40f };
+    constexpr RumbleSpec PowerRestoreAfterglowRumble{ 4, 0.07f };
+
+    // 出口へ送電する演出：照明を消した瞬間と、角・出口の照明を順に点け直す拍、最後の光
+    constexpr PulseSpec ExitPowerCutPulse{ 0.30f, 0.28f };
+    constexpr FlickerSpec ExitPowerFirstFlicker{ 0.72f, 0.82f };
+    constexpr PulseSpec ExitPowerFirstBloom{ 0.68f, 0.24f };
+    constexpr RumbleSpec ExitPowerFirstRumble{ 5, 0.11f };
+    constexpr FlickerSpec ExitPowerSecondFlicker{ 0.82f, 0.92f };
+    constexpr PulseSpec ExitPowerSecondBloom{ 0.92f, 0.30f };
+    constexpr RumbleSpec ExitPowerSecondRumble{ 7, 0.15f };
+    constexpr PulseSpec ExitPowerFinalBloom{ 1.18f, 0.42f };
+    constexpr RumbleSpec ExitPowerFinalRumble{ 10, 0.20f };
+
+    // 出口の前兆：影が出た瞬間と、その後の2拍（背後の照明が消える・出口の照明が壊れる）
+    constexpr FlickerSpec ExitOmenFlicker{ 0.82f, 0.78f };
+    constexpr PulseSpec ExitOmenPulse{ 0.28f, 0.42f };
+    constexpr PulseSpec ExitOmenBloom{ 0.54f, 0.24f };
+    constexpr RumbleSpec ExitOmenRumble{ 10, 0.22f };
+    constexpr PulseSpec ExitOmenLightOffPulse{ 0.22f, 0.30f };
+    constexpr RumbleSpec ExitOmenLightOffRumble{ 7, 0.16f };
+    constexpr FlickerSpec ExitOmenFaultFlicker{ 1.10f, 0.88f };
+    constexpr PulseSpec ExitOmenFaultBloom{ 0.44f, 0.20f };
+
+    // 暖かい灯りの下にいる度合いが、これ以上なら物音を鳴らさない
+    constexpr float SafeLightQuietCalm = 0.5f;
+
+    // 書き換わった壁の文字を読んだとき
+    constexpr PulseSpec ChangedWritingPulse{ 0.22f, 0.36f };
+    constexpr RumbleSpec ChangedWritingRumble{ 5, 0.16f };
+
+    // 書類保管室の影：現れたときの棚の奥の音、近づく足音、触れられたとき
+    constexpr SoundSpec ArchiveStalkerKnockSound{ 0.55f, 1.4f };
+    constexpr SoundSpec ArchiveStalkerStepSound{ 0.74f, 1.6f };
+    constexpr SoundSpec ArchiveStalkerCaughtSound{ 0.9f, 1.0f };
+    constexpr PulseSpec ArchiveStalkerCaughtPulse{ 0.72f, 0.55f };
+    constexpr RumbleSpec ArchiveStalkerCaughtRumble{ 14, 0.36f };
+
+    // 誰かの濡れた足跡：水音、照らして止めたとき、すぐ後ろまで来たときの息づかい（聞き手の後ろのこの距離から鳴らす）
+    constexpr SoundSpec FollowerWaterStepSound{ 0.78f, 0.55f };
+    constexpr PulseSpec FollowerLitPulse{ 0.14f, 0.26f };
+    constexpr RumbleSpec FollowerLitRumble{ 2, 0.08f };
+    constexpr float FollowerBreathBehindDistance = 10.0f;
+    constexpr SoundSpec FollowerBreathSound{ 0.85f, 0.45f };
+    constexpr PulseSpec FollowerReachedPulse{ 0.30f, 0.40f };
+    constexpr RumbleSpec FollowerReachedRumble{ 5, 0.14f };
 }
 
 // 入口の演出：中央の扉の先へ初めて入ったとき、前と後ろの照明を順に明滅させている（電力が戻るまで）
@@ -141,14 +289,14 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
         m_EntranceEventPhase = 0;
 
         CeilingLight* lightBehind =
-            m_Objects.CeilingLightAt(4);
+            m_Objects.CeilingLightAt(MiddleCorridorLightIndex);
         if (lightBehind != nullptr)
         {
-            lightBehind->TriggerEventFlicker(0.38f, 0.52f);
+            EventFeedback::Flicker(*lightBehind, EntranceFirstFlicker);
         }
 
-        game->GetPostProcess()->TriggerHorrorPulse(0.075f, 0.14f);
-        Input::SetVibration(3, 0.07f);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), EntranceFirstPulse);
+        EventFeedback::Rumble(EntranceFirstRumble);
         return;
     }
 
@@ -168,24 +316,24 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
     if (m_EntranceEventPhase == 0 && m_EntranceEventTimer >= EntranceAheadFlickerSeconds)
     {
         CeilingLight* lightAhead =
-            m_Objects.CeilingLightAt(5);
+            m_Objects.CeilingLightAt(CentralHallLightIndex);
         if (lightAhead != nullptr)
         {
-            lightAhead->TriggerEventFlicker(0.62f, 0.72f);
+            EventFeedback::Flicker(*lightAhead, EntranceAheadFlicker);
         }
 
-        game->GetPostProcess()->TriggerHorrorPulse(0.10f, 0.18f);
-        Input::SetVibration(4, 0.09f);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), EntranceAheadPulse);
+        EventFeedback::Rumble(EntranceAheadRumble);
         m_EntranceEventPhase = 1;
     }
     else if (m_EntranceEventPhase == 1 &&
         m_EntranceEventTimer >= EntranceBehindFlickerSeconds)
     {
         CeilingLight* lightBehind =
-            m_Objects.CeilingLightAt(4);
+            m_Objects.CeilingLightAt(MiddleCorridorLightIndex);
         if (lightBehind != nullptr)
         {
-            lightBehind->TriggerEventFlicker(0.20f, 0.28f);
+            EventFeedback::Flicker(*lightBehind, EntranceBehindFlicker);
         }
 
         m_EntranceEventTimer = -1.0f;
@@ -221,11 +369,11 @@ void StageScene::UpdateStorageScare(Player& player)
         m_StorageScarePhase = 1;
         m_StorageScareTimer = 0.0f;
         m_StorageScareNoticeTimer = StorageNoiseNoticeSeconds;
-        game->PlayAudioCue(SOUND_CUE_DOOR, 0.68f);
-        CeilingLight* light = m_Objects.CeilingLightAt(2);
+        game->PlayAudioCue(SOUND_CUE_DOOR, StorageNoiseDoorSound.Pitch, StorageNoiseDoorSound.Volume);
+        CeilingLight* light = m_Objects.CeilingLightAt(StorageLightIndex);
         if (light != nullptr)
         {
-            light->TriggerEventFlicker(0.42f, 0.62f);
+            EventFeedback::Flicker(*light, StorageNoiseFlicker);
         }
         return;
     }
@@ -262,14 +410,14 @@ void StageScene::UpdateStorageScare(Player& player)
         m_StorageScarePhase = 3;
         m_StorageScareNoticeTimer = StorageObservedNoticeSeconds;
         CeilingLight* light =
-            m_Objects.CeilingLightAt(2);
+            m_Objects.CeilingLightAt(StorageLightIndex);
         if (light != nullptr)
         {
-            light->TriggerEventFlicker(0.75f, 0.88f);
+            EventFeedback::Flicker(*light, StorageObservedFlicker);
         }
-        currentGame->PlayAudioCue(SOUND_CUE_SCARE, 0.82f);
-        currentGame->GetPostProcess()->TriggerHorrorPulse(0.24f, 0.26f);
-        Input::SetVibration(7, 0.15f);
+        currentGame->PlayAudioCue(SOUND_CUE_SCARE, StorageObservedScareSound.Pitch, StorageObservedScareSound.Volume);
+        EventFeedback::HorrorPulse(*currentGame->GetPostProcess(), StorageObservedPulse);
+        EventFeedback::Rumble(StorageObservedRumble);
     });
 }
 
@@ -339,7 +487,7 @@ void StageScene::UpdateCorridorLoop(Player& player)
                 }
                 else
                 {
-                    m_StartDoorKnocksLeft = 2 + m_StartDoorKnockEvents % 3;
+                    m_StartDoorKnocksLeft = StartDoorKnockMinCount + m_StartDoorKnockEvents % StartDoorKnockCountCycle;
                 }
             }
             if (m_StartDoorKnocksLeft > 0)
@@ -347,7 +495,8 @@ void StageScene::UpdateCorridorLoop(Player& player)
                 // 拳で木の扉を叩くような鈍い音。続けて叩く間は短く、叩き終えたら長く間を空けている
                 --m_StartDoorKnocksLeft;
                 game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, startDoor->GetPosition(),
-                    0.58f + static_cast<float>(m_StartDoorKnocksLeft) * 0.03f, 1.5f);
+                    StartDoorKnockBasePitch + static_cast<float>(m_StartDoorKnocksLeft) * StartDoorKnockPitchStep,
+                    StartDoorKnockVolume);
                 m_StartDoorKnockTimer = m_StartDoorKnocksLeft > 0
                     ? StartDoorKnockBurstInterval
                     : StartDoorKnockPauseBase + std::fmod(static_cast<float>(m_StartDoorKnockEvents) * StartDoorKnockPauseStep, StartDoorKnockPauseRange);
@@ -377,7 +526,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
 {
     Core::Game* game = Core::Game::GetInstance();
     // 最後のドアは、前の周回の開き方で開き始めている。奥のドアも同じ開き方で開けて、続きに見せている。
-    const int openingPhase = (std::min)(m_CorridorLoopCount, 3);
+    const int openingPhase = (std::min)(m_CorridorLoopCount, MaxCorridorLoopPhase);
     ++m_CorridorLoopCount;
 
     if (m_CorridorLoopCount == 1 && m_Objects.facilityMap != nullptr)
@@ -404,13 +553,13 @@ void StageScene::AdvanceCorridorLoop(Player& player)
         startDoor->StartOpeningQuietly();
         game->PlayAudioCueAt(SOUND_CUE_DOOR, startDoor->GetPosition());
     }
-    m_LoopCooldown = 1.0f;
+    m_LoopCooldown = CorridorLoopCooldownSeconds;
     m_ProgressHintTimer = 0.0f;
     m_LoopNoticeTimer = CorridorLoopNoticeSeconds;
 
-    const int loopPhase = m_CorridorLoopCount < 3
+    const int loopPhase = m_CorridorLoopCount < MaxCorridorLoopPhase
         ? m_CorridorLoopCount
-        : 3;
+        : MaxCorridorLoopPhase;
 
     // 開始地点の部屋に、この周回の壁の文字をじわりと浮かばせている（戻ってくるたびに、部屋の文字が1つずつ増えていく）
     if (m_CorridorLoopCount >= 1 && m_CorridorLoopCount <= static_cast<int>(m_Objects.lapWritings.size()))
@@ -423,24 +572,27 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     }
 
     // 周回の数だけ、壁の赤い印を出している
-    for (int markerIndex = 1; markerIndex <= 3; ++markerIndex)
+    for (int markerIndex = 1; markerIndex <= MaxCorridorLoopPhase; ++markerIndex)
     {
         Wall* marker = m_Objects.loopMarkers[static_cast<std::size_t>(markerIndex - 1)];
         if (marker != nullptr)
         {
             marker->SetVisible(markerIndex <= loopPhase);
             const float intensity =
-                0.14f + static_cast<float>(markerIndex) * 0.055f;
+                LoopMarkerGlowBase + static_cast<float>(markerIndex) * LoopMarkerGlowStep;
             marker->SetAppearance(
-                Color(0.26f, 0.012f, 0.008f, 1.0f),
-                Color(intensity, 0.002f, 0.001f, 1.0f),
-                24.0f);
+                LoopMarkerDiffuse,
+                Color(intensity, LoopMarkerGlowGreen, LoopMarkerGlowBlue, 1.0f),
+                LoopMarkerShininess);
         }
     }
-    game->GetPostProcess()->TriggerHorrorPulse(
-        0.24f + static_cast<float>(loopPhase) * 0.13f,
-        0.42f + static_cast<float>(loopPhase) * 0.10f);
-    Input::SetVibration(7 + loopPhase * 3, 0.18f + loopPhase * 0.04f);
+    const float phase = static_cast<float>(loopPhase);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), PulseSpec{
+        CorridorLoopPulseBase.Strength + phase * CorridorLoopPulseStep.Strength,
+        CorridorLoopPulseBase.Seconds + phase * CorridorLoopPulseStep.Seconds });
+    EventFeedback::Rumble(RumbleSpec{
+        CorridorLoopRumbleBase.Frames + loopPhase * CorridorLoopRumbleStep.Frames,
+        CorridorLoopRumbleBase.Strength + loopPhase * CorridorLoopRumbleStep.Strength });
 
     // 開始地点へ戻すときに、廊下の扉も閉じた状態に戻している。同じ境目をもう一度開けさせることで、
     // 各周回が意図された繰り返しとして感じられるようにしている。
@@ -457,11 +609,11 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     }
 
     CeilingLight* entranceLight =
-        m_Objects.CeilingLightAt(1);
+        m_Objects.CeilingLightAt(StartRoomLightIndex);
     CeilingLight* middleLight =
-        m_Objects.CeilingLightAt(4);
+        m_Objects.CeilingLightAt(MiddleCorridorLightIndex);
     CeilingLight* cornerLight =
-        m_Objects.CeilingLightAt(8);
+        m_Objects.CeilingLightAt(CornerLightIndex);
 
     // 1周目：左の倉庫に2本目のヒューズを出している
     if (loopPhase == 1)
@@ -474,7 +626,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
 
         if (middleLight != nullptr)
         {
-            middleLight->SetEmergencyLight(false, 2.4f);
+            middleLight->SetEmergencyLight(false, MiddleLoop1EmergencyOffset);
         }
     }
     else if (loopPhase == 2)
@@ -491,11 +643,11 @@ void StageScene::AdvanceCorridorLoop(Player& player)
 
         if (middleLight != nullptr)
         {
-            middleLight->SetEmergencyLight(true, 5.8f);
+            middleLight->SetEmergencyLight(true, MiddleLoop2EmergencyOffset);
         }
         if (cornerLight != nullptr)
         {
-            cornerLight->SetEmergencyLight(true, 1.1f);
+            cornerLight->SetEmergencyLight(true, CornerLoop2EmergencyOffset);
         }
 
         // 中央の廊下に影を出している
@@ -514,11 +666,11 @@ void StageScene::AdvanceCorridorLoop(Player& player)
         }
         if (middleLight != nullptr)
         {
-            middleLight->SetEmergencyLight(true, 8.2f);
+            middleLight->SetEmergencyLight(true, MiddleIdleEmergencyOffset);
         }
         if (cornerLight != nullptr)
         {
-            cornerLight->SetEmergencyLight(false, 4.3f);
+            cornerLight->SetEmergencyLight(false, CornerIdleEmergencyOffset);
         }
 
         // 3周目だけ、壁の文字の警告どおり、プレイヤーの背後に一度だけ人影を出している（見ると照明の連鎖が始まる）。
@@ -551,35 +703,35 @@ void StageScene::StartScareLightSequence()
     m_ScareLightSequence.Start();
 
     CeilingLight* entrance =
-        m_Objects.CeilingLightAt(1);
+        m_Objects.CeilingLightAt(StartRoomLightIndex);
     CeilingLight* middle =
-        m_Objects.CeilingLightAt(4);
+        m_Objects.CeilingLightAt(MiddleCorridorLightIndex);
     CeilingLight* hall =
-        m_Objects.CeilingLightAt(5);
+        m_Objects.CeilingLightAt(CentralHallLightIndex);
     CeilingLight* corner =
-        m_Objects.CeilingLightAt(8);
+        m_Objects.CeilingLightAt(CornerLightIndex);
     CeilingLight* loopExit =
-        m_Objects.CeilingLightAt(7);
+        m_Objects.CeilingLightAt(LoopExitLightIndex);
 
     if (entrance != nullptr)
     {
-        entrance->SetEmergencyLight(true, 0.35f);
+        entrance->SetEmergencyLight(true, StartRoomEmergencyOffset);
     }
     if (middle != nullptr)
     {
-        middle->SetEmergencyLight(false, 8.2f);
+        middle->SetEmergencyLight(false, MiddleIdleEmergencyOffset);
     }
     if (hall != nullptr)
     {
-        hall->SetEmergencyLight(false, 3.1f);
+        hall->SetEmergencyLight(false, HallIdleEmergencyOffset);
     }
     if (corner != nullptr)
     {
-        corner->SetEmergencyLight(false, 4.3f);
+        corner->SetEmergencyLight(false, CornerIdleEmergencyOffset);
     }
     if (loopExit != nullptr)
     {
-        loopExit->SetEmergencyLight(false, 4.5f);
+        loopExit->SetEmergencyLight(false, LoopExitIdleEmergencyOffset);
     }
 }
 
@@ -604,81 +756,81 @@ void StageScene::UpdateScareLightSequence()
     m_ScareLightSequence.Advance(deltaTime);
 
     CeilingLight* entrance =
-        m_Objects.CeilingLightAt(1);
+        m_Objects.CeilingLightAt(StartRoomLightIndex);
     CeilingLight* middle =
-        m_Objects.CeilingLightAt(4);
+        m_Objects.CeilingLightAt(MiddleCorridorLightIndex);
     CeilingLight* hall =
-        m_Objects.CeilingLightAt(5);
+        m_Objects.CeilingLightAt(CentralHallLightIndex);
     CeilingLight* corner =
-        m_Objects.CeilingLightAt(8);
+        m_Objects.CeilingLightAt(CornerLightIndex);
     CeilingLight* loopExit =
-        m_Objects.CeilingLightAt(7);
+        m_Objects.CeilingLightAt(LoopExitLightIndex);
 
     switch (m_ScareLightSequence.ConsumePendingBeat())
     {
     case 0:
         if (entrance != nullptr)
         {
-            entrance->SetEmergencyLight(false, 0.35f);
+            entrance->SetEmergencyLight(false, StartRoomEmergencyOffset);
         }
         if (middle != nullptr)
         {
-            middle->SetEmergencyLight(true, 0.75f);
+            middle->SetEmergencyLight(true, MiddleChaseEmergencyOffset);
         }
-        game->GetPostProcess()->TriggerHorrorPulse(0.13f, 0.18f);
-        Input::SetVibration(5, 0.10f);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), ScareChasePulse1);
+        EventFeedback::Rumble(ScareChaseRumble1);
         break;
     case 1:
         if (middle != nullptr)
         {
-            middle->SetEmergencyLight(false, 0.75f);
+            middle->SetEmergencyLight(false, MiddleChaseEmergencyOffset);
         }
         if (hall != nullptr)
         {
-            hall->SetEmergencyLight(true, 0.42f);
+            hall->SetEmergencyLight(true, HallChaseEmergencyOffset);
         }
-        game->GetPostProcess()->TriggerHorrorPulse(0.14f, 0.18f);
-        Input::SetVibration(6, 0.13f);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), ScareChasePulse2);
+        EventFeedback::Rumble(ScareChaseRumble2);
         break;
     case 2:
         if (hall != nullptr)
         {
-            hall->SetEmergencyLight(false, 0.42f);
+            hall->SetEmergencyLight(false, HallChaseEmergencyOffset);
         }
         if (corner != nullptr)
         {
-            corner->SetEmergencyLight(true, 0.18f);
+            corner->SetEmergencyLight(true, CornerChaseEmergencyOffset);
         }
-        game->GetPostProcess()->TriggerHorrorPulse(0.16f, 0.20f);
-        Input::SetVibration(7, 0.16f);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), ScareChasePulse3);
+        EventFeedback::Rumble(ScareChaseRumble3);
         break;
     case 3:
         if (corner != nullptr)
         {
-            corner->SetEmergencyLight(false, 0.18f);
+            corner->SetEmergencyLight(false, CornerChaseEmergencyOffset);
         }
         if (loopExit != nullptr)
         {
-            loopExit->SetEmergencyLight(true, 0.08f);
+            loopExit->SetEmergencyLight(true, LoopExitChaseEmergencyOffset);
         }
-        game->GetPostProcess()->TriggerHorrorPulse(0.19f, 0.22f);
-        Input::SetVibration(8, 0.19f);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), ScareChasePulse4);
+        EventFeedback::Rumble(ScareChaseRumble4);
         break;
     // 最後の段階で、廊下の照明を赤い非常灯に戻している
     case 4:
         if (middle != nullptr)
         {
-            middle->SetEmergencyLight(true, 2.6f);
+            middle->SetEmergencyLight(true, MiddleFinalEmergencyOffset);
         }
         if (hall != nullptr)
         {
-            hall->SetEmergencyLight(true, 3.1f);
+            hall->SetEmergencyLight(true, HallIdleEmergencyOffset);
         }
         if (corner != nullptr)
         {
-            corner->SetEmergencyLight(true, 4.3f);
+            corner->SetEmergencyLight(true, CornerIdleEmergencyOffset);
         }
-        Input::SetVibration(4, 0.09f);
+        EventFeedback::Rumble(ScareChaseFinalRumble);
         break;
     default:
         break;
@@ -723,20 +875,19 @@ void StageScene::StartFuseWatcher(int fuseCount)
             }
 
             CeilingLight* reactionLight =
-                m_Objects.CeilingLightAt(4);
+                m_Objects.CeilingLightAt(MiddleCorridorLightIndex);
             if (reactionLight != nullptr)
             {
-                reactionLight->TriggerEventFlicker(0.72f, 0.74f);
+                EventFeedback::Flicker(*reactionLight, FuseWatcherObservedFlicker);
             }
-            game->GetPostProcess()->TriggerBloomPulse(0.42f, 0.18f);
-            Input::SetVibration(7, 0.16f);
+            EventFeedback::BloomPulse(*game->GetPostProcess(), FuseWatcherObservedBloom);
+            EventFeedback::Rumble(FuseWatcherObservedRumble);
         });
 
     m_FuseWatcherState = 1;
     m_FuseWatcherNoticeTimer = fuseCount == 2 ? FuseWatcherSecondSeconds : FuseWatcherThirdSeconds;
-    game->GetPostProcess()->TriggerHorrorPulse(
-        fuseCount == 2 ? 0.20f : 0.32f,
-        0.30f);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(),
+        fuseCount == 2 ? FuseWatcherSecondPulse : FuseWatcherThirdPulse);
 }
 
 // 電力が戻る演出：戻った瞬間に照明の演出と周回の印を消し、0.38・1.15・2.25秒に画面の光と振動を出している
@@ -770,16 +921,16 @@ void StageScene::UpdatePowerRestoreSequence()
     switch (m_PowerSequence.ConsumeRestoreBeat())
     {
     case 0:
-        game->GetPostProcess()->TriggerBloomPulse(1.18f, 0.55f);
-        Input::SetVibration(9, 0.16f);
+        EventFeedback::BloomPulse(*game->GetPostProcess(), PowerRestoreFlashBloom);
+        EventFeedback::Rumble(PowerRestoreFlashRumble);
         break;
     case 1:
-        game->GetPostProcess()->TriggerHorrorPulse(0.12f, 0.22f);
-        Input::SetVibration(6, 0.11f);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), PowerRestoreJoltPulse);
+        EventFeedback::Rumble(PowerRestoreJoltRumble);
         break;
     case 2:
-        game->GetPostProcess()->TriggerBloomPulse(0.48f, 0.40f);
-        Input::SetVibration(4, 0.07f);
+        EventFeedback::BloomPulse(*game->GetPostProcess(), PowerRestoreAfterglowBloom);
+        EventFeedback::Rumble(PowerRestoreAfterglowRumble);
         break;
     default:
         break;
@@ -801,11 +952,11 @@ void StageScene::UpdateExitPowerSequence()
     {
         m_ProgressHintTimer = 0.0f;
 
-        CeilingLight* corner = m_Objects.CeilingLightAt(7);
-        CeilingLight* exitLight = m_Objects.CeilingLightAt(8);
+        CeilingLight* corner = m_Objects.CeilingLightAt(LoopExitLightIndex);
+        CeilingLight* exitLight = m_Objects.CeilingLightAt(CornerLightIndex);
         if (corner != nullptr) corner->SetForcedOff(true);
         if (exitLight != nullptr) exitLight->SetForcedOff(true);
-        game->GetPostProcess()->TriggerHorrorPulse(0.30f, 0.28f);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), ExitPowerCutPulse);
         return;
     }
 
@@ -819,33 +970,33 @@ void StageScene::UpdateExitPowerSequence()
     {
     case 0:
     {
-        CeilingLight* corner = m_Objects.CeilingLightAt(7);
+        CeilingLight* corner = m_Objects.CeilingLightAt(LoopExitLightIndex);
         if (corner != nullptr)
         {
             corner->SetForcedOff(false);
             corner->SetEmergencyLight(false, 0.0f);
-            corner->TriggerEventFlicker(0.72f, 0.82f);
+            EventFeedback::Flicker(*corner, ExitPowerFirstFlicker);
         }
-        game->GetPostProcess()->TriggerBloomPulse(0.68f, 0.24f);
-        Input::SetVibration(5, 0.11f);
+        EventFeedback::BloomPulse(*game->GetPostProcess(), ExitPowerFirstBloom);
+        EventFeedback::Rumble(ExitPowerFirstRumble);
         break;
     }
     case 1:
     {
-        CeilingLight* exitLight = m_Objects.CeilingLightAt(8);
+        CeilingLight* exitLight = m_Objects.CeilingLightAt(CornerLightIndex);
         if (exitLight != nullptr)
         {
             exitLight->SetForcedOff(false);
             exitLight->SetEmergencyLight(false, 0.0f);
-            exitLight->TriggerEventFlicker(0.82f, 0.92f);
+            EventFeedback::Flicker(*exitLight, ExitPowerSecondFlicker);
         }
-        game->GetPostProcess()->TriggerBloomPulse(0.92f, 0.30f);
-        Input::SetVibration(7, 0.15f);
+        EventFeedback::BloomPulse(*game->GetPostProcess(), ExitPowerSecondBloom);
+        EventFeedback::Rumble(ExitPowerSecondRumble);
         break;
     }
     case 2:
-        game->GetPostProcess()->TriggerBloomPulse(1.18f, 0.42f);
-        Input::SetVibration(10, 0.20f);
+        EventFeedback::BloomPulse(*game->GetPostProcess(), ExitPowerFinalBloom);
+        EventFeedback::Rumble(ExitPowerFinalRumble);
         break;
     default:
         break;
@@ -865,25 +1016,25 @@ void StageScene::UpdateExitOmen(Player& player)
         case 0:
         {
             CeilingLight* lightBehind =
-                m_Objects.CeilingLightAt(8);
+                m_Objects.CeilingLightAt(CornerLightIndex);
             if (lightBehind != nullptr)
             {
                 lightBehind->SetForcedOff(true);
             }
-            game->GetPostProcess()->TriggerHorrorPulse(0.22f, 0.30f);
-            Input::SetVibration(7, 0.16f);
+            EventFeedback::HorrorPulse(*game->GetPostProcess(), ExitOmenLightOffPulse);
+            EventFeedback::Rumble(ExitOmenLightOffRumble);
             break;
         }
         case 1:
         {
             CeilingLight* exitLight =
-                m_Objects.CeilingLightAt(7);
+                m_Objects.CeilingLightAt(LoopExitLightIndex);
             if (exitLight != nullptr)
             {
                 exitLight->SetFaulted(true);
-                exitLight->TriggerEventFlicker(1.10f, 0.88f);
+                EventFeedback::Flicker(*exitLight, ExitOmenFaultFlicker);
             }
-            game->GetPostProcess()->TriggerBloomPulse(0.44f, 0.20f);
+            EventFeedback::BloomPulse(*game->GetPostProcess(), ExitOmenFaultBloom);
             break;
         }
         default:
@@ -911,18 +1062,18 @@ void StageScene::UpdateExitOmen(Player& player)
         shadow->EnableGazeScare(ExitOmenGazeSeconds);
     }
 
-    for (int lightNumber : { 7, 8 })
+    for (int lightNumber : { LoopExitLightIndex, CornerLightIndex })
     {
         CeilingLight* light = m_Objects.CeilingLightAt(lightNumber);
         if (light != nullptr)
         {
-            light->TriggerEventFlicker(0.82f, 0.78f);
+            EventFeedback::Flicker(*light, ExitOmenFlicker);
         }
     }
 
-    game->GetPostProcess()->TriggerHorrorPulse(0.28f, 0.42f);
-    game->GetPostProcess()->TriggerBloomPulse(0.54f, 0.24f);
-    Input::SetVibration(10, 0.22f);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), ExitOmenPulse);
+    EventFeedback::BloomPulse(*game->GetPostProcess(), ExitOmenBloom);
+    EventFeedback::Rumble(ExitOmenRumble);
 }
 
 // ----------------------------------------------------------------------------
@@ -947,7 +1098,7 @@ bool StageScene::IsAmbientSoundAllowed() const
         m_FuseWatcherState != 1 &&
         m_ExitOmenSequence.GetTimer() <= 0.0f &&
         !powerRestoring &&
-        m_SafeLights.GetCalm() < 0.5f &&
+        m_SafeLights.GetCalm() < SafeLightQuietCalm &&
         (exit == nullptr || !exit->IsEscaping());
 }
 
@@ -996,8 +1147,8 @@ void StageScene::UpdateWallWritings(Player& player)
 
     m_AmbientSounds.StartCeilingStepsNow(
         game->IsPowerRestored(), camera->GetPosition(), camera->GetForward());
-    game->GetPostProcess()->TriggerHorrorPulse(0.22f, 0.36f);
-    Input::SetVibration(5, 0.16f);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), ChangedWritingPulse);
+    EventFeedback::Rumble(ChangedWritingRumble);
 }
 
 // 今の危険度（0〜1）を求めている
@@ -1022,8 +1173,7 @@ float StageScene::ComputeThreatRate(const Player& player) const
         }
         Vector3 toShadow = shadow->GetPosition() - player.GetPosition();
         toShadow.y = 0.0f;
-        const float danger = 1.0f - (std::clamp)(
-            (toShadow.Length() - HeartbeatNearDistance) / HeartbeatRange, 0.0f, 1.0f);
+        const float danger = MathUtility::Proximity(toShadow.Length(), HeartbeatNearDistance, HeartbeatRange);
         threatRate = (std::max)(threatRate, danger);
     }
     // 隠し部屋に閉じ込められている間は、影が出ていなくても小さく心拍が聞こえるようにしている（息は荒くしない）。
@@ -1173,7 +1323,8 @@ bool StageScene::UpdateArchiveStalker(Player& player, float deltaTime)
     if (result.Appeared)
     {
         game->PlayAudioCueAt(
-            SOUND_CUE_PIPE_KNOCK, result.Position + Vector3(0.0f, ArchiveStalkerKnockHeight, 0.0f), 0.55f, 1.4f);
+            SOUND_CUE_PIPE_KNOCK, result.Position + Vector3(0.0f, ArchiveStalkerKnockHeight, 0.0f),
+            ArchiveStalkerKnockSound.Pitch, ArchiveStalkerKnockSound.Volume);
         m_ArchiveStalkerNotice = result.FirstAppearance
             ? "棚の奥で、何かが動いた"
             : "また棚の間に何かいる";
@@ -1184,7 +1335,8 @@ bool StageScene::UpdateArchiveStalker(Player& player, float deltaTime)
     if (result.Step)
     {
         game->PlayAudioCueAt(
-            SOUND_CUE_FOOTSTEP, result.Position + Vector3(0.0f, ArchiveStalkerStepHeight, 0.0f), 0.74f, 1.6f);
+            SOUND_CUE_FOOTSTEP, result.Position + Vector3(0.0f, ArchiveStalkerStepHeight, 0.0f),
+            ArchiveStalkerStepSound.Pitch, ArchiveStalkerStepSound.Volume);
     }
 
     // 触れられたとき：懐中電灯の電池を奪っている（5%は残し、完全には空にしない）
@@ -1194,9 +1346,9 @@ bool StageScene::UpdateArchiveStalker(Player& player, float deltaTime)
         const float taken = (std::min)(
             BatteryPenalty, (std::max)(0.0f, player.GetBattery() - ArchiveStalkerBatteryFloor));
         player.AddBattery(-taken);
-        game->PlayAudioCue(SOUND_CUE_SCARE, 0.9f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.72f, 0.55f);
-        Input::SetVibration(14, 0.36f);
+        game->PlayAudioCue(SOUND_CUE_SCARE, ArchiveStalkerCaughtSound.Pitch, ArchiveStalkerCaughtSound.Volume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), ArchiveStalkerCaughtPulse);
+        EventFeedback::Rumble(ArchiveStalkerCaughtRumble);
         m_ArchiveStalkerNotice = "影に触れられた 電池を奪われた";
         m_ArchiveStalkerNoticeTimer = ArchiveStalkerCaughtNoticeSeconds;
     }
@@ -1236,20 +1388,21 @@ void StageScene::UpdateFootprintFollower(Player& player)
     if (followerEvent == FootprintFollower::Event::Step)
     {
         ground->AddFootprint(step.Position, step.Yaw, step.Side, true, 1.0f);
-        game->PlayAudioCueAt(SOUND_CUE_WATER_STEP, Vector3(step.Position.x, -99.0f, step.Position.y), 0.78f, 0.55f);
+        game->PlayAudioCueAt(SOUND_CUE_WATER_STEP, Vector3(step.Position.x, FootY, step.Position.y),
+            FollowerWaterStepSound.Pitch, FollowerWaterStepSound.Volume);
     }
     else if (followerEvent == FootprintFollower::Event::Lit)
     {
-        game->GetPostProcess()->TriggerHorrorPulse(0.14f, 0.26f);
-        Input::SetVibration(2, 0.08f);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), FollowerLitPulse);
+        EventFeedback::Rumble(FollowerLitRumble);
     }
     else if (followerEvent == FootprintFollower::Event::Reached)
     {
         const Vector3 playerPosition = player.GetPosition();
-        Vector3 behind = playerPosition - camera->GetForward() * 10.0f;
+        Vector3 behind = playerPosition - camera->GetForward() * FollowerBreathBehindDistance;
         behind.y = playerPosition.y;
-        game->PlayAudioCueAt(SOUND_CUE_BREATH, behind, 0.85f, 0.45f);
-        game->GetPostProcess()->TriggerHorrorPulse(0.30f, 0.40f);
-        Input::SetVibration(5, 0.14f);
+        game->PlayAudioCueAt(SOUND_CUE_BREATH, behind, FollowerBreathSound.Pitch, FollowerBreathSound.Volume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), FollowerReachedPulse);
+        EventFeedback::Rumble(FollowerReachedRumble);
     }
 }

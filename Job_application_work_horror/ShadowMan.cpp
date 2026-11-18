@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "Game.h"
+#include "PostProcess.h"
 #include "Application.h"
 #include "ShadowMan.h"
 #include "Player.h"

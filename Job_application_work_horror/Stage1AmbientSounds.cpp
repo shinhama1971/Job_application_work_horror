@@ -5,6 +5,7 @@
 // ============================================================================
 
 #include "Stage1AmbientSounds.h"
+#include "MathUtility.h"
 
 #include "StageSurveillanceCameras.h"
 
@@ -23,7 +24,7 @@ namespace
     constexpr float StageMinZ = -170.0f;
     constexpr float StageMaxZ = 330.0f;
     constexpr float CeilingVoidY = -44.0f;  // 天井板（y=-47付近）のすぐ上
-    constexpr float Pi = 3.14159265f;
+    constexpr float Pi = MathUtility::Pi;
 
     // 見ていない方向（背後・横）から鳴らすと、振り向いても何もいない怖さが出る。
     // 視線との内積がこの値以下の場所だけを選んでいる（0で真横、負で背後寄り）。

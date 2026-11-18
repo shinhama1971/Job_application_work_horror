@@ -49,6 +49,24 @@ private:
     void SetupPracticalLights();
     // 進む先の天井照明を1灯だけ、不規則にちかちかさせている
     void UpdateRouteLights();
+    // 進行に合わせて、次に向かう場所の照明の組を選んでいる
+    Stage1RouteLight SelectRouteLight() const;
+
+    // --- 1フレームの進行の段階（StageScene.cpp。Update から順に呼んでいる） ---
+    // 経過時間・ヒント・光の安全地帯・知らせの残り時間・配置の読み直し
+    void UpdateTimersAndHints(class Player& player, float deltaTime);
+    // ヒューズを拾った瞬間の知らせと、電力が戻った後の影の片付け
+    void UpdateFusePickup();
+    // 非常用充電器を使ったとき
+    void UpdateEmergencyCharger(class Player& player);
+    // 各演出と仕組みを順に更新する
+    void UpdateStageEvents(class Player& player, float deltaTime);
+    // 最後のドアの鍵と、2面への脱出の始まり
+    void UpdateExitDoor(class Player& player);
+    // 出口の表示・開始地点のドアの裏の表示・扉のランプ
+    void UpdateExitSigns();
+    // 電池の少なさ・走っているか・廊下の奥への近さに合わせた画面効果
+    void UpdateScreenAtmosphere(const class Player& player);
     // 3本目のヒューズの2つの手に入れ方（西棟の奥か、暗証番号の扉の先の部屋）を切り替えている。
     // 3本目を探す段階で暗証番号の部屋のヒューズを出し、どちらか一方を取ったら、もう一方を消している
     void UpdateThirdFuseRoutes();

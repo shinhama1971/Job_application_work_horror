@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <iterator>
 #include <string>
 #include <unordered_map>
 #include <windows.h>
@@ -225,6 +226,110 @@ void Hud::DrawTitle(
     Flush();
 }
 
+namespace
+{
+    // --- リザルト画面の評価の点数：満点から、時間・捕まった回数・観察の失敗を引き、異変への対処と残された記録を足す
+    constexpr int ResultMaxScore = 100;
+    constexpr int ResultParSeconds = 360;               // この時間（6分）を超えた分だけ減点する
+    constexpr int ResultSecondsPerTimePenalty = 15;     // 15秒ごとに1点
+    constexpr int ResultMaxTimePenalty = 40;
+    constexpr int ResultCaughtPenalty = 15;             // 1回15点
+    constexpr int ResultMaxCaughtPenalty = 45;
+    constexpr int ResultMistakePenalty = 5;             // 1回5点
+    constexpr int ResultMaxMistakePenalty = 25;
+    constexpr int ResultAnomalyBonus = 2;               // 1回2点
+    constexpr int ResultMaxAnomalyBonus = 8;
+    constexpr int ResultEvidenceBonus = 3;              // 1つ3点
+    // 評価の境目（この点数以上で S・A・B、それ未満は C）
+    constexpr int ResultRankSScore = 90;
+    constexpr int ResultRankAScore = 75;
+    constexpr int ResultRankBScore = 55;
+    constexpr int SecondsPerMinute = 60;
+
+    // 評価の点数と評価の文字（S・A・B・C）を求めている
+    char ComputeResultRank(int clearSeconds, int caughtCount, int puzzleMistakes, int anomaliesHandled, int evidenceCollected)
+    {
+        const int timePenalty = (std::min)(
+            (std::max)(clearSeconds - ResultParSeconds, 0) / ResultSecondsPerTimePenalty, ResultMaxTimePenalty);
+        const int caughtPenalty = (std::min)(caughtCount * ResultCaughtPenalty, ResultMaxCaughtPenalty);
+        const int mistakePenalty = (std::min)(puzzleMistakes * ResultMistakePenalty, ResultMaxMistakePenalty);
+        const int anomalyBonus = (std::min)(anomaliesHandled * ResultAnomalyBonus, ResultMaxAnomalyBonus);
+        const int evidenceBonus = evidenceCollected * ResultEvidenceBonus;
+        const int performanceScore = (std::clamp)(
+            ResultMaxScore - timePenalty - caughtPenalty - mistakePenalty + anomalyBonus + evidenceBonus,
+            0,
+            ResultMaxScore);
+        return performanceScore >= ResultRankSScore
+            ? 'S'
+            : (performanceScore >= ResultRankAScore
+                ? 'A'
+                : (performanceScore >= ResultRankBScore ? 'B' : 'C'));
+    }
+
+    // 達成の一言：全部見つけて一度も失敗しない「完全探索」を最優先にし、次に記録の更新、捕まらなかったことの順で選んでいる
+    std::string_view SelectResultAchievement(bool everythingFound, int caughtCount, int puzzleMistakes,
+        bool newBestTime, bool newBestCaught)
+    {
+        if (everythingFound && caughtCount == 0 && puzzleMistakes == 0) return "完全探索で脱出";
+        if (newBestTime && newBestCaught) return "自己記録を更新";
+        if (newBestTime) return "最速クリア記録を更新";
+        if (newBestCaught) return "最少捕獲記録を更新";
+        if (caughtCount == 0) return "一度も捕まらず脱出";
+        return {};
+    }
+
+    // --- リザルト画面の見た目：パネルの大きさ（画面の幅に対する割合と上限・高さ）、左の線と上の線の太さ、背景の走査線の間隔
+    constexpr float ResultPanelWidthRatio = 0.72f;
+    constexpr float ResultPanelMaxWidth = 860.0f;
+    constexpr float ResultPanelHeight = 714.0f;     // 下段に「今回の発見」（壁の文字・録音・隠し部屋・今回の異変）を並べるため、縦に広げている
+    constexpr float ResultPanelAccentWidth = 6.0f;
+    constexpr float ResultPanelTopLineHeight = 2.0f;
+    constexpr float ResultScanlineSpacing = 8.0f;
+    constexpr float ResultScanlineHeight = 1.0f;
+    // 文字の大きさ（題名・階・評価・成績の行・小見出し・操作の案内）
+    constexpr float ResultTitlePixelSize = 7.0f;
+    constexpr float ResultFloorPixelSize = 3.0f;
+    constexpr float ResultRankPixelSize = 5.0f;
+    constexpr float ResultStatPixelSize = 2.5f;
+    constexpr float ResultSmallPixelSize = 2.2f;
+    constexpr float ResultPromptPixelSize = 3.0f;
+    // パネルの上からの各行の位置。成績と今回の発見の行は、この間隔で並べる
+    constexpr float ResultTitleY = 48.0f;
+    constexpr float ResultFloorY = 116.0f;
+    constexpr float ResultRankY = 158.0f;
+    constexpr float ResultStatsY = 232.0f;
+    constexpr float ResultRowSpacing = 34.0f;
+    constexpr float ResultDividerY = 446.0f;
+    constexpr float ResultDividerInset = 60.0f;
+    constexpr float ResultDiscoveryHeaderY = 458.0f;
+    constexpr float ResultDiscoveryY = 490.0f;
+    constexpr float ResultAchievementY = 632.0f;
+    constexpr float ResultPromptY = 672.0f;
+    // 色（背景・パネル・緑・淡い文字・金・控えめな文字・評価がCのときの赤茶・走査線）。透明度は表示の進み具合を掛けて使う
+    const Color ResultBackground(0.004f, 0.007f, 0.006f, 1.0f);
+    const Color ResultPanelColor(0.018f, 0.028f, 0.025f, 0.94f);
+    const Color ResultGreen(0.48f, 0.90f, 0.56f, 0.96f);
+    const Color ResultPale(0.74f, 0.82f, 0.76f, 0.78f);
+    const Color ResultGold(0.92f, 0.78f, 0.34f, 0.96f);
+    const Color ResultRankSGold(0.92f, 0.78f, 0.34f, 0.98f);
+    const Color ResultDim(0.50f, 0.58f, 0.52f, 0.80f);
+    const Color ResultPoorRank(0.74f, 0.42f, 0.34f, 0.92f);
+    const Color ResultScanline(0.10f, 0.16f, 0.12f, 0.075f);
+
+    // 色の透明度に、表示の進み具合（0〜1）を掛けている
+    Color Faded(const Color& color, float reveal)
+    {
+        return Color(color.x, color.y, color.z, color.w * reveal);
+    }
+}
+
+// 文字列を、画面の横の中央に置いている
+void Hud::AddCenteredText(float y, std::string_view text, float pixelSize, const Color& color)
+{
+    const float width = static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * GlyphAdvance;
+    AddText((GetCanvasWidth() - width) * 0.5f, y, text, pixelSize, color);
+}
+
 // リザルト画面：評価・成績・今回の発見・達成の一言・次の操作を並べている。revealAmountで全体をフェードインさせている
 void Hud::DrawResult(
     float revealAmount,
@@ -246,253 +351,100 @@ void Hud::DrawResult(
     const float reveal = (std::clamp)(revealAmount, 0.0f, 1.0f);
     const float screenWidth = GetCanvasWidth();
     const float screenHeight = GetCanvasHeight();
-    const Color background(0.004f, 0.007f, 0.006f, 1.0f);
-    const Color panel(0.018f, 0.028f, 0.025f, 0.94f * reveal);
-    const Color green(0.48f, 0.90f, 0.56f, 0.96f * reveal);
-    const Color pale(0.74f, 0.82f, 0.76f, 0.78f * reveal);
+    const Color green = Faded(ResultGreen, reveal);
+    const Color pale = Faded(ResultPale, reveal);
+    const Color gold = Faded(ResultGold, reveal);
+    const Color dim = Faded(ResultDim, reveal);
 
-    AddRectangle(0.0f, 0.0f, screenWidth, screenHeight, background);
-
-    for (float y = 0.0f; y < screenHeight; y += 8.0f)
+    // 背景・走査線・パネル
+    AddRectangle(0.0f, 0.0f, screenWidth, screenHeight, ResultBackground);
+    for (float y = 0.0f; y < screenHeight; y += ResultScanlineSpacing)
     {
-        AddRectangle(
-            0.0f,
-            y,
-            screenWidth,
-            1.0f,
-            Color(0.10f, 0.16f, 0.12f, 0.075f * reveal));
+        AddRectangle(0.0f, y, screenWidth, ResultScanlineHeight, Faded(ResultScanline, reveal));
     }
-
-    const float panelWidth = (std::min)(screenWidth * 0.72f, 860.0f);
-    // 下段に「今回の発見」（壁の文字・録音・隠し部屋・今回の異変）を並べるため、縦に広げている。
-    const float panelHeight = 714.0f;
+    const float panelWidth = (std::min)(screenWidth * ResultPanelWidthRatio, ResultPanelMaxWidth);
     const float panelX = (screenWidth - panelWidth) * 0.5f;
-    const float panelY = (screenHeight - panelHeight) * 0.5f;
-    AddRectangle(panelX, panelY, panelWidth, panelHeight, panel);
-    AddRectangle(panelX, panelY, 6.0f, panelHeight, green);
-    AddRectangle(panelX, panelY, panelWidth, 2.0f, green);
+    const float panelY = (screenHeight - ResultPanelHeight) * 0.5f;
+    AddRectangle(panelX, panelY, panelWidth, ResultPanelHeight, Faded(ResultPanelColor, reveal));
+    AddRectangle(panelX, panelY, ResultPanelAccentWidth, ResultPanelHeight, green);
+    AddRectangle(panelX, panelY, panelWidth, ResultPanelTopLineHeight, green);
 
-    constexpr std::string_view title = "脱出成功";
-    constexpr float titlePixelSize = 7.0f;
-    const float titleWidth =
-        static_cast<float>(CountDisplayedCharacters(title)) *
-        titlePixelSize * GlyphAdvance;
-    AddText(
-        (screenWidth - titleWidth) * 0.5f,
-        panelY + 48.0f,
-        title,
-        titlePixelSize,
-        green);
+    AddCenteredText(panelY + ResultTitleY, "脱出成功", ResultTitlePixelSize, green);
+    AddCenteredText(panelY + ResultFloorY, "2階をクリア", ResultFloorPixelSize, pale);
 
-    constexpr std::string_view floorText = "2階をクリア";
-    constexpr float floorPixelSize = 3.0f;
-    const float floorWidth =
-        static_cast<float>(CountDisplayedCharacters(floorText)) * floorPixelSize * GlyphAdvance;
-    AddText(
-        (screenWidth - floorWidth) * 0.5f,
-        panelY + 116.0f,
-        floorText,
-        floorPixelSize,
-        pale);
-
-    // 評価の点数：100点から、6分を超えた時間（15秒ごとに1点、最大40点）・捕まった回数（1回15点、最大45点）・
-    // 観察の失敗（1回5点、最大25点）を引き、異変への対処（1回2点、最大8点）と残された記録（1つ3点）を足している
-    const int clearSeconds = (std::max)(
-        0, static_cast<int>(clearTimeSeconds + 0.5f));
-    const int minutes = clearSeconds / 60;
-    const int seconds = clearSeconds % 60;
+    // 数を、0未満や全部の数を超えないよう収めている
+    const int clearSeconds = (std::max)(0, static_cast<int>(clearTimeSeconds + 0.5f));
     const int safeCaughtCount = (std::max)(caughtCount, 0);
     const int safeAnomaliesHandled = (std::max)(anomaliesHandled, 0);
     const int safePuzzleMistakes = (std::max)(puzzleMistakes, 0);
     const int safeChargersUsed = (std::max)(chargersUsed, 0);
     constexpr int totalEvidence = Core::GameState::TotalEvidenceCount;
     constexpr int totalWritings = Core::GameState::TotalWallWritingCount;
+    constexpr int totalRecordings = Core::GameState::TotalRecordingCount;
     const int safeEvidenceCollected = (std::clamp)(evidenceCollected, 0, totalEvidence);
     const int safeWritingsRead = (std::clamp)(wallWritingsRead, 0, totalWritings);
-    constexpr int totalRecordings = Core::GameState::TotalRecordingCount;
     const int safeRecordingsPlayed = (std::clamp)(recordingsPlayed, 0, totalRecordings);
-    const int timePenalty = (std::min)(
-        (std::max)(clearSeconds - 360, 0) / 15, 40);
-    const int caughtPenalty = (std::min)(safeCaughtCount * 15, 45);
-    const int mistakePenalty = (std::min)(safePuzzleMistakes * 5, 25);
-    const int anomalyBonus = (std::min)(safeAnomaliesHandled * 2, 8);
-    const int evidenceBonus = safeEvidenceCollected * 3;
-    const int performanceScore = (std::clamp)(
-        100 - timePenalty - caughtPenalty - mistakePenalty +
-            anomalyBonus + evidenceBonus,
-        0,
-        100);
-    // 90点以上でS、75点以上でA、55点以上でB、それ未満はC
-    const char rank = performanceScore >= 90
-        ? 'S'
-        : (performanceScore >= 75
-            ? 'A'
-            : (performanceScore >= 55 ? 'B' : 'C'));
-    const std::string rankText = "評価 " + std::string(1, rank);
+
+    // 評価
+    const char rank = ComputeResultRank(
+        clearSeconds, safeCaughtCount, safePuzzleMistakes, safeAnomaliesHandled, safeEvidenceCollected);
     const Color rankColor = rank == 'S'
-        ? Color(0.92f, 0.78f, 0.34f, 0.98f * reveal)
-        : (rank == 'A'
-            ? green
-            : (rank == 'B'
-                ? pale
-                : Color(0.74f, 0.42f, 0.34f, 0.92f * reveal)));
-    constexpr float rankPixelSize = 5.0f;
-    const float rankWidth =
-        static_cast<float>(CountDisplayedCharacters(rankText)) * rankPixelSize * GlyphAdvance;
-    AddText(
-        (screenWidth - rankWidth) * 0.5f,
-        panelY + 158.0f,
-        rankText,
-        rankPixelSize,
-        rankColor);
+        ? Faded(ResultRankSGold, reveal)
+        : (rank == 'A' ? green : (rank == 'B' ? pale : Faded(ResultPoorRank, reveal)));
+    AddCenteredText(panelY + ResultRankY, "評価 " + std::string(1, rank), ResultRankPixelSize, rankColor);
 
     // 成績の各行（タイム・捕まった回数・異変への対処・観察の失敗・充電器・残された記録）
-    const std::string timeText =
-        "クリア時間 " + std::to_string(minutes) + "分 " +
-        std::to_string(seconds) + "秒";
-    const std::string caughtText =
-        "捕まった回数 " + std::to_string(safeCaughtCount) + "回";
-    const std::string anomalyText =
-        "怪異への対処 " + std::to_string(safeAnomaliesHandled) + "回";
-    const std::string mistakeText =
-        "観察の失敗 " + std::to_string(safePuzzleMistakes) + "回";
-    const std::string chargerText =
-        "充電器の使用 " + std::to_string(safeChargersUsed) + "回";
-    const std::string evidenceText =
-        "残された記録 " + std::to_string(safeEvidenceCollected) + " / " +
-        std::to_string(totalEvidence);
-    constexpr float statPixelSize = 2.5f;
-    const float timeWidth =
-        static_cast<float>(CountDisplayedCharacters(timeText)) * statPixelSize * GlyphAdvance;
-    const float caughtWidth =
-        static_cast<float>(CountDisplayedCharacters(caughtText)) * statPixelSize * GlyphAdvance;
-    const float anomalyWidth =
-        static_cast<float>(CountDisplayedCharacters(anomalyText)) * statPixelSize * GlyphAdvance;
-    const float mistakeWidth =
-        static_cast<float>(CountDisplayedCharacters(mistakeText)) * statPixelSize * GlyphAdvance;
-    const float chargerWidth =
-        static_cast<float>(CountDisplayedCharacters(chargerText)) * statPixelSize * GlyphAdvance;
-    const float evidenceWidth =
-        static_cast<float>(CountDisplayedCharacters(evidenceText)) * statPixelSize * GlyphAdvance;
-    AddText(
-        (screenWidth - timeWidth) * 0.5f,
-        panelY + 232.0f,
-        timeText,
-        statPixelSize,
-        pale);
-    AddText(
-        (screenWidth - caughtWidth) * 0.5f,
-        panelY + 266.0f,
-        caughtText,
-        statPixelSize,
-        pale);
-    AddText(
-        (screenWidth - anomalyWidth) * 0.5f,
-        panelY + 300.0f,
-        anomalyText,
-        statPixelSize,
-        pale);
-    AddText(
-        (screenWidth - mistakeWidth) * 0.5f,
-        panelY + 334.0f,
-        mistakeText,
-        statPixelSize,
-        pale);
-    AddText(
-        (screenWidth - chargerWidth) * 0.5f,
-        panelY + 368.0f,
-        chargerText,
-        statPixelSize,
-        pale);
-    AddText(
-        (screenWidth - evidenceWidth) * 0.5f,
-        panelY + 402.0f,
-        evidenceText,
-        statPixelSize,
-        safeEvidenceCollected >= totalEvidence
-            ? Color(0.92f, 0.78f, 0.34f, 0.96f * reveal)
-            : pale);
+    const std::string statLines[] =
+    {
+        "クリア時間 " + std::to_string(clearSeconds / SecondsPerMinute) + "分 " +
+            std::to_string(clearSeconds % SecondsPerMinute) + "秒",
+        "捕まった回数 " + std::to_string(safeCaughtCount) + "回",
+        "怪異への対処 " + std::to_string(safeAnomaliesHandled) + "回",
+        "観察の失敗 " + std::to_string(safePuzzleMistakes) + "回",
+        "充電器の使用 " + std::to_string(safeChargersUsed) + "回",
+        "残された記録 " + std::to_string(safeEvidenceCollected) + " / " + std::to_string(totalEvidence),
+    };
+    constexpr std::size_t evidenceLine = std::size(statLines) - 1;
+    for (std::size_t line = 0; line < std::size(statLines); ++line)
+    {
+        const bool complete = line == evidenceLine && safeEvidenceCollected >= totalEvidence;
+        AddCenteredText(panelY + ResultStatsY + static_cast<float>(line) * ResultRowSpacing,
+            statLines[line], ResultStatPixelSize, complete ? gold : pale);
+    }
 
     // 今回の発見。プレイごとに変わる要素と任意の探索を並べ、もう一度遊ぶ理由にしている。
-    const Color gold(0.92f, 0.78f, 0.34f, 0.96f * reveal);
-    const Color dim(0.50f, 0.58f, 0.52f, 0.80f * reveal);
-    const auto addCenteredStat = [this, screenWidth](
-        float y, std::string_view text, float pixelSize, const Color& color)
-    {
-        const float width =
-            static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * GlyphAdvance;
-        AddText((screenWidth - width) * 0.5f, y, text, pixelSize, color);
-    };
-    AddRectangle(panelX + 60.0f, panelY + 446.0f, panelWidth - 120.0f, 1.0f, dim);
-    addCenteredStat(panelY + 458.0f, "今回の発見", 2.2f, dim);
-    const std::string writingText =
-        "壁の文字 " + std::to_string(safeWritingsRead) + " / " + std::to_string(totalWritings);
-    addCenteredStat(panelY + 490.0f, writingText, statPixelSize,
-        safeWritingsRead >= totalWritings ? gold : pale);
-    const std::string recordingText =
-        "録音 " + std::to_string(safeRecordingsPlayed) + " / " + std::to_string(totalRecordings);
-    addCenteredStat(panelY + 524.0f, recordingText, statPixelSize,
-        safeRecordingsPlayed >= totalRecordings ? gold : pale);
-    addCenteredStat(panelY + 558.0f,
-        hiddenRoomEscaped ? "隠し部屋 脱出した" : "隠し部屋 見つけていない", statPixelSize,
-        hiddenRoomEscaped ? gold : pale);
+    AddRectangle(panelX + ResultDividerInset, panelY + ResultDividerY,
+        panelWidth - ResultDividerInset * 2.0f, ResultScanlineHeight, dim);
+    AddCenteredText(panelY + ResultDiscoveryHeaderY, "今回の発見", ResultSmallPixelSize, dim);
+    const float discoveryY = panelY + ResultDiscoveryY;
+    AddCenteredText(discoveryY,
+        "壁の文字 " + std::to_string(safeWritingsRead) + " / " + std::to_string(totalWritings),
+        ResultStatPixelSize, safeWritingsRead >= totalWritings ? gold : pale);
+    AddCenteredText(discoveryY + ResultRowSpacing,
+        "録音 " + std::to_string(safeRecordingsPlayed) + " / " + std::to_string(totalRecordings),
+        ResultStatPixelSize, safeRecordingsPlayed >= totalRecordings ? gold : pale);
+    AddCenteredText(discoveryY + ResultRowSpacing * 2.0f,
+        hiddenRoomEscaped ? "隠し部屋 脱出した" : "隠し部屋 見つけていない",
+        ResultStatPixelSize, hiddenRoomEscaped ? gold : pale);
     if (!stage2Anomalies.empty())
     {
-        addCenteredStat(panelY + 592.0f,
-            "2階の異変 " + std::string(stage2Anomalies), statPixelSize, pale);
+        AddCenteredText(discoveryY + ResultRowSpacing * 3.0f,
+            "2階の異変 " + std::string(stage2Anomalies), ResultStatPixelSize, pale);
     }
 
-    // 達成の一言：全部見つけて一度も失敗しない「完全探索」を最優先にし、次に記録の更新、捕まらなかったことの順で選んでいる
-    std::string_view achievement = "";
-    if (safeEvidenceCollected >= totalEvidence && safeWritingsRead >= totalWritings &&
-        safeRecordingsPlayed >= totalRecordings &&
-        hiddenRoomEscaped && safeCaughtCount == 0 && safePuzzleMistakes == 0)
-    {
-        achievement = "完全探索で脱出";
-    }
-    else if (newBestTime && newBestCaught)
-    {
-        achievement = "自己記録を更新";
-    }
-    else if (newBestTime)
-    {
-        achievement = "最速クリア記録を更新";
-    }
-    else if (newBestCaught)
-    {
-        achievement = "最少捕獲記録を更新";
-    }
-    else if (safeCaughtCount == 0)
-    {
-        achievement = "一度も捕まらず脱出";
-    }
+    // 達成の一言と、次の操作
+    const bool everythingFound = safeEvidenceCollected >= totalEvidence && safeWritingsRead >= totalWritings &&
+        safeRecordingsPlayed >= totalRecordings && hiddenRoomEscaped;
+    const std::string_view achievement = SelectResultAchievement(
+        everythingFound, safeCaughtCount, safePuzzleMistakes, newBestTime, newBestCaught);
     if (!achievement.empty())
     {
-        constexpr float achievementPixelSize = 2.2f;
-        const float achievementWidth = static_cast<float>(
-            CountDisplayedCharacters(achievement)) *
-            achievementPixelSize * GlyphAdvance;
-        AddText(
-            (screenWidth - achievementWidth) * 0.5f,
-            panelY + 632.0f,
-            achievement,
-            achievementPixelSize,
-            Color(0.92f, 0.78f, 0.34f, 0.96f * reveal));
+        AddCenteredText(panelY + ResultAchievementY, achievement, ResultSmallPixelSize, gold);
     }
-
     const std::string_view prompt = Input::IsControllerConnected()
         ? "A タイトルへ   X もう一度"
         : "ENTER タイトルへ   R もう一度";
-    constexpr float promptPixelSize = 3.0f;
-    const float promptWidth =
-        static_cast<float>(CountDisplayedCharacters(prompt)) *
-        promptPixelSize * GlyphAdvance;
-    AddText(
-        (screenWidth - promptWidth) * 0.5f,
-        panelY + 672.0f,
-        prompt,
-        promptPixelSize,
-        pale);
+    AddCenteredText(panelY + ResultPromptY, prompt, ResultPromptPixelSize, pale);
 
     Flush();
 }

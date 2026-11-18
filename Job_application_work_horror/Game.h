@@ -15,19 +15,10 @@
 #include "Camera.h"
 #include "Renderer.h"
 #include "Object.h"
-#include"PostProcess.h"
-#include "ShadowMap.h"
-#include "ReflectionProbe.h"
-#include "PointShadowMap.h"
-#include "AmbientOcclusion.h"
-#include "ScreenSpaceReflection.h"
-#include "TiledLighting.h"
-#include "FigureVolumes.h"
 #include "GameState.h"
 #include "GameSettings.h"
 #include "PauseMenu.h"
 #include "ObjectManager.h"
-#include "GpuTimer.h"
 #include "sound.h"
 #include "utility.h"
 // ゲームのシーン（タイトル・1面・2面・リザルト）
@@ -46,7 +37,24 @@ enum class SceneName
 
 class Scene;
 
-namespace Effect { class DDGIVolume; class LightShafts; }
+// 描画の仕組みは Game.cpp・GameRendering.cpp だけが中身を使うので、ここでは名前だけを知らせ、unique_ptr で持っている。
+// 中身（各ヘッダー）を Game.h で読まないことで、描画のクラスを1つ変えても、Game.h を読む全てのファイルを作り直さずに済む
+// （値で持っていたころは、DDGIVolume に変数を1つ足しただけで並びが変わり、作り直されていない .obj との食い違いで落ちた）。
+// 使う側は、必要なヘッダー（PostProcess.h など）を自分で読む。
+namespace Effect
+{
+    class PostProcess;
+    class ShadowMap;
+    class ReflectionProbe;
+    class PointShadowMap;
+    class FigureVolumes;
+    class AmbientOcclusion;
+    class DDGIVolume;
+    class LightShafts;
+    class ScreenSpaceReflection;
+    class TiledLighting;
+}
+class GpuTimer;
 
 namespace Core
 {
@@ -63,28 +71,28 @@ namespace Core
         // 今のシーン、プレイヤーの視点のカメラ、画面効果、影、水面の反射、タイルベースライティング
         std::unique_ptr<Scene> m_Scene;
         Camera m_Camera;
-        Effect::PostProcess m_PostProcess;
-        Effect::ShadowMap m_ShadowMap;
+        std::unique_ptr<Effect::PostProcess> m_PostProcess;
+        std::unique_ptr<Effect::ShadowMap> m_ShadowMap;
         // 水面の反射と方式別の計測で使う、キューブマップとSSR
-        Effect::ReflectionProbe m_ReflectionProbe;
+        std::unique_ptr<Effect::ReflectionProbe> m_ReflectionProbe;
         // PBRの金属や濡れた面に映す景色（環境マップ）。カメラの位置から1フレームに1面ずつ撮り直し、t14 で読ませている
-        Effect::ReflectionProbe m_EnvironmentProbe;
+        std::unique_ptr<Effect::ReflectionProbe> m_EnvironmentProbe;
         // 揺れる裸電球（2面）の影。電球から6方向を撮った「電球からの距離」のキューブマップで、t2 で読ませている
-        Effect::PointShadowMap m_PointShadowMap;
+        std::unique_ptr<Effect::PointShadowMap> m_PointShadowMap;
         // 鏡と水たまりにだけ映る人の形の距離場（3Dテクスチャ）
-        Effect::FigureVolumes m_FigureVolumes;
+        std::unique_ptr<Effect::FigureVolumes> m_FigureVolumes;
         // 画面空間の環境遮蔽（SSAO）。本描画の直前に深度プリパスの深度から作り、t15 で読ませている
-        Effect::AmbientOcclusion m_AmbientOcclusion;
+        std::unique_ptr<Effect::AmbientOcclusion> m_AmbientOcclusion;
         // DDGI：壁や床で跳ね返った間接光（プローブの格子と、画面の間接光の画像）
         std::unique_ptr<Effect::DDGIVolume> m_GlobalIllumination;
         std::unique_ptr<Effect::LightShafts> m_LightShafts;
         unsigned int m_EnvironmentQualityFrame = 0;
-        Effect::ScreenSpaceReflection m_ScreenSpaceReflection;
-        Effect::TiledLighting m_TiledLighting;
+        std::unique_ptr<Effect::ScreenSpaceReflection> m_ScreenSpaceReflection;
+        std::unique_ptr<Effect::TiledLighting> m_TiledLighting;
         // 毎フレームObjectから集める点光源。確保し直しを避けるため、同じvectorを使い回している。
         std::vector<ENVIRONMENT_POINT_LIGHT> m_FramePointLights;
         // 描画の段階ごとのGPU時間の計測、音、音の初期化に成功したか
-        GpuTimer m_GpuTimer;
+        std::unique_ptr<GpuTimer> m_GpuTimer;
         Sound m_Sound;
         bool m_SoundReady = false;
         // 聞き手のまわりがふさがれている度合い（SetListenerMuffle）
@@ -114,6 +122,31 @@ namespace Core
         void ApplyVisualSettings();
         // ポーズメニューの開閉と操作を処理している
         void UpdatePauseMenu();
+        // --- 1フレームの描画の段階（GameRendering.cpp）。Draw から順に呼んでいる ---
+        // デバッグ画面に出す、描いた数と省いた数
+        struct DrawStats
+        {
+            unsigned int MainDrawn = 0;
+            unsigned int MainCulled = 0;
+            unsigned int ShadowDrawn = 0;
+            unsigned int ShadowCulled = 0;
+            unsigned int ReflectionDrawn = 0;
+        };
+        void PrepareFrameState(int quality);
+        void SubmitReflectionProps();
+        void RunGpuSimulations(ID3D11DeviceContext* context);
+        void CollectFramePointLights();
+        void DrawShadowPass(ID3D11DeviceContext* context, DrawStats& stats);
+        void DrawBulbShadowPass(ID3D11DeviceContext* context, int quality);
+        bool HasWetFloor() const;
+        void DrawReflectionProbe(ID3D11DeviceContext* context, bool useCubeMap, bool hasWetFloor, DrawStats& stats);
+        void DrawEnvironmentProbe(ID3D11DeviceContext* context, int quality, bool hasWetFloor);
+        void DrawDepthPrepass();
+        void ComputeAmbientOcclusion(ID3D11DeviceContext* context, bool enabled);
+        void ComputeGlobalIllumination(ID3D11DeviceContext* context, bool enabled);
+        bool ComputeLightShafts(ID3D11DeviceContext* context, bool enabled);
+        void DrawMainSceneObjects(DrawStats& stats);
+
         // 聞き手と音源の間にある壁・閉じた扉の量（0〜1）を返している。
         float ComputeSoundOcclusion(
             const DirectX::SimpleMath::Vector3& listener,
@@ -381,22 +414,22 @@ namespace Core
 
         Effect::PostProcess* GetPostProcess()
         {
-            return &m_PostProcess;
+            return m_PostProcess.get();
         }
 
         Effect::TiledLighting* GetTiledLighting()
         {
-            return &m_TiledLighting;
+            return m_TiledLighting.get();
         }
 
         Effect::ShadowMap* GetShadowMap()
         {
-            return &m_ShadowMap;
+            return m_ShadowMap.get();
         }
 
         GpuTimer* GetGpuTimer()
         {
-            return &m_GpuTimer;
+            return m_GpuTimer.get();
         }
     };
 }

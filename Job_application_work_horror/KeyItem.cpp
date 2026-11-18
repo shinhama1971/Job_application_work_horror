@@ -6,6 +6,7 @@
 #include "KeyItem.h"
 #include "Application.h"
 #include "Game.h"
+#include "PostProcess.h"
 #include "Input.h"
 #include "PropModel.h"
 

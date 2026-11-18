@@ -5,6 +5,7 @@
 // ============================================================================
 
 #include "FirstPersonHands.h"
+#include "MathUtility.h"
 
 #include "Application.h"
 #include "Camera.h"
@@ -71,17 +72,6 @@ namespace
         return target + (current - target) * std::exp(-ratePerSecond * deltaTime);
     }
 
-    // 角度の差を -π〜π に直している
-    float WrapAngle(float angle)
-    {
-        constexpr float TwoPi = 6.28318530718f;
-        angle = std::fmod(angle + TwoPi * 0.5f, TwoPi);
-        if (angle < 0.0f)
-        {
-            angle += TwoPi;
-        }
-        return angle - TwoPi * 0.5f;
-    }
 }
 
 // ばねの式（目標との差に比例する力と、速さに比例する減衰）を、時間を細かく割って進めている
@@ -194,7 +184,7 @@ void FirstPersonHands::Update(const FrameInput& input)
     float pitchVelocity = 0.0f;
     if (m_HasPreviousLook && deltaTime > 0.0f)
     {
-        yawVelocity = WrapAngle(input.Yaw - m_PreviousYaw) / deltaTime;
+        yawVelocity = MathUtility::WrapAngle(input.Yaw - m_PreviousYaw) / deltaTime;
         pitchVelocity = (input.Pitch - m_PreviousPitch) / deltaTime;
     }
     m_PreviousYaw = input.Yaw;

@@ -14,6 +14,11 @@
 #include "PlayerMovement.h"
 #include "FirstPersonHands.h"
 
+#include <vector>
+
+class Wall;
+class Door;
+
 // プレイヤー。足元の位置を持ち、毎フレーム入力から移動し、目の高さにカメラを置いて懐中電灯の光を作っている。
 class Player : public Object
 {
@@ -91,6 +96,31 @@ private:
 
     // 隠れている間の見回せる範囲の制限と、外へ出る操作
     void UpdateHiding(Camera& camera, float deltaTime);
+
+    // ===== 1フレームの更新の段階（Player.cpp。Update から順に呼んでいる） =====
+    // 懐中電灯の光線：目の位置と向き、最初に当たる面までの距離、近い面で光を弱めるのに使う距離
+    struct FlashlightBeam
+    {
+        DirectX::SimpleMath::Vector3 Origin;
+        DirectX::SimpleMath::Vector3 Direction = DirectX::SimpleMath::Vector3::UnitZ;
+        float HitDistance = 0.0f;
+        float ClosestSurfaceDistance = 0.0f;
+    };
+    DirectX::SimpleMath::Vector3 ReadMoveInput(
+        const DirectX::SimpleMath::Vector3& forward, const DirectX::SimpleMath::Vector3& right) const;
+    DirectX::SimpleMath::Vector3 MoveAndCollide(const DirectX::SimpleMath::Vector3& moveDir,
+        const std::vector<Wall*>& walls, const std::vector<Door*>& doors, float deltaTime);
+    void UpdateFootsteps(const DirectX::SimpleMath::Vector3& positionBeforeMove, float deltaTime);
+    FlashlightSystem::FrameState UpdateFlashlightPower(float deltaTime);
+    FlashlightBeam TraceFlashlightBeam(const Camera& camera, float yaw,
+        const std::vector<Wall*>& walls, bool visibleLight) const;
+    LIGHT BuildFlashlightLight(const FlashlightSystem::FrameState& state, float closestSurfaceDistance,
+        float batteryWeakness, float deltaTime);
+    void UpdateFlashlightBounce(const LIGHT& light, bool renderFlashlight, const FlashlightBeam& beam, float deltaTime);
+    void UpdateCameraPosition(Camera& camera,
+        const DirectX::SimpleMath::Vector3& forward, const DirectX::SimpleMath::Vector3& right);
+    void UpdateBodyShadow(const DirectX::SimpleMath::Vector3& forward, float deltaTime);
+    void HandleDebugBatteryKey();
 
 public:
     // ===== 階段を自動で上る演出（1面の最後の扉の先・2面の始まり） =====

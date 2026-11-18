@@ -6,6 +6,7 @@
 #include "PipeProp.h"
 
 #include "Game.h"
+#include "ShadowMap.h"
 #include "Renderer.h"
 
 using namespace DirectX::SimpleMath;

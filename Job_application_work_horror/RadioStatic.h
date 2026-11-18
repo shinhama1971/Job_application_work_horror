@@ -11,6 +11,7 @@
 #pragma once
 
 #include "Game.h"
+#include "PostProcess.h"
 
 #include <algorithm>
 #include <cmath>

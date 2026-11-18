@@ -827,6 +827,12 @@
     <ClInclude Include="TensionPulseFeedback.h">
       <Filter>ヘッダー ファイル\Scene\Stage2</Filter>
     </ClInclude>
+    <ClInclude Include="MathUtility.h">
+      <Filter>ヘッダー ファイル\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="EventFeedback.h">
+      <Filter>ヘッダー ファイル\Scene</Filter>
+    </ClInclude>
     <ClInclude Include="UnseenPresenceAnomaly.h">
       <Filter>ヘッダー ファイル\Scene\Stage2</Filter>
     </ClInclude>

@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "Game.h"
+#include "PostProcess.h"
 #include "FuseBox.h"
 #include "Input.h"
 #include "Player.h"

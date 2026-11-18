@@ -67,6 +67,29 @@ private:
     // 配置のファイルを読み直し、建物と、扉・照明などの置き場所を置き直している（Debug版の F5 と、ファイルが書き換わったとき）
     void ReloadPropLayout();
 
+    // --- 1フレームの進行の段階（Stage2Scene.cpp。Update から順に呼んでいる） ---
+    // 出口の階段を上らせ、脱出している間は追跡と影を止めている（脱出中なら true）
+    bool UpdateExitEscape(Player& player);
+    // デバッグ画面から頼まれた操作と、異変を探す周回にしてその異変を決める処理
+    void RunPendingDebugAction(Player& player);
+    bool ForceAnomalyLoop(Player& player, Stage2Anomaly anomaly);
+    // 周回の切り替え・ヒント・知らせ・各タイマーと、心拍・呼吸
+    void UpdateTimers(Player& player, float deltaTime);
+    // しばらく進めていないときに、探すべき異変の近くの照明を揺らす
+    void UpdateGuidancePulse(Door* corridorDoor);
+    // 周回を進め、準備ができていれば最後の停電を始める
+    void UpdateProgression(Player& player);
+    // 照明の区画・各異変・時計の更新
+    void UpdateAnomalies(Player& player, float deltaTime);
+    void UpdateLockers();
+    // 非常用充電器・残された記録・異常確認のスイッチ
+    void UpdateEmergencyCharger(Player& player);
+    void UpdateEvidence(Player& player);
+    void UpdateConfirmationPanel(Door* corridorDoor);
+    // 周回の進み具合・近くの照明の明るさ・危険度に合わせた画面効果と、扉のランプ
+    void UpdateCorridorAtmosphere(Player& player, float deltaTime);
+    void UpdateDoorIndicator(Door* corridorDoor);
+
     // 2面は同じ廊下を周回するたびに異変が追加される。
     // AdvanceLoopが周回の段階を進め、それぞれのUpdate関数が異変と謎解きを更新している。
     void Init();

@@ -461,6 +461,8 @@
     <ClInclude Include="UnseenPresenceAnomaly.h" />
     <ClInclude Include="TensionPulse.h" />
     <ClInclude Include="TensionPulseFeedback.h" />
+    <ClInclude Include="EventFeedback.h" />
+    <ClInclude Include="MathUtility.h" />
     <ClInclude Include="BehindPresence.h" />
     <ClInclude Include="Stage2SceneConstants.h" />
     <ClInclude Include="QuietRecovery.h" />

@@ -3,6 +3,7 @@
 // ============================================================================
 
 #include "ForestBackdrop.h"
+#include "MathUtility.h"
 
 #include "Camera.h"
 #include "ForestGrass.h"
@@ -19,11 +20,6 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
-    float SmoothStep(float t)
-    {
-        t = std::clamp(t, 0.0f, 1.0f);
-        return t * t * (3.0f - 2.0f * t);
-    }
 }
 
 void ForestBackdrop::Init(const std::vector<Shot>& shots, bool loop)
@@ -59,7 +55,7 @@ void ForestBackdrop::ApplyCamera()
         return;
     }
     const Shot& shot = m_Shots[static_cast<std::size_t>(m_ShotIndex)];
-    const float progress = SmoothStep(m_ShotTime / shot.Seconds);
+    const float progress = MathUtility::SmoothStep01(m_ShotTime / shot.Seconds);
     m_Player->SetPosition(Vector3::Lerp(shot.From, shot.To, progress));
     // 手持ちのカメラのように、ほんの少し揺らしている
     constexpr float SlowSwayRadiansPerSecond = 0.7f;

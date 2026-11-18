@@ -12,9 +12,11 @@
 #include "CaptureMode.h"
 #include "CeilingLight.h"
 #include "Door.h"
+#include "EventFeedback.h"
 #include "ExitTrigger.h"
 #include "FuseBox.h"
 #include "Game.h"
+#include "PostProcess.h"
 #include "Input.h"
 #include "Player.h"
 #include "Renderer.h"
@@ -35,6 +37,89 @@ namespace
 {
     constexpr float RoomOcclusionCeilingY = -48.5f;
     constexpr float RoomOcclusionStrength = 0.55f;
+
+    using EventFeedback::FlickerSpec;
+    using EventFeedback::PulseSpec;
+    using EventFeedback::RumbleSpec;
+
+    // --- ヒントと案内：H（LB）でヒントを頼んだときの振動、しばらく進めていないときに異変の近くの照明を揺らす明滅と光
+    constexpr RumbleSpec HintRequestRumble{ 2, 0.04f };
+    constexpr FlickerSpec GuidanceFlicker{ 0.72f, 0.58f };
+    constexpr PulseSpec GuidanceBloom{ 0.30f, 0.16f };
+    // ロッカーの中で、すべての位置付きの音をこもらせる量（扉越しに聞こえる）
+    constexpr float LockerListenerMuffle = 0.45f;
+
+    // --- 非常用充電器を使ったとき
+    constexpr FlickerSpec ChargerFlicker{ 1.10f, 0.88f };
+    constexpr PulseSpec ChargerPulse{ 0.28f, 0.30f };
+    constexpr RumbleSpec ChargerRumble{ 7, 0.16f };
+    // --- 残された記録を回収したとき：目印を緑に変える色と光沢、光と振動
+    const Color EvidenceCollectedDiffuse(0.06f, 0.14f, 0.08f, 1.0f);
+    const Color EvidenceCollectedEmission(0.08f, 0.30f, 0.12f, 1.0f);
+    constexpr float EvidenceCollectedShininess = 44.0f;
+    constexpr PulseSpec EvidenceBloom{ 0.38f, 0.18f };
+    constexpr RumbleSpec EvidenceRumble{ 4, 0.08f };
+    // --- 異常確認のスイッチを押して扉の鍵が外れたとき
+    constexpr FlickerSpec ConfirmationFlicker{ 0.90f, 0.78f };
+    constexpr PulseSpec ConfirmationBloom{ 0.76f, 0.28f };
+    constexpr RumbleSpec ConfirmationRumble{ 7, 0.16f };
+
+    // --- 廊下の画面効果（UpdateCorridorAtmosphere）。各値は「基本＋周回の進み具合1・暗さ1・危険度1のときに足す分」
+    // 周回の色調が追いつく速さ（毎秒）、照明の明るさが届く廊下の向きの距離、緊張のゆっくりした揺れ（速さ・大きさ）
+    constexpr float LoopDepthFollowSpeed = 2.5f;
+    constexpr float FixtureLightReach = 105.0f;
+    constexpr float TensionPulseSpeed = 1.7f;
+    constexpr float TensionPulseAmount = 0.025f;
+    constexpr float TensionBase = 0.38f;
+    constexpr float TensionPerLoop = 0.42f;
+    constexpr float TensionPerThreat = 0.14f;
+    constexpr float TensionMax = 0.92f;
+    constexpr float NoiseBase = 0.20f;
+    constexpr float NoisePerLoop = 0.10f;
+    constexpr float NoisePerDarkness = 0.018f;
+    constexpr float NoisePerThreat = 0.025f;
+    constexpr float VignetteBase = 0.62f;
+    constexpr float VignettePerLoop = 0.12f;
+    constexpr float VignettePerDarkness = 0.035f;
+    constexpr float VignettePerThreat = 0.045f;
+    // 目が慣れたような露出（ライトを点けているとき・消しているとき）
+    constexpr float FlashlightOnExposure = 1.00f;
+    constexpr float FlashlightOnExposurePerDarkness = 0.035f;
+    constexpr float FlashlightOffExposure = 1.055f;
+    constexpr float FlashlightOffExposurePerDarkness = 0.090f;
+    constexpr float DistortionBase = 0.20f;
+    constexpr float DistortionPerLoop = 0.34f;
+    constexpr float FilmGradeBase = 0.58f;
+    constexpr float FilmGradePerLoop = 0.20f;
+    constexpr float LensDirtBase = 0.14f;
+    constexpr float LensDirtPerLoop = 0.08f;
+    // 信号の乱れ：信号盤の数、足音の影が近いときに乱れ始める危険度と強まり方と上限、信号盤パズルの間の乱れ
+    constexpr int SignalTerminalTotal = 3;
+    constexpr float StalkerInterferenceStartThreat = 0.52f;
+    constexpr float StalkerInterferencePerThreat = 0.72f;
+    constexpr float StalkerInterferenceMax = 0.30f;
+    constexpr float SignalInterferenceBase = 0.10f;
+    constexpr float SignalInterferencePerThreat = 0.62f;
+    constexpr float SignalInterferenceUnresolved = 0.16f;
+    constexpr float SignalInterferenceMax = 0.88f;
+    constexpr float VolumetricBase = 0.38f;
+    constexpr float VolumetricPerLoop = 0.20f;
+    constexpr float VolumetricPerDarkness = 0.055f;
+
+    // --- 扉のランプ：鍵がかかっている間は赤くゆっくり、外れたら緑で速く点滅させる（点滅の速さ、色、光沢）
+    constexpr float LockedIndicatorPulseSpeed = 3.4f;
+    constexpr float OpenIndicatorPulseSpeed = 6.2f;
+    const Color LockedIndicatorDiffuse(0.24f, 0.012f, 0.008f, 1.0f);
+    constexpr float LockedIndicatorRedBase = 0.13f;
+    constexpr float LockedIndicatorRedPulse = 0.08f;
+    constexpr float LockedIndicatorGreen = 0.001f;
+    constexpr float LockedIndicatorShininess = 24.0f;
+    const Color OpenIndicatorDiffuse(0.04f, 0.18f, 0.035f, 1.0f);
+    constexpr float OpenIndicatorRed = 0.015f;
+    constexpr float OpenIndicatorGreenBase = 0.16f;
+    constexpr float OpenIndicatorGreenPulse = 0.10f;
+    constexpr float OpenIndicatorBlue = 0.008f;
+    constexpr float OpenIndicatorShininess = 28.0f;
 }
 
 // 作るときに初期化している
@@ -258,9 +343,9 @@ void Stage2Scene::ReloadPropLayout()
     m_LayoutNoticeTimer = PropLayoutFile::LayoutSuccessNoticeSeconds;
 }
 
+// 1フレーム分の2面の進行。段階ごとの中身は、この下の関数に分けている
 void Stage2Scene::Update()
 {
-    Core::Game* game = Core::Game::GetInstance();
     Player* player = m_Objects.player;
     if (player == nullptr)
     {
@@ -282,37 +367,8 @@ void Stage2Scene::Update()
     player->SetSprintAllowed(
         m_FinalSequence.IsSequenceActive() || m_FinalSequence.IsPursuitActive());
 
-    // 最後のループで出口の扉を抜けたら（扉の中心はz=140）、扉の先の階段を自動で上らせている。
-    // 出口を扉の手前から調べたときも、同じように上らせる。上り切る頃に、出口の演出が3面へ移す
-    ExitTrigger* exit = m_Objects.exit;
-    if (exit != nullptr && exit->IsStairClimb())
+    if (UpdateExitEscape(*player))
     {
-        if (!exit->IsEscaping() && exit->IsInteractionEnabled() && player->CanControl() &&
-            player->GetPosition().z > Stage2StairAutoStartZ)
-        {
-            exit->BeginEscape(*player);
-        }
-        if (exit->IsEscaping() && !player->IsClimbingStairs())
-        {
-            StartExitStairClimb(*player);
-        }
-    }
-
-    // 出口から脱出している間は、追跡をやめ、影をすべて消して何もしない
-    if (exit != nullptr && exit->IsEscaping())
-    {
-        m_FinalSequence.StopPursuit();
-        ShadowMan* shadow = m_Objects.shadow;
-        if (shadow != nullptr)
-        {
-            shadow->SetActive(false);
-        }
-        ShadowMan* noiseShadow = m_Objects.noiseShadow;
-        if (noiseShadow != nullptr)
-        {
-            noiseShadow->SetActive(false);
-        }
-        m_Objects.presence->SetActive(false);
         return;
     }
 
@@ -329,105 +385,167 @@ void Stage2Scene::Update()
         return;
     }
 
-    // デバッグ画面から頼まれた操作（周回を進める・最後の停電・照明の演出）を実行している
-    if (m_PendingDebugAction.has_value())
+    RunPendingDebugAction(*player);
+    UpdateTimers(*player, deltaTime);
+
+    Door* corridorDoor = m_Objects.door;
+    UpdateGuidancePulse(corridorDoor);
+    UpdateProgression(*player);
+    UpdateAnomalies(*player, deltaTime);
+    UpdateLockers();
+    // 足音の危険度と背後の気配を更新している
+    UpdateNoiseThreat(*player, deltaTime);
+    UpdateBehindPresence(*player, deltaTime);
+    UpdateEmergencyCharger(*player);
+    UpdateEvidence(*player);
+
+    // 信号盤パズルと、その間に背後から来る影を更新している
+    UpdateSignalPuzzle();
+    UpdateSignalStalker();
+    UpdateConfirmationPanel(corridorDoor);
+    UpdateCorridorAtmosphere(*player, deltaTime);
+
+    // 演出の更新（影を見たときの照明・最後の追跡・最後の停電）
+    UpdateObservedScare(deltaTime);
+    UpdateFinalPursuit(deltaTime);
+    UpdateFinalSequence(deltaTime);
+    UpdateDoorIndicator(corridorDoor);
+
+    // 調べる対象を選び、Eキー（A）で調べている
+    m_InteractionSystem.Update(*player);
+}
+
+// 最後のループで出口の扉を抜けたら（扉の中心はz=140）、扉の先の階段を自動で上らせている。
+// 出口を扉の手前から調べたときも、同じように上らせる。上り切る頃に、出口の演出が3面へ移す。
+// 脱出している間は、追跡をやめ、影をすべて消して何もしない（そのときは true を返している）
+bool Stage2Scene::UpdateExitEscape(Player& player)
+{
+    ExitTrigger* exit = m_Objects.exit;
+    if (exit == nullptr)
     {
-        const SceneDebugAction debugAction = *m_PendingDebugAction;
-        m_PendingDebugAction.reset();
-        switch (debugAction)
+        return false;
+    }
+    if (exit->IsStairClimb())
+    {
+        if (!exit->IsEscaping() && exit->IsInteractionEnabled() && player.CanControl() &&
+            player.GetPosition().z > Stage2StairAutoStartZ)
         {
-        case SceneDebugAction::AdvanceProgression:
-            if (m_LoopCount < Stage2FinalLoopCount)
-            {
-                AdvanceLoop(*player);
-            }
-            break;
-        case SceneDebugAction::PlayFinalSequence:
-            while (m_LoopCount < Stage2FinalLoopCount)
-            {
-                AdvanceLoop(*player);
-            }
-            m_SignalPuzzle.ForceComplete();
-            m_FinalSequenceArmed = true;
-            if (!m_FinalSequence.IsSequenceActive())
-            {
-                StartFinalSequence();
-            }
-            break;
-        case SceneDebugAction::PlayLightingEvent:
-            StartObservedScare();
-            break;
-        case SceneDebugAction::ShowMirrorAnomaly:
-            // 異変を探す周回（1周目か2周目）にし、その周回の異変を鏡にしている。
-            // 周回を進める前に異変を決めておき、ほかの異変（偽の扉など）が出ないようにしている
-            if (m_LoopCount < 1)
-            {
-                m_AnomalyPlan.ForceLoop(1, Stage2Anomaly::Mirror);
-                AdvanceLoop(*player);
-            }
-            if (m_LoopCount <= Stage2AnomalyPlan::PlannedLoopCount)
-            {
-                m_AnomalyPlan.ForceLoop(m_LoopCount, Stage2Anomaly::Mirror);
-                m_MirrorAnomaly.ResetProgressForLoop();
-            }
-            break;
-        case SceneDebugAction::ShowPortraitAnomaly:
-            // 異変を探す周回にし、その周回の異変を肖像画にしている（鏡と同じく、周回を進める前に決めている）
-            if (m_LoopCount < 1)
-            {
-                m_AnomalyPlan.ForceLoop(1, Stage2Anomaly::Portrait);
-                AdvanceLoop(*player);
-            }
-            if (m_LoopCount <= Stage2AnomalyPlan::PlannedLoopCount)
-            {
-                m_AnomalyPlan.ForceLoop(m_LoopCount, Stage2Anomaly::Portrait);
-                m_PortraitAnomaly.ResetProgressForLoop();
-            }
-            break;
-        case SceneDebugAction::ShowFalseDoorAnomaly:
-            // 異変を探す周回にし、その周回の異変を偽の扉にして、左の壁に偽の扉を出している
-            if (m_LoopCount < 1)
-            {
-                m_AnomalyPlan.ForceLoop(1, Stage2Anomaly::FalseDoor);
-                AdvanceLoop(*player);
-            }
-            if (m_LoopCount <= Stage2AnomalyPlan::PlannedLoopCount)
-            {
-                m_AnomalyPlan.ForceLoop(m_LoopCount, Stage2Anomaly::FalseDoor);
-                m_FalseDoorAnomaly.ResetProgressForLoop();
-                SetFalseDoorState(true, false);
-            }
-            break;
-        case SceneDebugAction::ShowUnseenAnomaly:
-            // 異変を探す周回にし、その周回の異変を見えない影にしている（廊下の奥から歩き直させる）
-            if (m_LoopCount < 1)
-            {
-                m_AnomalyPlan.ForceLoop(1, Stage2Anomaly::Unseen);
-                AdvanceLoop(*player);
-            }
-            if (m_LoopCount <= Stage2AnomalyPlan::PlannedLoopCount)
-            {
-                m_AnomalyPlan.ForceLoop(m_LoopCount, Stage2Anomaly::Unseen);
-                m_UnseenPresence.ResetProgressForLoop();
-            }
-            break;
-        case SceneDebugAction::ShowPuddleAnomaly:
-            // 異変を探す周回にし、その周回の異変を水たまりにしている（鏡と同じく、周回を進める前に決めている）
-            if (m_LoopCount < 1)
-            {
-                m_AnomalyPlan.ForceLoop(1, Stage2Anomaly::Puddle);
-                AdvanceLoop(*player);
-            }
-            if (m_LoopCount <= Stage2AnomalyPlan::PlannedLoopCount)
-            {
-                m_AnomalyPlan.ForceLoop(m_LoopCount, Stage2Anomaly::Puddle);
-                m_PuddleAnomaly.ResetProgressForLoop();
-            }
-            break;
+            exit->BeginEscape(player);
+        }
+        if (exit->IsEscaping() && !player.IsClimbingStairs())
+        {
+            StartExitStairClimb(player);
         }
     }
+    if (!exit->IsEscaping())
+    {
+        return false;
+    }
 
-    // 周回の切り替えの演出は4.2秒で終えている
+    m_FinalSequence.StopPursuit();
+    ShadowMan* shadow = m_Objects.shadow;
+    if (shadow != nullptr)
+    {
+        shadow->SetActive(false);
+    }
+    ShadowMan* noiseShadow = m_Objects.noiseShadow;
+    if (noiseShadow != nullptr)
+    {
+        noiseShadow->SetActive(false);
+    }
+    m_Objects.presence->SetActive(false);
+    return true;
+}
+
+// 異変を探す周回（1周目か2周目）にし、その周回の異変を anomaly にしている。
+// 周回を進める前に異変を決めておき、ほかの異変が出ないようにしている。異変を決め直せたら true を返している
+bool Stage2Scene::ForceAnomalyLoop(Player& player, Stage2Anomaly anomaly)
+{
+    if (m_LoopCount < 1)
+    {
+        m_AnomalyPlan.ForceLoop(1, anomaly);
+        AdvanceLoop(player);
+    }
+    if (m_LoopCount > Stage2AnomalyPlan::PlannedLoopCount)
+    {
+        return false;
+    }
+    m_AnomalyPlan.ForceLoop(m_LoopCount, anomaly);
+    return true;
+}
+
+// デバッグ画面から頼まれた操作（周回を進める・最後の停電・照明の演出・異変を出す）を実行している
+void Stage2Scene::RunPendingDebugAction(Player& player)
+{
+    if (!m_PendingDebugAction.has_value())
+    {
+        return;
+    }
+    const SceneDebugAction debugAction = *m_PendingDebugAction;
+    m_PendingDebugAction.reset();
+    switch (debugAction)
+    {
+    case SceneDebugAction::AdvanceProgression:
+        if (m_LoopCount < Stage2FinalLoopCount)
+        {
+            AdvanceLoop(player);
+        }
+        break;
+    case SceneDebugAction::PlayFinalSequence:
+        while (m_LoopCount < Stage2FinalLoopCount)
+        {
+            AdvanceLoop(player);
+        }
+        m_SignalPuzzle.ForceComplete();
+        m_FinalSequenceArmed = true;
+        if (!m_FinalSequence.IsSequenceActive())
+        {
+            StartFinalSequence();
+        }
+        break;
+    case SceneDebugAction::PlayLightingEvent:
+        StartObservedScare();
+        break;
+    case SceneDebugAction::ShowMirrorAnomaly:
+        if (ForceAnomalyLoop(player, Stage2Anomaly::Mirror))
+        {
+            m_MirrorAnomaly.ResetProgressForLoop();
+        }
+        break;
+    case SceneDebugAction::ShowPortraitAnomaly:
+        if (ForceAnomalyLoop(player, Stage2Anomaly::Portrait))
+        {
+            m_PortraitAnomaly.ResetProgressForLoop();
+        }
+        break;
+    case SceneDebugAction::ShowFalseDoorAnomaly:
+        // 偽の扉は、左の壁に出し直している
+        if (ForceAnomalyLoop(player, Stage2Anomaly::FalseDoor))
+        {
+            m_FalseDoorAnomaly.ResetProgressForLoop();
+            SetFalseDoorState(true, false);
+        }
+        break;
+    case SceneDebugAction::ShowUnseenAnomaly:
+        // 見えない影は、廊下の奥から歩き直させている
+        if (ForceAnomalyLoop(player, Stage2Anomaly::Unseen))
+        {
+            m_UnseenPresence.ResetProgressForLoop();
+        }
+        break;
+    case SceneDebugAction::ShowPuddleAnomaly:
+        if (ForceAnomalyLoop(player, Stage2Anomaly::Puddle))
+        {
+            m_PuddleAnomaly.ResetProgressForLoop();
+        }
+        break;
+    }
+}
+
+// 周回の切り替えの演出・ヒント・知らせ・各タイマーを進め、心拍と呼吸を更新している
+void Stage2Scene::UpdateTimers(Player& player, float deltaTime)
+{
+    // 周回の切り替えの演出は Stage2LoopTransitionSeconds で終えている
     m_VisualTimer += deltaTime;
     if (m_LoopTransitionTimer >= 0.0f)
     {
@@ -443,7 +561,7 @@ void Stage2Scene::Update()
         Input::GetButtonTrigger(XINPUT_LEFT_SHOULDER))
     {
         m_ProgressHintTimer = (std::max)(m_ProgressHintTimer, Stage2RequestedHintSeconds);
-        Input::SetVibration(2, 0.04f);
+        EventFeedback::Rumble(HintRequestRumble);
     }
 
     // 各タイマーと知らせの残り時間を減らし、心拍・呼吸を更新している
@@ -458,7 +576,7 @@ void Stage2Scene::Update()
     m_ClockAnomaly.UpdateNoticeTimer(deltaTime);
     m_PuzzleFeedback.Update(deltaTime);
     m_NoiseThreatSystem.UpdateTimers(deltaTime);
-    UpdateTensionPulse(*player, deltaTime);
+    UpdateTensionPulse(player, deltaTime);
 
     // 水たまりの上の足音は、濡れた床（Ground）の判定で Player が水音にしている（水たまりの反射・波も1面と同じ）
     m_LoopBlinkTimer =
@@ -466,66 +584,79 @@ void Stage2Scene::Update()
     m_FinalSequence.UpdateCountdowns(deltaTime);
     m_GuidancePulseCooldown = (std::max)(
         0.0f, m_GuidancePulseCooldown - deltaTime);
+}
 
-    Door* corridorDoor = m_Objects.door;
-    if (corridorDoor != nullptr && corridorDoor->IsLocked() &&
-        m_ProgressHintTimer >= Stage2GuidanceHintSeconds &&
-        m_GuidancePulseCooldown <= 0.0f)
+// しばらく進めていないとき、探すべき異変の近くの照明を揺らしている（偽の扉は奥寄り、時計と肖像画は中央付近、
+// ノックは音の出どころの近く、血の手形は最後に現れた手形の近く、鏡は鏡の真上、見えない影はその影の真上、水たまりは中央の水たまりの真上）。
+void Stage2Scene::UpdateGuidancePulse(Door* corridorDoor)
+{
+    if (corridorDoor == nullptr || !corridorDoor->IsLocked() ||
+        m_ProgressHintTimer < Stage2GuidanceHintSeconds ||
+        m_GuidancePulseCooldown > 0.0f)
     {
-        // しばらく進めていないとき、探すべき異変の近くの照明を揺らしている（偽の扉は奥寄り、時計と肖像画は中央付近、
-        // ノックは音の出どころの近く、血の手形は最後に現れた手形の近く、鏡は鏡の真上、見えない影はその影の真上、水たまりは中央の水たまりの真上）。
-        const Stage2Anomaly requiredAnomaly = m_AnomalyPlan.GetRequired(m_LoopCount);
-        CeilingLight* guideLight = m_Objects.Light(
-            requiredAnomaly == Stage2Anomaly::FalseDoor ? Stage2Light::Light3 :
-            requiredAnomaly == Stage2Anomaly::Mirror ? Stage2NearestLight(MirrorAnomaly::CenterZ) :
-            requiredAnomaly == Stage2Anomaly::Puddle ? Stage2NearestLight(PuddleReflectionAnomaly::PuddleCenterZ) :
-            requiredAnomaly == Stage2Anomaly::Handprint
-                ? Stage2NearestLight(m_HandprintAnomaly.GetLatestPosition().z) :
-            requiredAnomaly == Stage2Anomaly::Knocking
-                ? Stage2NearestLight(GetKnockListenPoint().z) :
-            requiredAnomaly == Stage2Anomaly::Unseen
-                ? Stage2NearestLight(m_UnseenPresence.GetPosition().z)
-                : Stage2Light::Light2);
-        if (guideLight != nullptr)
-        {
-            guideLight->TriggerEventFlicker(0.72f, 0.58f);
-        }
-        game->GetPostProcess()->TriggerBloomPulse(0.30f, 0.16f);
-        m_GuidancePulseCooldown = Stage2GuidancePulseInterval;
+        return;
     }
+    const Stage2Anomaly requiredAnomaly = m_AnomalyPlan.GetRequired(m_LoopCount);
+    CeilingLight* guideLight = m_Objects.Light(
+        requiredAnomaly == Stage2Anomaly::FalseDoor ? Stage2Light::Light3 :
+        requiredAnomaly == Stage2Anomaly::Mirror ? Stage2NearestLight(MirrorAnomaly::CenterZ) :
+        requiredAnomaly == Stage2Anomaly::Puddle ? Stage2NearestLight(PuddleReflectionAnomaly::PuddleCenterZ) :
+        requiredAnomaly == Stage2Anomaly::Handprint
+            ? Stage2NearestLight(m_HandprintAnomaly.GetLatestPosition().z) :
+        requiredAnomaly == Stage2Anomaly::Knocking
+            ? Stage2NearestLight(GetKnockListenPoint().z) :
+        requiredAnomaly == Stage2Anomaly::Unseen
+            ? Stage2NearestLight(m_UnseenPresence.GetPosition().z)
+            : Stage2Light::Light2);
+    if (guideLight != nullptr)
+    {
+        EventFeedback::Flicker(*guideLight, GuidanceFlicker);
+    }
+    EventFeedback::BloomPulse(*Core::Game::GetInstance()->GetPostProcess(), GuidanceBloom);
+    m_GuidancePulseCooldown = Stage2GuidancePulseInterval;
+}
 
+// 廊下の扉を開けて通った後に周回を進め、信号盤が直って準備ができていれば、廊下の中央まで来たときに最後の停電を始めている
+void Stage2Scene::UpdateProgression(Player& player)
+{
     if (m_LoopCount < Stage2FinalLoopCount && m_LoopCooldown <= 0.0f &&
-        // プレイヤーが廊下の扉を開けて通った後だけ、周回の状態を変えている。
         // 扉の中心の座標はz=140。
-        player->GetPosition().z > Stage2LoopDoorPassZ)
+        player.GetPosition().z > Stage2LoopDoorPassZ)
     {
-        AdvanceLoop(*player);
+        AdvanceLoop(player);
     }
 
-    // 信号盤が直り、準備ができていれば、廊下の中央（z>-8）まで来たときに最後の停電を始めている
     if (m_SignalPuzzle.IsComplete() && m_FinalSequenceArmed &&
         !m_FinalSequence.IsSequenceActive() &&
-        player->GetPosition().z > Stage2FinalSequenceStartZ)
+        player.GetPosition().z > Stage2FinalSequenceStartZ)
     {
         StartFinalSequence();
     }
-    // 照明の区画・各異変・時計を更新している
-    UpdateLightZones(*player);
-    UpdateScratchMessage(*player, deltaTime);
-    UpdatePortraitAnomaly(*player, deltaTime);
+}
+
+// 照明の区画・各異変・時計を更新している
+void Stage2Scene::UpdateAnomalies(Player& player, float deltaTime)
+{
+    UpdateLightZones(player);
+    UpdateScratchMessage(player, deltaTime);
+    UpdatePortraitAnomaly(player, deltaTime);
     UpdatePortraitEyes(deltaTime);
-    UpdateHandprintAnomaly(*player, deltaTime);
-    UpdateMirrorAnomaly(*player, deltaTime);
-    UpdatePuddleAnomaly(*player, deltaTime);
-    UpdateFootprintFollower(*player, deltaTime);
+    UpdateHandprintAnomaly(player, deltaTime);
+    UpdateMirrorAnomaly(player, deltaTime);
+    UpdatePuddleAnomaly(player, deltaTime);
+    UpdateFootprintFollower(player, deltaTime);
     // ロッカーの中では、扉越しに聞こえるよう、すべての位置付きの音をこもらせている
-    Core::Game::GetInstance()->SetListenerMuffle(player->IsHiding() ? 0.45f : 0.0f);
-    UpdateKnockingAnomaly(*player, deltaTime);
-    UpdateUnseenPresence(*player, deltaTime);
-    UpdateFalseDoorAnomaly(*player);
+    Core::Game::GetInstance()->SetListenerMuffle(player.IsHiding() ? LockerListenerMuffle : 0.0f);
+    UpdateKnockingAnomaly(player, deltaTime);
+    UpdateUnseenPresence(player, deltaTime);
+    UpdateFalseDoorAnomaly(player);
     UpdateClock(deltaTime);
     UpdateClockObservation();
-    // ロッカーは周回中だけ使える（信号盤パズルと最後の追跡では、隠れずに対処させるため）。
+}
+
+// ロッカーは周回中だけ使える（信号盤パズルと最後の追跡では、隠れずに対処させるため）。
+void Stage2Scene::UpdateLockers()
+{
     const bool lockersUsable = m_LoopCount < Stage2FinalLoopCount &&
         !m_FinalSequence.IsSequenceActive() && !m_FinalSequence.IsPursuitActive();
     for (Locker* locker : m_Objects.lockers)
@@ -535,102 +666,107 @@ void Stage2Scene::Update()
             locker->SetUsable(lockersUsable);
         }
     }
-    // 足音の危険度と背後の気配を更新している
-    UpdateNoiseThreat(*player, deltaTime);
-    UpdateBehindPresence(*player, deltaTime);
+}
 
-    // 非常用充電器を使ったら、電池を回復する代わりに、音で危険度を大きく上げている
-    FuseBox* emergencyCharger =
-        m_Objects.emergencyCharger;
-    if (!m_ChargerHandled && emergencyCharger != nullptr &&
-        emergencyCharger->IsActivated())
+// 非常用充電器を使ったら、電池を回復する代わりに、音で危険度を大きく上げている
+void Stage2Scene::UpdateEmergencyCharger(Player& player)
+{
+    FuseBox* emergencyCharger = m_Objects.emergencyCharger;
+    if (m_ChargerHandled || emergencyCharger == nullptr || !emergencyCharger->IsActivated())
     {
-        m_ChargerHandled = true;
-        m_Notices.charger = Stage2NoticeSeconds;
-        m_NoiseThreatSystem.SetWarningTimer(Stage2ChargerWarningSeconds);
-        m_NoiseThreatSystem.SetThreat((std::max)(
-            m_NoiseThreatSystem.GetThreat(), Stage2ChargerThreat));
-        m_NoiseThreatSystem.SetEventCooldown(Stage2ChargerEventCooldown);
-        player->AddBattery(Stage2ChargerBattery);
-        game->RegisterChargerUsed();
-
-        CeilingLight* startLight =
-            m_Objects.Light(Stage2Light::Light1);
-        if (startLight != nullptr)
-        {
-            startLight->TriggerEventFlicker(1.10f, 0.88f);
-        }
-        game->GetPostProcess()->TriggerHorrorPulse(0.28f, 0.30f);
-        Input::SetVibration(7, 0.16f);
+        return;
     }
+    Core::Game* game = Core::Game::GetInstance();
+    m_ChargerHandled = true;
+    m_Notices.charger = Stage2NoticeSeconds;
+    m_NoiseThreatSystem.SetWarningTimer(Stage2ChargerWarningSeconds);
+    m_NoiseThreatSystem.SetThreat((std::max)(
+        m_NoiseThreatSystem.GetThreat(), Stage2ChargerThreat));
+    m_NoiseThreatSystem.SetEventCooldown(Stage2ChargerEventCooldown);
+    player.AddBattery(Stage2ChargerBattery);
+    game->RegisterChargerUsed();
 
-    // 残された記録を回収したら、電池を少し回復し、危険度を下げ、目印を緑に変えている
-    for (int evidenceIndex = 0; evidenceIndex < 2; ++evidenceIndex)
+    CeilingLight* startLight = m_Objects.Light(Stage2Light::Light1);
+    if (startLight != nullptr)
+    {
+        EventFeedback::Flicker(*startLight, ChargerFlicker);
+    }
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), ChargerPulse);
+    EventFeedback::Rumble(ChargerRumble);
+}
+
+// 残された記録を回収したら、電池を少し回復し、危険度を下げ、目印を緑に変えている
+void Stage2Scene::UpdateEvidence(Player& player)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    for (std::size_t evidenceIndex = 0; evidenceIndex < m_Objects.evidenceTerminals.size(); ++evidenceIndex)
     {
         FuseBox* evidence = m_Objects.evidenceTerminals[evidenceIndex];
-        if (!m_EvidenceHandled[evidenceIndex] && evidence != nullptr &&
-            evidence->IsActivated())
+        if (m_EvidenceHandled[evidenceIndex] || evidence == nullptr || !evidence->IsActivated())
         {
-            m_EvidenceHandled[evidenceIndex] = true;
-            m_Notices.evidence = Stage2ImportantNoticeSeconds;
-            game->RegisterEvidenceCollected();
-            player->AddBattery(Stage2EvidenceBattery);
-            m_NoiseThreatSystem.SetThreat((std::max)(
-                0.0f, m_NoiseThreatSystem.GetThreat() - Stage2EvidenceThreatRelief));
-            Wall* marker = m_Objects.evidenceMarkers[evidenceIndex];
-            if (marker != nullptr)
-            {
-                marker->SetAppearance(
-                    Color(0.06f, 0.14f, 0.08f, 1.0f),
-                    Color(0.08f, 0.30f, 0.12f, 1.0f),
-                    44.0f);
-            }
-            game->GetPostProcess()->TriggerBloomPulse(0.38f, 0.18f);
-            Input::SetVibration(4, 0.08f);
+            continue;
         }
+        m_EvidenceHandled[evidenceIndex] = true;
+        m_Notices.evidence = Stage2ImportantNoticeSeconds;
+        game->RegisterEvidenceCollected();
+        player.AddBattery(Stage2EvidenceBattery);
+        m_NoiseThreatSystem.SetThreat((std::max)(
+            0.0f, m_NoiseThreatSystem.GetThreat() - Stage2EvidenceThreatRelief));
+        Wall* marker = m_Objects.evidenceMarkers[evidenceIndex];
+        if (marker != nullptr)
+        {
+            marker->SetAppearance(EvidenceCollectedDiffuse, EvidenceCollectedEmission, EvidenceCollectedShininess);
+        }
+        EventFeedback::BloomPulse(*game->GetPostProcess(), EvidenceBloom);
+        EventFeedback::Rumble(EvidenceRumble);
     }
+}
 
-    // 信号盤パズルと、その間に背後から来る影を更新している
-    UpdateSignalPuzzle();
-    UpdateSignalStalker();
-
-    // この周回の異変を見つけたら、異常確認のスイッチを押せるようにし、押したら扉の鍵を外している
-    FuseBox* confirmationPanel =
-        m_Objects.confirmationPanel;
-    const bool evidenceConfirmed = IsRequiredAnomalyFound();
-    if (confirmationPanel != nullptr)
+// この周回の異変を見つけたら、異常確認のスイッチを押せるようにし、押したら扉の鍵を外している
+void Stage2Scene::UpdateConfirmationPanel(Door* corridorDoor)
+{
+    FuseBox* confirmationPanel = m_Objects.confirmationPanel;
+    if (confirmationPanel == nullptr)
     {
-        confirmationPanel->SetManualInteractionAllowed(evidenceConfirmed);
-        if (evidenceConfirmed && confirmationPanel->IsActivated() &&
-            !m_ConfirmationHandledThisLoop)
-        {
-            m_ConfirmationHandledThisLoop = true;
-            game->RegisterAnomalyHandled();
-            m_Notices.loop = Stage2NoticeSeconds;
-            m_FalseDoorAnomaly.ClearNotice();
-            m_ClockAnomaly.ClearNotice();
-            m_ProgressHintTimer = 0.0f;
-            if (corridorDoor != nullptr)
-            {
-                corridorDoor->SetLocked(false);
-            }
-
-            CeilingLight* doorLight =
-                m_Objects.Light(Stage2Light::DoorLight);
-            if (doorLight != nullptr)
-            {
-                doorLight->TriggerEventFlicker(0.90f, 0.78f);
-            }
-            game->GetPostProcess()->TriggerBloomPulse(0.76f, 0.28f);
-            Input::SetVibration(7, 0.16f);
-        }
+        return;
+    }
+    const bool evidenceConfirmed = IsRequiredAnomalyFound();
+    confirmationPanel->SetManualInteractionAllowed(evidenceConfirmed);
+    if (!evidenceConfirmed || !confirmationPanel->IsActivated() || m_ConfirmationHandledThisLoop)
+    {
+        return;
+    }
+    Core::Game* game = Core::Game::GetInstance();
+    m_ConfirmationHandledThisLoop = true;
+    game->RegisterAnomalyHandled();
+    m_Notices.loop = Stage2NoticeSeconds;
+    m_FalseDoorAnomaly.ClearNotice();
+    m_ClockAnomaly.ClearNotice();
+    m_ProgressHintTimer = 0.0f;
+    if (corridorDoor != nullptr)
+    {
+        corridorDoor->SetLocked(false);
     }
 
-    // 画面効果を、周回の進み具合・近くの照明の明るさ・危険度に合わせて変えている
+    CeilingLight* doorLight = m_Objects.Light(Stage2Light::DoorLight);
+    if (doorLight != nullptr)
+    {
+        EventFeedback::Flicker(*doorLight, ConfirmationFlicker);
+    }
+    EventFeedback::BloomPulse(*game->GetPostProcess(), ConfirmationBloom);
+    EventFeedback::Rumble(ConfirmationRumble);
+}
+
+// 画面効果を、周回の進み具合・近くの照明の明るさ・危険度に合わせて変えている
+void Stage2Scene::UpdateCorridorAtmosphere(Player& player, float deltaTime)
+{
+    Core::Game* game = Core::Game::GetInstance();
     const float loopRate = static_cast<float>(m_LoopCount) / static_cast<float>(Stage2FinalLoopCount);
+    const float threat = m_NoiseThreatSystem.GetThreat();
     // P.T. のように、周回が進むほど廊下の色調を赤黒く沈め、霧を濃くしている（扉を抜けた直後の暗転の間に、約1秒で変わる）
-    m_LoopDepth += (loopRate - m_LoopDepth) * (std::min)(deltaTime * 2.5f, 1.0f);
+    m_LoopDepth += (loopRate - m_LoopDepth) * (std::min)(deltaTime * LoopDepthFollowSpeed, 1.0f);
     Renderer::SetLoopDepth(m_LoopDepth);
+    // 一番明るく照らしている近くの照明（廊下の向きの距離で弱める）から、今いる所の暗さを求めている
     float localFixtureLight = 0.0f;
     for (CeilingLight* fixture : m_Objects.lights)
     {
@@ -640,89 +776,77 @@ void Stage2Scene::Update()
         }
 
         const float longitudinalDistance = std::fabs(
-            fixture->GetPosition().z - player->GetPosition().z);
+            fixture->GetPosition().z - player.GetPosition().z);
         const float proximity = 1.0f - (std::min)(
-            longitudinalDistance / 105.0f, 1.0f);
+            longitudinalDistance / FixtureLightReach, 1.0f);
         localFixtureLight = (std::max)(
             localFixtureLight,
             fixture->GetBrightness() * proximity);
     }
     const float localDarkness =
         1.0f - (std::clamp)(localFixtureLight, 0.0f, 1.0f);
-    const float pulse = std::sin(m_VisualTimer * 1.7f) * 0.025f;
+    const float pulse = std::sin(m_VisualTimer * TensionPulseSpeed) * TensionPulseAmount;
     game->GetPostProcess()->SetCorridorTension(
-        (std::clamp)(0.38f + loopRate * 0.42f +
-            m_NoiseThreatSystem.GetThreat() * 0.14f + pulse, 0.0f, 0.92f));
+        (std::clamp)(TensionBase + loopRate * TensionPerLoop +
+            threat * TensionPerThreat + pulse, 0.0f, TensionMax));
     game->GetPostProcess()->SetAtmosphere(
-        0.20f + loopRate * 0.10f + localDarkness * 0.018f +
-            m_NoiseThreatSystem.GetThreat() * 0.025f,
-        0.62f + loopRate * 0.12f + localDarkness * 0.035f +
-            m_NoiseThreatSystem.GetThreat() * 0.045f);
+        NoiseBase + loopRate * NoisePerLoop + localDarkness * NoisePerDarkness + threat * NoisePerThreat,
+        VignetteBase + loopRate * VignettePerLoop + localDarkness * VignettePerDarkness + threat * VignettePerThreat);
     // ライトを消しているときと暗い場所では、目が慣れたように露出を上げている
-    const float adaptedExposure = player->IsFlashlightOn()
-        ? 1.00f + localDarkness * 0.035f
-        : 1.055f + localDarkness * 0.090f;
+    const float adaptedExposure = player.IsFlashlightOn()
+        ? FlashlightOnExposure + localDarkness * FlashlightOnExposurePerDarkness
+        : FlashlightOffExposure + localDarkness * FlashlightOffExposurePerDarkness;
     game->GetPostProcess()->SetExposure(adaptedExposure);
-    game->GetPostProcess()->SetLensDistortionStrength(
-        0.20f + loopRate * 0.34f);
-    game->GetPostProcess()->SetFilmGradeStrength(
-        0.58f + loopRate * 0.20f);
-    game->GetPostProcess()->SetLensDirtStrength(
-        0.14f + loopRate * 0.08f);
+    game->GetPostProcess()->SetLensDistortionStrength(DistortionBase + loopRate * DistortionPerLoop);
+    game->GetPostProcess()->SetFilmGradeStrength(FilmGradeBase + loopRate * FilmGradePerLoop);
+    game->GetPostProcess()->SetLensDirtStrength(LensDirtBase + loopRate * LensDirtPerLoop);
     // 信号盤パズルの間と、足音の影が近いときは、監視映像のような信号の乱れを出している
     const bool signalRestorationActive =
         m_LoopCount >= Stage2FinalLoopCount && !m_SignalPuzzle.IsComplete();
     const float unresolvedSignalRate =
-        1.0f - static_cast<float>(m_SignalPuzzle.GetStep()) / 3.0f;
-    ShadowMan* activeNoiseShadow =
-        m_Objects.noiseShadow;
+        1.0f - static_cast<float>(m_SignalPuzzle.GetStep()) / static_cast<float>(SignalTerminalTotal);
+    ShadowMan* activeNoiseShadow = m_Objects.noiseShadow;
     const float stalkerInterference =
         activeNoiseShadow != nullptr && activeNoiseShadow->IsActive()
-            ? (std::clamp)((m_NoiseThreatSystem.GetThreat() - 0.52f) * 0.72f,
-                0.0f, 0.30f)
+            ? (std::clamp)((threat - StalkerInterferenceStartThreat) * StalkerInterferencePerThreat,
+                0.0f, StalkerInterferenceMax)
             : 0.0f;
     game->GetPostProcess()->SetSignalInterference(
         signalRestorationActive
-            ? (std::clamp)(0.10f + m_NoiseThreatSystem.GetThreat() * 0.62f +
-                unresolvedSignalRate * 0.16f, 0.0f, 0.88f)
+            ? (std::clamp)(SignalInterferenceBase + threat * SignalInterferencePerThreat +
+                unresolvedSignalRate * SignalInterferenceUnresolved, 0.0f, SignalInterferenceMax)
             : stalkerInterference);
-    game->GetPostProcess()->SetVolumetricLight(player->IsFlashlightOn());
+    game->GetPostProcess()->SetVolumetricLight(player.IsFlashlightOn());
     game->GetPostProcess()->SetVolumetricIntensity(
-        0.38f + loopRate * 0.20f + localDarkness * 0.055f);
-    // 演出の更新（影を見たときの照明・最後の追跡・最後の停電）
-    UpdateObservedScare(deltaTime);
-    UpdateFinalPursuit(deltaTime);
-    UpdateFinalSequence(deltaTime);
-
-    // 扉のランプ：鍵がかかっている間は赤く、外れたら緑でゆっくり点滅させている
-    Wall* doorIndicator = m_Objects.doorIndicator;
-    if (doorIndicator != nullptr && !m_FinalDoorReady)
-    {
-        const bool locked = corridorDoor != nullptr && corridorDoor->IsLocked();
-        const float indicatorPulse = std::sin(
-            m_VisualTimer * (locked ? 3.4f : 6.2f)) * 0.5f + 0.5f;
-        if (locked)
-        {
-            doorIndicator->SetAppearance(
-                Color(0.24f, 0.012f, 0.008f, 1.0f),
-                Color(0.13f + indicatorPulse * 0.08f,
-                    0.001f, 0.0f, 1.0f), 24.0f);
-        }
-        else
-        {
-            doorIndicator->SetAppearance(
-                Color(0.04f, 0.18f, 0.035f, 1.0f),
-                Color(0.015f, 0.16f + indicatorPulse * 0.10f,
-                    0.008f, 1.0f), 28.0f);
-        }
-    }
-
-    // 調べる対象を選び、Eキー（A）で調べている
-    m_InteractionSystem.Update(*player);
+        VolumetricBase + loopRate * VolumetricPerLoop + localDarkness * VolumetricPerDarkness);
 }
 
-
-
+// 扉のランプ：鍵がかかっている間は赤く、外れたら緑でゆっくり点滅させている
+void Stage2Scene::UpdateDoorIndicator(Door* corridorDoor)
+{
+    Wall* doorIndicator = m_Objects.doorIndicator;
+    if (doorIndicator == nullptr || m_FinalDoorReady)
+    {
+        return;
+    }
+    const bool locked = corridorDoor != nullptr && corridorDoor->IsLocked();
+    const float indicatorPulse = std::sin(
+        m_VisualTimer * (locked ? LockedIndicatorPulseSpeed : OpenIndicatorPulseSpeed)) * 0.5f + 0.5f;
+    if (locked)
+    {
+        doorIndicator->SetAppearance(
+            LockedIndicatorDiffuse,
+            Color(LockedIndicatorRedBase + indicatorPulse * LockedIndicatorRedPulse,
+                LockedIndicatorGreen, 0.0f, 1.0f), LockedIndicatorShininess);
+    }
+    else
+    {
+        doorIndicator->SetAppearance(
+            OpenIndicatorDiffuse,
+            Color(OpenIndicatorRed, OpenIndicatorGreenBase + indicatorPulse * OpenIndicatorGreenPulse,
+                OpenIndicatorBlue, 1.0f), OpenIndicatorShininess);
+    }
+}
 
 // 画面効果を普段の値に戻し、配置で作ったObjectを破棄している
 void Stage2Scene::Uninit()

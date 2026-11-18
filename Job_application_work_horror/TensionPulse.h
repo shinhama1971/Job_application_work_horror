@@ -11,6 +11,7 @@
 #pragma once
 
 #include <algorithm>
+#include "MathUtility.h"
 
 class TensionPulse final
 {
@@ -57,12 +58,6 @@ private:
     bool m_WasBreathAudible = false;
     bool m_WasHiding = false;
 
-    // edge0〜edge1の間でなめらかに0から1へ変わる値を返している
-    static float SmoothStep(float edge0, float edge1, float value) noexcept
-    {
-        const float t = (std::clamp)((value - edge0) / (edge1 - edge0), 0.0f, 1.0f);
-        return t * t * (3.0f - 2.0f * t);
-    }
 
 public:
     // 最初の状態に戻している
@@ -103,7 +98,7 @@ public:
             {
                 m_BeatTimer += 60.0f / GetBeatsPerMinute();
                 m_BeatTimer = (std::max)(m_BeatTimer, 0.05f);
-                const float loudness = SmoothStep(HeartAudibleLevel, HeartFullVolumeLevel, m_Level);
+                const float loudness = MathUtility::SmoothStep(HeartAudibleLevel, HeartFullVolumeLevel, m_Level);
                 output.beat = true;
                 // 隠れている間は周りが静かな分、自分の心拍を少し大きく聞かせている。
                 output.beatVolume = (0.30f + 0.70f * loudness) * (hiding ? 1.15f : 1.0f);
@@ -118,7 +113,7 @@ public:
         }
 
         // 呼吸。隠れている間は「息を殺す」ため、緊張度に関係なく小さくゆっくりにしている。
-        const float heavy = SmoothStep(BreathAudibleLevel, 0.85f, m_Level);
+        const float heavy = MathUtility::SmoothStep(BreathAudibleLevel, 0.85f, m_Level);
         const bool breathAudible = hiding || m_Level >= BreathAudibleLevel;
         m_BreathElapsed += (std::max)(deltaTime, 0.0f);
         if (hiding && !m_WasHiding)

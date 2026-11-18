@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "ForestGrass.h"
+#include "MathUtility.h"
 
 #include "Application.h"
 #include "Camera.h"
@@ -143,8 +144,8 @@ namespace
         const float cellY = std::floor(y);
         float blendX = x - cellX;
         float blendY = y - cellY;
-        blendX = blendX * blendX * (3.0f - 2.0f * blendX);
-        blendY = blendY * blendY * (3.0f - 2.0f * blendY);
+        blendX = MathUtility::SmoothCurve(blendX);
+        blendY = MathUtility::SmoothCurve(blendY);
         const float a = Hash21(cellX, cellY);
         const float b = Hash21(cellX + 1.0f, cellY);
         const float c = Hash21(cellX, cellY + 1.0f);
@@ -154,11 +155,6 @@ namespace
         return top + (bottom - top) * blendY;
     }
 
-    float SmoothStep(float edge0, float edge1, float value)
-    {
-        const float t = std::clamp((value - edge0) / (edge1 - edge0), 0.0f, 1.0f);
-        return t * t * (3.0f - 2.0f * t);
-    }
 
     // 上から見た、葉を生やさない長方形（当たり判定のある物の足元。回っている物は向きも使っている）
     struct Footprint
@@ -331,8 +327,8 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
                 ValueNoise(x * 0.07f - 11.0f, z * 0.07f + 5.0f) * 0.35f;
             // 小道の上は踏まれて生えず、縁は短くまばらにしている
             const float pathDistance = std::fabs(x - GetPathCenterX(z));
-            const float pathFade = SmoothStep(PathBareWidth, PathFullWidth, pathDistance);
-            const float keep = SmoothStep(ClumpKeepStart, ClumpKeepEnd, clump) * pathFade;
+            const float pathFade = MathUtility::SmoothStep(PathBareWidth, PathFullWidth, pathDistance);
+            const float keep = MathUtility::SmoothStep(ClumpKeepStart, ClumpKeepEnd, clump) * pathFade;
             if (unit(random) > keep)
             {
                 continue;
@@ -361,7 +357,7 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
             Blade blade{};
             blade.Root = Vector3(x, groundY, z);
             // 高さ：群れの濃い所ほど高い（膝より少し下まで）。小道の縁は短い
-            const float tall = SmoothStep(ClumpTallStart, ClumpTallEnd, clump);
+            const float tall = MathUtility::SmoothStep(ClumpTallStart, ClumpTallEnd, clump);
             blade.Height = (BladeMinHeight + tall * BladeTallExtra) * (0.65f + unit(random) * 0.6f) * (0.55f + pathFade * 0.45f);
             const float angle = unit(random) * DirectX::XM_2PI;
             blade.Facing = Vector2(std::cos(angle), std::sin(angle));
@@ -628,7 +624,7 @@ void ForestGrass::Draw(Camera* camera)
         }
         else if (nearestDistance > NearDistance)
         {
-            fraction = 1.0f - MiddleBladeReduction * SmoothStep(NearDistance, MiddleDistance, nearestDistance);
+            fraction = 1.0f - MiddleBladeReduction * MathUtility::SmoothStep(NearDistance, MiddleDistance, nearestDistance);
             segments = MiddleSegments;
             lodLevel = 2;
         }

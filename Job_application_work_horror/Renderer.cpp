@@ -49,6 +49,30 @@ namespace
 		}
 		return nullptr;
 	}
+
+	// --- スワップチェーン：フリップ方式で使うバックバッファの数（古いWindowsの BitBlt 方式では1枚）、望むリフレッシュレート
+	constexpr UINT FlipBackBufferCount = 2;
+	constexpr UINT BitBltBackBufferCount = 1;
+	constexpr UINT PreferredRefreshRate = 60;
+	// --- いつも使うサンプラー（異方性フィルタリングの倍率と、ピクセルシェーダーの番号 s0）
+	constexpr UINT DefaultMaxAnisotropy = 4;
+	constexpr UINT DefaultSamplerSlot = 0;
+	// --- 定数バッファの番号（シェーダーの b0〜b7。common.hlsl と同じ）
+	constexpr UINT WorldBufferSlot = 0;
+	constexpr UINT ViewBufferSlot = 1;
+	constexpr UINT ProjectionBufferSlot = 2;
+	constexpr UINT LightBufferSlot = 3;
+	constexpr UINT MaterialBufferSlot = 4;
+	constexpr UINT TextureBufferSlot = 5;
+	constexpr UINT DebugViewBufferSlot = 7;
+	// --- ライトの初期値（Player が最初のフレームから上書きするので、作った直後の一瞬だけ使う）
+	constexpr float InitialLightIntensity = 1.6f;
+	constexpr float InitialLightRange = 260.0f;
+	const Color InitialLightDiffuse(1.4f, 1.25f, 1.0f, 1.0f);
+	const Color InitialLightAmbient(0.055f, 0.055f, 0.065f, 1.0f);
+	constexpr float InitialLightInnerConeDegrees = 16.0f;
+	constexpr float InitialLightOuterConeDegrees = 32.0f;
+	constexpr float InitialLightConeFalloff = 1.35f;
 }
 
 // 描画に使うGPUが内蔵GPUかを、専用のビデオメモリの量で判定している
@@ -117,28 +141,46 @@ Microsoft::WRL::ComPtr<ID3D11BlendState>
 
 
 //--------------------------------------------------------------------------------------
-// 初期化処理：デバイス・スワップチェーン・描画の状態・定数バッファを作っている
+// 初期化処理：デバイス・スワップチェーン・描画の状態・定数バッファを、この順に作っている
 //--------------------------------------------------------------------------------------
 HRESULT Renderer::Init()
 {
-	HRESULT hr = S_OK;
+    HRESULT hr = CreateDeviceAndSwapChain();
+    if (FAILED(hr)) return hr;
 
-	// デバイスとスワップチェーンの設定
-	DXGI_SWAP_CHAIN_DESC swapChainDesc{};
-	// フリップ方式（FLIP_DISCARD）でバックバッファを2枚使っている。描いた画面を写さずに表示へ切り替えるため、
-	// 垂直同期のときのフレームの間隔がそろう（BitBlt方式では、内蔵GPUの画面に単体GPUで描くノートPCで、30fps前後に落ちたり上下したりしていた）
-	swapChainDesc.BufferCount = 2;
-	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-	swapChainDesc.BufferDesc.Width = Application::GetWidth(); // バッファの幅を描画解像度に合わせている
-	swapChainDesc.BufferDesc.Height = Application::GetHeight(); // バッファの高さを描画解像度に合わせている
-	swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // 1画素を赤・緑・青・透明度の各8ビットにしている
-	swapChainDesc.BufferDesc.RefreshRate.Numerator = 60; // リフレッシュレート（60Hz）
-	swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
-	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT; // 描画先として使う
-	swapChainDesc.OutputWindow = Application::GetWindow(); // 表示するウィンドウ
-	swapChainDesc.SampleDesc.Count = 1; // マルチサンプリング（アンチエイリアス）は使わない
-	swapChainDesc.SampleDesc.Quality = 0; // 同上
-	swapChainDesc.Windowed = TRUE; // ウィンドウモード（全画面に広げたボーダーレスのウィンドウで表示している）
+    // 描画先・深度バッファを作っている
+    hr = CreateRenderAndDepthResources();
+    if (FAILED(hr)) return hr;
+
+    SetFullViewport();
+
+    hr = CreatePipelineStates();
+    if (FAILED(hr)) return hr;
+
+    return CreateConstantBuffers();
+}
+
+//--------------------------------------------------------------------------------------
+// デバイスとスワップチェーンを作り、ボーダーレス表示のまま Alt+Enter で全画面に切り替わらないようにしている
+//--------------------------------------------------------------------------------------
+HRESULT Renderer::CreateDeviceAndSwapChain()
+{
+    // デバイスとスワップチェーンの設定
+    DXGI_SWAP_CHAIN_DESC swapChainDesc{};
+    // フリップ方式（FLIP_DISCARD）でバックバッファを2枚使っている。描いた画面を写さずに表示へ切り替えるため、
+    // 垂直同期のときのフレームの間隔がそろう（BitBlt方式では、内蔵GPUの画面に単体GPUで描くノートPCで、30fps前後に落ちたり上下したりしていた）
+    swapChainDesc.BufferCount = FlipBackBufferCount;
+    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+    swapChainDesc.BufferDesc.Width = Application::GetWidth(); // バッファの幅を描画解像度に合わせている
+    swapChainDesc.BufferDesc.Height = Application::GetHeight(); // バッファの高さを描画解像度に合わせている
+    swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // 1画素を赤・緑・青・透明度の各8ビットにしている
+    swapChainDesc.BufferDesc.RefreshRate.Numerator = PreferredRefreshRate; // リフレッシュレート
+    swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
+    swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT; // 描画先として使う
+    swapChainDesc.OutputWindow = Application::GetWindow(); // 表示するウィンドウ
+    swapChainDesc.SampleDesc.Count = 1; // マルチサンプリング（アンチエイリアス）は使わない
+    swapChainDesc.SampleDesc.Quality = 0; // 同上
+    swapChainDesc.Windowed = TRUE; // ウィンドウモード（全画面に広げたボーダーレスのウィンドウで表示している）
 
     // Debug構成で、起動オプション --d3d-debug を付けたときだけ、D3D11のデバッグレイヤーを有効にして、使い方の間違いを出力させている。
     // デバッグレイヤーは描画の命令を1つずつ検査するため、CPU の時間が1フレーム1〜2.5ミリ秒増え、ときどき大きく重いフレームも出る
@@ -171,7 +213,7 @@ HRESULT Renderer::Init()
             m_pDeviceContext.ReleaseAndGetAddressOf());
     };
 
-    hr = createDevice(adapter.Get(), deviceCreationFlags);
+    HRESULT hr = createDevice(adapter.Get(), deviceCreationFlags);
 #if defined(DEBUG) || defined(_DEBUG)
     // グラフィックスのデバッグ機能（任意で入れる部品）が無いPCでも、ゲームを起動できるようにしている。
     if (hr == DXGI_ERROR_SDK_COMPONENT_MISSING)
@@ -193,7 +235,7 @@ HRESULT Renderer::Init()
     // フリップ方式を使えない古いWindows（8.1以前）では、これまでのBitBlt方式（バックバッファ1枚）で作り直している
     if (FAILED(hr))
     {
-        swapChainDesc.BufferCount = 1;
+        swapChainDesc.BufferCount = BitBltBackBufferCount;
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
         hr = createDevice(adapter.Get(), 0);
         if (FAILED(hr) && adapter != nullptr)
@@ -207,203 +249,222 @@ HRESULT Renderer::Init()
     Microsoft::WRL::ComPtr<IDXGIFactory> factory;
     hr = m_pSwapChain->GetParent(IID_PPV_ARGS(factory.GetAddressOf()));
     if (FAILED(hr)) return hr;
-    hr = factory->MakeWindowAssociation(Application::GetWindow(), DXGI_MWA_NO_ALT_ENTER);
+    return factory->MakeWindowAssociation(Application::GetWindow(), DXGI_MWA_NO_ALT_ENTER);
+}
+
+//--------------------------------------------------------------------------------------
+// ビューポート（描く範囲）を描画解像度の全体にしている
+//--------------------------------------------------------------------------------------
+void Renderer::SetFullViewport()
+{
+    D3D11_VIEWPORT viewport{};
+    viewport.Width = (FLOAT)Application::GetWidth();   // ビューポートの幅
+    viewport.Height = (FLOAT)Application::GetHeight(); // ビューポートの高さ
+    viewport.MinDepth = 0.0f;                          // 深度の範囲の最小値
+    viewport.MaxDepth = 1.0f;                          // 深度の範囲の最大値
+    viewport.TopLeftX = 0;                             // ビューポートの左上のX座標
+    viewport.TopLeftY = 0;                             // ビューポートの左上のY座標
+    m_pDeviceContext->RSSetViewports(1, &viewport);
+}
+
+//--------------------------------------------------------------------------------------
+// 描画の状態（ラスタライザー・ブレンド・深度ステンシル・サンプラー）を作り、普段の設定にしている
+//--------------------------------------------------------------------------------------
+HRESULT Renderer::CreatePipelineStates()
+{
+    // ラスタライザーの状態（三角形の塗り方）
+    D3D11_RASTERIZER_DESC rasterizerDesc{};
+    rasterizerDesc.FillMode = D3D11_FILL_SOLID; // 面を塗りつぶしている
+    // （線だけで確かめたいときは D3D11_FILL_WIREFRAME にする）
+    rasterizerDesc.CullMode = D3D11_CULL_BACK; // 裏を向いた面は描かない
+    // （表を向いた面を描かないときは D3D11_CULL_FRONT）
+    // （両面とも描くときは D3D11_CULL_NONE。コードで作る形は表と裏の両方の面を持たせているので、背面カリングのままでよい）
+    rasterizerDesc.DepthClipEnable = TRUE;
+    rasterizerDesc.MultisampleEnable = FALSE;
+    Microsoft::WRL::ComPtr<ID3D11RasterizerState> rs;
+    HRESULT hr = m_pDevice->CreateRasterizerState(&rasterizerDesc, rs.GetAddressOf());
+    if (FAILED(hr)) return hr;
+    m_pDeviceContext->RSSetState(rs.Get());
+
+    hr = CreateBlendStates();
+    if (FAILED(hr)) return hr;
+    SetBlendState(BS_ALPHABLEND);
+
+    // 深度ステンシルの状態：深度テストは「手前か同じなら描く」
+    D3D11_DEPTH_STENCIL_DESC depthStencilDesc{};
+    depthStencilDesc.DepthEnable = TRUE;
+    depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+    depthStencilDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+    depthStencilDesc.StencilEnable = FALSE;
+
+    hr = m_pDevice->CreateDepthStencilState(
+        &depthStencilDesc, m_pDepthStateEnable.ReleaseAndGetAddressOf());
     if (FAILED(hr)) return hr;
 
-	// 描画先・深度バッファを作っている
-	hr = CreateRenderAndDepthResources();
-	if (FAILED(hr)) return hr;
+    // 深度の書き込みだけを止めた状態（半透明・加算合成の描画用）
+    depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+    hr = m_pDevice->CreateDepthStencilState(
+        &depthStencilDesc, m_pDepthStateDisable.ReleaseAndGetAddressOf());
+    if (FAILED(hr)) return hr;
 
-	// ビューポート（描く範囲）を描画解像度の全体にしている
-	D3D11_VIEWPORT viewport{};
-	viewport.Width = (FLOAT)Application::GetWidth();   // ビューポートの幅
-	viewport.Height = (FLOAT)Application::GetHeight(); // ビューポートの高さ
-	viewport.MinDepth = 0.0f;                          // 深度の範囲の最小値
-	viewport.MaxDepth = 1.0f;                          // 深度の範囲の最大値
-	viewport.TopLeftX = 0;                             // ビューポートの左上のX座標
-	viewport.TopLeftY = 0;                             // ビューポートの左上のY座標
-	m_pDeviceContext->RSSetViewports(1, &viewport);
+    m_pDeviceContext->OMSetDepthStencilState(m_pDepthStateEnable.Get(), NULL);
 
+    // サンプラーの状態：異方性フィルタリングで、UVが0〜1を超えたら繰り返している
+    D3D11_SAMPLER_DESC smpDesc{};
+    smpDesc.Filter = D3D11_FILTER_ANISOTROPIC;
+    smpDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+    smpDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+    smpDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+    smpDesc.MaxAnisotropy = DefaultMaxAnisotropy;
+    smpDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
-	// ラスタライザーの状態（三角形の塗り方）
-	D3D11_RASTERIZER_DESC rasterizerDesc{};
-	rasterizerDesc.FillMode = D3D11_FILL_SOLID; // 面を塗りつぶしている
-	// （線だけで確かめたいときは D3D11_FILL_WIREFRAME にする）
-	rasterizerDesc.CullMode = D3D11_CULL_BACK; // 裏を向いた面は描かない
-	// （表を向いた面を描かないときは D3D11_CULL_FRONT）
-	// （両面とも描くときは D3D11_CULL_NONE。コードで作る形は表と裏の両方の面を持たせているので、背面カリングのままでよい）
-	rasterizerDesc.DepthClipEnable = TRUE;
-	rasterizerDesc.MultisampleEnable = FALSE;
-	Microsoft::WRL::ComPtr<ID3D11RasterizerState> rs;
-	hr = m_pDevice->CreateRasterizerState(&rasterizerDesc, rs.GetAddressOf());
-	if (FAILED(hr)) return hr;
-	m_pDeviceContext->RSSetState(rs.Get());
-	// ブレンドの状態を作っている（まずは重ねない設定）
-	D3D11_BLEND_DESC BlendDesc{};
-	BlendDesc.AlphaToCoverageEnable = FALSE;                     // 透明度をカバレッジとして使わない
-	BlendDesc.IndependentBlendEnable = TRUE;                     // 描画先ごとに別のブレンドの設定を使えるようにしている
-	BlendDesc.RenderTarget[0].BlendEnable = FALSE;               // ブレンドしない（不透明な描画）
-	BlendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;  // 描く色には、その色の透明度を掛ける
-	BlendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA; // 下の色には、(1 - 透明度) を掛ける
-	BlendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;      // 2つを足す
-	BlendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;   // 透明度はそのまま使う
-	BlendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO; // 下の透明度は使わない
-	BlendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD; // 透明度も足す
-	BlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL; // 赤・緑・青・透明度のすべてを書き込む
-	hr = m_pDevice->CreateBlendState(
-		&BlendDesc, m_pBlendState[0].ReleaseAndGetAddressOf());
-	if (FAILED(hr)) return hr;
+    Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerState;
+    hr = m_pDevice->CreateSamplerState(&smpDesc, samplerState.GetAddressOf());
+    if (FAILED(hr)) return hr;
 
-	// 半透明の合成（上の設定でブレンドを有効にしたもの）
-	BlendDesc.RenderTarget[0].BlendEnable = TRUE;
-	hr = m_pDevice->CreateBlendState(
-		&BlendDesc, m_pBlendState[1].ReleaseAndGetAddressOf());
-	if (FAILED(hr)) return hr;
+    m_pDeviceContext->PSSetSamplers(DefaultSamplerSlot, 1, samplerState.GetAddressOf());
+    return S_OK;
+}
 
-	// 加算合成（下の色を減らさずに足す）
-	BlendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
-	hr = m_pDevice->CreateBlendState(
-		&BlendDesc, m_pBlendState[2].ReleaseAndGetAddressOf());
-	if (FAILED(hr)) return hr;
+//--------------------------------------------------------------------------------------
+// ブレンドの状態を作っている（重ねない・半透明・加算・減算。m_pBlendState の番号は BLEND_STATE と同じ）
+//--------------------------------------------------------------------------------------
+HRESULT Renderer::CreateBlendStates()
+{
+    // まずは重ねない設定
+    D3D11_BLEND_DESC BlendDesc{};
+    BlendDesc.AlphaToCoverageEnable = FALSE;                     // 透明度をカバレッジとして使わない
+    BlendDesc.IndependentBlendEnable = TRUE;                     // 描画先ごとに別のブレンドの設定を使えるようにしている
+    BlendDesc.RenderTarget[0].BlendEnable = FALSE;               // ブレンドしない（不透明な描画）
+    BlendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;  // 描く色には、その色の透明度を掛ける
+    BlendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA; // 下の色には、(1 - 透明度) を掛ける
+    BlendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;      // 2つを足す
+    BlendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;   // 透明度はそのまま使う
+    BlendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO; // 下の透明度は使わない
+    BlendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD; // 透明度も足す
+    BlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL; // 赤・緑・青・透明度のすべてを書き込む
+    HRESULT hr = m_pDevice->CreateBlendState(
+        &BlendDesc, m_pBlendState[BS_NONE].ReleaseAndGetAddressOf());
+    if (FAILED(hr)) return hr;
 
-	// 減算合成（下の色から引く）
-	BlendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_REV_SUBTRACT;
-	hr = m_pDevice->CreateBlendState(
-		&BlendDesc, m_pBlendState[3].ReleaseAndGetAddressOf());
-	if (FAILED(hr)) return hr;
+    // 半透明の合成（上の設定でブレンドを有効にしたもの）
+    BlendDesc.RenderTarget[0].BlendEnable = TRUE;
+    hr = m_pDevice->CreateBlendState(
+        &BlendDesc, m_pBlendState[BS_ALPHABLEND].ReleaseAndGetAddressOf());
+    if (FAILED(hr)) return hr;
 
-	SetBlendState(BS_ALPHABLEND);
+    // 加算合成（下の色を減らさずに足す）
+    BlendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+    hr = m_pDevice->CreateBlendState(
+        &BlendDesc, m_pBlendState[BS_ADDITIVE].ReleaseAndGetAddressOf());
+    if (FAILED(hr)) return hr;
 
-	// 深度ステンシルの状態：深度テストは「手前か同じなら描く」
-	D3D11_DEPTH_STENCIL_DESC depthStencilDesc{};
-	depthStencilDesc.DepthEnable = TRUE;
-	depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-	depthStencilDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
-	depthStencilDesc.StencilEnable = FALSE;
+    // 減算合成（下の色から引く）
+    BlendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_REV_SUBTRACT;
+    return m_pDevice->CreateBlendState(
+        &BlendDesc, m_pBlendState[BS_SUBTRACTION].ReleaseAndGetAddressOf());
+}
 
-	hr = m_pDevice->CreateDepthStencilState(
-		&depthStencilDesc, m_pDepthStateEnable.ReleaseAndGetAddressOf());
-	if (FAILED(hr)) return hr;
+//--------------------------------------------------------------------------------------
+// 定数バッファ（行列・ライト・デバッグ表示・部屋の形・水面の光・マテリアル・UV）を作ってシェーダーに設定し、初期値を入れている
+//--------------------------------------------------------------------------------------
+HRESULT Renderer::CreateConstantBuffers()
+{
+    // 行列の定数バッファを作り、頂点シェーダーのb0（ワールド）・b1（ビュー）・b2（射影）に設定している（ビューはピクセルシェーダーにも）
+    D3D11_BUFFER_DESC bufferDesc{};
+    bufferDesc.ByteWidth = sizeof(Matrix);
+    bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    bufferDesc.CPUAccessFlags = 0;
+    bufferDesc.MiscFlags = 0;
+    bufferDesc.StructureByteStride = sizeof(float);
 
-	// 深度の書き込みだけを止めた状態（半透明・加算合成の描画用）
-	depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
-	hr = m_pDevice->CreateDepthStencilState(
-		&depthStencilDesc, m_pDepthStateDisable.ReleaseAndGetAddressOf());
-	if (FAILED(hr)) return hr;
+    HRESULT hr = m_pDevice->CreateBuffer(
+        &bufferDesc, NULL, m_pWorldBuffer.ReleaseAndGetAddressOf());
+    m_pDeviceContext->VSSetConstantBuffers(WorldBufferSlot, 1, m_pWorldBuffer.GetAddressOf());
+    if (FAILED(hr)) return hr;
 
-	m_pDeviceContext->OMSetDepthStencilState(m_pDepthStateEnable.Get(), NULL);
+    hr = m_pDevice->CreateBuffer(
+        &bufferDesc, NULL, m_pViewBuffer.ReleaseAndGetAddressOf());
+    m_pDeviceContext->VSSetConstantBuffers(ViewBufferSlot, 1, m_pViewBuffer.GetAddressOf());
+    // ビュー行列はピクセルシェーダーのb1にも設定している（凹凸で傾けた法線・光の向きをビュー空間へ回すのに使う）
+    m_pDeviceContext->PSSetConstantBuffers(ViewBufferSlot, 1, m_pViewBuffer.GetAddressOf());
+    if (FAILED(hr)) return hr;
 
-	// サンプラーの状態：異方性フィルタリング（4倍）で、UVが0〜1を超えたら繰り返している
-	D3D11_SAMPLER_DESC smpDesc{};
-	smpDesc.Filter = D3D11_FILTER_ANISOTROPIC;
-	smpDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
-	smpDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
-	smpDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-	smpDesc.MaxAnisotropy = 4;
-	smpDesc.MaxLOD = D3D11_FLOAT32_MAX;
+    hr = m_pDevice->CreateBuffer(
+        &bufferDesc, NULL, m_pProjectionBuffer.ReleaseAndGetAddressOf());
+    m_pDeviceContext->VSSetConstantBuffers(ProjectionBufferSlot, 1, m_pProjectionBuffer.GetAddressOf());
+    if (FAILED(hr)) return hr;
 
-	Microsoft::WRL::ComPtr<ID3D11SamplerState> samplerState;
-	hr = m_pDevice->CreateSamplerState(&smpDesc, samplerState.GetAddressOf());
-	if (FAILED(hr)) return hr;
+    // ライトの定数バッファを作り、頂点・ピクセルシェーダーのb3に設定している
+    bufferDesc.ByteWidth = sizeof(LIGHT);
+    hr = m_pDevice->CreateBuffer(
+        &bufferDesc, NULL, m_pLightBuffer.ReleaseAndGetAddressOf());
+    m_pDeviceContext->VSSetConstantBuffers(LightBufferSlot, 1, m_pLightBuffer.GetAddressOf());
+    m_pDeviceContext->PSSetConstantBuffers(LightBufferSlot, 1, m_pLightBuffer.GetAddressOf());
+    if (FAILED(hr)) return hr;
+    // ライトの初期値（Playerが毎フレーム上書きしている）
+    LIGHT light{};
+    light.Enable = TRUE;
+    light.FlashlightEnabled = TRUE;
+    light.Intensity = InitialLightIntensity;
+    light.Range = InitialLightRange;
+    light.Direction = Vector4(0.0f, 0.0f, 1.0f, 0.0f);
+    light.Diffuse = InitialLightDiffuse;
+    light.Ambient = InitialLightAmbient;
+    light.SpotParams = Vector4(
+        cosf(DirectX::XMConvertToRadians(InitialLightInnerConeDegrees)),
+        cosf(DirectX::XMConvertToRadians(InitialLightOuterConeDegrees)), InitialLightConeFalloff, 0.0f);
 
-	m_pDeviceContext->PSSetSamplers(0, 1, samplerState.GetAddressOf());
+    SetLight(light);
 
-	// 行列の定数バッファを作り、頂点シェーダーのb0（ワールド）・b1（ビュー）・b2（射影）に設定している（ビューはピクセルシェーダーにも）
-	D3D11_BUFFER_DESC bufferDesc{};
-	bufferDesc.ByteWidth = sizeof(Matrix);
-	bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-	bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	bufferDesc.CPUAccessFlags = 0;
-	bufferDesc.MiscFlags = 0;
-	bufferDesc.StructureByteStride = sizeof(float);
+    // デバッグ表示と壁の古さの定数バッファを作り、ピクセルシェーダーのb7に設定している
+    bufferDesc.ByteWidth = sizeof(DEBUG_VIEW_BUFFER);
+    hr = m_pDevice->CreateBuffer(
+        &bufferDesc, NULL, m_pDebugViewBuffer.ReleaseAndGetAddressOf());
+    if (FAILED(hr)) return hr;
+    m_pDeviceContext->PSSetConstantBuffers(
+        DebugViewBufferSlot, 1, m_pDebugViewBuffer.GetAddressOf());
+    SetDebugViewMode(0);
 
-	hr = m_pDevice->CreateBuffer(
-		&bufferDesc, NULL, m_pWorldBuffer.ReleaseAndGetAddressOf());
-	m_pDeviceContext->VSSetConstantBuffers(0, 1, m_pWorldBuffer.GetAddressOf());
-	if (FAILED(hr)) return hr;
+    // 部屋の角の暗がり。最初は壁がない（暗がりなし）状態にしている。
+    bufferDesc.ByteWidth = sizeof(ROOM_OCCLUSION_BUFFER);
+    hr = m_pDevice->CreateBuffer(
+        &bufferDesc, NULL, m_pRoomOcclusionBuffer.ReleaseAndGetAddressOf());
+    if (FAILED(hr)) return hr;
+    SetRoomOcclusion(nullptr, 0, 0.0f, 0.0f, 0.0f);
 
-	hr = m_pDevice->CreateBuffer(
-		&bufferDesc, NULL, m_pViewBuffer.ReleaseAndGetAddressOf());
-	m_pDeviceContext->VSSetConstantBuffers(1, 1, m_pViewBuffer.GetAddressOf());
-	// ビュー行列はピクセルシェーダーのb1にも設定している（凹凸で傾けた法線・光の向きをビュー空間へ回すのに使う）
-	m_pDeviceContext->PSSetConstantBuffers(1, 1, m_pViewBuffer.GetAddressOf());
-	if (FAILED(hr)) return hr;
+    // 水面の光の揺らぎ。最初は浸水した範囲がない（効果なし）状態にしている。
+    bufferDesc.ByteWidth = sizeof(WATER_CAUSTICS_BUFFER);
+    hr = m_pDevice->CreateBuffer(
+        &bufferDesc, NULL, m_pWaterCausticsBuffer.ReleaseAndGetAddressOf());
+    if (FAILED(hr)) return hr;
+    SetWaterCaustics(Vector4(1.0f, 1.0f, 0.0f, 0.0f), 0.0f, 0.0f, 0.0f);
 
-	hr = m_pDevice->CreateBuffer(
-		&bufferDesc, NULL, m_pProjectionBuffer.ReleaseAndGetAddressOf());
-	m_pDeviceContext->VSSetConstantBuffers(2, 1, m_pProjectionBuffer.GetAddressOf());
-	if (FAILED(hr)) return hr;
+    // マテリアルの定数バッファを作り、頂点・ピクセルシェーダーのb4に設定している
+    bufferDesc.ByteWidth = sizeof(MATERIAL);
+    hr = m_pDevice->CreateBuffer(
+        &bufferDesc, NULL, m_pMaterialBuffer.ReleaseAndGetAddressOf());
+    m_pDeviceContext->VSSetConstantBuffers(MaterialBufferSlot, 1, m_pMaterialBuffer.GetAddressOf());
+    m_pDeviceContext->PSSetConstantBuffers(MaterialBufferSlot, 1, m_pMaterialBuffer.GetAddressOf());
+    if (FAILED(hr)) return hr;
 
+    // マテリアルの初期値（白）
+    MATERIAL material{};
+    material.Diffuse = Color(1.0f, 1.0f, 1.0f, 1.0f);
+    material.Ambient = Color(1.0f, 1.0f, 1.0f, 1.0f);
+    SetMaterial(material);
 
-	// ライトの定数バッファを作り、頂点・ピクセルシェーダーのb3に設定している
-	bufferDesc.ByteWidth = sizeof(LIGHT);
-	hr = m_pDevice->CreateBuffer(
-		&bufferDesc, NULL, m_pLightBuffer.ReleaseAndGetAddressOf());
-	m_pDeviceContext->VSSetConstantBuffers(3, 1, m_pLightBuffer.GetAddressOf());
-	m_pDeviceContext->PSSetConstantBuffers(3, 1, m_pLightBuffer.GetAddressOf());
-	if (FAILED(hr)) return hr;
-	// ライトの初期値（Playerが毎フレーム上書きしている）
-	LIGHT light{};
-	light.Enable = TRUE;
-	light.FlashlightEnabled = TRUE;
-	light.Intensity = 1.6f;
-	light.Range = 260.0f;
-	light.Direction = Vector4(0.0f, 0.0f, 1.0f, 0.0f);
-	light.Diffuse = Color(1.4f, 1.25f, 1.0f, 1.0f);
-	light.Ambient = Color(0.055f, 0.055f, 0.065f, 1.0f);
-	light.SpotParams = Vector4(
-		cosf(DirectX::XMConvertToRadians(16.0f)),
-		cosf(DirectX::XMConvertToRadians(32.0f)), 1.35f, 0.0f);
+    // UVの行列の定数バッファを作り、頂点シェーダーのb5に設定している
+    bufferDesc.ByteWidth = sizeof(Matrix);
+    hr = m_pDevice->CreateBuffer(
+        &bufferDesc, NULL, m_pTextureBuffer.ReleaseAndGetAddressOf());
+    m_pDeviceContext->VSSetConstantBuffers(TextureBufferSlot, 1, m_pTextureBuffer.GetAddressOf());
+    if (FAILED(hr)) return hr;
 
-	SetLight(light);
-
-	// デバッグ表示と壁の古さの定数バッファを作り、ピクセルシェーダーのb7に設定している
-	bufferDesc.ByteWidth = sizeof(DEBUG_VIEW_BUFFER);
-	hr = m_pDevice->CreateBuffer(
-		&bufferDesc, NULL, m_pDebugViewBuffer.ReleaseAndGetAddressOf());
-	if (FAILED(hr)) return hr;
-	m_pDeviceContext->PSSetConstantBuffers(
-		7, 1, m_pDebugViewBuffer.GetAddressOf());
-	SetDebugViewMode(0);
-
-	// 部屋の角の暗がり。最初は壁がない（暗がりなし）状態にしている。
-	bufferDesc.ByteWidth = sizeof(ROOM_OCCLUSION_BUFFER);
-	hr = m_pDevice->CreateBuffer(
-		&bufferDesc, NULL, m_pRoomOcclusionBuffer.ReleaseAndGetAddressOf());
-	if (FAILED(hr)) return hr;
-	SetRoomOcclusion(nullptr, 0, 0.0f, 0.0f, 0.0f);
-
-	// 水面の光の揺らぎ。最初は浸水した範囲がない（効果なし）状態にしている。
-	bufferDesc.ByteWidth = sizeof(WATER_CAUSTICS_BUFFER);
-	hr = m_pDevice->CreateBuffer(
-		&bufferDesc, NULL, m_pWaterCausticsBuffer.ReleaseAndGetAddressOf());
-	if (FAILED(hr)) return hr;
-	SetWaterCaustics(Vector4(1.0f, 1.0f, 0.0f, 0.0f), 0.0f, 0.0f, 0.0f);
-
-	// マテリアルの定数バッファを作り、頂点・ピクセルシェーダーのb4に設定している
-	bufferDesc.ByteWidth = sizeof(MATERIAL);
-	hr = m_pDevice->CreateBuffer(
-		&bufferDesc, NULL, m_pMaterialBuffer.ReleaseAndGetAddressOf());
-	m_pDeviceContext->VSSetConstantBuffers(4, 1, m_pMaterialBuffer.GetAddressOf());
-	m_pDeviceContext->PSSetConstantBuffers(4, 1, m_pMaterialBuffer.GetAddressOf());
-	if (FAILED(hr)) return hr;
-
-	// マテリアルの初期値（白）
-	MATERIAL material{};
-	material.Diffuse = Color(1.0f, 1.0f, 1.0f, 1.0f);
-	material.Ambient = Color(1.0f, 1.0f, 1.0f, 1.0f);
-	SetMaterial(material);
-
-	// UVの行列の定数バッファを作り、頂点シェーダーのb5に設定している
-	bufferDesc.ByteWidth = sizeof(Matrix);
-	hr = m_pDevice->CreateBuffer(
-		&bufferDesc, NULL, m_pTextureBuffer.ReleaseAndGetAddressOf());
-	m_pDeviceContext->VSSetConstantBuffers(5, 1, m_pTextureBuffer.GetAddressOf());
-	if (FAILED(hr))return hr;
-
-	// UVの初期値（拡大も移動もしない）
-	SetUV(0, 0, 1, 1);
-	return S_OK;
+    // UVの初期値（拡大も移動もしない）
+    SetUV(0, 0, 1, 1);
+    return S_OK;
 }
 
 //--------------------------------------------------------------------------------------

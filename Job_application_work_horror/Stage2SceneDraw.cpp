@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "Stage2Scene.h"
+#include "MathUtility.h"
 
 #include "BatteryItem.h"
 #include "CeilingLight.h"
@@ -67,8 +68,10 @@ void Stage2Scene::Draw(Camera* camera)
         {
             Vector3 toStalker = stalker->GetPosition() - player->GetPosition();
             toStalker.y = 0.0f;
-            // 足音の影が近いほど、すき間の縁を赤くしている（20〜100の距離で変化）
-            hidingDanger = 1.0f - (std::clamp)((toStalker.Length() - 20.0f) / 80.0f, 0.0f, 1.0f);
+            // 足音の影が近いほど、すき間の縁を赤くしている（この距離から、この幅で遠ざかるほど弱く）
+            constexpr float HidingDangerNearDistance = 20.0f;
+            constexpr float HidingDangerRange = 80.0f;
+            hidingDanger = MathUtility::Proximity(toStalker.Length(), HidingDangerNearDistance, HidingDangerRange);
         }
         m_Hud.DrawHidingView(m_VisualTimer, hidingDanger,
             m_BreathHold.GetBreath(), m_BreathHold.IsHolding(), m_BreathHold.GetExposure());
@@ -201,7 +204,7 @@ void Stage2Scene::Draw(Camera* camera)
             (exit->GetEscapeProgress() - 0.36f) / 0.64f,
             0.0f, 1.0f);
         const float smoothFade =
-            fadeRate * fadeRate * (3.0f - 2.0f * fadeRate);
+            MathUtility::SmoothCurve(fadeRate);
         m_Hud.DrawBlink(smoothFade * 0.90f);
     }
 

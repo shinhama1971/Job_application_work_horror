@@ -9,6 +9,7 @@
 #include "FlashlightWriting.h"
 #include "FuseBox.h"
 #include "Game.h"
+#include "PostProcess.h"
 #include "Hud.h"
 #include "Input.h"
 #include "Player.h"

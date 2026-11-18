@@ -4,8 +4,10 @@
 // ============================================================================
 
 #include "StageScene.h"
+#include "MathUtility.h"
 #include "Application.h"
 #include "Game.h"
+#include "PostProcess.h"
 #include "Input.h"
 #include "Renderer.h"
 
@@ -14,6 +16,7 @@
 #include "Ground.h"
 #include "Item.h"
 #include "Door.h"
+#include "EventFeedback.h"
 #include "FuseBox.h"
 #include "CeilingLight.h"
 #include "ExitTrigger.h"
@@ -38,6 +41,8 @@ namespace
     constexpr float StartDoorFirstKnockSeconds = 4.0f;
     // 次に進む方向の天井灯：今の灯りからこの距離より離れるまでは、次の灯りへ進めない
     constexpr float RouteLightAdvanceDistance = 35.0f;
+    // 照明が無いときの距離の2乗（どの灯よりも遠いとみなす）
+    constexpr float MissingRouteLightDistanceSquared = 1.0e20f;
     // H（LB）でヒントを頼んだときに、進めていない時間をこの秒数まで進め、すぐに強いヒントを出している
     constexpr float RequestedHintSeconds = 35.0f;
     // 知らせの文字を出す秒数（ヒューズを拾ったとき・非常用充電器・監視映像をすべて確かめたとき）
@@ -58,6 +63,89 @@ namespace
     // 箱にヒューズが戻るときの、金属の箱に物を置くような低い音（配管を叩く音を低くして使っている）の高さと音量
     constexpr float KeypadFuseReturnPitch = 0.62f;
     constexpr float KeypadFuseReturnVolume = 1.3f;
+
+    using EventFeedback::FlickerSpec;
+    using EventFeedback::PulseSpec;
+    using EventFeedback::RumbleSpec;
+
+    // --- ヒントを頼んだときの短い振動
+    constexpr RumbleSpec HintRequestRumble{ 2, 0.04f };
+    // --- ヒューズを拾ったときの光と振動（基本＋拾った本数ごとに強める分）
+    constexpr float FusePickupBloomBase = 0.48f;
+    constexpr float FusePickupBloomPerFuse = 0.12f;
+    constexpr float FusePickupBloomSeconds = 0.28f;
+    constexpr int FusePickupRumbleFramesBase = 4;
+    constexpr int FusePickupRumbleFramesPerFuse = 2;
+    constexpr float FusePickupRumbleStrengthBase = 0.10f;
+    constexpr float FusePickupRumbleStrengthPerFuse = 0.025f;
+    // --- 非常用充電器：物音で呼ぶ影の強さ（ヒューズ2本目と同じ）、揺らす照明の番号、明滅・光・振動
+    constexpr int ChargerWatcherFuseCount = 2;
+    constexpr int ChargerCeilingLightIndex = 2;
+    constexpr FlickerSpec ChargerFlicker{ 0.92f, 0.84f };
+    constexpr PulseSpec ChargerBloom{ 0.66f, 0.24f };
+    constexpr RumbleSpec ChargerRumble{ 6, 0.14f };
+
+    // --- 出口の表示と扉のランプ：脈打ちの明るさ（基本＋揺れ）と速さ（電力が戻った後は落ち着いて、前は警報のように速く）、色、光沢
+    constexpr float ExitSignPulseBase = 0.78f;
+    constexpr float ExitSignPulseAmount = 0.16f;
+    constexpr float ExitSignCalmPulseSpeed = 3.2f;
+    constexpr float ExitSignAlarmPulseSpeed = 7.4f;
+    const Color ExitSignReadyDiffuse(0.025f, 0.24f, 0.06f, 1.0f);
+    const Vector3 ExitSignReadyEmission(0.006f, 0.36f, 0.025f);
+    constexpr float ExitSignReadyShininess = 34.0f;
+    const Color ExitSignWaitingDiffuse(0.24f, 0.025f, 0.018f, 1.0f);
+    const Vector3 ExitSignWaitingEmission(0.32f, 0.004f, 0.002f);
+    constexpr float ExitSignWaitingShininess = 30.0f;
+    // 扉のランプ：出口の前兆の間ほど速く大きく点滅させる
+    constexpr float IndicatorPulseBase = 0.72f;
+    constexpr float IndicatorPulseSpeed = 3.2f;
+    constexpr float IndicatorOmenPulseSpeed = 8.0f;
+    constexpr float IndicatorPulseAmount = 0.10f;
+    constexpr float IndicatorOmenPulseAmount = 0.14f;
+    const Color IndicatorReadyDiffuse(0.025f, 0.20f, 0.055f, 1.0f);
+    const Vector3 IndicatorReadyEmission(0.005f, 0.24f, 0.025f);
+    constexpr float IndicatorReadyShininess = 30.0f;
+    constexpr float IndicatorWaitingRed = 0.28f;
+    constexpr float IndicatorWaitingShininess = 28.0f;
+
+    // --- 画面効果（UpdateScreenAtmosphere）
+    // 電力が戻ったときに和らげるノイズと周辺減光の量
+    constexpr float PowerRestoredCalm = 0.03f;
+    // 廊下の奥へ進むほど強め（この z から、この長さで最大）、廊下の中央から横へ離れるほど弱める（この幅から、この幅で0）
+    constexpr float CorridorTensionStartZ = 90.0f;
+    constexpr float CorridorTensionDepth = 190.0f;
+    constexpr float CorridorTensionHalfWidth = 75.0f;
+    constexpr float CorridorTensionWidthFade = 105.0f;
+    constexpr float CorridorDepthTension = 0.72f;
+    // 周回ごとに足す緊張と上限、電力が戻った後に出口の前だけに残す緊張（この z から、この長さで最大）
+    constexpr float LoopTensionPerLoop = 0.14f;
+    constexpr float LoopTensionMax = 0.42f;
+    constexpr float PoweredExitTensionStartZ = 190.0f;
+    constexpr float PoweredExitTensionDepth = 105.0f;
+    constexpr float PoweredExitTension = 0.38f;
+    // 露出：電力が戻る前（その後は普段の明るさへ移す）、ライトを点けているとき・消しているとき（目が慣れたように明るく）
+    constexpr float PowerOffExposure = 1.12f;
+    constexpr float PoweredExposure = 1.01f;
+    constexpr float FlashlightOnExposure = 1.04f;
+    constexpr float FlashlightOffExposure = 1.15f;
+    // ノイズと周辺減光（基本＋電池の少なさ・走っている・廊下の緊張で足す分、光の安全地帯で引く分）
+    constexpr float NoiseBase = 0.18f;
+    constexpr float NoiseLowBattery = 0.18f;
+    constexpr float NoiseSprint = 0.04f;
+    constexpr float NoiseTension = 0.055f;
+    constexpr float NoiseSafeCalm = 0.07f;
+    constexpr float VignetteBase = 0.55f;
+    constexpr float VignetteLowBattery = 0.20f;
+    constexpr float VignetteSprint = 0.06f;
+    constexpr float VignetteTension = 0.075f;
+    constexpr float VignetteSafeCalm = 0.15f;
+    // レンズの歪み・色調・レンズの汚れ（基本＋廊下の緊張で足す分）
+    constexpr float DistortionBase = 0.20f;
+    constexpr float DistortionTension = 0.22f;
+    constexpr float FilmGradeBase = 0.52f;
+    constexpr float FilmGradeTension = 0.18f;
+    constexpr float LensDirtBase = 0.10f;
+    constexpr float LensDirtTension = 0.12f;
 }
 
 // 作るときに初期化している
@@ -264,7 +352,8 @@ void StageScene::UpdateThirdFuseRoutes()
 // 進む先の天井照明を1灯だけ、切れかけの電球のように不規則にちかちかさせている（ほかの照明は落ち着いて点いたまま）。
 // 明滅と周囲に落ちる光を、次に向かう場所の目印にする。
 // 経路の選択は進行を参照するだけで、鍵・アイテム・扉の状態は変更しない。
-void StageScene::UpdateRouteLights()
+// 進行に合わせて、次に向かう場所の照明の組を選んでいる（どれも当てはまらないときは Stage1RouteLight::Count）
+Stage1RouteLight StageScene::SelectRouteLight() const
 {
     const Core::Game* game = Core::Game::GetInstance();
     const int fuseCount = game->GetItemCount();
@@ -323,8 +412,13 @@ void StageScene::UpdateRouteLights()
         }
         // 排水中は、バルブの赤いランプが目印になるので、ちかちかさせない。
     }
+    return selected;
+}
 
-    const std::size_t route = static_cast<std::size_t>(selected);
+// 選んだ照明の組のうち、プレイヤーが近づいた先の1灯だけをちかちかさせている
+void StageScene::UpdateRouteLights()
+{
+    const std::size_t route = static_cast<std::size_t>(SelectRouteLight());
     if (route != m_ActiveRoute)
     {
         m_ActiveRoute = route;
@@ -354,7 +448,7 @@ void StageScene::UpdateRouteLights()
     {
         if (light == nullptr)
         {
-            return 1.0e20f;
+            return MissingRouteLightDistanceSquared;
         }
         const Vector3 position = light->GetPosition();
         const float x = position.x - playerPosition.x;
@@ -441,7 +535,7 @@ void StageScene::UpdateCeilingReflection(const Player& player, float deltaTime)
     }
 }
 
-// ヒューズの数と電力の状態をもとに、目的表示と演出の段階を更新している。
+// ヒューズの数と電力の状態をもとに、目的表示と演出の段階を更新している。段階ごとの中身は、この下の関数に分けている
 void StageScene::Update()
 {
     Player* player =
@@ -468,27 +562,39 @@ void StageScene::Update()
         return;
     }
 
-    Core::Game* game = Core::Game::GetInstance();
     const float deltaTime = Application::GetDeltaTime();
-    // 経過時間と、進行が止まっている時間を数えている。H（LB）が押されたら、すぐに強いヒントを出している
+    UpdateTimersAndHints(*player, deltaTime);
+    UpdateFusePickup();
+    UpdateEmergencyCharger(*player);
+    UpdateStageEvents(*player, deltaTime);
+    UpdateExitDoor(*player);
+    UpdateExitSigns();
+    UpdateScreenAtmosphere(*player);
+
+    // 調べる対象を選び、Eキー（A）で調べている
+    m_InteractionSystem.Update(*player);
+}
+
+// 経過時間と進行が止まっている時間を数え、ヒント・光の安全地帯・知らせの残り時間・配置の読み直しを更新している
+void StageScene::UpdateTimersAndHints(Player& player, float deltaTime)
+{
+    // H（LB）が押されたら、すぐに強いヒントを出している
     m_StageVisualTimer += deltaTime;
     m_ProgressHintTimer += deltaTime;
     if (Input::GetKeyTrigger(VK_H) ||
         Input::GetButtonTrigger(XINPUT_LEFT_SHOULDER))
     {
         m_ProgressHintTimer = (std::max)(m_ProgressHintTimer, RequestedHintSeconds);
-        constexpr int HintVibrationStrength = 2;
-        constexpr float HintVibrationSeconds = 0.04f;
-        Input::SetVibration(HintVibrationStrength, HintVibrationSeconds);
+        EventFeedback::Rumble(HintRequestRumble);
     }
 
     // 光の安全地帯：暖かい灯りの下で、ライトを消して休んでいる間は電池が少しずつ戻る。
     // 落ち着きの度合いは、心拍・物音・画面のざらつきを弱めるのに使っている。
     const float safeLightCharge = m_SafeLights.Update(
-        deltaTime, player->GetPosition(), player->IsFlashlightOn(), player->GetBattery());
+        deltaTime, player.GetPosition(), player.IsFlashlightOn(), player.GetBattery());
     if (safeLightCharge > 0.0f)
     {
-        player->AddBattery(safeLightCharge);
+        player.AddBattery(safeLightCharge);
     }
 
     // 各知らせの残り時間を減らしている
@@ -514,80 +620,77 @@ void StageScene::Update()
         0.0f, m_EvidenceNoticeTimer - deltaTime);
     m_StorageScareNoticeTimer = (std::max)(
         0.0f, m_StorageScareNoticeTimer - deltaTime);
-    // ヒューズを拾った瞬間、知らせを出し、画面の光と振動で伝え、廊下に影を出している
+}
+
+// ヒューズを拾った瞬間、知らせを出し、画面の光と振動で伝え（本数が多いほど強く）、廊下に影を出している。
+// 電力が戻ったら、ヒューズの後に出る影を消している
+void StageScene::UpdateFusePickup()
+{
+    Core::Game* game = Core::Game::GetInstance();
     const int currentFuseCount = game->GetItemCount();
     if (currentFuseCount > m_LastFuseCount)
     {
         m_LastFuseCount = currentFuseCount;
         m_ProgressHintTimer = 0.0f;
         m_FuseNoticeTimer = FuseNoticeSeconds;
-        constexpr float FusePickupBloomBase = 0.48f;
-        constexpr float FusePickupBloomPerFuse = 0.12f;
-        constexpr float FusePickupBloomSeconds = 0.28f;
-        constexpr int FusePickupVibrationBase = 4;
-        constexpr int FusePickupVibrationPerFuse = 2;
-        constexpr float FusePickupVibrationSeconds = 0.10f;
-        constexpr float FusePickupVibrationSecondsPerFuse = 0.025f;
         const float fuseCount = static_cast<float>(currentFuseCount);
         game->GetPostProcess()->TriggerBloomPulse(
             FusePickupBloomBase + fuseCount * FusePickupBloomPerFuse, FusePickupBloomSeconds);
         Input::SetVibration(
-            FusePickupVibrationBase + currentFuseCount * FusePickupVibrationPerFuse,
-            FusePickupVibrationSeconds + fuseCount * FusePickupVibrationSecondsPerFuse);
+            FusePickupRumbleFramesBase + currentFuseCount * FusePickupRumbleFramesPerFuse,
+            FusePickupRumbleStrengthBase + fuseCount * FusePickupRumbleStrengthPerFuse);
         StartFuseWatcher(currentFuseCount);
     }
 
-    // 電力が戻ったら、ヒューズの後に出る影を消している
     if (game->IsPowerRestored())
     {
         ShadowMan* watcher = m_Objects.fuseWatcher;
         if (watcher != nullptr) watcher->SetActive(false);
         m_FuseWatcherState = 0;
     }
+}
 
-    // 非常用充電器を使ったら、電池を回復する代わりに、音で廊下に影を呼んでいる
-    FuseBox* emergencyCharger =
-        m_Objects.emergencyCharger;
-    if (!m_ChargerHandled && emergencyCharger != nullptr &&
-        emergencyCharger->IsActivated())
+// 非常用充電器を使ったら、電池を回復する代わりに、音で廊下に影を呼んでいる
+void StageScene::UpdateEmergencyCharger(Player& player)
+{
+    FuseBox* emergencyCharger = m_Objects.emergencyCharger;
+    if (m_ChargerHandled || emergencyCharger == nullptr || !emergencyCharger->IsActivated())
     {
-        m_ChargerHandled = true;
-        m_ChargerNoticeTimer = ChargerNoticeSeconds;
-        player->AddBattery(ChargerBattery);
-        game->RegisterChargerUsed();
-        // 充電器の物音には、ヒューズ2本目と同じ強さの影を使う。
-        constexpr int ChargerWatcherFuseCount = 2;
-        constexpr int ChargerCeilingLightIndex = 2;
-        StartFuseWatcher(ChargerWatcherFuseCount);
-
-        CeilingLight* chargerLight =
-            m_Objects.CeilingLightAt(ChargerCeilingLightIndex);
-        if (chargerLight != nullptr)
-        {
-            constexpr float ChargerFlickerSeconds = 0.92f;
-            constexpr float ChargerFlickerStrength = 0.84f;
-            chargerLight->TriggerEventFlicker(ChargerFlickerSeconds, ChargerFlickerStrength);
-        }
-        constexpr float ChargerBloomPeak = 0.66f;
-        constexpr float ChargerBloomSeconds = 0.24f;
-        constexpr int ChargerVibrationStrength = 6;
-        constexpr float ChargerVibrationSeconds = 0.14f;
-        game->GetPostProcess()->TriggerBloomPulse(ChargerBloomPeak, ChargerBloomSeconds);
-        Input::SetVibration(ChargerVibrationStrength, ChargerVibrationSeconds);
+        return;
     }
+    Core::Game* game = Core::Game::GetInstance();
+    m_ChargerHandled = true;
+    m_ChargerNoticeTimer = ChargerNoticeSeconds;
+    player.AddBattery(ChargerBattery);
+    game->RegisterChargerUsed();
+    // 充電器の物音には、ヒューズ2本目と同じ強さの影を使う。
+    StartFuseWatcher(ChargerWatcherFuseCount);
 
-    // 各演出と仕組みを順に更新している
-    UpdateCorridorLoop(*player);
-    UpdateEntranceThresholdEvent(*player);
-    UpdateStorageScare(*player);
+    CeilingLight* chargerLight = m_Objects.CeilingLightAt(ChargerCeilingLightIndex);
+    if (chargerLight != nullptr)
+    {
+        EventFeedback::Flicker(*chargerLight, ChargerFlicker);
+    }
+    EventFeedback::BloomPulse(*game->GetPostProcess(), ChargerBloom);
+    EventFeedback::Rumble(ChargerRumble);
+}
+
+// 各演出と仕組みを順に更新している（ループ廊下・入口・倉庫・照明の連鎖・電力の復旧・出口・壁の文字・足跡・
+// 隠し部屋・書類保管室の影・無線・西棟・3本目のヒューズ・天井の映り込み・次に進む方向の灯り・心拍）
+void StageScene::UpdateStageEvents(Player& player, float deltaTime)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    UpdateCorridorLoop(player);
+    UpdateEntranceThresholdEvent(player);
+    UpdateStorageScare(player);
     UpdateScareLightSequence();
     UpdatePowerRestoreSequence();
     UpdateExitPowerSequence();
-    UpdateExitOmen(*player);
-    UpdateWallWritings(*player);
-    UpdateFootprintFollower(*player);
+    UpdateExitOmen(player);
+    UpdateWallWritings(player);
+    UpdateFootprintFollower(player);
     // 隠し部屋の影も、書類保管室の影と同じく、棚・壁・閉じた扉を通り抜けずに回り込む
-    m_HiddenRoom.Update(*player, deltaTime, m_KeypadDoor.IsSolved(),
+    m_HiddenRoom.Update(player, deltaTime, m_KeypadDoor.IsSolved(),
         [this](Vector3& position, float radius)
         {
             for (const Wall* wall : m_StalkerWalls)
@@ -599,11 +702,11 @@ void StageScene::Update()
                 door->ResolveCollision(position, radius);
             }
         });
-    const bool archiveStalkerLit = UpdateArchiveStalker(*player, deltaTime);
-    UpdateTransmissions(*player, deltaTime, archiveStalkerLit);
+    const bool archiveStalkerLit = UpdateArchiveStalker(player, deltaTime);
+    UpdateTransmissions(player, deltaTime, archiveStalkerLit);
     // 西棟の進行（排水バルブの長押しを含む）と、水の滴る音・背後で水の中を歩く音などの物音。
     m_WestWingCues.clear();
-    m_WestWing.Update(*player, deltaTime, game->GetCamera()->GetForward(),
+    m_WestWing.Update(player, deltaTime, game->GetCamera()->GetForward(),
         m_InteractionSystem.GetFocusedInteractable(), m_WestWingCues);
     for (const AmbientSoundCue& cue : m_WestWingCues)
     {
@@ -612,171 +715,174 @@ void StageScene::Update()
     }
     // 西棟がヒューズを出した後に、3本目の手に入れ方を整えている（暗証番号の部屋のヒューズを取っていれば、西棟のヒューズを消す）
     UpdateThirdFuseRoutes();
-    UpdateCeilingReflection(*player, deltaTime);
+    UpdateCeilingReflection(player, deltaTime);
     UpdateRouteLights();
-    UpdateTensionPulse(*player, deltaTime);
+    UpdateTensionPulse(player, deltaTime);
+}
 
-    // 最後のドア：電力が戻る前は開けて通ると次の周回へ進む（UpdateCorridorLoop）。
-    // 電力が戻ってから出口の送電が終わるまでは鍵をかけ、送電が終わったら、開けて通り抜けたときに2面への脱出を始めている。
+// 最後のドア：電力が戻る前は開けて通ると次の周回へ進む（UpdateCorridorLoop）。
+// 電力が戻ってから出口の送電が終わるまでは鍵をかけ、送電が終わったら、開けて通り抜けたときに2面への脱出を始めている。
+void StageScene::UpdateExitDoor(Player& player)
+{
     Door* stageExitDoor = m_Objects.exitDoor;
+    if (stageExitDoor == nullptr)
+    {
+        return;
+    }
     ExitTrigger* stageExit = m_Objects.exitTrigger;
     const bool exitPowerReady = m_PowerSequence.IsExitComplete();
-    if (stageExitDoor != nullptr)
+    const bool waitingForExitPower = Core::Game::GetInstance()->IsPowerRestored() && !exitPowerReady;
+    // 周回のために開けたまま電力を戻した場合は、閉じてから鍵をかけている（送電の前に通れないようにする）
+    if (waitingForExitPower && !stageExitDoor->IsLocked())
     {
-        const bool waitingForExitPower = game->IsPowerRestored() && !exitPowerReady;
-        // 周回のために開けたまま電力を戻した場合は、閉じてから鍵をかけている（送電の前に通れないようにする）
-        if (waitingForExitPower && !stageExitDoor->IsLocked())
-        {
-            stageExitDoor->ResetClosed(0);
-        }
-        stageExitDoor->SetLocked(waitingForExitPower);
-        if (exitPowerReady && stageExit != nullptr && !stageExit->IsEscaping() &&
-            IsThroughEndDoor(player->GetPosition()))
-        {
-            // ドアの先の階段を、自動で上らせている（上の踊り場の奥へ向けて歩き、段ごとに目の高さを上げる）。
-            // 上り切る頃に、出口の演出が2面へ移す
-            if (stageExit->IsStairClimb())
-            {
-                const Vector3 position = player->GetPosition();
-                const Vector3 landing(
-                    Stage1StairStartX + Stage1StairStepRun * static_cast<float>(Stage1StairStepCount) +
-                        Player::ExitClimbLandingDepth,
-                    position.y, Stage1EndDoorZ);
-                player->StartStairClimb(Player::MakeExitClimb(position, Vector3(1.0f, 0.0f, 0.0f), Stage1StairStartX,
-                    Stage1StairStepRun, Stage1StairStepRise, Stage1StairStepCount, landing));
-            }
-            stageExit->BeginEscape(*player);
-        }
+        stageExitDoor->ResetClosed(0);
     }
+    stageExitDoor->SetLocked(waitingForExitPower);
+    if (!exitPowerReady || stageExit == nullptr || stageExit->IsEscaping() ||
+        !IsThroughEndDoor(player.GetPosition()))
+    {
+        return;
+    }
+    // ドアの先の階段を、自動で上らせている（上の踊り場の奥へ向けて歩き、段ごとに目の高さを上げる）。
+    // 上り切る頃に、出口の演出が2面へ移す
+    if (stageExit->IsStairClimb())
+    {
+        const Vector3 position = player.GetPosition();
+        const Vector3 landing(
+            Stage1StairStartX + Stage1StairStepRun * static_cast<float>(Stage1StairStepCount) +
+                Player::ExitClimbLandingDepth,
+            position.y, Stage1EndDoorZ);
+        player.StartStairClimb(Player::MakeExitClimb(position, Vector3::UnitX, Stage1StairStartX,
+            Stage1StairStepRun, Stage1StairStepRise, Stage1StairStepCount, landing));
+    }
+    stageExit->BeginEscape(player);
+}
 
-    // 出口の表示：送電が終わるまで赤く、終わったら緑で脈打たせている
+// 出口の表示：送電が終わるまで赤く、終わったら緑で脈打たせている。開始地点の奥のドアの裏側の表示も同じ赤で脈打たせ、
+// 扉のランプは、出口の前兆の間は速く点滅させている
+void StageScene::UpdateExitSigns()
+{
+    const bool powerRestored = Core::Game::GetInstance()->IsPowerRestored();
+    const bool exitPowerReady = m_PowerSequence.IsExitComplete();
+    const auto signPulse = [this](float speed)
+    {
+        return ExitSignPulseBase + std::sin(m_StageVisualTimer * speed) * ExitSignPulseAmount;
+    };
+
     Wall* stageExitSign = m_Objects.exitSign;
     if (stageExitSign != nullptr)
     {
-        const float pulse = 0.78f +
-            std::sin(m_StageVisualTimer *
-                (game->IsPowerRestored() ? 3.2f : 7.4f)) * 0.16f;
+        const float pulse = signPulse(powerRestored ? ExitSignCalmPulseSpeed : ExitSignAlarmPulseSpeed);
         if (exitPowerReady)
         {
             stageExitSign->SetAppearance(
-                Color(0.025f, 0.24f, 0.06f, 1.0f),
-                Color(0.006f, 0.36f * pulse, 0.025f, 1.0f),
-                34.0f);
+                ExitSignReadyDiffuse,
+                Color(ExitSignReadyEmission.x, ExitSignReadyEmission.y * pulse, ExitSignReadyEmission.z, 1.0f),
+                ExitSignReadyShininess);
         }
         else
         {
             stageExitSign->SetAppearance(
-                Color(0.24f, 0.025f, 0.018f, 1.0f),
-                Color(0.32f * pulse, 0.004f, 0.002f, 1.0f),
-                30.0f);
+                ExitSignWaitingDiffuse,
+                Color(ExitSignWaitingEmission.x * pulse, ExitSignWaitingEmission.y, ExitSignWaitingEmission.z, 1.0f),
+                ExitSignWaitingShininess);
         }
     }
-    // 開始地点の奥のドアの裏側の表示は、最後のドアの表示（送電の前の赤）と同じように脈打たせている
     if (m_Objects.startDoorSign != nullptr)
     {
-        const float pulse = 0.78f + std::sin(m_StageVisualTimer * 7.4f) * 0.16f;
+        const float pulse = signPulse(ExitSignAlarmPulseSpeed);
         m_Objects.startDoorSign->SetAppearance(
-            Color(0.24f, 0.025f, 0.018f, 1.0f),
-            Color(0.32f * pulse, 0.004f, 0.002f, 1.0f),
-            30.0f);
+            ExitSignWaitingDiffuse,
+            Color(ExitSignWaitingEmission.x * pulse, ExitSignWaitingEmission.y, ExitSignWaitingEmission.z, 1.0f),
+            ExitSignWaitingShininess);
     }
 
-    // 扉のランプ：出口の前兆の間は速く点滅させている
     Wall* exitIndicator = m_Objects.doorIndicator;
-    if (exitIndicator != nullptr)
+    if (exitIndicator == nullptr)
     {
-        const float omenRate = m_ExitOmenSequence.IsTriggered()
-            ? 1.0f - (std::clamp)(
-                m_ExitOmenSequence.GetTimer() / ExitOmenBlinkSeconds, 0.0f, 1.0f)
-            : 0.0f;
-        const float indicatorPulse =
-            0.72f + std::sin(m_StageVisualTimer *
-                (3.2f + omenRate * 8.0f)) *
-                (0.10f + omenRate * 0.14f);
-        if (exitPowerReady)
-        {
-            exitIndicator->SetAppearance(
-                Color(0.025f, 0.20f, 0.055f, 1.0f),
-                Color(0.005f, 0.24f * indicatorPulse, 0.025f, 1.0f),
-                30.0f);
-        }
-        else
-        {
-            exitIndicator->SetAppearance(
-                Color(0.24f, 0.025f, 0.018f, 1.0f),
-                Color(0.28f * indicatorPulse, 0.004f, 0.002f, 1.0f),
-                28.0f);
-        }
+        return;
     }
+    const float omenRate = m_ExitOmenSequence.IsTriggered()
+        ? 1.0f - (std::clamp)(
+            m_ExitOmenSequence.GetTimer() / ExitOmenBlinkSeconds, 0.0f, 1.0f)
+        : 0.0f;
+    const float indicatorPulse =
+        IndicatorPulseBase + std::sin(m_StageVisualTimer *
+            (IndicatorPulseSpeed + omenRate * IndicatorOmenPulseSpeed)) *
+            (IndicatorPulseAmount + omenRate * IndicatorOmenPulseAmount);
+    if (exitPowerReady)
+    {
+        exitIndicator->SetAppearance(
+            IndicatorReadyDiffuse,
+            Color(IndicatorReadyEmission.x, IndicatorReadyEmission.y * indicatorPulse, IndicatorReadyEmission.z, 1.0f),
+            IndicatorReadyShininess);
+    }
+    else
+    {
+        exitIndicator->SetAppearance(
+            ExitSignWaitingDiffuse,
+            Color(IndicatorWaitingRed * indicatorPulse, ExitSignWaitingEmission.y, ExitSignWaitingEmission.z, 1.0f),
+            IndicatorWaitingShininess);
+    }
+}
 
-    // 画面効果：電池の少なさ・走っているか・ループ廊下の奥への近さで、ノイズと周辺減光を強めている
-    float lowBattery = (LowBatteryThreshold - player->GetBattery()) / LowBatteryThreshold;
-    if (lowBattery < 0.0f) lowBattery = 0.0f;
-    if (lowBattery > 1.0f) lowBattery = 1.0f;
-
-    const float powerBlend = game->IsPowerRestored()
+// 画面効果：電池の少なさ・走っているか・ループ廊下の奥への近さで、ノイズと周辺減光を強めている
+void StageScene::UpdateScreenAtmosphere(const Player& player)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    const bool powerRestored = game->IsPowerRestored();
+    const float lowBattery = (std::clamp)((LowBatteryThreshold - player.GetBattery()) / LowBatteryThreshold, 0.0f, 1.0f);
+    const float powerBlend = powerRestored
         ? (std::clamp)(
             m_PowerSequence.GetRestoreTimer() / PowerRestoreBlendSeconds, 0.0f, 1.0f)
         : 0.0f;
-    const float powerCalm = 0.03f * powerBlend;
-    const float sprintStress = player->IsSprinting() ? 1.0f : 0.0f;
-    const Vector3 playerPosition = player->GetPosition();
+    const float powerCalm = PowerRestoredCalm * powerBlend;
+    const float sprintStress = player.IsSprinting() ? 1.0f : 0.0f;
+    const Vector3 playerPosition = player.GetPosition();
 
     // ループ廊下の奥ほど圧迫感を強め、周回の数に応じて基準の値も上げている。
-    // 電力が戻った後は効果を外し、状況が変わったことを伝えている。
+    // 電力が戻った後は効果を外し、出口の前だけに弱く残して、状況が変わったことを伝えている。
     const float corridorDepth = (std::clamp)(
-        (playerPosition.z - 90.0f) / 190.0f,
+        (playerPosition.z - CorridorTensionStartZ) / CorridorTensionDepth,
         0.0f,
         1.0f);
-    const float corridorWidthMask = 1.0f - (std::clamp)(
-        (std::abs(playerPosition.x) - 75.0f) / 105.0f,
-        0.0f,
-        1.0f);
+    const float corridorWidthMask = MathUtility::Proximity(
+        std::abs(playerPosition.x), CorridorTensionHalfWidth, CorridorTensionWidthFade);
     const float loopTension = (std::min)(
-        static_cast<float>(m_CorridorLoopCount) * 0.14f,
-        0.42f);
+        static_cast<float>(m_CorridorLoopCount) * LoopTensionPerLoop,
+        LoopTensionMax);
     const float poweredExitDepth = (std::clamp)(
-        (playerPosition.z - 190.0f) / 105.0f,
+        (playerPosition.z - PoweredExitTensionStartZ) / PoweredExitTensionDepth,
         0.0f,
         1.0f);
-    const float corridorTension = game->IsPowerRestored()
-        ? poweredExitDepth * 0.38f
+    const float corridorTension = powerRestored
+        ? poweredExitDepth * PoweredExitTension
         : (std::clamp)(
-            corridorDepth * corridorWidthMask * 0.72f + loopTension,
+            corridorDepth * corridorWidthMask * CorridorDepthTension + loopTension,
             0.0f,
             1.0f);
     game->GetPostProcess()->SetCorridorTension(corridorTension);
 
     // ホラーらしい暗さを保ちつつ、懐中電灯なしでも時間とともに目が慣れ、
-    // 最低限動ける明るさにしている。
-    const float targetExposure = game->IsPowerRestored()
-        ? 1.12f + (1.01f - 1.12f) * powerBlend
-        : (player->IsFlashlightOn() ? 1.04f : 1.15f);
+    // 最低限動ける明るさにしている。電力が戻ったら、普段の明るさへ移していく
+    const float targetExposure = powerRestored
+        ? PowerOffExposure + (PoweredExposure - PowerOffExposure) * powerBlend
+        : (player.IsFlashlightOn() ? FlashlightOnExposure : FlashlightOffExposure);
     game->GetPostProcess()->SetExposure(targetExposure);
     // 暖かい灯りの下（光の安全地帯）では、ざらつきと周辺の暗さを和らげ、ほっとできる画面にしている
     const float safeCalm = m_SafeLights.GetCalm();
     const float noiseAmount =
-        0.18f - powerCalm + lowBattery * 0.18f +
-        sprintStress * 0.04f + corridorTension * 0.055f - safeCalm * 0.07f;
+        NoiseBase - powerCalm + lowBattery * NoiseLowBattery +
+        sprintStress * NoiseSprint + corridorTension * NoiseTension - safeCalm * NoiseSafeCalm;
     const float vignetteStrength =
-        0.55f - powerCalm + lowBattery * 0.20f +
-        sprintStress * 0.06f + corridorTension * 0.075f - safeCalm * 0.15f;
+        VignetteBase - powerCalm + lowBattery * VignetteLowBattery +
+        sprintStress * VignetteSprint + corridorTension * VignetteTension - safeCalm * VignetteSafeCalm;
 
-    game->GetPostProcess()->SetAtmosphere(
-        noiseAmount,
-        vignetteStrength);
-    game->GetPostProcess()->SetLensDistortionStrength(
-        0.20f + corridorTension * 0.22f);
-    game->GetPostProcess()->SetFilmGradeStrength(
-        0.52f + corridorTension * 0.18f);
-    game->GetPostProcess()->SetLensDirtStrength(
-        0.10f + corridorTension * 0.12f);
-
-    // 調べる対象を選び、Eキー（A）で調べている
-    m_InteractionSystem.Update(*player);
+    game->GetPostProcess()->SetAtmosphere(noiseAmount, vignetteStrength);
+    game->GetPostProcess()->SetLensDistortionStrength(DistortionBase + corridorTension * DistortionTension);
+    game->GetPostProcess()->SetFilmGradeStrength(FilmGradeBase + corridorTension * FilmGradeTension);
+    game->GetPostProcess()->SetLensDirtStrength(LensDirtBase + corridorTension * LensDirtTension);
 }
-
-
 
 // 描画の設定と画面効果を普段の値に戻し、配置で作ったObjectを破棄している
 void StageScene::Uninit()
