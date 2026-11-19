@@ -20,7 +20,7 @@ struct PS_IN
 };
 
 // FullScreenQuad.cppのToneMapBufferと同じ並び（b0）
-cbuffer ToneMapBuffer : register(b0)
+cbuffer ToneMapBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_TONE_MAP_BUFFER_SLOT))
 {
     uint ToneMapMode;   // 0 = ACES、1 = HDRにする前に近い曲線、2 = 曲線なし（デバッグ表示）、3 = Reinhard（Effect::ToneMapMode）
     uint3 ToneMapPadding;

@@ -3,7 +3,7 @@
 #include "renderingConfig.hlsli"
 
 // FullScreenQuad.h の TimeBuffer と同じ並び。画面効果の PS は共通の b0 を読む。
-cbuffer TimeBuffer : register(b0)
+cbuffer TimeBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_POST_EFFECT_BUFFER_SLOT))
 {
     float time;
     float bloomIntensity;

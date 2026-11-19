@@ -10,6 +10,8 @@
 // ============================================================================
 #ifndef DDGI_UPDATE_INCLUDED
 #define DDGI_UPDATE_INCLUDED
+#include "renderingConfig.hlsli"
+#include "computeDispatchConfig.hlsli"
 
 #include "ddgiCommon.hlsli"
 
@@ -24,9 +26,9 @@ static const float DDGI_DISTANCE_SHARPNESS = 50.0f;
 #define DDGI_RESET_THRESHOLD 0.5f
 
 // このフレームの光線の結果（ddgiTraceCS）と、前の画像（ピンポンのもう片方）、書き込む画像
-Texture2D<float4> RayResults : register(t1);
-Texture2D<float4> PreviousAtlas : register(t4);
-RWTexture2D<float4> OutputAtlas : register(u0);
+Texture2D<float4> RayResults : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_DDGI_RAY_RESULTS_SLOT));
+Texture2D<float4> PreviousAtlas : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_DDGI_PREVIOUS_ATLAS_SLOT));
+RWTexture2D<float4> OutputAtlas : register(SIGNAL_LOST_UAV_REGISTER(SIGNAL_LOST_DDGI_OUTPUT_SLOT));
 
 // 区画の中の画素の新しい値（縁を書くために、グループで共有している）
 // タイルの外周は4辺と4つの隅に分けて配置する。

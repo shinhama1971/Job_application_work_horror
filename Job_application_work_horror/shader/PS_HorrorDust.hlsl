@@ -3,6 +3,7 @@
 // 定数バッファのスロットと入出力の形は、CPU側の定義（ScreenDustOverlay.hのTimeBuffer）と一致させている。
 // ============================================================================
 
+#include "renderingConfig.hlsli"
 // 頂点シェーダー（unlitTextureVS）から受け取る値
 struct PS_IN
 {
@@ -12,7 +13,7 @@ struct PS_IN
 };
 
 // 経過時間、強さ（0〜1）、16バイトにそろえる詰め物
-cbuffer TimeBuffer : register(b0)
+cbuffer TimeBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_DUST_TIME_BUFFER_SLOT))
 {
     float time;
     float power;

@@ -210,13 +210,15 @@ namespace Effect
         {
             ID3D11Device* device = Renderer::GetDevice();
             D3D11_BUFFER_DESC stateDesc{};
-            stateDesc.ByteWidth = sizeof(float) * 2;
+            constexpr unsigned int stateCount = SIGNAL_LOST_EXPOSURE_GAIN_INDEX + 1;
+            stateDesc.ByteWidth = sizeof(float) * stateCount;
             stateDesc.StructureByteStride = sizeof(float);
             stateDesc.Usage = D3D11_USAGE_DEFAULT;
             stateDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
             stateDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
             // 最初の値は「倍率1」にしている（最初のフレームは、すぐ今の明るさに慣れさせる）
-            const float initialState[2] = { 0.0f, 1.0f };
+            float initialState[stateCount] = {};
+            initialState[SIGNAL_LOST_EXPOSURE_GAIN_INDEX] = 1.0f;
             D3D11_SUBRESOURCE_DATA initialData{};
             initialData.pSysMem = initialState;
 
@@ -515,14 +517,14 @@ namespace Effect
             UINT groupY)
         {
             shader.SetGPU();
-            context->CSSetShaderResources(0, 1, &input);
-            context->CSSetUnorderedAccessViews(0, 1, &output, nullptr);
+            context->CSSetShaderResources(SIGNAL_LOST_BLOOM_COMPUTE_INPUT_SLOT, 1, &input);
+            context->CSSetUnorderedAccessViews(SIGNAL_LOST_BLOOM_COMPUTE_OUTPUT_SLOT, 1, &output, nullptr);
             context->Dispatch(groupX, groupY, 1);
 
             ID3D11ShaderResourceView* nullSRV = nullptr;
             ID3D11UnorderedAccessView* nullUAV = nullptr;
-            context->CSSetShaderResources(0, 1, &nullSRV);
-            context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
+            context->CSSetShaderResources(SIGNAL_LOST_BLOOM_COMPUTE_INPUT_SLOT, 1, &nullSRV);
+            context->CSSetUnorderedAccessViews(SIGNAL_LOST_BLOOM_COMPUTE_OUTPUT_SLOT, 1, &nullUAV, nullptr);
         };
 
         // 明るい部分の抽出（8x8の画素を1グループとして処理している）
@@ -609,19 +611,19 @@ namespace Effect
 
         m_AutoExposureShader.SetGPU();
         ID3D11Buffer* paramsBuffer = m_AutoExposureParams.Get();
-        context->CSSetConstantBuffers(0, 1, &paramsBuffer);
+        context->CSSetConstantBuffers(SIGNAL_LOST_AUTO_EXPOSURE_PARAMS_SLOT, 1, &paramsBuffer);
         ID3D11ShaderResourceView* sceneSRV = m_RenderTexture.GetSRV();
-        context->CSSetShaderResources(0, 1, &sceneSRV);
+        context->CSSetShaderResources(SIGNAL_LOST_AUTO_EXPOSURE_SCENE_SLOT, 1, &sceneSRV);
         ID3D11UnorderedAccessView* stateUAV = m_AutoExposureUAV.Get();
-        context->CSSetUnorderedAccessViews(0, 1, &stateUAV, nullptr);
+        context->CSSetUnorderedAccessViews(SIGNAL_LOST_AUTO_EXPOSURE_STATE_SLOT, 1, &stateUAV, nullptr);
 
         // 1グループだけで画面全体を測っている（64x64点）
         context->Dispatch(1, 1, 1);
 
         ID3D11ShaderResourceView* nullSRV = nullptr;
         ID3D11UnorderedAccessView* nullUAV = nullptr;
-        context->CSSetShaderResources(0, 1, &nullSRV);
-        context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
+        context->CSSetShaderResources(SIGNAL_LOST_AUTO_EXPOSURE_SCENE_SLOT, 1, &nullSRV);
+        context->CSSetUnorderedAccessViews(SIGNAL_LOST_AUTO_EXPOSURE_STATE_SLOT, 1, &nullUAV, nullptr);
         context->CSSetShader(nullptr, nullptr, 0);
         Renderer::SetBackBufferRenderTarget();
     }

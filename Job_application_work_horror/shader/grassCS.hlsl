@@ -7,6 +7,7 @@
 // ・最後に葉先を葉の長さの球の上へ戻し、地面にめり込まないよう高さの下限を付けている（葉が伸び縮みして見えないように）。
 // ============================================================================
 
+#include "renderingConfig.hlsli"
 #include "fastNoise.hlsli"
 #include "computeDispatchConfig.hlsli"
 
@@ -30,7 +31,7 @@ struct GrassState
 };
 
 // ForestGrass.cpp の SimulationParams と同じ並び（b0）
-cbuffer GrassSimulationBuffer : register(b0)
+cbuffer GrassSimulationBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_GRASS_SIM_PARAMS_SLOT))
 {
     float Time;
     float DeltaTime;
@@ -46,8 +47,8 @@ cbuffer GrassSimulationBuffer : register(b0)
     float UnseenStrength;   // 0 なら通っていない
 }
 
-StructuredBuffer<GrassBlade> g_Blades : register(t0);
-RWStructuredBuffer<GrassState> g_States : register(u0);
+StructuredBuffer<GrassBlade> g_Blades : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_GRASS_SIM_INPUT_SLOT));
+RWStructuredBuffer<GrassState> g_States : register(SIGNAL_LOST_UAV_REGISTER(SIGNAL_LOST_GRASS_SIM_OUTPUT_SLOT));
 
 // 場所ごとに位相をずらし、草むらを渡る突風と葉ごとの細かい動きを重ねる。
 static const float GRASS_GUST_SPATIAL_SCALE = 0.011f;

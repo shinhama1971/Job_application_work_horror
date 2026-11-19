@@ -5,6 +5,7 @@
 // ============================================================================
 
 #include "WaterRippleSimulation.h"
+#include "shader/computeDispatchConfig.hlsli"
 
 #include "Renderer.h"
 #include "utility.h"
@@ -143,7 +144,7 @@ void WaterRippleSimulation::Update(float deltaTime, const Vector2& centerXZ,
 
     m_Shader.SetGPU();
     ID3D11Buffer* paramsBuffer = m_ParamsBuffer.Get();
-    context->CSSetConstantBuffers(0, 1, &paramsBuffer);
+    context->CSSetConstantBuffers(SIGNAL_LOST_RIPPLE_PARAMS_SLOT, 1, &paramsBuffer);
     context->CSSetConstantBuffers(PuddleCellBufferSlot, 1, &puddleCellBuffer);
 
     // 波を跳ね返す物のうち、計算する範囲に掛かっている物だけを、最大数まで選んでいる
@@ -190,12 +191,12 @@ void WaterRippleSimulation::Update(float deltaTime, const Vector2& centerXZ,
         const int nextState = 1 - m_CurrentState;
         ID3D11ShaderResourceView* input = m_States[m_CurrentState].GetSRV();
         ID3D11UnorderedAccessView* output = m_States[nextState].GetUAV();
-        context->CSSetShaderResources(0, 1, &input);
-        context->CSSetUnorderedAccessViews(0, 1, &output, nullptr);
+        context->CSSetShaderResources(SIGNAL_LOST_RIPPLE_PREVIOUS_STATE_SLOT, 1, &input);
+        context->CSSetUnorderedAccessViews(SIGNAL_LOST_RIPPLE_NEXT_STATE_SLOT, 1, &output, nullptr);
         context->Dispatch(groupCount, groupCount, 1);
         ID3D11UnorderedAccessView* nullUAV = nullptr;
-        context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
-        context->CSSetShaderResources(0, 1, &nullSRV);
+        context->CSSetUnorderedAccessViews(SIGNAL_LOST_RIPPLE_NEXT_STATE_SLOT, 1, &nullUAV, nullptr);
+        context->CSSetShaderResources(SIGNAL_LOST_RIPPLE_PREVIOUS_STATE_SLOT, 1, &nullSRV);
         m_CurrentState = nextState;
     }
 

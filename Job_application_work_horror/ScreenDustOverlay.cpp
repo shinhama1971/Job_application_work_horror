@@ -117,7 +117,7 @@ void ScreenDustOverlay::Draw(Camera* /*camera*/)
     m_Material->SetGPU();
 
     ID3D11Buffer* timeBuffer = m_TimeBuffer.Get();
-    context->PSSetConstantBuffers(0, 1, &timeBuffer);
+    context->PSSetConstantBuffers(SIGNAL_LOST_DUST_TIME_BUFFER_SLOT, 1, &timeBuffer);
 
     context->IASetPrimitiveTopology(
         D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP

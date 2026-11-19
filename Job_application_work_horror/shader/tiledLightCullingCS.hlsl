@@ -11,6 +11,8 @@
 //   一番奥の深度だけを使えば、半透明の物や、プリパスに描いていない物の画素も取りこぼさない。
 // ============================================================================
 
+#include "renderingConfig.hlsli"
+#include "computeDispatchConfig.hlsli"
 // タイルの大きさ、1タイルに入れる光源の上限、1タイルのスレッド数（TiledLighting.hと同じ値）
 #include "tiledLightingConfig.hlsli"
 #define TILE_SIZE SIGNAL_LOST_LIGHT_TILE_SIZE
@@ -30,7 +32,7 @@ struct POINT_LIGHT
 };
 
 // TiledLighting.cppのCullingParamsと同じ並び（b0）
-cbuffer TileCullingBuffer : register(b0)
+cbuffer TileCullingBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_TILE_CULL_PARAMS_SLOT))
 {
     float4x4 InverseViewProjection;
     float4 CameraPosition;
@@ -43,10 +45,10 @@ cbuffer TileCullingBuffer : register(b0)
     float2 ViewportOffset;
 };
 
-StructuredBuffer<POINT_LIGHT> PointLights : register(t0);   // 読み取り専用なのでSRV
-Texture2D<float> PrepassDepth : register(t1);               // 深度プリパスで本描画の深度バッファに描いた深度（0=手前、1=一番奥）
-RWStructuredBuffer<uint> TileLightIndices : register(u0);   // タイルの数 x MAX_LIGHTS_PER_TILE
-RWStructuredBuffer<uint> TileLightCounts : register(u1);    // タイルごとの光源の数
+StructuredBuffer<POINT_LIGHT> PointLights : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_TILE_CULL_LIGHTS_SLOT));   // 読み取り専用なのでSRV
+Texture2D<float> PrepassDepth : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_TILE_CULL_DEPTH_SLOT));               // 深度プリパスで本描画の深度バッファに描いた深度（0=手前、1=一番奥）
+RWStructuredBuffer<uint> TileLightIndices : register(SIGNAL_LOST_UAV_REGISTER(SIGNAL_LOST_TILE_CULL_INDICES_SLOT));   // タイルの数 x MAX_LIGHTS_PER_TILE
+RWStructuredBuffer<uint> TileLightCounts : register(SIGNAL_LOST_UAV_REGISTER(SIGNAL_LOST_TILE_CULL_COUNTS_SLOT));    // タイルごとの光源の数
 
 // グループ内で共有する、タイルの光源の数・光源の番号・視錐台の4つの平面・一番奥の深度
 groupshared uint g_TileLightCount;

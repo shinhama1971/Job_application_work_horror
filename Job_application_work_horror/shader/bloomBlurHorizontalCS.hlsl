@@ -2,11 +2,12 @@
 // シェーダーの役割: ブルームの画像を、横方向にガウシアンぼかしで、にじませている。
 // ============================================================================
 
+#include "renderingConfig.hlsli"
 #include "computeDispatchConfig.hlsli"
 
 // 入力の画像（t0）と、書き込む先（u0）
-Texture2D<float4> InputTexture : register(t0);
-RWTexture2D<float4> OutputTexture : register(u0);
+Texture2D<float4> InputTexture : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_BLOOM_COMPUTE_INPUT_SLOT));
+RWTexture2D<float4> OutputTexture : register(SIGNAL_LOST_UAV_REGISTER(SIGNAL_LOST_BLOOM_COMPUTE_OUTPUT_SLOT));
 
 // 1グループの画素の数（128）、ぼかしの半径（左右4画素）、共有メモリに置く画素の数（両端の分も含む）
 static const int GroupSize = SIGNAL_LOST_BLOOM_BLUR_GROUP_SIZE;

@@ -11,7 +11,7 @@
 #        README.txt              遊ぶ人向けの説明（distribution\README.txt）
 #        THIRD_PARTY_NOTICES.txt 使っているライブラリと素材の一覧（distribution\THIRD_PARTY_NOTICES.txt）
 #        licenses\               ライブラリのライセンスの全文
-#   3. 同じ名前の zip を release\ に作る（日本語のファイル名も化けないよう、UTF-8 で名前を書く）
+#   3. UTF-8 のファイル名で仮の ZIP を作り、確認が通ってから配布用の名前にする
 #   4. 配布用のフォルダの exe を、別のフォルダを作業フォルダにして自動撮影で動かし、最後まで動くか確かめる（-SkipTest で省ける）
 #
 # release\ は .gitignore で外している（[Rr]elease/）。前に作ったフォルダは消さず、毎回新しい名前で作る。
@@ -136,23 +136,31 @@ foreach ($license in $licenses) {
     Copy-Item $source (Join-Path $licenseDir $license.Name)
 }
 
-# --- 3. zip を作る
+# --- 3. 仮の ZIP を作る（起動テストでフォルダに追加されたファイルは入れない）
 $zipPath = Join-Path $OutputRoot "$packageName.zip"
-Write-Step "zip を作っています: $zipPath"
+$pendingZipPath = "$zipPath.partial"
+Write-Step "仮の ZIP を作っています: $pendingZipPath"
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory(
-    $packageDir, $zipPath, [System.IO.Compression.CompressionLevel]::Optimal, $true, [System.Text.Encoding]::UTF8)
+    $packageDir, $pendingZipPath, [System.IO.Compression.CompressionLevel]::Optimal, $true, [System.Text.Encoding]::UTF8)
 
 # --- 4. 配布用のフォルダから起動して確かめる
 if (-not $SkipTest) {
     Write-Step "配布用のフォルダの exe を、別の作業フォルダから自動撮影で動かしています（森の道順。1分ほど）"
-    $testDir = Join-Path ([IO.Path]::GetTempPath()) "SignalLost_release_check_$stamp"
+    $testDir = Join-Path ([IO.Path]::GetTempPath()) ("SignalLost_release_check_" + [guid]::NewGuid().ToString("N"))
     New-Item -ItemType Directory -Force $testDir | Out-Null
     $process = Start-Process -FilePath (Join-Path $packageDir "SignalLost.exe") `
         -ArgumentList "--forest", "--capture", "`"$testDir`"" `
-        -WorkingDirectory ([IO.Path]::GetTempPath()) -PassThru -Wait
-    $images = @(Get-ChildItem $testDir -Filter *.png -File -ErrorAction SilentlyContinue)
-    if ($process.ExitCode -ne 0 -or $images.Count -eq 0) {
+        -WorkingDirectory ([IO.Path]::GetTempPath()) -WindowStyle Hidden -PassThru
+    $testTimeoutMinutes = 10
+    $testTimeoutMilliseconds = [int][TimeSpan]::FromMinutes($testTimeoutMinutes).TotalMilliseconds
+    if (-not $process.WaitForExit($testTimeoutMilliseconds)) {
+        Stop-Process -InputObject $process -ErrorAction SilentlyContinue
+        throw "配布用の起動確認が $testTimeoutMinutes 分で完了しませんでした。ログの場所: $testDir"
+    }
+    $images = @(Get-ChildItem -LiteralPath $testDir -Filter *.png -File -ErrorAction SilentlyContinue | Where-Object Length -gt 0)
+    $video = Get-Item -LiteralPath (Join-Path $testDir "プレイ動画.mp4") -ErrorAction SilentlyContinue
+    if ($process.ExitCode -ne 0 -or $images.Count -eq 0 -or $null -eq $video -or $video.Length -le 0) {
         throw "配布用のフォルダからの起動の確認に失敗しました（終了コード $($process.ExitCode)、画像 $($images.Count) 枚）。$testDir を確かめてください。"
     }
     Write-Host "起動の確認に成功（終了コード0、画像 $($images.Count) 枚。$testDir）"
@@ -163,6 +171,9 @@ if (-not $SkipTest) {
         $newFiles | ForEach-Object { Write-Host "  $($_.FullName)" }
     }
 }
+
+# --- 起動テストが通った ZIP を完成名にする（-SkipTest は作者の指定で検証を省く）
+[IO.File]::Move($pendingZipPath, $zipPath)
 
 # --- まとめ
 $sizeMB = (Get-Item $zipPath).Length / 1MB

@@ -8,6 +8,8 @@
 //   CPUへ読み戻さないため、GPUの処理を待たずに済む。
 // ============================================================================
 
+#include "renderingConfig.hlsli"
+#include "computeDispatchConfig.hlsli"
 // 1グループのスレッドの数（16x16）と、1スレッドが読む点の数（4x4）
 #define GROUP_SIZE 16
 #define SAMPLES_PER_THREAD 4
@@ -15,7 +17,7 @@
 #define THREAD_COUNT (GROUP_SIZE * GROUP_SIZE)
 
 // PostProcess.cppのAutoExposureParamsと同じ並び（b0）
-cbuffer AutoExposureBuffer : register(b0)
+cbuffer AutoExposureBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_AUTO_EXPOSURE_PARAMS_SLOT))
 {
     float DeltaTime;            // 前のフレームからの秒数
     float TargetLuminance;      // 目標にする明るさ（この明るさなら倍率1）
@@ -27,8 +29,8 @@ cbuffer AutoExposureBuffer : register(b0)
     float ResetAdaptation;      // 1なら今の画面の明るさにすぐ慣れさせる（始めのフレーム）
 };
 
-Texture2D<float4> SceneTexture : register(t0);              // 画面効果を掛ける前の、描いた画面
-RWStructuredBuffer<float> ExposureState : register(u0);     // [0] 慣れた明るさ（対数）、[1] 露出の倍率
+Texture2D<float4> SceneTexture : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_AUTO_EXPOSURE_SCENE_SLOT));              // 画面効果を掛ける前の、描いた画面
+RWStructuredBuffer<float> ExposureState : register(SIGNAL_LOST_UAV_REGISTER(SIGNAL_LOST_AUTO_EXPOSURE_STATE_SLOT));     // [0] 慣れた明るさ（対数）、[1] 露出の倍率
 
 // 輝度比をそのまま補正すると暗がりが明るくなりすぎるため、1未満の指数で圧縮する。
 static const float AUTO_EXPOSURE_GAIN_EXPONENT = 0.35f;
@@ -117,7 +119,7 @@ void main(uint3 threadId : SV_GroupThreadID, uint threadIndex : SV_GroupIndex)
     float adaptedLogLuminance = frameLogLuminance;
     if (ResetAdaptation < AUTO_EXPOSURE_FLAG_THRESHOLD)
     {
-        const float previous = ExposureState[0];
+        const float previous = ExposureState[SIGNAL_LOST_EXPOSURE_LOG_LUMINANCE_INDEX];
         const float speed = frameLogLuminance > previous ? LightAdaptSpeed : DarkAdaptSpeed;
         const float blend = 1.0f - exp(-DeltaTime * speed);
         adaptedLogLuminance = previous + (frameLogLuminance - previous) * blend;
@@ -133,6 +135,6 @@ void main(uint3 threadId : SV_GroupThreadID, uint threadIndex : SV_GroupIndex)
         gain = 1.0f;
     }
 
-    ExposureState[0] = adaptedLogLuminance;
-    ExposureState[1] = gain;
+    ExposureState[SIGNAL_LOST_EXPOSURE_LOG_LUMINANCE_INDEX] = adaptedLogLuminance;
+    ExposureState[SIGNAL_LOST_EXPOSURE_GAIN_INDEX] = gain;
 }

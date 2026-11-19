@@ -14,7 +14,8 @@ using DirectX::SimpleMath::Vector4;
 namespace
 {
     // lightShaftsCS.hlsl の t0（深度）と t1（ライト一覧）。
-    constexpr UINT ShaftInputCount = 2;
+    constexpr UINT ShaftInputCount = SIGNAL_LOST_SHAFT_POINT_LIGHTS_SLOT - SIGNAL_LOST_SHAFT_DEPTH_SLOT + 1;
+    static_assert(SIGNAL_LOST_SHAFT_POINT_LIGHTS_SLOT == SIGNAL_LOST_SHAFT_DEPTH_SLOT + 1);
     // 全解像度に切り替える環境変数の値を、末尾の終端文字込みで読む。
     constexpr std::size_t FullResolutionModeBufferSize = 8;
     constexpr UINT MaxShaftLights = 256;
@@ -130,11 +131,11 @@ namespace Effect
         auto* target = Renderer::GetBackBufferRTV();
         context->OMSetRenderTargets(1, &target, nullptr);
         auto* buffer = m_Parameters.Get();
-        context->CSSetConstantBuffers(0, 1, &buffer);
+        context->CSSetConstantBuffers(SIGNAL_LOST_SHAFT_PARAMS_SLOT, 1, &buffer);
         ID3D11ShaderResourceView* inputs[ShaftInputCount] = { Renderer::GetDepthShaderResourceView(), m_LightView.Get() };
-        context->CSSetShaderResources(0, ShaftInputCount, inputs);
+        context->CSSetShaderResources(SIGNAL_LOST_SHAFT_DEPTH_SLOT, ShaftInputCount, inputs);
         auto* output = m_Output.Get();
-        context->CSSetUnorderedAccessViews(0, 1, &output, nullptr);
+        context->CSSetUnorderedAccessViews(SIGNAL_LOST_SHAFT_OUTPUT_SLOT, 1, &output, nullptr);
 
         const auto width = DivideRoundUp(static_cast<UINT>(viewport.Width), ResolutionDivisor);
         const auto height = DivideRoundUp(static_cast<UINT>(viewport.Height), ResolutionDivisor);
@@ -143,8 +144,8 @@ namespace Effect
 
         ID3D11UnorderedAccessView* noOutput = nullptr;
         ID3D11ShaderResourceView* noInputs[ShaftInputCount]{};
-        context->CSSetUnorderedAccessViews(0, 1, &noOutput, nullptr);
-        context->CSSetShaderResources(0, ShaftInputCount, noInputs);
+        context->CSSetUnorderedAccessViews(SIGNAL_LOST_SHAFT_OUTPUT_SLOT, 1, &noOutput, nullptr);
+        context->CSSetShaderResources(SIGNAL_LOST_SHAFT_DEPTH_SLOT, ShaftInputCount, noInputs);
         context->CSSetShader(nullptr, nullptr, 0);
         context->OMSetRenderTargets(1, &target, Renderer::GetDepthStencilView());
         auto* result = m_Result.Get();

@@ -5,6 +5,7 @@
 // ============================================================================
 
 #include "renderingConfig.hlsli"
+#include "computeDispatchConfig.hlsli"
 // 頂点シェーダー（unlitTextureVS）から受け取る値
 struct PS_IN
 {
@@ -77,7 +78,7 @@ float4 main(PS_IN input) : SV_TARGET
             0.0f).rgb) * EXPOSURE_LOCAL_SAMPLE_WEIGHT;
 
     // シーンが決めた露出（演出の意図）に、実際の画面の明るさから求めた目の慣れの倍率を掛けている。
-    const float autoGain = AutoExposureState[1];
+    const float autoGain = AutoExposureState[SIGNAL_LOST_EXPOSURE_GAIN_INDEX];
     const float adaptedExposure = exposure * (autoGain > 0.0f ? autoGain : 1.0f);
 
     // HDRターゲットへの加算で C + C*(gain-1) = C*gain とする。1未満の倍率では加算値が負になる。

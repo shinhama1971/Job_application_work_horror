@@ -6,6 +6,7 @@
 // ============================================================================
 
 #include "TiledLighting.h"
+#include "shader/computeDispatchConfig.hlsli"
 #include "shader/renderingConfig.hlsli"
 
 #include "Application.h"
@@ -30,8 +31,10 @@ namespace
     // 本描画の t10〜t12 をまとめて設定・解除する。
     constexpr UINT ShadingInputCount = TileCountSlot - PointLightSlot + 1;
     // tiledLightCullingCS.hlsl の t0〜t1（ライトと深度）と u0〜u1（番号と個数）。
-    constexpr UINT CullingInputCount = 2;
-    constexpr UINT CullingOutputCount = 2;
+    constexpr UINT CullingInputCount = SIGNAL_LOST_TILE_CULL_DEPTH_SLOT - SIGNAL_LOST_TILE_CULL_LIGHTS_SLOT + 1;
+    static_assert(SIGNAL_LOST_TILE_CULL_DEPTH_SLOT == SIGNAL_LOST_TILE_CULL_LIGHTS_SLOT + 1);
+    constexpr UINT CullingOutputCount = SIGNAL_LOST_TILE_CULL_COUNTS_SLOT - SIGNAL_LOST_TILE_CULL_INDICES_SLOT + 1;
+    static_assert(SIGNAL_LOST_TILE_CULL_COUNTS_SLOT == SIGNAL_LOST_TILE_CULL_INDICES_SLOT + 1);
     constexpr UINT ShadingParamsSlot = SIGNAL_LOST_TILED_LIGHT_BUFFER_SLOT;
     // ライトごとの壁の印（common.hlsl の g_PointLightWallMasks）
     constexpr UINT WallMaskSlot = SIGNAL_LOST_POINT_LIGHT_WALL_MASKS_SLOT;
@@ -295,7 +298,7 @@ namespace Effect
 
         m_CullingShader.SetGPU();
         ID3D11Buffer* cullingParams = m_CullingParamsBuffer.Get();
-        context->CSSetConstantBuffers(0, 1, &cullingParams);
+        context->CSSetConstantBuffers(SIGNAL_LOST_TILE_CULL_PARAMS_SLOT, 1, &cullingParams);
         // 深度バッファは、描画先に設定したままでは読み取れないため、描画先から外している（色の描画先はそのまま）。
         ID3D11RenderTargetView* backBuffer = Renderer::GetBackBufferRTV();
         context->OMSetRenderTargets(1, &backBuffer, nullptr);
@@ -303,20 +306,20 @@ namespace Effect
         // t0にライトの一覧、t1に深度プリパスの深度を設定している
         ID3D11ShaderResourceView* csViews[CullingInputCount] = {
             m_LightSRV.Get(), Renderer::GetDepthShaderResourceView() };
-        context->CSSetShaderResources(0, CullingInputCount, csViews);
+        context->CSSetShaderResources(SIGNAL_LOST_TILE_CULL_LIGHTS_SLOT, CullingInputCount, csViews);
         ID3D11UnorderedAccessView* uavs[CullingOutputCount] = {
             m_TileIndexUAV.Get(), m_TileCountUAV.Get() };
-        context->CSSetUnorderedAccessViews(0, CullingOutputCount, uavs, nullptr);
+        context->CSSetUnorderedAccessViews(SIGNAL_LOST_TILE_CULL_INDICES_SLOT, CullingOutputCount, uavs, nullptr);
 
         // 1タイル = 1スレッドグループ。グループ内の64スレッドで、ライトを分担して判定している。
         context->Dispatch(m_TilesX, m_TilesY, 1);
 
         // Compute Shaderからバッファを外し、ピクセルシェーダーがタイルのリストを使う設定にしている
         ID3D11UnorderedAccessView* nullUAVs[CullingOutputCount] = {};
-        context->CSSetUnorderedAccessViews(0, CullingOutputCount, nullUAVs, nullptr);
+        context->CSSetUnorderedAccessViews(SIGNAL_LOST_TILE_CULL_INDICES_SLOT, CullingOutputCount, nullUAVs, nullptr);
         // 深度バッファの読み取りを外してから、本描画の描画先（色と深度）に戻している
         ID3D11ShaderResourceView* nullSRVs[CullingInputCount] = {};
-        context->CSSetShaderResources(0, CullingInputCount, nullSRVs);
+        context->CSSetShaderResources(SIGNAL_LOST_TILE_CULL_LIGHTS_SLOT, CullingInputCount, nullSRVs);
         context->CSSetShader(nullptr, nullptr, 0);
         context->OMSetRenderTargets(1, &backBuffer, Renderer::GetDepthStencilView());
 

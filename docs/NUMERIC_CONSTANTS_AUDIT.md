@@ -2,6 +2,8 @@
 
 作品『通信途絶 / SIGNAL LOST』。2026年11月20日。比較元はローカルの `main` の `8b19375`。
 
+[今回の後続確認と検証結果](#後続確認の総覧) ｜ [前回までの引き継ぎ](HANDOFF.md)
+
 ## 調査範囲
 
 C++ 255本、HLSL 89本、UnityのC# 6本、PowerShell・Pythonの制作スクリプト18本の計368本を走査した。外部ライブラリ、Unityのキャッシュ、ビルド成果物、退役コードは集計対象外。コメントと文字列を外して数値リテラルを抽出し、描画の受け渡し、件数、進行条件、調整値の参照先を確認した。色・座標・字幕を含むデータ表、API形式、数式の数値も抽出されるため、抽出数は修正件数と異なる。
@@ -156,3 +158,113 @@ C++とHLSLが [renderingConfig.hlsli](../Job_application_work_horror/shader/rend
 - UnityのC# 6本をコンパイルし、警告・エラー0件。タイトルの4つの遷移先と表示文の並びも変更前後で照合した。
 - 変更した制作スクリプトで書き出した rain、radio_static、pipe_knock、heartbeat、breath のWAVは5本すべてバイト単位で一致した。
 - 実プレイとUnityエディター内の操作は未検証。
+
+## 後続確認の総覧
+
+自作ソース369本（C++ 255、HLSL 89、Unity C# 6、制作スクリプト19）を再走査。今回の変更はソース・制作スクリプト40ファイル。前回までの修正を含め、提出前に見る項目を次の表から辿れる。
+
+| 範囲 | 今回と前回までの対応 |
+|---|---|
+| 描画・計算 | 画面に表示するリソースのバインド先は前節の34項目。今回、Compute Shaderのバインド先33項目と画面合成のバッファ3項目も同じ値を参照するようにした。自動露出の輝度・倍率の添字、入力・出力の連続性も確認した。 |
+| 演出・進行 | 照明が迫る演出、電力復旧、出口送電、出口の前兆を、時刻に対応するイベント名で管理する。前回までの人影、ヒューズ、目的表示、異変、台詞、設定順の修正は [HANDOFF.md](HANDOFF.md) の11月19・20日の欄にまとまっている。 |
+| 制作・配布 | WAVの出力5スクリプトがモノラルPCMのヘッダーを共有する。水音の切り出しはRIFF/WAVEの識別子を確認する。日次撮影の再実行ごとの保存先と、配布ZIPの完了判定は [HANDOFF.md](HANDOFF.md) を参照。 |
+| 動作確認の範囲 | ゲームを使わないビルド・出力比較は下記の結果。暗さ、誘導、演出の見え方、GPU時間は実プレイを伴う確認項目。 |
+
+### Compute Shaderの共通定義
+
+番号の照合先は [computeDispatchConfig.hlsli](../Job_application_work_horror/shader/computeDispatchConfig.hlsli)。C++の計算パスとHLSLから同じ名前で参照する。
+
+| 枠 | 定義 | 実行側 | HLSL側 |
+|---|---|---|---|
+| `b0` | `SIGNAL_LOST_AO_PARAMS_SLOT` | [AmbientOcclusion.cpp](../Job_application_work_horror/AmbientOcclusion.cpp) | [ambientOcclusionCS.hlsl](../Job_application_work_horror/shader/ambientOcclusionCS.hlsl)、[ambientOcclusionBlurCS.hlsl](../Job_application_work_horror/shader/ambientOcclusionBlurCS.hlsl) |
+| `t0` | `SIGNAL_LOST_AO_DEPTH_SLOT` | [AmbientOcclusion.cpp](../Job_application_work_horror/AmbientOcclusion.cpp) | [ambientOcclusionCS.hlsl](../Job_application_work_horror/shader/ambientOcclusionCS.hlsl)、[ambientOcclusionBlurCS.hlsl](../Job_application_work_horror/shader/ambientOcclusionBlurCS.hlsl) |
+| `t1` | `SIGNAL_LOST_AO_SECOND_INPUT_SLOT` | [AmbientOcclusion.cpp](../Job_application_work_horror/AmbientOcclusion.cpp) | [ambientOcclusionCS.hlsl](../Job_application_work_horror/shader/ambientOcclusionCS.hlsl)、[ambientOcclusionBlurCS.hlsl](../Job_application_work_horror/shader/ambientOcclusionBlurCS.hlsl) |
+| `u0` | `SIGNAL_LOST_AO_OUTPUT_SLOT` | [AmbientOcclusion.cpp](../Job_application_work_horror/AmbientOcclusion.cpp) | [ambientOcclusionCS.hlsl](../Job_application_work_horror/shader/ambientOcclusionCS.hlsl)、[ambientOcclusionBlurCS.hlsl](../Job_application_work_horror/shader/ambientOcclusionBlurCS.hlsl) |
+| `b0` | `SIGNAL_LOST_DDGI_PARAMS_SLOT` | [DDGIVolume.cpp](../Job_application_work_horror/DDGIVolume.cpp) | [ddgiCommon.hlsli](../Job_application_work_horror/shader/ddgiCommon.hlsli) |
+| `s0` | `SIGNAL_LOST_DDGI_SAMPLER_SLOT` | [DDGIVolume.cpp](../Job_application_work_horror/DDGIVolume.cpp) | [ddgiCommon.hlsli](../Job_application_work_horror/shader/ddgiCommon.hlsli) |
+| `t0` | `SIGNAL_LOST_DDGI_POINT_LIGHTS_SLOT` | [DDGIVolume.cpp](../Job_application_work_horror/DDGIVolume.cpp) | [ddgiTraceCS.hlsl](../Job_application_work_horror/shader/ddgiTraceCS.hlsl) |
+| `t1` | `SIGNAL_LOST_DDGI_RAY_RESULTS_SLOT` | [DDGIVolume.cpp](../Job_application_work_horror/DDGIVolume.cpp) | [ddgiUpdate.hlsli](../Job_application_work_horror/shader/ddgiUpdate.hlsli) |
+| `t2` | `SIGNAL_LOST_DDGI_IRRADIANCE_ATLAS_SLOT` | [DDGIVolume.cpp](../Job_application_work_horror/DDGIVolume.cpp) | [ddgiCommon.hlsli](../Job_application_work_horror/shader/ddgiCommon.hlsli) |
+| `t3` | `SIGNAL_LOST_DDGI_DISTANCE_ATLAS_SLOT` | [DDGIVolume.cpp](../Job_application_work_horror/DDGIVolume.cpp) | [ddgiCommon.hlsli](../Job_application_work_horror/shader/ddgiCommon.hlsli) |
+| `t4` | `SIGNAL_LOST_DDGI_PREVIOUS_ATLAS_SLOT` | [DDGIVolume.cpp](../Job_application_work_horror/DDGIVolume.cpp) | [ddgiUpdate.hlsli](../Job_application_work_horror/shader/ddgiUpdate.hlsli) |
+| `t5` | `SIGNAL_LOST_DDGI_SCENE_DEPTH_SLOT` | [DDGIVolume.cpp](../Job_application_work_horror/DDGIVolume.cpp) | [ddgiApplyCS.hlsl](../Job_application_work_horror/shader/ddgiApplyCS.hlsl) |
+| `u0` | `SIGNAL_LOST_DDGI_OUTPUT_SLOT` | [DDGIVolume.cpp](../Job_application_work_horror/DDGIVolume.cpp) | [ddgiTraceCS.hlsl](../Job_application_work_horror/shader/ddgiTraceCS.hlsl)、[ddgiUpdate.hlsli](../Job_application_work_horror/shader/ddgiUpdate.hlsli)、[ddgiApplyCS.hlsl](../Job_application_work_horror/shader/ddgiApplyCS.hlsl) |
+| `b0` | `SIGNAL_LOST_GRASS_SIM_PARAMS_SLOT` | [ForestGrass.cpp](../Job_application_work_horror/ForestGrass.cpp) | [grassCS.hlsl](../Job_application_work_horror/shader/grassCS.hlsl) |
+| `t0` | `SIGNAL_LOST_GRASS_SIM_INPUT_SLOT` | [ForestGrass.cpp](../Job_application_work_horror/ForestGrass.cpp) | [grassCS.hlsl](../Job_application_work_horror/shader/grassCS.hlsl) |
+| `u0` | `SIGNAL_LOST_GRASS_SIM_OUTPUT_SLOT` | [ForestGrass.cpp](../Job_application_work_horror/ForestGrass.cpp) | [grassCS.hlsl](../Job_application_work_horror/shader/grassCS.hlsl) |
+| `b0` | `SIGNAL_LOST_SHAFT_PARAMS_SLOT` | [LightShafts.cpp](../Job_application_work_horror/LightShafts.cpp) | [lightShaftsCS.hlsl](../Job_application_work_horror/shader/lightShaftsCS.hlsl) |
+| `t0` | `SIGNAL_LOST_SHAFT_DEPTH_SLOT` | [LightShafts.cpp](../Job_application_work_horror/LightShafts.cpp) | [lightShaftsCS.hlsl](../Job_application_work_horror/shader/lightShaftsCS.hlsl) |
+| `t1` | `SIGNAL_LOST_SHAFT_POINT_LIGHTS_SLOT` | [LightShafts.cpp](../Job_application_work_horror/LightShafts.cpp) | [lightShaftsCS.hlsl](../Job_application_work_horror/shader/lightShaftsCS.hlsl) |
+| `u0` | `SIGNAL_LOST_SHAFT_OUTPUT_SLOT` | [LightShafts.cpp](../Job_application_work_horror/LightShafts.cpp) | [lightShaftsCS.hlsl](../Job_application_work_horror/shader/lightShaftsCS.hlsl) |
+| `b0` | `SIGNAL_LOST_TILE_CULL_PARAMS_SLOT` | [TiledLighting.cpp](../Job_application_work_horror/TiledLighting.cpp) | [tiledLightCullingCS.hlsl](../Job_application_work_horror/shader/tiledLightCullingCS.hlsl) |
+| `t0` | `SIGNAL_LOST_TILE_CULL_LIGHTS_SLOT` | [TiledLighting.cpp](../Job_application_work_horror/TiledLighting.cpp) | [tiledLightCullingCS.hlsl](../Job_application_work_horror/shader/tiledLightCullingCS.hlsl) |
+| `t1` | `SIGNAL_LOST_TILE_CULL_DEPTH_SLOT` | [TiledLighting.cpp](../Job_application_work_horror/TiledLighting.cpp) | [tiledLightCullingCS.hlsl](../Job_application_work_horror/shader/tiledLightCullingCS.hlsl) |
+| `u0` | `SIGNAL_LOST_TILE_CULL_INDICES_SLOT` | [TiledLighting.cpp](../Job_application_work_horror/TiledLighting.cpp) | [tiledLightCullingCS.hlsl](../Job_application_work_horror/shader/tiledLightCullingCS.hlsl) |
+| `u1` | `SIGNAL_LOST_TILE_CULL_COUNTS_SLOT` | [TiledLighting.cpp](../Job_application_work_horror/TiledLighting.cpp) | [tiledLightCullingCS.hlsl](../Job_application_work_horror/shader/tiledLightCullingCS.hlsl) |
+| `b0` | `SIGNAL_LOST_RIPPLE_PARAMS_SLOT` | [WaterRippleSimulation.cpp](../Job_application_work_horror/WaterRippleSimulation.cpp) | [waterRippleCS.hlsl](../Job_application_work_horror/shader/waterRippleCS.hlsl) |
+| `t0` | `SIGNAL_LOST_RIPPLE_PREVIOUS_STATE_SLOT` | [WaterRippleSimulation.cpp](../Job_application_work_horror/WaterRippleSimulation.cpp) | [waterRippleCS.hlsl](../Job_application_work_horror/shader/waterRippleCS.hlsl) |
+| `u0` | `SIGNAL_LOST_RIPPLE_NEXT_STATE_SLOT` | [WaterRippleSimulation.cpp](../Job_application_work_horror/WaterRippleSimulation.cpp) | [waterRippleCS.hlsl](../Job_application_work_horror/shader/waterRippleCS.hlsl) |
+| `t0` | `SIGNAL_LOST_BLOOM_COMPUTE_INPUT_SLOT` | [PostProcess.cpp](../Job_application_work_horror/PostProcess.cpp) | [bloomExtractCS.hlsl](../Job_application_work_horror/shader/bloomExtractCS.hlsl)、[bloomDownsampleCS.hlsl](../Job_application_work_horror/shader/bloomDownsampleCS.hlsl)、[bloomBlurHorizontalCS.hlsl](../Job_application_work_horror/shader/bloomBlurHorizontalCS.hlsl)、[bloomBlurVerticalCS.hlsl](../Job_application_work_horror/shader/bloomBlurVerticalCS.hlsl) |
+| `u0` | `SIGNAL_LOST_BLOOM_COMPUTE_OUTPUT_SLOT` | [PostProcess.cpp](../Job_application_work_horror/PostProcess.cpp) | [bloomExtractCS.hlsl](../Job_application_work_horror/shader/bloomExtractCS.hlsl)、[bloomDownsampleCS.hlsl](../Job_application_work_horror/shader/bloomDownsampleCS.hlsl)、[bloomBlurHorizontalCS.hlsl](../Job_application_work_horror/shader/bloomBlurHorizontalCS.hlsl)、[bloomBlurVerticalCS.hlsl](../Job_application_work_horror/shader/bloomBlurVerticalCS.hlsl) |
+| `b0` | `SIGNAL_LOST_AUTO_EXPOSURE_PARAMS_SLOT` | [PostProcess.cpp](../Job_application_work_horror/PostProcess.cpp) | [autoExposureCS.hlsl](../Job_application_work_horror/shader/autoExposureCS.hlsl) |
+| `t0` | `SIGNAL_LOST_AUTO_EXPOSURE_SCENE_SLOT` | [PostProcess.cpp](../Job_application_work_horror/PostProcess.cpp) | [autoExposureCS.hlsl](../Job_application_work_horror/shader/autoExposureCS.hlsl) |
+| `u0` | `SIGNAL_LOST_AUTO_EXPOSURE_STATE_SLOT` | [PostProcess.cpp](../Job_application_work_horror/PostProcess.cpp) | [autoExposureCS.hlsl](../Job_application_work_horror/shader/autoExposureCS.hlsl) |
+
+### 調整・整合性の修正
+
+| 修正箇所 | 修正理由 |
+|---|---|
+| 画面効果・トーンマッピング・画面の埃の定数バッファ | 画面を合成する各パスで、C++とHLSLが同じバインド先を参照する。 [FullScreenQuad.cpp](../Job_application_work_horror/FullScreenQuad.cpp)、[ScreenDustOverlay.cpp](../Job_application_work_horror/ScreenDustOverlay.cpp)、[renderingConfig.hlsli](../Job_application_work_horror/shader/renderingConfig.hlsli) |
+| 自動露出 | 状態の保存領域、計算パス、描画パスで「順応した対数輝度」と「露出倍率」の添字を共有する。 [PostProcess.cpp](../Job_application_work_horror/PostProcess.cpp)、[autoExposureCS.hlsl](../Job_application_work_horror/shader/autoExposureCS.hlsl)、[exposurePS.hlsl](../Job_application_work_horror/shader/exposurePS.hlsl) |
+| 1面の照明イベント | `case 0` などが時刻表の並びに依存していた。時刻とイベントを一行に置き、実行側の分岐もイベント名を参照する。 [ScareLightSequence.h](../Job_application_work_horror/ScareLightSequence.h)、[StagePowerSequence.h](../Job_application_work_horror/StagePowerSequence.h)、[ExitOmenSequence.h](../Job_application_work_horror/ExitOmenSequence.h)、[StageSceneEvents.cpp](../Job_application_work_horror/StageSceneEvents.cpp) |
+| WAVの形式 | PCMの形式番号、サンプル幅、バイト数を共有し、各スクリプトの基本ヘッダーを一か所で書く。水音は切り出し前にRIFF/WAVEを確認する。 [MonoPcmWave.ps1](../Job_application_work_horror/tools/MonoPcmWave.ps1)、[generate-water-steps.ps1](../Job_application_work_horror/tools/generate-water-steps.ps1) |
+
+### 今回更新したファイル
+
+- [Job_application_work_horror/AmbientOcclusion.cpp](../Job_application_work_horror/AmbientOcclusion.cpp)
+- [Job_application_work_horror/DDGIVolume.cpp](../Job_application_work_horror/DDGIVolume.cpp)
+- [Job_application_work_horror/ExitOmenSequence.h](../Job_application_work_horror/ExitOmenSequence.h)
+- [Job_application_work_horror/ForestGrass.cpp](../Job_application_work_horror/ForestGrass.cpp)
+- [Job_application_work_horror/FullScreenQuad.cpp](../Job_application_work_horror/FullScreenQuad.cpp)
+- [Job_application_work_horror/LightShafts.cpp](../Job_application_work_horror/LightShafts.cpp)
+- [Job_application_work_horror/PostProcess.cpp](../Job_application_work_horror/PostProcess.cpp)
+- [Job_application_work_horror/ScareLightSequence.h](../Job_application_work_horror/ScareLightSequence.h)
+- [Job_application_work_horror/ScreenDustOverlay.cpp](../Job_application_work_horror/ScreenDustOverlay.cpp)
+- [Job_application_work_horror/StagePowerSequence.h](../Job_application_work_horror/StagePowerSequence.h)
+- [Job_application_work_horror/StageSceneEvents.cpp](../Job_application_work_horror/StageSceneEvents.cpp)
+- [Job_application_work_horror/TiledLighting.cpp](../Job_application_work_horror/TiledLighting.cpp)
+- [Job_application_work_horror/WaterRippleSimulation.cpp](../Job_application_work_horror/WaterRippleSimulation.cpp)
+- [Job_application_work_horror/shader/PS_HorrorDust.hlsl](../Job_application_work_horror/shader/PS_HorrorDust.hlsl)
+- [Job_application_work_horror/shader/ambientOcclusionBlurCS.hlsl](../Job_application_work_horror/shader/ambientOcclusionBlurCS.hlsl)
+- [Job_application_work_horror/shader/ambientOcclusionCS.hlsl](../Job_application_work_horror/shader/ambientOcclusionCS.hlsl)
+- [Job_application_work_horror/shader/autoExposureCS.hlsl](../Job_application_work_horror/shader/autoExposureCS.hlsl)
+- [Job_application_work_horror/shader/bloomBlurHorizontalCS.hlsl](../Job_application_work_horror/shader/bloomBlurHorizontalCS.hlsl)
+- [Job_application_work_horror/shader/bloomBlurVerticalCS.hlsl](../Job_application_work_horror/shader/bloomBlurVerticalCS.hlsl)
+- [Job_application_work_horror/shader/bloomDownsampleCS.hlsl](../Job_application_work_horror/shader/bloomDownsampleCS.hlsl)
+- [Job_application_work_horror/shader/bloomExtractCS.hlsl](../Job_application_work_horror/shader/bloomExtractCS.hlsl)
+- [Job_application_work_horror/shader/computeDispatchConfig.hlsli](../Job_application_work_horror/shader/computeDispatchConfig.hlsli)
+- [Job_application_work_horror/shader/ddgiApplyCS.hlsl](../Job_application_work_horror/shader/ddgiApplyCS.hlsl)
+- [Job_application_work_horror/shader/ddgiCommon.hlsli](../Job_application_work_horror/shader/ddgiCommon.hlsli)
+- [Job_application_work_horror/shader/ddgiTraceCS.hlsl](../Job_application_work_horror/shader/ddgiTraceCS.hlsl)
+- [Job_application_work_horror/shader/ddgiUpdate.hlsli](../Job_application_work_horror/shader/ddgiUpdate.hlsli)
+- [Job_application_work_horror/shader/exposurePS.hlsl](../Job_application_work_horror/shader/exposurePS.hlsl)
+- [Job_application_work_horror/shader/grassCS.hlsl](../Job_application_work_horror/shader/grassCS.hlsl)
+- [Job_application_work_horror/shader/lightShaftsCS.hlsl](../Job_application_work_horror/shader/lightShaftsCS.hlsl)
+- [Job_application_work_horror/shader/postProcessBuffer.hlsli](../Job_application_work_horror/shader/postProcessBuffer.hlsli)
+- [Job_application_work_horror/shader/renderingConfig.hlsli](../Job_application_work_horror/shader/renderingConfig.hlsli)
+- [Job_application_work_horror/shader/tiledLightCullingCS.hlsl](../Job_application_work_horror/shader/tiledLightCullingCS.hlsl)
+- [Job_application_work_horror/shader/toneMapPS.hlsl](../Job_application_work_horror/shader/toneMapPS.hlsl)
+- [Job_application_work_horror/shader/waterRippleCS.hlsl](../Job_application_work_horror/shader/waterRippleCS.hlsl)
+- [Job_application_work_horror/tools/MonoPcmWave.ps1](../Job_application_work_horror/tools/MonoPcmWave.ps1)
+- [Job_application_work_horror/tools/generate-heartbeat-breath.ps1](../Job_application_work_horror/tools/generate-heartbeat-breath.ps1)
+- [Job_application_work_horror/tools/generate-pipe-knock.ps1](../Job_application_work_horror/tools/generate-pipe-knock.ps1)
+- [Job_application_work_horror/tools/generate-radio-static.ps1](../Job_application_work_horror/tools/generate-radio-static.ps1)
+- [Job_application_work_horror/tools/generate-rain.ps1](../Job_application_work_horror/tools/generate-rain.ps1)
+- [Job_application_work_horror/tools/generate-water-steps.ps1](../Job_application_work_horror/tools/generate-water-steps.ps1)
+
+### 最新の検証結果
+- Release・Debug x64をビルドし、警告・エラー各0件。検証用出力先と /Z7 を使用。
+- SM 5.0のシェーダー54本で、FXC /O3 のバイトコードが前後一致。
+- 照明演出4系統について、約1/60秒・0.1秒・0.9秒の時間刻みで、変更前後のイベントと完了状態を比較し一致。
+- WAV 7本が前後一致。奇数長のチャンクを含むWAVも読み込み、壊れたRIFF識別子はエラーとして扱った。
+- ゲーム画面とUnityエディター上の操作は未確認。

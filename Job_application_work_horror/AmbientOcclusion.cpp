@@ -18,7 +18,8 @@ using namespace DirectX::SimpleMath;
 namespace
 {
     // 遮蔽・ぼかしとも t0 は深度、t1 は各パスの入力（点光源または遮蔽結果）。
-    constexpr UINT OcclusionInputCount = 2;
+    constexpr UINT OcclusionInputCount = SIGNAL_LOST_AO_SECOND_INPUT_SLOT - SIGNAL_LOST_AO_DEPTH_SLOT + 1;
+    static_assert(SIGNAL_LOST_AO_SECOND_INPUT_SLOT == SIGNAL_LOST_AO_DEPTH_SLOT + 1);
     // 環境遮蔽をピクセルシェーダーへ渡すテクスチャの番号
     constexpr UINT OcclusionSlot = SIGNAL_LOST_SCREEN_AO_TEXTURE_SLOT;
     // 遮蔽とぼかしで同じ縮小画像を扱うため、画素変換とスレッド数を共有する。
@@ -117,7 +118,7 @@ namespace Effect
         context->OMSetRenderTargets(1, &backBuffer, nullptr);
 
         ID3D11Buffer* parameterBuffer = m_ParameterBuffer.Get();
-        context->CSSetConstantBuffers(0, 1, &parameterBuffer);
+        context->CSSetConstantBuffers(SIGNAL_LOST_AO_PARAMS_SLOT, 1, &parameterBuffer);
         const UINT groupsX = (static_cast<UINT>(parameters.OcclusionSize.x) + (OcclusionThreadGroupSize - 1)) / OcclusionThreadGroupSize;
         const UINT groupsY = (static_cast<UINT>(parameters.OcclusionSize.y) + (OcclusionThreadGroupSize - 1)) / OcclusionThreadGroupSize;
 
@@ -125,25 +126,25 @@ namespace Effect
         m_OcclusionShader.SetGPU();
         ID3D11ShaderResourceView* depth = Renderer::GetDepthShaderResourceView();
         ID3D11ShaderResourceView* occlusionInputs[OcclusionInputCount] = { depth, pointLights };
-        context->CSSetShaderResources(0, OcclusionInputCount, occlusionInputs);
+        context->CSSetShaderResources(SIGNAL_LOST_AO_DEPTH_SLOT, OcclusionInputCount, occlusionInputs);
         ID3D11UnorderedAccessView* rawUAV = m_RawUAV.Get();
-        context->CSSetUnorderedAccessViews(0, 1, &rawUAV, nullptr);
+        context->CSSetUnorderedAccessViews(SIGNAL_LOST_AO_OUTPUT_SLOT, 1, &rawUAV, nullptr);
         context->Dispatch(groupsX, groupsY, 1);
 
         // 2回目：深さを見ながらぼかしている（t0 = 深度、t1 = ぼかす前、u0 = ぼかした後）
         ID3D11UnorderedAccessView* nullUAV = nullptr;
-        context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
+        context->CSSetUnorderedAccessViews(SIGNAL_LOST_AO_OUTPUT_SLOT, 1, &nullUAV, nullptr);
         m_BlurShader.SetGPU();
         ID3D11ShaderResourceView* blurInputs[OcclusionInputCount] = { depth, m_RawSRV.Get() };
-        context->CSSetShaderResources(0, OcclusionInputCount, blurInputs);
+        context->CSSetShaderResources(SIGNAL_LOST_AO_DEPTH_SLOT, OcclusionInputCount, blurInputs);
         ID3D11UnorderedAccessView* blurredUAV = m_BlurredUAV.Get();
-        context->CSSetUnorderedAccessViews(0, 1, &blurredUAV, nullptr);
+        context->CSSetUnorderedAccessViews(SIGNAL_LOST_AO_OUTPUT_SLOT, 1, &blurredUAV, nullptr);
         context->Dispatch(groupsX, groupsY, 1);
 
         // Compute Shaderから外し、本描画の描画先（色と深度）に戻して、結果を t15 に設定している
-        context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
+        context->CSSetUnorderedAccessViews(SIGNAL_LOST_AO_OUTPUT_SLOT, 1, &nullUAV, nullptr);
         ID3D11ShaderResourceView* nullSRVs[OcclusionInputCount] = {};
-        context->CSSetShaderResources(0, OcclusionInputCount, nullSRVs);
+        context->CSSetShaderResources(SIGNAL_LOST_AO_DEPTH_SLOT, OcclusionInputCount, nullSRVs);
         context->CSSetShader(nullptr, nullptr, 0);
         context->OMSetRenderTargets(1, &backBuffer, Renderer::GetDepthStencilView());
         ID3D11ShaderResourceView* blurred = m_BlurredSRV.Get();

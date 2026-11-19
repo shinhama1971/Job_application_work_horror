@@ -111,7 +111,7 @@ namespace Graphics
         m_Material->SetGPU();
         m_ToneMapShader.SetGPU();
         ID3D11Buffer* toneMapBuffer = m_ToneMapBuffer.Get();
-        context->PSSetConstantBuffers(0, 1, &toneMapBuffer);
+        context->PSSetConstantBuffers(SIGNAL_LOST_TONE_MAP_BUFFER_SLOT, 1, &toneMapBuffer);
         context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
         Renderer::SetBlendState(BS_NONE);
         context->PSSetShaderResources(0, 1, &hdrSceneSRV);
@@ -208,7 +208,7 @@ namespace Graphics
         m_Material->SetGPU();
 
         ID3D11Buffer* timeBuffer = m_TimeBuffer.Get();
-        context->PSSetConstantBuffers(0, 1, &timeBuffer);
+        context->PSSetConstantBuffers(SIGNAL_LOST_POST_EFFECT_BUFFER_SLOT, 1, &timeBuffer);
 
         context->IASetPrimitiveTopology(
             D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP

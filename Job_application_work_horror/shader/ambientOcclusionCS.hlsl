@@ -6,10 +6,11 @@
 //           （回した模様は ambientOcclusionBlurCS で深度を見ながらぼかして消している）
 // ============================================================================
 
+#include "renderingConfig.hlsli"
 #include "computeDispatchConfig.hlsli"
 
 // AmbientOcclusion.cpp の Parameters と同じ並び（b0）
-cbuffer AmbientOcclusionBuffer : register(b0)
+cbuffer AmbientOcclusionBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_AO_PARAMS_SLOT))
 {
     float4x4 Projection;        // 視点の空間 → 画面
     float4x4 InverseProjection; // 画面 → 視点の空間
@@ -33,10 +34,10 @@ struct POINT_LIGHT
     float4 ColorIntensity;  // rgb = 色、a = 強さ
 };
 
-Texture2D<float> SceneDepth : register(t0);
-StructuredBuffer<POINT_LIGHT> PointLights : register(t1);
+Texture2D<float> SceneDepth : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_AO_DEPTH_SLOT));
+StructuredBuffer<POINT_LIGHT> PointLights : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_AO_SECOND_INPUT_SLOT));
 // x = 環境遮蔽、y = 接触影（どちらも1 = 遮る物なし）
-RWTexture2D<float2> OcclusionOutput : register(u0);
+RWTexture2D<float2> OcclusionOutput : register(SIGNAL_LOST_UAV_REGISTER(SIGNAL_LOST_AO_OUTPUT_SLOT));
 
 // ---- 接触影（スクリーンスペース・コンタクトシャドウ） ----
 // 天井の照明（点光源）には、揺れる裸電球の1つを除いて影の画像（シャドウマップ）がない。そのため棚・机・ロッカーの足元に影がなく、

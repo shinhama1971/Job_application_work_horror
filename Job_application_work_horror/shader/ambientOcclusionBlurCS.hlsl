@@ -4,9 +4,10 @@
 // 環境遮蔽は描く範囲の縦横半分の解像度で持っているので、深さは対応する画素（2倍の位置）から読んでいる。
 // ============================================================================
 
+#include "renderingConfig.hlsli"
 #include "computeDispatchConfig.hlsli"
 
-cbuffer AmbientOcclusionBuffer : register(b0)
+cbuffer AmbientOcclusionBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_AO_PARAMS_SLOT))
 {
     float4x4 Projection;
     float4x4 InverseProjection;
@@ -20,10 +21,10 @@ cbuffer AmbientOcclusionBuffer : register(b0)
     float2 OcclusionPadding;
 };
 
-Texture2D<float> SceneDepth : register(t0);
+Texture2D<float> SceneDepth : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_AO_DEPTH_SLOT));
 // x = 環境遮蔽、y = 接触影（ambientOcclusionCS）。どちらも同じぼかしで粒を消している
-Texture2D<float2> RawOcclusion : register(t1);
-RWTexture2D<float2> OcclusionOutput : register(u0);
+Texture2D<float2> RawOcclusion : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_AO_SECOND_INPUT_SLOT));
+RWTexture2D<float2> OcclusionOutput : register(SIGNAL_LOST_UAV_REGISTER(SIGNAL_LOST_AO_OUTPUT_SLOT));
 
 // 半分の解像度の画素に対応する所の深さ（0〜1）を、カメラからの前向きの距離へ戻している
 float LinearDepthAt(int2 occlusionPixel)

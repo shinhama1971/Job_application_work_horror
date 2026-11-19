@@ -8,6 +8,7 @@
 # ============================================================================
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "MonoPcmWave.ps1")
 
 $sampleRate = 44100
 $durationSeconds = 2.0
@@ -84,22 +85,9 @@ $outputPath = Join-Path (Split-Path -Parent $PSScriptRoot) "assets\Audio\pipe_kn
 $stream = [System.IO.File]::Create($outputPath)
 $writer = New-Object System.IO.BinaryWriter $stream
 try {
-    $dataSize = $sampleCount * 2
-    $writer.Write([System.Text.Encoding]::ASCII.GetBytes("RIFF"))
-    $writer.Write([int](36 + $dataSize))
-    $writer.Write([System.Text.Encoding]::ASCII.GetBytes("WAVE"))
-    $writer.Write([System.Text.Encoding]::ASCII.GetBytes("fmt "))
-    $writer.Write([int]16)
-    $writer.Write([int16]1)                  # PCM
-    $writer.Write([int16]1)                  # モノラル（立体音響で位置を付けるため）
-    $writer.Write([int]$sampleRate)
-    $writer.Write([int]($sampleRate * 2))
-    $writer.Write([int16]2)
-    $writer.Write([int16]16)
-    $writer.Write([System.Text.Encoding]::ASCII.GetBytes("data"))
-    $writer.Write([int]$dataSize)
+    Write-MonoPcm16Header $writer $sampleRate $sampleCount
     foreach ($value in $samples) {
-        $writer.Write([int16][Math]::Round($value * $scale * 32767.0))
+        $writer.Write([int16][Math]::Round($value * $scale * $monoPcmSamplePeak))
     }
 }
 finally {

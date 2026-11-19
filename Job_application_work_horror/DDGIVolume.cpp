@@ -21,17 +21,18 @@ namespace
     // 間接光の画像をピクセルシェーダーへ渡す番号（screenAmbientOcclusion.hlsli の g_ScreenIndirectLight）
     constexpr UINT IndirectLightSlot = SIGNAL_LOST_SCREEN_INDIRECT_LIGHT_TEXTURE_SLOT;
     // Compute Shader の入力の番号（ddgiCommon.hlsli・ddgiTraceCS・ddgiUpdate.hlsli・ddgiApplyCS と同じ）
-    constexpr UINT PointLightsSlot = 0;
-    constexpr UINT RayResultsSlot = 1;
-    constexpr UINT IrradianceAtlasSlot = 2;
-    constexpr UINT DistanceAtlasSlot = 3;
-    static_assert(DistanceAtlasSlot == IrradianceAtlasSlot + 1);
-    constexpr UINT PreviousAtlasSlot = 4;
-    constexpr UINT DepthSlot = 5;
+    constexpr UINT PointLightsSlot = SIGNAL_LOST_DDGI_POINT_LIGHTS_SLOT;
+    constexpr UINT RayResultsSlot = SIGNAL_LOST_DDGI_RAY_RESULTS_SLOT;
+    constexpr UINT IrradianceAtlasSlot = SIGNAL_LOST_DDGI_IRRADIANCE_ATLAS_SLOT;
+    constexpr UINT DistanceAtlasSlot = SIGNAL_LOST_DDGI_DISTANCE_ATLAS_SLOT;
+    static_assert(IrradianceAtlasSlot == PointLightsSlot + 2 && DistanceAtlasSlot == IrradianceAtlasSlot + 1);
+    constexpr UINT PreviousAtlasSlot = SIGNAL_LOST_DDGI_PREVIOUS_ATLAS_SLOT;
+    constexpr UINT DepthSlot = SIGNAL_LOST_DDGI_SCENE_DEPTH_SLOT;
     // 光線の追跡は t0〜t3（t1 は空）。解除は適用パスの深度 t5 まで含める。
     constexpr UINT TraceInputCount = DistanceAtlasSlot - PointLightsSlot + 1;
     constexpr UINT AtlasInputCount = DistanceAtlasSlot - IrradianceAtlasSlot + 1;
-    constexpr UINT ComputeInputSlotCount = DepthSlot + 1;
+    constexpr UINT ComputeInputSlotCount = DepthSlot - PointLightsSlot + 1;
+    static_assert(RayResultsSlot == PointLightsSlot + 1 && PreviousAtlasSlot < DepthSlot);
     // 部屋の形の定数バッファ（roomOcclusion.hlsli の b11）
     constexpr UINT RoomShapeSlot = SIGNAL_LOST_ROOM_OCCLUSION_BUFFER_SLOT;
 
@@ -262,10 +263,10 @@ namespace Effect
 
         ID3D11Buffer* parameterBuffer = m_ParameterBuffer.Get();
         ID3D11Buffer* roomBuffer = Renderer::GetRoomOcclusionBuffer();
-        context->CSSetConstantBuffers(0, 1, &parameterBuffer);
+        context->CSSetConstantBuffers(SIGNAL_LOST_DDGI_PARAMS_SLOT, 1, &parameterBuffer);
         context->CSSetConstantBuffers(RoomShapeSlot, 1, &roomBuffer);
         ID3D11SamplerState* sampler = m_LinearClamp.Get();
-        context->CSSetSamplers(0, 1, &sampler);
+        context->CSSetSamplers(SIGNAL_LOST_DDGI_SAMPLER_SLOT, 1, &sampler);
 
         const int previous = m_Current;
         const int next = 1 - m_Current;
@@ -278,12 +279,12 @@ namespace Effect
             pointLights, nullptr, m_IrradianceAtlas[previous].SRV.Get(), m_DistanceAtlas[previous].SRV.Get() };
         context->CSSetShaderResources(PointLightsSlot, TraceInputCount, traceInputs);
         ID3D11UnorderedAccessView* rayUAV = m_RayResults.UAV.Get();
-        context->CSSetUnorderedAccessViews(0, 1, &rayUAV, nullptr);
+        context->CSSetUnorderedAccessViews(SIGNAL_LOST_DDGI_OUTPUT_SLOT, 1, &rayUAV, nullptr);
         const UINT probeGroups =
             (GetProbeCount() - p.ProbeUpdatePhase + p.ProbeUpdateStride - 1u) / p.ProbeUpdateStride;
         context->Dispatch(probeGroups, 1, 1);
-        context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
-        context->CSSetShaderResources(0, ComputeInputSlotCount, nullSRVs);
+        context->CSSetUnorderedAccessViews(SIGNAL_LOST_DDGI_OUTPUT_SLOT, 1, &nullUAV, nullptr);
+        context->CSSetShaderResources(PointLightsSlot, ComputeInputSlotCount, nullSRVs);
 
         // 2. 八面体マップを更新する（t1 = 光線の結果、t4 = 前の画像、u0 = 新しい画像）。1グループ = 1プローブの区画
         const auto runUpdate = [&](const ComputeShader& shader, const GpuTexture& previousAtlas, const GpuTexture& nextAtlas)
@@ -299,10 +300,10 @@ namespace Effect
             context->CSSetShaderResources(RayResultsSlot, 1, &rays);
             context->CSSetShaderResources(PreviousAtlasSlot, 1, &previousSRV);
             ID3D11UnorderedAccessView* output = nextAtlas.UAV.Get();
-            context->CSSetUnorderedAccessViews(0, 1, &output, nullptr);
+            context->CSSetUnorderedAccessViews(SIGNAL_LOST_DDGI_OUTPUT_SLOT, 1, &output, nullptr);
             context->Dispatch(probeGroups, 1, 1);
-            context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
-            context->CSSetShaderResources(0, ComputeInputSlotCount, nullSRVs);
+            context->CSSetUnorderedAccessViews(SIGNAL_LOST_DDGI_OUTPUT_SLOT, 1, &nullUAV, nullptr);
+            context->CSSetShaderResources(PointLightsSlot, ComputeInputSlotCount, nullSRVs);
         };
         runUpdate(m_IrradianceUpdateShader, m_IrradianceAtlas[previous], m_IrradianceAtlas[next]);
         runUpdate(m_DistanceUpdateShader, m_DistanceAtlas[previous], m_DistanceAtlas[next]);
@@ -340,10 +341,10 @@ namespace Effect
         // 壁の向こうのプローブを使わない判定に、部屋の形（b11）も使っている
         ID3D11Buffer* parameterBuffer = m_ParameterBuffer.Get();
         ID3D11Buffer* roomBuffer = Renderer::GetRoomOcclusionBuffer();
-        context->CSSetConstantBuffers(0, 1, &parameterBuffer);
+        context->CSSetConstantBuffers(SIGNAL_LOST_DDGI_PARAMS_SLOT, 1, &parameterBuffer);
         context->CSSetConstantBuffers(RoomShapeSlot, 1, &roomBuffer);
         ID3D11SamplerState* sampler = m_LinearClamp.Get();
-        context->CSSetSamplers(0, 1, &sampler);
+        context->CSSetSamplers(SIGNAL_LOST_DDGI_SAMPLER_SLOT, 1, &sampler);
         m_ApplyShader.SetGPU();
         ID3D11ShaderResourceView* atlases[AtlasInputCount] = {
             m_IrradianceAtlas[m_Current].SRV.Get(), m_DistanceAtlas[m_Current].SRV.Get() };
@@ -351,15 +352,15 @@ namespace Effect
         ID3D11ShaderResourceView* depth = Renderer::GetDepthShaderResourceView();
         context->CSSetShaderResources(DepthSlot, 1, &depth);
         ID3D11UnorderedAccessView* output = m_IndirectLight.UAV.Get();
-        context->CSSetUnorderedAccessViews(0, 1, &output, nullptr);
+        context->CSSetUnorderedAccessViews(SIGNAL_LOST_DDGI_OUTPUT_SLOT, 1, &output, nullptr);
         context->Dispatch(
             (static_cast<UINT>(m_Parameters.OutputSize.x) + ApplyGroupSize - 1) / ApplyGroupSize,
             (static_cast<UINT>(m_Parameters.OutputSize.y) + ApplyGroupSize - 1) / ApplyGroupSize, 1);
 
         ID3D11UnorderedAccessView* nullUAV = nullptr;
         ID3D11ShaderResourceView* nullSRVs[ComputeInputSlotCount] = {};
-        context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
-        context->CSSetShaderResources(0, ComputeInputSlotCount, nullSRVs);
+        context->CSSetUnorderedAccessViews(SIGNAL_LOST_DDGI_OUTPUT_SLOT, 1, &nullUAV, nullptr);
+        context->CSSetShaderResources(PointLightsSlot, ComputeInputSlotCount, nullSRVs);
         context->CSSetShader(nullptr, nullptr, 0);
 
         // 本描画の描画先（色と深度）に戻して、結果を t18 に設定している

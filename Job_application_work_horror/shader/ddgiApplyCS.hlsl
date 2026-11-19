@@ -8,11 +8,12 @@
 // ・プローブの格子の外（建物の外）は、横の端へ行くほど弱めて0にしている。
 // ============================================================================
 
+#include "renderingConfig.hlsli"
 #include "ddgiCommon.hlsli"
 #include "computeDispatchConfig.hlsli"
 
-Texture2D<float> SceneDepth : register(t5);
-RWTexture2D<float4> IndirectOutput : register(u0);
+Texture2D<float> SceneDepth : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_DDGI_SCENE_DEPTH_SLOT));
+RWTexture2D<float4> IndirectOutput : register(SIGNAL_LOST_UAV_REGISTER(SIGNAL_LOST_DDGI_OUTPUT_SLOT));
 
 // 格子の端から内側へ、間接光を弱める幅（プローブの間隔に対する割合）
 static const float DDGI_VOLUME_EDGE_FADE = 0.5f;

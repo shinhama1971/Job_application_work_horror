@@ -119,4 +119,9 @@
 
 #define SIGNAL_LOST_FALSE_DOOR_BASE_RGB 0.07f, 0.025f, 0.018f
 
+// 画面効果の定数。トーンマッピングと画面の埃は個別のパスで同じ番号を使う。
+#define SIGNAL_LOST_POST_EFFECT_BUFFER_SLOT 0
+#define SIGNAL_LOST_TONE_MAP_BUFFER_SLOT 0
+#define SIGNAL_LOST_DUST_TIME_BUFFER_SLOT 0
+
 #endif

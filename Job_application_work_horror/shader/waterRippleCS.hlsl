@@ -9,12 +9,13 @@
 // ・計算する範囲はプレイヤーのまわりだけ。プレイヤーが動いたら、マス目の単位で中身をずらして範囲を付いて行かせている。
 // ============================================================================
 
+#include "renderingConfig.hlsli"
 #include "fastNoise.hlsli"
 #include "puddleMask.hlsli"
 #include "computeDispatchConfig.hlsli"
 
 // WaterRippleSimulation.cppのRippleParamsと同じ並び（b0）
-cbuffer WaterRippleBuffer : register(b0)
+cbuffer WaterRippleBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_RIPPLE_PARAMS_SLOT))
 {
     float2 Origin;              // 範囲の最小のx・z（ワールド座標）
     float TexelSize;            // マス目1つの長さ
@@ -29,8 +30,8 @@ cbuffer WaterRippleBuffer : register(b0)
     float4 Obstacles[SIGNAL_LOST_RIPPLE_MAX_OBSTACLES];    // 床に立った物を上から見た長方形（xy = 中心のx・z、zw = 半分の幅と奥行き）
 };
 
-Texture2D<float2> PreviousState : register(t0);     // 1歩前の（今の高さ, 1つ前の高さ）
-RWTexture2D<float2> NextState : register(u0);       // 次の（今の高さ, 1つ前の高さ）
+Texture2D<float2> PreviousState : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_RIPPLE_PREVIOUS_STATE_SLOT));     // 1歩前の（今の高さ, 1つ前の高さ）
+RWTexture2D<float2> NextState : register(SIGNAL_LOST_UAV_REGISTER(SIGNAL_LOST_RIPPLE_NEXT_STATE_SLOT));       // 次の（今の高さ, 1つ前の高さ）
 
 // 波のマス目の数（1面・2面は256、外の森は768）。テクスチャの大きさから読んでいる
 int GetRippleResolution()

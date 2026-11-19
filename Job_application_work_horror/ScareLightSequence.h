@@ -64,19 +64,29 @@ public:
         }
     }
 
-    // 次の段階の時刻が来ていれば、その段階の番号を返して次へ進めている（まだなら-1）。最後の段階で演出を終えている
-    int ConsumePendingBeat() noexcept
+    // 次の段階の時刻が来ていれば、その段階の番号を返して次へ進めている（まだなら None）。最後の段階で演出を終えている
+    enum class Beat { None, MiddleCorridor, CentralHall, NorthCorner, LoopExit, RestoreEmergency };
+
+    Beat ConsumePendingBeat() noexcept
     {
-        constexpr float BeatTimes[] = { 0.45f, 0.90f, 1.38f, 1.92f, 2.65f };
-        constexpr int BeatCount =
-            static_cast<int>(sizeof(BeatTimes) / sizeof(BeatTimes[0]));
-        if (!IsActive() || m_Phase >= BeatCount ||
-            m_Timer < BeatTimes[m_Phase])
+        struct ScheduledBeat { float Time; Beat Event; };
+        constexpr ScheduledBeat schedule[] =
         {
-            return -1;
+            { 0.45f, Beat::MiddleCorridor },
+            { 0.90f, Beat::CentralHall },
+            { 1.38f, Beat::NorthCorner },
+            { 1.92f, Beat::LoopExit },
+            { 2.65f, Beat::RestoreEmergency },
+        };
+        constexpr int BeatCount =
+            static_cast<int>(sizeof(schedule) / sizeof(schedule[0]));
+        if (!IsActive() || m_Phase >= BeatCount ||
+            m_Timer < schedule[m_Phase].Time)
+        {
+            return Beat::None;
         }
 
-        const int beat = m_Phase++;
+        const auto beat = schedule[m_Phase++].Event;
         if (m_Phase >= BeatCount)
         {
             m_Timer = -1.0f;

@@ -594,17 +594,17 @@ void ForestGrass::RunGpuSimulation()
 
     m_SimulationShader.SetGPU();
     ID3D11Buffer* constantBuffer = m_SimulationParams.Get();
-    context->CSSetConstantBuffers(0, 1, &constantBuffer);
+    context->CSSetConstantBuffers(SIGNAL_LOST_GRASS_SIM_PARAMS_SLOT, 1, &constantBuffer);
     ID3D11ShaderResourceView* bladeView = m_BladeView.Get();
-    context->CSSetShaderResources(0, 1, &bladeView);
+    context->CSSetShaderResources(SIGNAL_LOST_GRASS_SIM_INPUT_SLOT, 1, &bladeView);
     ID3D11UnorderedAccessView* stateAccess = m_StateAccess.Get();
-    context->CSSetUnorderedAccessViews(0, 1, &stateAccess, nullptr);
+    context->CSSetUnorderedAccessViews(SIGNAL_LOST_GRASS_SIM_OUTPUT_SLOT, 1, &stateAccess, nullptr);
     context->Dispatch((params.BladeCount + GroupSize - 1) / GroupSize, 1, 1);
 
     ID3D11UnorderedAccessView* nullAccess = nullptr;
     ID3D11ShaderResourceView* nullView = nullptr;
-    context->CSSetUnorderedAccessViews(0, 1, &nullAccess, nullptr);
-    context->CSSetShaderResources(0, 1, &nullView);
+    context->CSSetUnorderedAccessViews(SIGNAL_LOST_GRASS_SIM_OUTPUT_SLOT, 1, &nullAccess, nullptr);
+    context->CSSetShaderResources(SIGNAL_LOST_GRASS_SIM_INPUT_SLOT, 1, &nullView);
     context->CSSetShader(nullptr, nullptr, 0);
 }
 

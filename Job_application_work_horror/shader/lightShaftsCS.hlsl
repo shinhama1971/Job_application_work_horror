@@ -1,16 +1,17 @@
 // 光の筋だけを半解像度で積分する。wには奥行きを持ち、拡大時の光漏れを防ぐ。
 #include "fastNoise.hlsli"
+#include "renderingConfig.hlsli"
 #include "lightShaftSegment.hlsli"
 #include "computeDispatchConfig.hlsli"
 struct ENVIRONMENT_POINT_LIGHT { float4 PositionRange; float4 ColorIntensity; };
-cbuffer ShaftParameters : register(b0) {
+cbuffer ShaftParameters : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_SHAFT_PARAMS_SLOT)) {
  matrix InverseViewProjection; float4 EyeTime; float4 Viewport; uint LightCount; float3 Padding;
  // 見えない影の人影（xyz = 足もと、w = 見え方。figureShadow.hlsli と同じ名前にしている）
  float4 UnseenFigure;
 };
-Texture2D<float> SceneDepth : register(t0);
-StructuredBuffer<ENVIRONMENT_POINT_LIGHT> Lights : register(t1);
-RWTexture2D<float4> Output : register(u0);
+Texture2D<float> SceneDepth : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_SHAFT_DEPTH_SLOT));
+StructuredBuffer<ENVIRONMENT_POINT_LIGHT> Lights : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_SHAFT_POINT_LIGHTS_SLOT));
+RWTexture2D<float4> Output : register(SIGNAL_LOST_UAV_REGISTER(SIGNAL_LOST_SHAFT_OUTPUT_SLOT));
 float3 GetMistEyePosition() { return EyeTime.xyz; }
 // 見えない影の人影が光を遮る割合（床や壁の影と同じ計算。霧の中の光の筋にも、人の形の暗い切れ目ができる）
 // プレイヤーの体の影は、霧の中の光の筋には付けない（体の値はこの定数バッファにないため）

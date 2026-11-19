@@ -47,19 +47,27 @@ public:
     // 電力の演出の時間を進めている
     void AdvanceRestore(float deltaTime) noexcept { m_RestoreTimer += deltaTime; }
 
-    // 電力の演出の次の段階（0.38・1.15・2.25秒）が来ていれば、その番号を返している（まだなら-1）
-    int ConsumeRestoreBeat() noexcept
+    // 電力の演出の次の段階（0.38・1.15・2.25秒）が来ていれば、その番号を返している（まだなら None）
+    enum class RestoreBeat { None, Flash, Jolt, Afterglow };
+
+    RestoreBeat ConsumeRestoreBeat() noexcept
     {
-        constexpr float BeatTimes[] = { 0.38f, 1.15f, 2.25f };
+        struct ScheduledBeat { float Time; RestoreBeat Event; };
+        constexpr ScheduledBeat schedule[] =
+        {
+            { 0.38f, RestoreBeat::Flash },
+            { 1.15f, RestoreBeat::Jolt },
+            { 2.25f, RestoreBeat::Afterglow },
+        };
         constexpr int BeatCount =
-            static_cast<int>(sizeof(BeatTimes) / sizeof(BeatTimes[0]));
+            static_cast<int>(sizeof(schedule) / sizeof(schedule[0]));
         if (m_RestoreTimer < 0.0f || m_RestorePhase == NotStarted ||
             m_RestorePhase >= BeatCount ||
-            m_RestoreTimer < BeatTimes[m_RestorePhase])
+            m_RestoreTimer < schedule[m_RestorePhase].Time)
         {
-            return -1;
+            return RestoreBeat::None;
         }
-        return m_RestorePhase++;
+        return schedule[m_RestorePhase++].Event;
     }
 
     // 出口の演出をまだ始めていなければ始め、trueを返している
@@ -78,17 +86,25 @@ public:
     void AdvanceExit(float deltaTime) noexcept { m_ExitTimer += deltaTime; }
 
     // 出口の演出の次の段階（0.28・0.78・1.30秒）が来ていれば番号を返し、最後の段階で終えている
-    int ConsumeExitBeat() noexcept
+    enum class ExitBeat { None, RestoreCorridor, RestoreExit, Finish };
+
+    ExitBeat ConsumeExitBeat() noexcept
     {
-        constexpr float BeatTimes[] = { 0.28f, 0.78f, 1.30f };
-        constexpr int BeatCount =
-            static_cast<int>(sizeof(BeatTimes) / sizeof(BeatTimes[0]));
-        if (m_ExitComplete || m_ExitTimer < 0.0f || m_ExitPhase == NotStarted ||
-            m_ExitPhase >= BeatCount || m_ExitTimer < BeatTimes[m_ExitPhase])
+        struct ScheduledBeat { float Time; ExitBeat Event; };
+        constexpr ScheduledBeat schedule[] =
         {
-            return -1;
+            { 0.28f, ExitBeat::RestoreCorridor },
+            { 0.78f, ExitBeat::RestoreExit },
+            { 1.30f, ExitBeat::Finish },
+        };
+        constexpr int BeatCount =
+            static_cast<int>(sizeof(schedule) / sizeof(schedule[0]));
+        if (m_ExitComplete || m_ExitTimer < 0.0f || m_ExitPhase == NotStarted ||
+            m_ExitPhase >= BeatCount || m_ExitTimer < schedule[m_ExitPhase].Time)
+        {
+            return ExitBeat::None;
         }
-        const int beat = m_ExitPhase++;
+        const auto beat = schedule[m_ExitPhase++].Event;
         if (m_ExitPhase >= BeatCount)
         {
             m_ExitComplete = true;

@@ -44,19 +44,26 @@ public:
         m_Timer = (std::max)(0.0f, m_Timer - deltaTime);
     }
 
-    // 次の段階の時刻が来ていれば、その段階の番号を返して次へ進めている（まだなら-1）。
+    // 次の段階の時刻が来ていれば、その段階の番号を返して次へ進めている（まだなら None）。
     // 残り2.45秒で段階0（背後の照明が消える）、残り1.35秒で段階1（出口の照明が故障する）
-    int ConsumePendingBeat() noexcept
+    enum class Beat { None, CutLightBehind, FlickerExit };
+
+    Beat ConsumePendingBeat() noexcept
     {
-        constexpr float RemainingTimes[] = { 2.45f, 1.35f };
-        constexpr int BeatCount =
-            static_cast<int>(sizeof(RemainingTimes) / sizeof(RemainingTimes[0]));
-        if (!m_Triggered || m_Phase == NotStarted || m_Phase >= BeatCount ||
-            m_Timer > RemainingTimes[m_Phase])
+        struct ScheduledBeat { float Time; Beat Event; };
+        constexpr ScheduledBeat schedule[] =
         {
-            return -1;
+            { 2.45f, Beat::CutLightBehind },
+            { 1.35f, Beat::FlickerExit },
+        };
+        constexpr int BeatCount =
+            static_cast<int>(sizeof(schedule) / sizeof(schedule[0]));
+        if (!m_Triggered || m_Phase == NotStarted || m_Phase >= BeatCount ||
+            m_Timer > schedule[m_Phase].Time)
+        {
+            return Beat::None;
         }
-        return m_Phase++;
+        return schedule[m_Phase++].Event;
     }
 
     // 演出を始めたか、残り秒数を返している

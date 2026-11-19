@@ -13,12 +13,13 @@
 #ifndef DDGI_COMMON_INCLUDED
 #define DDGI_COMMON_INCLUDED
 #include "renderingConfig.hlsli"
+#include "computeDispatchConfig.hlsli"
 
 // 1つのセルを囲み、三線形補間に使うプローブの数。
 #define DDGI_CELL_CORNER_COUNT 8
 
 // DDGIVolume.cpp の DDGIParameters と同じ並び（b0）
-cbuffer DDGIBuffer : register(b0)
+cbuffer DDGIBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_DDGI_PARAMS_SLOT))
 {
     float3 ProbeOrigin;         // 一番手前・左・下のプローブの位置
     uint RaysPerProbe;          // 1つのプローブから飛ばす光線の数
@@ -132,9 +133,9 @@ bool IsWallBetween(float3 from, float3 to)
 }
 
 // 放射照度と距離の画像（前のフレームの物。光線の当たった面の跳ね返りと、画面への適用で読む）と、線形補間のサンプラー
-Texture2D<float4> DDGIIrradianceAtlas : register(t2);
-Texture2D<float2> DDGIDistanceAtlas : register(t3);
-SamplerState DDGILinearClamp : register(s0);
+Texture2D<float4> DDGIIrradianceAtlas : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_DDGI_IRRADIANCE_ATLAS_SLOT));
+Texture2D<float2> DDGIDistanceAtlas : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_DDGI_DISTANCE_ATLAS_SLOT));
+SamplerState DDGILinearClamp : register(SIGNAL_LOST_SAMPLER_REGISTER(SIGNAL_LOST_DDGI_SAMPLER_SLOT));
 
 // 0で割らないよう、0を+1として扱う符号
 float2 SignNotZero(float2 value)

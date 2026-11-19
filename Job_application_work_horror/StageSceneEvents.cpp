@@ -844,7 +844,7 @@ void StageScene::UpdateScareLightSequence()
 
     switch (m_ScareLightSequence.ConsumePendingBeat())
     {
-    case 0:
+    case ScareLightSequence::Beat::MiddleCorridor:
         if (entrance != nullptr)
         {
             entrance->SetEmergencyLight(false, StartRoomEmergencyOffset);
@@ -856,7 +856,7 @@ void StageScene::UpdateScareLightSequence()
         EventFeedback::HorrorPulse(*game->GetPostProcess(), ScareChasePulse1);
         EventFeedback::Rumble(ScareChaseRumble1);
         break;
-    case 1:
+    case ScareLightSequence::Beat::CentralHall:
         if (middle != nullptr)
         {
             middle->SetEmergencyLight(false, MiddleChaseEmergencyOffset);
@@ -868,7 +868,7 @@ void StageScene::UpdateScareLightSequence()
         EventFeedback::HorrorPulse(*game->GetPostProcess(), ScareChasePulse2);
         EventFeedback::Rumble(ScareChaseRumble2);
         break;
-    case 2:
+    case ScareLightSequence::Beat::NorthCorner:
         if (hall != nullptr)
         {
             hall->SetEmergencyLight(false, HallChaseEmergencyOffset);
@@ -880,7 +880,7 @@ void StageScene::UpdateScareLightSequence()
         EventFeedback::HorrorPulse(*game->GetPostProcess(), ScareChasePulse3);
         EventFeedback::Rumble(ScareChaseRumble3);
         break;
-    case 3:
+    case ScareLightSequence::Beat::LoopExit:
         if (corner != nullptr)
         {
             corner->SetEmergencyLight(false, CornerChaseEmergencyOffset);
@@ -893,7 +893,7 @@ void StageScene::UpdateScareLightSequence()
         EventFeedback::Rumble(ScareChaseRumble4);
         break;
     // 最後の段階で、廊下の照明を赤い非常灯に戻している
-    case 4:
+    case ScareLightSequence::Beat::RestoreEmergency:
         if (middle != nullptr)
         {
             middle->SetEmergencyLight(true, MiddleFinalEmergencyOffset);
@@ -908,7 +908,7 @@ void StageScene::UpdateScareLightSequence()
         }
         EventFeedback::Rumble(ScareChaseFinalRumble);
         break;
-    default:
+    case ScareLightSequence::Beat::None:
         break;
     }
 }
@@ -1077,19 +1077,19 @@ void StageScene::UpdatePowerRestoreSequence()
 
     switch (m_PowerSequence.ConsumeRestoreBeat())
     {
-    case 0:
+    case StagePowerSequence::RestoreBeat::Flash:
         EventFeedback::BloomPulse(*game->GetPostProcess(), PowerRestoreFlashBloom);
         EventFeedback::Rumble(PowerRestoreFlashRumble);
         break;
-    case 1:
+    case StagePowerSequence::RestoreBeat::Jolt:
         EventFeedback::HorrorPulse(*game->GetPostProcess(), PowerRestoreJoltPulse);
         EventFeedback::Rumble(PowerRestoreJoltRumble);
         break;
-    case 2:
+    case StagePowerSequence::RestoreBeat::Afterglow:
         EventFeedback::BloomPulse(*game->GetPostProcess(), PowerRestoreAfterglowBloom);
         EventFeedback::Rumble(PowerRestoreAfterglowRumble);
         break;
-    default:
+    case StagePowerSequence::RestoreBeat::None:
         break;
     }
 }
@@ -1125,7 +1125,7 @@ void StageScene::UpdateExitPowerSequence()
     m_PowerSequence.AdvanceExit(deltaTime);
     switch (m_PowerSequence.ConsumeExitBeat())
     {
-    case 0:
+    case StagePowerSequence::ExitBeat::RestoreCorridor:
     {
         CeilingLight* corner = m_Objects.CeilingLightAt(Stage1LightNumber::LoopExitCorridor);
         if (corner != nullptr)
@@ -1138,7 +1138,7 @@ void StageScene::UpdateExitPowerSequence()
         EventFeedback::Rumble(ExitPowerFirstRumble);
         break;
     }
-    case 1:
+    case StagePowerSequence::ExitBeat::RestoreExit:
     {
         CeilingLight* exitLight = m_Objects.CeilingLightAt(Stage1LightNumber::NorthCorner);
         if (exitLight != nullptr)
@@ -1151,11 +1151,11 @@ void StageScene::UpdateExitPowerSequence()
         EventFeedback::Rumble(ExitPowerSecondRumble);
         break;
     }
-    case 2:
+    case StagePowerSequence::ExitBeat::Finish:
         EventFeedback::BloomPulse(*game->GetPostProcess(), ExitPowerFinalBloom);
         EventFeedback::Rumble(ExitPowerFinalRumble);
         break;
-    default:
+    case StagePowerSequence::ExitBeat::None:
         break;
     }
 }
@@ -1170,7 +1170,7 @@ void StageScene::UpdateExitOmen(Player& player)
         Core::Game* game = Core::Game::GetInstance();
         switch (m_ExitOmenSequence.ConsumePendingBeat())
         {
-        case 0:
+        case ExitOmenSequence::Beat::CutLightBehind:
         {
             CeilingLight* lightBehind =
                 m_Objects.CeilingLightAt(Stage1LightNumber::NorthCorner);
@@ -1182,7 +1182,7 @@ void StageScene::UpdateExitOmen(Player& player)
             EventFeedback::Rumble(ExitOmenLightOffRumble);
             break;
         }
-        case 1:
+        case ExitOmenSequence::Beat::FlickerExit:
         {
             CeilingLight* exitLight =
                 m_Objects.CeilingLightAt(Stage1LightNumber::LoopExitCorridor);
@@ -1194,7 +1194,7 @@ void StageScene::UpdateExitOmen(Player& player)
             EventFeedback::BloomPulse(*game->GetPostProcess(), ExitOmenFaultBloom);
             break;
         }
-        default:
+        case ExitOmenSequence::Beat::None:
             break;
         }
         return;

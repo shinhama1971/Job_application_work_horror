@@ -4,24 +4,32 @@ param([Parameter(Mandatory=$true)][string]$SourcePath)
 $ErrorActionPreference = 'Stop'
 $assetDir = Join-Path $PSScriptRoot '../assets/Audio'
 
+. (Join-Path $PSScriptRoot "MonoPcmWave.ps1")
+$attackFadeSeconds = 0.003
+
 function Read-MonoPcm([string]$name) {
     $bytes = [IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $name).Path)
+    $ascii = [Text.Encoding]::ASCII
+    if ($bytes.Length -lt $monoPcmRiffHeaderBytes -or $ascii.GetString($bytes, 0, $monoPcmChunkIdBytes) -ne "RIFF" -or
+        $ascii.GetString($bytes, $monoPcmChunkHeaderBytes, $monoPcmChunkIdBytes) -ne "WAVE") {
+        throw "$name はRIFF/WAVE形式のファイルではありません。"
+    }
     $rate = 0
-    for ($offset = 12; $offset + 8 -le $bytes.Length; $offset += 8 + $length + ($length % 2)) {
-        $chunk = [Text.Encoding]::ASCII.GetString($bytes, $offset, 4)
-        $length = [BitConverter]::ToInt32($bytes, $offset + 4)
-        $start = $offset + 8
+    for ($offset = $monoPcmRiffHeaderBytes; $offset + $monoPcmChunkHeaderBytes -le $bytes.Length; $offset += $monoPcmChunkHeaderBytes + $length + ($length % 2)) {
+        $chunk = $ascii.GetString($bytes, $offset, $monoPcmChunkIdBytes)
+        $length = [BitConverter]::ToInt32($bytes, $offset + $monoPcmChunkIdBytes)
+        $start = $offset + $monoPcmChunkHeaderBytes
         if ($length -lt 0 -or $start + $length -gt $bytes.Length) { break }
-        if ($chunk -eq 'fmt ' -and $length -ge 16) {
-            if ([BitConverter]::ToInt16($bytes, $start) -ne 1 -or
-                [BitConverter]::ToInt16($bytes, $start + 2) -ne 1 -or
-                [BitConverter]::ToInt16($bytes, $start + 14) -ne 16) {
+        if ($chunk -eq 'fmt ' -and $length -ge $monoPcmFormatBytes) {
+            if ([BitConverter]::ToInt16($bytes, $start) -ne $monoPcmFormatTag -or
+                [BitConverter]::ToInt16($bytes, $start + 2) -ne $monoPcmChannelCount -or
+                [BitConverter]::ToInt16($bytes, $start + 14) -ne $monoPcmSampleBits) {
                 throw "$name はモノラル16ビットPCMが必要です。"
             }
             $rate = [BitConverter]::ToInt32($bytes, $start + 4)
         }
-        if ($chunk -eq 'data' -and $rate -gt 0 -and $length % 2 -eq 0) {
-            $samples = New-Object 'int16[]' ($length / 2)
+        if ($chunk -eq 'data' -and $rate -gt 0 -and $length % $monoPcmSampleBytes -eq 0) {
+            $samples = New-Object 'int16[]' ($length / $monoPcmSampleBytes)
             [Buffer]::BlockCopy($bytes, $start, $samples, 0, $length)
             return @{ Rate = $rate; Samples = $samples }
         }
@@ -44,24 +52,13 @@ foreach ($clip in $clips) {
         $peak = [Math]::Max($peak, [Math]::Abs([int]$water.Samples[$start + $i]))
     }
     if ($peak -eq 0) { throw '切り出した区間が無音です。' }
-    $gain = 32767.0 * $clip.Peak / $peak
+    $gain = $monoPcmSamplePeak * $clip.Peak / $peak
     $writer = New-Object IO.BinaryWriter ([IO.File]::Create((Join-Path $assetDir $clip.Name)))
     try {
-        $writer.Write([Text.Encoding]::ASCII.GetBytes('RIFF'))
-        $writer.Write([int](36 + $count * 2))
-        $writer.Write([Text.Encoding]::ASCII.GetBytes('WAVEfmt '))
-        $writer.Write([int]16)
-        $writer.Write([int16]1)
-        $writer.Write([int16]1)
-        $writer.Write([int]$sampleRate)
-        $writer.Write([int]($sampleRate * 2))
-        $writer.Write([int16]2)
-        $writer.Write([int16]16)
-        $writer.Write([Text.Encoding]::ASCII.GetBytes('data'))
-        $writer.Write([int]($count * 2))
+        Write-MonoPcm16Header $writer $sampleRate $count
         for ($i = 0; $i -lt $count; $i++) {
             $t = $i / $sampleRate
-            $envelope = [Math]::Min(1.0, [Math]::Min($t / 0.003, ($count - 1 - $i) / ($sampleRate * $clip.Fade)))
+            $envelope = [Math]::Min(1.0, [Math]::Min($t / $attackFadeSeconds, ($count - 1 - $i) / ($sampleRate * $clip.Fade)))
             $writer.Write([int16][Math]::Round($water.Samples[$start + $i] * $gain * $envelope))
         }
     }

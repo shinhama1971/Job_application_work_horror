@@ -9,6 +9,8 @@
 // ・プローブが壁の中にあるときは、光線が壁の裏に当たったとして、距離を負にして書く（更新のときに使わない）。
 // ============================================================================
 
+#include "renderingConfig.hlsli"
+#include "computeDispatchConfig.hlsli"
 // 部屋の形（roomOcclusion.hlsli）と、間の壁の判定（IsWallBetween）は ddgiCommon.hlsli が読み込んでいる
 #include "ddgiCommon.hlsli"
 
@@ -18,9 +20,9 @@ struct POINT_LIGHT
     float4 PositionRange;   // xyz = 位置、w = 影響の半径
     float4 ColorIntensity;  // rgb = 色、a = 強さ
 };
-StructuredBuffer<POINT_LIGHT> PointLights : register(t0);
+StructuredBuffer<POINT_LIGHT> PointLights : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_DDGI_POINT_LIGHTS_SLOT));
 // x = 光線の番号、y = プローブの番号。rgb = 返ってくる光、a = 当たるまでの距離（負なら壁の裏）
-RWTexture2D<float4> RayResults : register(u0);
+RWTexture2D<float4> RayResults : register(SIGNAL_LOST_UAV_REGISTER(SIGNAL_LOST_DDGI_OUTPUT_SLOT));
 
 // 壁・床・天井の色（照らす前の色。打ちっぱなしのコンクリートと、床のタイル・天井板）
 static const float3 DDGI_WALL_ALBEDO = float3(0.34f, 0.35f, 0.32f);

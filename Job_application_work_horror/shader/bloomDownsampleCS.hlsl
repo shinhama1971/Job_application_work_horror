@@ -7,11 +7,12 @@
 //   まわりの画素まで含めた4x4画素を、中央を重くしたテント形の重みで平均している。
 // ============================================================================
 
+#include "renderingConfig.hlsli"
 #include "computeDispatchConfig.hlsli"
 
 // 入力の画像（t0。1つ上の段のぼかした画像）と、書き込む先（u0。縦横半分の大きさ）
-Texture2D<float4> InputTexture : register(t0);
-RWTexture2D<float4> OutputTexture : register(u0);
+Texture2D<float4> InputTexture : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_BLOOM_COMPUTE_INPUT_SLOT));
+RWTexture2D<float4> OutputTexture : register(SIGNAL_LOST_UAV_REGISTER(SIGNAL_LOST_BLOOM_COMPUTE_OUTPUT_SLOT));
 
 // テント形の重み（1・3・3・1 を合計1にした物）。縦と横の重みを掛けて使う
 static const float TENT_WEIGHTS[4] = { 0.125f, 0.375f, 0.375f, 0.125f };
