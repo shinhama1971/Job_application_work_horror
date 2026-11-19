@@ -20,6 +20,8 @@ namespace
 {
     // 1面の施設の広さ（壁の内側。西棟は含めていない）。この外で鳴る音は選ばない。
     constexpr float StageMinX = -205.0f;
+    // 配管の上で鳴らす場所を探す回数（視線の外で離れた所が見つからなければ、その回は鳴らさない）
+    constexpr int PipeSpotAttempts = 16;
     constexpr float StageMaxX = 205.0f;
     constexpr float StageMinZ = -170.0f;
     constexpr float StageMaxZ = 330.0f;
@@ -312,7 +314,7 @@ bool Stage1AmbientSounds::SchedulePipeKnocks(
     std::uniform_int_distribution<int> segmentDistribution(
         0, static_cast<int>(PipeSegments.size()) - 1);
     // 配管の線分の上から、視線の外で60〜200離れた場所を探している
-    for (int attempt = 0; attempt < 16; ++attempt)
+    for (int attempt = 0; attempt < PipeSpotAttempts; ++attempt)
     {
         const PipeSegment& segment = PipeSegments[
             static_cast<std::size_t>(segmentDistribution(m_Random))];

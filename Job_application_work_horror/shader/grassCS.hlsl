@@ -83,6 +83,12 @@ static const float GRASS_DAMPING_STIFFNESS_GAIN = 0.12f;
 static const float GRASS_MIN_UPDATED_UP_COMPONENT = 0.10f;
 
 // 何もないときの葉先と、風とプレイヤーの力を足した、この瞬間の目標の葉先（根元からのずれ）を返している
+// 0で割らないための下限、atan2 の 0/0 と、葉の向きの長さ0を避けるわずかなずれ、1フレームを分ける歩数とその1歩の割合
+#define GRASS_MIN_DIVISOR 0.001f
+#define GRASS_DIRECTION_NUDGE 0.0001f
+#define GRASS_SUBSTEP_COUNT 2
+#define GRASS_SUBSTEP_FRACTION 0.5f
+
 float3 GetTargetTip(GrassBlade blade, float flatten, float flattenAngle)
 {
     const float3 leanDirection = float3(-blade.Facing.y, 0.0f, blade.Facing.x);
@@ -98,10 +104,10 @@ float3 GetTargetTip(GrassBlade blade, float flatten, float flattenAngle)
     // プレイヤー：足元のまわりの葉を、外へ押し倒している（近いほど強く、真ん中の葉はほぼ寝る）
     const float2 away = blade.Root.xz - PlayerPosition;
     const float distanceToPlayer = length(away);
-    const float push = PlayerStrength * saturate(1.0f - distanceToPlayer / max(PlayerRadius, 0.001f));
+    const float push = PlayerStrength * saturate(1.0f - distanceToPlayer / max(PlayerRadius, GRASS_MIN_DIVISOR));
     if (push > 0.0f)
     {
-        const float2 pushDirection = away / max(distanceToPlayer, 0.001f);
+        const float2 pushDirection = away / max(distanceToPlayer, GRASS_MIN_DIVISOR);
         target += float3(pushDirection.x, 0.0f, pushDirection.y) * push * GRASS_PLAYER_PUSH_GAIN;
         target.y *= 1.0f - push * GRASS_PLAYER_HEIGHT_REDUCTION;
     }
@@ -137,22 +143,22 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     {
         const float2 fromWalker = blade.Root.xz - UnseenPosition;
         const float walkerDistance = length(fromWalker);
-        const float stepOn = UnseenStrength * saturate(GRASS_UNSEEN_FOOTPRINT_CENTER_WEIGHT - walkerDistance / max(UnseenRadius, 0.001f));
+        const float stepOn = UnseenStrength * saturate(GRASS_UNSEEN_FOOTPRINT_CENTER_WEIGHT - walkerDistance / max(UnseenRadius, GRASS_MIN_DIVISOR));
         if (stepOn > flatten)
         {
             flatten = saturate(stepOn);
-            flattenAngle = atan2(fromWalker.y, fromWalker.x + 0.0001f);
+            flattenAngle = atan2(fromWalker.y, fromWalker.x + GRASS_DIRECTION_NUDGE);
         }
     }
     const float3 target = GetTargetTip(blade, flatten, flattenAngle);
 
     // 1フレームの時間を2歩に分け、硬い葉でも計算が暴れないようにしている（速さを先に更新する、半陰的オイラー法）
-    const float stepSeconds = DeltaTime * 0.5f;
+    const float stepSeconds = DeltaTime * GRASS_SUBSTEP_FRACTION;
     float3 tip = state.Tip.xyz;
     float3 velocity = state.Velocity.xyz;
     const float damping = GRASS_DAMPING_BASE + blade.Stiffness * GRASS_DAMPING_STIFFNESS_GAIN;
     [unroll]
-    for (int step = 0; step < 2; ++step)
+    for (int step = 0; step < GRASS_SUBSTEP_COUNT; ++step)
     {
         const float3 acceleration = (target - tip) * blade.Stiffness - velocity * damping;
         velocity += acceleration * stepSeconds;
@@ -160,7 +166,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     }
 
     // 葉の長さを保ち、地面にめり込ませない
-    tip = normalize(tip + float3(0.0f, 0.0001f, 0.0f));
+    tip = normalize(tip + float3(0.0f, GRASS_DIRECTION_NUDGE, 0.0f));
     tip.y = max(tip.y, GRASS_MIN_UPDATED_UP_COMPONENT);
     tip = normalize(tip) * blade.Height;
 

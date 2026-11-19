@@ -30,18 +30,23 @@ static const float2 g_PointShadowTaps[POINT_SHADOW_TAP_COUNT] =
 
 // この点光源から、この位置へ光が届く割合（0〜1）を返している。
 // 影を作っている電球の光（位置が PointShadowLight と同じ）でなければ、いつも1を返す。
+// 裸電球の影を使うかのしきい値、0で割らないための下限、補助の上向きを横向きに替える縦の向きの上限
+#define POINT_SHADOW_ENABLE_THRESHOLD 0.5f
+#define POINT_SHADOW_MIN_DIVISOR 0.001f
+#define POINT_SHADOW_UP_FALLBACK_LIMIT 0.99f
+
 float GetPointLightShadow(float3 worldPosition, float3 worldNormal, float3 lightPosition)
 {
     float visibility = 1.0f;
     [branch]
-    if (PointShadowOptions.x > 0.5f && distance(lightPosition, PointShadowLight.xyz) < POINT_SHADOW_LIGHT_MATCH_RADIUS)
+    if (PointShadowOptions.x > POINT_SHADOW_ENABLE_THRESHOLD && distance(lightPosition, PointShadowLight.xyz) < POINT_SHADOW_LIGHT_MATCH_RADIUS)
     {
-        const float range = max(PointShadowLight.w, 0.001f);
+        const float range = max(PointShadowLight.w, POINT_SHADOW_MIN_DIVISOR);
         // 面から少し浮かせた位置で比べ、自分自身の面で影ができる（にきびのような模様）のを防いでいる
         const float3 toPixel = worldPosition + normalize(worldNormal) * POINT_SHADOW_SURFACE_NORMAL_BIAS - PointShadowLight.xyz;
         const float pixelDistance = length(toPixel);
-        const float3 direction = toPixel / max(pixelDistance, 0.001f);
-        const float3 helper = abs(direction.y) < 0.99f ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f);
+        const float3 direction = toPixel / max(pixelDistance, POINT_SHADOW_MIN_DIVISOR);
+        const float3 helper = abs(direction.y) < POINT_SHADOW_UP_FALLBACK_LIMIT ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f);
         const float3 tangent = normalize(cross(direction, helper));
         const float3 bitangent = cross(direction, tangent);
 

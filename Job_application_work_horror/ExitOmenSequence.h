@@ -12,6 +12,8 @@
 class ExitOmenSequence final
 {
 private:
+    // 演出の長さ（秒）
+    static constexpr float DurationSeconds = 3.2f;
     // 演出を始めたか、残り秒数、次に起こす段階（-1なら始まっていない）
     bool m_Triggered = false;
     float m_Timer = 0.0f;
@@ -30,7 +32,7 @@ public:
     void Start() noexcept
     {
         m_Triggered = true;
-        m_Timer = 3.2f;
+        m_Timer = DurationSeconds;
         m_Phase = 0;
     }
 

@@ -95,12 +95,16 @@ float3 FresnelSchlick(float3 f0, float vDotH)
 
 // 1つの光から目へ返る鏡面反射（光の色と明るさを掛ける前の値。n・lまで含む）。
 // normal・toView・toLight は同じ空間の、長さ1の向き。
+// 視線と光がちょうど逆向きのときに足すわずかな向きと、視線との内積の下限
+#define PBR_HALF_VECTOR_NUDGE 1e-5f
+#define PBR_MIN_N_DOT_V 1e-4f
+
 float3 EvaluateSpecularGGX(PbrSurface surface, float3 normal, float3 toView, float3 toLight)
 {
     const float nDotL = saturate(dot(normal, toLight));
     // 視線と光がちょうど逆向きのときに長さ0にならないよう、少しだけ足している
-    const float3 halfVector = normalize(toView + toLight + float3(0.0f, 0.0f, 1e-5f));
-    const float nDotV = max(dot(normal, toView), 1e-4f);
+    const float3 halfVector = normalize(toView + toLight + float3(0.0f, 0.0f, PBR_HALF_VECTOR_NUDGE));
+    const float nDotV = max(dot(normal, toView), PBR_MIN_N_DOT_V);
     const float nDotH = saturate(dot(normal, halfVector));
     const float vDotH = saturate(dot(toView, halfVector));
 
@@ -121,6 +125,49 @@ struct MetalWear
     float height;
 };
 
+// --- 金属の錆と擦れ傷の値
+// 錆と傷を付ける金属らしさの下限
+#define METAL_WEAR_MIN_METALLIC 0.05f
+// 錆：床からの高さで濃くなる範囲と足す量、まだらのノイズ（細かさ・ずらし）、出る範囲（出始め・出きる）、粒のノイズ（細かさ・ずらし）
+#define RUST_FLOOR_DAMP_HEIGHT 45.0f
+#define RUST_FLOOR_DAMP_BOOST 0.15f
+#define RUST_PATCH_SCALE 0.11f
+#define RUST_PATCH_SEED 17.3f
+#define RUST_MASK_START 0.57f
+#define RUST_MASK_FULL 0.76f
+#define RUST_GRAIN_SCALE 1.7f
+#define RUST_GRAIN_SEED 5.3f
+// 色の付いた金属かを見る：0で割らないための下限と、彩度を強める量
+#define METAL_MIN_CHANNEL 0.001f
+#define METAL_SATURATION_GAIN 2.5f
+// 鉄の赤茶の錆（暗い・明るい）と、色の付いた金属の黒ずみ（暗さ：暗い・明るい）
+#define IRON_RUST_DARK float3(0.20f, 0.075f, 0.030f)
+#define IRON_RUST_LIGHT float3(0.36f, 0.16f, 0.060f)
+#define TARNISH_DARK 0.28f
+#define TARNISH_LIGHT 0.42f
+// 擦れ傷：斜めの向き（回転の cos・sin）、細長いノイズ（細かさ・ずらし）、散らす範囲（出始め・出きる、細かさ・ずらし）、線のしきい値（始め・終わり）
+#define SCRATCH_ROTATE_COS 0.8f
+#define SCRATCH_ROTATE_SIN 0.6f
+#define SCRATCH_LINE_SCALE float2(0.35f, 9.0f)
+#define SCRATCH_LINE_SEED 3.1f
+#define SCRATCH_AREA_START 0.35f
+#define SCRATCH_AREA_FULL 0.65f
+#define SCRATCH_AREA_SCALE 0.07f
+#define SCRATCH_AREA_SEED 41.0f
+#define SCRATCH_LINE_START 0.86f
+#define SCRATCH_LINE_FULL 0.95f
+// 拭き跡（細かさ・ずらし・粗さのむら）、傷の粗さ、錆の粗さ、傷の明るさ（倍率・足す量・混ぜ方）、錆の盛り上がり（最低＋粒の幅）
+#define SMUDGE_SCALE 0.45f
+#define SMUDGE_SEED 9.0f
+#define SMUDGE_ROUGHNESS_RANGE 0.20f
+#define SCRATCH_ROUGHNESS 0.14f
+#define RUST_ROUGHNESS 0.88f
+#define SCRATCH_BRIGHTEN 1.25f
+#define SCRATCH_LIFT 0.04f
+#define SCRATCH_BLEND 0.6f
+#define RUST_HEIGHT_BASE 0.4f
+#define RUST_HEIGHT_GRAIN 0.6f
+
 MetalWear GetMetalWear(float3 baseColor, float metallic, float roughness, float3 worldPosition, float3 worldNormal)
 {
     MetalWear wear;
@@ -129,7 +176,7 @@ MetalWear GetMetalWear(float3 baseColor, float metallic, float roughness, float3
     wear.roughness = roughness;
     wear.height = 0.0f;
     [branch]
-    if (metallic > 0.05f)
+    if (metallic > METAL_WEAR_MIN_METALLIC)
     {
         // 面の向きで、模様を作る2次元の座標を選んでいる（箱のどの面でも、ワールドの大きさのまま模様を作る）
         const float3 axis = abs(normalize(worldNormal));
@@ -139,35 +186,35 @@ MetalWear GetMetalWear(float3 baseColor, float metallic, float roughness, float3
 
         // 錆：大きなまだらの染みに、床に近いほど濃くなる分（水と湿気が溜まる）を足している。
         // 錆は鉄の上にできた酸化物なので、金属ではなく、ざらざらで光らない
-        const float floorDamp = saturate(1.0f - (worldPosition.y - SCENE_BASE_FLOOR_Y) / 45.0f);
-        const float rustPatches = FastFractalNoise3(uv * 0.11f + 17.3f) + floorDamp * 0.15f;
-        const float rustMask = smoothstep(0.57f, 0.76f, rustPatches);
-        const float rustGrain = FastValueNoise(uv * 1.7f + 5.3f);
+        const float floorDamp = saturate(1.0f - (worldPosition.y - SCENE_BASE_FLOOR_Y) / RUST_FLOOR_DAMP_HEIGHT);
+        const float rustPatches = FastFractalNoise3(uv * RUST_PATCH_SCALE + RUST_PATCH_SEED) + floorDamp * RUST_FLOOR_DAMP_BOOST;
+        const float rustMask = smoothstep(RUST_MASK_START, RUST_MASK_FULL, rustPatches);
+        const float rustGrain = FastValueNoise(uv * RUST_GRAIN_SCALE + RUST_GRAIN_SEED);
         // 鉄のような灰色の金属は赤茶の錆、真鍮や金のような色の付いた金属は黒ずんだくすみにしている
         const float maxChannel = max(baseColor.r, max(baseColor.g, baseColor.b));
         const float minChannel = min(baseColor.r, min(baseColor.g, baseColor.b));
-        const float grayness = 1.0f - saturate((maxChannel - minChannel) / max(maxChannel, 0.001f) * 2.5f);
-        const float3 ironRust = lerp(float3(0.20f, 0.075f, 0.030f), float3(0.36f, 0.16f, 0.060f), rustGrain);
-        const float3 tarnish = baseColor * lerp(0.28f, 0.42f, rustGrain);
+        const float grayness = 1.0f - saturate((maxChannel - minChannel) / max(maxChannel, METAL_MIN_CHANNEL) * METAL_SATURATION_GAIN);
+        const float3 ironRust = lerp(IRON_RUST_DARK, IRON_RUST_LIGHT, rustGrain);
+        const float3 tarnish = baseColor * lerp(TARNISH_DARK, TARNISH_LIGHT, rustGrain);
         const float3 rustColor = lerp(tarnish, ironRust, grayness);
 
         // 擦れ傷：斜めの向きに細長く引き伸ばしたノイズで細い線を作り、所々にだけ散らしている。
         // 傷の所は地の金属が出て、なめらかに光る
-        const float2 scratchUV = float2(uv.x * 0.8f + uv.y * 0.6f, uv.y * 0.8f - uv.x * 0.6f);
-        const float scratchLines = FastValueNoise(scratchUV * float2(0.35f, 9.0f) + 3.1f);
-        const float scratchArea = smoothstep(0.35f, 0.65f, FastValueNoise(uv * 0.07f + 41.0f));
-        const float scratchMask = smoothstep(0.86f, 0.95f, scratchLines) * scratchArea * (1.0f - rustMask);
+        const float2 scratchUV = float2(uv.x * SCRATCH_ROTATE_COS + uv.y * SCRATCH_ROTATE_SIN, uv.y * SCRATCH_ROTATE_COS - uv.x * SCRATCH_ROTATE_SIN);
+        const float scratchLines = FastValueNoise(scratchUV * SCRATCH_LINE_SCALE + SCRATCH_LINE_SEED);
+        const float scratchArea = smoothstep(SCRATCH_AREA_START, SCRATCH_AREA_FULL, FastValueNoise(uv * SCRATCH_AREA_SCALE + SCRATCH_AREA_SEED));
+        const float scratchMask = smoothstep(SCRATCH_LINE_START, SCRATCH_LINE_FULL, scratchLines) * scratchArea * (1.0f - rustMask);
 
         // 拭き跡や手の脂のような、光沢の細かな濃淡
-        const float smudge = FastValueNoise(uv * 0.45f + 9.0f);
+        const float smudge = FastValueNoise(uv * SMUDGE_SCALE + SMUDGE_SEED);
 
-        wear.roughness = clamp(roughness + (smudge - 0.5f) * 0.20f, PBR_MIN_ROUGHNESS, 1.0f);
-        wear.roughness = lerp(wear.roughness, 0.14f, scratchMask);
-        wear.roughness = lerp(wear.roughness, 0.88f, rustMask);
-        wear.baseColor = lerp(baseColor, baseColor * 1.25f + 0.04f, scratchMask * 0.6f);
+        wear.roughness = clamp(roughness + (smudge - 0.5f) * SMUDGE_ROUGHNESS_RANGE, PBR_MIN_ROUGHNESS, 1.0f);
+        wear.roughness = lerp(wear.roughness, SCRATCH_ROUGHNESS, scratchMask);
+        wear.roughness = lerp(wear.roughness, RUST_ROUGHNESS, rustMask);
+        wear.baseColor = lerp(baseColor, baseColor * SCRATCH_BRIGHTEN + SCRATCH_LIFT, scratchMask * SCRATCH_BLEND);
         wear.baseColor = lerp(wear.baseColor, rustColor, rustMask);
         wear.metallic = metallic * (1.0f - rustMask);
-        wear.height = rustMask * (0.4f + rustGrain * 0.6f);
+        wear.height = rustMask * (RUST_HEIGHT_BASE + rustGrain * RUST_HEIGHT_GRAIN);
     }
     return wear;
 }
@@ -187,20 +234,31 @@ float3 SampleEnvironment(float3 worldDirection, float roughness)
 }
 
 // 環境光の鏡面反射に掛ける割合（あらかじめ積分した表の代わりに、解析的な式で近似している。Karis 2014）
+// Karis 2014 の近似式の係数（論文のまま）
+#define KARIS_BRDF_C0 float4(-1.0f, -0.0275f, -0.572f, 0.022f)
+#define KARIS_BRDF_C1 float4(1.0f, 0.0425f, 1.04f, -0.04f)
+#define KARIS_BRDF_FALLOFF -9.28f
+#define KARIS_BRDF_SCALE_BIAS float2(-1.04f, 1.04f)
+
 float3 EnvironmentBrdfApprox(float3 f0, float roughness, float nDotV)
 {
-    const float4 c0 = float4(-1.0f, -0.0275f, -0.572f, 0.022f);
-    const float4 c1 = float4(1.0f, 0.0425f, 1.04f, -0.04f);
+    const float4 c0 = KARIS_BRDF_C0;
+    const float4 c1 = KARIS_BRDF_C1;
     const float4 r = roughness * c0 + c1;
-    const float a004 = min(r.x * r.x, exp2(-9.28f * nDotV)) * r.x + r.y;
-    const float2 scaleBias = float2(-1.04f, 1.04f) * a004 + r.zw;
+    const float a004 = min(r.x * r.x, exp2(KARIS_BRDF_FALLOFF * nDotV)) * r.x + r.y;
+    const float2 scaleBias = KARIS_BRDF_SCALE_BIAS * a004 + r.zw;
     return f0 * scaleBias.x + scaleBias.y;
 }
 
 // 粗い面ほど、隙間や角で環境の映り込みがさえぎられる分（Lagarde 2014 の鏡面の遮蔽の近似）
+// Lagarde 2014 の近似式の係数（論文のまま）と、0の累乗を避ける下限
+#define LAGARDE_OCCLUSION_ROUGHNESS_SCALE -16.0f
+#define SPECULAR_OCCLUSION_MIN_BASE 1e-4f
+
 float GetSpecularOcclusion(float nDotV, float ambientOcclusion, float roughness)
 {
-    return saturate(pow(max(nDotV + ambientOcclusion, 1e-4f), exp2(-16.0f * roughness - 1.0f)) - 1.0f + ambientOcclusion);
+    return saturate(pow(max(nDotV + ambientOcclusion, SPECULAR_OCCLUSION_MIN_BASE),
+        exp2(LAGARDE_OCCLUSION_ROUGHNESS_SCALE * roughness - 1.0f)) - 1.0f + ambientOcclusion);
 }
 
 #endif

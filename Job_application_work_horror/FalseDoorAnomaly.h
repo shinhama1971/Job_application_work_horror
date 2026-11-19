@@ -12,6 +12,8 @@
 class FalseDoorAnomaly final
 {
 private:
+    // 気づいたときの通知を出す秒数
+    static constexpr float NoticeSeconds = 2.8f;
     // 気づいたときの通知を出す残り秒数、偽の扉を見たか、反対側へ移ったか、表示しているか
     float m_NoticeTimer = 0.0f;
     bool m_Observed = false;
@@ -48,7 +50,7 @@ public:
     void MarkMoved() noexcept
     {
         m_Moved = true;
-        m_NoticeTimer = 2.8f;
+        m_NoticeTimer = NoticeSeconds;
         SetVisible(true);
     }
 

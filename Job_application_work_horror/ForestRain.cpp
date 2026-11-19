@@ -59,6 +59,8 @@ namespace
     // 1粒の濃さ（最低＋雨の強さの幅）
     constexpr float StreakIntensityBase = 0.6f;
     constexpr float StreakIntensityRange = 0.4f;
+    // 雨を描く定数のシェーダーの番号（rainVS.hlsl の b9）
+    constexpr UINT RainDrawBufferSlot = 9;
 }
 
 void ForestRain::Init()
@@ -212,7 +214,7 @@ void ForestRain::Draw(Camera* camera)
     context->IASetInputLayout(nullptr);
     context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
     ID3D11Buffer* drawBuffer = m_DrawParams.Get();
-    context->VSSetConstantBuffers(9, 1, &drawBuffer);
+    context->VSSetConstantBuffers(RainDrawBufferSlot, 1, &drawBuffer);
 
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> previousRasterizer;
     context->RSGetState(previousRasterizer.GetAddressOf());

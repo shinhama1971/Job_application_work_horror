@@ -39,13 +39,32 @@ struct MIRROR_PS_IN
     float4 shadowPos : TEXCOORD6;
 };
 
+// 鏡に映る自分の体：使うかのしきい値、囲む球（中心は腰の高さ・半径）、0で割らないための下限、
+// 天井の照明の当て方（最低＋ランバートの幅）、鏡で跳ね返った懐中電灯の強さ
+#define MIRROR_SELF_ENABLE_THRESHOLD 0.5f
+#define MIRROR_SELF_BOUND_CENTER_HEIGHT 20.0f
+#define MIRROR_SELF_BOUND_RADIUS 26.0f
+#define MIRROR_MIN_DIVISOR 0.001f
+#define MIRROR_SELF_LIGHT_BASE 0.15f
+#define MIRROR_SELF_LIGHT_LAMBERT 0.85f
+#define MIRROR_SELF_FLASHLIGHT_GAIN 0.28f
+// 鏡の異変の人影：当たらないときの距離、見え方のしきい値、囲む球（中心の高さ・半径）、頭の高さ、
+// 向きを決めるときに足すわずかなずれ、距離場をたどるときの縁のぼけ
+#define MIRROR_FIGURE_NO_HIT_DEPTH 1e6f
+#define MIRROR_FIGURE_MIN_VISIBILITY 0.001f
+#define MIRROR_FIGURE_BOUND_CENTER_HEIGHT 20.0f
+#define MIRROR_FIGURE_BOUND_RADIUS 30.0f
+#define MIRROR_FIGURE_HEAD_HEIGHT 39.0f
+#define MIRROR_DIRECTION_NUDGE 1e-4f
+#define MIRROR_FIGURE_EDGE_SOFTNESS 1.6f
+
 // 鏡に映る自分の体と光線を交差させ、当たったら距離（当たらなければ負）と、照らした色を返している。
 // 体の形は、懐中電灯を前に持った立ち姿の距離場（足もとが0、前が+z、右が+x。build_figure_volumes.py）
 float TraceMirrorSelf(float3 origin, float3 direction, float3 mirrorViewDirection, out float3 shaded)
 {
     shaded = 0.0f;
     [branch]
-    if (MirrorSelf.w <= 0.5f)
+    if (MirrorSelf.w <= MIRROR_SELF_ENABLE_THRESHOLD)
     {
         return -1.0f;
     }
@@ -56,11 +75,11 @@ float TraceMirrorSelf(float3 origin, float3 direction, float3 mirrorViewDirectio
     const float3 localOrigin = float3(dot(fromFoot, right), fromFoot.y, dot(fromFoot, forward));
     const float3 localDirection = float3(dot(direction, right), direction.y, dot(direction, forward));
     // 体を囲む球（中心は腰の高さ、半径26）のそばを通らない光線は、点と光線の距離だけで先に飛ばしている
-    const float3 toCenter = float3(0.0f, 20.0f, 0.0f) - localOrigin;
+    const float3 toCenter = float3(0.0f, MIRROR_SELF_BOUND_CENTER_HEIGHT, 0.0f) - localOrigin;
     const float alongCenter = max(dot(toCenter, localDirection), 0.0f);
     const float3 missCenter = toCenter - localDirection * alongCenter;
     [branch]
-    if (dot(missCenter, missCenter) > 26.0f * 26.0f)
+    if (dot(missCenter, missCenter) > MIRROR_SELF_BOUND_RADIUS * MIRROR_SELF_BOUND_RADIUS)
     {
         return -1.0f;
     }
@@ -85,25 +104,26 @@ float TraceMirrorSelf(float3 origin, float3 direction, float3 mirrorViewDirectio
         const ENVIRONMENT_POINT_LIGHT pointLight = g_PointLights[i];
         const float3 offset = pointLight.PositionRange.xyz - worldPosition;
         const float lightDistance2 = dot(offset, offset);
-        const float range = max(pointLight.PositionRange.w, 0.001f);
+        const float range = max(pointLight.PositionRange.w, MIRROR_MIN_DIVISOR);
         [branch]
         if (lightDistance2 < range * range)
         {
             const float lightDistance = sqrt(lightDistance2);
             float attenuation = saturate(1.0f - lightDistance / range);
             attenuation *= attenuation;
-            const float lambert = saturate(dot(worldNormal, offset / max(lightDistance, 0.001f)));
-            lighting += pointLight.ColorIntensity.rgb * pointLight.ColorIntensity.a * attenuation * (0.15f + lambert * 0.85f);
+            const float lambert = saturate(dot(worldNormal, offset / max(lightDistance, MIRROR_MIN_DIVISOR)));
+            lighting += pointLight.ColorIntensity.rgb * pointLight.ColorIntensity.a * attenuation *
+                (MIRROR_SELF_LIGHT_BASE + lambert * MIRROR_SELF_LIGHT_LAMBERT);
         }
     }
     // 懐中電灯で鏡を照らすと、跳ね返った光が自分の体の前を照らす（鏡のこの点が光の円錐の中にあるかで強さを決めている）
     if (Light.Enable && Light.FlashlightEnabled)
     {
         const float travel = length(worldPosition - GetMistEyePosition()) + nearest;
-        const float normalizedDistance = saturate(travel / max(Light.Range, 0.001f));
+        const float normalizedDistance = saturate(travel / max(Light.Range, MIRROR_MIN_DIVISOR));
         const float rangeFade = saturate(1.0f - normalizedDistance * normalizedDistance);
         lighting += Light.Diffuse.rgb * GetFlashlightTint(mirrorViewDirection) * Light.Intensity *
-            GetFlashlightBeamProfile(mirrorViewDirection) * rangeFade * rangeFade * 0.28f *
+            GetFlashlightBeamProfile(mirrorViewDirection) * rangeFade * rangeFade * MIRROR_SELF_FLASHLIGHT_GAIN *
             saturate(dot(worldNormal, -direction));
     }
     float3 color = albedo * lighting;
@@ -117,30 +137,30 @@ float TraceMirrorSelf(float3 origin, float3 direction, float3 mirrorViewDirectio
 // 人影のモデルと同じ形の距離場を、頭が MirrorAnomaly の頭（足もとから39）の高さになる大きさにして、鏡の面の方を向かせている
 float TraceMirrorFigure(float3 origin, float3 direction, out float depth)
 {
-    depth = 1e6f;
+    depth = MIRROR_FIGURE_NO_HIT_DEPTH;
     [branch]
-    if (MirrorFigure.w <= 0.001f)
+    if (MirrorFigure.w <= MIRROR_FIGURE_MIN_VISIBILITY)
     {
         return 0.0f;
     }
     const float3 foot = MirrorFigure.xyz;
-    const float3 toCenter = foot + float3(0.0f, 20.0f, 0.0f) - origin;
+    const float3 toCenter = foot + float3(0.0f, MIRROR_FIGURE_BOUND_CENTER_HEIGHT, 0.0f) - origin;
     const float alongCenter = max(dot(toCenter, direction), 0.0f);
     const float3 missCenter = toCenter - direction * alongCenter;
     [branch]
-    if (dot(missCenter, missCenter) > 30.0f * 30.0f)
+    if (dot(missCenter, missCenter) > MIRROR_FIGURE_BOUND_RADIUS * MIRROR_FIGURE_BOUND_RADIUS)
     {
         return 0.0f;
     }
     // 人影の空間（前 = 鏡の面の方、右、上）へ光線を移し、大きさで割っている
-    const float scale = 39.0f / FIGURE_VOLUME_HEAD_HEIGHT;
-    const float3 forward = normalize(float3(origin.x - foot.x, 0.0f, origin.z - foot.z) + float3(1e-4f, 0.0f, 0.0f));
+    const float scale = MIRROR_FIGURE_HEAD_HEIGHT / FIGURE_VOLUME_HEAD_HEIGHT;
+    const float3 forward = normalize(float3(origin.x - foot.x, 0.0f, origin.z - foot.z) + float3(MIRROR_DIRECTION_NUDGE, 0.0f, 0.0f));
     const float3 right = float3(forward.z, 0.0f, -forward.x);
     const float3 fromFoot = (origin - foot) / scale;
     const float3 localOrigin = float3(dot(fromFoot, right), fromFoot.y, dot(fromFoot, forward));
     const float3 localDirection = float3(dot(direction, right), direction.y, dot(direction, forward));
     float localDepth;
-    const float coverage = TraceFigureVolume(localOrigin, localDirection, 1.6f, localDepth);
+    const float coverage = TraceFigureVolume(localOrigin, localDirection, MIRROR_FIGURE_EDGE_SOFTNESS, localDepth);
     depth = localDepth * scale;
     return coverage * saturate(MirrorFigure.w);
 }
@@ -177,13 +197,30 @@ static const float MIRROR_DUST_BLEND = 0.35f;
 // 反射の始点を鏡の表面から浮かせ、曇ったガラスの粗さで像をなじませる。
 #define MIRROR_RAY_SURFACE_OFFSET 0.1f
 #define MIRROR_RAY_ROUGHNESS 0.12f
+// SSR を使うかのしきい値
+#define MIRROR_SSR_ENABLE_THRESHOLD 0.5f
+// 人影の色（霧の色に掛ける暗さ）
+#define MIRROR_FIGURE_DARKNESS 0.10f
+// 銀の剥げのしみのノイズ（粗い方：細かさ・ずらし・重み、細かい方：細かさ・ずらし・重み）、点々の剥げのノイズ（細かさ・ずらし）
+#define MIRROR_BLOTCH_COARSE_SCALE float2(7.0f, 11.0f)
+#define MIRROR_BLOTCH_COARSE_SEED 13.0f
+#define MIRROR_BLOTCH_COARSE_WEIGHT 0.6f
+#define MIRROR_BLOTCH_FINE_SCALE 23.0f
+#define MIRROR_BLOTCH_FINE_SEED 4.0f
+#define MIRROR_BLOTCH_FINE_WEIGHT 0.4f
+#define MIRROR_DESILVER_SPOT_SCALE float2(5.0f, 7.0f)
+#define MIRROR_DESILVER_SPOT_SEED 31.0f
+// 埃のくもりのノイズ（細かさ・ずらし）と、くもった所で照り返しを広げる量
+#define MIRROR_HAZE_SCALE float2(2.0f, 3.0f)
+#define MIRROR_HAZE_SEED 7.0f
+#define MIRROR_HAZE_GLARE_SPREAD 0.5f
 
 float4 main(MIRROR_PS_IN input) : SV_Target
 {
     const float2 face = saturate(input.tex);
     // 古いガラスは平らではないため、面の向きをほんの少しうねらせ、映りを揺らしている
     const float3 surfaceNormal = normalize(input.worldNormal);
-    const float3 tangent = normalize(cross(float3(0.0f, 1.0f, 0.0f), surfaceNormal) + float3(1e-4f, 0.0f, 0.0f));
+    const float3 tangent = normalize(cross(float3(0.0f, 1.0f, 0.0f), surfaceNormal) + float3(MIRROR_DIRECTION_NUDGE, 0.0f, 0.0f));
     const float3 bitangent = cross(surfaceNormal, tangent);
     const float2 wobble = float2(
         FastValueNoise(face * MIRROR_WOBBLE_NOISE_SCALE + MIRROR_WOBBLE_NOISE_SEED_X),
@@ -198,7 +235,7 @@ float4 main(MIRROR_PS_IN input) : SV_Target
     float nearVertical;
     float3 color = TraceRoomReflection(origin, direction, MIRROR_RAY_ROUGHNESS, roomDistance, nearVertical);
     [branch]
-    if (ReflectionParams.y > 0.5f)
+    if (ReflectionParams.y > MIRROR_SSR_ENABLE_THRESHOLD)
     {
         // 鏡は水たまりより近くを映すので、歩幅を細かくしている（32歩・1.14倍。以前は20歩・1.22倍で、映る物の輪郭が階段状にずれていた）
         const int mirrorSsrSteps = 32;
@@ -213,7 +250,7 @@ float4 main(MIRROR_PS_IN input) : SV_Target
     float3 selfColor;
     const float selfDistance = TraceMirrorSelf(origin, direction, normalize(input.viewPos), selfColor);
     const bool selfVisible = selfDistance > 0.0f && selfDistance < roomDistance;
-    const float3 figureColor = GetHorrorFogColor(Light.Ambient.rgb, LoopDepth) * 0.10f;
+    const float3 figureColor = GetHorrorFogColor(Light.Ambient.rgb, LoopDepth) * MIRROR_FIGURE_DARKNESS;
     const float figureCoverage = figureDepth < roomDistance ? figure : 0.0f;
     if (selfVisible && selfDistance < figureDepth)
     {
@@ -237,15 +274,15 @@ float4 main(MIRROR_PS_IN input) : SV_Target
     const float2 edge = min(face, 1.0f - face);
     const float edgeDistance = min(edge.x, edge.y);
     const float blotch =
-        FastValueNoise(face * float2(7.0f, 11.0f) + 13.0f) * 0.6f +
-        FastValueNoise(face * 23.0f - 4.0f) * 0.4f;
+        FastValueNoise(face * MIRROR_BLOTCH_COARSE_SCALE + MIRROR_BLOTCH_COARSE_SEED) * MIRROR_BLOTCH_COARSE_WEIGHT +
+        FastValueNoise(face * MIRROR_BLOTCH_FINE_SCALE - MIRROR_BLOTCH_FINE_SEED) * MIRROR_BLOTCH_FINE_WEIGHT;
     const float edgeLoss = smoothstep(MIRROR_DESILVER_EDGE_WIDTH, 0.0f, edgeDistance - blotch * MIRROR_DESILVER_EDGE_JITTER);
-    const float spotLoss = smoothstep(MIRROR_DESILVER_SPOT_START, MIRROR_DESILVER_SPOT_FULL, FastValueNoise(face * float2(5.0f, 7.0f) + 31.0f)) * MIRROR_DESILVER_SPOT_WEIGHT;
+    const float spotLoss = smoothstep(MIRROR_DESILVER_SPOT_START, MIRROR_DESILVER_SPOT_FULL, FastValueNoise(face * MIRROR_DESILVER_SPOT_SCALE + MIRROR_DESILVER_SPOT_SEED)) * MIRROR_DESILVER_SPOT_WEIGHT;
     const float desilver = saturate(edgeLoss + spotLoss);
     color = lerp(color, MIRROR_DESILVER_TINT, desilver * MIRROR_DESILVER_BLEND);
 
     // 埃のくもり：映りを少し白っぽく、薄くしている
-    const float haze = FastValueNoise(face * float2(2.0f, 3.0f) + 7.0f);
+    const float haze = FastValueNoise(face * MIRROR_HAZE_SCALE + MIRROR_HAZE_SEED);
     color = lerp(color, color * MIRROR_DUST_REFLECTION_SCALE + MIRROR_DUST_TINT, haze * MIRROR_DUST_BLEND);
 
     // 懐中電灯を正面から当てると、跳ね返った光が目に戻ってきて、鏡の一点がまぶしく光る（懐中電灯は目の位置にある）
@@ -257,7 +294,7 @@ float4 main(MIRROR_PS_IN input) : SV_Target
         const float beam = GetFlashlightBeamProfile(toPixel);
         const float glare = (pow(towardEye, MIRROR_GLARE_HOTSPOT_EXPONENT) * MIRROR_GLARE_HOTSPOT_GAIN + pow(towardEye, MIRROR_GLARE_HALO_EXPONENT) * MIRROR_GLARE_HALO_GAIN) * beam;
         // くもった所は、光を広くにじませている
-        color += Light.Diffuse.rgb * Light.Intensity * glare * (1.0f - desilver) * (1.0f + haze * 0.5f);
+        color += Light.Diffuse.rgb * Light.Intensity * glare * (1.0f - desilver) * (1.0f + haze * MIRROR_HAZE_GLARE_SPREAD);
     }
     return float4(color, 1.0f);
 }

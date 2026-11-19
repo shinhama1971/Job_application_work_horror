@@ -26,6 +26,8 @@ namespace
     constexpr float HandFieldOfView = DirectX::XMConvertToRadians(52.0f);
     constexpr float HandNearPlane = 0.1f;
     constexpr float HandFarPlane = 60.0f;
+    // 手と懐中電灯の定数のシェーダーの番号（viewModel.hlsli の b9）
+    constexpr UINT ViewModelBufferSlot = 9;
 
     // 握る所の中ほど（ビュー空間。1単位は約5cm）と、懐中電灯を向ける先（画面の中央の遠く）
     const Vector3 GripPosition(2.15f, -1.95f, 5.0f);
@@ -317,8 +319,8 @@ void FirstPersonHands::Draw(Camera& camera)
     ID3D11DeviceContext* context = Renderer::GetDeviceContext();
     context->UpdateSubresource(m_ViewModelBuffer.Get(), 0, nullptr, &buffer, 0, 0);
     ID3D11Buffer* constantBuffer = m_ViewModelBuffer.Get();
-    context->VSSetConstantBuffers(9, 1, &constantBuffer);
-    context->PSSetConstantBuffers(9, 1, &constantBuffer);
+    context->VSSetConstantBuffers(ViewModelBufferSlot, 1, &constantBuffer);
+    context->PSSetConstantBuffers(ViewModelBufferSlot, 1, &constantBuffer);
 
     UINT viewportCount = 1;
     D3D11_VIEWPORT viewport{};

@@ -11,20 +11,23 @@
 #ifndef FIGURE_SHADOW_INCLUDED
 #define FIGURE_SHADOW_INCLUDED
 
+// 線分の長さの2乗と、平行かを見る値の下限（0で割らないため）
+#define SEGMENT_MIN_LENGTH_SQ 1e-5f
+
 // 2つの線分（p1-q1 と p2-q2）が一番近づくときの距離を返している。along1 は1つ目の線分の上の位置（0〜1）
 float SegmentSegmentDistance(float3 p1, float3 q1, float3 p2, float3 q2, out float along1)
 {
     const float3 direction1 = q1 - p1;
     const float3 direction2 = q2 - p2;
     const float3 offset = p1 - p2;
-    const float length1 = max(dot(direction1, direction1), 1e-5f);
-    const float length2 = max(dot(direction2, direction2), 1e-5f);
+    const float length1 = max(dot(direction1, direction1), SEGMENT_MIN_LENGTH_SQ);
+    const float length2 = max(dot(direction2, direction2), SEGMENT_MIN_LENGTH_SQ);
     const float cross12 = dot(direction1, direction2);
     const float along1Offset = dot(direction1, offset);
     const float along2Offset = dot(direction2, offset);
     const float denominator = length1 * length2 - cross12 * cross12;
     // 平行に近いときは1つ目の線分の始点から求めている
-    float s = denominator > 1e-5f ? saturate((cross12 * along2Offset - along1Offset * length2) / denominator) : 0.0f;
+    float s = denominator > SEGMENT_MIN_LENGTH_SQ ? saturate((cross12 * along2Offset - along1Offset * length2) / denominator) : 0.0f;
     float t = (cross12 * s + along2Offset) / length2;
     // 2つ目の線分の外へ出たら端に止め、1つ目の線分の位置を求め直している
     if (t < 0.0f)
@@ -45,12 +48,55 @@ float SegmentSegmentDistance(float3 p1, float3 q1, float3 p2, float3 q2, out flo
 #define FIGURE_SHADOW_DEFAULT_SOFTNESS 0.045f
 #define FIGURE_SHADOW_BASE_PENUMBRA 0.5f
 #define FIGURE_SHADOW_RECEIVER_FADE_END 0.03f
+// 影の内側へくっきりさせる幅（半影に掛ける）
+#define FIGURE_SHADOW_INNER_PENUMBRA 0.5f
+// 画素から光源への線分の長さの2乗の下限（0で割らないため）
+#define FIGURE_SHADOW_MIN_RAY_LENGTH_SQ 1e-4f
 
 // 影の適用しきい値、カプセルを調べる球の中心の高さと半径、影の最大の濃さ。
 #define UNSEEN_SHADOW_MIN_STRENGTH 0.001f
 #define UNSEEN_SHADOW_BOUND_CENTER_HEIGHT 19.0f
 #define UNSEEN_SHADOW_BOUND_RADIUS 27.0f
 #define UNSEEN_SHADOW_OPACITY 0.97f
+// 人影の形：胴のカプセル（下端・上端の高さ、半径）と頭（下端・上端の高さ、半径）
+#define UNSEEN_BODY_BOTTOM 4.0f
+#define UNSEEN_BODY_TOP 29.0f
+#define UNSEEN_BODY_RADIUS 5.4f
+#define UNSEEN_HEAD_BOTTOM 35.5f
+#define UNSEEN_HEAD_TOP 36.5f
+#define UNSEEN_HEAD_RADIUS 3.8f
+
+// プレイヤーの体の影：使うかのしきい値、調べる球（中心は腰の高さ・半径）、縁のぼけ、影の濃さ
+#define PLAYER_BODY_ENABLE_THRESHOLD 0.5f
+#define PLAYER_BODY_BOUND_CENTER_HEIGHT 20.0f
+#define PLAYER_BODY_BOUND_RADIUS 24.0f
+#define PLAYER_BODY_SHADOW_SOFTNESS 0.018f
+#define PLAYER_BODY_SHADOW_OPACITY 0.9f
+// 胴（下端・上端の高さ、半径）、頭（高さ・前への出・半径）
+#define PLAYER_TORSO_BOTTOM 18.5f
+#define PLAYER_TORSO_TOP 30.0f
+#define PLAYER_TORSO_RADIUS 4.2f
+#define PLAYER_HEAD_BOTTOM 37.2f
+#define PLAYER_HEAD_TOP 37.8f
+#define PLAYER_HEAD_FORWARD 0.4f
+#define PLAYER_HEAD_RADIUS 2.7f
+// 脚（付け根の横・高さ、足先の横・高さ、振りの大きさ、半径）
+#define PLAYER_HIP_SIDE 1.8f
+#define PLAYER_HIP_HEIGHT 17.0f
+#define PLAYER_FOOT_SIDE 1.9f
+#define PLAYER_FOOT_HEIGHT 1.2f
+#define PLAYER_LEG_SWING 3.5f
+#define PLAYER_LEG_RADIUS 1.8f
+// 腕（肩の横・高さ、左の手の横・高さ・振りの大きさ、懐中電灯を持つ右の手の横・高さ・前への出、半径）
+#define PLAYER_SHOULDER_SIDE 4.7f
+#define PLAYER_SHOULDER_HEIGHT 30.5f
+#define PLAYER_LEFT_HAND_SIDE 5.0f
+#define PLAYER_LEFT_HAND_HEIGHT 17.5f
+#define PLAYER_ARM_SWING 3.0f
+#define PLAYER_RIGHT_HAND_SIDE 3.6f
+#define PLAYER_RIGHT_HAND_HEIGHT 27.5f
+#define PLAYER_RIGHT_HAND_FORWARD 9.5f
+#define PLAYER_ARM_RADIUS 1.2f
 
 // カプセル（芯の線分 a-b、半径 radius）が、画素から光源への線分をどれだけ遮るか（0〜1）を返している。
 // 遮る所から画素までの距離に合わせて縁をぼかし、近い所ほどくっきり、遠い所ほどぼんやりした影にしている（softness はぼけの広がり方）
@@ -60,7 +106,7 @@ float GetCapsuleOcclusion(float3 pixel, float3 light, float3 a, float3 b, float 
     const float distance = SegmentSegmentDistance(pixel, light, a, b, along);
     const float penumbra = FIGURE_SHADOW_BASE_PENUMBRA + along * length(light - pixel) * softness;
     // 画素のすぐそば（自分の足もとの面）では遮らないようにしている
-    return smoothstep(radius + penumbra, radius - penumbra * 0.5f, distance) * smoothstep(0.0f, FIGURE_SHADOW_RECEIVER_FADE_END, along);
+    return smoothstep(radius + penumbra, radius - penumbra * FIGURE_SHADOW_INNER_PENUMBRA, distance) * smoothstep(0.0f, FIGURE_SHADOW_RECEIVER_FADE_END, along);
 }
 
 // 見えない影の人影が、lightPosition から worldPosition へ届く光をどれだけ通すか（0〜1）を返している。
@@ -77,15 +123,15 @@ float GetUnseenFigureShadow(float3 worldPosition, float3 lightPosition)
         // （ほとんどの画素と光源はここで終わるため、重いカプセルの計算をしない）
         const float3 center = foot + float3(0.0f, UNSEEN_SHADOW_BOUND_CENTER_HEIGHT, 0.0f);
         const float3 toLight = lightPosition - worldPosition;
-        const float along = saturate(dot(center - worldPosition, toLight) / max(dot(toLight, toLight), 1e-4f));
+        const float along = saturate(dot(center - worldPosition, toLight) / max(dot(toLight, toLight), FIGURE_SHADOW_MIN_RAY_LENGTH_SQ));
         const float3 closest = worldPosition + toLight * along - center;
         [branch]
         if (dot(closest, closest) <= UNSEEN_SHADOW_BOUND_RADIUS * UNSEEN_SHADOW_BOUND_RADIUS)
         {
             const float body = GetCapsuleOcclusion(worldPosition, lightPosition,
-                foot + float3(0.0f, 4.0f, 0.0f), foot + float3(0.0f, 29.0f, 0.0f), 5.4f);
+                foot + float3(0.0f, UNSEEN_BODY_BOTTOM, 0.0f), foot + float3(0.0f, UNSEEN_BODY_TOP, 0.0f), UNSEEN_BODY_RADIUS);
             const float head = GetCapsuleOcclusion(worldPosition, lightPosition,
-                foot + float3(0.0f, 35.5f, 0.0f), foot + float3(0.0f, 36.5f, 0.0f), 3.8f);
+                foot + float3(0.0f, UNSEEN_HEAD_BOTTOM, 0.0f), foot + float3(0.0f, UNSEEN_HEAD_TOP, 0.0f), UNSEEN_HEAD_RADIUS);
             visibility = 1.0f - max(body, head) * UNSEEN_SHADOW_OPACITY * saturate(UnseenFigure.w);
         }
     }
@@ -101,33 +147,39 @@ float GetPlayerBodyShadow(float3 worldPosition, float3 lightPosition)
 {
     float visibility = 1.0f;
     [branch]
-    if (PlayerBody.w > 0.5f)
+    if (PlayerBody.w > PLAYER_BODY_ENABLE_THRESHOLD)
     {
         const float3 foot = PlayerBody.xyz;
         // 体を囲む球（中心は腰の高さ、半径24）に、画素から光源への線分が届かないときは、カプセルの計算を飛ばしている
-        const float3 center = foot + float3(0.0f, 20.0f, 0.0f);
+        const float3 center = foot + float3(0.0f, PLAYER_BODY_BOUND_CENTER_HEIGHT, 0.0f);
         const float3 toLight = lightPosition - worldPosition;
-        const float along = saturate(dot(center - worldPosition, toLight) / max(dot(toLight, toLight), 1e-4f));
+        const float along = saturate(dot(center - worldPosition, toLight) / max(dot(toLight, toLight), FIGURE_SHADOW_MIN_RAY_LENGTH_SQ));
         const float3 closest = worldPosition + toLight * along - center;
         [branch]
-        if (dot(closest, closest) <= 24.0f * 24.0f)
+        if (dot(closest, closest) <= PLAYER_BODY_BOUND_RADIUS * PLAYER_BODY_BOUND_RADIUS)
         {
             // 体の向き（前と右）と、手足の振り
             const float3 forward = float3(PlayerBodyPose.x, 0.0f, PlayerBodyPose.y);
             const float3 right = float3(forward.z, 0.0f, -forward.x);
             const float swing = PlayerBodyPose.z;
             // 電球や照明は小さな光源なので、体の影は見えない影の人影より縁をくっきりさせている
-            const float BodyShadowSoftness = 0.018f;
+            const float BodyShadowSoftness = PLAYER_BODY_SHADOW_SOFTNESS;
             #define BODY_POINT(x, y, z) (foot + right * (x) + float3(0.0f, (y), 0.0f) + forward * (z))
-            float occlusion = GetCapsuleOcclusion(worldPosition, lightPosition, BODY_POINT(0.0f, 18.5f, 0.0f), BODY_POINT(0.0f, 30.0f, 0.0f), 4.2f, BodyShadowSoftness);
-            occlusion = max(occlusion, GetCapsuleOcclusion(worldPosition, lightPosition, BODY_POINT(0.0f, 37.2f, 0.4f), BODY_POINT(0.0f, 37.8f, 0.4f), 2.7f, BodyShadowSoftness));
-            occlusion = max(occlusion, GetCapsuleOcclusion(worldPosition, lightPosition, BODY_POINT(1.8f, 17.0f, 0.0f), BODY_POINT(1.9f, 1.2f, swing * 3.5f), 1.8f, BodyShadowSoftness));
-            occlusion = max(occlusion, GetCapsuleOcclusion(worldPosition, lightPosition, BODY_POINT(-1.8f, 17.0f, 0.0f), BODY_POINT(-1.9f, 1.2f, -swing * 3.5f), 1.8f, BodyShadowSoftness));
-            occlusion = max(occlusion, GetCapsuleOcclusion(worldPosition, lightPosition, BODY_POINT(-4.7f, 30.5f, 0.0f), BODY_POINT(-5.0f, 17.5f, -swing * 3.0f), 1.2f, BodyShadowSoftness));
-            occlusion = max(occlusion, GetCapsuleOcclusion(worldPosition, lightPosition, BODY_POINT(4.7f, 30.5f, 0.0f), BODY_POINT(3.6f, 27.5f, 9.5f), 1.2f, BodyShadowSoftness));
+            float occlusion = GetCapsuleOcclusion(worldPosition, lightPosition,
+                BODY_POINT(0.0f, PLAYER_TORSO_BOTTOM, 0.0f), BODY_POINT(0.0f, PLAYER_TORSO_TOP, 0.0f), PLAYER_TORSO_RADIUS, BodyShadowSoftness);
+            occlusion = max(occlusion, GetCapsuleOcclusion(worldPosition, lightPosition,
+                BODY_POINT(0.0f, PLAYER_HEAD_BOTTOM, PLAYER_HEAD_FORWARD), BODY_POINT(0.0f, PLAYER_HEAD_TOP, PLAYER_HEAD_FORWARD), PLAYER_HEAD_RADIUS, BodyShadowSoftness));
+            occlusion = max(occlusion, GetCapsuleOcclusion(worldPosition, lightPosition,
+                BODY_POINT(PLAYER_HIP_SIDE, PLAYER_HIP_HEIGHT, 0.0f), BODY_POINT(PLAYER_FOOT_SIDE, PLAYER_FOOT_HEIGHT, swing * PLAYER_LEG_SWING), PLAYER_LEG_RADIUS, BodyShadowSoftness));
+            occlusion = max(occlusion, GetCapsuleOcclusion(worldPosition, lightPosition,
+                BODY_POINT(-PLAYER_HIP_SIDE, PLAYER_HIP_HEIGHT, 0.0f), BODY_POINT(-PLAYER_FOOT_SIDE, PLAYER_FOOT_HEIGHT, -swing * PLAYER_LEG_SWING), PLAYER_LEG_RADIUS, BodyShadowSoftness));
+            occlusion = max(occlusion, GetCapsuleOcclusion(worldPosition, lightPosition,
+                BODY_POINT(-PLAYER_SHOULDER_SIDE, PLAYER_SHOULDER_HEIGHT, 0.0f), BODY_POINT(-PLAYER_LEFT_HAND_SIDE, PLAYER_LEFT_HAND_HEIGHT, -swing * PLAYER_ARM_SWING), PLAYER_ARM_RADIUS, BodyShadowSoftness));
+            occlusion = max(occlusion, GetCapsuleOcclusion(worldPosition, lightPosition,
+                BODY_POINT(PLAYER_SHOULDER_SIDE, PLAYER_SHOULDER_HEIGHT, 0.0f), BODY_POINT(PLAYER_RIGHT_HAND_SIDE, PLAYER_RIGHT_HAND_HEIGHT, PLAYER_RIGHT_HAND_FORWARD), PLAYER_ARM_RADIUS, BodyShadowSoftness));
             #undef BODY_POINT
             // まわりの照り返しが入るので、影は真っ黒にはしていない
-            visibility = 1.0f - occlusion * 0.9f;
+            visibility = 1.0f - occlusion * PLAYER_BODY_SHADOW_OPACITY;
         }
     }
     return visibility;

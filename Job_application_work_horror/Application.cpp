@@ -17,6 +17,9 @@
 
 namespace
 {
+    // 自動撮影のとき、ウィンドウを全モニターの左端からさらに離す幅（画素）
+    constexpr int CaptureWindowMargin = 64;
+
     // Windows の標準の DPI（拡大率1のとき）
     constexpr float StandardDpi = 96.0f;
     // 内蔵GPUのときの描画解像度の倍率
@@ -209,7 +212,7 @@ bool Application::InitApp()
 
     // 自動撮影モードは、作業の邪魔にならないよう画面の外（全モニターの左端よりさらに左）に置いている。
     const int windowX = capturing
-        ? GetSystemMetrics(SM_XVIRTUALSCREEN) - static_cast<int>(m_WindowWidth) - 64
+        ? GetSystemMetrics(SM_XVIRTUALSCREEN) - static_cast<int>(m_WindowWidth) - CaptureWindowMargin
         : 0;
 
     // ウィンドウを生成している

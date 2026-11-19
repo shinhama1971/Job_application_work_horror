@@ -45,6 +45,10 @@ struct VIEW_MODEL_PS_IN
 // wrap は面の裏側へ回り込む光の量（肌や布は0.3〜0.5、金属は0）。
 // 手は画面の端の小さな範囲なので、タイルのリストではなく全部の光源を順に調べている
 // （タイルのリストは壁の深度で作っているので、手前の手を照らす光源が外れていることがある）。
+// 0で割らないための下限と、天井の照明が横向き（目の高さの手）へ届く割合
+#define VIEW_MODEL_MIN_DIVISOR 0.001f
+#define VIEW_MODEL_FIXTURE_SIDE_LIGHT 0.22f
+
 void AccumulateViewModelPointLights(
     float3 worldPosition, float3 worldNormal, float3 toView, float wrap, PbrSurface surface,
     inout float3 diffuse, inout float3 specular)
@@ -54,7 +58,7 @@ void AccumulateViewModelPointLights(
     {
         const ENVIRONMENT_POINT_LIGHT pointLight = g_PointLights[i];
         const float3 offset = pointLight.PositionRange.xyz - worldPosition;
-        const float range = max(pointLight.PositionRange.w, 0.001f);
+        const float range = max(pointLight.PositionRange.w, VIEW_MODEL_MIN_DIVISOR);
         const float distanceSquared = dot(offset, offset);
         [branch]
         if (distanceSquared >= range * range)
@@ -62,11 +66,11 @@ void AccumulateViewModelPointLights(
             continue;
         }
         const float lightDistance = sqrt(distanceSquared);
-        const float3 toLight = offset / max(lightDistance, 0.001f);
+        const float3 toLight = offset / max(lightDistance, VIEW_MODEL_MIN_DIVISOR);
         float attenuation = saturate(1.0f - lightDistance / range);
         attenuation *= attenuation;
         // 天井の照明は下向きに広がる面の光源なので、横に近い向き（目の高さの手）には弱くしか届かない（litTexturePS と同じ近似）
-        const float fixtureDistribution = lerp(0.22f, 1.0f, smoothstep(FIXTURE_BEAM_DOT_START, FIXTURE_BEAM_DOT_END, toLight.y));
+        const float fixtureDistribution = lerp(VIEW_MODEL_FIXTURE_SIDE_LIGHT, 1.0f, smoothstep(FIXTURE_BEAM_DOT_START, FIXTURE_BEAM_DOT_END, toLight.y));
         const float3 radiance = pointLight.ColorIntensity.rgb * pointLight.ColorIntensity.a * attenuation *
             fixtureDistribution * GetPointLightShadow(worldPosition, worldNormal, pointLight.PositionRange.xyz);
         const float lambert = saturate((dot(worldNormal, toLight) + wrap) / (1.0f + wrap));

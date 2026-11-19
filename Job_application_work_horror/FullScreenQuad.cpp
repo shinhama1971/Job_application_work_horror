@@ -12,6 +12,8 @@ namespace
 {
     // 画面効果がこれより弱ければ、その効果の描画を省く
     constexpr float EffectEpsilon = 0.001f;
+    // 自動露出の倍率を読むシェーダーの番号（exposurePS.hlsl の t3）
+    constexpr UINT AutoExposureTextureSlot = 3;
 }
 
 namespace Graphics
@@ -194,11 +196,11 @@ namespace Graphics
         Renderer::SetBlendState(BS_ADDITIVE);
         context->PSSetShaderResources(0, 1, &sceneSRV);
         // 自動露出の倍率は、Compute Shaderが書いたバッファをそのまま読んでいる（CPUへは読み戻さない）
-        context->PSSetShaderResources(3, 1, &autoExposureSRV);
+        context->PSSetShaderResources(AutoExposureTextureSlot, 1, &autoExposureSRV);
         context->DrawIndexed(4, 0, 0);
         context->PSSetShaderResources(0, 1, &nullResource);
         // 次のフレームでCompute Shaderが書き込めるよう、読み取りを外している
-        context->PSSetShaderResources(3, 1, &nullResource);
+        context->PSSetShaderResources(AutoExposureTextureSlot, 1, &nullResource);
 
         // 露出の補正の後にブルームを加算し、明るい照明のにじみを残している。
         // 大きさの違う段（t0〜t3。1/4・1/8・1/16・1/32）を合成のシェーダーで重ねている

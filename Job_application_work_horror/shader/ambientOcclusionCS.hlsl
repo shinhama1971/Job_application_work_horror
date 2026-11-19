@@ -69,8 +69,9 @@ static const float3 CONTACT_LUMINANCE_WEIGHTS = float3(0.2126f, 0.7152f, 0.0722f
 // インターリーブド・グラディエント・ノイズの係数（Jimenez 2014）。画素ごとに歩く位置をずらし、段の縞を粒にしてぼかしで消す
 static const float3 INTERLEAVED_GRADIENT_NOISE = float3(0.06711056f, 0.00583715f, 52.9829189f);
 
-// 法線の向きの半球に散らした12個の点（長さ0.15〜1。内側ほど多く置いている）
-static const float3 g_Kernel[12] =
+// 法線の向きの半球に散らした点の数と、その点（長さ0.15〜1。内側ほど多く置いている）
+#define OCCLUSION_KERNEL_SIZE 12
+static const float3 g_Kernel[OCCLUSION_KERNEL_SIZE] =
 {
     float3(0.538f, 0.183f, 0.259f), float3(-0.403f, 0.452f, 0.150f), float3(0.123f, -0.552f, 0.328f),
     float3(-0.287f, -0.210f, 0.121f), float3(0.704f, -0.257f, 0.422f), float3(-0.639f, 0.112f, 0.563f),
@@ -96,6 +97,9 @@ static const float OCCLUSION_ROTATION_FULL_TURN = 6.2831853f;
 
 // 除算の下限と、遠方で効果を薄め始める距離の割合。
 static const float OCCLUSION_RANGE_MIN_DEPTH_DELTA = 0.001f;
+// カメラの後ろとみなす w の下限と、光源の範囲・距離で0で割らないための下限
+#define OCCLUSION_MIN_CLIP_W 0.001f
+#define OCCLUSION_MIN_DIVISOR 0.001f
 static const float OCCLUSION_DISTANCE_FADE_START_FRACTION = 0.6f;
 
 float InterleavedAngle(int2 pixel)
@@ -109,7 +113,7 @@ bool ProjectToPixel(float3 viewPosition, out int2 pixel)
 {
     const float4 clip = mul(float4(viewPosition, 1.0f), Projection);
     pixel = int2(0, 0);
-    if (clip.w <= 0.001f)
+    if (clip.w <= OCCLUSION_MIN_CLIP_W)
     {
         return false;
     }
@@ -136,7 +140,7 @@ float ComputeContactShadow(float3 center, float3 normal, int2 outputPixel)
     {
         const POINT_LIGHT light = PointLights[index];
         const float3 lightView = mul(float4(light.PositionRange.xyz, 1.0f), View).xyz;
-        const float range = max(light.PositionRange.w, 0.001f);
+        const float range = max(light.PositionRange.w, OCCLUSION_MIN_DIVISOR);
         const float lightDistance = length(lightView - center);
         if (lightDistance >= range)
         {
@@ -161,7 +165,7 @@ float ComputeContactShadow(float3 center, float3 normal, int2 outputPixel)
     const float3 toLight = bestLight - center;
     const float distanceToLight = length(toLight);
     const float rayLength = min(CONTACT_SHADOW_LENGTH, distanceToLight - CONTACT_SHADOW_LIGHT_CLEARANCE);
-    const float3 direction = toLight / max(distanceToLight, 0.001f);
+    const float3 direction = toLight / max(distanceToLight, OCCLUSION_MIN_DIVISOR);
     const float grazingFade = smoothstep(CONTACT_SHADOW_GRAZING_START, CONTACT_SHADOW_GRAZING_FULL, dot(normal, direction));
     if (rayLength <= 0.0f || grazingFade <= 0.0f)
     {
@@ -237,7 +241,7 @@ void main(uint3 id : SV_DispatchThreadID)
 
     float occlusion = 0.0f;
     [unroll]
-    for (int index = 0; index < 12; ++index)
+    for (int index = 0; index < OCCLUSION_KERNEL_SIZE; ++index)
     {
         const float3 offset = g_Kernel[index];
         const float3 samplePosition = center + (tangent * offset.x + bitangent * offset.y + normal * offset.z) * Radius;
@@ -257,6 +261,6 @@ void main(uint3 id : SV_DispatchThreadID)
 
     const float distanceFade = 1.0f - smoothstep(MaxDistance * OCCLUSION_DISTANCE_FADE_START_FRACTION, MaxDistance, center.z);
     OcclusionOutput[outputPixel] = float2(
-        saturate(1.0f - occlusion / 12.0f * Intensity * distanceFade),
+        saturate(1.0f - occlusion / float(OCCLUSION_KERNEL_SIZE) * Intensity * distanceFade),
         ComputeContactShadow(center, normal, outputPixel));
 }

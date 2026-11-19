@@ -52,12 +52,45 @@ uint Pcg(uint value)
     const uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
     return (word >> 22u) ^ word;
 }
+// 乱数の下16ビットを0〜1にするときの最大値
+#define RAIN_HASH_MASK 0xFFFFu
+#define RAIN_HASH_MAX 65535.0f
+// 雨粒の筋：速さのばらつき（最低・幅、乱数を混ぜる係数）、見え始める距離（始め・終わり）、箱の端で消す範囲（箱の幅の割合）、
+// 1画素より細くしないための広げ方、0で割らないための下限、横の向きを作れないとみなす長さの2乗、筋の長さ（最低・幅）
+#define RAIN_SPEED_BASE 0.85f
+#define RAIN_SPEED_RANGE 0.3f
+#define RAIN_SPEED_SEED_X 7.13f
+#define RAIN_SPEED_SEED_Z 3.7f
+#define RAIN_NEAR_FADE_START 4.0f
+#define RAIN_NEAR_FADE_END 16.0f
+#define RAIN_BOX_EDGE_FADE_START 0.38f
+#define RAIN_BOX_EDGE_FADE_END 0.5f
+#define RAIN_MIN_PIXEL_WIDTH_SCALE 1.3f
+#define RAIN_MIN_DIVISOR 0.001f
+#define RAIN_MIN_RIGHT_LENGTH_SQ 0.000001f
+#define RAIN_STREAK_LENGTH_BASE 0.7f
+#define RAIN_STREAK_LENGTH_RANGE 0.6f
+// 地面のしぶき：1回の長さ（秒）、乱数の種（素数）、地面から浮かせる高さ、見え始める距離（始め・終わり）、
+// 範囲の端で消す割合、屋根を調べる高さ、大きさ（最低・幅）
+#define SPLASH_PERIOD 0.45f
+#define SPLASH_SEED_PRIME 7919u
+#define SPLASH_SEED_OFFSET 17u
+#define SPLASH_CYCLE_PRIME 104729u
+#define SPLASH_PLACE_OFFSET 3u
+#define SPLASH_GROUND_LIFT 0.12f
+#define SPLASH_NEAR_FADE_START 3.0f
+#define SPLASH_NEAR_FADE_END 8.0f
+#define SPLASH_EDGE_FADE_START 0.7f
+#define SPLASH_SHELTER_PROBE_HEIGHT 0.5f
+#define SPLASH_RADIUS_BASE 0.35f
+#define SPLASH_RADIUS_RANGE 0.9f
+
 float3 Hash3(uint value)
 {
     const uint a = Pcg(value);
     const uint b = Pcg(a);
     const uint c = Pcg(b);
-    return float3(a & 0xFFFFu, b & 0xFFFFu, c & 0xFFFFu) / 65535.0f;
+    return float3(a & RAIN_HASH_MASK, b & RAIN_HASH_MASK, c & RAIN_HASH_MASK) / RAIN_HASH_MAX;
 }
 
 // 屋根やひさしの下か（雨が当たらない場所）
@@ -99,7 +132,7 @@ RAIN_PS_IN main(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
     {
         // ---- 雨粒の筋 ----
         const float3 random = Hash3(instanceId);
-        const float speedScale = 0.85f + 0.3f * frac(random.x * 7.13f + random.z * 3.7f);
+        const float speedScale = RAIN_SPEED_BASE + RAIN_SPEED_RANGE * frac(random.x * RAIN_SPEED_SEED_X + random.z * RAIN_SPEED_SEED_Z);
         const float3 velocity = float3(Wind.x, -FallSpeed * speedScale, Wind.y);
         // 箱の中の乱数の位置を、速さ×時間だけ動かし、カメラを中心にした箱の中へ折り返している
         const float3 moved = random * BoxSize + velocity * Time;
@@ -109,20 +142,20 @@ RAIN_PS_IN main(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
         const float3 toCamera = CameraPosition - head;
         const float distanceToCamera = length(toCamera);
         // 地面より下、屋根の下、目のすぐ前（大きな板に見える）は描かない
-        float alpha = Intensity * smoothstep(4.0f, 16.0f, distanceToCamera) *
-            (1.0f - smoothstep(BoxSize.x * 0.38f, BoxSize.x * 0.5f, length(relative.xz)));
+        float alpha = Intensity * smoothstep(RAIN_NEAR_FADE_START, RAIN_NEAR_FADE_END, distanceToCamera) *
+            (1.0f - smoothstep(BoxSize.x * RAIN_BOX_EDGE_FADE_START, BoxSize.x * RAIN_BOX_EDGE_FADE_END, length(relative.xz)));
         if (head.y < GroundY || IsSheltered(head))
         {
             alpha = 0.0f;
         }
         // 1画素より細くならないよう幅を広げ、広げた分だけ薄くしている（遠くの筋のちらつきを防ぐ）
         const float pixelWidth = distanceToCamera / max(PixelScale, 1.0f);
-        const float width = max(StreakWidth, pixelWidth * 1.3f);
+        const float width = max(StreakWidth, pixelWidth * RAIN_MIN_PIXEL_WIDTH_SCALE);
         alpha *= StreakWidth / width;
         // 筋の横の向き：落ちる向きと、カメラへの向きの両方に直角
-        float3 right = cross(axis, toCamera / max(distanceToCamera, 0.001f));
-        right = dot(right, right) > 0.000001f ? normalize(right) : float3(1.0f, 0.0f, 0.0f);
-        const float streakLength = StreakLength * (0.7f + 0.6f * random.y);
+        float3 right = cross(axis, toCamera / max(distanceToCamera, RAIN_MIN_DIVISOR));
+        right = dot(right, right) > RAIN_MIN_RIGHT_LENGTH_SQ ? normalize(right) : float3(1.0f, 0.0f, 0.0f);
+        const float streakLength = StreakLength * (RAIN_STREAK_LENGTH_BASE + RAIN_STREAK_LENGTH_RANGE * random.y);
         const float3 position = head - axis * streakLength * (1.0f - along) + right * side * width * 0.5f;
         RAIN_PS_IN output = Finish(position, float2(side, along), alpha, 0.0f, 0.0f);
         if (alpha <= 0.0f)
@@ -135,23 +168,24 @@ RAIN_PS_IN main(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
 
     // ---- 地面のしぶき ----
     const uint splashIndex = instanceId - DropCount;
-    const float period = 0.45f;
-    const float3 seed = Hash3(splashIndex * 7919u + 17u);
+    const float period = SPLASH_PERIOD;
+    const float3 seed = Hash3(splashIndex * SPLASH_SEED_PRIME + SPLASH_SEED_OFFSET);
     // しぶきごとに時間をずらし、1回ごとに違う場所に出している
     const float cycleTime = Time / period + seed.z;
     const uint cycle = (uint)floor(cycleTime);
     const float life = frac(cycleTime);
-    const float3 place = Hash3(splashIndex * 7919u + cycle * 104729u + 3u);
+    const float3 place = Hash3(splashIndex * SPLASH_SEED_PRIME + cycle * SPLASH_CYCLE_PRIME + SPLASH_PLACE_OFFSET);
     const float2 area = float2(SplashRadius, SplashRadius) * 2.0f;
     const float2 relative = (frac((place.xy * area - CameraPosition.xz) / area + 0.5f) - 0.5f) * area;
-    float3 center = float3(CameraPosition.x + relative.x, GroundY + 0.12f, CameraPosition.z + relative.y);
+    float3 center = float3(CameraPosition.x + relative.x, GroundY + SPLASH_GROUND_LIFT, CameraPosition.z + relative.y);
     const float distanceToCamera = length(CameraPosition - center);
-    float alpha = Intensity * smoothstep(3.0f, 8.0f, distanceToCamera) * (1.0f - smoothstep(SplashRadius * 0.7f, SplashRadius, length(relative)));
-    if (IsSheltered(center + float3(0.0f, 0.5f, 0.0f)))
+    float alpha = Intensity * smoothstep(SPLASH_NEAR_FADE_START, SPLASH_NEAR_FADE_END, distanceToCamera) *
+        (1.0f - smoothstep(SplashRadius * SPLASH_EDGE_FADE_START, SplashRadius, length(relative)));
+    if (IsSheltered(center + float3(0.0f, SPLASH_SHELTER_PROBE_HEIGHT, 0.0f)))
     {
         alpha = 0.0f;
     }
-    const float radius = 0.35f + 0.9f * place.z;
+    const float radius = SPLASH_RADIUS_BASE + SPLASH_RADIUS_RANGE * place.z;
     const float3 position = center + float3(side * radius, 0.0f, (along * 2.0f - 1.0f) * radius);
     RAIN_PS_IN output = Finish(position, float2(side, along * 2.0f - 1.0f), alpha, 1.0f, life);
     if (alpha <= 0.0f)

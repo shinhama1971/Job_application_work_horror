@@ -55,6 +55,8 @@ namespace
 	// 見られて驚かせるときの振動
 	constexpr int GazeScareRumbleFrames = 12;
 	constexpr float GazeScareRumbleStrength = 0.32f;
+	// 崩れる度合いを渡すシェーダーの番号（shadowDissolvePS.hlsl の b7。デバッグ表示の定数と同じ番号なので、描いた後に戻す）
+	constexpr UINT DissolveBufferSlot = 7;
 }
 
 // 状態を初期化し、Mayaで作った人の形のモデルを読み込んでいる
@@ -306,11 +308,11 @@ void ShadowMan::Draw(Camera* camera)
     // b7は普通のマテリアルのシェーダーでは、デバッグ表示の設定にも使っている。
     // 人影を描いた後に戻さないと、次のフレームの部屋全体が黒くなる場合がある。
     Microsoft::WRL::ComPtr<ID3D11Buffer> previousBuffer;
-    context->PSGetConstantBuffers(7, 1, previousBuffer.GetAddressOf());
-    context->PSSetConstantBuffers(7, 1, &dissolveBuffer);
+    context->PSGetConstantBuffers(DissolveBufferSlot, 1, previousBuffer.GetAddressOf());
+    context->PSSetConstantBuffers(DissolveBufferSlot, 1, &dissolveBuffer);
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
     ID3D11Buffer* restoredBuffer = previousBuffer.Get();
-    context->PSSetConstantBuffers(7, 1, &restoredBuffer);
+    context->PSSetConstantBuffers(DissolveBufferSlot, 1, &restoredBuffer);
 }
 
 // 見られたときの処理と、定数バッファ・頂点データを解放している

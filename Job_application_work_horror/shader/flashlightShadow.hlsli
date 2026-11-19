@@ -23,26 +23,34 @@ cbuffer ShadowBuffer : register(b8)
 // 懐中電灯のレンズの大きさ（ワールドの長さ。約10cm）。大きいほど影の縁がぼやける
 static const float FlashlightLensSize = 2.0f;
 
-// 遮る物の探索と比較に使う、円の中にばらけた8つの点（半径1）
-static const float2 g_ShadowDisk[8] =
+// 遮る物の探索と比較に使う、円の中にばらけた点の数と、その点（半径1）
+#define SHADOW_DISK_SIZE 8
+static const float2 g_ShadowDisk[SHADOW_DISK_SIZE] =
 {
     float2(-0.613f, 0.617f), float2(0.680f, -0.160f), float2(-0.299f, -0.791f), float2(0.645f, 0.493f),
     float2(-0.651f, -0.133f), float2(0.421f, -0.713f), float2(0.077f, 0.946f), float2(0.912f, -0.215f)
 };
+
+// 0で割らないための下限
+#define SHADOW_MIN_DIVISOR 0.001f
 
 // シャドウマップの深度（0〜1）を、ライトからの距離に戻している（near=ShadowParameters.z、far=ShadowParameters.w）
 float LinearizeShadowDepth(float depth)
 {
     const float nearPlane = ShadowParameters.z;
     const float farPlane = ShadowParameters.w;
-    return nearPlane * farPlane / max(farPlane - depth * (farPlane - nearPlane), 0.001f);
+    return nearPlane * farPlane / max(farPlane - depth * (farPlane - nearPlane), SHADOW_MIN_DIVISOR);
 }
+
+// 疑似乱数の係数（Dave Hoskins の hash12。決まった値）
+#define SHADOW_HASH_SCALE 0.1031f
+#define SHADOW_HASH_OFFSET 33.33f
 
 // 2次元の値から0〜1の疑似乱数を作っている（円の配置を画素ごとに回すのに使う）
 float ShadowHash21(float2 value)
 {
-    float3 value3 = frac(float3(value.xyx) * 0.1031f);
-    value3 += dot(value3, value3.yzx + 33.33f);
+    float3 value3 = frac(float3(value.xyx) * SHADOW_HASH_SCALE);
+    value3 += dot(value3, value3.yzx + SHADOW_HASH_OFFSET);
     return frac((value3.x + value3.y) * value3.z);
 }
 
@@ -62,10 +70,17 @@ float ShadowHash21(float2 value)
 // 細い影が溶けるほど大きくぼかさないよう、テクセル単位で制限する。
 #define FLASHLIGHT_SHADOW_MAX_FILTER_TEXELS 12.0f
 
+// 影の方式（ShadowOptions.x：0 = 影なし、1 = 硬い影、2 = PCSS）を分けるしきい値
+#define SHADOW_MODE_ENABLED_THRESHOLD 0.5f
+#define SHADOW_MODE_PCSS_THRESHOLD 1.5f
+// 円の配置を回す1回転、中心と回した点の比較を平均する重み
+#define SHADOW_FULL_TURN 6.2831853f
+#define SHADOW_SAMPLE_WEIGHT (1.0f / 9.0f)
+
 float GetFlashlightShadow(float4 shadowPosition)
 {
     // ライトの後ろや、シャドウマップの範囲の外は、影ではないことにしている（「影なし」の方式も同じ）
-    if (shadowPosition.w <= 0.0f || ShadowOptions.x < 0.5f)
+    if (shadowPosition.w <= 0.0f || ShadowOptions.x < SHADOW_MODE_ENABLED_THRESHOLD)
     {
         return 1.0f;
     }
@@ -92,7 +107,7 @@ float GetFlashlightShadow(float4 shadowPosition)
     const float compareDepth = projected.z - receiverBias;
     const float texel = ShadowParameters.x;
     // 「硬い影」の方式は、1か所だけ比べる（PCSSと見比べるため）
-    if (ShadowOptions.x < 1.5f)
+    if (ShadowOptions.x < SHADOW_MODE_PCSS_THRESHOLD)
     {
         return g_FlashlightShadowMap.SampleCmpLevelZero(g_ShadowSampler, shadowUV, compareDepth);
     }
@@ -100,7 +115,7 @@ float GetFlashlightShadow(float4 shadowPosition)
 
     // 画素ごとに円の配置を回し、少ない回数でも縁が段々にならず、細かいざらつきになるようにしている。
     // 回し方はシャドウマップ上の位置から決め、カメラが止まっていれば模様も止まって見えるようにしている。
-    const float angle = ShadowHash21(floor(shadowUV / texel)) * 6.2831853f;
+    const float angle = ShadowHash21(floor(shadowUV / texel)) * SHADOW_FULL_TURN;
     float sinAngle;
     float cosAngle;
     sincos(angle, sinAngle, cosAngle);
@@ -111,7 +126,7 @@ float GetFlashlightShadow(float4 shadowPosition)
     float blockerSum = 0.0f;
     float blockerCount = 0.0f;
     [unroll]
-    for (int searchIndex = 0; searchIndex < 8; ++searchIndex)
+    for (int searchIndex = 0; searchIndex < SHADOW_DISK_SIZE; ++searchIndex)
     {
         const float2 offset = mul(g_ShadowDisk[searchIndex], rotation) * (texel * FLASHLIGHT_SHADOW_BLOCKER_SEARCH_TEXELS);
         const int2 texelPosition = int2(saturate(shadowUV + offset) * (shadowSize - 1.0f));
@@ -132,7 +147,7 @@ float GetFlashlightShadow(float4 shadowPosition)
     //    影の画角は66度なので、距離dでの幅は 2 × d × tan(33度)。
     const float blockerDistance = blockerSum / blockerCount;
     const float penumbraWidth = FlashlightLensSize *
-        max(receiverDistance - blockerDistance, 0.0f) / max(blockerDistance, 0.001f);
+        max(receiverDistance - blockerDistance, 0.0f) / max(blockerDistance, SHADOW_MIN_DIVISOR);
     const float penumbraRadius = 0.5f * penumbraWidth /
         (2.0f * receiverDistance * FLASHLIGHT_SHADOW_TAN_HALF_FOV);
     // 細い物の影が消えないよう最小1テクセル、ぼやけすぎないよう最大12テクセルにしている
@@ -140,13 +155,13 @@ float GetFlashlightShadow(float4 shadowPosition)
 
     // 3. 中心と、回した8か所の比較を平均している
     float visibility = g_FlashlightShadowMap.SampleCmpLevelZero(
-        g_ShadowSampler, shadowUV, compareDepth) * (1.0f / 9.0f);
+        g_ShadowSampler, shadowUV, compareDepth) * SHADOW_SAMPLE_WEIGHT;
     [unroll]
-    for (int sampleIndex = 0; sampleIndex < 8; ++sampleIndex)
+    for (int sampleIndex = 0; sampleIndex < SHADOW_DISK_SIZE; ++sampleIndex)
     {
         const float2 offset = mul(g_ShadowDisk[sampleIndex], rotation) * filterRadius;
         visibility += g_FlashlightShadowMap.SampleCmpLevelZero(
-            g_ShadowSampler, shadowUV + offset, compareDepth) * (1.0f / 9.0f);
+            g_ShadowSampler, shadowUV + offset, compareDepth) * SHADOW_SAMPLE_WEIGHT;
     }
 
     return visibility;

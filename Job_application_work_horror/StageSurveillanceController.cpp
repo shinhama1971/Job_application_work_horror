@@ -30,6 +30,10 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // 監視カメラの映像の解像度（大きく表示しても異常の輪郭が潰れない大きさ）
+    constexpr UINT FeedWidth = 960;
+    constexpr UINT FeedHeight = 540;
+
     // 映像を開いてから操作を受け付けるまでの秒数（開いた直後の押し間違いを防いでいる）。
     constexpr float PatrolInputDelay = 0.65f;
     // 判定を間違えたときの表示の秒数、警告を始める残り秒数、照らしたと判定する距離と内積
@@ -152,7 +156,7 @@ void StageSurveillanceController::Init(const StageObjects& objects)
         "shader/unlitTextureVS.hlsl",
         "shader/surveillanceFeedPS.hlsl");
     // 大きく表示しても、異常の輪郭が潰れない解像度を確保している。
-    m_Feed.InitRequired(960, 540, "監視カメラの映像");
+    m_Feed.InitRequired(FeedWidth, FeedHeight, "監視カメラの映像");
     for (Graphics::RenderTexture& reference : m_References)
     {
         reference.InitRequired(960, 540, "監視カメラの比較画像");

@@ -10,6 +10,8 @@
 class ScareLightSequence final
 {
 private:
+    // 通知を出す秒数
+    static constexpr float NoticeSeconds = 3.8f;
     // 演出の経過秒（負なら演出していない）、通知の残り秒数、次に起こす段階（-1なら始まっていない）
     float m_Timer = -1.0f;
     float m_NoticeTimer = 0.0f;
@@ -28,7 +30,7 @@ public:
     void Start() noexcept
     {
         m_Timer = 0.0f;
-        m_NoticeTimer = 3.8f;
+        m_NoticeTimer = NoticeSeconds;
         m_Phase = 0;
     }
 

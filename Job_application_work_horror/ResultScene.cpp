@@ -13,6 +13,9 @@
 
 namespace
 {
+    // 項目を浮かび上がらせる秒数
+    constexpr float ResultRevealSeconds = 1.10f;
+
     // 結果画面の画面効果：光の筋を消し、ノイズや歪みを弱め、少し明るく、少し光らせて始める
     constexpr float ResultExposure = 0.94f;
     constexpr float ResultNoiseAmount = 0.06f;
@@ -95,8 +98,8 @@ void ResultScene::Update()
 void ResultScene::Draw(Camera* camera)
 {
     (void)camera;
-    const float reveal = m_ResultTimer < 1.10f
-        ? m_ResultTimer / 1.10f
+    const float reveal = m_ResultTimer < ResultRevealSeconds
+        ? m_ResultTimer / ResultRevealSeconds
         : 1.0f;
     Core::Game* game = Core::Game::GetInstance();
     m_Hud.DrawResult(

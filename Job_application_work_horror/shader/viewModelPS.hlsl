@@ -33,6 +33,35 @@ float3 PerturbNormal(float3 normal, float3 worldPosition, float height, float st
     return normalize(abs(determinant) * normal - gradient * strength);
 }
 
+// 擦り傷：出る範囲（出始め・出きる）、ノイズの細かさ（軸のまわり・軸の向き）、塗装の上で地が出る量
+#define TORCH_SCRATCH_START 0.80f
+#define TORCH_SCRATCH_FULL 0.97f
+#define TORCH_SCRATCH_AROUND_SCALE 9.0f
+#define TORCH_SCRATCH_ALONG_SCALE 160.0f
+#define TORCH_SCRATCH_BARE 0.35f
+// はげた所の地のアルミ（色・粗さ）
+#define TORCH_BARE_METAL_COLOR float3(0.56f, 0.56f, 0.54f)
+#define TORCH_BARE_ROUGHNESS 0.34f
+// ローレット加工：使う範囲のしきい値、軸のまわりの縮め方、溝の間隔（約3mm）、細かすぎるときに弱める範囲、溝の深さ、粗さとその混ぜ方
+#define KNURL_MIN_AREA 0.01f
+#define KNURL_AROUND_SCALE 0.35f
+#define KNURL_PITCH 0.06f
+#define KNURL_FADE_START 0.35f
+#define KNURL_FADE_END 0.9f
+#define KNURL_DEPTH 0.010f
+#define KNURL_ROUGHNESS 0.55f
+#define KNURL_ROUGHNESS_BLEND 0.5f
+// 照り返しの回り込み
+#define TORCH_BOUNCE_WRAP 0.2f
+// レンズ：反射鏡の輪（最低・幅・本数）、中心の明るさ（縁の明るさ・ぼかし終わり）、電池が弱ったときの色
+#define LENS_RING_BASE 0.85f
+#define LENS_RING_RANGE 0.15f
+#define LENS_RING_FREQUENCY 38.0f
+#define LENS_EDGE_BRIGHTNESS 0.55f
+#define LENS_HOTSPOT_RADIUS 0.75f
+#define LENS_WEAK_TINT float3(1.0f, 0.78f, 0.45f)
+
+
 float4 main(in VIEW_MODEL_PS_IN input) : SV_Target
 {
     float3 normal = normalize(input.worldNormal);
@@ -48,30 +77,30 @@ float4 main(in VIEW_MODEL_PS_IN input) : SV_Target
 
     // 細かな擦り傷（軸のまわりに長く伸びた線）
     const float around = atan2(input.localPos.y, input.localPos.x);
-    const float scratches = smoothstep(0.80f, 0.97f,
-        FastValueNoise(float2(around * 9.0f, input.localPos.z * 160.0f)));
-    const float bare = saturate(wear + scratches * 0.35f * (1.0f - metallic));
-    baseColor = lerp(baseColor, float3(0.56f, 0.56f, 0.54f), bare);
+    const float scratches = smoothstep(TORCH_SCRATCH_START, TORCH_SCRATCH_FULL,
+        FastValueNoise(float2(around * TORCH_SCRATCH_AROUND_SCALE, input.localPos.z * TORCH_SCRATCH_ALONG_SCALE)));
+    const float bare = saturate(wear + scratches * TORCH_SCRATCH_BARE * (1.0f - metallic));
+    baseColor = lerp(baseColor, TORCH_BARE_METAL_COLOR, bare);
     metallic = lerp(metallic, 1.0f, bare);
-    roughness = lerp(roughness, 0.34f, bare);
+    roughness = lerp(roughness, TORCH_BARE_ROUGHNESS, bare);
 
     // ローレット加工：軸の周りの長さと軸の向きで、斜めの2本の溝が交わる菱形の模様（ピッチ約3mm）
     [branch]
-    if (knurlArea > 0.01f)
+    if (knurlArea > KNURL_MIN_AREA)
     {
-        const float2 grip = float2(around * 0.35f, input.localPos.z) / 0.06f;
+        const float2 grip = float2(around * KNURL_AROUND_SCALE, input.localPos.z) / KNURL_PITCH;
         const float diamond = abs(frac(grip.x + grip.y) - 0.5f) + abs(frac(grip.x - grip.y) - 0.5f);
         // 遠くて溝が画素より細かいときは、ちらつかないよう弱めている
-        const float detail = knurlArea * (1.0f - smoothstep(0.35f, 0.9f, fwidth(grip.x + grip.y)));
-        normal = PerturbNormal(normal, input.worldPos, diamond * 0.010f, detail);
-        roughness = lerp(roughness, 0.55f, knurlArea * 0.5f);
+        const float detail = knurlArea * (1.0f - smoothstep(KNURL_FADE_START, KNURL_FADE_END, fwidth(grip.x + grip.y)));
+        normal = PerturbNormal(normal, input.worldPos, diamond * KNURL_DEPTH, detail);
+        roughness = lerp(roughness, KNURL_ROUGHNESS, knurlArea * KNURL_ROUGHNESS_BLEND);
     }
 
     const PbrSurface surface = MakePbrSurface(baseColor, metallic, roughness, 0.0f);
     float3 diffuse = GetViewModelAmbient(input.worldPos, normal, occlusion);
     float3 specular = 0.0f;
     AccumulateViewModelPointLights(input.worldPos, normal, toView, 0.0f, surface, diffuse, specular);
-    const float3 bounce = GetViewModelBounce(normal, 0.2f);
+    const float3 bounce = GetViewModelBounce(normal, TORCH_BOUNCE_WRAP);
     diffuse += bounce * occlusion;
     specular += ViewModelBounce.rgb * EvaluateSpecularGGX(surface, normal, toView, ViewModelBounceDirection.xyz);
     specular += GetViewModelReflection(surface, normal, toView, occlusion);
@@ -83,15 +112,15 @@ float4 main(in VIEW_MODEL_PS_IN input) : SV_Target
     if (dot(Material.Emission.rgb, 1.0f) > 0.0f)
     {
         const float radius = length(input.tex - 0.5f) * 2.0f;
-        const float rings = 0.85f + 0.15f * sin(radius * 38.0f);
-        const float hotspot = lerp(0.55f, 1.0f, 1.0f - smoothstep(0.0f, 0.75f, radius));
-        const float3 weakTint = lerp(float3(1.0f, 1.0f, 1.0f), float3(1.0f, 0.78f, 0.45f), ViewModelState.y);
+        const float rings = LENS_RING_BASE + LENS_RING_RANGE * sin(radius * LENS_RING_FREQUENCY);
+        const float hotspot = lerp(LENS_EDGE_BRIGHTNESS, 1.0f, 1.0f - smoothstep(0.0f, LENS_HOTSPOT_RADIUS, radius));
+        const float3 weakTint = lerp(float3(1.0f, 1.0f, 1.0f), LENS_WEAK_TINT, ViewModelState.y);
         color += Material.Emission.rgb * weakTint * hotspot * rings * ViewModelState.x;
     }
 
     if (IsFullbrightDebugView())
     {
-        return float4(baseColor * (0.6f + 0.4f * saturate(dot(normal, toView))) * 1.35f, 1.0f);
+        return float4(baseColor * (FULLBRIGHT_BASE + FULLBRIGHT_FACING * saturate(dot(normal, toView))) * FULLBRIGHT_GAIN, 1.0f);
     }
     return float4(ApplyFilmicHorrorGrade(color, LoopDepth), 1.0f);
 }

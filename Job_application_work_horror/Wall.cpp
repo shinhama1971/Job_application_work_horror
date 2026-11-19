@@ -766,7 +766,7 @@ void Wall::SetWeatheringSurface(bool enabled)
 // 光る色をそのまま光の色にし、明るさは光る強さに比例させている。
 void Wall::CollectPointLights(std::vector<ENVIRONMENT_POINT_LIGHT>& lights) const
 {
-    if (!m_Visible || m_GlowRange <= 0.0f || m_GlowStrength <= 0.0f || m_EmissionScale <= 0.001f)
+    if (!m_Visible || m_GlowRange <= 0.0f || m_GlowStrength <= 0.0f || m_EmissionScale <= MinGlowEmissionScale)
     {
         return;
     }

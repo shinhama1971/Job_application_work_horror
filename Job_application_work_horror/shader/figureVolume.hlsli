@@ -26,6 +26,31 @@ static const float3 SELF_VOLUME_COUNT = float3(43.0f, 106.0f, 55.0f);
 // 人影の距離場の、頭の中心の高さ（呼ぶ側が、描きたい頭の高さに合わせて大きさを決めるのに使う）
 static const float FIGURE_VOLUME_HEAD_HEIGHT = 35.4f;
 
+// 光線の向きを0で割らないよう丸める下限と、当たらないときの距離
+#define FIGURE_VOLUME_MIN_DIRECTION 1e-5f
+#define FIGURE_VOLUME_NO_HIT 1e6f
+// 人影の距離場をたどる：最大の回数、近づいたとみなす距離、歩幅（距離に掛ける割合・最小）
+#define FIGURE_TRACE_STEPS 40
+#define FIGURE_TRACE_HIT_DISTANCE 0.05f
+#define FIGURE_TRACE_STEP_SCALE 0.9f
+#define FIGURE_TRACE_MIN_STEP 0.15f
+// 自分の体の距離場をたどる：最大の回数、当たったとみなす距離、歩幅（距離に掛ける割合・最小）、法線を調べるずれ（格子の幅に掛ける）
+#define SELF_TRACE_STEPS 56
+#define SELF_TRACE_HIT_DISTANCE 0.04f
+#define SELF_TRACE_STEP_SCALE 0.85f
+#define SELF_TRACE_MIN_STEP 0.08f
+#define SELF_NORMAL_EPSILON_SCALE 0.6f
+// 手足の振り：脚と腕の振れ幅（ラジアン）、股関節の高さと脚の振りが始まる高さ、
+// 腕とみなす横の位置（ぼかし始め・終わり）、肩の高さと腕の振りが消える高さ
+#define SELF_LEG_SWING_ANGLE 0.45f
+#define SELF_ARM_SWING_ANGLE 0.35f
+#define SELF_HIP_HEIGHT 17.5f
+#define SELF_LEG_SWING_FULL_HEIGHT 11.0f
+#define SELF_ARM_SIDE_START -3.8f
+#define SELF_ARM_SIDE_FULL -4.8f
+#define SELF_SHOULDER_HEIGHT 30.0f
+#define SELF_ARM_SWING_FULL_HEIGHT 25.0f
+
 // 位置を、格子点の中心に合わせたテクスチャ座標（0〜1）にしている
 float3 GetVolumeCoordinate(float3 position, float3 minimum, float3 count)
 {
@@ -41,7 +66,7 @@ float SampleFigureDistance(float3 position)
 // 光線（origin から単位ベクトル direction）が箱に入る距離と出る距離を求めている（当たらなければ false）
 bool IntersectVolumeBox(float3 origin, float3 direction, float3 minimum, float3 maximum, out float enter, out float leave)
 {
-    const float3 safeDirection = abs(direction) > 1e-5f ? direction : 1e-5f;
+    const float3 safeDirection = abs(direction) > FIGURE_VOLUME_MIN_DIRECTION ? direction : FIGURE_VOLUME_MIN_DIRECTION;
     const float3 entryPlane = (minimum - origin) / safeDirection;
     const float3 exitPlane = (maximum - origin) / safeDirection;
     const float3 low = min(entryPlane, exitPlane);
@@ -55,7 +80,7 @@ bool IntersectVolumeBox(float3 origin, float3 direction, float3 minimum, float3 
 // 当たらなくても、光線が形にどこまで近づいたかで、縁を softness の幅でぼかしている（霧の中の黒い人影）
 float TraceFigureVolume(float3 origin, float3 direction, float softness, out float depth)
 {
-    depth = 1e6f;
+    depth = FIGURE_VOLUME_NO_HIT;
     float enter;
     float leave;
     [branch]
@@ -64,9 +89,9 @@ float TraceFigureVolume(float3 origin, float3 direction, float softness, out flo
         return 0.0f;
     }
     float travel = enter;
-    float closest = 1e6f;
+    float closest = FIGURE_VOLUME_NO_HIT;
     [loop]
-    for (int step = 0; step < 40; ++step)
+    for (int step = 0; step < FIGURE_TRACE_STEPS; ++step)
     {
         const float distance = SampleFigureDistance(origin + direction * travel);
         if (distance < closest)
@@ -74,11 +99,11 @@ float TraceFigureVolume(float3 origin, float3 direction, float softness, out flo
             closest = distance;
             depth = travel;
         }
-        if (distance < 0.05f || travel > leave)
+        if (distance < FIGURE_TRACE_HIT_DISTANCE || travel > leave)
         {
             break;
         }
-        travel += max(distance * 0.9f, 0.15f);
+        travel += max(distance * FIGURE_TRACE_STEP_SCALE, FIGURE_TRACE_MIN_STEP);
     }
     return smoothstep(softness, 0.0f, closest);
 }
@@ -88,10 +113,11 @@ float TraceFigureVolume(float3 origin, float3 direction, float softness, out flo
 float3 WarpSelfPosition(float3 position, float swing)
 {
     const float side = position.x >= 0.0f ? 1.0f : -1.0f;
-    const float legAngle = swing * 0.45f * side * smoothstep(17.5f, 11.0f, position.y);
-    const float armAngle = -swing * 0.35f * smoothstep(-3.8f, -4.8f, position.x) * smoothstep(30.0f, 25.0f, position.y);
-    const float angle = position.y < 17.5f ? legAngle : armAngle;
-    const float3 pivot = position.y < 17.5f ? float3(0.0f, 17.5f, 0.0f) : float3(0.0f, 30.0f, 0.0f);
+    const float legAngle = swing * SELF_LEG_SWING_ANGLE * side * smoothstep(SELF_HIP_HEIGHT, SELF_LEG_SWING_FULL_HEIGHT, position.y);
+    const float armAngle = -swing * SELF_ARM_SWING_ANGLE * smoothstep(SELF_ARM_SIDE_START, SELF_ARM_SIDE_FULL, position.x) *
+        smoothstep(SELF_SHOULDER_HEIGHT, SELF_ARM_SWING_FULL_HEIGHT, position.y);
+    const float angle = position.y < SELF_HIP_HEIGHT ? legAngle : armAngle;
+    const float3 pivot = position.y < SELF_HIP_HEIGHT ? float3(0.0f, SELF_HIP_HEIGHT, 0.0f) : float3(0.0f, SELF_SHOULDER_HEIGHT, 0.0f);
     float sine;
     float cosine;
     sincos(-angle, sine, cosine);
@@ -120,15 +146,15 @@ float TraceSelfVolume(float3 origin, float3 direction, float swing, out float3 n
     float travel = enter;
     float hit = -1.0f;
     [loop]
-    for (int step = 0; step < 56; ++step)
+    for (int step = 0; step < SELF_TRACE_STEPS; ++step)
     {
         const float distance = SampleSelf(origin + direction * travel, swing).r;
-        if (distance < 0.04f)
+        if (distance < SELF_TRACE_HIT_DISTANCE)
         {
             hit = travel;
             break;
         }
-        travel += max(distance * 0.85f, 0.08f);
+        travel += max(distance * SELF_TRACE_STEP_SCALE, SELF_TRACE_MIN_STEP);
         if (travel > leave)
         {
             break;
@@ -141,7 +167,7 @@ float TraceSelfVolume(float3 origin, float3 direction, float swing, out float3 n
     }
     // 法線：正四面体の4つの向きで距離の変化を調べた勾配
     const float3 position = origin + direction * hit;
-    const float epsilon = FIGURE_VOLUME_VOXEL * 0.6f;
+    const float epsilon = FIGURE_VOLUME_VOXEL * SELF_NORMAL_EPSILON_SCALE;
     const float2 k = float2(1.0f, -1.0f);
     normal = normalize(
         k.xyy * SampleSelf(position + k.xyy * epsilon, swing).r +

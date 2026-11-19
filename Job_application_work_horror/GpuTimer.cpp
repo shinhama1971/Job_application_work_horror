@@ -11,6 +11,9 @@
 
 namespace
 {
+    // GPU の時刻の差（1秒あたりの刻み）をミリ秒に直す倍率
+    constexpr double MillisecondsPerSecond = 1000.0;
+
     // 段階の列挙値を、配列の添字に変えている
     constexpr std::size_t ToIndex(GpuPass pass)
     {
@@ -205,7 +208,7 @@ bool GpuTimer::TryResolveFrame(
             }
 
             resolvedTimings[passIndex].Milliseconds =
-                static_cast<double>(endTimestamp - startTimestamp) * 1000.0 /
+                static_cast<double>(endTimestamp - startTimestamp) * MillisecondsPerSecond /
                 static_cast<double>(disjointData.Frequency);
             resolvedTimings[passIndex].Status = GpuTimingStatus::Available;
         }

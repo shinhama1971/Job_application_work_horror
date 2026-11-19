@@ -10,9 +10,14 @@ Texture2D g_Texture : register(t0);
 SamplerState g_SamplerState : register(s0);
 
 // 2次元の値から0〜1の疑似乱数を作っている
+// 疑似乱数の係数（よく使われる sin のハッシュ。決まった値）と、輝度の重み
+#define SURVEILLANCE_HASH_DIRECTION float2(12.9898f, 78.233f)
+#define SURVEILLANCE_HASH_SCALE 43758.5453f
+#define SURVEILLANCE_LUMINANCE_WEIGHTS float3(0.2126f, 0.7152f, 0.0722f)
+
 float Hash(float2 value)
 {
-    return frac(sin(dot(value, float2(12.9898f, 78.233f))) * 43758.5453f);
+    return frac(sin(dot(value, SURVEILLANCE_HASH_DIRECTION)) * SURVEILLANCE_HASH_SCALE);
 }
 
 // 暗い部分に残っている輪郭を見やすくする監視映像用の露出とガンマ。
@@ -38,7 +43,7 @@ float4 main(in PS_IN input) : SV_Target
     color = pow(saturate(color + SURVEILLANCE_BLACK_LIFT), SURVEILLANCE_GAMMA_EXPONENT);
 
     // 色を少し残した暗視カメラのような表現にし、赤い非常灯や扉の材質の違いも見分けられるようにしている。
-    const float luminance = dot(color, float3(0.2126f, 0.7152f, 0.0722f));
+    const float luminance = dot(color, SURVEILLANCE_LUMINANCE_WEIGHTS);
     color = lerp(luminance.xxx, color, SURVEILLANCE_SATURATION);
     color *= SURVEILLANCE_CAMERA_TINT;
 

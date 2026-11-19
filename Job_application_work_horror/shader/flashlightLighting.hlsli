@@ -35,6 +35,11 @@
 #define FLASHLIGHT_TINT_EDGE float3(1.10f, 0.88f, 0.58f)
 
 // 上を向いた面はわずかに青白く、下を向いた面はわずかに暖かい色にした環境光を返している
+// 0で割らないための下限（距離・光の届く範囲）、光の円錐の外側の cos の下限、補助の上向きを横向きに替える縦の向きの上限
+#define FLASHLIGHT_MIN_DIVISOR 0.001f
+#define FLASHLIGHT_MIN_OUTER_COSINE 0.05f
+#define FLASHLIGHT_UP_FALLBACK_LIMIT 0.99f
+
 float3 GetHemisphereAmbient(float3 worldNormal)
 {
     const float skyAmount = saturate(normalize(worldNormal).y * 0.5f + 0.5f);
@@ -80,13 +85,13 @@ float GetFlashlightSpillProfile(float3 pixelDirection)
 float3 GetFlashlightSpillLight(float3 viewPosition, float3 viewNormal)
 {
     const float distanceFromCamera = length(viewPosition);
-    if (!(Light.Enable && Light.FlashlightEnabled) || distanceFromCamera < 0.001f)
+    if (!(Light.Enable && Light.FlashlightEnabled) || distanceFromCamera < FLASHLIGHT_MIN_DIVISOR)
     {
         return 0.0f;
     }
     const float3 pixelDirection = viewPosition / distanceFromCamera;
     const float spill = GetFlashlightSpillProfile(pixelDirection);
-    const float normalizedDistance = saturate(distanceFromCamera / max(Light.Range, 0.001f));
+    const float normalizedDistance = saturate(distanceFromCamera / max(Light.Range, FLASHLIGHT_MIN_DIVISOR));
     const float rangeFade = saturate(1.0f - normalizedDistance * normalizedDistance);
     const float lambert = saturate(dot(normalize(viewNormal), -pixelDirection));
     return Light.Diffuse.rgb * GetFlashlightTint(pixelDirection) * Light.Intensity * spill *
@@ -162,18 +167,18 @@ static const float BEAM_REFLECTOR_WARP_SCALE = 2.5f;
 
 float GetFlashlightLensPattern(float3 pixelDirection)
 {
-    const float outerCosine = max(Light.SpotParams.y, 0.05f);
+    const float outerCosine = max(Light.SpotParams.y, FLASHLIGHT_MIN_OUTER_COSINE);
     const float outerTangent =
         sqrt(saturate(1.0f - outerCosine * outerCosine)) / outerCosine;
     // 揺れるライトの向きを基準にし、明るい中心と外周を一致させている。
     const float3 forward = normalize(Light.Direction.xyz);
-    const float3 referenceUp = abs(forward.y) < 0.99f
+    const float3 referenceUp = abs(forward.y) < FLASHLIGHT_UP_FALLBACK_LIMIT
         ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f);
     const float3 right = normalize(cross(referenceUp, forward));
     const float3 up = cross(forward, right);
     // 画素の方向を、ライトの円錐の中の2次元の座標（外周が半径1）にしている
     const float2 lensUV = float2(dot(pixelDirection, right), dot(pixelDirection, up)) /
-        max(dot(pixelDirection, forward) * outerTangent, 0.001f);
+        max(dot(pixelDirection, forward) * outerTangent, FLASHLIGHT_MIN_DIVISOR);
     const float radius = length(lensUV);
 
     const float patternFade =
@@ -201,7 +206,7 @@ float GetFlashlightLensPattern(float3 pixelDirection)
 
     // 反射鏡の細かい同心円の輪。本物の反射鏡はきれいな円ではないので、向きによって輪の位置を少しずらしている
     // （向きの単位ベクトルからノイズを作るので、角度の境目で模様が切れない）
-    const float2 ringDirection = lensUV / max(radius, 0.001f);
+    const float2 ringDirection = lensUV / max(radius, FLASHLIGHT_MIN_DIVISOR);
     const float ringWarp = FastValueNoise(ringDirection * BEAM_REFLECTOR_WARP_SCALE + FLASHLIGHT_REFLECTOR_WARP_SEED) - 0.5f;
     const float rings = sin(radius * BEAM_REFLECTOR_RING_FREQUENCY + ringWarp * BEAM_REFLECTOR_RING_WARP) * 0.5f + 0.5f;
     const float ringPattern =

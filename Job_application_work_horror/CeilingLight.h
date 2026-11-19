@@ -17,6 +17,8 @@
 class CeilingLight : public Object
 {
 private:
+    // 出来事の明滅の最短の長さ（秒。0秒の明滅で割り算が壊れないように）
+    static constexpr float MinEventFlickerSeconds = 0.05f;
     // 頂点・インデックスとGPUのバッファ、本体と発光パネルのマテリアル
     std::vector<VERTEX_3D> m_Vertices;
     std::vector<unsigned int> m_Indices;
@@ -127,7 +129,7 @@ public:
     // イベント用の明滅を始めている（長さは0.05秒以上、強さは0〜1に制限している）
     void TriggerEventFlicker(float duration, float strength)
     {
-        m_EventFlickerDuration = (std::max)(duration, 0.05f);
+        m_EventFlickerDuration = (std::max)(duration, MinEventFlickerSeconds);
         m_EventFlickerTimer = m_EventFlickerDuration;
         m_EventFlickerStrength = (std::clamp)(strength, 0.0f, 1.0f);
     }

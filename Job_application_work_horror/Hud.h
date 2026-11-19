@@ -143,7 +143,7 @@ public:
         float runTimeSeconds,
         int caughtCount);
     // まばたきのように画面全体を暗くしている
-    void DrawBlink(float opacity, float maximumOpacity = 0.90f);
+    void DrawBlink(float opacity, float maximumOpacity = DefaultBlinkMaxOpacity);
     // ためた頂点を捨てている
     void Uninit();
 
@@ -157,6 +157,8 @@ public:
     static constexpr float Stage2StatusReservedHeight = 58.0f + 8.0f + 40.0f + 8.0f;
     // 面の始まり：黒から明るくする秒数と、章のカード（DrawChapterCard）を出す秒数。カードが消えてから目的地の方向を出す
     static constexpr float IntroFadeSeconds = 0.65f;
+    // まばたきで画面を暗くする濃さの上限（既定）
+    static constexpr float DefaultBlinkMaxOpacity = 0.90f;
     static constexpr float ChapterCardSeconds = 4.20f;
     // 捕まったときに画面を暗くする強さ
     static constexpr float CaughtDarkness = 0.96f;

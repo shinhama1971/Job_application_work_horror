@@ -60,6 +60,16 @@ static const float FacadeRoofHeight = 150.0f;
 
 // 縦の帯の雨だれ（0〜1）。startHeight は垂れ始める高さ（地面から）、height は今の画素の高さ、column は横の位置。
 // 帯は幅がまちまちで、垂れ始めは濃く、下へ行くほど細く薄れていく
+// 雨だれの帯：長さの下限（0で割らないため）、帯の中心をずらす幅、くねりの幅、帯の芯の割合、濃さのむら（最低＋幅、細かさ）
+#define FACADE_DRIP_MIN_LENGTH 0.001f
+#define FACADE_DRIP_CENTER_RANGE 0.5f
+#define FACADE_DRIP_WOBBLE_AMOUNT 0.5f
+#define FACADE_DRIP_CORE 0.4f
+#define FACADE_DRIP_SHADE_BASE 0.6f
+#define FACADE_DRIP_SHADE_RANGE 0.4f
+#define FACADE_DRIP_SHADE_COLUMN_SCALE 5.1f
+#define FACADE_DRIP_SHADE_HEIGHT_SCALE 0.6f
+
 float FacadeDripStreak(float along, float height, float startHeight, float maxLength, float density, float seed, float footprint)
 {
     const float below = startHeight - height;
@@ -77,15 +87,15 @@ float FacadeDripStreak(float along, float height, float startHeight, float maxLe
     const float lengthScale = lerp(FACADE_DRIP_LENGTH_MIN_RATIO, 1.0f, FastHash21(float2(column, seed + FACADE_DRIP_LENGTH_SEED_OFFSET)));
     const float streakLength = maxLength * lengthScale;
     // 下へ行くほど細くなり、薄れる
-    const float progress = saturate(below / max(streakLength, 0.001f));
+    const float progress = saturate(below / max(streakLength, FACADE_DRIP_MIN_LENGTH));
     const float halfWidth = lerp(FACADE_DRIP_TOP_HALF_WIDTH, FACADE_DRIP_BOTTOM_HALF_WIDTH, progress) * lerp(FACADE_DRIP_WIDTH_MIN_RATIO, 1.0f, FastHash21(float2(column, seed + FACADE_DRIP_WIDTH_SEED_OFFSET)));
     // 帯の中心を、列の中でずらし、高さに沿ってわずかにくねらせている
-    const float center = FACADE_DRIP_CENTER_MIN + 0.5f * FastHash21(float2(column, seed + FACADE_DRIP_CENTER_SEED_OFFSET));
-    const float wobble = (FastValueNoise(float2(column * FACADE_DRIP_WOBBLE_COLUMN_SCALE, height * FACADE_DRIP_WOBBLE_HEIGHT_SCALE)) - 0.5f) * 0.5f;
+    const float center = FACADE_DRIP_CENTER_MIN + FACADE_DRIP_CENTER_RANGE * FastHash21(float2(column, seed + FACADE_DRIP_CENTER_SEED_OFFSET));
+    const float wobble = (FastValueNoise(float2(column * FACADE_DRIP_WOBBLE_COLUMN_SCALE, height * FACADE_DRIP_WOBBLE_HEIGHT_SCALE)) - 0.5f) * FACADE_DRIP_WOBBLE_AMOUNT;
     const float centerOffset = abs(frac(along / columnWidth) - center - wobble * FACADE_DRIP_WOBBLE_OFFSET_GAIN) * columnWidth;
-    const float band = 1.0f - smoothstep(halfWidth * 0.4f, halfWidth + footprint, centerOffset);
+    const float band = 1.0f - smoothstep(halfWidth * FACADE_DRIP_CORE, halfWidth + footprint, centerOffset);
     return present * band * (1.0f - progress * progress) *
-        (0.6f + 0.4f * FastValueNoise(float2(column * 5.1f, height * 0.6f)));
+        (FACADE_DRIP_SHADE_BASE + FACADE_DRIP_SHADE_RANGE * FastValueNoise(float2(column * FACADE_DRIP_SHADE_COLUMN_SCALE, height * FACADE_DRIP_SHADE_HEIGHT_SCALE)));
 }
 
 // つなぎ目と木目の大きさを別にし、型枠の跡が読めるようにする。
@@ -122,19 +132,99 @@ float FacadeDripStreak(float along, float height, float startHeight, float maxLe
 #define FACADE_EFFLORESCENCE_FADE_END 7.0f
 
 // baseColor は配置ファイルの色（concrete）、baseRoughness はその粗さ
+// --- 外壁の残りの値
+// 縦の面とみなす法線の y、画素の大きさの下限、細かい模様を消す画素の大きさ
+#define FACADE_VERTICAL_LIMIT 0.5f
+#define FACADE_MIN_FOOTPRINT 0.0001f
+#define FACADE_FINE_FOOTPRINT_LIMIT 0.6f
+// 大きな色むら：2つのノイズ（細かさ・ずらし・割合）
+#define FACADE_TONE_SCALE_A 0.025f
+#define FACADE_TONE_SEED_A 5.0f
+#define FACADE_TONE_WEIGHT_A 0.6f
+#define FACADE_TONE_SCALE_B 0.09f
+#define FACADE_TONE_SEED_B 13.0f
+#define FACADE_TONE_WEIGHT_B 0.4f
+// 白華が下へ垂れる長さのぼかし始め
+#define FACADE_EFFLORESCENCE_FADE_START 0.5f
+// 根元の泥はね：高さ（消え始め・消えきる＋色むらの幅）
+#define FACADE_SPLASH_START 1.5f
+#define FACADE_SPLASH_END 6.0f
+#define FACADE_SPLASH_TONE_RANGE 3.0f
+// 苔と藻：出る場所（出始め・出きる）とノイズの細かさ・ずらし、雨だれで増える量、高さ（消え始め・消えきる＋色むらの幅）、
+// 上や下を向いた面の量、濃さのむら（最低＋幅、細かさ・ずらし）
+#define FACADE_MOSS_AREA_START 0.50f
+#define FACADE_MOSS_AREA_FULL 0.72f
+#define FACADE_MOSS_NOISE_SCALE 0.05f
+#define FACADE_MOSS_NOISE_SEED 31.0f
+#define FACADE_MOSS_DRIP_BOOST 0.15f
+#define FACADE_MOSS_HEIGHT_START 6.0f
+#define FACADE_MOSS_HEIGHT_END 22.0f
+#define FACADE_MOSS_TONE_RANGE 10.0f
+#define FACADE_MOSS_FLAT_AMOUNT 0.6f
+#define FACADE_MOSS_SHADE_BASE 0.6f
+#define FACADE_MOSS_SHADE_RANGE 0.4f
+#define FACADE_MOSS_SHADE_SCALE 0.6f
+#define FACADE_MOSS_SHADE_SEED 7.0f
+// ひび：線を揺らすノイズ（細かさ・ずらし）、線の太さ（細さ＋画素の幅）、等高線のノイズ（細かさ・ずらし・揺らす量）、
+// 出る場所（出始め・出きる、細かさ・ずらし）
+#define FACADE_CRACK_WARP_SCALE 0.7f
+#define FACADE_CRACK_WARP_SEED_X 3.0f
+#define FACADE_CRACK_WARP_SEED_Y 17.0f
+#define FACADE_CRACK_LINE_WIDTH 0.014f
+#define FACADE_CRACK_LINE_FILTER 0.04f
+#define FACADE_CRACK_LINE_SCALE 0.07f
+#define FACADE_CRACK_LINE_SEED 61.0f
+#define FACADE_CRACK_WARP_WEIGHT 0.25f
+#define FACADE_CRACK_MASK_START 0.60f
+#define FACADE_CRACK_MASK_FULL 0.76f
+#define FACADE_CRACK_MASK_SCALE 0.018f
+#define FACADE_CRACK_MASK_SEED 9.0f
+// 色：明るさ（色むら：最低＋幅、パネル：最低＋幅）、木目（最低＋幅）、継ぎ目・穴・ひびの暗さ、
+// 雨だれ・白華・泥・苔の色と混ぜ方
+#define FACADE_TONE_BRIGHTNESS 0.80f
+#define FACADE_TONE_BRIGHTNESS_RANGE 0.35f
+#define FACADE_PANEL_BRIGHTNESS 0.93f
+#define FACADE_PANEL_BRIGHTNESS_RANGE 0.12f
+#define FACADE_GRAIN_BRIGHTNESS 0.94f
+#define FACADE_GRAIN_BRIGHTNESS_RANGE 0.10f
+#define FACADE_SEAM_DARKEN 0.35f
+#define FACADE_TIE_HOLE_DARKEN 0.55f
+#define FACADE_CRACK_DARKEN 0.50f
+#define FACADE_DRIP_COLOR float3(0.36f, 0.38f, 0.36f)
+#define FACADE_DRIP_BLEND 0.85f
+#define FACADE_EFFLORESCENCE_COLOR float3(0.62f, 0.63f, 0.60f)
+#define FACADE_EFFLORESCENCE_BLEND 0.55f
+#define FACADE_SPLASH_COLOR float3(0.55f, 0.48f, 0.40f)
+#define FACADE_SPLASH_BLEND 0.70f
+#define FACADE_MOSS_COLOR float3(0.07f, 0.10f, 0.05f)
+#define FACADE_MOSS_BLEND 0.80f
+// 粗さの下限
+#define FACADE_MIN_ROUGHNESS 0.10f
+// 濡れ具合（雨だれ・泥はね・苔・継ぎ目）
+#define FACADE_DRIP_WETNESS 0.45f
+#define FACADE_SPLASH_WETNESS 0.35f
+#define FACADE_MOSS_WETNESS 0.40f
+#define FACADE_SEAM_WETNESS 0.10f
+// 高さ（継ぎ目・穴・ひびのへこみ、木目の凹凸、苔の盛り上がり）
+#define FACADE_SEAM_DEPTH 0.55f
+#define FACADE_TIE_HOLE_DEPTH 0.90f
+#define FACADE_CRACK_DEPTH 0.35f
+#define FACADE_GRAIN_HEIGHT 0.10f
+#define FACADE_MOSS_HEIGHT 0.12f
+
 FacadeSurface GetFacadeSurface(float3 worldPosition, float3 worldNormal, float3 baseColor, float baseRoughness)
 {
     FacadeSurface facade;
     const float3 normal = normalize(worldNormal);
     const float3 axis = abs(normal);
-    const bool vertical = axis.y < 0.5f;
+    const bool vertical = axis.y < FACADE_VERTICAL_LIMIT;
     // 面に沿った2次元の座標：縦の面は（横の位置, 地面からの高さ）、上や下を向いた面は（x, z）
     const float heightFromGround = worldPosition.y - FacadeGroundY;
     const float along = axis.x > axis.z ? worldPosition.z : worldPosition.x;
     const float2 uv = vertical ? float2(along, heightFromGround) : worldPosition.xz;
     // 1画素がワールドで何単位か。遠くで細かい模様がちらつかないよう、これで薄めている
-    const float footprint = max(length(fwidth(uv)), 0.0001f);
-    const float fineFade = saturate(1.0f - footprint / 0.6f);
+    const float footprint = max(length(fwidth(uv)), FACADE_MIN_FOOTPRINT);
+    const float fineFade = saturate(1.0f - footprint / FACADE_FINE_FOOTPRINT_LIMIT);
 
     // --- 型枠のパネル（横22・縦44）の継ぎ目と、パネルごとの色の違い
     const float2 panelSize = FACADE_PANEL_SIZE;
@@ -160,7 +250,8 @@ FacadeSurface GetFacadeSurface(float3 worldPosition, float3 worldNormal, float3 
     }
 
     // --- 大きな色むら（雨の当たり方と、打った日の違い）
-    const float tone = FastValueNoise(uv * 0.025f + 5.0f) * 0.6f + FastValueNoise(uv * 0.09f + 13.0f) * 0.4f;
+    const float tone = FastValueNoise(uv * FACADE_TONE_SCALE_A + FACADE_TONE_SEED_A) * FACADE_TONE_WEIGHT_A +
+        FastValueNoise(uv * FACADE_TONE_SCALE_B + FACADE_TONE_SEED_B) * FACADE_TONE_WEIGHT_B;
 
     // --- 雨だれの黒い跡（縦の面だけ）：各階の窓の下の水切りと、屋上の縁から垂れている
     float drip = 0.0f;
@@ -182,49 +273,54 @@ FacadeSurface GetFacadeSurface(float3 worldPosition, float3 worldNormal, float3 
         const float belowJoint = (1.0f - local.y) * panelSize.y;
         const float effloColumn = FastValueNoise(float2(uv.x * FACADE_EFFLORESCENCE_COLUMN_SCALE, panelId.y * FACADE_EFFLORESCENCE_ROW_SCALE));
         efflorescence = effloPanel * smoothstep(FACADE_EFFLORESCENCE_COLUMN_START, FACADE_EFFLORESCENCE_COLUMN_FULL, effloColumn) *
-            (1.0f - smoothstep(0.5f, FACADE_EFFLORESCENCE_FADE_END, belowJoint)) * fineFade;
+            (1.0f - smoothstep(FACADE_EFFLORESCENCE_FADE_START, FACADE_EFFLORESCENCE_FADE_END, belowJoint)) * fineFade;
     }
 
     // --- 根元の泥はね（地面から5くらいまで）と、湿った所の苔・藻（地面から20くらいまで、まだらに）
-    const float splash = vertical ? 1.0f - smoothstep(1.5f, 6.0f + tone * 3.0f, heightFromGround) : 0.0f;
-    const float mossArea = smoothstep(0.50f, 0.72f, FastValueNoise(uv * 0.05f + 31.0f) + drip * 0.15f);
-    const float mossLow = vertical ? 1.0f - smoothstep(6.0f, 22.0f + tone * 10.0f, heightFromGround) : 0.6f;
-    const float moss = mossArea * mossLow * (0.6f + 0.4f * FastValueNoise(uv * 0.6f + 7.0f));
+    const float splash = vertical ? 1.0f - smoothstep(FACADE_SPLASH_START, FACADE_SPLASH_END + tone * FACADE_SPLASH_TONE_RANGE, heightFromGround) : 0.0f;
+    const float mossArea = smoothstep(FACADE_MOSS_AREA_START, FACADE_MOSS_AREA_FULL,
+        FastValueNoise(uv * FACADE_MOSS_NOISE_SCALE + FACADE_MOSS_NOISE_SEED) + drip * FACADE_MOSS_DRIP_BOOST);
+    const float mossLow = vertical
+        ? 1.0f - smoothstep(FACADE_MOSS_HEIGHT_START, FACADE_MOSS_HEIGHT_END + tone * FACADE_MOSS_TONE_RANGE, heightFromGround)
+        : FACADE_MOSS_FLAT_AMOUNT;
+    const float moss = mossArea * mossLow * (FACADE_MOSS_SHADE_BASE + FACADE_MOSS_SHADE_RANGE * FastValueNoise(uv * FACADE_MOSS_SHADE_SCALE + FACADE_MOSS_SHADE_SEED));
 
     // --- ひび（ノイズの等高線を細い線にし、別のノイズで出る場所を絞っている）
     float crack = 0.0f;
     [branch]
     if (fineFade > 0.0f)
     {
-        const float2 crackWarp = float2(FastValueNoise(uv * 0.7f + 3.0f), FastValueNoise(uv * 0.7f + 17.0f)) - 0.5f;
-        const float crackLine = 1.0f - smoothstep(0.0f, 0.014f + footprint * 0.04f,
-            abs(FastValueNoise(uv * 0.07f + 61.0f + crackWarp * 0.25f) - 0.5f));
-        const float crackMask = smoothstep(0.60f, 0.76f, FastValueNoise(uv * 0.018f + 9.0f));
+        const float2 crackWarp = float2(FastValueNoise(uv * FACADE_CRACK_WARP_SCALE + FACADE_CRACK_WARP_SEED_X),
+            FastValueNoise(uv * FACADE_CRACK_WARP_SCALE + FACADE_CRACK_WARP_SEED_Y)) - 0.5f;
+        const float crackLine = 1.0f - smoothstep(0.0f, FACADE_CRACK_LINE_WIDTH + footprint * FACADE_CRACK_LINE_FILTER,
+            abs(FastValueNoise(uv * FACADE_CRACK_LINE_SCALE + FACADE_CRACK_LINE_SEED + crackWarp * FACADE_CRACK_WARP_WEIGHT) - 0.5f));
+        const float crackMask = smoothstep(FACADE_CRACK_MASK_START, FACADE_CRACK_MASK_FULL, FastValueNoise(uv * FACADE_CRACK_MASK_SCALE + FACADE_CRACK_MASK_SEED));
         crack = crackLine * crackMask * fineFade;
     }
 
     // 色：元の色に、色むら・パネルの違い・木目を掛け、継ぎ目・穴・ひびの奥を暗く、雨だれ・白華・泥・苔の色を混ぜている
-    float3 albedo = baseColor * (0.80f + tone * 0.35f) * (0.93f + panelShade * 0.12f);
-    albedo *= lerp(1.0f, 0.94f + boardGrain * 0.10f, fineFade);
-    albedo *= 1.0f - seam * 0.35f - tieHole * 0.55f - crack * 0.50f;
-    albedo = lerp(albedo, albedo * float3(0.36f, 0.38f, 0.36f), drip * 0.85f);
-    albedo = lerp(albedo, float3(0.62f, 0.63f, 0.60f), efflorescence * 0.55f);
-    albedo = lerp(albedo, albedo * float3(0.55f, 0.48f, 0.40f), splash * 0.70f);
-    albedo = lerp(albedo, float3(0.07f, 0.10f, 0.05f), moss * 0.80f);
+    float3 albedo = baseColor * (FACADE_TONE_BRIGHTNESS + tone * FACADE_TONE_BRIGHTNESS_RANGE) *
+        (FACADE_PANEL_BRIGHTNESS + panelShade * FACADE_PANEL_BRIGHTNESS_RANGE);
+    albedo *= lerp(1.0f, FACADE_GRAIN_BRIGHTNESS + boardGrain * FACADE_GRAIN_BRIGHTNESS_RANGE, fineFade);
+    albedo *= 1.0f - seam * FACADE_SEAM_DARKEN - tieHole * FACADE_TIE_HOLE_DARKEN - crack * FACADE_CRACK_DARKEN;
+    albedo = lerp(albedo, albedo * FACADE_DRIP_COLOR, drip * FACADE_DRIP_BLEND);
+    albedo = lerp(albedo, FACADE_EFFLORESCENCE_COLOR, efflorescence * FACADE_EFFLORESCENCE_BLEND);
+    albedo = lerp(albedo, albedo * FACADE_SPLASH_COLOR, splash * FACADE_SPLASH_BLEND);
+    albedo = lerp(albedo, FACADE_MOSS_COLOR, moss * FACADE_MOSS_BLEND);
     facade.albedo = albedo;
 
     // 粗さ：コンクリートは粗く、雨だれの所は少しなめらか、苔はさらに粗い（濡れた所は MakePbrSurface が下げる）
     float roughness = baseRoughness + (tone - 0.5f) * FACADE_TONE_ROUGHNESS_VARIATION;
     roughness = lerp(roughness, FACADE_DRIP_ROUGHNESS, drip * FACADE_DRIP_ROUGHNESS_BLEND);
     roughness = lerp(roughness, FACADE_MOSS_ROUGHNESS, moss);
-    facade.roughness = clamp(roughness, 0.10f, 1.0f);
+    facade.roughness = clamp(roughness, FACADE_MIN_ROUGHNESS, 1.0f);
 
     // 濡れ具合：雨だれの跡は水の通り道なので湿っていて、根元と苔の所も湿っている
-    facade.wetness = saturate(drip * 0.45f + splash * 0.35f + moss * 0.40f + seam * 0.10f);
+    facade.wetness = saturate(drip * FACADE_DRIP_WETNESS + splash * FACADE_SPLASH_WETNESS + moss * FACADE_MOSS_WETNESS + seam * FACADE_SEAM_WETNESS);
 
     // 高さ：継ぎ目・Pコンの穴・ひびのへこみと、木目のわずかな凹凸、苔の盛り上がり
-    facade.height = -(seam * 0.55f + tieHole * 0.90f + crack * 0.35f) +
-        boardGrain * 0.10f * fineFade + moss * 0.12f;
+    facade.height = -(seam * FACADE_SEAM_DEPTH + tieHole * FACADE_TIE_HOLE_DEPTH + crack * FACADE_CRACK_DEPTH) +
+        boardGrain * FACADE_GRAIN_HEIGHT * fineFade + moss * FACADE_MOSS_HEIGHT;
     return facade;
 }
 

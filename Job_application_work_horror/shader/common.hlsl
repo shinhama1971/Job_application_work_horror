@@ -157,21 +157,29 @@ uint GetPixelLightCount(float2 pixelPosition, out uint listOffset)
     return g_TileLightCounts[tileIndex];
 }
 
+// 光源の数の表示：赤になる数、色（0 = 暗い青、少ない = 緑、中くらい = 黄、多い = 赤）、タイルの境目の線の暗さ
+#define HEATMAP_MAX_LIGHTS 4.0f
+#define HEATMAP_NONE_COLOR float3(0.02f, 0.03f, 0.10f)
+#define HEATMAP_LOW_COLOR float3(0.10f, 0.75f, 0.20f)
+#define HEATMAP_MID_COLOR float3(1.0f, 0.85f, 0.10f)
+#define HEATMAP_HIGH_COLOR float3(1.0f, 0.12f, 0.08f)
+#define HEATMAP_EDGE_SHADE 0.45f
+
 // デバッグ表示: タイルごとの光源の数を色で表している（0=暗い青、1=緑、2=黄、4以上=赤）。
 // タイルの境目の線も重ね、画面がどう分かれているかを確かめられるようにしている。
 float4 GetLightTileHeatmap(float2 pixelPosition, uint lightCount)
 {
-    const float amount = saturate(float(lightCount) / 4.0f);
+    const float amount = saturate(float(lightCount) / HEATMAP_MAX_LIGHTS);
     float3 heat = lightCount == 0
-        ? float3(0.02f, 0.03f, 0.10f)
-        : lerp(float3(0.10f, 0.75f, 0.20f), float3(1.0f, 0.85f, 0.10f),
+        ? HEATMAP_NONE_COLOR
+        : lerp(HEATMAP_LOW_COLOR, HEATMAP_MID_COLOR,
             saturate(amount * 2.0f - 0.5f));
-    heat = lerp(heat, float3(1.0f, 0.12f, 0.08f), saturate(amount * 2.0f - 1.0f));
+    heat = lerp(heat, HEATMAP_HIGH_COLOR, saturate(amount * 2.0f - 1.0f));
 
     const float2 localPixel = pixelPosition - LightViewportOffset;
     const float2 inTile = fmod(max(localPixel, 0.0f), float(LIGHT_TILE_SIZE));
     const bool onEdge = inTile.x < 1.0f || inTile.y < 1.0f;
-    return float4(onEdge ? heat * 0.45f : heat, 1.0f);
+    return float4(onEdge ? heat * HEATMAP_EDGE_SHADE : heat, 1.0f);
 }
 
 // その画素で計算するlightNumber番目の光源の、光源の一覧（t10）での番号を返している
@@ -214,6 +222,19 @@ cbuffer TextureBuffer : register(b5)
 // 暗い場所の配置（アイテムが埋まっていないか、壁の文字の位置など）を確かめるためのもの。
 // DebugUIはDebug構成だけなので、Release版の見た目には影響しない。
 // ----------------------------------------------------------------------------
+// デバッグ表示の番号（DebugUI.cpp の「Shader debug view」の並びと同じ）。
+// 1 = 法線、2 = 懐中電灯の影、3 = 照明だけ、4 = 水たまりの濃さとメッシュの細かさ（床）、5 = 反射の画像（床）、
+// 6 = 壁の湿り気（壁）、7 = タイルごとの光源の数。
+// static const int にすると wetFloorPS の FXC の最適化が変わってしまうため、ここは #define にしている
+#define DEBUG_VIEW_NORMAL 1
+#define DEBUG_VIEW_FLASHLIGHT_SHADOW 2
+#define DEBUG_VIEW_LIGHTING 3
+#define DEBUG_VIEW_PUDDLE 4
+#define DEBUG_VIEW_REFLECTION 5
+#define DEBUG_VIEW_WALL_DAMP 6
+#define DEBUG_VIEW_LIGHT_TILES 7
+// 照明だけの表示で、明るすぎないよう掛ける割合
+#define DEBUG_VIEW_LIGHTING_SCALE 0.5f
 static const int DEBUG_VIEW_FULLBRIGHT = 8;
 // PBRの材質を色で見る表示（赤 = 金属らしさ、緑 = 粗さ、青 = 濡れ具合。壁・扉・小物だけ。床は黒）
 static const int DEBUG_VIEW_PBR_MATERIAL = 9;
@@ -230,14 +251,20 @@ bool IsFullbrightDebugView()
         DebugViewMode == DEBUG_VIEW_GRASS_LOD;
 }
 
+// 明るさを揃えたデバッグ表示：最低の明るさ、向きで足す幅、全体の明るさ（一人称の手と懐中電灯でも使う）、反射の確認で暗部を持ち上げる量
+#define FULLBRIGHT_BASE 0.60f
+#define FULLBRIGHT_FACING 0.40f
+#define FULLBRIGHT_GAIN 1.35f
+#define FULLBRIGHT_REFLECTION_LIFT 0.16f
+
 float3 GetFullbrightSurfaceColor(float3 baseColor, float facing)
 {
     if (DebugViewMode == DEBUG_VIEW_FULLBRIGHT_REFLECTION)
     {
         // 暗い天井板や扉の模様を残したまま、暗部の底を持ち上げる。
-        baseColor += 0.16f * (1.0f - saturate(baseColor));
+        baseColor += FULLBRIGHT_REFLECTION_LIFT * (1.0f - saturate(baseColor));
     }
-    return baseColor * (0.60f + 0.40f * facing) * 1.35f;
+    return baseColor * (FULLBRIGHT_BASE + FULLBRIGHT_FACING * facing) * FULLBRIGHT_GAIN;
 }
 
 float4 GetFullbrightColor(float3 baseColor, float3 viewNormal, float3 viewPosition)

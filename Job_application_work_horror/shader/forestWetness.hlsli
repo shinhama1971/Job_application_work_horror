@@ -42,6 +42,9 @@ struct ForestWetSurface
 #define FOREST_RAIN_COLUMN_SEED 17.0f
 #define FOREST_RAIN_COLUMN_THRESHOLD 0.62f
 #define FOREST_RAIN_STREAK_WIDTH 0.06f
+// 横向きが0にならないよう足すわずかなずれと、画素の大きさの下限
+#define FOREST_RAIN_DIRECTION_NUDGE 0.0001f
+#define FOREST_RAIN_MIN_FOOTPRINT 0.0001f
 #define FOREST_RAIN_STREAK_CENTER_START 0.3f
 #define FOREST_RAIN_STREAK_CENTER_SPAN 0.4f
 #define FOREST_RAIN_STREAK_FILTER_FLOOR 0.2f
@@ -94,13 +97,13 @@ ForestWetSurface ApplyForestRain(
     // 水平の向き（面に沿った横向き）の座標で細い列に分け、列ごとに乱数で筋があるかと流れる速さを決めている。
     // 筋の中には、時間とともに下へ動く水の粒（少し太く明るい所）がある
     const float side = 1.0f - smoothstep(FOREST_RAIN_SIDE_FADE_START, FOREST_RAIN_SIDE_FADE_END, abs(normal.y));
-    const float2 across2 = normalize(float2(-normal.z, normal.x) + 0.0001f);
+    const float2 across2 = normalize(float2(-normal.z, normal.x) + FOREST_RAIN_DIRECTION_NUDGE);
     const float across = dot(worldPosition.xz, across2) * grainScale;
     const float column = floor(across);
     const float columnRandom = FastHash21(float2(column, FOREST_RAIN_COLUMN_SEED));
     const float hasStreak = step(FOREST_RAIN_COLUMN_THRESHOLD, columnRandom);
     // 列の中の筋の位置（列の幅に対して細い線）。画素の大きさで線の幅を広げ、広げた分だけ薄めている
-    const float footprint = max(fwidth(across), 0.0001f);
+    const float footprint = max(fwidth(across), FOREST_RAIN_MIN_FOOTPRINT);
     const float lineWidth = FOREST_RAIN_STREAK_WIDTH + footprint;
     const float centerOffset = abs(frac(across) - (FOREST_RAIN_STREAK_CENTER_START + columnRandom * FOREST_RAIN_STREAK_CENTER_SPAN));
     const float streakLine = (1.0f - smoothstep(lineWidth * 0.5f, lineWidth, centerOffset)) * saturate(FOREST_RAIN_STREAK_WIDTH / lineWidth + FOREST_RAIN_STREAK_FILTER_FLOOR);

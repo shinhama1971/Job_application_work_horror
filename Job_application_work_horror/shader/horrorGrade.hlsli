@@ -41,6 +41,8 @@ static const float HORROR_LOOP_TINT_BASE_BLEND = 0.45f;
 static const float HORROR_LOOP_SHADOW_TINT_GAIN = 0.55f;
 static const float HORROR_LOOP_HIGHLIGHT_TINT_GAIN = 0.60f;
 static const float HORROR_LOOP_DARKEN_GAIN = 0.14f;
+// 輝度の重み（Rec. 709）
+#define GRADE_LUMINANCE_WEIGHTS float3(0.2126f, 0.7152f, 0.0722f)
 
 float3 ApplyFilmicHorrorGrade(float3 color, float loopDepth)
 {
@@ -48,7 +50,7 @@ float3 ApplyFilmicHorrorGrade(float3 color, float loopDepth)
     color = max(color, 0.0f);
 
     // 明るい所を丸める曲線（ACES）は、画面効果の最後のトーンマッピング（toneMapPS.hlsl）で画面全体に1回だけ掛けている
-    const float luminance = dot(color, float3(0.2126f, 0.7152f, 0.0722f));
+    const float luminance = dot(color, GRADE_LUMINANCE_WEIGHTS);
 
     // 彩度：暗い所ほど色を抜き（70%）、照らされた所に少しだけ色を残している（82%）。
     // 暗い所でも、非常灯の赤や電球の橙の光だまりの色は残るようにしている

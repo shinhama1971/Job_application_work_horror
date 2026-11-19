@@ -34,10 +34,15 @@ struct GRASS_PS_IN
 #define GRASS_FLASHLIGHT_SPECULAR_EXPONENT 32.0f
 #define GRASS_FLASHLIGHT_SPECULAR_GAIN 0.035f
 
+// LOD の色を出す印のしきい値、0で割らないための下限、懐中電灯が届いているとみなす下限
+#define GRASS_LOD_COLOR_THRESHOLD 0.5f
+#define GRASS_MIN_DIVISOR 0.001f
+#define GRASS_MIN_BEAM 0.001f
+
 float4 main(GRASS_PS_IN input) : SV_TARGET
 {
     // 草の LOD の色分け：照明を使わず、LOD の色に葉の向きの陰影だけを付けて描いている（暗い森でも色が分かるように）
-    if (input.debugColor.a > 0.5f || DebugViewMode == DEBUG_VIEW_GRASS_LOD)
+    if (input.debugColor.a > GRASS_LOD_COLOR_THRESHOLD || DebugViewMode == DEBUG_VIEW_GRASS_LOD)
     {
         const float facing = abs(dot(normalize(input.viewNormal), normalize(-input.viewPos)));
         return float4(input.debugColor.rgb * (GRASS_LOD_DEBUG_BASE_LIGHT + GRASS_LOD_DEBUG_FACING_WEIGHT * facing + GRASS_LOD_DEBUG_OCCLUSION_WEIGHT * input.ao), 1.0f);
@@ -47,7 +52,7 @@ float4 main(GRASS_PS_IN input) : SV_TARGET
     if (IsFullbrightDebugView())
         return GetFullbrightColor(input.color, viewNormal, input.viewPos);
     const float distanceFromCamera = length(input.viewPos);
-    const float3 viewDirection = -input.viewPos / max(distanceFromCamera, 0.001f);
+    const float3 viewDirection = -input.viewPos / max(distanceFromCamera, GRASS_MIN_DIVISOR);
     float3 lighting = GetHemisphereAmbient(n) * input.ao;
     uint listOffset;
     const uint lightCount = GetPixelLightCount(input.pos.xy, listOffset);
@@ -57,23 +62,23 @@ float4 main(GRASS_PS_IN input) : SV_TARGET
         const ENVIRONMENT_POINT_LIGHT pointLight = GetPixelLight(listOffset, index);
         const float3 offset = pointLight.PositionRange.xyz - input.worldPos;
         const float distanceToLight = length(offset);
-        const float range = max(pointLight.PositionRange.w, 0.001f);
+        const float range = max(pointLight.PositionRange.w, GRASS_MIN_DIVISOR);
         if (distanceToLight >= range) continue;
-        const float3 lightDirection = offset / max(distanceToLight, 0.001f);
+        const float3 lightDirection = offset / max(distanceToLight, GRASS_MIN_DIVISOR);
         const float attenuation = saturate(1.0f - distanceToLight / range);
         // 薄い葉なので、裏からの光も通す。根元側の暗さは頂点の色と環境光に残している。
         lighting += pointLight.ColorIntensity.rgb * pointLight.ColorIntensity.a * attenuation * attenuation *
             (GRASS_POINT_LIGHT_GRAZING + GRASS_POINT_LIGHT_FACING_WEIGHT * abs(dot(n, lightDirection)));
     }
     float3 specular = 0.0f;
-    if (Light.Enable && Light.FlashlightEnabled && distanceFromCamera > 0.001f)
+    if (Light.Enable && Light.FlashlightEnabled && distanceFromCamera > GRASS_MIN_DIVISOR)
     {
         const float3 pixelDirection = -viewDirection;
         const float beam = GetFlashlightBeamProfile(pixelDirection);
         [branch]
-        if (beam > 0.001f)
+        if (beam > GRASS_MIN_BEAM)
         {
-            const float normalizedDistance = saturate(distanceFromCamera / max(Light.Range, 0.001f));
+            const float normalizedDistance = saturate(distanceFromCamera / max(Light.Range, GRASS_MIN_DIVISOR));
             const float rangeFade = saturate(1.0f - normalizedDistance * normalizedDistance);
             const float falloff = lerp(1.0f, rcp(1.0f + distanceFromCamera * distanceFromCamera * FLASHLIGHT_PHYSICAL_FALLOFF_SCALE), FLASHLIGHT_PHYSICAL_FALLOFF_BLEND);
             const float3 radiance = Light.Diffuse.rgb * GetFlashlightTint(pixelDirection) * Light.Intensity * beam *
@@ -97,10 +102,10 @@ float4 main(GRASS_PS_IN input) : SV_TARGET
     color = ApplyHorrorMist(color, input.worldPos, input.viewPos, lighting);
     color += GetLightShafts(input.worldPos, listOffset, lightCount, input.pos.xy);
     color = ApplyFilmicHorrorGrade(color, LoopDepth);
-    if (DebugViewMode == 1) return float4(n * 0.5f + 0.5f, 1.0f);
-    if (DebugViewMode == 2) return float4(GetFlashlightShadow(input.shadowPos).xxx, 1.0f);
-    if (DebugViewMode == 3) return float4(saturate(lighting * 0.5f), 1.0f);
-    if (DebugViewMode == 7) return GetLightTileHeatmap(input.pos.xy, lightCount);
-    if (DebugViewMode >= 4) return float4(0.0f, 0.0f, 0.0f, 1.0f);
+    if (DebugViewMode == DEBUG_VIEW_NORMAL) return float4(n * 0.5f + 0.5f, 1.0f);
+    if (DebugViewMode == DEBUG_VIEW_FLASHLIGHT_SHADOW) return float4(GetFlashlightShadow(input.shadowPos).xxx, 1.0f);
+    if (DebugViewMode == DEBUG_VIEW_LIGHTING) return float4(saturate(lighting * DEBUG_VIEW_LIGHTING_SCALE), 1.0f);
+    if (DebugViewMode == DEBUG_VIEW_LIGHT_TILES) return GetLightTileHeatmap(input.pos.xy, lightCount);
+    if (DebugViewMode >= DEBUG_VIEW_PUDDLE) return float4(0.0f, 0.0f, 0.0f, 1.0f);
     return float4(color, 1.0f);
 }

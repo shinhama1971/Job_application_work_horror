@@ -38,6 +38,8 @@ static const float AUTO_EXPOSURE_LOG_OFFSET = 0.002f;
 // 中央の輝度を優先しつつ、周辺にも測定の重みを残す。
 static const float AUTO_EXPOSURE_CENTER_WEIGHT_RADIUS = 0.9f;
 static const float AUTO_EXPOSURE_EDGE_WEIGHT_FLOOR = 0.15f;
+// 輝度の重み（Rec. 709）
+#define AUTO_EXPOSURE_LUMINANCE_WEIGHTS float3(0.2126f, 0.7152f, 0.0722f)
 
 // 集計時の重み、復元した輝度、露出の比率にそれぞれ下限を設ける。
 static const float AUTO_EXPOSURE_MIN_ACCUMULATED_WEIGHT = 0.0001f;
@@ -74,7 +76,7 @@ void main(uint3 threadId : SV_GroupThreadID, uint threadIndex : SV_GroupIndex)
             const float2 uv = grid / GRID_SIZE;
             const int2 pixel = min(int2(uv * sceneSize), int2(sceneSize) - 1);
             const float3 color = SceneTexture.Load(int3(pixel, 0)).rgb;
-            const float luminance = dot(color, float3(0.2126f, 0.7152f, 0.0722f));
+            const float luminance = dot(color, AUTO_EXPOSURE_LUMINANCE_WEIGHTS);
 
             // 画面の中央ほど重くしている（視線と懐中電灯が向く所を優先して測る）。端も少しは数えている
             const float2 centered = (uv - 0.5f) * float2(aspect, 1.0f);

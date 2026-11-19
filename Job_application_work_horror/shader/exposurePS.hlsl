@@ -48,6 +48,10 @@ StructuredBuffer<float> AutoExposureState : register(t3);
 #define EXPOSURE_TENSION_HAZE_TINT float3(0.020f, 0.034f, 0.040f)
 
 // 元の画面に「足す分の明るさ」だけを返している（加算合成で画面に足される）
+// まわりの明るさを3点の平均で求める重みと、輝度の重み
+#define EXPOSURE_LOCAL_SAMPLE_WEIGHT (1.0f / 3.0f)
+#define EXPOSURE_LUMINANCE_WEIGHTS float3(0.2126f, 0.7152f, 0.0722f)
+
 float4 main(PS_IN input) : SV_TARGET
 {
     const float3 scene =
@@ -69,7 +73,7 @@ float4 main(PS_IN input) : SV_TARGET
          sceneTexture.SampleLevel(
             sceneSampler,
             saturate(input.uv - localOffset),
-            0.0f).rgb) * (1.0f / 3.0f);
+            0.0f).rgb) * EXPOSURE_LOCAL_SAMPLE_WEIGHT;
 
     // シーンが決めた露出（演出の意図）に、実際の画面の明るさから求めた目の慣れの倍率を掛けている。
     const float autoGain = AutoExposureState[1];
@@ -85,10 +89,10 @@ float4 main(PS_IN input) : SV_TARGET
 
     // 緊張が高まるほど、深い影の一部だけを持ち上げている。これで冷たい霧のように
     // 輪郭が浮かび、光が当たっている面は平らにならない。
-    const float luminance = dot(scene, float3(0.2126f, 0.7152f, 0.0722f));
+    const float luminance = dot(scene, EXPOSURE_LUMINANCE_WEIGHTS);
     const float localLuminance = dot(
         localAverage,
-        float3(0.2126f, 0.7152f, 0.0722f));
+        EXPOSURE_LUMINANCE_WEIGHTS);
     // 周りが暗く、明るい部分ではない所を、画面の中心ほど強く持ち上げている（露出を上げる設定のときだけ）
     const float localDarkness =
         1.0f - smoothstep(EXPOSURE_LOCAL_DARK_START, EXPOSURE_LOCAL_DARK_END, localLuminance);

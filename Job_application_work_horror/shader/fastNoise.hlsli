@@ -31,17 +31,24 @@ float FastValueNoise(float2 value)
     return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
 }
 
+// 3段のノイズ：段の数、1段目の強さ、段ごとに細かくする割合（2から少しずらして模様が揃わないようにする）とずらし、段ごとに弱める割合
+#define FRACTAL_OCTAVES 3
+#define FRACTAL_FIRST_AMPLITUDE 0.55f
+#define FRACTAL_LACUNARITY 2.03f
+#define FRACTAL_OCTAVE_OFFSET 7.17f
+#define FRACTAL_GAIN 0.48f
+
 // 細かさの違うノイズを3段重ねた、自然な揺らぎのノイズ
 float FastFractalNoise3(float2 value)
 {
     float result = 0.0f;
-    float amplitude = 0.55f;
+    float amplitude = FRACTAL_FIRST_AMPLITUDE;
     [unroll]
-    for (int octave = 0; octave < 3; ++octave)
+    for (int octave = 0; octave < FRACTAL_OCTAVES; ++octave)
     {
         result += FastValueNoise(value) * amplitude;
-        value = value * 2.03f + 7.17f;
-        amplitude *= 0.48f;
+        value = value * FRACTAL_LACUNARITY + FRACTAL_OCTAVE_OFFSET;
+        amplitude *= FRACTAL_GAIN;
     }
     return result;
 }

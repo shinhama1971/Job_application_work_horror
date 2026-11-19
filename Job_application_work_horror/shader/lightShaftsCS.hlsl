@@ -22,16 +22,23 @@ float3 GetMistEyePosition() { return EyeTime.xyz; }
 // 詳しい影計算は、人影の胸から床へ伸びる影の近くを通る視線に絞る。
 static const float SHAFT_FIGURE_CHEST_HEIGHT = 19.0f;
 static const float SHAFT_FIGURE_SHADOW_TEST_RADIUS = 28.0f;
+// 霧の中で人影を表す1本のカプセル（下端は床や壁の影の胴と同じ、上端は頭の上、半径）と、影が下へ伸びるとみなす向きの下限
+#define SHAFT_FIGURE_TOP 35.0f
+#define SHAFT_FIGURE_RADIUS 5.0f
+#define SHAFT_FIGURE_MIN_DOWNWARD 0.001f
+// 調べる点を区間の各部分の真ん中に置く割合と、スレッドの組の大きさ
+#define SHAFT_SAMPLE_CENTER 0.5f
+#define SHAFT_THREAD_GROUP_SIZE 8
 
 float3 GetLightShafts(float3 worldPosition, uint lightCount)
 {
     const float3 eye = GetMistEyePosition();
     const float3 toPixel = worldPosition - eye;
     const float rayLength = length(toPixel);
-    const float3 rayDirection = toPixel / max(rayLength, 0.001f);
+    const float3 rayDirection = toPixel / max(rayLength, LIGHT_SHAFT_MIN_DIVISOR);
     // 調べる点は区間を等分した各部分の真ん中に置いている（画素ごとにずらさない）
-    const float jitter = 0.5f;
-    const float2 flow = float2(CausticTime * 0.60f, CausticTime * 0.25f);
+    const float jitter = SHAFT_SAMPLE_CENTER;
+    const float2 flow = float2(CausticTime * LIGHT_SHAFT_FLOW_SPEED_X, CausticTime * LIGHT_SHAFT_FLOW_SPEED_Z);
 
     float3 scattered = 0.0f;
     [loop]
@@ -39,7 +46,7 @@ float3 GetLightShafts(float3 worldPosition, uint lightCount)
     {
         const ENVIRONMENT_POINT_LIGHT pointLight = Lights[i];
         const float3 center = pointLight.PositionRange.xyz;
-        const float range = max(pointLight.PositionRange.w, 0.001f);
+        const float range = max(pointLight.PositionRange.w, LIGHT_SHAFT_MIN_DIVISOR);
         [branch]
         if (center.y < LIGHT_SHAFT_MIN_HEIGHT)
         {
@@ -59,11 +66,11 @@ float3 GetLightShafts(float3 worldPosition, uint lightCount)
         // そばを通るときだけ、霧の中の点ごとに人影の影を調べている（ほとんどの画素と光源は、この1回の判定で終わる）
         bool figureInRange = false;
         [branch]
-        if (UnseenFigure.w > 0.001f)
+        if (UnseenFigure.w > UNSEEN_SHADOW_MIN_STRENGTH)
         {
             const float3 figureCenter = UnseenFigure.xyz + float3(0.0f, SHAFT_FIGURE_CHEST_HEIGHT, 0.0f);
             const float3 away = figureCenter - center;
-            const float3 shadowEnd = away.y < -0.001f
+            const float3 shadowEnd = away.y < -SHAFT_FIGURE_MIN_DOWNWARD
                 ? figureCenter + away * ((UnseenFigure.y - figureCenter.y) / away.y)
                 : figureCenter + normalize(away) * range;
             float unused;
@@ -72,7 +79,7 @@ float3 GetLightShafts(float3 worldPosition, uint lightCount)
         }
         // 霧のむら：ゆっくり流れるノイズで、光の筋の中に濃い所と薄い所を作っている（区間の真ん中で1回だけ求めている）
         const float3 middlePoint = eye + rayDirection * ((segmentStart + segmentEnd) * 0.5f);
-        const float haze = 0.45f + FastValueNoise(middlePoint.xz * 0.05f + flow) * 0.90f;
+        const float haze = LIGHT_SHAFT_HAZE_BASE + FastValueNoise(middlePoint.xz * LIGHT_SHAFT_HAZE_SCALE + flow) * LIGHT_SHAFT_HAZE_RANGE;
         float lightScatter = 0.0f;
         // 見えない人影の影（霧の中の点が人影に遮られて残る光の割合）。1点おきに求め、間の点は前の値を使っている
         float figureShadow = 1.0f;
@@ -88,14 +95,14 @@ float3 GetLightShafts(float3 worldPosition, uint lightCount)
             // 天井の器具から下へ広がる円錐の中だけを光らせている（真下ほど濃く、約60度より横では消える）
             const float cone = GetLightShaftConeWeight(toLight, lightDistance);
             // 光源のすぐそばは、照明そのものの明るさに任せて薄くしている
-            const float awayFromFixture = smoothstep(2.0f, 9.0f, lightDistance);
+            const float awayFromFixture = smoothstep(LIGHT_SHAFT_FIXTURE_FADE_START, LIGHT_SHAFT_FIXTURE_FADE_END, lightDistance);
             // 霧はぼんやり見えるだけなので、床や壁より軽い、頭まで1本のカプセルで遮っている。
             // （HLSL の ?: は両側を計算してしまうため、if で範囲の外の光源では計算しないようにしている）
             [branch]
             if (figureInRange && (sampleIndex & 1) == 0)
             {
-                figureShadow = 1.0f - GetCapsuleOcclusion(samplePoint, center, UnseenFigure.xyz + float3(0.0f, 4.0f, 0.0f),
-                    UnseenFigure.xyz + float3(0.0f, 35.0f, 0.0f), 5.0f) * 0.97f * saturate(UnseenFigure.w);
+                figureShadow = 1.0f - GetCapsuleOcclusion(samplePoint, center, UnseenFigure.xyz + float3(0.0f, UNSEEN_BODY_BOTTOM, 0.0f),
+                    UnseenFigure.xyz + float3(0.0f, SHAFT_FIGURE_TOP, 0.0f), SHAFT_FIGURE_RADIUS) * UNSEEN_SHADOW_OPACITY * saturate(UnseenFigure.w);
             }
             lightScatter += attenuation * cone * awayFromFixture * figureShadow;
         }
@@ -103,15 +110,15 @@ float3 GetLightShafts(float3 worldPosition, uint lightCount)
     }
     // 光源の真下を長く見通したときに白く飛ばないよう、明るいほど伸びを抑えている（上限はおよそ0.35）
     const float3 shaft = scattered * LIGHT_SHAFT_DENSITY;
-    return shaft / (1.0f + shaft * 2.8f);
+    return shaft / (1.0f + shaft * LIGHT_SHAFT_COMPRESSION);
 }
 
 
-[numthreads(8,8,1)]
+[numthreads(SHAFT_THREAD_GROUP_SIZE, SHAFT_THREAD_GROUP_SIZE, 1)]
 void main(uint3 id : SV_DispatchThreadID) {
- uint2 size = uint2(ceil(Viewport.xy * 0.5f));
+ uint2 size = uint2(ceil(Viewport.xy * LIGHT_SHAFT_RESOLUTION_SCALE));
  if(any(id.xy >= size)) return;
- uint2 pixel = min(id.xy * 2, uint2(Viewport.xy)-1);
+ uint2 pixel = min(id.xy * LIGHT_SHAFT_DOWNSAMPLE_FACTOR, uint2(Viewport.xy)-1);
  float depth = SceneDepth.Load(int3(pixel + uint2(Viewport.zw),0));
  float2 uv=(float2(pixel)+0.5f)/Viewport.xy;
  float4 world=mul(float4(uv.x*2-1,1-uv.y*2,depth,1),InverseViewProjection);

@@ -27,6 +27,8 @@ class Material {
 	// 今のマテリアルの値と、定数バッファ
 	MATERIAL	m_Material{};
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_pConstantBufferMaterial;
+	// マテリアルの定数のシェーダーの番号（common.hlsl の b4。頂点と画素の両方が読む）
+	static constexpr UINT ConstantBufferSlot = 4;
 
 	// 一緒に設定するシェーダーとテクスチャ（どちらも持ち主は別で、ここでは参照するだけ）
 	Shader* m_pShader;
@@ -94,9 +96,9 @@ public:
 		devcontext = Renderer::GetDeviceContext();
 
 		// 頂点と画素の両方が同じマテリアルの b4 を読む。
-		devcontext->VSSetConstantBuffers(4, 1, m_pConstantBufferMaterial.GetAddressOf());
+		devcontext->VSSetConstantBuffers(ConstantBufferSlot, 1, m_pConstantBufferMaterial.GetAddressOf());
 
-		devcontext->PSSetConstantBuffers(4, 1, m_pConstantBufferMaterial.GetAddressOf());
+		devcontext->PSSetConstantBuffers(ConstantBufferSlot, 1, m_pConstantBufferMaterial.GetAddressOf());
 	}
 
 	// 一時的な値を定数バッファへ送って設定している（m_Materialは変えない。明るさが毎フレーム変わる物で使っている）
@@ -116,9 +118,9 @@ public:
 			0, 0);
 
 		// 頂点と画素の両方が同じマテリアルの b4 を読む。
-		devcontext->VSSetConstantBuffers(4, 1, m_pConstantBufferMaterial.GetAddressOf());
+		devcontext->VSSetConstantBuffers(ConstantBufferSlot, 1, m_pConstantBufferMaterial.GetAddressOf());
 
-		devcontext->PSSetConstantBuffers(4, 1, m_pConstantBufferMaterial.GetAddressOf());
+		devcontext->PSSetConstantBuffers(ConstantBufferSlot, 1, m_pConstantBufferMaterial.GetAddressOf());
 
 	}
 

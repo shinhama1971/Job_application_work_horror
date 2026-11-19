@@ -51,6 +51,11 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // 計測の表：1%遅いフレーム（99パーセンタイル）、ミリ秒から FPS への換算、プレイ動画のフレームレート
+    constexpr double SlowFramePercentile = 0.99;
+    constexpr double MillisecondsPerSecond = 1000.0;
+    constexpr UINT PlayVideoFps = 30;
+
     // ------------------------------------------------------------------------
     // 道順（キーフレーム）。時刻と時刻の間は、位置と向きを直線で補間している。
     // Shotに名前があるキーフレームの時刻で、スクリーンショットを1枚保存している。
@@ -779,7 +784,7 @@ namespace
             const double offFrame = Average(result.Off.FrameMs);
             const double onFrame = Average(result.On.FrameMs);
             row("フレーム", offFrame, onFrame);
-            row("1%遅", Percentile(result.Off.FrameMs, 0.99), Percentile(result.On.FrameMs, 0.99));
+            row("1%遅", Percentile(result.Off.FrameMs, SlowFramePercentile), Percentile(result.On.FrameMs, SlowFramePercentile));
             row("最大", Percentile(result.Off.FrameMs, 1.0), Percentile(result.On.FrameMs, 1.0));
             row("ばらつき", StandardDeviation(result.Off.FrameMs), StandardDeviation(result.On.FrameMs));
             row("CPU", Average(result.Off.CpuMs), Average(result.On.CpuMs));
@@ -787,8 +792,8 @@ namespace
             {
                 row(label, GpuAverage(result.Off, pass), GpuAverage(result.On, pass));
             }
-            row("FPS換算", offFrame > 0.0 ? 1000.0 / offFrame : 0.0,
-                onFrame > 0.0 ? 1000.0 / onFrame : 0.0);
+            row("FPS換算", offFrame > 0.0 ? MillisecondsPerSecond / offFrame : 0.0,
+                onFrame > 0.0 ? MillisecondsPerSecond / onFrame : 0.0);
             text << "\n";
         }
 
@@ -1458,7 +1463,7 @@ namespace Tools::CaptureMode
         {
             g_VideoTried = true;
             g_Video.Open((g_OutputDirectory / L"プレイ動画.mp4").wstring(),
-                description.Width, description.Height, 30);
+                description.Width, description.Height, PlayVideoFps);
         }
 
         // バックバッファをステージングテクスチャへコピーし、CPUから読める状態にしてから書き出している

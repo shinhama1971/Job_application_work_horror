@@ -14,6 +14,8 @@ class KeypadLock final
 public:
     // 桁の数と、4桁の番号の型
     static constexpr int DigitCount = 4;
+    // 1桁で選べる数の種類（0〜9）
+    static constexpr int DigitValueCount = 10;
     using Digits = std::array<int, DigitCount>;
 
     // 決定した結果（不正解・正解）
@@ -49,7 +51,7 @@ public:
     void ChangeDigit(int delta) noexcept
     {
         int& digit = m_Entered[static_cast<std::size_t>(m_Cursor)];
-        digit = Wrap(digit + delta, 10);
+        digit = Wrap(digit + delta, DigitValueCount);
     }
 
     // 入力中の番号を決定している。正解なら解けた状態にし、不正解なら間違えた回数を増やしている

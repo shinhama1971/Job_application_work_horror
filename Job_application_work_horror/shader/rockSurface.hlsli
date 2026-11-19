@@ -50,6 +50,15 @@ float RockRidge(float3 position, float3 weights, float scale, float offset)
 
 // 鉱物の粒（0〜1）。3方向のうち一番近い面へ投影し、マス目ごとに乱数で粒があるか・マス目の中の位置を決めている
 // （位置をばらつかせないと、粒がマス目どおりに並んで水玉模様に見えるため）。radius は粒の半径（ワールドの単位）
+// 鉱物の粒：粒があるマスの割合のしきい値と乱数のずらし、粒の中心（マスの端からの余白・置く範囲）とその乱数のずらし、粒の芯の割合
+#define ROCK_SPARK_THRESHOLD 0.78f
+#define ROCK_SPARK_PRESENCE_SEED 37.0f
+#define ROCK_SPARK_CENTER_MARGIN 0.15f
+#define ROCK_SPARK_CENTER_RANGE 0.70f
+#define ROCK_SPARK_CENTER_SEED_X 13.0f
+#define ROCK_SPARK_CENTER_SEED_Y 71.0f
+#define ROCK_SPARK_CORE 0.4f
+
 float RockGrainSpark(float3 position, float3 weights, float scale, float radius, float footprint)
 {
     const float3 p = position * scale;
@@ -57,10 +66,11 @@ float RockGrainSpark(float3 position, float3 weights, float scale, float radius,
         ? p.xz
         : (weights.x > weights.z ? p.yz : p.xy);
     const float2 cell = floor(uv);
-    const float present = step(0.78f, FastHash21(cell + 37.0f));
-    const float2 center = 0.15f + 0.70f * float2(FastHash21(cell + 13.0f), FastHash21(cell + 71.0f));
+    const float present = step(ROCK_SPARK_THRESHOLD, FastHash21(cell + ROCK_SPARK_PRESENCE_SEED));
+    const float2 center = ROCK_SPARK_CENTER_MARGIN + ROCK_SPARK_CENTER_RANGE *
+        float2(FastHash21(cell + ROCK_SPARK_CENTER_SEED_X), FastHash21(cell + ROCK_SPARK_CENTER_SEED_Y));
     const float distanceToGrain = length(frac(uv) - center) / scale;
-    return present * (1.0f - smoothstep(radius * 0.4f, radius + footprint, distanceToGrain));
+    return present * (1.0f - smoothstep(radius * ROCK_SPARK_CORE, radius + footprint, distanceToGrain));
 }
 
 // baseColor は配置ファイルの色（頂点の環境遮蔽を掛けた後）、baseRoughness はその色の粗さ（rough。rockColor は0.85）
@@ -115,20 +125,71 @@ float RockGrainSpark(float3 position, float3 weights, float scale, float radius,
 #define ROCK_LICHEN_AREA_SCALE 0.09f
 #define ROCK_LICHEN_AREA_SEED 97.0f
 
+// --- 岩の残りの値
+// 投影の重みの鋭さ、0で割らないための下限、画素の大きさの下限、細かい模様を消す画素の大きさ
+#define ROCK_PROJECTION_SHARPNESS 4.0f
+#define ROCK_MIN_WEIGHT_SUM 0.0001f
+#define ROCK_MIN_FOOTPRINT 0.0001f
+#define ROCK_FINE_FOOTPRINT_LIMIT 0.8f
+// 大きな色むら：2つのノイズ（細かさ・ずらし・割合）
+#define ROCK_TONE_SCALE_A 0.07f
+#define ROCK_TONE_SEED_A 3.1f
+#define ROCK_TONE_WEIGHT_A 0.65f
+#define ROCK_TONE_SCALE_B 0.21f
+#define ROCK_TONE_SEED_B 17.4f
+#define ROCK_TONE_WEIGHT_B 0.35f
+// 地面との境目の湿り：高さ（消え始め・消えきる＋粒の幅）
+#define ROCK_GROUND_DAMP_START 0.5f
+#define ROCK_GROUND_DAMP_END 3.5f
+#define ROCK_GROUND_DAMP_GRAIN_RANGE 1.5f
+// 色：暖かい灰色と冷たい灰色（元の色に掛ける）、その混ぜ方（色むらの強め方・ずらし）、明るさ（色むら：最低＋幅、縞：最低＋幅、
+// 粒：最低＋粒の幅＋細かい粒の幅）、ひびの暗さ、苔と地衣類の色と混ぜ方、光る粒の明るさ（倍率と足す量）、地面の湿りの暗さ
+#define ROCK_WARM_TINT float3(1.08f, 1.00f, 0.92f)
+#define ROCK_COOL_TINT float3(0.94f, 0.98f, 1.04f)
+#define ROCK_TINT_GAIN 1.4f
+#define ROCK_TINT_OFFSET 0.2f
+#define ROCK_TONE_BRIGHTNESS 0.84f
+#define ROCK_TONE_BRIGHTNESS_RANGE 0.40f
+#define ROCK_BAND_BRIGHTNESS 0.94f
+#define ROCK_BAND_BRIGHTNESS_RANGE 0.10f
+#define ROCK_GRAIN_BRIGHTNESS 0.86f
+#define ROCK_GRAIN_BRIGHTNESS_RANGE 0.22f
+#define ROCK_FINE_GRAIN_BRIGHTNESS_RANGE 0.08f
+#define ROCK_CRACK_DARKEN 0.60f
+#define ROCK_MOSS_COLOR float3(0.075f, 0.095f, 0.045f)
+#define ROCK_MOSS_BLEND 0.85f
+#define ROCK_LICHEN_COLOR float3(0.30f, 0.32f, 0.27f)
+#define ROCK_LICHEN_BLEND 0.70f
+#define ROCK_GLINT_BRIGHTEN 1.25f
+#define ROCK_GLINT_LIFT 0.01f
+#define ROCK_GROUND_DAMP_DARKEN 0.30f
+// 粗さの下限、濡れ具合（地面の湿り・ひび）
+#define ROCK_MIN_ROUGHNESS 0.045f
+#define ROCK_GROUND_DAMP_WETNESS 0.55f
+#define ROCK_CRACK_WETNESS 0.25f
+// 高さ：大きなこぶ（細かさ・ずらし・高さ）、粒と細かい粒の凹凸、ひびのへこみ、苔の盛り上がり
+#define ROCK_LUMP_SCALE 0.45f
+#define ROCK_LUMP_SEED 23.0f
+#define ROCK_LUMP_HEIGHT 0.55f
+#define ROCK_GRAIN_HEIGHT 0.22f
+#define ROCK_FINE_GRAIN_HEIGHT 0.08f
+#define ROCK_CRACK_DEPTH 0.55f
+#define ROCK_MOSS_HEIGHT 0.18f
+
 RockSurface GetRockSurface(float3 worldPosition, float3 worldNormal, float3 baseColor, float baseRoughness)
 {
     RockSurface rock;
     const float3 normal = normalize(worldNormal);
     // 投影の重み：面の向きに近い軸ほど強くし（4乗）、斜めの面で模様がぼやけて混ざる幅を狭めている
-    float3 weights = pow(abs(normal), 4.0f);
-    weights /= max(weights.x + weights.y + weights.z, 0.0001f);
+    float3 weights = pow(abs(normal), ROCK_PROJECTION_SHARPNESS);
+    weights /= max(weights.x + weights.y + weights.z, ROCK_MIN_WEIGHT_SUM);
     // 1画素がワールドで何単位か。遠くで細かい模様がちらつかないよう、これで薄めている
-    const float footprint = max(length(fwidth(worldPosition)), 0.0001f);
-    const float fineFade = saturate(1.0f - footprint / 0.8f);
+    const float footprint = max(length(fwidth(worldPosition)), ROCK_MIN_FOOTPRINT);
+    const float fineFade = saturate(1.0f - footprint / ROCK_FINE_FOOTPRINT_LIMIT);
 
     // --- 大きな色むら（岩ごと・場所ごとの色の違い）と、うっすらした地層の縞
-    const float tone = RockTriplanarNoise(worldPosition, weights, 0.07f, 3.1f) * 0.65f +
-        RockTriplanarNoise(worldPosition, weights, 0.21f, 17.4f) * 0.35f;
+    const float tone = RockTriplanarNoise(worldPosition, weights, ROCK_TONE_SCALE_A, ROCK_TONE_SEED_A) * ROCK_TONE_WEIGHT_A +
+        RockTriplanarNoise(worldPosition, weights, ROCK_TONE_SCALE_B, ROCK_TONE_SEED_B) * ROCK_TONE_WEIGHT_B;
     const float bandWarp = RockTriplanarNoise(worldPosition, weights, ROCK_BAND_WARP_NOISE_SCALE, ROCK_BAND_WARP_NOISE_SEED);
     const float band = 0.5f + 0.5f * sin(worldPosition.y * ROCK_BAND_HEIGHT_RATE + bandWarp * ROCK_BAND_WARP_GAIN);
 
@@ -166,20 +227,20 @@ RockSurface GetRockSurface(float3 worldPosition, float3 worldNormal, float3 base
 
     // --- 地面との境目の湿り（地面の水を吸い上げて黒ずみ、少し光る）
     const float heightFromGround = worldPosition.y - RockGroundY;
-    const float groundDamp = 1.0f - smoothstep(0.5f, 3.5f + grain * 1.5f, heightFromGround);
+    const float groundDamp = 1.0f - smoothstep(ROCK_GROUND_DAMP_START, ROCK_GROUND_DAMP_END + grain * ROCK_GROUND_DAMP_GRAIN_RANGE, heightFromGround);
 
     // 色：元の色に、色むら（暖かい灰色〜冷たい灰色）・縞・ざらつきを掛け、ひびの奥を暗く、苔・地衣類・粒の色を混ぜている
-    const float3 warmGray = baseColor * float3(1.08f, 1.00f, 0.92f);
-    const float3 coolGray = baseColor * float3(0.94f, 0.98f, 1.04f);
-    float3 albedo = lerp(coolGray, warmGray, saturate(tone * 1.4f - 0.2f));
-    albedo *= 0.84f + tone * 0.40f;
-    albedo *= 0.94f + band * 0.10f;
-    albedo *= lerp(1.0f, 0.86f + grain * 0.22f + grainFine * 0.08f, fineFade);
-    albedo *= 1.0f - crack * 0.60f;
-    albedo = lerp(albedo, float3(0.075f, 0.095f, 0.045f), moss * 0.85f);
-    albedo = lerp(albedo, float3(0.30f, 0.32f, 0.27f), lichen * 0.70f);
-    albedo = lerp(albedo, albedo * 1.25f + 0.01f, glint);
-    albedo *= 1.0f - groundDamp * 0.30f;
+    const float3 warmGray = baseColor * ROCK_WARM_TINT;
+    const float3 coolGray = baseColor * ROCK_COOL_TINT;
+    float3 albedo = lerp(coolGray, warmGray, saturate(tone * ROCK_TINT_GAIN - ROCK_TINT_OFFSET));
+    albedo *= ROCK_TONE_BRIGHTNESS + tone * ROCK_TONE_BRIGHTNESS_RANGE;
+    albedo *= ROCK_BAND_BRIGHTNESS + band * ROCK_BAND_BRIGHTNESS_RANGE;
+    albedo *= lerp(1.0f, ROCK_GRAIN_BRIGHTNESS + grain * ROCK_GRAIN_BRIGHTNESS_RANGE + grainFine * ROCK_FINE_GRAIN_BRIGHTNESS_RANGE, fineFade);
+    albedo *= 1.0f - crack * ROCK_CRACK_DARKEN;
+    albedo = lerp(albedo, ROCK_MOSS_COLOR, moss * ROCK_MOSS_BLEND);
+    albedo = lerp(albedo, ROCK_LICHEN_COLOR, lichen * ROCK_LICHEN_BLEND);
+    albedo = lerp(albedo, albedo * ROCK_GLINT_BRIGHTEN + ROCK_GLINT_LIFT, glint);
+    albedo *= 1.0f - groundDamp * ROCK_GROUND_DAMP_DARKEN;
     rock.albedo = albedo;
 
     // 粗さ：元の粗さを色むらで少し揺らし、苔はさらに粗く、鉱物の粒はなめらかにしている（濡れた所は MakePbrSurface が下げる）
@@ -187,17 +248,17 @@ RockSurface GetRockSurface(float3 worldPosition, float3 worldNormal, float3 base
     roughness = lerp(roughness, ROCK_MOSS_ROUGHNESS, moss);
     roughness = lerp(roughness, ROCK_CRACK_ROUGHNESS, crack);
     roughness = lerp(roughness, ROCK_GLINT_ROUGHNESS, glint);
-    rock.roughness = clamp(roughness, 0.045f, 1.0f);
+    rock.roughness = clamp(roughness, ROCK_MIN_ROUGHNESS, 1.0f);
 
     // 濡れ具合：地面との境目と、ひびの奥にたまった水
-    rock.wetness = saturate(groundDamp * 0.55f + crack * 0.25f);
+    rock.wetness = saturate(groundDamp * ROCK_GROUND_DAMP_WETNESS + crack * ROCK_CRACK_WETNESS);
 
     // 高さ：ゆるい起伏・細かいざらつき・ひびのへこみ・苔の盛り上がり
-    const float lumps = RockTriplanarNoise(worldPosition, weights, 0.45f, 23.0f);
-    rock.height = lumps * 0.55f +
-        (grain * 0.22f + grainFine * 0.08f) * fineFade -
-        crack * 0.55f +
-        moss * 0.18f * grainFine;
+    const float lumps = RockTriplanarNoise(worldPosition, weights, ROCK_LUMP_SCALE, ROCK_LUMP_SEED);
+    rock.height = lumps * ROCK_LUMP_HEIGHT +
+        (grain * ROCK_GRAIN_HEIGHT + grainFine * ROCK_FINE_GRAIN_HEIGHT) * fineFade -
+        crack * ROCK_CRACK_DEPTH +
+        moss * ROCK_MOSS_HEIGHT * grainFine;
     return rock;
 }
 

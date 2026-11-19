@@ -16,6 +16,10 @@
 
 namespace
 {
+    // 暗証番号の各桁に選ぶ数の範囲（0は「まだ入力していない桁」と見分けにくいので使わない）
+    constexpr int CodeDigitMin = 1;
+    constexpr int CodeDigitMax = 9;
+
     // 番号を変えたときの手ごたえ（高い音と、ごく短い振動）
     constexpr float DialClickPitch = 1.35f;
     constexpr int DialRumbleFrames = 1;
@@ -46,7 +50,7 @@ void Stage1KeypadDoor::Init(const Parts& parts)
     m_WrongTimer = 0.0f;
 
     // 0は「まだ入力していない桁」と見分けにくいため、1〜9から選んでいる。
-    std::uniform_int_distribution<int> digitDistribution(1, 9);
+    std::uniform_int_distribution<int> digitDistribution(CodeDigitMin, CodeDigitMax);
     KeypadLock::Digits code{};
     for (int& digit : code)
     {

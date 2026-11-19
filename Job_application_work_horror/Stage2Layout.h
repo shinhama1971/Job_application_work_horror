@@ -44,12 +44,15 @@ enum class Stage2Light
     Count
 };
 
+// 隣り合う照明の間の境目（z = ±75。照明 -112 と -38、38 と 112 の真ん中あたり）
+inline constexpr float Stage2LightBoundaryZ = 75.0f;
+
 // 廊下の奥行き（z）に一番近い天井照明を返している。照明はz=-112, -38, 38, 112に並んでいる。
 inline Stage2Light Stage2NearestLight(float z)
 {
-    if (z < -75.0f) return Stage2Light::Light1;
+    if (z < -Stage2LightBoundaryZ) return Stage2Light::Light1;
     if (z < 0.0f) return Stage2Light::Light2;
-    if (z < 75.0f) return Stage2Light::Light3;
+    if (z < Stage2LightBoundaryZ) return Stage2Light::Light3;
     return Stage2Light::DoorLight;
 }
 

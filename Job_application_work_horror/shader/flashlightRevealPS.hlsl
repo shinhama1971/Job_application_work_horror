@@ -62,6 +62,11 @@ static const float NominalFlashlightIntensity = 1.5f;
 #define WRITING_INK_GLINT_START 0.55f
 #define WRITING_INK_GLINT_GAIN 0.12f
 
+// 文字が見えるとみなす下限、0で割らないための下限、懐中電灯が届いているとみなす下限
+#define REVEAL_MIN_PRESENCE 0.001f
+#define REVEAL_MIN_DIVISOR 0.001f
+#define REVEAL_MIN_BEAM 0.001f
+
 float4 main(in LIT_PS_IN input) : SV_Target
 {
     // 文字の形の外は描かない
@@ -77,7 +82,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         return float4(Material.Diffuse.rgb * WRITING_DEBUG_BRIGHTNESS, saturate(shape * presence));
     }
     if (!Light.Enable || !Light.FlashlightEnabled ||
-        presence <= 0.001f || distanceFromCamera <= 0.001f)
+        presence <= REVEAL_MIN_PRESENCE || distanceFromCamera <= REVEAL_MIN_DIVISOR)
     {
         discard;
     }
@@ -85,12 +90,12 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 壁と同じ配光・減衰・影で、「この画素に届いている懐中電灯の光」を求めている。
     const float3 pixelDirection = input.viewPos / distanceFromCamera;
     const float beamProfile = GetFlashlightBeamProfile(pixelDirection);
-    if (beamProfile <= 0.001f)
+    if (beamProfile <= REVEAL_MIN_BEAM)
     {
         discard;
     }
     const float normalizedDistance = saturate(
-        distanceFromCamera / max(Light.Range, 0.001f));
+        distanceFromCamera / max(Light.Range, REVEAL_MIN_DIVISOR));
     const float rangeFade = saturate(1.0f - normalizedDistance * normalizedDistance);
     const float received = beamProfile * rangeFade * rangeFade *
         GetFlashlightShadow(input.shadowPos) *

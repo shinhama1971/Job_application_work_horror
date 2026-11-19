@@ -70,6 +70,9 @@ namespace
 	// 波を止める壁：床からこの高さより上にある壁は数えない。まっすぐ・横向きとみなす角度の誤差（ラジアン）
 	constexpr float RippleObstacleMaxHeight = 1.5f;
 	constexpr float AxisAlignedTolerance = 0.01f;
+	// シェーダーの番号（wetFloorPS.hlsl の register と合わせる）：床の定数 b10、水たまりの表 b13
+	constexpr UINT WetFloorBufferSlot = 10;
+	constexpr UINT PuddleCellBufferSlot = 13;
 }
 
 //=======================================
@@ -702,10 +705,10 @@ void Ground::Draw(Camera* cam)
 		m_WetFloorBuffer.Get(), 0, nullptr, &wetFloor, 0, 0);
 	// ピクセルシェーダーのb10へ設定している
 	ID3D11Buffer* wetFloorBuffer = m_WetFloorBuffer.Get();
-	devicecontext->PSSetConstantBuffers(10, 1, &wetFloorBuffer);
+	devicecontext->PSSetConstantBuffers(WetFloorBufferSlot, 1, &wetFloorBuffer);
 	// 水たまりの表をb13へ設定している
 	ID3D11Buffer* puddleCellBuffer = m_PuddleCellBuffer.Get();
-	devicecontext->PSSetConstantBuffers(13, 1, &puddleCellBuffer);
+	devicecontext->PSSetConstantBuffers(PuddleCellBufferSlot, 1, &puddleCellBuffer);
 
 	devicecontext->DrawIndexed(
 		(UINT)m_Indices.size(),	// 描くインデックスの数

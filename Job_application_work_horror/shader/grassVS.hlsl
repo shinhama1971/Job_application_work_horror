@@ -64,6 +64,20 @@ static const float GRASS_BILLBOARD_MAX_BLEND = 0.6f;
 
 // 葉の断面を少し丸く見せ、根元の光は葉先より弱くする。
 static const float GRASS_BLADE_NORMAL_CURVATURE = 0.35f;
+// 葉の上の制御点を葉先へ寄せる割合、接線が0にならないよう足すわずかな上向き、0で割らないための下限、
+// カメラの上の向きが水平に近すぎるとみなす長さの2乗
+#define GRASS_UPPER_CURVE_TIP_BLEND 0.5f
+#define GRASS_TANGENT_NUDGE 0.00001f
+#define GRASS_MIN_DIVISOR 0.001f
+#define GRASS_MIN_HORIZONTAL_UP_SQ 0.0001f
+// 倒した葉の幅を横へ寄せる割合、根元の幅（葉の幅に掛ける）と、その幅が広がりきる高さの割合
+#define GRASS_BEND_SIDE_BLEND 0.7f
+#define GRASS_ROOT_WIDTH 0.6f
+#define GRASS_ROOT_WIDTH_HEIGHT 0.2f
+// LOD の色の表示：近い = 緑、中くらい = 黄、遠い = 赤
+#define GRASS_LOD_NEAR_COLOR float3(0.15f, 0.85f, 0.25f)
+#define GRASS_LOD_MIDDLE_COLOR float3(0.95f, 0.80f, 0.15f)
+#define GRASS_LOD_FAR_COLOR float3(0.95f, 0.20f, 0.12f)
 static const float GRASS_ROOT_OCCLUSION = 0.5f;
 
 GRASS_PS_IN main(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
@@ -86,7 +100,7 @@ GRASS_PS_IN main(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
     const float3 cameraForward = mul((float3x3)View, float3(0.0f, 0.0f, 1.0f));
     const float3 cameraUp = mul((float3x3)View, float3(0.0f, 1.0f, 0.0f));
     const float lookDown = smoothstep(GRASS_CAMERA_BEND_START, GRASS_CAMERA_BEND_FULL, -cameraForward.y) * CameraBend;
-    if (lookDown > 0.0f && dot(cameraUp.xz, cameraUp.xz) > 0.0001f)
+    if (lookDown > 0.0f && dot(cameraUp.xz, cameraUp.xz) > GRASS_MIN_HORIZONTAL_UP_SQ)
     {
         const float2 bendDirection = normalize(cameraUp.xz);
         const float tipLength = length(tip);
@@ -98,7 +112,8 @@ GRASS_PS_IN main(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
     }
     const float3 p0 = blade.Root;
     const float3 p1 = p0 + float3(0.0f, blade.Height * GRASS_LOWER_CURVE_HEIGHT, 0.0f) * heightScale;
-    const float3 p2 = p0 + float3(tip.x * 0.5f, tip.y + (blade.Height - tip.y) * GRASS_UPPER_CURVE_HEIGHT_BLEND, tip.z * 0.5f) * heightScale;
+    const float3 p2 = p0 + float3(tip.x * GRASS_UPPER_CURVE_TIP_BLEND, tip.y + (blade.Height - tip.y) * GRASS_UPPER_CURVE_HEIGHT_BLEND,
+        tip.z * GRASS_UPPER_CURVE_TIP_BLEND) * heightScale;
     const float3 p3 = p0 + tip * heightScale;
     // 制御点を順に補間する。最後の2点の差から、同じ曲線の接線も求めている。
     const float3 a = lerp(p0, p1, t);
@@ -106,21 +121,21 @@ GRASS_PS_IN main(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
     const float3 c = lerp(p2, p3, t);
     const float3 d = lerp(a, b, t);
     const float3 e = lerp(b, c, t);
-    const float3 tangent = normalize(e - d + float3(0.0f, 0.00001f, 0.0f));
+    const float3 tangent = normalize(e - d + float3(0.0f, GRASS_TANGENT_NUDGE, 0.0f));
     float3 widthDirection = float3(blade.Facing.x, 0.0f, blade.Facing.y);
-    float3 cameraRight = float3(toCamera.z, 0.0f, -toCamera.x) / max(horizontalDistance, 0.001f);
+    float3 cameraRight = float3(toCamera.z, 0.0f, -toCamera.x) / max(horizontalDistance, GRASS_MIN_DIVISOR);
     // 向きを混ぜたときに打ち消し合わないよう、もとの幅と同じ側へそろえる。
     if (dot(cameraRight, widthDirection) < 0.0f) cameraRight = -cameraRight;
     widthDirection = normalize(lerp(widthDirection, cameraRight, smoothstep(GRASS_BILLBOARD_START_DISTANCE, GRASS_BILLBOARD_FULL_DISTANCE, horizontalDistance) * GRASS_BILLBOARD_MAX_BLEND));
     // カメラの上の向きへ倒した葉は、幅をその横の向きへ寄せている（幅が倒れる向きと同じだと、上から見て線のままになるため）
-    if (lookDown > 0.0f && dot(cameraUp.xz, cameraUp.xz) > 0.0001f)
+    if (lookDown > 0.0f && dot(cameraUp.xz, cameraUp.xz) > GRASS_MIN_HORIZONTAL_UP_SQ)
     {
         const float2 bendDirection = normalize(cameraUp.xz);
         float3 bendSide = float3(-bendDirection.y, 0.0f, bendDirection.x);
         if (dot(bendSide, widthDirection) < 0.0f) bendSide = -bendSide;
-        widthDirection = normalize(lerp(widthDirection, bendSide, lookDown * 0.7f));
+        widthDirection = normalize(lerp(widthDirection, bendSide, lookDown * GRASS_BEND_SIDE_BLEND));
     }
-    const float width = blade.Width * WidthScale * (1.0f - t) * lerp(0.6f, 1.0f, smoothstep(0.0f, 0.2f, t));
+    const float width = blade.Width * WidthScale * (1.0f - t) * lerp(GRASS_ROOT_WIDTH, 1.0f, smoothstep(0.0f, GRASS_ROOT_WIDTH_HEIGHT, t));
     const float3 position = lerp(d, e, t) + widthDirection * side * width * 0.5f;
     float3 normal = normalize(normalize(cross(widthDirection, tangent)) + widthDirection * side * GRASS_BLADE_NORMAL_CURVATURE);
     if (dot(normal, CameraPosition - position) < 0.0f) normal = -normal;
@@ -135,7 +150,7 @@ GRASS_PS_IN main(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
     output.ao = lerp(GRASS_ROOT_OCCLUSION, 1.0f, t);
     output.color = blade.Color;
     // LOD の色の表示：近い = 緑、中くらい = 黄、遠い = 赤
-    const float3 lodColor = LodLevel <= 1u ? float3(0.15f, 0.85f, 0.25f) : (LodLevel == 2u ? float3(0.95f, 0.80f, 0.15f) : float3(0.95f, 0.20f, 0.12f));
+    const float3 lodColor = LodLevel <= 1u ? GRASS_LOD_NEAR_COLOR : (LodLevel == 2u ? GRASS_LOD_MIDDLE_COLOR : GRASS_LOD_FAR_COLOR);
     output.debugColor = float4(lodColor, ShowLodColors != 0u ? 1.0f : 0.0f);
     return output;
 }

@@ -10,6 +10,16 @@
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+	// シェーダーの番号（common.hlsl・roomOcclusion.hlsli・waterCaustics.hlsli の register と合わせる）：
+	// デバッグ表示の b7、部屋の形の b11、水面の光と反射の b12、水たまりの波の高さの t9
+	constexpr UINT DebugViewBufferSlot = 7;
+	constexpr UINT RoomOcclusionBufferSlot = 11;
+	constexpr UINT WaterCausticsBufferSlot = 12;
+	constexpr UINT RippleHeightTextureSlot = 9;
+}
+
 //--------------------------------------------------------------------------------------
 // 懐中電灯と環境光を定数バッファ（b3）へ送っている。懐中電灯の点灯は FlashlightEnabled で切り替える
 void Renderer::SetLight(LIGHT Light)
@@ -88,7 +98,7 @@ void Renderer::SetRoomOcclusion(
 	m_pDeviceContext->UpdateSubresource(
 		m_pRoomOcclusionBuffer.Get(), 0, NULL, &buffer, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
-		11, 1, m_pRoomOcclusionBuffer.GetAddressOf());
+		RoomOcclusionBufferSlot, 1, m_pRoomOcclusionBuffer.GetAddressOf());
 }
 
 // 水面の光の揺らぎの値を、ピクセルシェーダーのb12へ設定している
@@ -107,7 +117,7 @@ void Renderer::SetWaterCaustics(
 	m_pDeviceContext->UpdateSubresource(
 		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
-		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+		WaterCausticsBufferSlot, 1, m_pWaterCausticsBuffer.GetAddressOf());
 }
 
 // 水面の光の揺らぎで使うビュー行列を覚え、b12へ設定し直している。ビュー行列のb1は頂点シェーダーにしか設定していないため、
@@ -122,7 +132,7 @@ void Renderer::SetWaterCausticsView(const Matrix& view)
 	m_pDeviceContext->UpdateSubresource(
 		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
-		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+		WaterCausticsBufferSlot, 1, m_pWaterCausticsBuffer.GetAddressOf());
 }
 
 // 水たまりの波の高さのテクスチャをピクセルシェーダーのt9へ、範囲と強さをb12へ設定している
@@ -137,8 +147,8 @@ void Renderer::SetWaterRipples(ID3D11ShaderResourceView* heightTexture,
 	m_pDeviceContext->UpdateSubresource(
 		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
-		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
-	m_pDeviceContext->PSSetShaderResources(9, 1, &heightTexture);
+		WaterCausticsBufferSlot, 1, m_pWaterCausticsBuffer.GetAddressOf());
+	m_pDeviceContext->PSSetShaderResources(RippleHeightTextureSlot, 1, &heightTexture);
 }
 
 // 水面の反射の方式と、SSRで使う射影行列をb12へ設定している
@@ -155,7 +165,7 @@ void Renderer::SetReflectionMode(int mode, const Matrix& projection)
 	m_pDeviceContext->UpdateSubresource(
 		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
-		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+		WaterCausticsBufferSlot, 1, m_pWaterCausticsBuffer.GetAddressOf());
 }
 
 void Renderer::SetReflectionHistory(const Matrix& viewProjection, const Vector4& depth)
@@ -186,7 +196,7 @@ void Renderer::SetReflectionEnvironment(bool available, const Vector3& captureCe
 	m_pDeviceContext->UpdateSubresource(
 		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
-		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+		WaterCausticsBufferSlot, 1, m_pWaterCausticsBuffer.GetAddressOf());
 }
 
 // 2面の「血の手形」の異変の手形をb12へ設定している（渡さなかった分は見え方0にして描かない）
@@ -203,7 +213,7 @@ void Renderer::SetWallHandprints(const Vector4* handprints, int count)
 	m_pDeviceContext->UpdateSubresource(
 		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
-		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+		WaterCausticsBufferSlot, 1, m_pWaterCausticsBuffer.GetAddressOf());
 }
 
 // 2面の「水たまり」の異変の人影をb12へ設定している（レイ反射で、反射の光線と人影の形を交差させる）
@@ -224,7 +234,7 @@ void Renderer::SetPuddleFigure(const Vector3& footPosition, float visibility, bo
 	m_pDeviceContext->UpdateSubresource(
 		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
-		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+		WaterCausticsBufferSlot, 1, m_pWaterCausticsBuffer.GetAddressOf());
 }
 
 // 2面の「見えない影」の異変の人影をb12へ設定している（壁と床のシェーダーで、光がその形に遮られるかを調べる）
@@ -240,7 +250,7 @@ void Renderer::SetUnseenFigure(const Vector3& footPosition, float visibility)
 	m_pDeviceContext->UpdateSubresource(
 		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
-		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+		WaterCausticsBufferSlot, 1, m_pWaterCausticsBuffer.GetAddressOf());
 }
 
 // 2面の壁の鏡に映す自分の体をb12へ設定している（鏡のシェーダーが、光線と体の距離場を交差させる）
@@ -256,7 +266,7 @@ void Renderer::SetMirrorSelf(const Vector3& footPosition, const Vector3& right, 
 	m_pDeviceContext->UpdateSubresource(
 		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
-		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+		WaterCausticsBufferSlot, 1, m_pWaterCausticsBuffer.GetAddressOf());
 }
 
 // 鏡の異変の、鏡にだけ映る人影をb12へ設定している（鏡のシェーダーが、反射の光線と人影の形を交差させる）
@@ -270,7 +280,7 @@ void Renderer::SetMirrorFigure(const Vector3& footPosition, float visibility)
 	m_pDeviceContext->UpdateSubresource(
 		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
-		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+		WaterCausticsBufferSlot, 1, m_pWaterCausticsBuffer.GetAddressOf());
 }
 
 // プレイヤーの体の位置・向き・手足の振りをb12へ設定している（figureShadow.hlsli の GetPlayerBodyShadow が使う）
@@ -285,7 +295,7 @@ void Renderer::SetPlayerBody(const Vector3& footPosition, const Vector3& forward
 	m_pDeviceContext->UpdateSubresource(
 		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
-		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+		WaterCausticsBufferSlot, 1, m_pWaterCausticsBuffer.GetAddressOf());
 }
 
 // 計測モード用に、2つの人影を指定した位置へ置き続けている（解除したときは、次に場面が設定するまで消している）
@@ -314,7 +324,7 @@ void Renderer::SetReflectionProps(const Vector4* props, int count)
 	m_pDeviceContext->UpdateSubresource(
 		m_pWaterCausticsBuffer.Get(), 0, NULL, &m_WaterCaustics, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
-		12, 1, m_pWaterCausticsBuffer.GetAddressOf());
+		WaterCausticsBufferSlot, 1, m_pWaterCausticsBuffer.GetAddressOf());
 }
 
 // デバッグ表示と壁の古さの定数バッファ（b7）を、覚えている中身で更新している
@@ -327,7 +337,7 @@ void Renderer::UploadDebugViewBuffer()
 	m_pDeviceContext->UpdateSubresource(
 		m_pDebugViewBuffer.Get(), 0, NULL, &m_DebugView, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
-		7, 1, m_pDebugViewBuffer.GetAddressOf());
+		DebugViewBufferSlot, 1, m_pDebugViewBuffer.GetAddressOf());
 }
 
 //--------------------------------------------------------------------------------------

@@ -16,6 +16,9 @@
 #define TILE_SIZE SIGNAL_LOST_LIGHT_TILE_SIZE
 #define MAX_LIGHTS_PER_TILE SIGNAL_LOST_MAX_LIGHTS_PER_TILE
 #define THREADS_PER_TILE 64
+// タイルの一番奥の面に持たせる余裕（奥行きに掛ける割合・足す長さ）
+#define TILE_FAR_LIMIT_SCALE 1.02f
+#define TILE_FAR_LIMIT_MARGIN 2.0f
 
 struct POINT_LIGHT
 {
@@ -145,7 +148,7 @@ void main(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
         const float farDistance =
             dot(CameraForward.xyz, farthestPoint - CameraPosition.xyz);
         // 光源の影響の範囲の端は弱い光でも届くため、判定の誤差で消えないよう、少し奥まで余裕を持たせている
-        farLimit = farDistance * 1.02f + 2.0f;
+        farLimit = farDistance * TILE_FAR_LIMIT_SCALE + TILE_FAR_LIMIT_MARGIN;
     }
 
     // 64スレッドで光源を分担して判定している（光源が64個を超える場合は、何回かに分けている）。

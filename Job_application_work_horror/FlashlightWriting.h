@@ -25,7 +25,7 @@ public:
     void Init() override;
     void Update() override;
     void Draw(Camera* cam) override;
-    bool WritesDepthPrepass() const override { return m_PrintedSurface && m_Presence > 0.001f; }
+    bool WritesDepthPrepass() const override { return m_PrintedSurface && m_Presence > MinDepthPrepassPresence; }
     void DrawDepthPrepass(Camera* cam) override;
     void Uninit() override;
     // 浮かび上がる文字は監視映像に映さない。印刷物は普通の小物と同じように映す。
@@ -72,6 +72,8 @@ private:
 
     // 壁から浮かせる距離
     static constexpr float SurfaceOffset = 0.25f;
+    // これより薄い文字は、深度プリパスに書かない（見えないのに奥の物を隠さないため）
+    static constexpr float MinDepthPrepassPresence = 0.001f;
     static constexpr float PresenceFadeSpeed = 0.55f;   // 1秒あたりの濃さの変化量
     // 読める距離
     static constexpr float ReadDistance = 150.0f;

@@ -10,6 +10,12 @@ RWTexture2D<float4> OutputTexture : register(u0);
 static const int GroupSize = 128;
 static const int Radius = 4;
 static const int SharedSize = GroupSize + Radius * 2 + 1;
+// ガウス分布の重み（中心と、1〜4画素離れた所。両側を足して合計1。bloomBlurHorizontalCS と同じ）
+#define BLOOM_GAUSS_WEIGHT_0 0.22702703f
+#define BLOOM_GAUSS_WEIGHT_1 0.19459459f
+#define BLOOM_GAUSS_WEIGHT_2 0.12162162f
+#define BLOOM_GAUSS_WEIGHT_3 0.05405405f
+#define BLOOM_GAUSS_WEIGHT_4 0.01621622f
 
 // 色ごとに配列を分け、共有メモリのバンクの衝突を減らしている
 groupshared float SharedRed[SharedSize];
@@ -64,10 +70,10 @@ void main(
     }
 
     // 上下4画素ずつ、ガウス分布の重み（合計1）で足し合わせている
-    float3 result = LoadShared(localIndex) * 0.22702703f;
-    result += (LoadShared(localIndex - 1) + LoadShared(localIndex + 1)) * 0.19459459f;
-    result += (LoadShared(localIndex - 2) + LoadShared(localIndex + 2)) * 0.12162162f;
-    result += (LoadShared(localIndex - 3) + LoadShared(localIndex + 3)) * 0.05405405f;
-    result += (LoadShared(localIndex - 4) + LoadShared(localIndex + 4)) * 0.01621622f;
+    float3 result = LoadShared(localIndex) * BLOOM_GAUSS_WEIGHT_0;
+    result += (LoadShared(localIndex - 1) + LoadShared(localIndex + 1)) * BLOOM_GAUSS_WEIGHT_1;
+    result += (LoadShared(localIndex - 2) + LoadShared(localIndex + 2)) * BLOOM_GAUSS_WEIGHT_2;
+    result += (LoadShared(localIndex - 3) + LoadShared(localIndex + 3)) * BLOOM_GAUSS_WEIGHT_3;
+    result += (LoadShared(localIndex - 4) + LoadShared(localIndex + 4)) * BLOOM_GAUSS_WEIGHT_4;
     OutputTexture[dispatchThreadId.xy] = float4(result, 1.0f);
 }

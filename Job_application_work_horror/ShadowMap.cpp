@@ -24,6 +24,10 @@ namespace
     constexpr float LightFar = 280.0f;
     // シェーダーで影を比べるときのずらし
     constexpr float ShaderDepthBias = 0.0012f;
+    // シェーダーの番号（flashlightShadow.hlsli の register と合わせる）：影の画像 t5、比較サンプラー s1、影の定数 b8
+    constexpr UINT ShadowTextureSlot = 5;
+    constexpr UINT ComparisonSamplerSlot = 1;
+    constexpr UINT ShadowBufferSlot = 8;
 }
 
 namespace Effect
@@ -147,7 +151,7 @@ namespace Effect
 
         // 影のテクスチャを読み取りに使っている間は描画先にできないため、先にt5から外している
         ID3D11ShaderResourceView* nullResource = nullptr;
-        context->PSSetShaderResources(5, 1, &nullResource);
+        context->PSSetShaderResources(ShadowTextureSlot, 1, &nullResource);
 
         // 今のビューポートとラスタライザーを覚えておき、影用に差し替えている
         context->RSGetViewports(
@@ -206,8 +210,8 @@ namespace Effect
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
         context->UpdateSubresource(m_ShadowBuffer.Get(), 0, nullptr, &m_BufferData, 0, 0);
         ID3D11Buffer* shadowBuffer = m_ShadowBuffer.Get();
-        context->VSSetConstantBuffers(8, 1, &shadowBuffer);
-        context->PSSetConstantBuffers(8, 1, &shadowBuffer);
+        context->VSSetConstantBuffers(ShadowBufferSlot, 1, &shadowBuffer);
+        context->PSSetConstantBuffers(ShadowBufferSlot, 1, &shadowBuffer);
     }
 
     void ShadowMap::SetPbrEnabled(bool enabled)
@@ -239,8 +243,8 @@ namespace Effect
             m_ShaderResourceView.Get();
         ID3D11SamplerState* comparisonSampler =
             m_ComparisonSampler.Get();
-        context->PSSetShaderResources(5, 1, &shadowResource);
-        context->PSSetSamplers(1, 1, &comparisonSampler);
+        context->PSSetShaderResources(ShadowTextureSlot, 1, &shadowResource);
+        context->PSSetSamplers(ComparisonSamplerSlot, 1, &comparisonSampler);
     }
 
     // 前に描いた影のテクスチャと比較サンプラーを設定している
@@ -251,8 +255,8 @@ namespace Effect
             m_ShaderResourceView.Get();
         ID3D11SamplerState* comparisonSampler =
             m_ComparisonSampler.Get();
-        context->PSSetShaderResources(5, 1, &shadowResource);
-        context->PSSetSamplers(1, 1, &comparisonSampler);
+        context->PSSetShaderResources(ShadowTextureSlot, 1, &shadowResource);
+        context->PSSetSamplers(ComparisonSamplerSlot, 1, &comparisonSampler);
     }
 
     // 深度だけを書く頂点シェーダーを設定している

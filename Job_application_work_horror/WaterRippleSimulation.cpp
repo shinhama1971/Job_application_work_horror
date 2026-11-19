@@ -42,6 +42,9 @@ namespace
     constexpr float WaveSpeedSquared = 0.09f;
     // 1歩ごとに高さに掛ける値。約1.6秒で半分の高さになる（波が遅くなった分、少し長く残している）
     constexpr float Damping = 0.993f;
+    // シェーダーの番号：床が読む波の高さ t9（waterCaustics.hlsli）と、波の計算が読む水たまりの表 b13（waterRippleCS.hlsl）
+    constexpr UINT RippleHeightTextureSlot = 9;
+    constexpr UINT PuddleCellBufferSlot = 13;
 }
 
 void WaterRippleSimulation::Init(int resolution, float worldSize)
@@ -137,12 +140,12 @@ void WaterRippleSimulation::Update(float deltaTime, const Vector2& centerXZ,
 
     // 前のフレームで床・壁のシェーダーに渡した高さのテクスチャを、書き込む前に外している（読み書きの重なりを防ぐ）
     ID3D11ShaderResourceView* nullSRV = nullptr;
-    context->PSSetShaderResources(9, 1, &nullSRV);
+    context->PSSetShaderResources(RippleHeightTextureSlot, 1, &nullSRV);
 
     m_Shader.SetGPU();
     ID3D11Buffer* paramsBuffer = m_ParamsBuffer.Get();
     context->CSSetConstantBuffers(0, 1, &paramsBuffer);
-    context->CSSetConstantBuffers(13, 1, &puddleCellBuffer);
+    context->CSSetConstantBuffers(PuddleCellBufferSlot, 1, &puddleCellBuffer);
 
     // 波を跳ね返す物のうち、計算する範囲に掛かっている物だけを、最大数まで選んでいる
     Vector4 selectedObstacles[MaxObstacles]{};
@@ -198,6 +201,6 @@ void WaterRippleSimulation::Update(float deltaTime, const Vector2& centerXZ,
     }
 
     ID3D11Buffer* nullBuffer = nullptr;
-    context->CSSetConstantBuffers(13, 1, &nullBuffer);
+    context->CSSetConstantBuffers(PuddleCellBufferSlot, 1, &nullBuffer);
     context->CSSetShader(nullptr, nullptr, 0);
 }

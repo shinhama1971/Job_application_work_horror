@@ -115,6 +115,9 @@ float3 GetRippleHeightAndSlope(float2 positionXZ)
 
 // 波の面のへこみ具合（ラプラシアン）から、波が光を集めて明るくなる度合い（0〜1）を返している。
 // へこんだ所は凹面鏡のように光を集め、盛り上がった所は光を散らすため、正の値の所だけを明るくしている。
+// 波が光を集める強さ（曲がり具合に掛ける）
+#define RIPPLE_CAUSTIC_FOCUS_GAIN 0.9f
+
 float GetRippleCausticFocus(float2 positionXZ)
 {
     if (CausticRipple.w <= 0.0f)
@@ -128,7 +131,7 @@ float GetRippleCausticFocus(float2 positionXZ)
         SampleRippleHeight(positionXZ - float2(step, 0.0f)) +
         SampleRippleHeight(positionXZ + float2(0.0f, step)) +
         SampleRippleHeight(positionXZ - float2(0.0f, step)) - 4.0f * center) / (step * step);
-    return saturate(laplacian * 0.9f) * CausticRipple.w;
+    return saturate(laplacian * RIPPLE_CAUSTIC_FOCUS_GAIN) * CausticRipple.w;
 }
 
 // 揺らぎで網目の位置を曲げ、二層のノイズを違う速さで動かす。
@@ -174,6 +177,13 @@ float GetCausticPattern(float2 waterPositionXZ, float time)
 }
 
 // 壁や天井の点（ワールド座標）に、水面で跳ね返って届く懐中電灯の光の明るさ（色は掛ける前）を返している
+// 0で割らないための下限、懐中電灯が届いているとみなす下限、浸水した範囲の光（全体の明るさ・網目の強さ）、波の輪の光の強さ
+#define CAUSTIC_MIN_DIVISOR 0.001f
+#define CAUSTIC_MIN_BEAM 0.001f
+#define CAUSTIC_FLOOD_BASE_LIGHT 0.05f
+#define CAUSTIC_FLOOD_PATTERN_LIGHT 0.55f
+#define CAUSTIC_RIPPLE_LIGHT 0.55f
+
 float GetWaterCausticLight(float3 worldPosition, float3 worldNormal)
 {
     // 効果がない面（浸水した範囲も水たまりの波もない）・懐中電灯を消しているとき・水面より下の点では計算しない
@@ -194,7 +204,7 @@ float GetWaterCausticLight(float3 worldPosition, float3 worldNormal)
     // 点を水面で上下に折り返した点P'と、カメラからP'へ向かう光が水面に当たる点W
     const float3 mirrored = float3(
         worldPosition.x, 2.0f * CausticWaterY - worldPosition.y, worldPosition.z);
-    const float waterHit = (eye.y - CausticWaterY) / max(eye.y - mirrored.y, 0.001f);
+    const float waterHit = (eye.y - CausticWaterY) / max(eye.y - mirrored.y, CAUSTIC_MIN_DIVISOR);
     const float3 waterPoint = eye + (mirrored - eye) * waterHit;
 
     // 光が水面に当たる点が、浸水した範囲の中にあるときだけ（縁は少しずつ弱めている）
@@ -213,16 +223,16 @@ float GetWaterCausticLight(float3 worldPosition, float3 worldNormal)
     // 懐中電灯がP'の方向を照らしているか（ふつうの照明と同じ円錐の形）と、水面を経由した道のりでの弱まり
     const float3 mirroredView = mul(float4(mirrored, 1.0f), CausticView).xyz;
     const float pathLength = length(mirroredView);
-    if (pathLength <= 0.001f)
+    if (pathLength <= CAUSTIC_MIN_DIVISOR)
     {
         return 0.0f;
     }
     const float beamProfile = GetFlashlightBeamProfile(mirroredView / pathLength);
-    if (beamProfile <= 0.001f)
+    if (beamProfile <= CAUSTIC_MIN_BEAM)
     {
         return 0.0f;
     }
-    const float normalizedDistance = saturate(pathLength / max(Light.Range, 0.001f));
+    const float normalizedDistance = saturate(pathLength / max(Light.Range, CAUSTIC_MIN_DIVISOR));
     const float rangeFade = saturate(1.0f - normalizedDistance * normalizedDistance);
 
     // 光は水面の点Wから来るので、面がWの方を向いているほど明るい（天井はほぼ真上から、壁は斜めから受ける）
@@ -234,10 +244,10 @@ float GetWaterCausticLight(float3 worldPosition, float3 worldNormal)
     if (flood > 0.0f)
     {
         const float pattern = GetCausticPattern(waterPoint.xz, CausticTime);
-        reflected += (0.05f + pattern * 0.55f) * flood;
+        reflected += (CAUSTIC_FLOOD_BASE_LIGHT + pattern * CAUSTIC_FLOOD_PATTERN_LIGHT) * flood;
     }
     // 水たまりの波：広がっていく輪が、光の輪になって壁を横切る
-    reflected += rippleFocus * 0.55f;
+    reflected += rippleFocus * CAUSTIC_RIPPLE_LIGHT;
 
     return Light.Intensity * beamProfile * rangeFade * rangeFade *
         facing * reflected;

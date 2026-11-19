@@ -42,33 +42,56 @@ SamplerState g_SamplerState : register(s0);
 #include "forestWetness.hlsli"
 #endif
 
+// --- 2面の「血の手形」の異変の値
+// 手形の数（WallHandprints の数）、画素の大きさの下限（0で割らないため）
+static const int ANOMALY_HANDPRINT_COUNT = 4;
+static const float MIN_PIXEL_FOOTPRINT = 0.0001f;
+// 手形の壁の面とみなす範囲：x の離れ具合と、法線の x の大きさ
+static const float HANDPRINT_SURFACE_DEPTH = 0.6f;
+static const float HANDPRINT_SURFACE_NORMAL = 0.7f;
+// 手形ごとの傾き：番号の中心と、1つあたりの角度（ラジアン）。手形の大きさ（座標を割る値）
+static const float HANDPRINT_TILT_CENTER = 1.5f;
+static const float HANDPRINT_TILT_STEP = 0.18f;
+static const float HANDPRINT_SCALE = 1.25f;
+// 手のひらの下の引きずった跡：横の幅（消え始め・消えきる）、下へ伸びる長さ、横の縞の細かさ、濃さ
+static const float HANDPRINT_DRAG_EDGE_START = 1.4f;
+static const float HANDPRINT_DRAG_EDGE_END = 1.9f;
+static const float HANDPRINT_DRAG_LENGTH = 5.0f;
+static const float HANDPRINT_DRAG_STRIPES = 7.0f;
+static const float HANDPRINT_DRAG_STRENGTH = 0.6f;
+// にじみ：最低の濃さとむらの幅、むらの細かさ、手形ごとのずらし
+static const float HANDPRINT_SMUDGE_BASE = 0.6f;
+static const float HANDPRINT_SMUDGE_RANGE = 0.4f;
+static const float HANDPRINT_SMUDGE_SCALE = 0.8f;
+static const float HANDPRINT_SMUDGE_SEED_STEP = 13.0f;
+
 // 2面の「血の手形」の異変：Stage2Scene が渡した手形（WallHandprints）を、その壁の面に描き、濃さ（0〜1）を返している。
 // 形は1面の壁の血の跡と同じ式（HorrorHandprint）。見え方（w）で少しずつ浮かぶ。
 float GetAnomalyHandprint(float3 worldPosition, float3 worldNormal)
 {
     // 1画素がワールドで何単位か（手形の縁のぼかしに使う。分岐の外で求めている）
-    const float footprint = max(length(fwidth(worldPosition.zy)), 0.0001f);
+    const float footprint = max(length(fwidth(worldPosition.zy)), MIN_PIXEL_FOOTPRINT);
     float mask = 0.0f;
     [unroll]
-    for (int index = 0; index < 4; ++index)
+    for (int index = 0; index < ANOMALY_HANDPRINT_COUNT; ++index)
     {
         const float4 print = WallHandprints[index];
         // 浮かんでいない手形と、その手形の壁の面ではない所（x が離れている・壁の向きではない）は描かない
-        if (print.w <= 0.0f || abs(worldPosition.x - print.x) > 0.6f || abs(worldNormal.x) < 0.7f)
+        if (print.w <= 0.0f || abs(worldPosition.x - print.x) > HANDPRINT_SURFACE_DEPTH || abs(worldNormal.x) < HANDPRINT_SURFACE_NORMAL)
         {
             continue;
         }
         // 壁を正面から見たときの右向きを横の軸にし（右の壁は+z、左の壁は-z）、手形ごとに少し傾けている
         const float side = print.x > 0.0f ? 1.0f : -1.0f;
         const float2 local = float2((worldPosition.z - print.z) * side, worldPosition.y - print.y);
-        const float angle = (float(index) - 1.5f) * 0.18f;
+        const float angle = (float(index) - HANDPRINT_TILT_CENTER) * HANDPRINT_TILT_STEP;
         const float2x2 rotation = float2x2(cos(angle), -sin(angle), sin(angle), cos(angle));
-        const float2 handPoint = mul(rotation, local) / 1.25f;
-        const float hand = HorrorHandprint(handPoint, ((uint(index) & 1u) == 0u) ? 1.0f : -1.0f, footprint / 1.25f);
+        const float2 handPoint = mul(rotation, local) / HANDPRINT_SCALE;
+        const float hand = HorrorHandprint(handPoint, ((uint(index) & 1u) == 0u) ? 1.0f : -1.0f, footprint / HANDPRINT_SCALE);
         // 手のひらの下へ、少し引きずった跡
-        const float drag = (1.0f - smoothstep(1.4f, 1.9f, abs(handPoint.x))) * step(handPoint.y, 0.0f) *
-            (1.0f - saturate(-handPoint.y / 5.0f)) * (0.5f + 0.5f * sin(handPoint.x * 7.0f)) * 0.6f;
-        const float smudge = 0.6f + 0.4f * FastValueNoise(local * 0.8f + float(index) * 13.0f);
+        const float drag = (1.0f - smoothstep(HANDPRINT_DRAG_EDGE_START, HANDPRINT_DRAG_EDGE_END, abs(handPoint.x))) * step(handPoint.y, 0.0f) *
+            (1.0f - saturate(-handPoint.y / HANDPRINT_DRAG_LENGTH)) * (0.5f + 0.5f * sin(handPoint.x * HANDPRINT_DRAG_STRIPES)) * HANDPRINT_DRAG_STRENGTH;
+        const float smudge = HANDPRINT_SMUDGE_BASE + HANDPRINT_SMUDGE_RANGE * FastValueNoise(local * HANDPRINT_SMUDGE_SCALE + float(index) * HANDPRINT_SMUDGE_SEED_STEP);
         mask = max(mask, max(hand, drag) * smudge * print.w);
     }
     return mask;
@@ -220,6 +243,146 @@ static const float WALL_TIDE_MARK_LINE_FALLOFF = 1.6f;
 static const float WallFloorY = -100.0f;
 static const float WallHeight = 51.0f;
 
+// --- 壁の古さの値（ComputeWallAgeing）
+// 打ちっぱなしコンクリートのパネルの幅（高さは壁の3分の1）と、パネルごとの色の乱数のずらし
+static const float WALL_PANEL_WIDTH = 60.0f;
+static const float WALL_PANEL_ROWS = 3.0f;
+static const float WALL_PANEL_SHADE_SEED = 71.0f;
+// 気泡の穴とひびを描く画素の大きさの上限（これより遠いと1画素より小さい）
+static const float WALL_DETAIL_FOOTPRINT_LIMIT = 0.5f;
+// 気泡の穴：マス目の大きさ、乱数のずらし（出るか・横・縦・大きさ）、出る割合のしきい値、位置のずらしの幅、
+// 大きさ（最小＋乱数の幅）、穴の芯の割合
+static const float WALL_PIT_CELL_SIZE = 1.6f;
+static const float WALL_PIT_SEED = 17.3f;
+static const float WALL_PIT_OFFSET_SEED_X = 3.9f;
+static const float WALL_PIT_OFFSET_SEED_Y = 8.6f;
+static const float WALL_PIT_SIZE_SEED = 29.4f;
+static const float WALL_PIT_THRESHOLD = 0.92f;
+static const float WALL_PIT_OFFSET_RANGE = 0.5f;
+static const float WALL_PIT_OFFSET_CENTER = 0.25f;
+static const float WALL_PIT_MIN_SIZE = 0.05f;
+static const float WALL_PIT_SIZE_RANGE = 0.12f;
+static const float WALL_PIT_CORE = 0.4f;
+// ひび：出る場所のノイズのずらし、線を揺らすノイズ（細かさとずらし）、等高線のノイズ（細かさとずらし）、途切れさせるノイズ（細かさとずらし）
+static const float WALL_CRACK_MASK_SEED = 9.0f;
+static const float WALL_CRACK_WARP_SCALE = 0.9f;
+static const float WALL_CRACK_WARP_SEED_X = 3.0f;
+static const float WALL_CRACK_WARP_SEED_Y = 17.0f;
+static const float WALL_CRACK_LINE_SCALE = 0.085f;
+static const float WALL_CRACK_LINE_SEED = 61.0f;
+static const float WALL_CRACK_BREAK_SCALE = 0.32f;
+static const float WALL_CRACK_BREAK_SEED = 41.0f;
+// 床際の水位線：高さ（最低＋揺らぎの幅）、揺らぎの細かさ、ノイズの縦の座標
+static const float WALL_WATER_LINE_BASE = 6.0f;
+static const float WALL_WATER_LINE_RANGE = 6.0f;
+static const float WALL_WATER_LINE_SCALE = 0.04f;
+static const float WALL_WATER_LINE_SEED = 3.1f;
+// 上から垂れた錆と水の跡：帯の幅、出るかの乱数のずらしとしきい値（2割ほど）、半分の幅（最小＋乱数の幅）とその乱数のずらし、
+// 長さ（最小＋乱数の幅）とその乱数のずらし、芯の割合、消え始める長さの割合、濃さのむら（最低＋幅、細かさ）
+static const float WALL_STREAK_WIDTH = 2.4f;
+static const float WALL_STREAK_SEED = 41.7f;
+static const float WALL_STREAK_THRESHOLD = 0.80f;
+static const float WALL_STREAK_MIN_HALF_WIDTH = 0.10f;
+static const float WALL_STREAK_HALF_WIDTH_RANGE = 0.22f;
+static const float WALL_STREAK_WIDTH_SEED = 7.7f;
+static const float WALL_STREAK_MIN_LENGTH = 14.0f;
+static const float WALL_STREAK_LENGTH_RANGE = 26.0f;
+static const float WALL_STREAK_LENGTH_SEED = 13.1f;
+static const float WALL_STREAK_CORE = 0.35f;
+static const float WALL_STREAK_FADE_START = 0.45f;
+static const float WALL_STREAK_SHADE_BASE = 0.55f;
+static const float WALL_STREAK_SHADE_RANGE = 0.45f;
+static const float WALL_STREAK_SHADE_COLUMN_SCALE = 3.1f;
+static const float WALL_STREAK_SHADE_HEIGHT_SCALE = 0.35f;
+// カビ：塊のしきい値（出始め・濃くなる）とノイズの細かさ・ずらし、床からの減り方と壁の途中に残す量、
+// 斑点を描く画素の大きさの上限、回転（30度の cos と sin）、斑点のノイズ2つ（細かさ・ずらし・割合）、斑点の濃淡（最低・しきい値）
+static const float WALL_MOLD_START = 0.58f;
+static const float WALL_MOLD_FULL = 0.82f;
+static const float WALL_MOLD_SCALE = 0.055f;
+static const float WALL_MOLD_SEED = 23.0f;
+static const float WALL_MOLD_HEIGHT_FALLOFF = 0.05f;
+static const float WALL_MOLD_HEIGHT_FLOOR = 0.30f;
+static const float WALL_MOLD_FOOTPRINT_LIMIT = 0.6f;
+static const float WALL_MOLD_ROTATE_COS = 0.866f;
+static const float WALL_MOLD_ROTATE_SIN = 0.5f;
+static const float WALL_MOLD_GRAIN_SCALE_A = 1.1f;
+static const float WALL_MOLD_GRAIN_SEED_A = 5.0f;
+static const float WALL_MOLD_GRAIN_WEIGHT_A = 0.6f;
+static const float WALL_MOLD_GRAIN_SCALE_B = 2.7f;
+static const float WALL_MOLD_GRAIN_SEED_B = 13.0f;
+static const float WALL_MOLD_GRAIN_WEIGHT_B = 0.4f;
+static const float WALL_MOLD_SPECKLE_MIN = 0.45f;
+static const float WALL_MOLD_SPECKLE_START = 0.30f;
+static const float WALL_MOLD_SPECKLE_END = 0.75f;
+// へこみの高さ（継ぎ目・穴・ひび・引っかき傷）と、奥の暗さ（同じ順）
+static const float WALL_SEAM_DEPTH = 0.7f;
+static const float WALL_PIT_DEPTH = 0.5f;
+static const float WALL_CRACK_DEPTH = 0.35f;
+static const float WALL_GOUGE_DEPTH = 0.9f;
+static const float WALL_SEAM_CAVITY = 0.32f;
+static const float WALL_PIT_CAVITY = 0.40f;
+static const float WALL_CRACK_CAVITY = 0.42f;
+static const float WALL_GOUGE_CAVITY = 0.25f;
+// 色（元の色に掛ける）：錆、カビ、水に浸かっていた部分、パネルの明るさ（最低＋むらの幅）、それぞれの混ぜ方、
+// 引っかき傷で明るくする量と混ぜ方、血の色と混ぜ方
+static const float3 WALL_RUST_COLOR = float3(0.66f, 0.50f, 0.38f);
+static const float3 WALL_MOLD_COLOR = float3(0.26f, 0.32f, 0.24f);
+static const float3 WALL_SOAKED_COLOR = float3(0.72f, 0.76f, 0.70f);
+static const float WALL_PANEL_TINT_BASE = 0.94f;
+static const float WALL_PANEL_TINT_RANGE = 0.10f;
+static const float WALL_SOAKED_BLEND = 0.60f;
+static const float WALL_TIDE_RUST_DARKEN = 0.85f;
+static const float WALL_TIDE_BLEND = 0.50f;
+static const float WALL_STREAK_BLEND = 0.65f;
+static const float WALL_MOLD_BLEND = 0.75f;
+static const float WALL_GOUGE_BRIGHTEN = 1.35f;
+static const float WALL_GOUGE_BLEND = 0.8f;
+static const float3 WALL_BLOOD_COLOR = float3(0.46f, 0.035f, 0.030f);
+static const float WALL_BLOOD_BLEND = 0.92f;
+// 湿りの光沢（水に浸かっていた部分・垂れ跡・血）
+static const float WALL_SOAKED_DAMP = 0.6f;
+static const float WALL_STREAK_DAMP = 0.4f;
+static const float WALL_BLOOD_DAMP = 0.9f;
+
+// --- 天井の古さの値（ComputeCeilingAgeing）
+// 天井板の大きさ（12四方）、枠の幅（芯・ぼかし）、板ごとの乱数のずらし、外れ落ちた板の割合のしきい値（7%ほど）
+static const float CEILING_TILE_SIZE = 12.0f;
+static const float CEILING_FRAME_CORE = 0.15f;
+static const float CEILING_FRAME_EDGE = 0.35f;
+static const float CEILING_TILE_SEED = 5.0f;
+static const float CEILING_MISSING_THRESHOLD = 0.93f;
+// 雨漏りの染み：出るかの乱数のずらしとしきい値（25%ほど）、中心（最小＋乱数の幅）とその乱数のずらし、半径（最小＋乱数の幅）とその乱数のずらし、
+// 縁のゆがみ（最低＋ノイズの幅、細かさ・ずらし）、にじみの芯の割合、輪の鋭さ
+static const float CEILING_STAIN_SEED = 19.0f;
+static const float CEILING_STAIN_THRESHOLD = 0.75f;
+static const float CEILING_STAIN_CENTER_MIN = 0.3f;
+static const float CEILING_STAIN_CENTER_RANGE = 0.4f;
+static const float CEILING_STAIN_CENTER_SEED_X = 31.0f;
+static const float CEILING_STAIN_CENTER_SEED_Y = 47.0f;
+static const float CEILING_STAIN_MIN_RADIUS = 2.0f;
+static const float CEILING_STAIN_RADIUS_RANGE = 3.0f;
+static const float CEILING_STAIN_RADIUS_SEED = 61.0f;
+static const float CEILING_STAIN_WARP_BASE = 0.85f;
+static const float CEILING_STAIN_WARP_RANGE = 0.3f;
+static const float CEILING_STAIN_WARP_SCALE = 0.4f;
+static const float CEILING_STAIN_WARP_SEED = 3.0f;
+static const float CEILING_STAIN_CORE = 0.55f;
+static const float CEILING_STAIN_RING_SHARPNESS = 3.0f;
+// 高さ（枠は少し下に出る、外れた板の穴はへこむ）と穴の暗さ
+static const float CEILING_FRAME_HEIGHT = 0.4f;
+static const float CEILING_MISSING_DEPTH = 1.5f;
+static const float CEILING_MISSING_CAVITY = 0.9f;
+// 色：板の明るさ（最低＋乱数の幅）、枠、染みのにじみと輪（色と混ぜ方）、穴の暗さ、染みの湿り
+static const float CEILING_TILE_BRIGHTNESS = 2.3f;
+static const float CEILING_TILE_BRIGHTNESS_RANGE = 0.4f;
+static const float3 CEILING_FRAME_COLOR = float3(1.6f, 1.6f, 1.55f);
+static const float3 CEILING_STAIN_COLOR = float3(0.78f, 0.62f, 0.44f);
+static const float CEILING_STAIN_BLEND = 0.65f;
+static const float3 CEILING_STAIN_RING_COLOR = float3(0.50f, 0.40f, 0.30f);
+static const float CEILING_STAIN_RING_BLEND = 0.55f;
+static const float CEILING_MISSING_SHADE = 0.20f;
+static const float CEILING_STAIN_DAMP = 0.3f;
+
 // normal はワールドの法線の絶対値、weight は古さの濃さ（0より大きい）。GetWallAgeing から呼んでいる。
 WallAgeing ComputeWallAgeing(float3 worldPosition, float3 normal, float weight)
 {
@@ -231,94 +394,94 @@ WallAgeing ComputeWallAgeing(float3 worldPosition, float3 normal, float weight)
         worldPosition.y);
     const float heightFromFloor = worldPosition.y - WallFloorY;
     // 1画素がワールドで何単位か。遠くで細かい模様がちらつかないよう、これで薄めている。
-    const float footprint = max(length(fwidth(uv)), 0.0001f);
+    const float footprint = max(length(fwidth(uv)), MIN_PIXEL_FOOTPRINT);
 
     // --- 打ちっぱなしコンクリートの継ぎ目（幅60・高さ17のパネル。壁の文字の高さ y=-70 は横の継ぎ目を避けている）
     // 縦の継ぎ目はくっきり、横の継ぎ目（型枠の跡）は細く浅くして、タイル張りに見えないようにしている。
-    const float2 panelSize = float2(60.0f, WallHeight / 3.0f);
+    const float2 panelSize = float2(WALL_PANEL_WIDTH, WallHeight / WALL_PANEL_ROWS);
     const float2 panelUV = float2(uv.x, heightFromFloor) / panelSize;
     const float2 edgeDistance = (0.5f - abs(frac(panelUV) - 0.5f)) * panelSize;
     const float verticalJoint = 1.0f - smoothstep(WALL_VERTICAL_JOINT_CORE, WALL_VERTICAL_JOINT_EDGE + footprint, edgeDistance.x);
     const float formLine = (1.0f - smoothstep(WALL_FORM_LINE_CORE, WALL_FORM_LINE_EDGE + footprint, edgeDistance.y)) * WALL_FORM_LINE_WEIGHT;
     const float seam = max(verticalJoint, formLine);
     // パネルごとに、打った日の違いで色をわずかに変えている。
-    const float panelShade = FastHash21(floor(panelUV) + 71.0f);
+    const float panelShade = FastHash21(floor(panelUV) + WALL_PANEL_SHADE_SEED);
 
     // 気泡の穴とひびは、遠くて1画素より小さくなる場所では見えないため、計算を省いている。
     float pit = 0.0f;
     float crack = 0.0f;
     [branch]
-    if (footprint < 0.5f)
+    if (footprint < WALL_DETAIL_FOOTPRINT_LIMIT)
     {
         // --- 小さな気泡の穴（マス目の中で位置と大きさをばらつかせ、格子状に並ばないようにしている）
-        const float pitCellSize = 1.6f;
+        const float pitCellSize = WALL_PIT_CELL_SIZE;
         const float2 pitCell = floor(uv / pitCellSize);
-        const float pitSeed = FastHash21(pitCell + 17.3f);
+        const float pitSeed = FastHash21(pitCell + WALL_PIT_SEED);
         [branch]
-        if (pitSeed >= 0.92f)
+        if (pitSeed >= WALL_PIT_THRESHOLD)
         {
             const float2 pitOffset = float2(
-                FastHash21(pitCell + 3.9f), FastHash21(pitCell + 8.6f)) * 0.5f - 0.25f;
-            const float pitSize = 0.05f + 0.12f * FastHash21(pitCell + 29.4f);
+                FastHash21(pitCell + WALL_PIT_OFFSET_SEED_X), FastHash21(pitCell + WALL_PIT_OFFSET_SEED_Y)) * WALL_PIT_OFFSET_RANGE - WALL_PIT_OFFSET_CENTER;
+            const float pitSize = WALL_PIT_MIN_SIZE + WALL_PIT_SIZE_RANGE * FastHash21(pitCell + WALL_PIT_SIZE_SEED);
             const float pitRadius = length(frac(uv / pitCellSize) - 0.5f - pitOffset) * pitCellSize;
-            pit = (1.0f - smoothstep(pitSize * 0.4f, pitSize + footprint, pitRadius)) *
-                saturate(1.0f - footprint / 0.5f);
+            pit = (1.0f - smoothstep(pitSize * WALL_PIT_CORE, pitSize + footprint, pitRadius)) *
+                saturate(1.0f - footprint / WALL_DETAIL_FOOTPRINT_LIMIT);
         }
 
         // --- ひび（ノイズの等高線を細い線として使い、別のノイズで出る場所を絞っている）
         // 等高線だけだと大きな輪のようななめらかな曲線になるため、細かいノイズで線をギザギザに揺らし、
         // さらに別のノイズで途切れ途切れにして、割れたひびらしくしている。
-        const float crackMask = smoothstep(WALL_CRACK_MASK_START, WALL_CRACK_MASK_FULL, FastValueNoise(uv * WALL_CRACK_MASK_SCALE + 9.0f));
+        const float crackMask = smoothstep(WALL_CRACK_MASK_START, WALL_CRACK_MASK_FULL, FastValueNoise(uv * WALL_CRACK_MASK_SCALE + WALL_CRACK_MASK_SEED));
         [branch]
         if (crackMask > 0.0f && footprint < WALL_CRACK_FOOTPRINT_LIMIT)
         {
             const float2 crackWarp = float2(
-                FastValueNoise(uv * 0.9f + 3.0f), FastValueNoise(uv * 0.9f + 17.0f)) - 0.5f;
+                FastValueNoise(uv * WALL_CRACK_WARP_SCALE + WALL_CRACK_WARP_SEED_X), FastValueNoise(uv * WALL_CRACK_WARP_SCALE + WALL_CRACK_WARP_SEED_Y)) - 0.5f;
             const float crackLine = 1.0f - smoothstep(0.0f, WALL_CRACK_LINE_WIDTH + footprint * WALL_CRACK_LINE_FILTER,
-                abs(FastValueNoise(uv * 0.085f + 61.0f + crackWarp * WALL_CRACK_WARP_WEIGHT) - 0.5f));
-            const float crackPieces = smoothstep(WALL_CRACK_BREAK_START, WALL_CRACK_BREAK_END, FastValueNoise(uv * 0.32f + 41.0f));
+                abs(FastValueNoise(uv * WALL_CRACK_LINE_SCALE + WALL_CRACK_LINE_SEED + crackWarp * WALL_CRACK_WARP_WEIGHT) - 0.5f));
+            const float crackPieces = smoothstep(WALL_CRACK_BREAK_START, WALL_CRACK_BREAK_END, FastValueNoise(uv * WALL_CRACK_BREAK_SCALE + WALL_CRACK_BREAK_SEED));
             crack = crackLine * crackMask * crackPieces * saturate(1.0f - footprint / WALL_CRACK_FOOTPRINT_LIMIT);
         }
     }
 
     // --- 床際の水位線（水がたまっていた跡）。高さは場所によって6〜12で揺らいでいる
-    const float waterLine = 6.0f + 6.0f * FastValueNoise(float2(uv.x * 0.04f, 3.1f));
+    const float waterLine = WALL_WATER_LINE_BASE + WALL_WATER_LINE_RANGE * FastValueNoise(float2(uv.x * WALL_WATER_LINE_SCALE, WALL_WATER_LINE_SEED));
     const float belowWater = 1.0f - smoothstep(waterLine - WALL_TIDE_MARK_BOTTOM_BLEND, waterLine + WALL_TIDE_MARK_TOP_BLEND, heightFromFloor);
     const float tideMark = exp(-abs(heightFromFloor - waterLine) * WALL_TIDE_MARK_LINE_FALLOFF);
 
     // --- 上から垂れた錆と水の跡（幅2.4ごとの縦の帯のうち、2割ほどに出している）
-    const float streakWidth = 2.4f;
+    const float streakWidth = WALL_STREAK_WIDTH;
     const float column = floor(uv.x / streakWidth);
-    const float streakSeed = FastHash21(float2(column, 41.7f));
+    const float streakSeed = FastHash21(float2(column, WALL_STREAK_SEED));
     float streak = 0.0f;
     [branch]
-    if (streakSeed >= 0.80f)
+    if (streakSeed >= WALL_STREAK_THRESHOLD)
     {
         const float streakX = abs(frac(uv.x / streakWidth) - 0.5f);
-        const float streakHalfWidth = 0.10f + 0.22f * FastHash21(float2(column, 7.7f));
-        const float streakLength = 14.0f + 26.0f * FastHash21(float2(column, 13.1f));
+        const float streakHalfWidth = WALL_STREAK_MIN_HALF_WIDTH + WALL_STREAK_HALF_WIDTH_RANGE * FastHash21(float2(column, WALL_STREAK_WIDTH_SEED));
+        const float streakLength = WALL_STREAK_MIN_LENGTH + WALL_STREAK_LENGTH_RANGE * FastHash21(float2(column, WALL_STREAK_LENGTH_SEED));
         const float fromTop = WallHeight - heightFromFloor;
-        streak = (1.0f - smoothstep(streakHalfWidth * 0.35f, streakHalfWidth + footprint, streakX)) *
-            (1.0f - smoothstep(streakLength * 0.45f, streakLength, fromTop)) *
-            (0.55f + 0.45f * FastValueNoise(float2(column * 3.1f, heightFromFloor * 0.35f)));
+        streak = (1.0f - smoothstep(streakHalfWidth * WALL_STREAK_CORE, streakHalfWidth + footprint, streakX)) *
+            (1.0f - smoothstep(streakLength * WALL_STREAK_FADE_START, streakLength, fromTop)) *
+            (WALL_STREAK_SHADE_BASE + WALL_STREAK_SHADE_RANGE * FastValueNoise(float2(column * WALL_STREAK_SHADE_COLUMN_SCALE, heightFromFloor * WALL_STREAK_SHADE_HEIGHT_SCALE)));
     }
 
     // --- カビ（床際に多く、壁の途中にも固まって生えている）。細かい斑点はなめらかなノイズで丸くにじませている
     // 値ノイズは格子に沿った四角い形が出やすいため、座標を回転させ、大きさの違う2つを混ぜて格子を崩している。
-    const float moldCluster = smoothstep(0.58f, 0.82f, FastValueNoise(uv * 0.055f + 23.0f));
-    float mold = moldCluster * saturate(exp(-heightFromFloor * 0.05f) + 0.30f);
+    const float moldCluster = smoothstep(WALL_MOLD_START, WALL_MOLD_FULL, FastValueNoise(uv * WALL_MOLD_SCALE + WALL_MOLD_SEED));
+    float mold = moldCluster * saturate(exp(-heightFromFloor * WALL_MOLD_HEIGHT_FALLOFF) + WALL_MOLD_HEIGHT_FLOOR);
     [branch]
-    if (moldCluster > 0.0f && footprint < 0.6f)
+    if (moldCluster > 0.0f && footprint < WALL_MOLD_FOOTPRINT_LIMIT)
     {
         const float2 rotatedUV = float2(
-            uv.x * 0.866f - uv.y * 0.5f,
-            uv.x * 0.5f + uv.y * 0.866f);
+            uv.x * WALL_MOLD_ROTATE_COS - uv.y * WALL_MOLD_ROTATE_SIN,
+            uv.x * WALL_MOLD_ROTATE_SIN + uv.y * WALL_MOLD_ROTATE_COS);
         const float moldGrain =
-            FastValueNoise(rotatedUV * 1.1f + 5.0f) * 0.6f +
-            FastValueNoise(uv * 2.7f - 13.0f) * 0.4f;
+            FastValueNoise(rotatedUV * WALL_MOLD_GRAIN_SCALE_A + WALL_MOLD_GRAIN_SEED_A) * WALL_MOLD_GRAIN_WEIGHT_A +
+            FastValueNoise(uv * WALL_MOLD_GRAIN_SCALE_B - WALL_MOLD_GRAIN_SEED_B) * WALL_MOLD_GRAIN_WEIGHT_B;
         // 斑点はカビの塊の中の濃淡として使う。
-        const float moldSpeckle = lerp(0.45f, 1.0f, smoothstep(0.30f, 0.75f, moldGrain));
-        mold *= lerp(1.0f, moldSpeckle, saturate(1.0f - footprint / 0.6f));
+        const float moldSpeckle = lerp(WALL_MOLD_SPECKLE_MIN, 1.0f, smoothstep(WALL_MOLD_SPECKLE_START, WALL_MOLD_SPECKLE_END, moldGrain));
+        mold *= lerp(1.0f, moldSpeckle, saturate(1.0f - footprint / WALL_MOLD_FOOTPRINT_LIMIT));
     }
 
     // --- ホラーらしい跡（血の手形と引きずった跡、引っかき傷、血の垂れ跡。horrorMarks.hlsli）
@@ -337,25 +500,21 @@ WallAgeing ComputeWallAgeing(float3 worldPosition, float3 normal, float weight)
     }
 
     // 継ぎ目・穴・ひび・引っかき傷を、へこみの高さと、奥の暗さにしている
-    ageing.height = -(seam * 0.7f + pit * 0.5f + crack * 0.35f + marks.gouge * 0.9f) * weight;
-    ageing.cavity = saturate(seam * 0.32f + pit * 0.40f + crack * 0.42f + marks.gouge * 0.25f) * weight;
+    ageing.height = -(seam * WALL_SEAM_DEPTH + pit * WALL_PIT_DEPTH + crack * WALL_CRACK_DEPTH + marks.gouge * WALL_GOUGE_DEPTH) * weight;
+    ageing.cavity = saturate(seam * WALL_SEAM_CAVITY + pit * WALL_PIT_CAVITY + crack * WALL_CRACK_CAVITY + marks.gouge * WALL_GOUGE_CAVITY) * weight;
 
     // 色は元の色に掛けている（茶色＝錆、くすんだ緑＝カビ、少し暗い灰緑＝水に浸かっていた部分）。
-    const float3 rust = float3(0.66f, 0.50f, 0.38f);
-    const float3 moldColor = float3(0.26f, 0.32f, 0.24f);
-    const float3 soakedColor = float3(0.72f, 0.76f, 0.70f);
-    float3 tint = (0.94f + 0.10f * panelShade).xxx;
-    tint = lerp(tint, soakedColor, belowWater * 0.60f);
-    tint = lerp(tint, rust * 0.85f, tideMark * 0.50f);
-    tint = lerp(tint, rust, streak * 0.65f);
-    tint = lerp(tint, moldColor, mold * 0.75f);
+    float3 tint = (WALL_PANEL_TINT_BASE + WALL_PANEL_TINT_RANGE * panelShade).xxx;
+    tint = lerp(tint, WALL_SOAKED_COLOR, belowWater * WALL_SOAKED_BLEND);
+    tint = lerp(tint, WALL_RUST_COLOR * WALL_TIDE_RUST_DARKEN, tideMark * WALL_TIDE_BLEND);
+    tint = lerp(tint, WALL_RUST_COLOR, streak * WALL_STREAK_BLEND);
+    tint = lerp(tint, WALL_MOLD_COLOR, mold * WALL_MOLD_BLEND);
     // 引っかき傷は、汚れた表面が削れて下の明るいコンクリートが見えている。血は赤黒く、青と緑を強く吸う
-    const float3 bloodColor = float3(0.46f, 0.035f, 0.030f);
-    tint = lerp(tint, tint * 1.35f, marks.gouge * 0.8f);
-    tint = lerp(tint, bloodColor, marks.blood * 0.92f);
+    tint = lerp(tint, tint * WALL_GOUGE_BRIGHTEN, marks.gouge * WALL_GOUGE_BLEND);
+    tint = lerp(tint, WALL_BLOOD_COLOR, marks.blood * WALL_BLOOD_BLEND);
     ageing.tint = lerp(1.0f.xxx, tint, weight);
     // 血は乾ききっておらず、浅い角度で懐中電灯の光を返す（湿りの光沢を使っている）
-    ageing.damp = saturate(belowWater * 0.6f + streak * 0.4f + marks.blood * 0.9f) * weight;
+    ageing.damp = saturate(belowWater * WALL_SOAKED_DAMP + streak * WALL_STREAK_DAMP + marks.blood * WALL_BLOOD_DAMP) * weight;
     return ageing;
 }
 
@@ -364,48 +523,53 @@ WallAgeing ComputeWallAgeing(float3 worldPosition, float3 normal, float weight)
 WallAgeing ComputeCeilingAgeing(float2 position, float weight)
 {
     WallAgeing ageing;
-    const float footprint = max(length(fwidth(position)), 0.0001f);
+    const float footprint = max(length(fwidth(position)), MIN_PIXEL_FOOTPRINT);
 
     // --- 天井板と金属の枠
-    const float tileSize = 12.0f;
+    const float tileSize = CEILING_TILE_SIZE;
     const float2 tileUV = position / tileSize;
     const float2 tileId = floor(tileUV);
     const float2 local = frac(tileUV);
     const float2 edgeDistance = (0.5f - abs(local - 0.5f)) * tileSize;
-    const float frame = 1.0f - smoothstep(0.15f, 0.35f + footprint, min(edgeDistance.x, edgeDistance.y));
-    const float tileSeed = FastHash21(tileId + 5.0f);
+    const float frame = 1.0f - smoothstep(CEILING_FRAME_CORE, CEILING_FRAME_EDGE + footprint, min(edgeDistance.x, edgeDistance.y));
+    const float tileSeed = FastHash21(tileId + CEILING_TILE_SEED);
 
     // --- 外れ落ちた板（7%ほど）。枠だけ残り、奥の暗い空間が見えている
-    const float missing = step(0.93f, tileSeed) * (1.0f - frame);
+    const float missing = step(CEILING_MISSING_THRESHOLD, tileSeed) * (1.0f - frame);
 
     // --- 雨漏りの染み（板の25%ほど）。茶色いにじみと、縁の濃い輪
-    const float stainSeed = FastHash21(tileId + 19.0f);
-    const float2 stainCenter = 0.3f + 0.4f * float2(
-        FastHash21(tileId + 31.0f), FastHash21(tileId + 47.0f));
-    const float stainRadius = 2.0f + 3.0f * FastHash21(tileId + 61.0f);
+    const float stainSeed = FastHash21(tileId + CEILING_STAIN_SEED);
+    const float2 stainCenter = CEILING_STAIN_CENTER_MIN + CEILING_STAIN_CENTER_RANGE * float2(
+        FastHash21(tileId + CEILING_STAIN_CENTER_SEED_X), FastHash21(tileId + CEILING_STAIN_CENTER_SEED_Y));
+    const float stainRadius = CEILING_STAIN_MIN_RADIUS + CEILING_STAIN_RADIUS_RANGE * FastHash21(tileId + CEILING_STAIN_RADIUS_SEED);
     const float stainDistance = length(local - stainCenter) * tileSize *
-        (0.85f + 0.3f * FastValueNoise(position * 0.4f + 3.0f));
-    const float stainOn = step(0.75f, stainSeed) * (1.0f - missing) * (1.0f - frame);
-    const float stainFill = (1.0f - smoothstep(stainRadius * 0.55f, stainRadius, stainDistance)) * stainOn;
-    const float stainRing = exp(-abs(stainDistance - stainRadius) * 3.0f) * stainOn;
+        (CEILING_STAIN_WARP_BASE + CEILING_STAIN_WARP_RANGE * FastValueNoise(position * CEILING_STAIN_WARP_SCALE + CEILING_STAIN_WARP_SEED));
+    const float stainOn = step(CEILING_STAIN_THRESHOLD, stainSeed) * (1.0f - missing) * (1.0f - frame);
+    const float stainFill = (1.0f - smoothstep(stainRadius * CEILING_STAIN_CORE, stainRadius, stainDistance)) * stainOn;
+    const float stainRing = exp(-abs(stainDistance - stainRadius) * CEILING_STAIN_RING_SHARPNESS) * stainOn;
 
     // 枠は板より少し下に出ていて、外れた板の穴は奥へへこんでいる。
-    ageing.height = (frame * 0.4f - missing * 1.5f) * weight;
-    ageing.cavity = missing * 0.9f * weight;
+    ageing.height = (frame * CEILING_FRAME_HEIGHT - missing * CEILING_MISSING_DEPTH) * weight;
+    ageing.cavity = missing * CEILING_MISSING_CAVITY * weight;
 
     // 板・枠・染み・穴の色
-    const float3 tileColor = (2.3f + 0.4f * tileSeed).xxx;
-    const float3 frameColor = float3(1.6f, 1.6f, 1.55f);
-    float3 tint = lerp(tileColor, frameColor, frame);
-    tint = lerp(tint, tint * float3(0.78f, 0.62f, 0.44f), stainFill * 0.65f);
-    tint = lerp(tint, tint * float3(0.50f, 0.40f, 0.30f), stainRing * 0.55f);
-    tint = lerp(tint, 0.20f.xxx, missing);
+    const float3 tileColor = (CEILING_TILE_BRIGHTNESS + CEILING_TILE_BRIGHTNESS_RANGE * tileSeed).xxx;
+    float3 tint = lerp(tileColor, CEILING_FRAME_COLOR, frame);
+    tint = lerp(tint, tint * CEILING_STAIN_COLOR, stainFill * CEILING_STAIN_BLEND);
+    tint = lerp(tint, tint * CEILING_STAIN_RING_COLOR, stainRing * CEILING_STAIN_RING_BLEND);
+    tint = lerp(tint, CEILING_MISSING_SHADE.xxx, missing);
     ageing.tint = lerp(1.0f.xxx, tint, weight);
-    ageing.damp = stainFill * 0.3f * weight;
+    ageing.damp = stainFill * CEILING_STAIN_DAMP * weight;
     return ageing;
 }
 
 // その面の古さを返している（壁・天井・それ以外で分けている）
+// 縦の面とみなす範囲（壁の古さが出始める・出きる）と、下を向いた面とみなす範囲（天井の古さ）
+static const float WALL_AGEING_VERTICAL_START = 0.5f;
+static const float WALL_AGEING_VERTICAL_FULL = 0.9f;
+static const float CEILING_AGEING_DOWN_START = 0.7f;
+static const float CEILING_AGEING_DOWN_FULL = 0.95f;
+
 WallAgeing GetWallAgeing(float3 worldPosition, float3 worldNormal, float amount)
 {
     WallAgeing ageing;
@@ -420,8 +584,8 @@ WallAgeing GetWallAgeing(float3 worldPosition, float3 worldNormal, float amount)
     const float3 signedNormal = normalize(worldNormal);
     const float3 normal = abs(signedNormal);
     const float verticalSurface = saturate(1.0f - normal.y * normal.y);
-    const float weight = amount * smoothstep(0.5f, 0.9f, verticalSurface);
-    const float ceilingWeight = amount * smoothstep(0.7f, 0.95f, -signedNormal.y);
+    const float weight = amount * smoothstep(WALL_AGEING_VERTICAL_START, WALL_AGEING_VERTICAL_FULL, verticalSurface);
+    const float ceilingWeight = amount * smoothstep(CEILING_AGEING_DOWN_START, CEILING_AGEING_DOWN_FULL, -signedNormal.y);
     [branch]
     if (weight > 0.0f)
     {
@@ -479,6 +643,17 @@ static const float WALL_TRICKLE_DAMP_BIAS = 0.25f;
 static const float WALL_TRICKLE_DAMP_START = 0.56f;
 static const float WALL_TRICKLE_DAMP_FULL = 0.72f;
 
+// 水の筋のくねりの幅（ノイズに掛ける量と、線をずらす量）
+static const float WALL_TRICKLE_WOBBLE_AMOUNT = 0.6f;
+// 流れ落ちる水の粒：粒になる範囲（濃くなり始め・濃くなりきる）と、水の膜の濃さ（最低＋粒の幅）
+static const float WALL_TRICKLE_BEAD_START = 0.55f;
+static const float WALL_TRICKLE_BEAD_END = 0.95f;
+static const float WALL_TRICKLE_FILM_BASE = 0.55f;
+static const float WALL_TRICKLE_FILM_RANGE = 0.45f;
+// 天井の際から流れ始める速さ（高さの割合に掛ける）と、天井近くの水の量（床に近いほど1）
+static const float WALL_TRICKLE_CEILING_FADE = 8.0f;
+static const float WALL_TRICKLE_TOP_AMOUNT = 0.55f;
+
 float GetWallTrickle(float3 worldPosition, float3 worldNormal, float damp)
 {
     const float3 axis = abs(normalize(worldNormal));
@@ -497,20 +672,20 @@ float GetWallTrickle(float3 worldPosition, float3 worldNormal, float damp)
         return 0.0f;
     }
     // 筋の線：列ごとの太さで、高さに沿ってわずかにくねらせている
-    const float wobble = (FastValueNoise(float2(column * WALL_TRICKLE_WOBBLE_COLUMN_SCALE, worldPosition.y * WALL_TRICKLE_WOBBLE_HEIGHT_SCALE)) - 0.5f) * 0.6f;
+    const float wobble = (FastValueNoise(float2(column * WALL_TRICKLE_WOBBLE_COLUMN_SCALE, worldPosition.y * WALL_TRICKLE_WOBBLE_HEIGHT_SCALE)) - 0.5f) * WALL_TRICKLE_WOBBLE_AMOUNT;
     const float width = lerp(WALL_TRICKLE_MIN_WIDTH, WALL_TRICKLE_MAX_WIDTH, FastHash21(float2(column, WALL_TRICKLE_WIDTH_SEED)));
-    const float trickleLine = 1.0f - smoothstep(width * 0.5f, width, abs(local - wobble * 0.6f));
+    const float trickleLine = 1.0f - smoothstep(width * 0.5f, width, abs(local - wobble * WALL_TRICKLE_WOBBLE_AMOUNT));
 
     // 上から下へ流れ落ちる水の粒（濃淡の模様を、時間とともに下へずらしている）
     const float speed = lerp(WALL_TRICKLE_MIN_SPEED, WALL_TRICKLE_MAX_SPEED, FastHash21(float2(column, WALL_TRICKLE_SPEED_SEED)));
     const float flowPhase = worldPosition.y * WALL_TRICKLE_BEAD_FREQUENCY + CausticTime * speed * WALL_TRICKLE_BEAD_FREQUENCY + seed * WALL_TRICKLE_PHASE_SEED_SCALE;
-    const float beads = smoothstep(0.55f, 0.95f, frac(flowPhase));
-    const float film = 0.55f + beads * 0.45f;
+    const float beads = smoothstep(WALL_TRICKLE_BEAD_START, WALL_TRICKLE_BEAD_END, frac(flowPhase));
+    const float film = WALL_TRICKLE_FILM_BASE + beads * WALL_TRICKLE_FILM_RANGE;
 
     // 天井の際から流れ始め、床に近いほど水が多い
     const float height = (worldPosition.y - WallFloorY) / WallHeight;
-    const float fromCeiling = saturate((1.0f - height) * 8.0f);
-    const float lowerAmount = lerp(1.0f, 0.55f, saturate(height));
+    const float fromCeiling = saturate((1.0f - height) * WALL_TRICKLE_CEILING_FADE);
+    const float lowerAmount = lerp(1.0f, WALL_TRICKLE_TOP_AMOUNT, saturate(height));
 
     // 壁の湿った区間（壁に沿った大きなまだら）だけに流している。床際の水の跡（damp）がある所は、少し流れやすくしている
     const float wetSection = FastValueNoise(float2(along * WALL_TRICKLE_DAMP_NOISE_SCALE, WALL_TRICKLE_DAMP_NOISE_SEED)) + damp * WALL_TRICKLE_DAMP_BIAS;
@@ -524,6 +699,79 @@ float GetWallTrickle(float3 worldPosition, float3 worldNormal, float damp)
 #include "figureShadow.hlsli"
 #include "toneMapping.hlsli"
 
+
+// --- 画素の色の計算（main）の値
+// 計算で描く絵の、普段のマテリアルの色（C++ の Stage2Layout と同じ値。異変で変わった色は、この色との比で掛ける）
+static const float3 PORTRAIT_BASE_DIFFUSE = float3(0.075f, 0.058f, 0.044f);
+static const float3 CLOCK_BASE_DIFFUSE = float3(0.095f, 0.086f, 0.070f);
+static const float3 DOOR_BASE_DIFFUSE = float3(0.07f, 0.025f, 0.018f);
+// 崩れて現れる・消える物：ノイズの細かさ、3つのノイズ（ずらし・細かさ・割合）、しきい値の広げ方、燃える縁の幅
+static const float DISSOLVE_NOISE_SCALE = 0.55f;
+static const float DISSOLVE_DEPTH_SKEW = 0.37f;
+static const float DISSOLVE_WEIGHT_A = 0.55f;
+static const float DISSOLVE_SCALE_B = 2.3f;
+static const float DISSOLVE_SEED_B = 7.0f;
+static const float DISSOLVE_WEIGHT_B = 0.30f;
+static const float DISSOLVE_SCALE_C = 5.1f;
+static const float DISSOLVE_SEED_C = 3.0f;
+static const float DISSOLVE_WEIGHT_C = 0.15f;
+static const float DISSOLVE_THRESHOLD_SCALE = 1.08f;
+static const float DISSOLVE_THRESHOLD_OFFSET = 0.04f;
+static const float DISSOLVE_EDGE_WIDTH = 0.07f;
+// 崩れている縁：焦げて黒ずむ量、燃える赤い光の色と強さ
+static const float DISSOLVE_CHAR_DARKEN = 0.55f;
+static const float3 DISSOLVE_GLOW_COLOR = float3(0.95f, 0.34f, 0.07f);
+static const float DISSOLVE_GLOW_STRENGTH = 1.5f;
+// 光る色の強さを平均で求める重みと、光らない面とみなす強さ
+static const float3 AVERAGE_WEIGHTS = float3(0.3333f, 0.3333f, 0.3333f);
+static const float EMISSION_EPSILON = 0.001f;
+// 外の森の材質の雨の濡れ：水の筋の列の細かさ（岩・樹皮・外壁）、水の筋を凹凸に足す量、凹凸の強さ
+static const float ROCK_RAIN_COLUMN_SCALE = 0.9f;
+static const float BARK_RAIN_COLUMN_SCALE = 1.6f;
+static const float FACADE_RAIN_COLUMN_SCALE = 0.7f;
+static const float RIVULET_HEIGHT = 0.12f;
+static const float FACADE_RIVULET_HEIGHT = 0.10f;
+static const float ROCK_BUMP_STRENGTH = 0.85f;
+static const float BARK_BUMP_STRENGTH = 1.10f;
+static const float FACADE_BUMP_STRENGTH = 0.9f;
+// 建物の汚れ：暗くする量、くすんだ緑の色と混ぜ方
+static const float GRIME_DARKEN = 0.22f;
+static const float3 GRIME_TINT = float3(0.72f, 0.80f, 0.69f);
+static const float GRIME_TINT_BLEND = 0.20f;
+// 壁の古さ：奥の暗さの効き方、湿りの光沢に足す割合。水の筋で暗くする量
+static const float AGEING_CAVITY_DARKEN = 0.55f;
+static const float AGEING_DAMP_WETNESS = 0.8f;
+static const float TRICKLE_DARKEN = 0.30f;
+// 水が引いた柱の根元の湿り：横を向いた面とみなす法線の y、柱からの範囲、水位からの高さの上限、
+// 水が引いてから湿りが出きる距離、湿りの上端（最低＋むら）とむらの細かさ、帯の下端（出始め・出きる）と上端のぼかし、色と光沢
+static const float DRAIN_SIDE_NORMAL_LIMIT = 0.2f;
+static const float DRAIN_COLUMN_HALF_WIDTH = 5.2f;
+static const float DRAIN_MAX_HEIGHT = 7.5f;
+static const float DRAIN_EXPOSE_DISTANCE = 3.0f;
+static const float DRAIN_DAMP_TOP = 4.7f;
+static const float DRAIN_DAMP_TOP_RANGE = 1.5f;
+static const float DRAIN_DAMP_NOISE_SCALE = 0.55f;
+static const float DRAIN_BAND_BOTTOM_START = -0.1f;
+static const float DRAIN_BAND_BOTTOM_END = 0.5f;
+static const float DRAIN_BAND_TOP_BLUR = 0.9f;
+static const float3 DRAIN_DAMP_COLOR = float3(0.51f, 0.56f, 0.55f);
+static const float DRAIN_DAMP_WETNESS = 0.50f;
+// 2面の血の手形の異変：血の色と混ぜ方、濡れた光沢
+static const float3 ANOMALY_BLOOD_COLOR = float3(0.85f, 0.05f, 0.04f);
+static const float ANOMALY_BLOOD_BLEND = 0.92f;
+static const float ANOMALY_BLOOD_WETNESS = 0.9f;
+// 凹凸の強さ：建物の壁（古さで強める量）と小物（壁の半分）、金属の錆の凹凸の効き方
+static const float BUILDING_BUMP_STRENGTH = 0.72f;
+static const float BUILDING_BUMP_WEATHERING = 0.8f;
+static const float PROP_BUMP_STRENGTH = 0.36f;
+static const float RUST_HEIGHT_SCALE = 0.6f;
+// 点光源：範囲と距離の下限（0で割らないため）、なだらかな当たり方（最低＋当たり方の割合）、横へ残す光の量
+static const float LIGHT_EPSILON = 0.001f;
+static const float SOFT_LAMBERT_BASE = 0.20f;
+static const float SOFT_LAMBERT_RANGE = 0.80f;
+static const float FIXTURE_SIDE_LIGHT = 0.22f;
+// 懐中電灯に掛ける部屋の角の暗がりの割合
+static const float FLASHLIGHT_ROOM_OCCLUSION = 0.4f;
 
 // 画素の色を計算している：元の色 → 汚れと古さ → 環境光・天井灯・懐中電灯 → 濡れた光沢 → 自己発光 → 霧 → 色調
 #if defined(PRINTED_SURFACE)
@@ -550,7 +798,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     {
         // 目の状態は、肖像画の面ではマテリアルの Ambuent（使っていない値）で受け取っている（Wall::SetPortraitEyes）
         const PortraitPaint painting = GetPortraitPainting(saturate(input.tex), Material.Ambuent);
-        const float3 portraitBaseDiffuse = float3(0.075f, 0.058f, 0.044f);
+        const float3 portraitBaseDiffuse = PORTRAIT_BASE_DIFFUSE;
         color.rgb = painting.albedo * (Material.Diffuse.rgb / portraitBaseDiffuse);
         paintingRelief = painting.relief;
         paintingEmission = painting.emission;
@@ -561,7 +809,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
 #if defined(CLOCK_SURFACE)
     {
         const ClockPaint clockPaint = GetClockFace(saturate(input.tex), Material.Ambuent);
-        const float3 clockBaseDiffuse = float3(0.095f, 0.086f, 0.070f);
+        const float3 clockBaseDiffuse = CLOCK_BASE_DIFFUSE;
         color.rgb = clockPaint.albedo * (Material.Diffuse.rgb / clockBaseDiffuse);
         paintingRelief = clockPaint.relief;
     }
@@ -570,7 +818,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
 #if defined(DOOR_SURFACE)
     {
         const DoorPaint doorPaint = GetDoorPainting(saturate(input.tex), Material.Ambuent);
-        const float3 doorBaseDiffuse = float3(0.07f, 0.025f, 0.018f);
+        const float3 doorBaseDiffuse = DOOR_BASE_DIFFUSE;
         color.rgb = doorPaint.albedo * (Material.Diffuse.rgb / doorBaseDiffuse);
         paintingRelief = doorPaint.relief;
     }
@@ -583,15 +831,15 @@ float4 main(in LIT_PS_IN input) : SV_Target
     [branch]
     if (Material.Dissolve > 0.0f)
     {
-        const float3 dissolvePosition = input.worldPos * 0.55f;
+        const float3 dissolvePosition = input.worldPos * DISSOLVE_NOISE_SCALE;
         const float dissolveNoise =
-            FastValueNoise(dissolvePosition.xy + dissolvePosition.z * 0.37f) * 0.55f +
-            FastValueNoise(dissolvePosition.zy * 2.3f + 7.0f) * 0.30f +
-            FastValueNoise(dissolvePosition.xz * 5.1f - 3.0f) * 0.15f;
+            FastValueNoise(dissolvePosition.xy + dissolvePosition.z * DISSOLVE_DEPTH_SKEW) * DISSOLVE_WEIGHT_A +
+            FastValueNoise(dissolvePosition.zy * DISSOLVE_SCALE_B + DISSOLVE_SEED_B) * DISSOLVE_WEIGHT_B +
+            FastValueNoise(dissolvePosition.xz * DISSOLVE_SCALE_C - DISSOLVE_SEED_C) * DISSOLVE_WEIGHT_C;
         // 崩れ具合0で何も捨てず、1ですべて捨てるよう、しきい値を少し広げている
-        const float dissolveThreshold = Material.Dissolve * 1.08f - 0.04f;
+        const float dissolveThreshold = Material.Dissolve * DISSOLVE_THRESHOLD_SCALE - DISSOLVE_THRESHOLD_OFFSET;
         clip(dissolveNoise - dissolveThreshold);
-        dissolveEdge = 1.0f - smoothstep(0.0f, 0.07f, dissolveNoise - dissolveThreshold);
+        dissolveEdge = 1.0f - smoothstep(0.0f, DISSOLVE_EDGE_WIDTH, dissolveNoise - dissolveThreshold);
     }
 #endif
 
@@ -605,7 +853,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 光るパネルは汚さず、ブルームと天井の光の明るさを保っている。
     const float emissionEnergy = dot(
         abs(Material.Emission.rgb),
-        float3(0.3333f, 0.3333f, 0.3333f));
+        AVERAGE_WEIGHTS);
     float3 detailWorldNormal = normalize(input.worldNormal);
     float grime = 0.0f;
     float wetness = 0.0f;
@@ -614,7 +862,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     float pbrRoughness = GetMaterialRoughness();
     float metalRustHeight = 0.0f;
 #if !defined(PRINTED_SURFACE)
-    if (!Material.TextureEnable && emissionEnergy < 0.001f)
+    if (!Material.TextureEnable && emissionEnergy < EMISSION_EPSILON)
     {
 #if defined(ROCK_SURFACE)
         // 外の森の岩（rockPS.hlsl）：壁の汚れと古さの代わりに、岩の色むら・ひび・苔・地衣類・鉱物の粒・地面際の湿りを
@@ -622,12 +870,12 @@ float4 main(in LIT_PS_IN input) : SV_Target
         const RockSurface rock = GetRockSurface(input.worldPos, input.worldNormal, color.rgb, pbrRoughness);
         // 雨で濡れた分（暗く・光沢・横の面を流れる水の筋）を足している（forestWetness.hlsli）
         const ForestWetSurface rockWet = ApplyForestRain(
-            input.worldPos, input.worldNormal, rock.albedo, rock.wetness, rock.height, 0.9f);
+            input.worldPos, input.worldNormal, rock.albedo, rock.wetness, rock.height, ROCK_RAIN_COLUMN_SCALE);
         color.rgb = rockWet.albedo;
         pbrRoughness = rock.roughness;
         wetness = rockWet.wetness;
         detailWorldNormal = ApplyHeightToNormal(
-            input.worldPos, normalize(input.worldNormal), rock.height + rockWet.rivulet * 0.12f, 0.85f);
+            input.worldPos, normalize(input.worldNormal), rock.height + rockWet.rivulet * RIVULET_HEIGHT, ROCK_BUMP_STRENGTH);
 #elif defined(BARK_SURFACE)
         // 外の森の枯れ木・倒木・茂み（barkPS.hlsl）：木目に沿った縦の溝・横のひび・繊維・剥がれて出た地の木・苔・地衣類・根元の湿りを
         // 色・粗さ・濡れ具合・凹凸として付けている（barkSurface.hlsli）。木目の向きはマテリアルの環境の色で受け取っている（Wall::UploadMaterial）
@@ -635,67 +883,67 @@ float4 main(in LIT_PS_IN input) : SV_Target
             input.worldPos, input.worldNormal, Material.Ambuent.xyz, color.rgb, pbrRoughness);
         // 雨で濡れた分を足している（樹皮は溝が細かいので、水の筋の列も細かくしている）
         const ForestWetSurface barkWet = ApplyForestRain(
-            input.worldPos, input.worldNormal, bark.albedo, bark.wetness, bark.height, 1.6f);
+            input.worldPos, input.worldNormal, bark.albedo, bark.wetness, bark.height, BARK_RAIN_COLUMN_SCALE);
         color.rgb = barkWet.albedo;
         pbrRoughness = bark.roughness;
         wetness = barkWet.wetness;
         detailWorldNormal = ApplyHeightToNormal(
-            input.worldPos, normalize(input.worldNormal), bark.height + barkWet.rivulet * 0.12f, 1.10f);
+            input.worldPos, normalize(input.worldNormal), bark.height + barkWet.rivulet * RIVULET_HEIGHT, BARK_BUMP_STRENGTH);
 #elif defined(FACADE_SURFACE)
         // 外の森の研究所の外壁（facadePS.hlsl）：型枠の跡・Pコンの穴・雨だれ・白華・根元の泥と苔・ひびを、
         // 色・粗さ・濡れ具合・凹凸として付けている（facadeSurface.hlsli）。雨で濡れた分と、壁を流れる水の筋も重ねている
         const FacadeSurface facade = GetFacadeSurface(input.worldPos, input.worldNormal, color.rgb, pbrRoughness);
         const ForestWetSurface facadeWet = ApplyForestRain(
-            input.worldPos, input.worldNormal, facade.albedo, facade.wetness, facade.height, 0.7f);
+            input.worldPos, input.worldNormal, facade.albedo, facade.wetness, facade.height, FACADE_RAIN_COLUMN_SCALE);
         color.rgb = facadeWet.albedo;
         pbrRoughness = facade.roughness;
         wetness = facadeWet.wetness;
         detailWorldNormal = ApplyHeightToNormal(
-            input.worldPos, normalize(input.worldNormal), facade.height + facadeWet.rivulet * 0.10f, 0.9f);
+            input.worldPos, normalize(input.worldNormal), facade.height + facadeWet.rivulet * FACADE_RIVULET_HEIGHT, FACADE_BUMP_STRENGTH);
 #else
         grime = GetProceduralGrime(
             input.worldPos,
             input.worldNormal) * WallDampStrength;
-        color.rgb *= 1.0f - grime * 0.22f;
+        color.rgb *= 1.0f - grime * GRIME_DARKEN;
         color.rgb = lerp(
             color.rgb,
-            color.rgb * float3(0.72f, 0.80f, 0.69f),
-            grime * 0.20f);
+            color.rgb * GRIME_TINT,
+            grime * GRIME_TINT_BLEND);
 
         // 壁の古さ（建物の壁と天井だけ）。0のときは前と同じ見た目になる。
         const float weathering = Material.WeatheringSurface ? WallWeathering : 0.0f;
         const WallAgeing ageing = GetWallAgeing(
             input.worldPos, input.worldNormal, weathering);
         color.rgb *= ageing.tint;
-        color.rgb *= 1.0f - ageing.cavity * 0.55f;
-        wetness = saturate(grime + ageing.damp * 0.8f);
+        color.rgb *= 1.0f - ageing.cavity * AGEING_CAVITY_DARKEN;
+        wetness = saturate(grime + ageing.damp * AGEING_DAMP_WETNESS);
         // 壁を伝う水の筋：湿った壁の所々を、細い水の筋が流れ落ちている（濡れて少し暗く、光沢が出る）
         const float trickle = weathering > 0.0f
             ? GetWallTrickle(input.worldPos, input.worldNormal, ageing.damp)
             : 0.0f;
-        color.rgb *= 1.0f - trickle * 0.30f;
+        color.rgb *= 1.0f - trickle * TRICKLE_DARKEN;
         wetness = max(wetness, trickle);
 
         // 水が引いた柱の根元には、元の水位の少し上まで吸い上げた水が残る。
         const float2 fromDrainColumn = abs(input.worldPos.xz - DrainTrace.xy);
         const float heightAboveWater = input.worldPos.y - CausticWaterY;
         [branch]
-        if (DrainTrace.w > 0.0f && Material.WeatheringSurface && abs(input.worldNormal.y) < 0.2f &&
-            max(fromDrainColumn.x, fromDrainColumn.y) < 5.2f && heightAboveWater < 7.5f)
+        if (DrainTrace.w > 0.0f && Material.WeatheringSurface && abs(input.worldNormal.y) < DRAIN_SIDE_NORMAL_LIMIT &&
+            max(fromDrainColumn.x, fromDrainColumn.y) < DRAIN_COLUMN_HALF_WIDTH && heightAboveWater < DRAIN_MAX_HEIGHT)
         {
-            const float exposed = smoothstep(0.0f, 3.0f, DrainTrace.z - input.worldPos.z);
-            const float dampTop = 4.7f + FastValueNoise(input.worldPos.xz * 0.55f) * 1.5f;
+            const float exposed = smoothstep(0.0f, DRAIN_EXPOSE_DISTANCE, DrainTrace.z - input.worldPos.z);
+            const float dampTop = DRAIN_DAMP_TOP + FastValueNoise(input.worldPos.xz * DRAIN_DAMP_NOISE_SCALE) * DRAIN_DAMP_TOP_RANGE;
             const float heightFromFloor = heightAboveWater + DrainTrace.w;
-            const float band = exposed * smoothstep(-0.1f, 0.5f, heightFromFloor) *
-                (1.0f - smoothstep(dampTop - 0.9f, dampTop, heightFromFloor));
-            color.rgb *= lerp(1.0f.xxx, float3(0.51f, 0.56f, 0.55f), band);
-            wetness = max(wetness, band * 0.50f);
+            const float band = exposed * smoothstep(DRAIN_BAND_BOTTOM_START, DRAIN_BAND_BOTTOM_END, heightFromFloor) *
+                (1.0f - smoothstep(dampTop - DRAIN_BAND_TOP_BLUR, dampTop, heightFromFloor));
+            color.rgb *= lerp(1.0f.xxx, DRAIN_DAMP_COLOR, band);
+            wetness = max(wetness, band * DRAIN_DAMP_WETNESS);
         }
 
         // 2面の「血の手形」の異変（その周回だけ、照らすと次の手形が奥に現れる）。濡れた血として光沢も返す
         const float anomalyHandprint = GetAnomalyHandprint(input.worldPos, normalize(input.worldNormal));
-        color.rgb *= lerp(1.0f.xxx, float3(0.85f, 0.05f, 0.04f), anomalyHandprint * 0.92f);
-        wetness = max(wetness, anomalyHandprint * 0.9f);
+        color.rgb *= lerp(1.0f.xxx, ANOMALY_BLOOD_COLOR, anomalyHandprint * ANOMALY_BLOOD_BLEND);
+        wetness = max(wetness, anomalyHandprint * ANOMALY_BLOOD_WETNESS);
 
         // 金属の錆と擦れ傷（金属らしさのある面だけ。pbrLighting.hlsli）。色・金属らしさ・粗さを場所ごとに変えている
         const MetalWear metalWear = GetMetalWear(
@@ -709,12 +957,12 @@ float4 main(in LIT_PS_IN input) : SV_Target
         // 扉や家具などの小物は、コンクリートの壁より平らな面なので、凹凸を半分にしている
         // （懐中電灯で正面から照らすと、壁と同じ強さでは木の扉が叩いた金属のように見えるため）
         const float bumpStrength = Material.WeatheringSurface
-            ? 0.72f * (1.0f + 0.8f * weathering)
-            : 0.36f;
+            ? BUILDING_BUMP_STRENGTH * (1.0f + BUILDING_BUMP_WEATHERING * weathering)
+            : PROP_BUMP_STRENGTH;
         detailWorldNormal = GetBumpedWorldNormal(
             input.worldPos,
             input.worldNormal,
-            ageing.height + paintingRelief + metalRustHeight * 0.6f,
+            ageing.height + paintingRelief + metalRustHeight * RUST_HEIGHT_SCALE,
             bumpStrength);
 #endif
     }
@@ -748,7 +996,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
         const float3 offsetToLight =
             pointLight.PositionRange.xyz - input.worldPos;
-        const float lightRange = max(pointLight.PositionRange.w, 0.001f);
+        const float lightRange = max(pointLight.PositionRange.w, LIGHT_EPSILON);
         const float distanceSquaredToLight = dot(offsetToLight, offsetToLight);
         // 光が届かない距離の光源は、計算を省いている
         [branch]
@@ -758,18 +1006,18 @@ float4 main(in LIT_PS_IN input) : SV_Target
         }
         const float distanceToLight = sqrt(distanceSquaredToLight);
         const float3 directionToPointLight =
-            offsetToLight / max(distanceToLight, 0.001f);
+            offsetToLight / max(distanceToLight, LIGHT_EPSILON);
         float pointAttenuation = saturate(1.0f - distanceToLight / lightRange);
         pointAttenuation *= pointAttenuation;
 
         const float pointLambert = saturate(dot(
             detailWorldNormal, directionToPointLight));
-        const float softPointLambert = 0.20f + pointLambert * 0.80f;
+        const float softPointLambert = SOFT_LAMBERT_BASE + pointLambert * SOFT_LAMBERT_RANGE;
         // 天井のパネルを裸の電球ではなく、下向きに広がる面の光源として近似している。
         // 床へ光を集めつつ、横の方向にも少しだけ光を残している。
         const float downwardAmount = saturate(directionToPointLight.y);
         const float fixtureDistribution = lerp(
-            0.22f,
+            FIXTURE_SIDE_LIGHT,
             1.0f,
             smoothstep(FIXTURE_BEAM_DOT_START, FIXTURE_BEAM_DOT_END, downwardAmount));
 
@@ -809,7 +1057,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
 #endif
     lighting *= roomOcclusion;
     specularLighting *= roomOcclusion;
-    const float flashlightOcclusion = lerp(1.0f, roomOcclusion, 0.4f);
+    const float flashlightOcclusion = lerp(1.0f, roomOcclusion, FLASHLIGHT_ROOM_OCCLUSION);
 
 #if !defined(PRINTED_SURFACE)
     // 環境の映り込み（IBL）：視線を面で反射した向きの景色を、環境マップから粗さに応じたぼやけ具合で読み、
@@ -830,16 +1078,16 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
 #endif
     // 懐中電灯の光：円錐の形・距離による弱まり・レンズの模様・面の向き・影を掛け合わせている
-    if (Light.Enable && Light.FlashlightEnabled && distanceFromCamera > 0.001f)
+    if (Light.Enable && Light.FlashlightEnabled && distanceFromCamera > LIGHT_EPSILON)
     {
         const float3 pixelDirection = input.viewPos / distanceFromCamera;
         const float beamProfile = GetFlashlightBeamProfile(pixelDirection);
         // 円錐の外では、レンズの汚れのノイズとシャドウマップの参照を丸ごと省いている。
         [branch]
-        if (beamProfile > 0.001f)
+        if (beamProfile > LIGHT_EPSILON)
         {
             const float normalizedDistance = saturate(
-                distanceFromCamera / max(Light.Range, 0.001f));
+                distanceFromCamera / max(Light.Range, LIGHT_EPSILON));
             const float rangeFade = saturate(
                 1.0f - normalizedDistance * normalizedDistance);
             const float attenuation = rangeFade * rangeFade;
@@ -894,8 +1142,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 自ら光る色を足している。0〜1の画面に出したい明るさで決めてあるので、トーンマッピングの後にその明るさで見えるHDRの値に直している（toneMapping.hlsli）
     color.rgb += InverseToneMapEmission(Material.Emission.rgb + paintingEmission);
     // 崩れている縁：焦げて黒ずみ、その外側が燃えるように赤く光る
-    color.rgb *= 1.0f - dissolveEdge * 0.55f;
-    color.rgb += float3(0.95f, 0.34f, 0.07f) * (dissolveEdge * dissolveEdge) * 1.5f;
+    color.rgb *= 1.0f - dissolveEdge * DISSOLVE_CHAR_DARKEN;
+    color.rgb += DISSOLVE_GLOW_COLOR * (dissolveEdge * dissolveEdge) * DISSOLVE_GLOW_STRENGTH;
 
     // 高さの違う霧を重ね、近くの見やすさを保ちながら、遠くの輪郭を分けている。
     // 部屋全体を一様に白くせず、床の近くに霧を集めている。
@@ -920,25 +1168,25 @@ float4 main(in LIT_PS_IN input) : SV_Target
     color.rgb = ApplyFilmicHorrorGrade(color.rgb, LoopDepth);
 
     // デバッグ表示：1=法線、2=懐中電灯の影、3=照明だけ、6=壁の湿り気、7=タイルごとの光源の数。4・5は床（水たまり・反射）用の表示なので、壁は黒にしている
-    if (DebugViewMode == 1)
+    if (DebugViewMode == DEBUG_VIEW_NORMAL)
     {
         return float4(detailWorldNormal * 0.5f + 0.5f, 1.0f);
     }
-    if (DebugViewMode == 2)
+    if (DebugViewMode == DEBUG_VIEW_FLASHLIGHT_SHADOW)
     {
         const float shadowVisibility =
             GetFlashlightShadow(input.shadowPos);
         return float4(shadowVisibility.xxx, 1.0f);
     }
-    if (DebugViewMode == 3)
+    if (DebugViewMode == DEBUG_VIEW_LIGHTING)
     {
-        return float4(saturate(lighting * 0.5f), 1.0f);
+        return float4(saturate(lighting * DEBUG_VIEW_LIGHTING_SCALE), 1.0f);
     }
-    if (DebugViewMode == 6)
+    if (DebugViewMode == DEBUG_VIEW_WALL_DAMP)
     {
         return float4(saturate(grime).xxx, 1.0f);
     }
-    if (DebugViewMode == 7)
+    if (DebugViewMode == DEBUG_VIEW_LIGHT_TILES)
     {
         return GetLightTileHeatmap(input.pos.xy, pointLightCount);
     }
@@ -951,7 +1199,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     {
         return float4(surface.metallic, surface.roughness, saturate(wetness), 1.0f);
     }
-    if (DebugViewMode >= 4)
+    if (DebugViewMode >= DEBUG_VIEW_PUDDLE)
     {
         return float4(0.0f, 0.0f, 0.0f, 1.0f);
     }

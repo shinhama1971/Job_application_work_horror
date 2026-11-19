@@ -194,6 +194,87 @@ static const float CRT_SIGNAL_LINE_EDGE = 0.085f;
 static const float CRT_SIGNAL_LINE_ALPHA = 0.055f;
 static const float CRT_SIGNAL_BACKGROUND_ALPHA = 0.006f;
 
+// --- main の残りの値
+// 明るさを求める重み（Rec.709）、0で割らないための下限、効果を省くとみなす強さ
+static const float3 CRT_LUMINANCE_WEIGHTS = float3(0.2126f, 0.7152f, 0.0722f);
+static const float CRT_MIN_DIVISOR = 0.0001f;
+static const float CRT_EFFECT_EPSILON = 0.001f;
+// 周辺減光の形を横に少しつぶす割合（画面の横長に合わせる）
+static const float CRT_VIGNETTE_ASPECT = 1.15f;
+// 粒のノイズの乱数のずらし（暗い粒・明るい粒は x と y を入れ替える）と、明るい粒の追加のずらし
+static const float2 CRT_GRAIN_FRAME_SEED = float2(17.0f, 31.0f);
+static const float2 CRT_BRIGHT_GRAIN_FRAME_SEED = float2(31.0f, 17.0f);
+static const float CRT_BRIGHT_GRAIN_SEED = 7.3f;
+// ゆっくり流れる帯：本数、速さ、鋭さ、濃さ
+static const float CRT_ROLLING_BANDS = 10.0f;
+static const float CRT_ROLLING_SPEED = 1.8f;
+static const float CRT_ROLLING_SHARPNESS = 12.0f;
+static const float CRT_ROLLING_OPACITY = 0.012f;
+// まれに出る埃の画素：出るしきい値と濃さ
+static const float CRT_DUST_THRESHOLD = 0.9985f;
+static const float CRT_DUST_OPACITY = 0.030f;
+// レンズの水滴：本体の景色を置き換える濃さ、縁と光る点の濃さ
+static const float CRT_DROP_REFRACTION_ALPHA = 0.85f;
+static const float CRT_DROP_EDGE_ALPHA = 0.30f;
+static const float CRT_DROP_HIGHLIGHT_ALPHA = 0.30f;
+// 横の裂け目：帯の数、1秒あたりの更新、出るしきい値、信号の乱れでの濃さ、色を選ぶ乱数のずらし
+static const float CRT_TEAR_BAND_ROWS = 38.0f;
+static const float CRT_TEAR_UPDATES_PER_SECOND = 24.0f;
+static const float CRT_TEAR_THRESHOLD = 0.86f;
+static const float CRT_TEAR_SIGNAL_STRENGTH = 0.58f;
+static const float CRT_TEAR_CHANNEL_SEED = 13.0f;
+// 重ねる層の色：埃と明るい粒、裂け目の色（青緑・赤）と景色に混ぜる割合、信号の乱れの色（青・赤）と景色に混ぜる割合
+static const float3 CRT_DUST_COLOR = float3(0.62f, 0.65f, 0.62f);
+static const float3 CRT_TEAR_CYAN = float3(0.12f, 0.72f, 0.80f);
+static const float3 CRT_TEAR_RED = float3(0.82f, 0.12f, 0.20f);
+static const float CRT_TEAR_COLOR_BLEND = 0.24f;
+static const float3 CRT_SIGNAL_BLUE = float3(0.025f, 0.20f, 0.28f);
+static const float3 CRT_SIGNAL_RED = float3(0.38f, 0.055f, 0.035f);
+static const float CRT_SIGNAL_COLOR_BLEND = 0.20f;
+// 層の色を優先させる強さ（濃さに掛ける）：信号の乱れ・歪み・色ずれ・水滴の本体・水滴の縁
+static const float CRT_SIGNAL_COLOR_GAIN = 13.0f;
+static const float CRT_DISTORTION_COLOR_GAIN = 18.0f;
+static const float CRT_CHROMA_COLOR_GAIN = 16.0f;
+static const float CRT_DROP_REFRACTION_COLOR_GAIN = 9.0f;
+static const float CRT_DROP_COLOR_GAIN = 3.0f;
+// 水滴の縁の暗い水の色と、光る点の色（光る強さに掛ける量）
+static const float3 CRT_DROP_DARK_COLOR = float3(0.020f, 0.035f, 0.040f);
+static const float3 CRT_DROP_HIGHLIGHT_COLOR = float3(0.62f, 0.70f, 0.72f);
+static const float CRT_DROP_HIGHLIGHT_GAIN = 1.4f;
+// 廊下の奥の冷たい色：画面の下の範囲（始め・終わり）、濃さ（いつも＋下ほど足す量）、色、色を優先させる強さ
+static const float CRT_TENSION_LOWER_START = 0.22f;
+static const float CRT_TENSION_LOWER_END = 0.92f;
+static const float CRT_TENSION_VEIL_BASE = 0.014f;
+static const float CRT_TENSION_VEIL_LOWER = 0.010f;
+static const float3 CRT_TENSION_COLOR = float3(0.035f, 0.060f, 0.070f);
+static const float CRT_TENSION_COLOR_GAIN = 12.0f;
+// 恐怖で視界が狭まる：視界の縁（怖くない・一番怖い）、心拍で寄せる量、縁のぼかしの幅、ぼかす点の数と1点ごとの引き寄せ、
+// 色を抜いた冷たい色と抜く割合、暗さ（中央寄り・端）、濃さ（最低＋心拍の幅）
+static const float CRT_FEAR_EDGE_CALM = 0.62f;
+static const float CRT_FEAR_EDGE_AFRAID = 0.28f;
+static const float CRT_FEAR_PULSE_PULL = 0.06f;
+static const float CRT_FEAR_EDGE_WIDTH = 0.40f;
+static const int CRT_FEAR_TAP_COUNT = 5;
+static const float CRT_FEAR_TAP_PULL = 0.022f;
+static const float CRT_FEAR_TAP_AVERAGE = 0.2f;
+static const float3 CRT_FEAR_TINT = float3(0.80f, 0.86f, 0.92f);
+static const float CRT_FEAR_DESATURATE = 0.78f;
+static const float CRT_FEAR_INNER_SHADE = 0.62f;
+static const float CRT_FEAR_OUTER_SHADE = 0.22f;
+static const float CRT_FEAR_ALPHA_BASE = 0.70f;
+static const float CRT_FEAR_ALPHA_PULSE = 0.25f;
+// 映画のような色分け：影とみなす明るさ（始め・終わり）、光とみなす明るさ（始め・終わり）、濃さ（影・光）、
+// 冷たい影の色、暖かい光の色、光の色へ寄せる強さ
+static const float CRT_FILM_SHADOW_START = 0.08f;
+static const float CRT_FILM_SHADOW_END = 0.48f;
+static const float CRT_FILM_HIGHLIGHT_START = 0.42f;
+static const float CRT_FILM_HIGHLIGHT_END = 1.10f;
+static const float CRT_FILM_SHADOW_ALPHA = 0.050f;
+static const float CRT_FILM_HIGHLIGHT_ALPHA = 0.022f;
+static const float3 CRT_FILM_COLD_SHADOW = float3(0.020f, 0.040f, 0.052f);
+static const float3 CRT_FILM_WARM_LIGHT = float3(0.160f, 0.095f, 0.040f);
+static const float CRT_FILM_WARM_GAIN = 1.35f;
+
 float4 main(PS_IN input) : SV_TARGET
 {
     // コマ落ち：影が近くラジオの雑音が強いとき、一瞬だけ映像が止まる。止まった画面は縦に少しずれ、
@@ -205,7 +286,7 @@ float4 main(PS_IN input) : SV_TARGET
         float3 held = SceneTexture.SampleLevel(LinearSampler, float2(input.uv.x, heldY), 0.0f).rgb;
         const float seam = smoothstep(0.0f, CRT_HOLD_SEAM_WIDTH, min(heldY, 1.0f - heldY));
         const float scanline = CRT_HOLD_SCANLINE_BASE + CRT_HOLD_SCANLINE_GAIN * step(0.5f, frac(input.uv.y * CRT_HOLD_SCANLINE_COUNT));
-        held = lerp(dot(held, float3(0.2126f, 0.7152f, 0.0722f)).xxx, held, CRT_HOLD_SATURATION);
+        held = lerp(dot(held, CRT_LUMINANCE_WEIGHTS).xxx, held, CRT_HOLD_SATURATION);
         return float4(held * scanline * lerp(CRT_HOLD_SEAM_BRIGHTNESS, 1.0f, seam), 1.0f);
     }
     const float2 center = float2(0.5f, 0.5f);
@@ -219,9 +300,9 @@ float4 main(PS_IN input) : SV_TARGET
         corridorTension * CRT_TENSION_VIGNETTE_GAIN;
 
     // 遊ぶのに必要な情報を隠さない程度の、柔らかい周辺減光。
-    float edgeDistance = length(centered * float2(1.15f, 1.0f));
+    float edgeDistance = length(centered * float2(CRT_VIGNETTE_ASPECT, 1.0f));
     const float2 radialDirection = centered /
-        max(length(centered), 0.001f);
+        max(length(centered), CRT_EFFECT_EPSILON);
     // 普段の緊張感だけでは、元の画像をずらさない。色ずれと歪みは、
     // 驚かせる演出・信号の異常・終盤の強い緊張のときだけにしている。
     const float highTension = smoothstep(CRT_HIGH_TENSION_START, CRT_HIGH_TENSION_FULL, corridorTension);
@@ -263,7 +344,7 @@ float4 main(PS_IN input) : SV_TARGET
     // 普段はdistortedUvとinput.uvが同じ。驚かせる演出のときだけ2回目を読み、
     // 普段の全画面のテクスチャの読み取りを1回分減らしている。
     [branch]
-    if (distortionEvent > 0.001f)
+    if (distortionEvent > CRT_EFFECT_EPSILON)
     {
         distortedScene = SceneTexture.SampleLevel(
             LinearSampler,
@@ -274,7 +355,7 @@ float4 main(PS_IN input) : SV_TARGET
     // 色ずれは演出のときだけの効果。普段は、この全体で同じ分岐によって、
     // 1画素あたり、全解像度のテクスチャの読み取りを2回省いている。
     [branch]
-    if (eventAberration > 0.001f)
+    if (eventAberration > CRT_EFFECT_EPSILON)
     {
         chromaticScene = float3(
             SceneTexture.SampleLevel(
@@ -310,26 +391,26 @@ float4 main(PS_IN input) : SV_TARGET
 
     // 1/30秒ごとに変わる粒状のノイズ（暗い粒）
     float frame = floor(time * CRT_GRAIN_UPDATES_PER_SECOND);
-    float noise = FastHash21(floor(input.pos.xy) + frame * float2(17.0f, 31.0f));
+    float noise = FastHash21(floor(input.pos.xy) + frame * CRT_GRAIN_FRAME_SEED);
     // 粒は暗い所ほど強く出し、闇がざらついて見えるようにしている
     const float grainLuminance = dot(sceneCenter,
-        float3(0.2126f, 0.7152f, 0.0722f));
+        CRT_LUMINANCE_WEIGHTS);
     // フィルムの粒：暗い粒と明るい粒の両方を、はっきり見える強さで出している（サイレントヒルの画面の粒を参考）。
     // 暗い所ほど強く出し、闇がざらついて見えるようにしている
     const float grainStrength = (CRT_GRAIN_BASE_STRENGTH + eventNoise) * lerp(1.0f, CRT_GRAIN_BRIGHT_REGION_SCALE, smoothstep(CRT_GRAIN_FADE_START, CRT_GRAIN_FADE_END, grainLuminance));
     float darkGrain = smoothstep(CRT_DARK_GRAIN_THRESHOLD, 1.0f, noise) * CRT_DARK_GRAIN_OPACITY * grainStrength;
-    const float brightNoise = FastHash21(floor(input.pos.xy) + frame * float2(31.0f, 17.0f) + 7.3f);
+    const float brightNoise = FastHash21(floor(input.pos.xy) + frame * CRT_BRIGHT_GRAIN_FRAME_SEED + CRT_BRIGHT_GRAIN_SEED);
     const float brightGrain = smoothstep(CRT_BRIGHT_GRAIN_THRESHOLD, 1.0f, brightNoise) * CRT_BRIGHT_GRAIN_OPACITY * grainStrength;
 
     // ごく薄い、ゆっくり流れる帯で、アナログ映像らしい動きを出している。
-    float rolling = sin(input.uv.y * 10.0f - time * 1.8f) * 0.5f + 0.5f;
-    rolling = pow(rolling, 12.0f) * 0.012f * eventNoise;
+    float rolling = sin(input.uv.y * CRT_ROLLING_BANDS - time * CRT_ROLLING_SPEED) * 0.5f + 0.5f;
+    rolling = pow(rolling, CRT_ROLLING_SHARPNESS) * CRT_ROLLING_OPACITY * eventNoise;
 
     // まれに出る埃の画素は明るいが、透明度はとても低くしている。
-    float dust = step(0.9985f, noise);
+    float dust = step(CRT_DUST_THRESHOLD, noise);
 
     float darkAlpha = saturate(vignette + scanline + darkGrain + rolling);
-    float dustAlpha = dust * 0.030f * eventNoise + brightGrain;
+    float dustAlpha = dust * CRT_DUST_OPACITY * eventNoise + brightGrain;
 
     // レンズのしぶきは、走って水たまりの水を強く蹴ったときだけ、画面の下の方に小さく付く。
     // 付く位置・大きさ・流れ落ちる速さは、しぶきごとの乱数の種（lensDropSeed）から決めるので、毎回違う。
@@ -374,16 +455,16 @@ float4 main(PS_IN input) : SV_TARGET
     }
     // 粒は、主に後ろの景色を逆さに映して見せる（本体の中は、ずらした景色に置き換える。乾くにつれて薄くなる）。
     // 縁は白い輪にせず、水の厚みで暗くなる細い線にし、光る所は左上の小さな点だけにしている
-    const float dropRefractionAlpha = saturate(lensDrop.y * 0.85f * moisture);
+    const float dropRefractionAlpha = saturate(lensDrop.y * CRT_DROP_REFRACTION_ALPHA * moisture);
     const float dropAlpha = saturate(
-        (lensDrop.x * 0.30f + lensDrop.z * 0.30f) * moisture);
+        (lensDrop.x * CRT_DROP_EDGE_ALPHA + lensDrop.z * CRT_DROP_HIGHLIGHT_ALPHA) * moisture);
 
     // 驚かせる演出では、半透明の同期の乱れ（横の裂け目）を加えている。この層は景色を置き換えないので、
     // テクスチャが無くても画面が真っ黒になることはない。
-    float bandId = floor(input.uv.y * 38.0f);
-    float bandNoise = FastHash21(float2(bandId, floor(time * 24.0f)));
-    float tear = step(0.86f, bandNoise) * horrorPulseStrength;
-    tear = max(tear, signalGate * signalInterference * 0.58f);
+    float bandId = floor(input.uv.y * CRT_TEAR_BAND_ROWS);
+    float bandNoise = FastHash21(float2(bandId, floor(time * CRT_TEAR_UPDATES_PER_SECOND)));
+    float tear = step(CRT_TEAR_THRESHOLD, bandNoise) * horrorPulseStrength;
+    tear = max(tear, signalGate * signalInterference * CRT_TEAR_SIGNAL_STRENGTH);
     float thinLine = 1.0f - smoothstep(
         CRT_TEAR_LINE_CORE,
         CRT_TEAR_LINE_EDGE,
@@ -392,7 +473,7 @@ float4 main(PS_IN input) : SV_TARGET
         (bandNoise - 0.5f) * CRT_TEAR_MAX_OFFSET * horrorPulseStrength * thinLine;
     float3 shiftedScene = sceneCenter;
     [branch]
-    if (horrorPulseStrength > 0.001f || signalInterference > 0.001f)
+    if (horrorPulseStrength > CRT_EFFECT_EPSILON || signalInterference > CRT_EFFECT_EPSILON)
     {
         shiftedScene = SceneTexture.SampleLevel(
             LinearSampler,
@@ -416,85 +497,85 @@ float4 main(PS_IN input) : SV_TARGET
     // 暗い層（周辺減光・暗い粒）と明るい層（埃・明るい粒）を、それぞれの強さの割合で混ぜた色にしている
     float3 overlayColor = lerp(
         float3(0.0f, 0.0f, 0.0f),
-        float3(0.62f, 0.65f, 0.62f),
-        saturate(dustAlpha / max(darkAlpha + dustAlpha, 0.0001f))
+        CRT_DUST_COLOR,
+        saturate(dustAlpha / max(darkAlpha + dustAlpha, CRT_MIN_DIVISOR))
     );
-    float channelChoice = FastHash21(float2(bandId + 13.0f, floor(time * 24.0f)));
+    float channelChoice = FastHash21(float2(bandId + CRT_TEAR_CHANNEL_SEED, floor(time * CRT_TEAR_UPDATES_PER_SECOND)));
     float3 tearColor = channelChoice < 0.5f
-        ? float3(0.12f, 0.72f, 0.80f)
-        : float3(0.82f, 0.12f, 0.20f);
-    tearColor = lerp(shiftedScene, tearColor, 0.24f);
+        ? CRT_TEAR_CYAN
+        : CRT_TEAR_RED;
+    tearColor = lerp(shiftedScene, tearColor, CRT_TEAR_COLOR_BLEND);
     overlayColor = lerp(overlayColor, tearColor, saturate(tear));
     const float3 signalColor = lerp(
-        float3(0.025f, 0.20f, 0.28f),
-        float3(0.38f, 0.055f, 0.035f),
+        CRT_SIGNAL_BLUE,
+        CRT_SIGNAL_RED,
         signalSeed);
     overlayColor = lerp(
         overlayColor,
-        lerp(shiftedScene, signalColor, 0.20f),
-        saturate(signalAlpha * 13.0f));
+        lerp(shiftedScene, signalColor, CRT_SIGNAL_COLOR_BLEND),
+        saturate(signalAlpha * CRT_SIGNAL_COLOR_GAIN));
     overlayColor = lerp(
         overlayColor,
         distortedScene,
-        saturate(distortionAlpha * 18.0f));
+        saturate(distortionAlpha * CRT_DISTORTION_COLOR_GAIN));
     overlayColor = lerp(
         overlayColor,
         chromaticScene,
-        saturate(chromaAlpha * 16.0f));
+        saturate(chromaAlpha * CRT_CHROMA_COLOR_GAIN));
     // 縁は暗い水の色、光る所だけ明るい色（縁の明るさは混ぜない）
     const float3 waterColor = lerp(
-        float3(0.020f, 0.035f, 0.040f),
-        float3(0.62f, 0.70f, 0.72f),
-        saturate(lensDrop.z * 1.4f));
+        CRT_DROP_DARK_COLOR,
+        CRT_DROP_HIGHLIGHT_COLOR,
+        saturate(lensDrop.z * CRT_DROP_HIGHLIGHT_GAIN));
     // 逆さに映った景色を先に置き、その上に縁の暗い線と光る点を重ねている（逆の順だと、縁が景色で消える）
     overlayColor = lerp(
         overlayColor,
         refractedScene,
-        saturate(dropRefractionAlpha * 9.0f));
+        saturate(dropRefractionAlpha * CRT_DROP_REFRACTION_COLOR_GAIN));
     overlayColor = lerp(
         overlayColor,
         waterColor,
-        saturate(dropAlpha * 3.0f));
+        saturate(dropAlpha * CRT_DROP_COLOR_GAIN));
 
     // 廊下の奥ほど、ゆっくり冷たい色で彩度を落としている。ごく控えめで半透明なので、
     // 進むための情報は隠れない。
-    const float lowerScreen = smoothstep(0.22f, 0.92f, input.uv.y);
+    const float lowerScreen = smoothstep(CRT_TENSION_LOWER_START, CRT_TENSION_LOWER_END, input.uv.y);
     const float tensionVeil = corridorTension *
-        (0.014f + lowerScreen * 0.010f);
-    const float3 tensionColor = float3(0.035f, 0.060f, 0.070f);
+        (CRT_TENSION_VEIL_BASE + lowerScreen * CRT_TENSION_VEIL_LOWER);
+    const float3 tensionColor = CRT_TENSION_COLOR;
     overlayColor = lerp(
         overlayColor,
         tensionColor,
-        saturate(tensionVeil * 12.0f));
+        saturate(tensionVeil * CRT_TENSION_COLOR_GAIN));
     alpha = saturate(alpha + tensionVeil);
 
     // 恐怖で視界が狭まる：緊張が高いほど、画面の端から、ぼけて色の抜けた闇が中央へ迫る。心拍が鳴るたびに一瞬さらに迫る。
     // 端の景色を中心へ向かう向きに5点読んでぼかし、白黒に寄せて暗くした色を、端ほど濃く、今の層の上に重ねている。
     // 視線の中央（見たい所）は隠さない。緊張していない間は、この全体で同じ分岐で計算を丸ごと省いている
     [branch]
-    if (fearVision > 0.001f)
+    if (fearVision > CRT_EFFECT_EPSILON)
     {
         const float fear = smoothstep(0.0f, 1.0f, fearVision);
         const float pulse = fearBeat * fearBeat;
         // ここより外が狭まる、視界の縁。怖いほど内側へ寄り、心拍で一瞬さらに寄る
-        const float inner = lerp(0.62f, 0.28f, fear) - pulse * 0.06f * fear;
-        const float fearEdge = smoothstep(inner, inner + 0.40f, edgeDistance);
+        const float inner = lerp(CRT_FEAR_EDGE_CALM, CRT_FEAR_EDGE_AFRAID, fear) - pulse * CRT_FEAR_PULSE_PULL * fear;
+        const float fearEdge = smoothstep(inner, inner + CRT_FEAR_EDGE_WIDTH, edgeDistance);
         float3 blurred = 0.0f;
         [unroll]
-        for (int tap = 0; tap < 5; ++tap)
+        for (int tap = 0; tap < CRT_FEAR_TAP_COUNT; ++tap)
         {
-            const float pull = 0.022f * (float)(tap + 1) * fearEdge * fear;
+            const float pull = CRT_FEAR_TAP_PULL * (float)(tap + 1) * fearEdge * fear;
             blurred += SceneTexture.SampleLevel(LinearSampler, saturate(input.uv - centered * pull), 0.0f).rgb;
         }
-        blurred *= 0.2f;
-        const float blurredLuminance = dot(blurred, float3(0.2126f, 0.7152f, 0.0722f));
+        blurred *= CRT_FEAR_TAP_AVERAGE;
+        const float blurredLuminance = dot(blurred, CRT_LUMINANCE_WEIGHTS);
         // 色を抜いて少し冷たくし、端ほど暗くしている
-        const float3 fearColor = lerp(blurred, blurredLuminance.xxx * float3(0.80f, 0.86f, 0.92f), 0.78f) *
-            lerp(0.62f, 0.22f, fearEdge);
-        const float fearAlpha = saturate(fearEdge * fear * (0.70f + pulse * 0.25f));
+        const float3 fearColor = lerp(blurred, blurredLuminance.xxx * CRT_FEAR_TINT, CRT_FEAR_DESATURATE) *
+            lerp(CRT_FEAR_INNER_SHADE, CRT_FEAR_OUTER_SHADE, fearEdge);
+        const float fearAlpha = saturate(fearEdge * fear * (CRT_FEAR_ALPHA_BASE + pulse * CRT_FEAR_ALPHA_PULSE));
         const float layeredAlpha = fearAlpha + alpha * (1.0f - fearAlpha);
         overlayColor = (fearColor * fearAlpha + overlayColor * alpha * (1.0f - fearAlpha)) /
-            max(layeredAlpha, 0.0001f);
+            max(layeredAlpha, CRT_MIN_DIVISOR);
         alpha = layeredAlpha;
     }
 
@@ -503,25 +584,25 @@ float4 main(PS_IN input) : SV_TARGET
     // 取り込んだ景色が黒で置き換わることはない。
     const float sceneLuminance = dot(
         sceneCenter,
-        float3(0.2126f, 0.7152f, 0.0722f));
+        CRT_LUMINANCE_WEIGHTS);
     const float shadowWeight = 1.0f - smoothstep(
-        0.08f, 0.48f, sceneLuminance);
+        CRT_FILM_SHADOW_START, CRT_FILM_SHADOW_END, sceneLuminance);
     const float highlightWeight = smoothstep(
-        0.42f, 1.10f, sceneLuminance);
+        CRT_FILM_HIGHLIGHT_START, CRT_FILM_HIGHLIGHT_END, sceneLuminance);
     const float filmAlpha = saturate(filmGradeStrength) *
-        (shadowWeight * 0.050f + highlightWeight * 0.022f);
-    const float3 coldShadow = float3(0.020f, 0.040f, 0.052f);
-    const float3 warmLight = float3(0.160f, 0.095f, 0.040f);
+        (shadowWeight * CRT_FILM_SHADOW_ALPHA + highlightWeight * CRT_FILM_HIGHLIGHT_ALPHA);
+    const float3 coldShadow = CRT_FILM_COLD_SHADOW;
+    const float3 warmLight = CRT_FILM_WARM_LIGHT;
     const float3 filmColor = lerp(
         coldShadow,
         warmLight,
-        saturate(highlightWeight * 1.35f));
+        saturate(highlightWeight * CRT_FILM_WARM_GAIN));
     // 2つの半透明の層を1つにまとめ、合わせた色と透明度を返している
     const float combinedAlpha = alpha + filmAlpha * (1.0f - alpha);
     overlayColor = (
         overlayColor * alpha +
         filmColor * filmAlpha * (1.0f - alpha)) /
-        max(combinedAlpha, 0.0001f);
+        max(combinedAlpha, CRT_MIN_DIVISOR);
     alpha = combinedAlpha;
 
     return float4(overlayColor, alpha);

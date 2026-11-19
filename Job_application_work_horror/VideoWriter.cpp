@@ -13,6 +13,13 @@
 
 using Microsoft::WRL::ComPtr;
 
+namespace
+{
+    // Media Foundation の時間の単位（100ナノ秒）で数えた1秒と、動画のビットレート（1秒あたり8メガビット）
+    constexpr LONGLONG MediaTimeUnitsPerSecond = 10'000'000LL;
+    constexpr UINT32 VideoBitrate = 8'000'000;
+}
+
 bool VideoWriter::Open(const std::wstring& path, UINT width, UINT height, UINT fps)
 {
     if (FAILED(MFStartup(MF_VERSION)))
@@ -24,7 +31,7 @@ bool VideoWriter::Open(const std::wstring& path, UINT width, UINT height, UINT f
     m_Height = height;
     m_Time = 0;
     // 1フレームの長さ（Media Foundationの時間の単位は100ナノ秒）
-    m_FrameDuration = 10'000'000LL / fps;
+    m_FrameDuration = MediaTimeUnitsPerSecond / fps;
 
     if (FAILED(MFCreateSinkWriterFromURL(path.c_str(), nullptr, nullptr, &m_Writer)))
     {
@@ -36,7 +43,7 @@ bool VideoWriter::Open(const std::wstring& path, UINT width, UINT height, UINT f
     MFCreateMediaType(&outputType);
     outputType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
     outputType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_H264);
-    outputType->SetUINT32(MF_MT_AVG_BITRATE, 8'000'000);
+    outputType->SetUINT32(MF_MT_AVG_BITRATE, VideoBitrate);
     outputType->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
     MFSetAttributeSize(outputType.Get(), MF_MT_FRAME_SIZE, width, height);
     MFSetAttributeRatio(outputType.Get(), MF_MT_FRAME_RATE, fps, 1);

@@ -198,6 +198,8 @@ namespace
     const Vector3 GrassStraw(0.34f, 0.29f, 0.16f);
     constexpr float BrightnessRandomMin = 0.8f;
     constexpr float BrightnessRandomRange = 0.4f;
+    // 草を描く定数のシェーダーの番号（grassVS.hlsl の b9）
+    constexpr UINT GrassDrawBufferSlot = 9;
 }
 
 void ForestGrass::Init()
@@ -613,7 +615,7 @@ void ForestGrass::Draw(Camera* camera)
     ID3D11ShaderResourceView* views[2] = { m_BladeView.Get(), m_StateView.Get() };
     context->VSSetShaderResources(0, 2, views);
     ID3D11Buffer* drawBuffer = m_DrawParams.Get();
-    context->VSSetConstantBuffers(9, 1, &drawBuffer);
+    context->VSSetConstantBuffers(GrassDrawBufferSlot, 1, &drawBuffer);
 
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> previousRasterizer;
     context->RSGetState(previousRasterizer.GetAddressOf());

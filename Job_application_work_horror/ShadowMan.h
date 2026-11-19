@@ -21,6 +21,8 @@ class ShadowMan : public Object
 private:
     // 追いかけるとき、プレイヤーの手前で止まる距離の下限
     static constexpr float MinimumChaseStopDistance = 8.0f;
+    // 見られたら強く驚かせるときの、既定の表示秒数
+    static constexpr float DefaultGazeScareSeconds = 6.0f;
 
     // 頂点・インデックスとGPUのバッファ、マテリアル
     std::vector<VERTEX_3D> m_Vertices;
@@ -79,7 +81,7 @@ public:
     }
 
     // 見られたら強く驚かせる設定にし、表示する時間を決めている（0.5秒以上）
-    void EnableGazeScare(float lifetimeSeconds = 6.0f)
+    void EnableGazeScare(float lifetimeSeconds = DefaultGazeScareSeconds)
     {
         m_GazeScareEnabled = true;
         m_LifeTime = (std::max)(lifetimeSeconds, 0.5f);

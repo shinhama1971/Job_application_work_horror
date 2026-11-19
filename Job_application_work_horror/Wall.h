@@ -22,6 +22,10 @@ class Camera;
 class Wall : public Object
 {
 private:
+    // 不透明とみなす色の透明度の下限（これより透けた壁は、深度プリパスに書かない）
+    static constexpr float OpaqueAlphaThreshold = 0.999f;
+    // 光る強さがこれ以下なら、点光源として数えない
+    static constexpr float MinGlowEmissionScale = 0.001f;
     // 頂点・インデックスとGPUのバッファ
     std::vector<VERTEX_3D> m_Vertices;
     std::vector<unsigned int> m_Indices;
@@ -88,7 +92,7 @@ public:
     bool WritesDepthPrepass() const override
     {
         // 崩れている途中は、ピクセルシェーダーで画素を捨てるため描かない
-        return m_Visible && m_SurfaceMaterial.Diffuse.w >= 0.999f && m_Dissolve <= 0.0f;
+        return m_Visible && m_SurfaceMaterial.Diffuse.w >= OpaqueAlphaThreshold && m_Dissolve <= 0.0f;
     }
     void DrawDepthPrepass(Camera* cam) override;
     bool UsesCameraCulling() const override { return true; }

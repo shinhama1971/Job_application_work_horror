@@ -60,6 +60,8 @@ float3 GetMistEyePosition()
 #define MIST_NOISE_BASE_DENSITY 0.35f
 #define MIST_BROAD_NOISE_WEIGHT 0.95f
 #define MIST_WISP_NOISE_WEIGHT 0.55f
+// 霧の色を照らすときに0で割らないための下限
+#define MIST_MIN_DIVISOR 0.001f
 
 float3 ApplyHorrorMist(float3 color, float3 worldPosition, float3 viewPosition, float3 surroundingLight)
 {
@@ -100,7 +102,7 @@ float3 ApplyHorrorMist(float3 color, float3 worldPosition, float3 viewPosition, 
     mistColor = lerp(mistColor, mistColor * MIST_DEEP_LOOP_TINT + MIST_DEEP_LOOP_RED_LIFT, saturate(LoopDepth));
     if (Light.Enable && Light.FlashlightEnabled)
     {
-        const float3 pixelDirection = viewPosition / max(length(viewPosition), 0.001f);
+        const float3 pixelDirection = viewPosition / max(length(viewPosition), MIST_MIN_DIVISOR);
         const float beam = GetFlashlightBeamProfile(pixelDirection);
         const float reach = saturate(1.0f - distance / max(Light.Range, 1.0f));
         // 中心の光に加えて、翼の光（GetFlashlightSpillProfile）でも霧がうっすら光り、光の円のまわりがぼんやり明るくかすむ
@@ -115,18 +117,28 @@ float3 ApplyHorrorMist(float3 color, float3 worldPosition, float3 viewPosition, 
 // 点光源の一覧は、その画素のタイルの一覧を使っている（タイルの一覧は、画面の奥の面より手前の光源をすべて含む）。
 // 光の筋の調べる点の数と、霧が光を散らす濃さ
 #define LIGHT_SHAFT_SAMPLES 5
+// 半分の解像度から復元するときの、物の縁とみなす奥行きの差（距離に掛ける割合・足す量）と、その差で重みを下げる強さ、重みの合計の下限
+#define LIGHT_SHAFT_UPSAMPLE_DEPTH_TOLERANCE 0.04f
+#define LIGHT_SHAFT_UPSAMPLE_DEPTH_OFFSET 1.0f
+#define LIGHT_SHAFT_UPSAMPLE_DEPTH_FALLOFF 0.5f
+#define LIGHT_SHAFT_UPSAMPLE_MIN_WEIGHT 0.00001f
+// 光の筋の方式（ScreenLightShaftsEnabled：-1 = 使わない、0 = この画素で積分、1 = 半分の解像度から復元）を分けるしきい値
+#define LIGHT_SHAFT_MODE_THRESHOLD 0.5f
+// インターリーブド・グラディエント・ノイズの係数（Jimenez 2014）
+#define MIST_IGN_SCALE 52.9829189f
+#define MIST_IGN_DIRECTION float2(0.06711056f, 0.00583715f)
 
 Texture2D<float4> g_HalfLightShafts : register(t16);
 float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCount, float2 pixelPosition)
 {
     const float3 eye = GetMistEyePosition();
     // 低設定では積分も復元も実行しない。0は別視点用の従来計算。
-    if (ScreenLightShaftsEnabled < -0.5f) return 0.0f;
-    if (ScreenLightShaftsEnabled > 0.5f)
+    if (ScreenLightShaftsEnabled < -LIGHT_SHAFT_MODE_THRESHOLD) return 0.0f;
+    if (ScreenLightShaftsEnabled > LIGHT_SHAFT_MODE_THRESHOLD)
     {
         // 近い深度の4画素から復元する。壁の縁をまたぐ試料には小さい重みを与える。
         uint width, height; g_HalfLightShafts.GetDimensions(width, height);
-        float2 p = (pixelPosition - LightViewportOffset - 0.5f) * 0.5f;
+        float2 p = (pixelPosition - LightViewportOffset - 0.5f) * LIGHT_SHAFT_RESOLUTION_SCALE;
         int2 base = int2(floor(p)); float2 f = frac(p);
         float distance = length(worldPosition-eye); float3 sum=0; float weights=0;
         [unroll] for(int y=0;y<2;++y) [unroll] for(int x=0;x<2;++x) {
@@ -134,18 +146,19 @@ float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCoun
             float4 shaftSample = g_HalfLightShafts.Load(int3(cell,0));
             // 奥行きの差による重みは、距離に比べて大きな差（物の縁をまたぐ所）だけで下げている。
             // 小さな差でも重みを変えると、斜めに見える壁で重みが画素ごとに揺れ、斜めの細かい格子模様になったため。
-            const float depthGap = max(abs(shaftSample.w - distance) - distance * 0.04f - 1.0f, 0.0f);
-            float weight=(x?f.x:1-f.x)*(y?f.y:1-f.y)/(1+depthGap*0.5f);
+            const float depthGap = max(abs(shaftSample.w - distance) - distance * LIGHT_SHAFT_UPSAMPLE_DEPTH_TOLERANCE -
+                LIGHT_SHAFT_UPSAMPLE_DEPTH_OFFSET, 0.0f);
+            float weight=(x?f.x:1-f.x)*(y?f.y:1-f.y)/(1+depthGap*LIGHT_SHAFT_UPSAMPLE_DEPTH_FALLOFF);
             sum+=shaftSample.rgb*weight; weights+=weight;
         }
-        return sum/max(weights,0.00001f);
+        return sum/max(weights,LIGHT_SHAFT_UPSAMPLE_MIN_WEIGHT);
     }
     const float3 toPixel = worldPosition - eye;
     const float rayLength = length(toPixel);
-    const float3 rayDirection = toPixel / max(rayLength, 0.001f);
+    const float3 rayDirection = toPixel / max(rayLength, LIGHT_SHAFT_MIN_DIVISOR);
     // 画素ごとに調べる位置を少しずらし、少ない点でも縞模様が出ないようにしている（インターリーブド・グラディエント・ノイズ）
-    const float jitter = frac(52.9829189f * frac(dot(pixelPosition, float2(0.06711056f, 0.00583715f))));
-    const float2 flow = float2(CausticTime * 0.60f, CausticTime * 0.25f);
+    const float jitter = frac(MIST_IGN_SCALE * frac(dot(pixelPosition, MIST_IGN_DIRECTION)));
+    const float2 flow = float2(CausticTime * LIGHT_SHAFT_FLOW_SPEED_X, CausticTime * LIGHT_SHAFT_FLOW_SPEED_Z);
 
     float3 scattered = 0.0f;
     [loop]
@@ -153,7 +166,7 @@ float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCoun
     {
         const ENVIRONMENT_POINT_LIGHT pointLight = GetPixelLight(lightListOffset, i);
         const float3 center = pointLight.PositionRange.xyz;
-        const float range = max(pointLight.PositionRange.w, 0.001f);
+        const float range = max(pointLight.PositionRange.w, LIGHT_SHAFT_MIN_DIVISOR);
         [branch]
         if (center.y < LIGHT_SHAFT_MIN_HEIGHT)
         {
@@ -171,7 +184,7 @@ float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCoun
         const float stepLength = (segmentEnd - segmentStart) / LIGHT_SHAFT_SAMPLES;
         // 霧のむら：ゆっくり流れるノイズで、光の筋の中に濃い所と薄い所を作っている（区間の真ん中で1回だけ求めている）
         const float3 middlePoint = eye + rayDirection * ((segmentStart + segmentEnd) * 0.5f);
-        const float haze = 0.45f + FastValueNoise(middlePoint.xz * 0.05f + flow) * 0.90f;
+        const float haze = LIGHT_SHAFT_HAZE_BASE + FastValueNoise(middlePoint.xz * LIGHT_SHAFT_HAZE_SCALE + flow) * LIGHT_SHAFT_HAZE_RANGE;
         float lightScatter = 0.0f;
         [unroll]
         for (int sampleIndex = 0; sampleIndex < LIGHT_SHAFT_SAMPLES; ++sampleIndex)
@@ -185,14 +198,14 @@ float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCoun
             // 天井の器具から下へ広がる円錐の中だけを光らせている（真下ほど濃く、約60度より横では消える）
             const float cone = GetLightShaftConeWeight(toLight, lightDistance);
             // 光源のすぐそばは、照明そのものの明るさに任せて薄くしている
-            const float awayFromFixture = smoothstep(2.0f, 9.0f, lightDistance);
+            const float awayFromFixture = smoothstep(LIGHT_SHAFT_FIXTURE_FADE_START, LIGHT_SHAFT_FIXTURE_FADE_END, lightDistance);
             lightScatter += attenuation * cone * awayFromFixture;
         }
         scattered += pointLight.ColorIntensity.rgb * pointLight.ColorIntensity.a * lightScatter * haze * stepLength;
     }
     // 光源の真下を長く見通したときに白く飛ばないよう、明るいほど伸びを抑えている（上限はおよそ0.35）
     const float3 shaft = scattered * LIGHT_SHAFT_DENSITY;
-    return shaft / (1.0f + shaft * 2.8f);
+    return shaft / (1.0f + shaft * LIGHT_SHAFT_COMPRESSION);
 }
 
 #endif

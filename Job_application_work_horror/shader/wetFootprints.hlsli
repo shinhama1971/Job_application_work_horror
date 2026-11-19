@@ -42,6 +42,22 @@ float FootprintEllipse(float2 position, float2 center, float2 radius)
     return 1.0f - smoothstep(FOOTPRINT_ELLIPSE_FEATHER_START, 1.0f, length((position - center) / radius));
 }
 
+// 靴の形：つま先側の楕円（中心・半径）とかかとの楕円（中心・半径）
+#define SHOE_FRONT_CENTER float2(0.0f, 0.9f)
+#define SHOE_FRONT_RADIUS float2(0.75f, 1.25f)
+#define SHOE_HEEL_CENTER float2(0.0f, -1.15f)
+#define SHOE_HEEL_RADIUS float2(0.62f, 0.70f)
+// 裸足の形：指の付け根のふくらみ、かかと、土踏まずの外側（それぞれ中心・半径）
+#define BARE_BALL_CENTER float2(0.05f, 0.45f)
+#define BARE_BALL_RADIUS float2(0.62f, 0.78f)
+#define BARE_HEEL_CENTER float2(0.0f, -1.10f)
+#define BARE_HEEL_RADIUS float2(0.50f, 0.62f)
+#define BARE_ARCH_CENTER float2(0.25f, -0.35f)
+#define BARE_ARCH_RADIUS float2(0.30f, 0.75f)
+// 足跡の並び（置き方・状態の2つ）と、裸足かを見るしきい値
+#define FOOTPRINT_STRIDE 2
+#define FOOTPRINT_BARE_THRESHOLD 0.5f
+
 // 足跡1つの形（0〜1）。localは足の向きに合わせた座標（x = 右、y = つま先の方向。単位はワールド）。
 // 靴は、つま先側の楕円とかかとの楕円に、靴底の溝の横縞。裸足は、くびれた足の裏と5本の指
 float FootprintShape(float2 local, bool bare)
@@ -50,15 +66,15 @@ float FootprintShape(float2 local, bool bare)
     const float2 p = local / FOOTPRINT_WORLD_SHAPE_SCALE;
     if (!bare)
     {
-        const float front = FootprintEllipse(p, float2(0.0f, 0.9f), float2(0.75f, 1.25f));
-        const float heel = FootprintEllipse(p, float2(0.0f, -1.15f), float2(0.62f, 0.70f));
+        const float front = FootprintEllipse(p, SHOE_FRONT_CENTER, SHOE_FRONT_RADIUS);
+        const float heel = FootprintEllipse(p, SHOE_HEEL_CENTER, SHOE_HEEL_RADIUS);
         const float tread = FOOTPRINT_SHOE_TREAD_BASE + FOOTPRINT_SHOE_TREAD_GAIN * step(FOOTPRINT_SHOE_TREAD_THRESHOLD, frac(p.y * FOOTPRINT_SHOE_TREAD_FREQUENCY));
         return max(front, heel) * tread;
     }
-    const float ball = FootprintEllipse(p, float2(0.05f, 0.45f), float2(0.62f, 0.78f));
-    const float heel = FootprintEllipse(p, float2(0.0f, -1.10f), float2(0.50f, 0.62f));
+    const float ball = FootprintEllipse(p, BARE_BALL_CENTER, BARE_BALL_RADIUS);
+    const float heel = FootprintEllipse(p, BARE_HEEL_CENTER, BARE_HEEL_RADIUS);
     // 土踏まずは内側（x の負の側）がくびれ、外側だけがつながっている
-    const float outerArch = FootprintEllipse(p, float2(0.25f, -0.35f), float2(0.30f, 0.75f));
+    const float outerArch = FootprintEllipse(p, BARE_ARCH_CENTER, BARE_ARCH_RADIUS);
     float sole = max(max(ball, heel), outerArch);
     // 指（親指が内側で大きく、外側ほど小さく、少し下がる）
     [unroll]
@@ -80,19 +96,19 @@ float GetWetFootprints(float2 worldPosition)
     [loop]
     for (int index = 0; index < count; ++index)
     {
-        const float4 placement = Footprints[index * 2];
+        const float4 placement = Footprints[index * FOOTPRINT_STRIDE];
         const float2 offset = worldPosition - placement.xy;
         // 足跡の大きさ（半分で約4）より遠い所は計算しない
         if (dot(offset, offset) > FOOTPRINT_MAX_DISTANCE_SQUARED)
         {
             continue;
         }
-        const float4 state = Footprints[index * 2 + 1];
+        const float4 state = Footprints[index * FOOTPRINT_STRIDE + 1];
         // 足の向き（前 = (sin, cos)、右 = (cos, -sin)）の座標へ回し、左足は左右を反転している
         const float2 forward = float2(placement.z, placement.w);
         const float2 right = float2(placement.w, -placement.z);
         const float2 local = float2(dot(offset, right) * state.y, dot(offset, forward));
-        const float shape = FootprintShape(local, state.z > 0.5f);
+        const float shape = FootprintShape(local, state.z > FOOTPRINT_BARE_THRESHOLD);
         // 乾きかけは縁から乾くので、薄い所ほどノイズで欠けさせている
         const float dryEdge = smoothstep(0.0f, FOOTPRINT_DRY_EDGE_FADE_END, state.x + (FastValueNoise(worldPosition * FOOTPRINT_DRY_EDGE_NOISE_SCALE) - 0.5f) * FOOTPRINT_DRY_EDGE_NOISE_WEIGHT);
         wet = max(wet, shape * state.x * dryEdge);

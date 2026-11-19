@@ -22,6 +22,8 @@ struct SKY_PS_IN
 // 描画の奥の端（Camera.cpp の MainCameraFarPlane と同じ）と、真上を見たときに霧を通る長さ
 static const float SkyFarDistance = 1000.0f;
 static const float SkyZenithDistance = 380.0f;
+// 背景の色（Renderer.cpp の画面を消す色と同じ、わずかに青みのある黒）
+#define SKY_BACKDROP_COLOR float3(0.003f, 0.005f, 0.008f)
 
 float4 main(SKY_PS_IN input) : SV_TARGET
 {
@@ -34,7 +36,7 @@ float4 main(SKY_PS_IN input) : SV_TARGET
     const float3 viewPosition = viewDirection * distanceFromCamera;
 
     // 背景の色（Renderer.cpp の画面を消す色と同じ、わずかに青みのある黒）
-    float3 color = float3(0.003f, 0.005f, 0.008f);
+    float3 color = SKY_BACKDROP_COLOR;
     // 以下は litTexturePS・grassPS と同じ霧の式
     const float distanceFog = GetHorrorDistanceFog(distanceFromCamera, LoopDepth);
     const float heightDensity = exp(-max(worldPosition.y - SCENE_BASE_FLOOR_Y, 0.0f) * HEIGHT_FOG_DECAY);

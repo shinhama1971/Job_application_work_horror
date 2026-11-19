@@ -16,8 +16,11 @@ static const float BLOOM_MAX_LUMINANCE = 2.0f;
 // 小さい光源の輪郭を残すため、縮小する範囲の中心を四隅より重く見る。
 static const float BLOOM_EXTRACT_CENTER_WEIGHT = 0.40f;
 static const float BLOOM_EXTRACT_CORNER_WEIGHT = 0.15f;
+// スレッドの組の大きさと、輝度の重み
+#define BLOOM_EXTRACT_GROUP_SIZE 8
+#define BLOOM_LUMINANCE_WEIGHTS float3(0.2126f, 0.7152f, 0.0722f)
 
-[numthreads(8, 8, 1)]
+[numthreads(BLOOM_EXTRACT_GROUP_SIZE, BLOOM_EXTRACT_GROUP_SIZE, 1)]
 void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 {
     uint outputWidth;
@@ -59,7 +62,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     const float3 brightColor =
         color4 * BLOOM_EXTRACT_CENTER_WEIGHT +
         (color0 + color1 + color2 + color3) * BLOOM_EXTRACT_CORNER_WEIGHT;
-    const float luminance = dot(brightColor, float3(0.2126f, 0.7152f, 0.0722f));
+    const float luminance = dot(brightColor, BLOOM_LUMINANCE_WEIGHTS);
     // 壁や床の中くらいの明るさは除き、照明・非常灯などの明るい部分だけを取り出している。
     const float contribution = smoothstep(BLOOM_THRESHOLD_START, BLOOM_THRESHOLD_FULL, luminance);
     // 画面はHDRなので、電球の芯は1を大きく超える。そのまま使うと、にじみが部屋中に広がるため、明るさに上限を付けている
