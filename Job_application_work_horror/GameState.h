@@ -15,8 +15,6 @@ namespace Core
         static constexpr int TotalEvidenceCount = 4;
         // 1面の懐中電灯で浮かぶ壁の文字のうち、読んだ数を数える対象の数（Stage1WallWritings::Count）。
         static constexpr int TotalWallWritingCount = 4;
-        // 1面のボイスレコーダーの録音の数（StoryText::RecordingCount と同じ。Stage1Layout.cpp で確かめている）。
-        static constexpr int TotalRecordingCount = 4;
         // 1面の配電盤に入れるヒューズの数（これだけ拾うと電力を戻せる）
         static constexpr int RequiredFuseCount = 3;
 

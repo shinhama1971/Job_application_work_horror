@@ -62,10 +62,13 @@ void Stage1Transmissions::PlayRecording(int index)
         return;
     }
     const StoryText::Recording& recording = StoryText::Recordings[index];
+    // 台詞を追加しても、番号と合計が一覧の件数を反映する。
+    const std::string header = "録音 " + std::to_string(index + 1) + "/" +
+        std::to_string(StoryText::RecordingCount) + "　——　" + recording.Speaker;
     for (int i = 0; i < StoryText::RecordingLineCount; ++i)
     {
         Line line;
-        line.Header = recording.Header;
+        line.Header = header;
         line.Text = recording.Lines[i];
         line.Recording = true;
         // 再生ボタンを押してから、テープが回り始めるまでの間

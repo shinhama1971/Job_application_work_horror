@@ -20,6 +20,7 @@
 #include <SimpleMath.h>
 
 #include <deque>
+#include <string>
 
 class Stage1Transmissions final
 {
@@ -50,7 +51,7 @@ private:
     // 字幕の1行（見出し・文章・録音か無線か・行の前に空ける秒数・この行の後に「通信途絶」を出すか・録音の最後の行か）
     struct Line
     {
-        const char* Header = "";
+        std::string Header;
         const char* Text = "";
         bool Recording = false;
         float Delay = 0.0f;

@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "GameState.h"
+#include "StoryText.h"
 #include "Stage1HiddenRoomEvent.h"
 #include "Stage1KeypadDoor.h"
 #include "Stage1LightNumber.h"
@@ -120,7 +120,7 @@ struct StageObjects
     // 3本目を探す段階になると現れ、西棟のヒューズとどちらか一方を取ればよい（取った方ではない方は消える。StageScene::UpdateThirdFuseRoutes）
     Item* keypadRoomFuse = nullptr;
     // ボイスレコーダー（並びは StoryText::Recordings と同じ。調べると Stage1Transmissions が録音の字幕を流す）
-    std::array<VoiceRecorder*, Core::GameState::TotalRecordingCount> recorders{};
+    std::array<VoiceRecorder*, StoryText::RecordingCount> recorders{};
     // 天井照明と、監視カメラの異常で使う開かずの扉
     std::array<CeilingLight*, CeilingLightCount> ceilingLights{};
     std::array<Door*, StageSealedDoorCount> sealedDoors{};

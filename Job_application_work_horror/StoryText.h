@@ -7,6 +7,7 @@
 #pragma once
 
 #include <string>
+#include <iterator>
 
 namespace StoryText
 {
@@ -33,17 +34,16 @@ namespace StoryText
 
     // 1面に落ちているボイスレコーダーの録音（Stage1Transmissions）。拾った順に関係なく分かるよう、1つずつで話が通じる内容にしている。
     // 4つ目は、森の無線と同じ調査員の声。これを聞くと、森で聞いた無線も、1面で聞こえる無線も、もう本人ではないと分かる。
-    inline constexpr int RecordingCount = 4;
     inline constexpr int RecordingLineCount = 3;
     struct Recording
     {
-        const char* Header;
+        const char* Speaker;
         const char* Lines[RecordingLineCount];
     };
-    inline constexpr Recording Recordings[RecordingCount] =
+    inline constexpr Recording Recordings[] =
     {
         {
-            "録音 1/4　——　研究員　三浦",
+            "研究員　三浦",
             {
                 "「実験記録、十月二日。アンテナが、どの局も使っていない帯域で声を拾った。」",
                 "「……私たちの声だった。昨日この部屋で話した言葉が、そのまま返ってくる。」",
@@ -51,7 +51,7 @@ namespace StoryText
             },
         },
         {
-            "録音 2/4　——　研究員　三浦",
+            "研究員　三浦",
             {
                 "「十月五日。送り返した夜に停電した。それから、廊下が終わらない。」",
                 "「暗がりで何かが動く。ライトを当てると止まる。……明かりを、絶対に消すな。」",
@@ -59,7 +59,7 @@ namespace StoryText
             },
         },
         {
-            "録音 3/4　——　警備員　野口",
+            "警備員　野口",
             {
                 "「警備の野口だ。無線で所長の声がした。書類保管室へ来い、と。」",
                 "「行った二人は戻らなかった。……所長は、三日前に死んでいる。」",
@@ -67,7 +67,7 @@ namespace StoryText
             },
         },
         {
-            "録音 4/4　——　第3研究棟　調査員",
+            "第3研究棟　調査員",
             {
                 "「……第3研究棟の調査員だ。これを聞いている人へ。」",
                 "「この先、無線で俺の声がしても、それはもう俺じゃない。」",
@@ -75,6 +75,9 @@ namespace StoryText
             },
         },
     };
+
+    // 台詞の一覧から、設置するレコーダー数と見出しの合計を決める。
+    inline constexpr int RecordingCount = static_cast<int>(std::size(Recordings));
 
     // 1面の途中で、また届く無線（Stage1Transmissions）。森と同じ調査員の声で、書類保管室へ誘い、
     // 照らすと止まる影の前で「ライトを消せ」と言う（壁の文字「あかりを けすな」と逆のことを言う、嘘の指示）。

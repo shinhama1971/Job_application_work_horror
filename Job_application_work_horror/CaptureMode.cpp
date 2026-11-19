@@ -12,6 +12,8 @@
 #include "Application.h"
 #include "Camera.h"
 #include "Game.h"
+#include "GameSettings.h"
+#include "TechDemo.h"
 #include "GpuTimer.h"
 #include "Ground.h"
 #include "FuseBox.h"
@@ -56,7 +58,6 @@ namespace
     // 計測の表：1%遅いフレーム（99パーセンタイル）、ミリ秒から FPS への換算、プレイ動画のフレームレート
     constexpr double SlowFramePercentile = 0.99;
     constexpr double MillisecondsPerSecond = 1000.0;
-    constexpr UINT PlayVideoFps = 30;
     // 画面写真の BGRA の1画素のバイト数と、不透明な透明度
     constexpr int BytesPerPixel = 4;
     // BGRAでは、末尾のバイトが透明度。
@@ -996,16 +997,31 @@ namespace Tools::CaptureMode
             {
                 const std::wstring option = arguments[i];
                 const std::wstring value = arguments[i + 1];
-                if (option == L"--effect-level" && value.size() == 1 && value[0] >= L'1' && value[0] <= L'3')
-                    g_EffectOverride = static_cast<int>(value[0] - L'1');
+                if (option == L"--effect-level" && value.size() == 1)
+                {
+                    // 起動オプションは1始まり、ゲーム内部はLowEffectLevelから数える。
+                    const int level = static_cast<int>(value[0] - L'1') + Core::GameSettings::LowEffectLevel;
+                    if (level >= Core::GameSettings::LowEffectLevel && level <= Core::GameSettings::HighEffectLevel)
+                    {
+                        g_EffectOverride = level;
+                    }
+                }
                 if (option == L"--debug-view")
                 {
                     if (value == L"10") g_ViewOverride = ShaderDebugView::AmbientOcclusion;
                     if (value == L"11") g_ViewOverride = ShaderDebugView::FullbrightReflection;
                     if (value == L"12") g_ViewOverride = ShaderDebugView::GrassLod;
                 }
-                if (option == L"--reflection" && value.size() == 1 && value[0] >= L'0' && value[0] <= L'3')
-                    g_ReflectionOverride = static_cast<int>(value[0] - L'0');
+                if (option == L"--reflection" && value.size() == 1)
+                {
+                    // 起動オプションでは、ゲーム本体の方式番号をそのまま使う。
+                    const int method = static_cast<int>(value[0] - L'0');
+                    if (method >= static_cast<int>(TechDemo::ReflectionMethod::Off) &&
+                        method <= static_cast<int>(TechDemo::ReflectionMethod::RoomRay))
+                    {
+                        g_ReflectionOverride = method;
+                    }
+                }
                 if (option == L"--tonemap" && value == L"aces")
                     g_ToneMapOverride = Effect::ToneMapMode::Aces;
                 if (option == L"--tonemap" && value == L"legacy")

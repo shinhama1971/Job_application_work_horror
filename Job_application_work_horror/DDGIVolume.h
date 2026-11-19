@@ -55,6 +55,8 @@ namespace Effect
         uint32_t GetProbeCount() const { return m_ProbeCounts[0] * m_ProbeCounts[1] * m_ProbeCounts[2]; }
 
     private:
+        // プローブ格子はXYZの3軸。HLSLのuint3 ProbeCountsと同じ要素数にする。
+        static constexpr std::size_t ProbeAxisCount = 3;
         // シェーダーへ渡す値（ddgiCommon.hlsli の DDGIBuffer と同じ並び）
         struct DDGIParameters
         {
@@ -62,7 +64,7 @@ namespace Effect
             uint32_t RaysPerProbe;
             DirectX::SimpleMath::Vector3 ProbeSpacing;
             float Hysteresis;
-            uint32_t ProbeCounts[3];
+            uint32_t ProbeCounts[ProbeAxisCount];
             uint32_t LightCount;
             DirectX::SimpleMath::Matrix RayRotation;
             DirectX::SimpleMath::Vector3 FlashlightPosition;
@@ -117,7 +119,7 @@ namespace Effect
 
         DirectX::SimpleMath::Vector3 m_ProbeOrigin;
         DirectX::SimpleMath::Vector3 m_ProbeSpacing;
-        std::array<uint32_t, 3> m_ProbeCounts{};
+        std::array<uint32_t, ProbeAxisCount> m_ProbeCounts{};
         DDGIParameters m_Parameters{};
 
         // 光線の結果（光線の番号 x プローブの番号）、放射照度と距離の八面体マップ（前と今を交互に使う2枚ずつ）、画面の間接光

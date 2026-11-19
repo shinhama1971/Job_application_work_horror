@@ -130,11 +130,11 @@ public:
     {
         DirectX::SimpleMath::Vector3 Direction = DirectX::SimpleMath::Vector3(0.0f, 0.0f, 1.0f); // 歩く向き（水平）
         float FlatDistance = 0.0f;      // 最初の段までの平らな距離
-        float StepRun = 7.0f;           // 1段の奥行き
-        float StepRise = 4.0f;          // 1段の高さ
-        int StepCount = 10;             // 段の数
+        float StepRun = 0.0f;           // 1段の奥行き
+        float StepRise = 0.0f;          // 1段の高さ
+        int StepCount = 0;             // 段の数
         float EndFlatDistance = 0.0f;   // 最後の段の後に歩く平らな距離
-        float Speed = 26.0f;            // 歩く速さ（普段の歩きは30）
+        float Speed = 0.0f;             // 歩く速さ（入口と出口の生成処理で指定）
         float EyeDrop = 0.0f;           // 始まりの目の高さを、普段よりこれだけ低くする（2面の始まり：下の段から上がってくる）
         float TargetPitch = 0.0f;       // 歩きながら向ける上下の向き（正で上）
         bool HoldAtEnd = false;         // 上り切った後もその姿勢で止まっているか（false なら、普段の操作に戻る）
@@ -144,6 +144,9 @@ public:
     static constexpr float ExitClimbSpeed = 26.0f;
     static constexpr float ExitClimbTargetPitch = 0.16f;
     // 面の始まり（2面・3面）：下の段から3段上がって出てくる。少し見上げた視点から始め、普段の高さへ戻す
+    // 入口の演出用の段の寸法。出口では、各面の実際の階段寸法を受け取る。
+    static constexpr float ArrivalStepRun = 7.0f;
+    static constexpr float ArrivalStepRise = 4.0f;
     static constexpr int ArrivalStepCount = 3;
     static constexpr float ArrivalStartPitch = 0.22f;
     static constexpr float ArrivalFlatDistance = 3.0f;

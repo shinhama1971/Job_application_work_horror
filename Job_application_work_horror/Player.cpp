@@ -861,6 +861,8 @@ Player::StairClimb Player::MakeArrivalClimb(const Vector3& direction)
     StairClimb arrival;
     arrival.Direction = direction;
     arrival.FlatDistance = ArrivalFlatDistance;
+    arrival.StepRun = ArrivalStepRun;
+    arrival.StepRise = ArrivalStepRise;
     arrival.StepCount = ArrivalStepCount;
     arrival.EndFlatDistance = ArrivalEndFlatDistance;
     arrival.Speed = ArrivalSpeed;

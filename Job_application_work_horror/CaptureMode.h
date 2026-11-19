@@ -77,8 +77,9 @@ namespace Tools::CaptureMode
     // 撮影中のウィンドウと動画の大きさ（720p）。
     constexpr unsigned int Width = 1280;
     constexpr unsigned int Height = 720;
-    // 撮影中の1フレームの長さ（30fps）
-    constexpr float FrameSeconds = 1.0f / 30.0f;
+    // 収録の進行とMP4の再生時間を同じにするため、同じFPSを使う。
+    constexpr unsigned int PlayVideoFps = 30;
+    constexpr float FrameSeconds = 1.0f / static_cast<float>(PlayVideoFps);
 
     // Sceneの更新の後・Objectの更新の前に呼ばれ、プレイヤーと視点を道順に沿って動かしている。
     void UpdateBeforeObjects();

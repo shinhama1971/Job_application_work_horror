@@ -19,6 +19,7 @@
 #include "Application.h"
 #include "Camera.h"
 #include "Game.h"
+#include "GameSettings.h"
 #include "Input.h"
 #include "Player.h"
 #include "Renderer.h"
@@ -499,7 +500,7 @@ void Hud::DrawResult(
     const int safeChargersUsed = (std::max)(chargersUsed, 0);
     constexpr int totalEvidence = Core::GameState::TotalEvidenceCount;
     constexpr int totalWritings = Core::GameState::TotalWallWritingCount;
-    constexpr int totalRecordings = Core::GameState::TotalRecordingCount;
+    constexpr int totalRecordings = StoryText::RecordingCount;
     const int safeEvidenceCollected = (std::clamp)(evidenceCollected, 0, totalEvidence);
     const int safeWritingsRead = (std::clamp)(wallWritingsRead, 0, totalWritings);
     const int safeRecordingsPlayed = (std::clamp)(recordingsPlayed, 0, totalRecordings);
@@ -1324,13 +1325,8 @@ namespace PauseLayout
     // 操作の説明の行：1行目の位置と行の間隔
     constexpr float HelpFirstY = 350.0f;
     constexpr float HelpSpacing = 42.0f;
-    // 表示できる階の上限、各設定の段階の上限（明るさ・画面効果・視点速度・音量・描画解像度）
+    // ポーズ画面の階表示の上限。設定の段階はGameSettings側とそろえる。
     constexpr int MaxFloorNumber = 2;
-    constexpr int MaxBrightnessLevel = 4;
-    constexpr int MaxEffectLevel = 2;
-    constexpr int MaxSensitivityLevel = 4;
-    constexpr int MaxVolumeLevel = 4;
-    constexpr int MaxResolutionLevel = 3;
     // 設定の項目の並び（上から順）
     enum Setting { BrightnessSetting, EffectSetting, SensitivitySetting, VolumeSetting, GuideSetting, ResolutionSetting, SettingCount };
 }
@@ -1375,11 +1371,11 @@ void Hud::DrawPause(
         std::to_string((std::max)(caughtCount, 0));
     AddCenteredText(panelY + StatusY, runStatus, SmallPixelSize, Pale);
     const int safeBrightnessLevel =
-        (std::clamp)(brightnessLevel, 0, MaxBrightnessLevel);
-    const int safeEffectLevel = (std::clamp)(effectLevel, 0, MaxEffectLevel);
+        (std::clamp)(brightnessLevel, 0, Core::GameSettings::MaxBrightnessLevel);
+    const int safeEffectLevel = (std::clamp)(effectLevel, Core::GameSettings::LowEffectLevel, Core::GameSettings::HighEffectLevel);
     const int safeSensitivityLevel =
-        (std::clamp)(lookSensitivityLevel, 0, MaxSensitivityLevel);
-    const int safeVolumeLevel = (std::clamp)(volumeLevel, 0, MaxVolumeLevel);
+        (std::clamp)(lookSensitivityLevel, 0, Core::GameSettings::MaxLookSensitivityLevel);
+    const int safeVolumeLevel = (std::clamp)(volumeLevel, 0, Core::GameSettings::MaxVolumeLevel);
     const int safeSelectedSetting =
         (std::clamp)(selectedSetting, 0, SettingCount - 1);
     // 設定の1行を、上からの順番の位置に、選んでいれば緑で描いている
@@ -1388,21 +1384,27 @@ void Hud::DrawPause(
         AddCenteredText(panelY + SettingFirstY + static_cast<float>(setting) * SettingSpacing,
             text, SettingPixelSize, safeSelectedSetting == setting ? Green : Pale);
     };
-    addSetting(BrightnessSetting, "明るさ " + std::to_string(safeBrightnessLevel + 1) + " OF 5");
+    addSetting(BrightnessSetting, "明るさ " + std::to_string(safeBrightnessLevel + 1) + " OF " +
+        std::to_string(Core::GameSettings::MaxBrightnessLevel + 1));
     constexpr std::string_view effectNames[] =
     {
         "軽量 FPS優先", "標準", "高品質"
     };
+    static_assert(std::size(effectNames) == Core::GameSettings::MaxEffectLevel + 1);
     addSetting(EffectSetting, "画面効果 " + std::string(effectNames[safeEffectLevel]));
-    addSetting(SensitivitySetting, "視点速度 " + std::to_string(safeSensitivityLevel + 1) + " OF 5");
+    addSetting(SensitivitySetting, "視点速度 " + std::to_string(safeSensitivityLevel + 1) + " OF " +
+        std::to_string(Core::GameSettings::MaxLookSensitivityLevel + 1));
+    // UIには操作の目安の割合を出す。音声に掛ける倍率とは別の表。
     constexpr int volumePercent[] = { 0, 25, 50, 75, 100 };
+    static_assert(std::size(volumePercent) == Core::GameSettings::MaxVolumeLevel + 1);
     addSetting(VolumeSetting, safeVolumeLevel == 0
         ? "音量 ミュート"
         : "音量 " + std::to_string(volumePercent[safeVolumeLevel]) + "%");
     addSetting(GuideSetting, guideEnabled ? "目的表示 あり" : "目的表示 なし");
     // 描画解像度は次回の起動から反映されるため、起動時と違う段階を選んでいるときは、そのことを表示している。
     constexpr std::string_view resolutionNames[] = { "自動", "100%", "75%", "67%" };
-    const int safeResolutionLevel = (std::clamp)(resolutionLevel, 0, MaxResolutionLevel);
+    static_assert(std::size(resolutionNames) == Core::GameSettings::MaxResolutionLevel + 1);
+    const int safeResolutionLevel = (std::clamp)(resolutionLevel, 0, Core::GameSettings::MaxResolutionLevel);
     addSetting(ResolutionSetting,
         "描画解像度 " + std::string(resolutionNames[safeResolutionLevel]) +
         (safeResolutionLevel == Application::GetLaunchResolutionLevel()

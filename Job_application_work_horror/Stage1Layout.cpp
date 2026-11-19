@@ -321,14 +321,12 @@ namespace
                 Place(*battery, batteryName);
             }
 
-            static_assert(StoryText::RecordingCount == Core::GameState::TotalRecordingCount,
-                "録音の数を StoryText と GameState でそろえる");
-            static_assert(std::tuple_size_v<decltype(m_Objects.recorders)> == StoryText::RecordingCount,
-                "置くボイスレコーダーの数を録音の数とそろえる");
             constexpr const char* recorderNames[] =
             {
                 "Stage1RecorderHall", "Stage1RecorderSouthWestHall", "Stage1RecorderWestWing", "Stage1RecorderArchive"
             };
+            static_assert(std::size(recorderNames) == StoryText::RecordingCount,
+                "レコーダーの配置名と録音を同じ件数にする");
             for (int i = 0; i < StoryText::RecordingCount; ++i)
             {
                 VoiceRecorder* recorder = m_Builder.Create<VoiceRecorder>(recorderNames[i]);
