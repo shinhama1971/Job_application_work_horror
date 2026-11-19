@@ -30,10 +30,6 @@ public:
 		return m_subsets;
 	}
 
-	const std::vector<std::string>& GetTextureNames() {
-		return m_texturenames;
-	}
-
 	// テクスチャを所有権ごと返している（呼んだ後は空になる）
 	std::vector<std::unique_ptr<Texture>> GetTextures() {
 		return std::move(m_textures);

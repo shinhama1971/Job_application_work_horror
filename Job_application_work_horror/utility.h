@@ -39,10 +39,8 @@ namespace utility
     // 保存フォルダを作り、完成した内容でセーブファイルを差し替える。
     bool WriteSaveFile(std::string const& fileName, std::string_view text);
 
-	// 文字コードの変換（UTF-16→Shift-JIS、UTF-8→UTF-16、UTF-8→Shift-JIS）
-	std::string wide_to_multi_winapi(std::wstring const& src);
+	// 文字コードの変換（UTF-8→UTF-16）
 	std::wstring utf8_to_wide_winapi(std::string const& src);
-	std::string utf8_to_multi_winapi(std::string const& src);
 
     // 続けられない初期化の失敗をダイアログで知らせ、プロセスを終えている。
     // assertはReleaseで消えるため、素材のファイルが無いときなどはこちらで扱っている。

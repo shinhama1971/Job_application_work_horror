@@ -131,10 +131,16 @@ namespace
     // 植える場所のむら（群れ）に使う、なめらかな乱数（シェーダーの FastValueNoise と同じく、格子の点の乱数をなめらかにつないでいる）
     float Hash21(float x, float y)
     {
-        std::uint32_t hash = static_cast<std::uint32_t>(static_cast<std::int32_t>(x)) * 374761393u +
-            static_cast<std::uint32_t>(static_cast<std::int32_t>(y)) * 668265263u;
-        hash = (hash ^ (hash >> 13)) * 1274126177u;
-        hash ^= hash >> 16;
+        // 整数のハッシュの係数（x・y に掛ける大きな素数、混ぜるときの掛け算とずらす量。よく使われる決まった値）
+        constexpr std::uint32_t HashPrimeX = 374761393u;
+        constexpr std::uint32_t HashPrimeY = 668265263u;
+        constexpr std::uint32_t HashMixMultiplier = 1274126177u;
+        constexpr std::uint32_t HashMixShift = 13u;
+        constexpr std::uint32_t HashFinalShift = 16u;
+        std::uint32_t hash = static_cast<std::uint32_t>(static_cast<std::int32_t>(x)) * HashPrimeX +
+            static_cast<std::uint32_t>(static_cast<std::int32_t>(y)) * HashPrimeY;
+        hash = (hash ^ (hash >> HashMixShift)) * HashMixMultiplier;
+        hash ^= hash >> HashFinalShift;
         // 下位24ビットを、1には届かない0〜1未満の値に変える。
         constexpr std::uint32_t HashFractionMask = 0x00FFFFFFu;
         constexpr std::uint32_t HashFractionDivisor = HashFractionMask + 1u;

@@ -64,9 +64,6 @@ public:
         const DirectX::SimpleMath::Vector3& cameraForward,
         bool flashlightOn) const;
 
-    // 文字が向いている方向（壁から外向き）
-    const DirectX::SimpleMath::Vector3& GetNormal() const { return m_Normal; }
-
 private:
     void BindGeometry(Camera* cam);
 

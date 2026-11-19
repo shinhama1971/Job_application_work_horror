@@ -213,6 +213,8 @@ void IntroScene::Draw(Camera* camera)
 
 namespace
 {
+    // 導入の通信の行数（字幕の時刻の表と同じ数）
+    constexpr std::size_t IntroLineCount = 4;
     constexpr const wchar_t* IntroStoryText[] =
     {
         L"受信記録を確認。",
@@ -222,11 +224,11 @@ namespace
     };
 
     static_assert(
-        std::size(IntroStoryText) == 4,
+        std::size(IntroStoryText) == IntroLineCount,
         "StoryText must contain four lines");
 }
 
-static constexpr float LineStartTimes[4] =
+static constexpr float LineStartTimes[IntroLineCount] =
 {
     2.2f,
     8.4f,

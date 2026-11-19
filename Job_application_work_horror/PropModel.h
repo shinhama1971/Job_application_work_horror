@@ -44,7 +44,4 @@ namespace PropModel
         std::vector<VERTEX_3D>& vertices,
         std::vector<unsigned int>& indices,
         const DirectX::SimpleMath::Matrix& orientation = DirectX::SimpleMath::Matrix::Identity);
-
-    // 範囲を1つにまとめている（続けて足した部位を、同じマテリアルで1回で描くとき）
-    IndexRange Merge(const IndexRange& first, const IndexRange& last);
 }

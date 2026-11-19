@@ -48,12 +48,20 @@ struct RAIN_PS_IN
     float life : TEXCOORD6;      // しぶきの経過（0〜1）
 };
 
+// PCG の係数（O'Neill 2014 の RXS-M-XS。決まった値）：状態を進める掛け算と足し算、ずらす量を選ぶ上位ビット、最小のずらし、出力の掛け算と最後のずらし
+#define PCG_MULTIPLIER 747796405u
+#define PCG_INCREMENT 2891336453u
+#define PCG_SHIFT_SELECT 28u
+#define PCG_SHIFT_BASE 4u
+#define PCG_OUTPUT_MULTIPLIER 277803737u
+#define PCG_OUTPUT_SHIFT 22u
+
 // 整数から、3つの 0〜1 の乱数を作っている（PCG の混ぜ方）
 uint Pcg(uint value)
 {
-    const uint state = value * 747796405u + 2891336453u;
-    const uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-    return (word >> 22u) ^ word;
+    const uint state = value * PCG_MULTIPLIER + PCG_INCREMENT;
+    const uint word = ((state >> ((state >> PCG_SHIFT_SELECT) + PCG_SHIFT_BASE)) ^ state) * PCG_OUTPUT_MULTIPLIER;
+    return (word >> PCG_OUTPUT_SHIFT) ^ word;
 }
 // 乱数の下16ビットを0〜1にするときの最大値
 #define RAIN_HASH_MASK 0xFFFFu

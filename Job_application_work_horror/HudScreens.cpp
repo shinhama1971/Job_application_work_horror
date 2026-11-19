@@ -427,6 +427,10 @@ namespace
     constexpr float ResultRankY = 158.0f;
     constexpr float ResultStatsY = 232.0f;
     constexpr float ResultRowSpacing = 34.0f;
+    // 「今回の発見」の行の番号（壁の文字が0行目、録音・隠し部屋・2階の異変の順）
+    constexpr float ResultRecordingRow = 1.0f;
+    constexpr float ResultHiddenRoomRow = 2.0f;
+    constexpr float ResultStage2AnomalyRow = 3.0f;
     constexpr float ResultDividerY = 446.0f;
     constexpr float ResultDividerInset = 60.0f;
     constexpr float ResultDiscoveryHeaderY = 458.0f;
@@ -542,15 +546,15 @@ void Hud::DrawResult(
     AddCenteredText(discoveryY,
         "壁の文字 " + std::to_string(safeWritingsRead) + " / " + std::to_string(totalWritings),
         ResultStatPixelSize, safeWritingsRead >= totalWritings ? gold : pale);
-    AddCenteredText(discoveryY + ResultRowSpacing,
+    AddCenteredText(discoveryY + ResultRowSpacing * ResultRecordingRow,
         "録音 " + std::to_string(safeRecordingsPlayed) + " / " + std::to_string(totalRecordings),
         ResultStatPixelSize, safeRecordingsPlayed >= totalRecordings ? gold : pale);
-    AddCenteredText(discoveryY + ResultRowSpacing * 2.0f,
+    AddCenteredText(discoveryY + ResultRowSpacing * ResultHiddenRoomRow,
         hiddenRoomEscaped ? "隠し部屋 脱出した" : "隠し部屋 見つけていない",
         ResultStatPixelSize, hiddenRoomEscaped ? gold : pale);
     if (!stage2Anomalies.empty())
     {
-        AddCenteredText(discoveryY + ResultRowSpacing * 3.0f,
+        AddCenteredText(discoveryY + ResultRowSpacing * ResultStage2AnomalyRow,
             "2階の異変 " + std::string(stage2Anomalies), ResultStatPixelSize, pale);
     }
 

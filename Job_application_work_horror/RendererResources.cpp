@@ -22,6 +22,10 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+	// 保存したシェーダーが、このゲームで使うシェーダーモデル（5.0）でコンパイルした物かを確かめる番号
+	constexpr UINT ShaderModelMajor = 5;
+	constexpr UINT ShaderModelMinor = 0;
+
 	// シェーダーのファイルごとの「自分と、#include しているファイル（入れ子も含む）のうち一番新しい更新時刻」を覚えている。
 	// 同じ .hlsli を多くのシェーダーが読むので、1回調べたファイルは覚えておき、調べ直さない。
 	// 事前コンパイルでは複数のスレッドから呼ぶので、覚えている表に鍵（mutex）を掛けている
@@ -141,8 +145,8 @@ namespace
 		const auto expectedType = shaderModel == "vs_5_0" ? D3D11_SHVER_VERTEX_SHADER :
 			shaderModel == "cs_5_0" ? D3D11_SHVER_COMPUTE_SHADER : D3D11_SHVER_PIXEL_SHADER;
 		return D3D11_SHVER_GET_TYPE(description.Version) == static_cast<UINT>(expectedType) &&
-			D3D11_SHVER_GET_MAJOR(description.Version) == 5 &&
-			D3D11_SHVER_GET_MINOR(description.Version) == 0;
+			D3D11_SHVER_GET_MAJOR(description.Version) == ShaderModelMajor &&
+			D3D11_SHVER_GET_MINOR(description.Version) == ShaderModelMinor;
 	}
 
 	template<class Create>

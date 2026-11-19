@@ -88,12 +88,4 @@ namespace PropModel
         }
         return ranges;
     }
-
-    IndexRange Merge(const IndexRange& first, const IndexRange& last)
-    {
-        IndexRange merged;
-        merged.Start = first.Start;
-        merged.Count = last.Start + last.Count - first.Start;
-        return merged;
-    }
 }
