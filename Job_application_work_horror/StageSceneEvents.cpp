@@ -245,6 +245,66 @@ namespace
     // 暖かい灯りの下にいる度合いが、これ以上なら物音を鳴らさない
     constexpr float SafeLightQuietCalm = 0.5f;
 
+    // --- 天井裏の足音が、照明を消しながら迫ってくる（Stage1CeilingStalker）
+    // 電力が戻ってから、この秒数が過ぎた後に起きる（照明が全部点き、落ち着いた頃）
+    constexpr float CeilingStalkerDelaySeconds = 25.0f;
+    // 足音が通る線の上の照明（南北に一直線に並ぶ、中央の廊下・中央ホール・北の角）
+    constexpr int CeilingStalkerLights[] =
+    {
+        Stage1LightNumber::MiddleCorridor,
+        Stage1LightNumber::CentralHall,
+        Stage1LightNumber::NorthCorner
+    };
+    // 足音が真下を通った照明が消えるときの音（懐中電灯のスイッチの音を低く）、画面の脈打ち、振動
+    constexpr EventFeedback::SoundSpec CeilingStalkerLightOffSound{ 0.45f, 1.3f };
+    constexpr PulseSpec CeilingStalkerLightOffPulse{ 0.18f, 0.24f };
+    constexpr RumbleSpec CeilingStalkerLightOffRumble{ 4, 0.12f };
+    // 追いつかれたとき：真上の大きな衝撃音、強い画面の脈打ち、振動
+    constexpr EventFeedback::SoundSpec CeilingStalkerCaughtSound{ 0.70f, 1.0f };
+    constexpr PulseSpec CeilingStalkerCaughtPulse{ 0.85f, 0.70f };
+    constexpr RumbleSpec CeilingStalkerCaughtRumble{ 18, 0.55f };
+    // 照明が点き直すときの明滅（秒・強さ）
+    constexpr FlickerSpec CeilingStalkerRestoreFlicker{ 0.55f, 0.80f };
+
+    // --- ヒューズを拾った瞬間の演出（1本目・2本目・3本目の順。本数が多いほど強い）
+    constexpr int FuseScareLevels = 3;
+    // この距離の中の天井の照明を消す範囲と、消えている秒数、懐中電灯をちらつかせる秒数
+    constexpr float FuseScareBlackoutRadius[FuseScareLevels] = { 90.0f, 120.0f, 160.0f };
+    constexpr float FuseScareBlackoutSeconds[FuseScareLevels] = { 1.2f, 1.8f, 2.4f };
+    constexpr float FuseScareSputterSeconds[FuseScareLevels] = { 0.9f, 1.4f, 1.9f };
+    // すぐ後ろで鳴らす足音の数と、それぞれを鳴らす時刻（拾ってからの秒数）
+    constexpr int FuseScareStepCount[FuseScareLevels] = { 0, 1, 2 };
+    constexpr int FuseScareMaxSteps = 2;
+    constexpr float FuseScareStepTimes[FuseScareMaxSteps] = { 0.65f, 1.05f };
+    // 足音を鳴らす所（拾った瞬間に向いていた方の、真後ろのこの距離。床の高さ）と、重い足音の高さ・音量
+    constexpr float FuseScareBehindDistance = 5.0f;
+    constexpr float FuseScareStepPitch = 0.62f;
+    constexpr float FuseScareStepVolume = 2.2f;
+    // 照明が消える瞬間の音（懐中電灯のスイッチの音を低く）、足音と一緒に出す画面の脈打ちと振動
+    constexpr EventFeedback::SoundSpec FuseScareCutSound{ 0.42f, 1.4f };
+    constexpr PulseSpec FuseScareStepPulse{ 0.36f, 0.40f };
+    constexpr RumbleSpec FuseScareStepRumble{ 8, 0.22f };
+    // 照明が点き直すときの明滅（秒・強さ）
+    constexpr FlickerSpec FuseScareRestoreFlicker{ 0.50f, 0.85f };
+
+    // --- 影のまわりの空間のゆがみ（PostProcess::SetPresenceWarps）
+    // ゆがみ始める距離と、一番強くなる距離（これより近いと最大）
+    constexpr float PresenceWarpRange = 140.0f;
+    constexpr float PresenceWarpNearDistance = 18.0f;
+    // ゆがみの中心にする高さ（影の胸。ShadowMan の視線の判定と同じ）と、ゆがむ範囲の体のまわりの半径（ワールドの長さ）
+    constexpr float PresenceWarpChestHeight = 17.0f;
+    constexpr float PresenceWarpWorldRadius = 18.0f;
+    // 画面の上でのゆがむ範囲の半径の下限と上限（縦の高さを1とした長さ）
+    constexpr float PresenceWarpMinScreenRadius = 0.08f;
+    constexpr float PresenceWarpMaxScreenRadius = 0.6f;
+    // 画面の外へこれだけ出た影までは、端にかかるゆがみを出す（画面の位置 0〜1 の外側）
+    constexpr float PresenceWarpScreenMargin = 0.25f;
+    // カメラの後ろとみなす w の下限
+    constexpr float PresenceWarpMinClipW = 0.001f;
+    // 残像（PostProcess::SetEcho）を出し始める緊張（影の近さ）と、一番強くなる緊張
+    constexpr float EchoThreatStart = 0.45f;
+    constexpr float EchoThreatFull = 0.95f;
+
     // 書き換わった壁の文字を読んだとき
     constexpr PulseSpec ChangedWritingPulse{ 0.22f, 0.36f };
     constexpr RumbleSpec ChangedWritingRumble{ 5, 0.16f };
@@ -840,6 +900,87 @@ void StageScene::UpdateScareLightSequence()
 }
 
 // ヒューズを拾った後の影：2本目なら中央のホール、3本目なら細い廊下に出している（見つめると消える）
+void StageScene::StartFuseScare(int fuseCount)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    Player* player = m_Objects.player;
+    if (player == nullptr || fuseCount <= 0 || game->IsPowerRestored())
+    {
+        return;
+    }
+    // 前の演出が終わっていなければ、照明を戻してからやり直している
+    EndFuseScare();
+    m_FuseScareLevel = (std::min)(fuseCount, FuseScareLevels) - 1;
+    m_FuseScareTimer = 0.0f;
+    m_FuseScareStepsPlayed = 0;
+
+    // 近くの天井の照明を一斉に消している（停電のように。暖かい色の電球の安全地帯は消さない）
+    const Vector3 position = player->GetPosition();
+    const float radius = FuseScareBlackoutRadius[m_FuseScareLevel];
+    for (CeilingLight* light : m_Objects.ceilingLights)
+    {
+        if (light == nullptr || light->IsForcedOff())
+        {
+            continue;
+        }
+        Vector3 offset = light->GetPosition() - position;
+        offset.y = 0.0f;
+        if (offset.LengthSquared() <= radius * radius)
+        {
+            light->SetForcedOff(true);
+            m_FuseScareLights.push_back(light);
+            game->PlayAudioCueAt(SOUND_CUE_FLASHLIGHT, light->GetPosition(),
+                FuseScareCutSound.Pitch, FuseScareCutSound.Volume);
+        }
+    }
+    // 懐中電灯もちらつかせている（消えるたびに、電圧が下がったときと同じ脈打ちと振動が出る）
+    player->SputterFlashlight(FuseScareSputterSeconds[m_FuseScareLevel]);
+
+    // 足音は、拾った瞬間に向いていた方の真後ろで鳴らす（振り向いても、そこには何もいない）
+    Vector3 forward = game->GetCamera()->GetForward();
+    forward.y = 0.0f;
+    if (forward.LengthSquared() > 0.0f)
+    {
+        forward.Normalize();
+    }
+    m_FuseScareBehind = Vector3(position.x - forward.x * FuseScareBehindDistance, FootY,
+        position.z - forward.z * FuseScareBehindDistance);
+}
+
+void StageScene::UpdateFuseScare(float deltaTime)
+{
+    if (m_FuseScareTimer < 0.0f)
+    {
+        return;
+    }
+    Core::Game* game = Core::Game::GetInstance();
+    m_FuseScareTimer += deltaTime;
+    const int stepCount = FuseScareStepCount[m_FuseScareLevel];
+    if (m_FuseScareStepsPlayed < stepCount && m_FuseScareTimer >= FuseScareStepTimes[m_FuseScareStepsPlayed])
+    {
+        game->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, m_FuseScareBehind, FuseScareStepPitch, FuseScareStepVolume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), FuseScareStepPulse);
+        EventFeedback::Rumble(FuseScareStepRumble);
+        ++m_FuseScareStepsPlayed;
+    }
+    if (m_FuseScareTimer >= FuseScareBlackoutSeconds[m_FuseScareLevel])
+    {
+        EndFuseScare();
+    }
+}
+
+void StageScene::EndFuseScare()
+{
+    // 消した照明を、明滅させながら点け直している
+    for (CeilingLight* light : m_FuseScareLights)
+    {
+        light->SetForcedOff(false);
+        EventFeedback::Flicker(*light, FuseScareRestoreFlicker);
+    }
+    m_FuseScareLights.clear();
+    m_FuseScareTimer = -1.0f;
+}
+
 void StageScene::StartFuseWatcher(int fuseCount)
 {
     if (fuseCount < 2 || Core::Game::GetInstance()->IsPowerRestored())
@@ -1099,9 +1240,77 @@ bool StageScene::IsAmbientSoundAllowed() const
         m_StorageScarePhase != StorageScarePhase::NoiseHeard &&
         m_FuseWatcherState != FuseWatcherState::Watching &&
         m_ExitOmenSequence.GetTimer() <= 0.0f &&
+        !m_CeilingStalker.IsActive() &&
         !powerRestoring &&
         m_SafeLights.GetCalm() < SafeLightQuietCalm &&
         (exit == nullptr || !exit->IsEscaping());
+}
+
+void StageScene::UpdateCeilingStalker(const Player& player, float deltaTime)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    if (game->IsPowerRestored())
+    {
+        m_CeilingStalkerWait += deltaTime;
+    }
+    // 出口へ送電した後や出口の前兆が始まった後は、北の角の照明をそちらの演出が使うので、足音では触らない
+    const FuseBox* exitPanel = m_Objects.exitPowerPanel;
+    const bool exitLightsBusy = (exitPanel != nullptr && exitPanel->IsActivated()) || m_ExitOmenSequence.IsTriggered();
+
+    if (!m_CeilingStalker.IsActive() && m_CeilingStalkerWait >= CeilingStalkerDelaySeconds && IsAmbientSoundAllowed())
+    {
+        std::vector<Stage1CeilingStalker::Fixture> fixtures;
+        for (int number : CeilingStalkerLights)
+        {
+            const CeilingLight* light = m_Objects.CeilingLightAt(number);
+            if (light == nullptr || light->IsForcedOff() ||
+                (number == Stage1LightNumber::NorthCorner && exitLightsBusy))
+            {
+                continue;
+            }
+            fixtures.push_back({ number, light->GetPosition() });
+        }
+        m_CeilingStalker.TryStart(player.GetPosition(), game->GetCamera()->GetForward(), fixtures);
+    }
+
+    m_CeilingStalkerCues.clear();
+    m_CeilingStalker.Update(deltaTime, player.GetPosition(), m_CeilingStalkerCues);
+    for (const Stage1CeilingStalker::Cue& cue : m_CeilingStalkerCues)
+    {
+        CeilingLight* light = cue.LightNumber > 0 ? m_Objects.CeilingLightAt(cue.LightNumber) : nullptr;
+        switch (cue.Type)
+        {
+        case Stage1CeilingStalker::CueType::Step:
+            // 人より重く低い足音。天井裏なので、壁がなくてもこもらせている
+            game->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, cue.Position, cue.Pitch,
+                Stage1CeilingStalker::StepVolume, Stage1CeilingStalker::StepMinimumOcclusion);
+            break;
+        case Stage1CeilingStalker::CueType::LightOff:
+            if (light != nullptr)
+            {
+                light->SetForcedOff(true);
+            }
+            game->PlayAudioCueAt(SOUND_CUE_FLASHLIGHT, cue.Position,
+                CeilingStalkerLightOffSound.Pitch, CeilingStalkerLightOffSound.Volume);
+            EventFeedback::HorrorPulse(*game->GetPostProcess(), CeilingStalkerLightOffPulse);
+            EventFeedback::Rumble(CeilingStalkerLightOffRumble);
+            break;
+        case Stage1CeilingStalker::CueType::Caught:
+            game->PlayAudioCueAt(SOUND_CUE_SCARE, cue.Position,
+                CeilingStalkerCaughtSound.Pitch, CeilingStalkerCaughtSound.Volume);
+            EventFeedback::HorrorPulse(*game->GetPostProcess(), CeilingStalkerCaughtPulse);
+            EventFeedback::Rumble(CeilingStalkerCaughtRumble);
+            break;
+        case Stage1CeilingStalker::CueType::LightOn:
+            // 足音の後に出口の演出が北の角の照明を使い始めていたら、点け直さずに任せる
+            if (light != nullptr && !(cue.LightNumber == Stage1LightNumber::NorthCorner && exitLightsBusy))
+            {
+                light->SetForcedOff(false);
+                EventFeedback::Flicker(*light, CeilingStalkerRestoreFlicker);
+            }
+            break;
+        }
+    }
 }
 
 // 物音の予定を進め、鳴らす時間が来た音を立体音響で鳴らしている
@@ -1178,6 +1387,8 @@ float StageScene::ComputeThreatRate(const Player& player) const
         const float danger = MathUtility::Proximity(toShadow.Length(), HeartbeatNearDistance, HeartbeatRange);
         threatRate = (std::max)(threatRate, danger);
     }
+    // 天井裏の足音が迫っている間と、追いつかれた直後も、近さに合わせて心拍を速めている
+    threatRate = (std::max)(threatRate, m_CeilingStalker.GetThreat());
     // 隠し部屋に閉じ込められている間は、影が出ていなくても小さく心拍が聞こえるようにしている（息は荒くしない）。
     if (m_HiddenRoom.IsTrapped())
     {
@@ -1187,10 +1398,91 @@ float StageScene::ComputeThreatRate(const Player& player) const
     return threatRate * (1.0f - m_SafeLights.GetCalm());
 }
 
+void StageScene::UpdatePresenceWarp(const Player& player)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    std::array<Vector4, Graphics::FullScreenQuad::PresenceWarpCount> warps{};
+    // 監視映像を見ている間は、画面に施設の景色が映っていないので出さない
+    if (m_Surveillance.IsViewing())
+    {
+        game->GetPostProcess()->SetPresenceWarps(warps);
+        return;
+    }
+    const ShadowMan* shadows[] =
+    {
+        m_Objects.fuseWatcher,
+        m_Objects.storageShadow,
+        m_Objects.evidenceShadow,
+        m_Objects.exitOmen,
+        m_Objects.hiddenRoom.shadow,
+        m_Objects.archiveStalker,
+    };
+    Matrix view;
+    Matrix projection;
+    game->GetCamera()->GetMainMatrices(view, projection);
+    const Matrix viewProjection = view * projection;
+    const Vector3 cameraRight = Vector3::TransformNormal(Vector3::UnitX, view.Invert());
+    const float aspect = static_cast<float>(Application::GetWidth()) / static_cast<float>(Application::GetHeight());
+    // 暖かい灯りの下（光の安全地帯）にいる間は、ゆがみも静まっていく
+    const float calm = 1.0f - m_SafeLights.GetCalm();
+
+    const auto toScreen = [&viewProjection](const Vector3& position, Vector2& uv)
+    {
+        const Vector4 clip = Vector4::Transform(Vector4(position.x, position.y, position.z, 1.0f), viewProjection);
+        if (clip.w <= PresenceWarpMinClipW)
+        {
+            return false;
+        }
+        uv = Vector2(clip.x / clip.w * 0.5f + 0.5f, -clip.y / clip.w * 0.5f + 0.5f);
+        return true;
+    };
+
+    for (const ShadowMan* shadow : shadows)
+    {
+        if (shadow == nullptr || !shadow->IsActive())
+        {
+            continue;
+        }
+        Vector3 toShadow = shadow->GetPosition() - player.GetPosition();
+        toShadow.y = 0.0f;
+        const float strength = MathUtility::Proximity(toShadow.Length(), PresenceWarpNearDistance, PresenceWarpRange) * calm;
+        if (strength <= 0.0f)
+        {
+            continue;
+        }
+        // 影の胸の位置と、そこから体の半径だけ横へずらした位置を画面へ写し、画面の上での位置と大きさにしている
+        const Vector3 chest = shadow->GetPosition() + Vector3(0.0f, PresenceWarpChestHeight, 0.0f);
+        Vector2 center;
+        Vector2 side;
+        if (!toScreen(chest, center) || !toScreen(chest + cameraRight * PresenceWarpWorldRadius, side) ||
+            center.x < -PresenceWarpScreenMargin || center.x > 1.0f + PresenceWarpScreenMargin ||
+            center.y < -PresenceWarpScreenMargin || center.y > 1.0f + PresenceWarpScreenMargin)
+        {
+            continue;
+        }
+        const float radius = std::clamp(((side - center) * Vector2(aspect, 1.0f)).Length(),
+            PresenceWarpMinScreenRadius, PresenceWarpMaxScreenRadius);
+        // 強い方から2つまで残している
+        Vector4 warp(center.x, center.y, radius, strength);
+        for (Vector4& slot : warps)
+        {
+            if (warp.w > slot.w)
+            {
+                std::swap(slot, warp);
+            }
+        }
+    }
+    game->GetPostProcess()->SetPresenceWarps(warps);
+}
+
 void StageScene::UpdateTensionPulse(const Player& player, float deltaTime)
 {
+    UpdatePresenceWarp(player);
     // 1面には隠れる場所がないため、隠れている扱いにはしていない。
     const float threatRate = ComputeThreatRate(player);
+    // 影がすぐ近くにいるほど、少し前の画面が遅れて重なる残像を強くしている（監視映像を見ている間は出さない）
+    Core::Game::GetInstance()->GetPostProcess()->SetEcho(m_Surveillance.IsViewing() ? 0.0f :
+        MathUtility::SmoothStep(EchoThreatStart, EchoThreatFull, threatRate));
     const TensionPulse::Output pulse = m_TensionPulse.Update(deltaTime, threatRate, false);
     PlayTensionPulse(pulse);
     // 緊張が高いほど、画面の端から視界が狭まり、心拍に合わせて脈打つ

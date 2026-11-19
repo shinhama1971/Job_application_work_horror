@@ -27,6 +27,12 @@ cbuffer TimeBuffer : register(b0)
     // レンズのしぶきの乱数の種（付くたびに変わる）と、付いてからの秒数。PostProcess::TriggerLensMoisture
     float lensDropSeed;
     float lensDropAge;
+    // 影のまわりの空間のゆがみ（xy = 画面の位置 0〜1、z = 半径（縦の高さを1とした長さ）、w = 強さ 0〜1。0なら使わない）。
+    // PostProcess::SetPresenceWarps。数は FullScreenQuad::PresenceWarpCount と合わせる
+    float4 presenceWarp[2];
+    // 残像（x = 強さ 0〜1、yz = 少し前の画面をずらす量（画面の位置 0〜1 の差）、w = 写し取るたびに変わる乱数の種）。
+    // PostProcess::SetEcho。少し前の画面は t1 の EchoTexture
+    float4 echo;
 };
 
 #endif

@@ -61,6 +61,14 @@ private:
     static constexpr float DropExtraSeconds = 0.060f;
     static constexpr float DropOutput = 0.80f;
     static constexpr float DropOutputRange = 0.10f;
+    // 出来事で起こすちらつき（TriggerSputter）：1秒あたりの刻みの数、何刻みごとに1回消えるか（その中で消える刻み）、
+    // 途中の長く消える刻み（始め・終わり）、消えている間の光の強さ
+    static constexpr float SputterPulsesPerSecond = 18.0f;
+    static constexpr int SputterPulseCycle = 3;
+    static constexpr int SputterOffPulse = 1;
+    static constexpr int SputterBlackoutStartPulse = 5;
+    static constexpr int SputterBlackoutEndPulse = 9;
+    static constexpr float SputterOffOutput = 0.04f;
 
     // 点いているか、電池の残り、電池を拾ったときの通知の残り秒数、点灯の度合い
     bool m_IsOn = true;
@@ -71,8 +79,18 @@ private:
     int m_LowBatteryWarningLevel = 0;
     float m_FlickerTime = 0.0f;
     bool m_WasVoltageDrop = false;
+    // 出来事で起こすちらつきの残り秒数と、始まってからの秒数
+    float m_SputterTimer = 0.0f;
+    float m_SputterElapsed = 0.0f;
 
 public:
+    // 出来事（ヒューズを拾った瞬間など）で、懐中電灯を seconds 秒だけ激しくちらつかせている（電池は減らさない）
+    void TriggerSputter(float seconds)
+    {
+        m_SputterTimer = (std::max)(m_SputterTimer, seconds);
+        m_SputterElapsed = 0.0f;
+    }
+
     // シーンの始めに、通知とちらつきの状態を初期化している（電池の残りはそのまま）
     void InitializeRuntimeNotifications()
     {
@@ -81,6 +99,8 @@ public:
         m_PowerBlend = m_IsOn ? 1.0f : 0.0f;
         m_FlickerTime = 0.0f;
         m_WasVoltageDrop = false;
+        m_SputterTimer = 0.0f;
+        m_SputterElapsed = 0.0f;
     }
 
     // 電池を拾ったときの通知の残り秒数を減らしている
@@ -182,6 +202,21 @@ public:
         else
         {
             m_FlickerTime = 0.0f;
+        }
+
+        // 出来事のちらつき：決まった並びで消えたり点いたりし、途中で少し長く消える（消えるたびに、電圧が下がったときと同じ反応を出す）
+        if (m_SputterTimer > 0.0f)
+        {
+            m_SputterTimer = (std::max)(0.0f, m_SputterTimer - deltaTime);
+            m_SputterElapsed += deltaTime;
+            const int pulse = static_cast<int>(m_SputterElapsed * SputterPulsesPerSecond);
+            const bool sputterOff = (pulse % SputterPulseCycle) == SputterOffPulse ||
+                (pulse >= SputterBlackoutStartPulse && pulse < SputterBlackoutEndPulse);
+            if (m_IsOn && sputterOff)
+            {
+                voltageDrop = true;
+                state.output *= SputterOffOutput;
+            }
         }
 
         state.voltageDropStarted = voltageDrop && !m_WasVoltageDrop;

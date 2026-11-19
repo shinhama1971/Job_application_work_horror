@@ -14,6 +14,8 @@ namespace
     constexpr float EffectEpsilon = 0.001f;
     // 画面を覆う四角形の頂点の数（三角形の帯で描く）
     constexpr UINT QuadVertexCount = 4;
+    // 残像の少し前の画面を読むテクスチャの番号（crtOverlayPS.hlsl の t1）
+    constexpr UINT EchoTextureSlot = 1;
     // 三角形ストリップの順に、位置とUVで同じ四隅を参照する。
     constexpr UINT TopLeftVertex = 0;
     constexpr UINT TopRightVertex = 1;
@@ -143,7 +145,10 @@ namespace Graphics
         float fearVision,
         float fearBeat,
         float lensDropSeed,
-        float lensDropAge)
+        float lensDropAge,
+        const DirectX::SimpleMath::Vector4* presenceWarps,
+        ID3D11ShaderResourceView* echoSRV,
+        const DirectX::SimpleMath::Vector4& echo)
     {
         ID3D11DeviceContext* context =
             Renderer::GetDeviceContext();
@@ -176,6 +181,17 @@ namespace Graphics
         tb.fearBeat = fearBeat;
         tb.lensDropSeed = lensDropSeed;
         tb.lensDropAge = lensDropAge;
+        for (unsigned int index = 0; index < PresenceWarpCount; ++index)
+        {
+            tb.presenceWarps[index] = presenceWarps != nullptr ? presenceWarps[index] : DirectX::SimpleMath::Vector4::Zero;
+        }
+        // 少し前の画面がないときは、残像を出さない
+        tb.echo = echoSRV != nullptr ? echo : DirectX::SimpleMath::Vector4::Zero;
+        bool presenceWarpActive = false;
+        for (const DirectX::SimpleMath::Vector4& warp : tb.presenceWarps)
+        {
+            presenceWarpActive = presenceWarpActive || warp.w > EffectEpsilon;
+        }
 
         context->UpdateSubresource(
             m_TimeBuffer.Get(),
@@ -237,13 +253,16 @@ namespace Graphics
         // CRT風の効果は半透明の重ね描きとして合成し、画面全体を黒で塗りつぶさないようにしている。
         if (noiseAmount > 0.0f || horrorPulseStrength > EffectEpsilon ||
             lensMoisture > EffectEpsilon || filmGradeStrength > EffectEpsilon ||
-            signalInterference > EffectEpsilon || frameHold > FrameHoldThreshold || fearVision > EffectEpsilon)
+            signalInterference > EffectEpsilon || frameHold > FrameHoldThreshold || fearVision > EffectEpsilon ||
+            presenceWarpActive || tb.echo.x > EffectEpsilon)
         {
             m_OverlayShader.SetGPU();
             Renderer::SetBlendState(BS_ALPHABLEND);
             context->PSSetShaderResources(0, 1, &sceneSRV);
+            context->PSSetShaderResources(EchoTextureSlot, 1, &echoSRV);
             context->DrawIndexed(QuadVertexCount, 0, 0);
             context->PSSetShaderResources(0, 1, &nullResource);
+            context->PSSetShaderResources(EchoTextureSlot, 1, &nullResource);
         }
 
         // ブレンドと深度の設定を元に戻している

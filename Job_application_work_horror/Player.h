@@ -300,6 +300,11 @@ public:
             m_Flashlight.Toggle();
         }
     }
+    // 出来事（ヒューズを拾った瞬間など）で、懐中電灯を seconds 秒だけ激しくちらつかせている
+    void SputterFlashlight(float seconds)
+    {
+        m_Flashlight.TriggerSputter(seconds);
+    }
     // 捕まったときなど、その場でロッカーから出た扱いにしている（位置は呼び出し側が決めている）。
     void ForceExitHiding()
     {

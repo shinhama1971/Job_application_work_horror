@@ -109,6 +109,21 @@ namespace Effect
         float m_TargetFearVision = 0.0f;
         float m_FearBeat = 0.0f;
         float m_FearVisionHold = 0.0f;
+        // 影のまわりの空間のゆがみ（Scene が毎フレーム SetPresenceWarps で渡し、渡されなくなったら消す）と、渡されてからの残り秒数
+        std::array<DirectX::SimpleMath::Vector4, Graphics::FullScreenQuad::PresenceWarpCount> m_PresenceWarps{};
+        float m_PresenceWarpHold = 0.0f;
+        // 残像：少し前の画面（ときどき写し取って止めておく）、強さ（今の値と目標）、渡されてからの残り秒数、
+        // 次に写し取るまでの秒数、写し取った画面があるか、次の写し取りを頼んだか、ずらす量、乱数の種と乱数の状態
+        Graphics::RenderTexture m_EchoTexture;
+        float m_EchoStrength = 0.0f;
+        float m_TargetEchoStrength = 0.0f;
+        float m_EchoHold = 0.0f;
+        float m_EchoCaptureTimer = 0.0f;
+        bool m_EchoValid = false;
+        bool m_EchoCopyRequested = false;
+        DirectX::SimpleMath::Vector2 m_EchoOffset = DirectX::SimpleMath::Vector2::Zero;
+        float m_EchoSeed = 0.0f;
+        unsigned int m_EchoRandom = FrameHoldInitialSeed;
         // 携帯ラジオの雑音の強さ（影が近いほど強い）。信号の乱れと同じ画面の乱れを、弱めに重ねている
         float m_PresenceStatic = 0.0f;
         // コマ落ち：雑音が強いとき、ときどき映像が一瞬止まり、縦に少しずれる。止めている残り秒数、次に止めるまでの秒数、
@@ -313,6 +328,20 @@ namespace Effect
             {
                 m_FearBeat = 1.0f;
             }
+        }
+
+        // 残像の強さ（0〜1）を設定している。Scene が毎フレーム渡し、渡されなくなったら0へ戻す
+        void SetEcho(float strength)
+        {
+            m_TargetEchoStrength = (std::clamp)(strength, 0.0f, 1.0f);
+            m_EchoHold = FearVisionHoldSeconds;
+        }
+
+        // 影のまわりの空間のゆがみを設定している（xy = 画面の位置 0〜1、z = 半径（縦の高さを1とした長さ）、w = 強さ 0〜1）
+        void SetPresenceWarps(const std::array<DirectX::SimpleMath::Vector4, Graphics::FullScreenQuad::PresenceWarpCount>& warps)
+        {
+            m_PresenceWarps = warps;
+            m_PresenceWarpHold = FearVisionHoldSeconds;
         }
 
         // デバッグ画面からの調整用。目標値ではなく、その場で値を変えている。

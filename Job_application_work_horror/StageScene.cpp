@@ -224,6 +224,11 @@ void StageScene::Init()
     m_StageVisualTimer = 0.0f;
     m_ExitOmenSequence.Reset();
     m_AmbientSounds.Reset();
+    m_CeilingStalker.Reset();
+    m_FuseScareTimer = -1.0f;
+    m_FuseScareStepsPlayed = 0;
+    m_FuseScareLights.clear();
+    m_CeilingStalkerWait = 0.0f;
     m_TensionPulse.Reset();
     m_ProgressHintTimer = 0.0f;
 
@@ -666,7 +671,9 @@ void StageScene::UpdateFusePickup()
             FusePickupRumbleFramesBase + currentFuseCount * FusePickupRumbleFramesPerFuse,
             FusePickupRumbleStrengthBase + fuseCount * FusePickupRumbleStrengthPerFuse);
         StartFuseWatcher(currentFuseCount);
+        StartFuseScare(currentFuseCount);
     }
+    UpdateFuseScare(Application::GetDeltaTime());
 
     if (game->IsPowerRestored())
     {
@@ -715,6 +722,7 @@ void StageScene::UpdateStageEvents(Player& player, float deltaTime)
     UpdateExitOmen(player);
     UpdateWallWritings(player);
     UpdateFootprintFollower(player);
+    UpdateCeilingStalker(player, deltaTime);
     // 隠し部屋の影も、書類保管室の影と同じく、棚・壁・閉じた扉を通り抜けずに回り込む
     m_HiddenRoom.Update(player, deltaTime, m_KeypadDoor.IsSolved(),
         [this](Vector3& position, float radius)

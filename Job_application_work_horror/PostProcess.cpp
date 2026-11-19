@@ -56,6 +56,13 @@ namespace
     constexpr float LensMoistureClearResponse = 0.035f;
     // 心臓の鼓動に合わせた視界の脈が、1秒で弱まる量
     constexpr float FearBeatDecayPerSecond = 3.2f;
+    // 残像：強さが目標へ近づく割合（60fpsで1フレームあたり）、少し前の画面を写し取る間隔（秒。この間は止まった画面が残る）、
+    // ずらす量の最大（画面の幅・高さに対する割合）、強さがこれより弱ければ写し取らない
+    constexpr float EchoResponse = 0.08f;
+    constexpr float EchoCaptureInterval = 0.16f;
+    constexpr float EchoMaxOffsetX = 0.018f;
+    constexpr float EchoMaxOffsetY = 0.006f;
+    constexpr float EchoMinStrength = 0.001f;
 
     // --- コマ落ち：起き始める強さと、そこから最大になるまでの幅、止まる秒数（最短＋強さの幅）、
     // 映像のずれ（強さに掛ける幅）、次までの間（最長−強さの幅、乱数で 最低＋幅 倍）、弱いときに残す最短の間
@@ -128,6 +135,14 @@ namespace Effect
         m_TargetFearVision = 0.0f;
         m_FearBeat = 0.0f;
         m_FearVisionHold = 0.0f;
+        m_PresenceWarps.fill(DirectX::SimpleMath::Vector4::Zero);
+        m_PresenceWarpHold = 0.0f;
+        m_EchoStrength = 0.0f;
+        m_TargetEchoStrength = 0.0f;
+        m_EchoHold = 0.0f;
+        m_EchoCaptureTimer = 0.0f;
+        m_EchoValid = false;
+        m_EchoCopyRequested = false;
 
         // 本描画のHDRの描き先を、そのまま写せるよう同じ形式にしている
         if (!m_RenderTexture.Init(
@@ -137,6 +152,16 @@ namespace Effect
         ))
         {
             MessageBoxW(nullptr, L"画面効果の描画テクスチャを作成できません。", L"描画エラー", MB_OK | MB_ICONERROR);
+            return false;
+        }
+        // 残像に使う少し前の画面（同じ大きさ・形式にして、そのまま写せるようにしている）
+        if (!m_EchoTexture.Init(
+            Application::GetWidth(),
+            Application::GetHeight(),
+            Renderer::SceneHdrFormat
+        ))
+        {
+            MessageBoxW(nullptr, L"残像の描画テクスチャを作成できません。", L"描画エラー", MB_OK | MB_ICONERROR);
             return false;
         }
 
@@ -251,6 +276,7 @@ namespace Effect
         m_BloomHorizontalTexture.Uninit();
         m_BloomExtractTexture.Uninit();
         m_RenderTexture.Uninit();
+        m_EchoTexture.Uninit();
     }
 
     // 目標値へゆっくり近づけ、場面が変わったときの露出やノイズの急な変化を防いでいる。
@@ -291,6 +317,40 @@ namespace Effect
         }
         m_FearVision += (m_TargetFearVision - m_FearVision) * response(FearVisionResponse);
         m_FearBeat = (std::max)(0.0f, m_FearBeat - deltaTime * FearBeatDecayPerSecond);
+        // 残像：Scene から渡されなくなったら0へ戻す。出ている間は、少し前の画面をときどき写し取り、そのたびにずらす向きを変える
+        m_EchoHold -= deltaTime;
+        if (m_EchoHold <= 0.0f)
+        {
+            m_TargetEchoStrength = 0.0f;
+        }
+        m_EchoStrength += (m_TargetEchoStrength - m_EchoStrength) * response(EchoResponse);
+        if (m_EchoStrength > EchoMinStrength)
+        {
+            m_EchoCaptureTimer -= deltaTime;
+            if (m_EchoCaptureTimer <= 0.0f || !m_EchoValid)
+            {
+                m_EchoCaptureTimer = EchoCaptureInterval;
+                m_EchoCopyRequested = true;
+                const auto nextSigned = [this]()
+                {
+                    MathUtility::NextXorShift32(m_EchoRandom);
+                    return static_cast<float>(m_EchoRandom & FrameHoldRandomMask) / static_cast<float>(FrameHoldRandomMask) * 2.0f - 1.0f;
+                };
+                m_EchoOffset = DirectX::SimpleMath::Vector2(nextSigned() * EchoMaxOffsetX, nextSigned() * EchoMaxOffsetY);
+                m_EchoSeed = nextSigned() * 0.5f + 0.5f;
+            }
+        }
+        else
+        {
+            // 消えている間は、古い画面を残さない（次に出るときは、まず今の画面を写し取る）
+            m_EchoValid = false;
+        }
+        // 影のまわりのゆがみ：Scene から渡されなくなったら（場面が変わったときなど）消している
+        m_PresenceWarpHold -= deltaTime;
+        if (m_PresenceWarpHold <= 0.0f)
+        {
+            m_PresenceWarps.fill(DirectX::SimpleMath::Vector4::Zero);
+        }
 
         // コマ落ち：影が近く、ラジオの雑音が強いほど、短い間隔で映像が一瞬（0.05〜0.1秒）止まる。
         // ポーズメニューの「演出の強さ」を下げると起きにくくなり、0なら起きない。自動撮影と計測では、画像と数字がぶれないよう起こさない
@@ -416,6 +476,13 @@ namespace Effect
             Microsoft::WRL::ComPtr<ID3D11Resource> backBufferResource;
             Renderer::GetBackBufferRTV()->GetResource(backBufferResource.GetAddressOf());
             context->CopyResource(m_RenderTexture.GetTexture(), backBufferResource.Get());
+            // 残像：頼まれていれば、今の画面を少し前の画面として止めておく（次に頼まれるまで、この画面が残る）
+            if (m_EchoCopyRequested)
+            {
+                context->CopyResource(m_EchoTexture.GetTexture(), m_RenderTexture.GetTexture());
+                m_EchoCopyRequested = false;
+                m_EchoValid = true;
+            }
         }
 
         Renderer::SetBackBufferRenderTarget();
@@ -602,6 +669,12 @@ namespace Effect
         {
             bloomLevels[level + 1] = m_WideBloomBlurred[level].GetSRV();
         }
+        // 影のまわりのゆがみも、ポーズメニューの「演出の強さ」で弱める（自動撮影と計測では、画像と数字がぶれないよう出さない）
+        std::array<DirectX::SimpleMath::Vector4, Graphics::FullScreenQuad::PresenceWarpCount> presenceWarps = m_PresenceWarps;
+        for (DirectX::SimpleMath::Vector4& warp : presenceWarps)
+        {
+            warp.w = Tools::CaptureMode::IsActive() ? 0.0f : (std::clamp)(warp.w * effectScale, 0.0f, 1.0f);
+        }
         m_FullScreenQuad.Draw(
             m_RenderTexture.GetSRV(),
             m_EnableBloom ? bloomLevels.data() : nullptr,
@@ -627,7 +700,12 @@ namespace Effect
             (std::clamp)(m_FearVision * effectScale, 0.0f, 1.0f),
             (std::clamp)(m_FearBeat * effectScale, 0.0f, 1.0f),
             m_LensDropSeed,
-            m_LensDropAge);
+            m_LensDropAge,
+            presenceWarps.data(),
+            m_EchoValid ? m_EchoTexture.GetSRV() : nullptr,
+            DirectX::SimpleMath::Vector4(
+                Tools::CaptureMode::IsActive() ? 0.0f : (std::clamp)(m_EchoStrength * effectScale, 0.0f, 1.0f),
+                m_EchoOffset.x, m_EchoOffset.y, m_EchoSeed));
 
         // 最後に、HDRの画面を曲線で0〜1へ移して、バックバッファへ描いている（自動撮影・計測では --tonemap で曲線を選べる）
         const auto toneMapOverride = Tools::CaptureMode::GetToneMapOverride();

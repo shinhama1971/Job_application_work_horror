@@ -15,6 +15,7 @@
 #include "Stage1Layout.h"
 #include "Stage1Objective.h"
 #include "Stage1AmbientSounds.h"
+#include "Stage1CeilingStalker.h"
 #include "TensionPulse.h"
 #include "Stage1LightStalker.h"
 #include "RadioStatic.h"
@@ -78,6 +79,8 @@ private:
     Stage1ObjectiveInput MakeObjectiveInput() const;
     // 姿の見えない物音を鳴らしてよいか（台本の演出や監視映像と重ならないか）を判断している。
     bool IsAmbientSoundAllowed() const;
+    // 電力が戻った後に一度だけ、天井裏の足音が照明を消しながら迫ってくる演出を進めている
+    void UpdateCeilingStalker(const class Player& player, float deltaTime);
     // 姿の見えない物音を更新し、鳴らしている
     void UpdateAmbientSounds();
     // 懐中電灯で照らすと浮かぶ壁の文字。書き換わった文字を読んだら物音の演出を起こしている。
@@ -92,6 +95,8 @@ private:
     float ComputeThreatRate(const class Player& player) const;
     // 危険度に合わせて、自分の心拍音と呼吸音を鳴らしている。
     void UpdateTensionPulse(const class Player& player, float deltaTime);
+    // 出ている影のうち近いものの画面の位置・大きさ・近さを、画面効果（影のまわりの空間のゆがみ）へ渡している
+    void UpdatePresenceWarp(const class Player& player);
     // 書類保管室の「照らすと止まる影」を進め、表示・足音・触れられたときの電池の減少を行っている。
     bool UpdateArchiveStalker(class Player& player, float deltaTime);
     // 点が懐中電灯で照らされているか（光の円の中にあり、間に壁や扉がないか）を返している。
@@ -119,6 +124,10 @@ private:
     void UpdatePowerRestoreSequence();
     void UpdateExitPowerSequence();
     void StartFuseWatcher(int fuseCount);
+    // ヒューズを拾った瞬間の演出：近くの照明が消え、懐中電灯がちらつき、すぐ後ろで足音がする（本数が多いほど強い）
+    void StartFuseScare(int fuseCount);
+    void UpdateFuseScare(float deltaTime);
+    void EndFuseScare();
     void UpdateExitOmen(class Player& player);
 
     // InteractionSystemは視線の先の調べる対象、Hudは今の目的と操作のヒントを担当している。
@@ -128,6 +137,16 @@ private:
     StageSurveillanceController m_Surveillance;
     // 天井裏の足音・配管を叩く音・遠くの扉。いつどこで鳴らすかはこのクラスが決めている。
     Stage1AmbientSounds m_AmbientSounds;
+    // 天井裏の足音の演出、電力が戻ってからの秒数（演出を始めてよい時間になったかを見る）、このフレームの合図
+    Stage1CeilingStalker m_CeilingStalker;
+    // ヒューズを拾った瞬間の演出：経過秒（-1 なら起きていない）、何本目か（0 から）、鳴らした足音の数、消した照明、足音を鳴らす所
+    float m_FuseScareTimer = -1.0f;
+    int m_FuseScareLevel = 0;
+    int m_FuseScareStepsPlayed = 0;
+    std::vector<class CeilingLight*> m_FuseScareLights;
+    DirectX::SimpleMath::Vector3 m_FuseScareBehind = DirectX::SimpleMath::Vector3::Zero;
+    float m_CeilingStalkerWait = 0.0f;
+    std::vector<Stage1CeilingStalker::Cue> m_CeilingStalkerCues;
     // このフレームに鳴らす物音（使い回している）
     std::vector<AmbientSoundCue> m_AmbientCues;
     // 壁の文字を読んだか、いつ書き換えるかを管理している（文字のObjectはStage1Layoutが配置している）。

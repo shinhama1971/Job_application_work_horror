@@ -21,6 +21,8 @@ namespace Graphics
     public:
         // ブルームの段の数（縦横1/4・1/8・1/16・1/32。bloomCompositePS.hlsl の t0〜t3）
         static constexpr unsigned int BloomLevelCount = 4;
+        // 影のまわりの空間のゆがみの数（shader/postProcessBuffer.hlsli の presenceWarp と同じ）
+        static constexpr unsigned int PresenceWarpCount = 2;
 
     private:
         // 画面効果のシェーダーへ渡す値（定数バッファb0）。16バイト単位にそろえるため、最後に詰め物を入れている
@@ -53,9 +55,14 @@ namespace Graphics
             float fearBeat;
             float lensDropSeed;
             float lensDropAge;
+            // 影のまわりの空間のゆがみ（xy = 画面の位置、z = 半径、w = 強さ）
+            DirectX::SimpleMath::Vector4 presenceWarps[PresenceWarpCount];
+            // 残像（x = 強さ、yz = ずらす量、w = 乱数の種）
+            DirectX::SimpleMath::Vector4 echo;
         };
 
-        static_assert(sizeof(TimeBuffer) == 80);
+        static_assert(sizeof(TimeBuffer) == 128);
+        static_assert(offsetof(TimeBuffer, presenceWarps) == 80);
         static_assert(offsetof(TimeBuffer, exposure) == 32);
         static_assert(offsetof(TimeBuffer, fearVision) == 64);
 
@@ -117,7 +124,10 @@ namespace Graphics
             float fearVision = 0.0f,
             float fearBeat = 0.0f,
             float lensDropSeed = 0.0f,
-            float lensDropAge = 0.0f);
+            float lensDropAge = 0.0f,
+            const DirectX::SimpleMath::Vector4* presenceWarps = nullptr,
+            ID3D11ShaderResourceView* echoSRV = nullptr,
+            const DirectX::SimpleMath::Vector4& echo = DirectX::SimpleMath::Vector4::Zero);
 
         // HDRの画面（hdrSceneSRV）を、選んだ曲線（Effect::ToneMapMode の番号）で今の描画先へ描いている（上書き）
         void DrawToneMap(ID3D11ShaderResourceView* hdrSceneSRV, unsigned int mode);

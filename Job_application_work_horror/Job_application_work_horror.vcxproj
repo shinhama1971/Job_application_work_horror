@@ -282,6 +282,7 @@
     <ClCompile Include="Stage1KeypadDoor.cpp" />
     <ClCompile Include="Stage1HiddenRoomEvent.cpp" />
     <ClCompile Include="Stage1SafeLights.cpp" />
+    <ClCompile Include="Stage1CeilingStalker.cpp" />
     <ClCompile Include="Stage1WestWing.cpp" />
     <ClCompile Include="KeyItem.cpp" />
     <ClCompile Include="Locker.cpp" />
@@ -427,6 +428,7 @@
     <ClInclude Include="Stage1LightStalker.h" />
     <ClInclude Include="RoomPathGrid.h" />
     <ClInclude Include="Stage1SafeLights.h" />
+    <ClInclude Include="Stage1CeilingStalker.h" />
     <ClInclude Include="Stage1WestWing.h" />
     <ClInclude Include="CeilingReflectionScare.h" />
     <ClInclude Include="KeyItem.h" />

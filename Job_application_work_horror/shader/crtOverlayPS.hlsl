@@ -17,6 +17,8 @@ struct PS_IN
 
 // 描いた画面（t0）とサンプラー（s0）
 Texture2D SceneTexture : register(t0);
+// 残像に使う、少し前に写し取って止めておいた画面（PostProcess の m_EchoTexture）
+Texture2D EchoTexture : register(t1);
 SamplerState LinearSampler : register(s0);
 
 // 粒状のノイズには、三角関数を使わない FastHash21 を共用する。
@@ -278,6 +280,38 @@ static const float CRT_FILM_WARM_GAIN = 1.35f;
 #define CRT_FRAME_HOLD_THRESHOLD 0.5f
 #define CRT_TEAR_COLOR_SPLIT 0.5f
 
+// --- 影のまわりの空間のゆがみ（presenceWarp。PostProcess::SetPresenceWarps）
+// 数（postProcessBuffer.hlsli の presenceWarp と同じ）
+#define PRESENCE_WARP_COUNT 2
+// ゆらぎの模様：細かさ（半径を1とした長さあたり）、流れる速さ、2つのノイズを互いにずらす量
+#define PRESENCE_WARP_NOISE_SCALE 3.2f
+#define PRESENCE_WARP_FLOW_SPEED 0.45f
+#define PRESENCE_WARP_NOISE_SEED 17.3f
+// 水の中のように揺れる波（縦横の波の数・速さ）と、ノイズと波の混ぜ方
+#define PRESENCE_WARP_WAVE_FREQUENCY 9.0f
+#define PRESENCE_WARP_WAVE_SPEED 2.3f
+#define PRESENCE_WARP_WAVE_WEIGHT 0.35f
+// ずらす量の最大（縦の高さを1とした長さ）。半径に比例させ、遠くの小さい影ではゆがみも小さくしている
+#define PRESENCE_WARP_AMPLITUDE 0.12f
+// ゆがむ範囲の縁のぼかし（半径に対する割合。ここから外側へ消えていく）
+#define PRESENCE_WARP_EDGE_START 0.35f
+// ゆがんだ所の重ね方の強さと、ほんの少し暗くする量
+#define PRESENCE_WARP_ALPHA_GAIN 0.85f
+#define PRESENCE_WARP_DARKEN 0.18f
+
+// --- 残像（echo。PostProcess::SetEcho）
+// 重ねる濃さ：いつも重ねる分と、今の画面と違う所（動いた物の輪郭）に足す分
+#define ECHO_BASE_ALPHA 0.16f
+#define ECHO_DIFFERENCE_ALPHA 1.4f
+#define ECHO_MAX_ALPHA 0.55f
+// 色：残す色の割合（残りは白黒）、冷たく沈めた色、明るさ
+#define ECHO_SATURATION 0.25f
+#define ECHO_TINT float3(0.78f, 0.92f, 1.0f)
+#define ECHO_BRIGHTNESS 0.9f
+// 古いビデオの焼き付きのような横の帯：帯の数、帯ごとの濃さのむら
+#define ECHO_BAND_COUNT 90.0f
+#define ECHO_BAND_VARIATION 0.45f
+
 float4 main(PS_IN input) : SV_TARGET
 {
     // コマ落ち：影が近くラジオの雑音が強いとき、一瞬だけ映像が止まる。止まった画面は縦に少しずれ、
@@ -332,9 +366,40 @@ float4 main(PS_IN input) : SV_TARGET
     const float signalGate = smoothstep(CRT_SIGNAL_GATE_START, CRT_SIGNAL_GATE_END, signalSeed);
     const float signalJitter = (signalSeed - 0.5f) * CRT_SIGNAL_JITTER_LIMIT *
         signalInterference * signalGate;
+    // 影のまわりの空間のゆがみ：影の画面の位置を中心にした円の中だけ、流れるノイズと波で景色をずらしている。
+    // 影が暗闇に溶けていても、ゆがみで「そこに何かいる」と分かる（近いほど強く、円も大きい）
+    float2 presenceOffset = float2(0.0f, 0.0f);
+    float presenceMask = 0.0f;
+    [unroll]
+    for (int warpIndex = 0; warpIndex < PRESENCE_WARP_COUNT; ++warpIndex)
+    {
+        const float4 warp = presenceWarp[warpIndex];
+        [branch]
+        if (warp.w > CRT_EFFECT_EPSILON)
+        {
+            const float radius = max(warp.z, CRT_EFFECT_EPSILON);
+            const float2 local = (input.uv - warp.xy) * float2(screenAspect, 1.0f) / radius;
+            const float falloff = 1.0f - smoothstep(PRESENCE_WARP_EDGE_START, 1.0f, length(local));
+            [branch]
+            if (falloff > 0.0f)
+            {
+                const float2 flow = float2(time, -time) * PRESENCE_WARP_FLOW_SPEED;
+                const float2 noise = float2(
+                    FastValueNoise(local * PRESENCE_WARP_NOISE_SCALE + flow),
+                    FastValueNoise(local * PRESENCE_WARP_NOISE_SCALE - flow + PRESENCE_WARP_NOISE_SEED)) - 0.5f;
+                const float2 wave = float2(
+                    sin(local.y * PRESENCE_WARP_WAVE_FREQUENCY + time * PRESENCE_WARP_WAVE_SPEED),
+                    cos(local.x * PRESENCE_WARP_WAVE_FREQUENCY - time * PRESENCE_WARP_WAVE_SPEED));
+                const float2 swirl = lerp(noise * 2.0f, wave, PRESENCE_WARP_WAVE_WEIGHT);
+                const float amount = falloff * warp.w;
+                presenceOffset += swirl * (radius * PRESENCE_WARP_AMPLITUDE * amount) / float2(screenAspect, 1.0f);
+                presenceMask = max(presenceMask, amount);
+            }
+        }
+    }
     const float2 distortedUv = saturate(
         input.uv + centered * radialSquared * radialWarp +
-        float2(signalJitter, 0.0f));
+        float2(signalJitter, 0.0f) + presenceOffset);
     const float chromaOffset =
         (CRT_BASE_CHROMA_OFFSET + horrorPulseStrength * CRT_PULSE_CHROMA_OFFSET_GAIN +
          highTension * lensDistortionStrength * CRT_TENSION_CHROMA_OFFSET_GAIN) *
@@ -347,12 +412,14 @@ float4 main(PS_IN input) : SV_TARGET
     // 普段はdistortedUvとinput.uvが同じ。驚かせる演出のときだけ2回目を読み、
     // 普段の全画面のテクスチャの読み取りを1回分減らしている。
     [branch]
-    if (distortionEvent > CRT_EFFECT_EPSILON)
+    if (distortionEvent > CRT_EFFECT_EPSILON || presenceMask > CRT_EFFECT_EPSILON)
     {
         distortedScene = SceneTexture.SampleLevel(
             LinearSampler,
             distortedUv,
             0.0f).rgb;
+        // 影のまわりは、ほんの少しだけ暗く沈めている
+        distortedScene *= 1.0f - presenceMask * PRESENCE_WARP_DARKEN;
     }
     float3 chromaticScene = distortedScene;
     // 色ずれは演出のときだけの効果。普段は、この全体で同じ分岐によって、
@@ -377,7 +444,8 @@ float4 main(PS_IN input) : SV_TARGET
     const float distortionAlpha = saturate(
         edgeAberration * lensDistortionStrength * distortionEvent *
         (CRT_WARP_ALPHA_BASE + highTension * CRT_WARP_ALPHA_TENSION_GAIN) +
-        distortionDifference * distortionEvent * CRT_WARP_DIFFERENCE_GAIN);
+        distortionDifference * distortionEvent * CRT_WARP_DIFFERENCE_GAIN +
+        presenceMask * PRESENCE_WARP_ALPHA_GAIN);
     const float chromaDifference = length(
         abs(chromaticScene - sceneCenter));
     const float chromaAlpha = saturate(
@@ -551,6 +619,24 @@ float4 main(PS_IN input) : SV_TARGET
         tensionColor,
         saturate(tensionVeil * CRT_TENSION_COLOR_GAIN));
     alpha = saturate(alpha + tensionVeil);
+
+    // 残像：少し前に止めた画面を、少しずらして、色を抜いて重ねている。今の画面と違う所（動いた物・視点を動かした分）ほど濃い。
+    // 止めた画面は約0.16秒ごとに写し直すので、視点を動かすと、景色が二重にぶれて遅れて追いかけてくる
+    [branch]
+    if (echo.x > CRT_EFFECT_EPSILON)
+    {
+        const float3 echoScene = EchoTexture.SampleLevel(LinearSampler, saturate(input.uv + echo.yz), 0.0f).rgb;
+        const float echoLuminance = dot(echoScene, CRT_LUMINANCE_WEIGHTS);
+        const float3 echoColor = lerp(echoLuminance.xxx * ECHO_TINT, echoScene, ECHO_SATURATION) * ECHO_BRIGHTNESS;
+        const float band = FastHash21(float2(floor(input.uv.y * ECHO_BAND_COUNT), echo.w));
+        const float echoDifference = length(echoScene - sceneCenter);
+        const float echoAlpha = saturate(echo.x * (ECHO_BASE_ALPHA + echoDifference * ECHO_DIFFERENCE_ALPHA) *
+            (1.0f - band * ECHO_BAND_VARIATION)) * ECHO_MAX_ALPHA;
+        const float echoLayered = echoAlpha + alpha * (1.0f - echoAlpha);
+        overlayColor = (echoColor * echoAlpha + overlayColor * alpha * (1.0f - echoAlpha)) /
+            max(echoLayered, CRT_MIN_DIVISOR);
+        alpha = echoLayered;
+    }
 
     // 恐怖で視界が狭まる：緊張が高いほど、画面の端から、ぼけて色の抜けた闇が中央へ迫る。心拍が鳴るたびに一瞬さらに迫る。
     // 端の景色を中心へ向かう向きに5点読んでぼかし、白黒に寄せて暗くした色を、端ほど濃く、今の層の上に重ねている。
