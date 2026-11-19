@@ -66,7 +66,7 @@ namespace
     // 木などから離す距離（埋まらないように）と、視線を遮る木とみなす太さのゆとり、遮る物とみなす高さ（胸より高い物）
     constexpr float FigureClearance = 5.0f;
     constexpr float FigureSightMargin = 2.0f;
-    constexpr float FigureChestHeight = 17.0f;
+    constexpr float FigureChestHeight = 30.0f;
     // 稲光の強さ（0〜1）から人影の見え方にする倍率（光の後半で崩れ始めるように、1より大きくしている）
     constexpr float FigureVisibilityGain = 1.8f;
     // 人影を見せている間の恐怖の画面効果の強さ（1回目・2回目）

@@ -19,8 +19,13 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
-	// 人影の大きさ（高さ16倍で、人の背丈くらいの約30）。モデルはこの大きさを1にした空間で読み込む
-	const Vector3 ShadowSize(8.0f, 16.0f, 8.0f);
+	// モデルを読み込むときに割る大きさ（ワールド行列で掛ける拡大率の基準）。モデルは身長約31の実際の大きさで作ってあり、
+	// この値で割って読み、描くときに同じ値を掛けるので、この値だけを変えても見た目の大きさは変わらない
+	const Vector3 ShadowModelScale(8.0f, 16.0f, 8.0f);
+	// 実際に描く大きさの倍率：背を1.75倍（約31 → 約54。プレイヤーの目の高さ40より高く、見上げる大きさ）、
+	// 幅を1.45倍（背に対して少し細くし、ひょろ長い形にしている）
+	const Vector3 ShadowEnlarge(1.45f, 1.75f, 1.45f);
+	const Vector3 ShadowSize = ShadowModelScale * ShadowEnlarge;
 	// 最初に表示する秒数と、追うときに止まる距離（EnableChase で変えられる）
 	constexpr float DefaultLifeSeconds = 4.0f;
 	constexpr float DefaultChaseStopDistance = 28.0f;
@@ -34,7 +39,7 @@ namespace
 	constexpr float GazeIgnoreSeconds = 0.18f;
 	constexpr float GazeDistance = 220.0f;
 	constexpr float GazeFacing = 0.955f;
-	constexpr float ChestHeight = 17.0f;
+	constexpr float ChestHeight = 30.0f;
 	// 見られている間に崩れる速さと、表示時間が減る速さ。目を離したときに戻る速さ
 	constexpr float ObservedRate = 3.6f;
 	constexpr float ObservedLifeDrain = 2.0f;
@@ -79,7 +84,7 @@ void ShadowMan::Init()
     // モデルは身長約31の実際の大きさなので、ワールド行列で掛ける拡大率（下の m_Scale）で割って読み込んでいる
     PropModel::Append("assets/model/props/shadow_man.fbx",
         { { "Body", Color(0.025f, 0.03f, 0.027f, 1.0f) } },
-        ShadowSize, m_Vertices, m_Indices);
+        ShadowModelScale, m_Vertices, m_Indices);
 
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
@@ -100,7 +105,7 @@ void ShadowMan::Init()
     m_Material = std::make_unique<Material>();
     m_Material->CreateRequired(material);
 
-    // 人の背丈くらいの大きさ（高さ16倍で約30）
+    // プレイヤーより背の高い大きさ（背丈が約54）
     m_Scale = ShadowSize;
 }
 

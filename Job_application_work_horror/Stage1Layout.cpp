@@ -33,6 +33,7 @@
 
 #include <SimpleMath.h>
 #include <array>
+#include <cmath>
 #include <iterator>
 #include <functional>
 #include <random>
@@ -48,6 +49,14 @@ namespace
     constexpr float StageDoorCenterY = -74.0f;
     constexpr float StageDoorHeight = 50.0f;
     constexpr float StageDoorThickness = 4.0f;
+    // 部屋の壁の中心の高さと高さ（床 y=-99 から天井の下 y=-37 まで。stage1_props.txt の壁と同じ）
+    constexpr float StageRoomWallCenterY = -68.0f;
+    constexpr float StageRoomWallHeight = 62.0f;
+    // 扉の上をふさぐ壁（扉の上の端から天井まで。天井を上げたので、高さ50の扉の上が空いている）：厚み（壁と同じ）、扉の幅から左右へはみ出す長さ
+    constexpr float DoorLintelThickness = 4.0f;
+    constexpr float DoorLintelOverlap = 2.0f;
+    // 扉が z の向きに並んでいる（90度回っている）とみなす、回した角度の sin の大きさ
+    constexpr float DoorAlongZThreshold = 0.5f;
     // ドアの上の赤い表示：高さ、ドアの面から手前へ出す距離、大きさ（薄い・高さ・幅）、色、光沢
     constexpr float DoorSignY = -52.0f;
     constexpr float DoorSignOffset = 3.0f;
@@ -300,6 +309,7 @@ namespace
             Door* westWingDoor = m_Builder.Create<Door>("Stage1WestWingDoor");
             Place(*westWingDoor, "Stage1WestWingDoor");
             westWingDoor->SetLocked(true);
+            CreateDoorLintel(*westWingDoor, "Stage1WestWingDoorLintel");
 
             m_Objects.westWing.door = westWingDoor;
             m_Objects.westWing.key = westWingKey;
@@ -355,6 +365,7 @@ namespace
         {
             Door* door = m_Builder.Create<Door>("Door");
             Place(*door, "Door");
+            CreateDoorLintel(*door, "DoorLintel");
             m_Objects.loopDoor = door;
             FuseBox* fuseBox = m_Builder.Create<FuseBox>("FuseBox");
             Place(*fuseBox, "FuseBox");
@@ -393,6 +404,7 @@ namespace
             stageExitDoor->SetPosition(Stage1EndDoorX, StageDoorCenterY, Stage1EndDoorZ);
             stageExitDoor->SetRotation(Vector3(0.0f, DirectX::XM_PIDIV2, 0.0f));
             stageExitDoor->SetScale(Vector3(Stage1EndDoorHalfWidth * 2.0f, StageDoorHeight, StageDoorThickness));
+            CreateDoorLintel(*stageExitDoor, "Stage1ExitDoorLintel");
             m_Objects.exitDoor = stageExitDoor;
 
             // 監視カメラの異常用に、壁際へ開かずの扉を置いている。開いても先は壁。
@@ -422,21 +434,22 @@ namespace
             startDoor->SetPosition(Stage1StartDoorX, StageDoorCenterY, Stage1StartDoorZ);
             startDoor->SetScale(Vector3(Stage1EndDoorHalfWidth * 2.0f, StageDoorHeight, StageDoorThickness));
             startDoor->SetLocked(true);
+            CreateDoorLintel(*startDoor, "Stage1StartDoorLintel");
             m_Objects.startDoor = startDoor;
 
             // ドアの裏側の通路（建物の外へ張り出した、最後の廊下の突き当たりと同じ幅・高さの行き止まり）。
             const float passageCenterZ = Stage1StartDoorZ - StartPassageLength * 0.5f;
             const float passageWallX = Stage1EndDoorHalfWidth + StartPassageSideMargin;
             Wall* passageWest = m_Builder.Create<Wall>("Stage1StartPassageWest");
-            passageWest->SetPosition(Stage1StartDoorX - passageWallX, StageDoorCenterY, passageCenterZ);
-            passageWest->SetScale(StartPassageWallThickness, StageDoorHeight, StartPassageLength);
+            passageWest->SetPosition(Stage1StartDoorX - passageWallX, StageRoomWallCenterY, passageCenterZ);
+            passageWest->SetScale(StartPassageWallThickness, StageRoomWallHeight, StartPassageLength);
             Wall* passageEast = m_Builder.Create<Wall>("Stage1StartPassageEast");
-            passageEast->SetPosition(Stage1StartDoorX + passageWallX, StageDoorCenterY, passageCenterZ);
-            passageEast->SetScale(StartPassageWallThickness, StageDoorHeight, StartPassageLength);
+            passageEast->SetPosition(Stage1StartDoorX + passageWallX, StageRoomWallCenterY, passageCenterZ);
+            passageEast->SetScale(StartPassageWallThickness, StageRoomWallHeight, StartPassageLength);
             Wall* passageEnd = m_Builder.Create<Wall>("Stage1StartPassageEnd");
-            passageEnd->SetPosition(Stage1StartDoorX, StageDoorCenterY,
+            passageEnd->SetPosition(Stage1StartDoorX, StageRoomWallCenterY,
                 Stage1StartDoorZ - StartPassageLength - StartPassageWallThickness * 0.5f);
-            passageEnd->SetScale(passageWallX * 2.0f + StartPassageWallThickness, StageDoorHeight, StartPassageWallThickness);
+            passageEnd->SetScale(passageWallX * 2.0f + StartPassageWallThickness, StageRoomWallHeight, StartPassageWallThickness);
             for (Wall* passageWall : { passageWest, passageEast, passageEnd })
             {
                 passageWall->SetWeatheringSurface(true);
@@ -496,6 +509,7 @@ namespace
             Door* keypadDoor = m_Builder.Create<Door>("Stage1KeypadDoor");
             Place(*keypadDoor, "Stage1KeypadDoor");
             keypadDoor->SetLocked(true);
+            CreateDoorLintel(*keypadDoor, "Stage1KeypadDoorLintel");
 
             FuseBox* keypadPanel = m_Builder.Create<FuseBox>("Stage1KeypadPanel");
             keypadPanel->SetManualControl("暗証番号を入力する");
@@ -697,6 +711,28 @@ namespace
 
         // Wallを、色と当たり判定の有無を指定した小物として作る（進行のコードが色や表示を変える物だけに使っている。
         // それ以外の小物は、小物のファイルから読んでいる）
+        // 扉の上の端から天井までをふさぐ壁を作っている（扉の向きに合わせて、幅を x か z に向ける）
+        void CreateDoorLintel(const Door& door, const char* name)
+        {
+            const Vector3 position = door.GetPosition();
+            const Vector3 scale = door.GetScale();
+            const float doorTop = position.y + scale.y * 0.5f;
+            const float wallTop = StageRoomWallCenterY + StageRoomWallHeight * 0.5f;
+            const float height = wallTop - doorTop;
+            if (height <= 0.0f)
+            {
+                return;
+            }
+            const float width = scale.x + DoorLintelOverlap * 2.0f;
+            const bool alongZ = std::fabs(std::sin(door.GetRotation().y)) > DoorAlongZThreshold;
+            Wall* lintel = m_Builder.Create<Wall>(name);
+            lintel->SetPosition(position.x, doorTop + height * 0.5f, position.z);
+            lintel->SetScale(alongZ ? DoorLintelThickness : width, height, alongZ ? width : DoorLintelThickness);
+            lintel->SetWeatheringSurface(true);
+            // 壁の当たり判定は上から見た四角だけで高さを見ないので、頭より上の壁でも通り道をふさいでしまう。当たり判定は切っている
+            lintel->SetCollisionEnabled(false);
+        }
+
         Wall* CreateStageProp(const char* name, const Vector3& position, const Vector3& scale,
             const Color& diffuse, const Color& emission, float shininess, bool collisionEnabled)
         {

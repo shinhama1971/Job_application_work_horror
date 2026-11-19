@@ -45,7 +45,7 @@ public:
     };
 
     // 足音の高さ（天井板のすぐ上。1面の物音の天井裏の足音と同じ）と、天井裏の足音の音量・こもらせ方
-    static constexpr float CeilingVoidY = -44.0f;
+    static constexpr float CeilingVoidY = -32.0f;
     static constexpr float StepVolume = 2.1f;
     static constexpr float StepMinimumOcclusion = 0.72f;
 

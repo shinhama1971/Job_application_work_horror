@@ -292,8 +292,8 @@ namespace
     constexpr float PresenceWarpRange = 140.0f;
     constexpr float PresenceWarpNearDistance = 18.0f;
     // ゆがみの中心にする高さ（影の胸。ShadowMan の視線の判定と同じ）と、ゆがむ範囲の体のまわりの半径（ワールドの長さ）
-    constexpr float PresenceWarpChestHeight = 17.0f;
-    constexpr float PresenceWarpWorldRadius = 18.0f;
+    constexpr float PresenceWarpChestHeight = 30.0f;
+    constexpr float PresenceWarpWorldRadius = 28.0f;
     // 画面の上でのゆがむ範囲の半径の下限と上限（縦の高さを1とした長さ）
     constexpr float PresenceWarpMinScreenRadius = 0.08f;
     constexpr float PresenceWarpMaxScreenRadius = 0.6f;

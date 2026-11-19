@@ -365,21 +365,31 @@ bool Door::BlocksSoundSegment(const Vector3& start, const Vector3& end) const
 // プレイヤー（半径radiusの円）が閉じた扉板にめり込んでいたら、外へ押し出している
 void Door::ResolveCollision(Vector3& position, float radius) const
 {
-    // 取っ手を操作した後は、扉板が回転している途中でも通れるようにしている。
+    // 取っ手を操作した後、扉板が回転している途中は通れるようにしている。
     // 回転するメッシュがプレイヤーを壁へ押し込むのを防いでいる。
-    if (m_IsOpen || m_IsOpening)
+    if (m_IsOpening)
     {
         return;
     }
 
-    // 扉の回転を打ち消したローカル空間で、扉板を長方形として扱っている
+    // 扉の回転を打ち消したローカル空間で、扉板を長方形として扱っている。
+    // 開ききった扉は、蝶番を軸に開いた位置・向きの扉板で判定している（開いた扉板を通り抜けないように）
     const float halfX = std::abs(m_Scale.x) * 0.5f;
     const float halfZ = std::abs(m_Scale.z) * 0.5f;
+    const float panelYaw = m_IsOpen ? m_Rotation.y + m_OpenAngle : m_Rotation.y;
+    Vector3 panelCenter = m_Position;
+    if (m_IsOpen)
+    {
+        const Matrix closedRotation = Matrix::CreateFromYawPitchRoll(m_Rotation.y, m_Rotation.x, m_Rotation.z);
+        const Matrix openRotation = Matrix::CreateFromYawPitchRoll(panelYaw, m_Rotation.x, m_Rotation.z);
+        const Vector3 hinge = m_StartPosition + Vector3::Transform(Vector3(-halfX, 0.0f, 0.0f), closedRotation);
+        panelCenter = hinge + Vector3::Transform(Vector3(halfX, 0.0f, 0.0f), openRotation);
+    }
     const Matrix baseRotation = Matrix::CreateFromYawPitchRoll(
-        m_Rotation.y, m_Rotation.x, m_Rotation.z);
+        panelYaw, m_Rotation.x, m_Rotation.z);
     const Matrix inverseRotation = baseRotation.Invert();
     Vector3 localPosition = Vector3::Transform(
-        position - m_Position,
+        position - panelCenter,
         inverseRotation);
     const float minX = -halfX;
     const float maxX = halfX;
@@ -406,7 +416,7 @@ void Door::ResolveCollision(Vector3& position, float radius) const
         const float pushDistance = radius - distance;
         localPosition.x += deltaX / distance * pushDistance;
         localPosition.z += deltaZ / distance * pushDistance;
-        position = m_Position + Vector3::Transform(
+        position = panelCenter + Vector3::Transform(
             localPosition,
             baseRotation);
         return;
@@ -439,7 +449,7 @@ void Door::ResolveCollision(Vector3& position, float radius) const
         localPosition.z = maxZ + radius;
     }
     // ローカル空間からワールド座標へ戻している
-    position = m_Position + Vector3::Transform(
+    position = panelCenter + Vector3::Transform(
         localPosition,
         baseRotation);
 }

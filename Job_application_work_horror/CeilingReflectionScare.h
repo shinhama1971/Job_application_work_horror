@@ -19,7 +19,7 @@ class CeilingReflectionScare final
 {
 public:
     // 天井の下面の高さ（人影の足を付けている所）と、水面の高さ
-    static constexpr float CeilingY = -49.0f;
+    static constexpr float CeilingY = -37.0f;
     static constexpr float WaterY = -100.0f;
     // 人影の胸と頭の高さ（天井から下へ。シェーダーの人影の形と合わせている）
     static constexpr float ChestDrop = 24.0f;

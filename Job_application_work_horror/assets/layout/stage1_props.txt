@@ -19,7 +19,7 @@
 #   metal の後ろの金属らしさ（省くと1）は、汚れや酸化の膜で覆われた分だけ下げている（暗い場所でも形が分かるよう、拡散反射を少し残す）。
 #   粗さは 0.045（鏡）〜1（ざらざら）。付けない色は、光沢の強さから粗さを換算する。
 #
-# 座標の単位は全ステージ共通（床の高さは y=-100、天井の下面は y=-48.5）。
+# 座標の単位は全ステージ共通（床の高さは y=-100）。1面の天井の下面は y=-36.5（11月19日に -48.5 から 12 上げた。2面は -48.5 のまま）。
 # ============================================================================
 
 # --- 色
@@ -48,32 +48,32 @@ color doorLamp      1.0   0.80  0.52                 # 部屋の入口の目印�
 color doorLampBody  0.60  0.48  0.31  rough 0.30
 
 # --- 建物の壁（外周・部屋の仕切り・ループ廊下・西棟・南西の広間）。名前を変えずに位置と大きさだけ直せる
-prop Wall1                     0 -74 340   440 50 4   concrete none 4 1 weathering room
+prop Wall1                     0 -68 340   440 62 4   concrete none 4 1 weathering room
 # 東の外壁。最後のドアの先（z=235〜275）だけ開けて、外の階段室（下の PropStair）へつないでいる。
 # 部屋の形（room。最大32個）は数が足りないので、北の短い方には付けていない
-prop Wall2                     220 -74 27.5   4 50 415   concrete none 4 1 weathering room
-prop Wall2North                220 -74 307.5  4 50 65    concrete none 4 1 weathering
-prop Wall3West                 -197.5 -74 -180   45 50 4   concrete none 4 1 weathering room
-prop Wall3                     -81.5 -74 -180   127 50 4   concrete none 4 1 weathering room
-prop Wall3East                 119 -74 -180   202 50 4   concrete none 4 1 weathering room
-prop Wall4                     -220 -74 -107.5   4 50 145   concrete none 4 1 weathering room
-prop Wall4North                -220 -74 167.5   4 50 345   concrete none 4 1 weathering room
-prop Wall5                     -117.5 -74 40   205 50 4   concrete none 4 1 weathering room
-prop Wall6                     117.5 -74 40   205 50 4   concrete none 4 1 weathering room
-prop Wall7                     -135 -74 -70   170 50 4   concrete none 4 1 weathering room
-prop Wall8                     135 -74 -70   170 50 4   concrete none 4 1 weathering room
-prop Wall9                     -90 -74 -140   4 50 80   concrete none 4 1 weathering room
-prop Wall10                    90 -74 -140   4 50 80   concrete none 4 1 weathering room
-prop Wall11                    -45 -74 75   4 50 70   concrete none 4 1 weathering room
-prop Wall12                    -45 -74 155   4 50 50   concrete none 4 1 weathering room
-prop Wall13                    45 -74 67.5   4 50 55   concrete none 4 1 weathering room
-prop Wall13North               45 -74 152.5   4 50 55   concrete none 4 1 weathering room
-prop Wall14                    -132.9 -74 180   175 50 4   concrete none 4 1 weathering room
-prop Wall15                    132.5 -74 180   175 50 4   concrete none 4 1 weathering room
-prop LoopWall1                 -45 -74 227.5   4 50 95   concrete none 4 1 weathering room
-prop LoopWall2                 45 -74 207.5   4 50 55   concrete none 4 1 weathering room
-prop LoopWall3                 122.5 -74 235   155 50 4   concrete none 4 1 weathering room
-prop LoopWall4                 77.5 -74 275   245 50 4   concrete none 4 1 weathering room
+prop Wall2                     220 -68 27.5   4 62 415   concrete none 4 1 weathering room
+prop Wall2North                220 -68 307.5  4 62 65    concrete none 4 1 weathering
+prop Wall3West                 -197.5 -68 -180   45 62 4   concrete none 4 1 weathering room
+prop Wall3                     -81.5 -68 -180   127 62 4   concrete none 4 1 weathering room
+prop Wall3East                 119 -68 -180   202 62 4   concrete none 4 1 weathering room
+prop Wall4                     -220 -68 -107.5   4 62 145   concrete none 4 1 weathering room
+prop Wall4North                -220 -68 167.5   4 62 345   concrete none 4 1 weathering room
+prop Wall5                     -117.5 -68 40   205 62 4   concrete none 4 1 weathering room
+prop Wall6                     117.5 -68 40   205 62 4   concrete none 4 1 weathering room
+prop Wall7                     -135 -68 -70   170 62 4   concrete none 4 1 weathering room
+prop Wall8                     135 -68 -70   170 62 4   concrete none 4 1 weathering room
+prop Wall9                     -90 -68 -140   4 62 80   concrete none 4 1 weathering room
+prop Wall10                    90 -68 -140   4 62 80   concrete none 4 1 weathering room
+prop Wall11                    -45 -68 75   4 62 70   concrete none 4 1 weathering room
+prop Wall12                    -45 -68 155   4 62 50   concrete none 4 1 weathering room
+prop Wall13                    45 -68 67.5   4 62 55   concrete none 4 1 weathering room
+prop Wall13North               45 -68 152.5   4 62 55   concrete none 4 1 weathering room
+prop Wall14                    -132.9 -68 180   175 62 4   concrete none 4 1 weathering room
+prop Wall15                    132.5 -68 180   175 62 4   concrete none 4 1 weathering room
+prop LoopWall1                 -45 -68 227.5   4 62 95   concrete none 4 1 weathering room
+prop LoopWall2                 45 -68 207.5   4 62 55   concrete none 4 1 weathering room
+prop LoopWall3                 122.5 -68 235   155 62 4   concrete none 4 1 weathering room
+prop LoopWall4                 77.5 -68 275   245 62 4   concrete none 4 1 weathering room
 
 # --- 最後のドアの先の、2階へ上る階段室（外壁の外へ東へ延びる）
 # 段は奥行き7・高さ4で10段（x=206〜276）、上の踊り場の床は y=-60。寸法は Stage1Layout.h の Stage1Stair* と合わせている
@@ -95,44 +95,44 @@ prop PropStairLanding          304 -80   255    56 40 36  concrete none 4 1
 prop PropStairCeilingLow       233 -23.5 255    30 3 40   ceilingPanel none 4 0 noshadow weathering
 prop PropStairCeilingMid       262 -10.5 255    28 3 40   ceilingPanel none 4 0 noshadow weathering
 prop PropStairCeilingHigh      305 -3.5  255    58 3 40   ceilingPanel none 4 0 noshadow weathering
-prop PropStairBulkhead1        219 -35.5 255    2 27 40   concrete none 4 0 noshadow weathering
+prop PropStairBulkhead1        219 -29.5 255    2 15 40   concrete none 4 0 noshadow weathering
 prop PropStairBulkhead2        248 -17   255    2 16 40   concrete none 4 0 noshadow weathering
 prop PropStairBulkhead3        276 -7    255    2 10 40   concrete none 4 0 noshadow weathering
 prop PropStairLandingLamp    331.5 -42   255    1 4 10    doorLampBody doorLamp 24 0 noshadow glow 55 1.9 model warning_lamp
-prop WestWingOuter             -380 -74 80   4 50 364   concrete none 4 1 weathering room
-prop WestWingSouth             -300 -74 -100   164 50 4   concrete none 4 1 weathering room
-prop WestWingNorth             -300 -74 260   164 50 4   concrete none 4 1 weathering room
-prop WestWingPumpRoomWallWest  -350 -74 180   60 50 4   concrete none 4 1 weathering room
-prop WestWingPumpRoomWallEast  -250 -74 180   60 50 4   concrete none 4 1 weathering room
-prop SouthWestHallNorth        -300 -74 -180   160 50 4   concrete none 4 1 weathering room
-prop SouthWestHallWest         -380 -74 -256   4 50 152   concrete none 4 1 weathering room
-prop SouthWestHallSouth        -250 -74 -332   264 50 4   concrete none 4 1 weathering room
-prop SouthWestHallEast         -120 -74 -256   4 50 152   concrete none 4 1 weathering room
+prop WestWingOuter             -380 -68 80   4 62 364   concrete none 4 1 weathering room
+prop WestWingSouth             -300 -68 -100   164 62 4   concrete none 4 1 weathering room
+prop WestWingNorth             -300 -68 260   164 62 4   concrete none 4 1 weathering room
+prop WestWingPumpRoomWallWest  -350 -68 180   60 62 4   concrete none 4 1 weathering room
+prop WestWingPumpRoomWallEast  -250 -68 180   60 62 4   concrete none 4 1 weathering room
+prop SouthWestHallNorth        -300 -68 -180   160 62 4   concrete none 4 1 weathering room
+prop SouthWestHallWest         -380 -68 -256   4 62 152   concrete none 4 1 weathering room
+prop SouthWestHallSouth        -250 -68 -332   264 62 4   concrete none 4 1 weathering room
+prop SouthWestHallEast         -120 -68 -256   4 62 152   concrete none 4 1 weathering room
 # 西棟と南西の広間の柱（建物の一部として古さを描く。部屋の角の暗がりは32枚までなので含めない）
-prop WestWingColumn1           -330 -74 10   10 50 10   concrete none 4 1 weathering
-prop WestWingColumn2           -270 -74 10   10 50 10   concrete none 4 1 weathering
-prop WestWingColumn3           -330 -74 70   10 50 10   concrete none 4 1 weathering
-prop WestWingColumn4           -270 -74 70   10 50 10   concrete none 4 1 weathering
-prop WestWingColumn5           -330 -74 130   10 50 10   concrete none 4 1 weathering
-prop WestWingColumn6           -270 -74 130   10 50 10   concrete none 4 1 weathering
-prop SouthWestHallColumn1      -290 -74 -225   10 50 10   concrete none 4 1 weathering
-prop SouthWestHallColumn2      -210 -74 -225   10 50 10   concrete none 4 1 weathering
-prop SouthWestHallColumn3      -290 -74 -285   10 50 10   concrete none 4 1 weathering
-prop SouthWestHallColumn4      -210 -74 -285   10 50 10   concrete none 4 1 weathering
+prop WestWingColumn1           -330 -68 10   10 62 10   concrete none 4 1 weathering
+prop WestWingColumn2           -270 -68 10   10 62 10   concrete none 4 1 weathering
+prop WestWingColumn3           -330 -68 70   10 62 10   concrete none 4 1 weathering
+prop WestWingColumn4           -270 -68 70   10 62 10   concrete none 4 1 weathering
+prop WestWingColumn5           -330 -68 130   10 62 10   concrete none 4 1 weathering
+prop WestWingColumn6           -270 -68 130   10 62 10   concrete none 4 1 weathering
+prop SouthWestHallColumn1      -290 -68 -225   10 62 10   concrete none 4 1 weathering
+prop SouthWestHallColumn2      -210 -68 -225   10 62 10   concrete none 4 1 weathering
+prop SouthWestHallColumn3      -290 -68 -285   10 62 10   concrete none 4 1 weathering
+prop SouthWestHallColumn4      -210 -68 -285   10 62 10   concrete none 4 1 weathering
 
 # --- 天井（床から53の高さに施設全体を覆う板。影は落とさず、天井板・外れた板の穴・雨漏りの染みを描く）
-prop PropCeilingMain           0     -47   80     436 3 516   ceilingPanel none 4 0 noshadow weathering
-prop PropCeilingWestWing       -300  -47   80     164 3 364   ceilingPanel none 4 0 noshadow weathering
-prop PropCeilingSouthWestHall  -250  -47   -256   264 3 156   ceilingPanel none 4 0 noshadow weathering
-prop PropCeilingStartPassage   0     -47   -230   44 3 104      ceilingPanel none 4 0 noshadow weathering
+prop PropCeilingMain           0     -35   80     436 3 516   ceilingPanel none 4 0 noshadow weathering
+prop PropCeilingWestWing       -300  -35   80     164 3 364   ceilingPanel none 4 0 noshadow weathering
+prop PropCeilingSouthWestHall  -250  -35   -256   264 3 156   ceilingPanel none 4 0 noshadow weathering
+prop PropCeilingStartPassage   0     -35   -230   44 3 104      ceilingPanel none 4 0 noshadow weathering
 
 # --- 壁際と天井近くを走る配管（Stage1AmbientSounds が、この線に沿って配管の音を鳴らしている）
 # 東の外壁沿いの配管は、最後のドアの先の階段の入口（z=235〜275）の手前で止めている（上るときに頭に当たらないように）
-prop PropPipeRight           215.89    -55   34    3 3 398       darkMetal none 22 0 model pipe_run
-prop PropPipeCrossDoor       -115   -52.5 37    175 2.5 2.5   darkMetal none 22 0 model pipe_run
-prop PropPipeCrossDoorRight  115    -52.5 37    175 2.5 2.5   darkMetal none 22 0 model pipe_run
-prop PropPipeCrossHall       -132.5 -52.5 177   175 2.5 2.5   darkMetal none 22 0 model pipe_run
-prop PropPipeCrossHallRight  132.5  -52.5 177   175 2.5 2.5   darkMetal none 22 0 model pipe_run
+prop PropPipeRight           215.89    -43   34    3 3 398       darkMetal none 22 0 model pipe_run
+prop PropPipeCrossDoor       -115   -40.5 37    175 2.5 2.5   darkMetal none 22 0 model pipe_run
+prop PropPipeCrossDoorRight  115    -40.5 37    175 2.5 2.5   darkMetal none 22 0 model pipe_run
+prop PropPipeCrossHall       -132.5 -40.5 177   175 2.5 2.5   darkMetal none 22 0 model pipe_run
+prop PropPipeCrossHallRight  132.5  -40.5 177   175 2.5 2.5   darkMetal none 22 0 model pipe_run
 
 # --- 幅木（西側は、西棟の扉 z=-35〜-5 の前で途切れさせている）
 prop PropBaseboardLeft       -217.2 -96.5 -105  1.5 6 140   trimColor none 5 0
@@ -191,7 +191,7 @@ prop PropDebrisBeam  -120 -93 250   60 6 6     darkMetal none 18 1 model beam
 prop PropWestWingPump   -345 -86   235   30 26 26    darkMetal none 20 1 model pump
 prop PropWestWingTank   -240 -82   208.32   20 34 30    cabinetMetal none 14 1 model tank
 prop PropWestWingDrain  -290 -99.6 228   16 0.8 16   drainGrate none 16 0 noshadow model drain
-prop PropWestWingPipe   -375 -55   80    3 3 350     darkMetal none 22 0 model pipe_pole
+prop PropWestWingPipe   -375 -43   80    3 3 350     darkMetal none 22 0 model pipe_pole
 
 # --- 南西の広間の西の奥：棚・机・細い柱・木箱の一角
 prop PropSouthWestShelf1    -362 -77   -300   10 44 30   shelfColor none 10 1 model shelf_short
@@ -202,13 +202,13 @@ prop PropSouthWestDeskLeg1  -340 -88.5 -310   2 23 2     deskWood none 8 1 model
 prop PropSouthWestDeskLeg2  -304 -88.5 -310   2 23 2     deskWood none 8 1 model desk_leg
 prop PropSouthWestDeskLeg3  -340 -88.5 -290   2 23 2     deskWood none 8 1 model desk_leg
 prop PropSouthWestDeskLeg4  -304 -88.5 -290   2 23 2     deskWood none 8 1 model desk_leg
-prop PropSouthWestPole      -268 -75   -252   3 50 3     darkMetal none 20 1 model pipe_pole
+prop PropSouthWestPole      -268 -69   -252   3 62 3     darkMetal none 20 1 model pipe_pole
 prop PropSouthWestCrate1    -340 -93   -205   14 14 14   debrisColor none 6 1 model crate
 prop PropSouthWestCrate2    -240 -95   -316   10 10 10   debrisColor none 6 1 model crate
 # 東の壁（x=-120）の、何もなかった壁際の目印（緑の警告灯の光が当たる）
 prop PropSouthWestCrate3    -130 -93   -238   14 14 14   debrisColor none 6 1 model crate
 prop PropSouthWestCrate4    -129 -95   -224   10 10 10   debrisColor none 6 1 model crate
-prop PropSouthWestPole2     -124 -75   -284   3 50 3     darkMetal none 20 1 model pipe_pole
+prop PropSouthWestPole2     -124 -69   -284   3 62 3     darkMetal none 20 1 model pipe_pole
 
 # --- 南西の広間の色の付いた警告灯（暗い中で目立ち、自分の色で周りを照らす点光源になる）
 prop PropSouthWestLampRed    -250   -70 -329.5   10 4 1   lampRedBody lampRed 24 0 noshadow glow 55 2.0 model warning_lamp
@@ -244,9 +244,9 @@ prop PropWestWingDeskLeg4  -312 -88.5 -68   2 23 2     deskWood none 8 1 model d
 prop PropWestWingCrate     -345 -93   -15   14 14 14   debrisColor none 6 1 model crate
 
 # --- 光の安全地帯の暖かい電球（停電しても消えない電池式の作業灯）。休む範囲は Stage1Layout.cpp の safeZones
-prop PropSafeLightHubCord    -198 -49.5 12     0.4 2.5 0.4   darkMetal none 4 0 model hanging_cord
-prop PropSafeLightHubBulb    -198 -52.3 12     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 85 3.2 model safe_bulb
-prop PropSafeLightHubBulb_1    -198 -52.3 -51.7     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 85 3.2 model safe_bulb
+prop PropSafeLightHubCord    -198 -37.5 12     0.4 2.5 0.4   darkMetal none 4 0 model hanging_cord
+prop PropSafeLightHubBulb    -198 -40.3 12     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 85 3.2 model safe_bulb
+prop PropSafeLightHubBulb_1    -198 -40.3 -51.7     2.6 3.2 2.6   warmBulbBody warmBulb 30 0 noshadow glow 85 3.2 model safe_bulb
 prop PropSafeLightDeskBase   -334 -74.5 -306   4 1 4         darkMetal none 12 0 model desk_lamp_base
 prop PropSafeLightDeskArm    -334 -70   -306   0.8 9 0.8     darkMetal none 12 0 model desk_lamp_arm
 prop PropSafeLightDeskShade  -332 -65   -304   5 3 5         warmBulbBody warmBulb 30 0 noshadow glow 85 3.2 model desk_lamp_shade
@@ -258,44 +258,44 @@ prop PropSafeLightDeskShade  -332 -65   -304   5 3 5         warmBulbBody warmBu
 # yaw は真上から見て +Z を0度とした向き、size は大きさ（照明は器具の幅・厚さ・奥行き、扉・配管は拡大率）。
 place Player                         0 -99 -120
 place Ground                         0 -100 0 size 20 1 20
-place CeilingLight1                  0 -50.5 -140 size 24 2 11
-place CeilingLight2                  -150 -50.5 -140 size 22 2 10
-place CeilingLight3                  150 -50.5 -140 size 22 2 10
-place CeilingLight4                  0 -50.5 -10 size 26 2 11
-place CeilingLight5                  0 -50.5 105 size 18 2 8
-place CeilingLight6                  -130 -50.5 120 size 24 2 11
-place CeilingLight7                  120.3 -50.5 254.4 size 30 2 13 yaw 85
-place CeilingLight8                  0 -50.5 215 size 20 2 8
+place CeilingLight1                  0 -38.5 -140 size 24 2 11
+place CeilingLight2                  -150 -38.5 -140 size 22 2 10
+place CeilingLight3                  150 -38.5 -140 size 22 2 10
+place CeilingLight4                  0 -38.5 -10 size 26 2 11
+place CeilingLight5                  0 -38.5 105 size 18 2 8
+place CeilingLight6                  -130 -38.5 120 size 24 2 11
+place CeilingLight7                  120.3 -38.5 254.4 size 30 2 13 yaw 85
+place CeilingLight8                  0 -38.5 215 size 20 2 8
 place Stage1WestWingDoor             -220 -74 -20 yaw 90
 place Stage1WestWingBattery          -355 -95 40
 place Stage1DebrisRoomBattery        -120 -95 300
 place Stage1SouthWestHallBattery     -321.8 -72.2 -297.3
-place Stage1SouthWestHallLight1      -290 -50.5 -256 size 24 2 11 yaw -92.974
-place Stage1SouthWestHallLight2      -180 -50.5 -256 size 24 2 11 yaw -94.203
-place Stage1WestWingLight1           -300 -50.5 -40 size 24 2 11
-place Stage1WestWingLight2           -300 -50.5 100 size 24 2 11
-place Stage1WestWingLight3           -300 -50.5 220 size 20 2 9
+place Stage1SouthWestHallLight1      -290 -38.5 -256 size 24 2 11 yaw -92.974
+place Stage1SouthWestHallLight2      -180 -38.5 -256 size 24 2 11 yaw -94.203
+place Stage1WestWingLight1           -300 -38.5 -40 size 24 2 11
+place Stage1WestWingLight2           -300 -38.5 100 size 24 2 11
+place Stage1WestWingLight3           -300 -38.5 220 size 20 2 9
 # 部屋の入口の照明（進む先の照明の誘導で名前を使う。電力が戻る前は消えている普通の照明）
-place Stage1LeftEntranceLight        -125 -50.5 -88 size 22 2 10
-place Stage1RightEntranceLight        125 -50.5 -88 size 22 2 10
-place Stage1WestEntranceLight        -190 -50.5 -20 size 22 2 10
-place Stage1MainPowerLight           -180 -50.5 20 size 22 2 10
+place Stage1LeftEntranceLight        -125 -38.5 -88 size 22 2 10
+place Stage1RightEntranceLight        125 -38.5 -88 size 22 2 10
+place Stage1WestEntranceLight        -190 -38.5 -20 size 22 2 10
+place Stage1MainPowerLight           -180 -38.5 20 size 22 2 10
 # 何個でも置ける天井照明（停電中も赤い非常灯として点く）。ExtraLight_ で始まる名前の place は、ゲームがすべて作る（LayoutExtras）。
 # Unity のマップエディターでコピーして足したり、消したりできる。電池も ExtraBattery_ で始まる名前で、同じように何個でも置ける
-place ExtraLight_HallCenter            0 -50.5 -75 size 22 2 10
-place ExtraLight_HallWest           -120 -50.5 -20 size 22 2 10
-place ExtraLight_HallEast            120 -50.5 -20 size 22 2 10
-place ExtraLight_HallFarEast         190 -50.5 10 size 22 2 10
-place ExtraLight_LeftStorageInner   -180 -50.5 -150 size 22 2 10
-place ExtraLight_RightStorageInner   185 -50.5 -150 size 22 2 10
-place ExtraLight_CenterStorage         0 -50.5 -105 size 22 2 10
-place ExtraLight_CorridorSouth         0 -50.5 55 size 22 2 10
-place ExtraLight_CorridorMid           0 -50.5 160 size 22 2 10
-place ExtraLight_ArchiveWest        -180 -50.5 75 size 22 2 10
-place ExtraLight_Debris             -130 -50.5 265 size 22 2 10
-place ExtraLight_ExitHall              0 -50.5 300 size 22 2 10
-place ExtraLight_WestWingSouth      -345 -50.5 35 size 22 2 10
-place ExtraLight_SouthWestHallWest  -345 -50.5 -210 size 22 2 10
+place ExtraLight_HallCenter            0 -38.5 -75 size 22 2 10
+place ExtraLight_HallWest           -120 -38.5 -20 size 22 2 10
+place ExtraLight_HallEast            120 -38.5 -20 size 22 2 10
+place ExtraLight_HallFarEast         190 -38.5 10 size 22 2 10
+place ExtraLight_LeftStorageInner   -180 -38.5 -150 size 22 2 10
+place ExtraLight_RightStorageInner   185 -38.5 -150 size 22 2 10
+place ExtraLight_CenterStorage         0 -38.5 -105 size 22 2 10
+place ExtraLight_CorridorSouth         0 -38.5 55 size 22 2 10
+place ExtraLight_CorridorMid           0 -38.5 160 size 22 2 10
+place ExtraLight_ArchiveWest        -180 -38.5 75 size 22 2 10
+place ExtraLight_Debris             -130 -38.5 265 size 22 2 10
+place ExtraLight_ExitHall              0 -38.5 300 size 22 2 10
+place ExtraLight_WestWingSouth      -345 -38.5 35 size 22 2 10
+place ExtraLight_SouthWestHallWest  -345 -38.5 -210 size 22 2 10
 place ExtraLight_StairLanding        304 -6 255 size 22 2 10
 place Door                           0 -74 40
 place FuseBox                        -35.1 -73.4 35

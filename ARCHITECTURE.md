@@ -174,6 +174,7 @@ DDGI と半解像度の光の筋は Game が単一所有し、型の定義は Ga
   生成したポインタをそのまま `StageObjects` / `Stage2Objects` に入れて返します。
   `Build` の中は、場所ごとの手順（`Stage1Builder`・`Stage2Builder` の `BuildPlayerAndGround`・`BuildMirror` など）に分けて、前と同じ順番で呼んでいます（作る順番が描く順番と置き直しの登録の順番になるため）。
 - 名前を書くのは生成時の1か所だけです（`SceneLayoutBuilder` が生成と同時に名前を記録します）。
+- 1面の天井の下面は y=-36.5 です（11月19日に -48.5 から12上げました。2面は -48.5 のまま）。壁と柱は配置ファイルで y=-99〜-37 の高さにしてあり、コードで作る壁（開始地点の裏の通路）も `StageRoomWallCenterY`・`StageRoomWallHeight` で同じ高さにしています。扉は高さ50（y=-99〜-49）のままなので、扉を作ったときに `Stage1Builder::CreateDoorLintel` が、扉の上の端から天井までをふさぐ壁（まぐさ）を扉の向きに合わせて足します。天井の高さを使うコードの値（部屋の形の `RoomOcclusionCeilingY`、天井裏の足音の `CeilingVoidY`、天井に張り付く人影の `CeilingReflectionScare::CeilingY`）も合わせています
   Sceneの終了時はその一覧で破棄するため、生成・取得・破棄で名前の一覧が食い違うことはありません。
 - 破棄を名前で行うのは、すでに破棄されたObjectに対しても安全だからです。将来、途中で破棄される
   Objectを配置に加えても、解放済みのポインタに触れることがありません。
