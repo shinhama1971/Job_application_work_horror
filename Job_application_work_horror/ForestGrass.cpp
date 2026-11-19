@@ -5,6 +5,7 @@
 
 #include "ForestGrass.h"
 #include "MathUtility.h"
+#include "shader/computeDispatchConfig.hlsli"
 
 #include "Application.h"
 #include "Camera.h"
@@ -71,8 +72,7 @@ namespace
     // FadeEnd より遠い区画は、描く処理ごと省いている
     constexpr float FadeStart = 330.0f;
     constexpr float FadeEnd = 410.0f;
-    // 1スレッドグループの葉の数（grassCS.hlsl の GRASS_GROUP_SIZE と同じ）
-    constexpr std::uint32_t GroupSize = 256;
+    constexpr std::uint32_t GroupSize = SIGNAL_LOST_GRASS_GROUP_SIZE;
 
     // 研究所までの小道の曲がり：中心の x が、z に沿ってこの振れ幅・この長さの周期（2π倍）で左右に揺れる
     constexpr float PathSwing = 28.0f;

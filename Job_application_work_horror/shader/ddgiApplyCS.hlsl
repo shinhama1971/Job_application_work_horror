@@ -9,6 +9,7 @@
 // ============================================================================
 
 #include "ddgiCommon.hlsli"
+#include "computeDispatchConfig.hlsli"
 
 Texture2D<float> SceneDepth : register(t5);
 RWTexture2D<float4> IndirectOutput : register(u0);
@@ -26,11 +27,7 @@ float3 ViewPositionAt(int2 pixel)
     return position.xyz / position.w;
 }
 
-// DDGIVolume.cpp の OutputDownscale と ApplyGroupSize に対応する。
-#define DDGI_APPLY_DOWNSAMPLE_FACTOR 2
-#define DDGI_APPLY_GROUP_SIZE 8
-
-[numthreads(DDGI_APPLY_GROUP_SIZE, DDGI_APPLY_GROUP_SIZE, 1)]
+[numthreads(SIGNAL_LOST_DDGI_APPLY_GROUP_SIZE, SIGNAL_LOST_DDGI_APPLY_GROUP_SIZE, 1)]
 void main(uint3 id : SV_DispatchThreadID)
 {
     const int2 outputPixel = int2(id.xy);
@@ -38,7 +35,7 @@ void main(uint3 id : SV_DispatchThreadID)
     {
         return;
     }
-    const int2 pixel = min(outputPixel * DDGI_APPLY_DOWNSAMPLE_FACTOR, int2(ViewportSize) - 1);
+    const int2 pixel = min(outputPixel * SIGNAL_LOST_DDGI_APPLY_DOWNSAMPLE_FACTOR, int2(ViewportSize) - 1);
     const float depth = SceneDepth.Load(int3(pixel + int2(ViewportOffset), 0));
     if (depth >= 1.0f)
     {

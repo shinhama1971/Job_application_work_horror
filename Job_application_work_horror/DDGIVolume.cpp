@@ -5,6 +5,7 @@
 #include "DDGIVolume.h"
 #include "MathUtility.h"
 #include "GIUpdateSettings.h"
+#include "shader/computeDispatchConfig.hlsli"
 
 #include "CaptureMode.h"
 #include "Renderer.h"
@@ -52,8 +53,8 @@ namespace
     // 円周率（光線の向きの乱数に使う）
     constexpr float Pi = MathUtility::Pi;
     // 間接光の画像を縦横何分の1の解像度で作るか、Compute Shader の1グループの縦横の数
-    constexpr int OutputDownscale = 2;
-    constexpr UINT ApplyGroupSize = 8;
+    constexpr int OutputDownscale = SIGNAL_LOST_DDGI_APPLY_DOWNSAMPLE_FACTOR;
+    constexpr UINT ApplyGroupSize = SIGNAL_LOST_DDGI_APPLY_GROUP_SIZE;
 }
 
 namespace Effect

@@ -8,6 +8,7 @@
 
 #include "Renderer.h"
 #include "utility.h"
+#include "shader/computeDispatchConfig.hlsli"
 
 #include <algorithm>
 #include <cmath>
@@ -20,9 +21,9 @@ namespace
     constexpr UINT OcclusionInputCount = 2;
     // 環境遮蔽をピクセルシェーダーへ渡すテクスチャの番号
     constexpr UINT OcclusionSlot = 15;
-    // 環境遮蔽とぼかしの両 Compute Shader の画素変換と numthreads に揃える。
-    constexpr int OcclusionDownsampleFactor = 2;
-    constexpr UINT OcclusionThreadGroupSize = 8;
+    // 遮蔽とぼかしで同じ縮小画像を扱うため、画素変換とスレッド数を共有する。
+    constexpr int OcclusionDownsampleFactor = SIGNAL_LOST_OCCLUSION_DOWNSAMPLE_FACTOR;
+    constexpr UINT OcclusionThreadGroupSize = SIGNAL_LOST_OCCLUSION_GROUP_SIZE;
     // 調べる半球の半径（ワールドの長さ。約30cm）、暗くする強さ、自分の面で暗くならないための深さのずれ、計算する一番遠い距離
     constexpr float OcclusionRadius = 6.0f;
     constexpr float OcclusionIntensity = 1.35f;

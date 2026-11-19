@@ -10,6 +10,7 @@
 #include "Application.h"
 #include "utility.h"
 #include "CaptureMode.h"
+#include "shader/computeDispatchConfig.hlsli"
 
 #include <algorithm>
 #include <cmath>
@@ -82,8 +83,8 @@ namespace
 
     // --- ブルームのコンピュートシェーダーの1グループの大きさ（シェーダーの numthreads と同じ）。
     // 明るい部分の抽出と縮小は8x8画素、横と縦のぼかしは1行（1列）の128画素
-    constexpr UINT BloomTileGroupSize = 8;
-    constexpr UINT BloomBlurGroupSize = 128;
+    constexpr UINT BloomTileGroupSize = SIGNAL_LOST_BLOOM_TILE_GROUP_SIZE;
+    constexpr UINT BloomBlurGroupSize = SIGNAL_LOST_BLOOM_BLUR_GROUP_SIZE;
 
     // 画素の数を、1グループの大きさで割って切り上げた、グループの数
     constexpr UINT GroupCount(UINT pixels, UINT groupSize)
@@ -155,12 +156,13 @@ namespace Effect
         }
 
         // 広くにじむ段は、1つ上の段の縦横半分（1/8・1/16・1/32）。小さくなりすぎないよう1画素で止める
+        constexpr int downsampleFactor = SIGNAL_LOST_BLOOM_WIDE_DOWNSAMPLE_FACTOR;
         int levelWidth = bloomWidth;
         int levelHeight = bloomHeight;
         for (unsigned int level = 0; level < WideBloomLevelCount; ++level)
         {
-            levelWidth = (std::max)(1, (levelWidth + 1) / 2);
-            levelHeight = (std::max)(1, (levelHeight + 1) / 2);
+            levelWidth = (std::max)(1, (levelWidth + downsampleFactor - 1) / downsampleFactor);
+            levelHeight = (std::max)(1, (levelHeight + downsampleFactor - 1) / downsampleFactor);
             if (!m_WideBloomDownsampled[level].Init(levelWidth, levelHeight, bloomFormat, true) ||
                 !m_WideBloomHorizontal[level].Init(levelWidth, levelHeight, bloomFormat, true) ||
                 !m_WideBloomBlurred[level].Init(levelWidth, levelHeight, bloomFormat, true))

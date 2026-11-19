@@ -635,6 +635,9 @@
     <ClInclude Include="PostProcess.h">
       <Filter>ヘッダー ファイル\Rendering\Effects</Filter>
     </ClInclude>
+    <ClInclude Include="CubeMapGeometry.h">
+      <Filter>ヘッダー ファイル\Rendering\Effects</Filter>
+    </ClInclude>
     <ClInclude Include="ReflectionProbe.h">
       <Filter>ヘッダー ファイル\Rendering\Effects</Filter>
     </ClInclude>
@@ -963,6 +966,9 @@
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
     <ClInclude Include="shader\horrorMist.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\computeDispatchConfig.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
     <ClInclude Include="shader\tiledLightingConfig.hlsli">

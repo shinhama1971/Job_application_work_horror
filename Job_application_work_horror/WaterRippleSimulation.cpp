@@ -35,8 +35,7 @@ namespace
     static_assert(sizeof(RippleParams) == 48 + 16 * WaterRippleSimulation::MaxImpulses + 16 + 16 * WaterRippleSimulation::MaxObstacles,
         "RippleParams must match HLSL layout");
 
-    // 1スレッドグループのマスの数（シェーダーのGROUP_SIZEと同じ）
-    constexpr int GroupSize = 16;
+    constexpr int GroupSize = SIGNAL_LOST_RIPPLE_GROUP_SIZE;
     // (波の速さ × 1歩の秒数 ÷ マス目の長さ)²。0.5を超えると計算が発散するので、余裕を持たせている。
     // マス目0.75、1秒60歩なので、波の速さは約13.5（静かな水面に広がる、ゆっくりした輪にしている。前の0.35では速すぎた）
     constexpr float WaveSpeedSquared = 0.09f;

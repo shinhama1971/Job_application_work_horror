@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include "CubeMapGeometry.h"
+
 #include <SimpleMath.h>
 #include <array>
 #include <d3d11.h>
@@ -38,7 +40,7 @@ namespace Effect
 
     private:
         // キューブマップの面の数
-        static constexpr int FaceCount = 6;
+        static constexpr int FaceCount = CubeMapGeometry::FaceCount;
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_Texture;
         std::array<Microsoft::WRL::ComPtr<ID3D11RenderTargetView>, FaceCount> m_FaceViews;
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_CubeView;

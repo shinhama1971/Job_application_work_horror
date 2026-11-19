@@ -1,6 +1,7 @@
 // 光の筋だけを半解像度で積分する。wには奥行きを持ち、拡大時の光漏れを防ぐ。
 #include "fastNoise.hlsli"
 #include "lightShaftSegment.hlsli"
+#include "computeDispatchConfig.hlsli"
 struct ENVIRONMENT_POINT_LIGHT { float4 PositionRange; float4 ColorIntensity; };
 cbuffer ShaftParameters : register(b0) {
  matrix InverseViewProjection; float4 EyeTime; float4 Viewport; uint LightCount; float3 Padding;
@@ -28,7 +29,6 @@ static const float SHAFT_FIGURE_SHADOW_TEST_RADIUS = 28.0f;
 #define SHAFT_FIGURE_MIN_DOWNWARD 0.001f
 // 調べる点を区間の各部分の真ん中に置く割合と、スレッドの組の大きさ
 #define SHAFT_SAMPLE_CENTER 0.5f
-#define SHAFT_THREAD_GROUP_SIZE 8
 
 float3 GetLightShafts(float3 worldPosition, uint lightCount)
 {
@@ -114,7 +114,7 @@ float3 GetLightShafts(float3 worldPosition, uint lightCount)
 }
 
 
-[numthreads(SHAFT_THREAD_GROUP_SIZE, SHAFT_THREAD_GROUP_SIZE, 1)]
+[numthreads(SIGNAL_LOST_SHAFT_GROUP_SIZE, SIGNAL_LOST_SHAFT_GROUP_SIZE, 1)]
 void main(uint3 id : SV_DispatchThreadID) {
  uint2 size = uint2(ceil(Viewport.xy * LIGHT_SHAFT_RESOLUTION_SCALE));
  if(any(id.xy >= size)) return;

@@ -2,6 +2,8 @@
 // シェーダーの役割: 描いた画面から、一定の明るさ以上の画素だけを取り出している（縦横1/4に縮めながら）。
 // ============================================================================
 
+#include "computeDispatchConfig.hlsli"
+
 // 入力の画面（t0）と、書き込む先（u0。縦横1/4の大きさ）
 Texture2D<float4> InputTexture : register(t0);
 RWTexture2D<float4> OutputTexture : register(u0);
@@ -16,11 +18,10 @@ static const float BLOOM_MAX_LUMINANCE = 2.0f;
 // 小さい光源の輪郭を残すため、縮小する範囲の中心を四隅より重く見る。
 static const float BLOOM_EXTRACT_CENTER_WEIGHT = 0.40f;
 static const float BLOOM_EXTRACT_CORNER_WEIGHT = 0.15f;
-// スレッドの組の大きさと、輝度の重み
-#define BLOOM_EXTRACT_GROUP_SIZE 8
+// 輝度の重み
 #define BLOOM_LUMINANCE_WEIGHTS float3(0.2126f, 0.7152f, 0.0722f)
 
-[numthreads(BLOOM_EXTRACT_GROUP_SIZE, BLOOM_EXTRACT_GROUP_SIZE, 1)]
+[numthreads(SIGNAL_LOST_BLOOM_TILE_GROUP_SIZE, SIGNAL_LOST_BLOOM_TILE_GROUP_SIZE, 1)]
 void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 {
     uint outputWidth;

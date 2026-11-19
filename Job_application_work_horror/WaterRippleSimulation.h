@@ -14,6 +14,7 @@
 
 #include "ComputeShader.h"
 #include "RenderTexture.h"
+#include "shader/computeDispatchConfig.hlsli"
 
 #include <SimpleMath.h>
 #include <d3d11.h>
@@ -26,9 +27,9 @@ public:
     // 普段のマス目の数と範囲の一辺の長さ（1面・2面）、1回に足せるおもりの数
     static constexpr int DefaultResolution = 256;
     static constexpr float DefaultWorldSize = 192.0f;
-    static constexpr int MaxImpulses = 16;
+    static constexpr int MaxImpulses = SIGNAL_LOST_RIPPLE_MAX_IMPULSES;
     // 波を跳ね返す物（床に立っている柱・棚の脚など）の最大数
-    static constexpr int MaxObstacles = 32;
+    static constexpr int MaxObstacles = SIGNAL_LOST_RIPPLE_MAX_OBSTACLES;
     // 1歩の秒数（1秒に60歩）と、1フレームに進める歩数の上限（重いフレームで歩数が増えすぎないように）
     static constexpr float StepSeconds = 1.0f / 60.0f;
     static constexpr int MaxStepsPerFrame = 3;

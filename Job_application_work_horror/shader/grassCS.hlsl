@@ -8,8 +8,7 @@
 // ============================================================================
 
 #include "fastNoise.hlsli"
-
-#define GRASS_GROUP_SIZE 256
+#include "computeDispatchConfig.hlsli"
 
 // ForestGrass.h の Blade と同じ並び（48バイト）
 struct GrassBlade
@@ -125,7 +124,7 @@ float3 GetTargetTip(GrassBlade blade, float flatten, float flattenAngle)
     return normalize(target) * blade.Height;
 }
 
-[numthreads(GRASS_GROUP_SIZE, 1, 1)]
+[numthreads(SIGNAL_LOST_GRASS_GROUP_SIZE, 1, 1)]
 void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 {
     const uint index = dispatchThreadId.x;

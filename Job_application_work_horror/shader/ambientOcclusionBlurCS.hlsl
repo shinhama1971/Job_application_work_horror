@@ -4,6 +4,8 @@
 // 環境遮蔽は描く範囲の縦横半分の解像度で持っているので、深さは対応する画素（2倍の位置）から読んでいる。
 // ============================================================================
 
+#include "computeDispatchConfig.hlsli"
+
 cbuffer AmbientOcclusionBuffer : register(b0)
 {
     float4x4 Projection;
@@ -23,14 +25,10 @@ Texture2D<float> SceneDepth : register(t0);
 Texture2D<float2> RawOcclusion : register(t1);
 RWTexture2D<float2> OcclusionOutput : register(u0);
 
-// AmbientOcclusion.cpp の OcclusionDownsampleFactor / OcclusionThreadGroupSize と揃える。
-#define OCCLUSION_DOWNSAMPLE_FACTOR 2
-#define OCCLUSION_THREAD_GROUP_SIZE 8
-
 // 半分の解像度の画素に対応する所の深さ（0〜1）を、カメラからの前向きの距離へ戻している
 float LinearDepthAt(int2 occlusionPixel)
 {
-    const int2 pixel = min(occlusionPixel * OCCLUSION_DOWNSAMPLE_FACTOR, int2(ViewportSize) - 1);
+    const int2 pixel = min(occlusionPixel * SIGNAL_LOST_OCCLUSION_DOWNSAMPLE_FACTOR, int2(ViewportSize) - 1);
     const float depth = SceneDepth.Load(int3(pixel + int2(ViewportOffset), 0));
     const float4 position = mul(float4(0.0f, 0.0f, depth, 1.0f), InverseProjection);
     return position.z / position.w;
@@ -44,7 +42,7 @@ static const float OCCLUSION_BLUR_MIN_WEIGHT_SUM = 0.0001f;
 static const int OCCLUSION_BLUR_WINDOW_BEGIN = -2;
 static const int OCCLUSION_BLUR_WINDOW_END = 2;
 
-[numthreads(OCCLUSION_THREAD_GROUP_SIZE, OCCLUSION_THREAD_GROUP_SIZE, 1)]
+[numthreads(SIGNAL_LOST_OCCLUSION_GROUP_SIZE, SIGNAL_LOST_OCCLUSION_GROUP_SIZE, 1)]
 void main(uint3 id : SV_DispatchThreadID)
 {
     const int2 pixel = int2(id.xy);

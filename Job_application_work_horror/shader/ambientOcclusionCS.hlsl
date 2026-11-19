@@ -6,6 +6,8 @@
 //           （回した模様は ambientOcclusionBlurCS で深度を見ながらぼかして消している）
 // ============================================================================
 
+#include "computeDispatchConfig.hlsli"
+
 // AmbientOcclusion.cpp の Parameters と同じ並び（b0）
 cbuffer AmbientOcclusionBuffer : register(b0)
 {
@@ -196,11 +198,7 @@ float ComputeContactShadow(float3 center, float3 normal, int2 outputPixel)
     return 1.0f;
 }
 
-// AmbientOcclusion.cpp の OcclusionDownsampleFactor / OcclusionThreadGroupSize と揃える。
-#define OCCLUSION_DOWNSAMPLE_FACTOR 2
-#define OCCLUSION_THREAD_GROUP_SIZE 8
-
-[numthreads(OCCLUSION_THREAD_GROUP_SIZE, OCCLUSION_THREAD_GROUP_SIZE, 1)]
+[numthreads(SIGNAL_LOST_OCCLUSION_GROUP_SIZE, SIGNAL_LOST_OCCLUSION_GROUP_SIZE, 1)]
 void main(uint3 id : SV_DispatchThreadID)
 {
     // 半分の解像度の1画素が、描く範囲の2x2画素の左上を受け持っている
@@ -209,7 +207,7 @@ void main(uint3 id : SV_DispatchThreadID)
     {
         return;
     }
-    const int2 pixel = min(outputPixel * OCCLUSION_DOWNSAMPLE_FACTOR, int2(ViewportSize) - 1);
+    const int2 pixel = min(outputPixel * SIGNAL_LOST_OCCLUSION_DOWNSAMPLE_FACTOR, int2(ViewportSize) - 1);
     const float depth = SceneDepth.Load(int3(pixel + int2(ViewportOffset), 0));
     const float3 center = ViewPositionAt(pixel);
     // 何も描いていない所と、遠くて霧に沈む所は、遮る物なしにしている

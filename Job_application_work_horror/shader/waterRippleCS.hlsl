@@ -11,11 +11,7 @@
 
 #include "fastNoise.hlsli"
 #include "puddleMask.hlsli"
-
-// 1スレッドグループのマスの数（16x16）
-#define GROUP_SIZE 16
-#define MAX_IMPULSES 16
-#define MAX_OBSTACLES 32
+#include "computeDispatchConfig.hlsli"
 
 // WaterRippleSimulation.cppのRippleParamsと同じ並び（b0）
 cbuffer WaterRippleBuffer : register(b0)
@@ -27,10 +23,10 @@ cbuffer WaterRippleBuffer : register(b0)
     float Damping;              // 1歩ごとに高さに掛ける値（1より少し小さい）
     int ImpulseCount;           // 今回足すおもりの数
     float4 FloodRect;           // 床一面が水に浸かった範囲（xy = 最小、zw = 最大。範囲がないときは最小が最大より大きい）
-    float4 Impulses[MAX_IMPULSES];  // おもり（xy = x・z、z = 半径、w = 強さ。負なら押し下げる）
+    float4 Impulses[SIGNAL_LOST_RIPPLE_MAX_IMPULSES];  // おもり（xy = x・z、z = 半径、w = 強さ。負なら押し下げる）
     int ObstacleCount;          // 波を跳ね返す物の数
     float3 ObstaclePadding;
-    float4 Obstacles[MAX_OBSTACLES];    // 床に立った物を上から見た長方形（xy = 中心のx・z、zw = 半分の幅と奥行き）
+    float4 Obstacles[SIGNAL_LOST_RIPPLE_MAX_OBSTACLES];    // 床に立った物を上から見た長方形（xy = 中心のx・z、zw = 半分の幅と奥行き）
 };
 
 Texture2D<float2> PreviousState : register(t0);     // 1歩前の（今の高さ, 1つ前の高さ）
@@ -62,7 +58,7 @@ static const float RIPPLE_BOUNDARY_FADE_CELLS = 8.0f;
 // 複数の足音が重なっても、高さを安定する範囲へ収める。
 static const float RIPPLE_MAX_HEIGHT = 4.0f;
 
-[numthreads(GROUP_SIZE, GROUP_SIZE, 1)]
+[numthreads(SIGNAL_LOST_RIPPLE_GROUP_SIZE, SIGNAL_LOST_RIPPLE_GROUP_SIZE, 1)]
 void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 {
     const int2 texel = int2(dispatchThreadId.xy);

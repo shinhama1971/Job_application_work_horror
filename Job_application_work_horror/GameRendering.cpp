@@ -5,6 +5,7 @@
 
 #include "Game.h"
 #include "AmbientOcclusion.h"
+#include "CubeMapGeometry.h"
 #include "DDGIVolume.h"
 #include "FigureVolumes.h"
 #include "GpuTimer.h"
@@ -42,9 +43,6 @@ namespace
     constexpr unsigned int ShadowIntervalStandard = 2u;
     constexpr unsigned int ShadowIntervalLow = 3u;
     constexpr unsigned int LowQualityEnvironmentInterval = 4u;
-    // キューブマップの面の数
-    constexpr int CubeFaceCount = 6;
-    static_assert(CubeFaceCount == Effect::ReflectionProbe::FaceCount);
     // 描画対象の選別に使う基準距離。影と反射は別々に調整する。
     constexpr float ShadowCasterRange = 292.0f;
     constexpr float ReflectionObjectRange = 230.0f;
@@ -427,7 +425,7 @@ namespace Core
         const float lightRange = shadowBulb->GetLightRange();
         m_ShadowMap->SetPointShadow(lightPosition, lightRange, true);
         m_ShadowMap->SetShaderOverride(&m_PointShadowMap->GetShader());
-        for (int face = 0; face < CubeFaceCount; ++face)
+        for (int face = 0; face < Effect::CubeMapGeometry::FaceCount; ++face)
         {
             m_PointShadowMap->BeginFace(face, lightPosition);
             for (auto& o : m_ObjectManager.GetAllObjects())
@@ -480,7 +478,7 @@ namespace Core
         }
 
         m_GpuTimer->BeginPass(GpuPass::Reflection, context);
-        const int faceCount = m_ReflectionProbe->HasAllFaces() ? 1 : CubeFaceCount;
+        const int faceCount = m_ReflectionProbe->HasAllFaces() ? 1 : Effect::CubeMapGeometry::FaceCount;
         for (int face = 0; face < faceCount; ++face)
         {
             m_ReflectionProbe->BeginFace(m_Camera, m_Camera.GetPosition());
@@ -522,7 +520,7 @@ namespace Core
                     mainView.Invert());
             // 別の視点から描くので、プレイヤー視点のタイルのリストではなく、全部の光源を順に計算させている
             m_TiledLighting->BindAllLights();
-            const int faceCount = m_EnvironmentProbe->HasAllFaces() ? 1 : CubeFaceCount;
+            const int faceCount = m_EnvironmentProbe->HasAllFaces() ? 1 : Effect::CubeMapGeometry::FaceCount;
             for (int face = 0; face < faceCount; ++face)
             {
                 m_EnvironmentProbe->BeginFace(m_Camera, m_Camera.GetPosition());

@@ -12,6 +12,8 @@
 
 #pragma once
 
+#include "CubeMapGeometry.h"
+
 #include <SimpleMath.h>
 #include <array>
 #include <d3d11.h>
@@ -28,7 +30,7 @@ namespace Effect
         // 縮小画像の段の数（256画素から1画素まで9段）は、シェーダーの PBR_ENVIRONMENT_MIP_COUNT と合わせている
         static constexpr int FaceSize = 256;
         // キューブマップの面の数と、キューブマップを設定する既定のテクスチャの番号（common.hlsl の t7）
-        static constexpr int FaceCount = 6;
+        static constexpr int FaceCount = CubeMapGeometry::FaceCount;
         static constexpr UINT DefaultTextureSlot = 7;
 
         // slot はキューブマップを設定するテクスチャの番号。withMipChain なら、描くたびに縮小画像（ミップ）も作っている

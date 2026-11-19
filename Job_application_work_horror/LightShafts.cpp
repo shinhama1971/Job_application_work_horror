@@ -1,6 +1,7 @@
 #include "LightShafts.h"
 #include "Renderer.h"
 #include "utility.h"
+#include "shader/computeDispatchConfig.hlsli"
 
 #include <algorithm>
 #include <array>
@@ -18,8 +19,7 @@ namespace
     constexpr std::size_t FullResolutionModeBufferSize = 8;
     constexpr UINT MaxShaftLights = 256;
     constexpr UINT ShaftResultSlot = 16;
-    // lightShaftsCS.hlsl の numthreads と同じ値。
-    constexpr UINT ThreadGroupWidth = 8;
+    constexpr UINT ThreadGroupWidth = SIGNAL_LOST_SHAFT_GROUP_SIZE;
     constexpr UINT ResolutionDivisor = 2;
 
     UINT DivideRoundUp(UINT value, UINT divisor)
