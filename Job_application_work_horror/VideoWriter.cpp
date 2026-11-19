@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "VideoWriter.h"
+#include "CapturePixelFormat.h"
 
 #include <limits>
 
@@ -21,10 +22,8 @@ namespace
     constexpr LONGLONG MediaTimeUnitsPerSecond = 10'000'000LL;
     constexpr UINT32 VideoBitrate = 8'000'000;
     // BGRA の1画素のバイト数と、不透明な透明度
-    constexpr int BytesPerPixel = 4;
+    using CapturePixelFormat::BytesPerPixel;
     // BGRAでは、末尾のバイトが透明度。
-    constexpr int BgraAlphaByte = BytesPerPixel - 1;
-    constexpr BYTE OpaqueAlpha = 255;
 }
 
 bool VideoWriter::Open(const std::wstring& path, UINT width, UINT height, UINT fps)
@@ -113,13 +112,7 @@ bool VideoWriter::WriteFrame(const BYTE* rgba, UINT rowPitch)
         const BYTE* sourceRow = rgba + static_cast<size_t>(y) * rowPitch;
         BYTE* destinationRow = destination +
             static_cast<size_t>(m_Height - 1 - y) * m_Width * BytesPerPixel;
-        for (UINT x = 0; x < m_Width; ++x)
-        {
-            destinationRow[x * BytesPerPixel + 0] = sourceRow[x * BytesPerPixel + 2];
-            destinationRow[x * BytesPerPixel + 1] = sourceRow[x * BytesPerPixel + 1];
-            destinationRow[x * BytesPerPixel + 2] = sourceRow[x * BytesPerPixel + 0];
-            destinationRow[x * BytesPerPixel + BgraAlphaByte] = OpaqueAlpha;
-        }
+        CapturePixelFormat::CopyRgbaToOpaqueBgra(sourceRow, destinationRow, m_Width);
     }
     if (FAILED(buffer->Unlock()) || FAILED(buffer->SetCurrentLength(size)))
     {

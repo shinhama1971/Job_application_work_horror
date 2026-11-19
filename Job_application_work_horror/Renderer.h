@@ -5,6 +5,8 @@
 // ============================================================================
 
 #pragma once
+#include "shader/renderingConfig.hlsli"
+#include <limits>
 #include	<d3d11.h>
 #include	<DirectXMath.h>
 #include	<SimpleMath.h>
@@ -95,18 +97,29 @@ static_assert(sizeof(DEBUG_VIEW_BUFFER) == 32, "Debug view buffer must be 32 byt
 // デバッグ表示の番号（DEBUG_VIEW_BUFFER::Mode。shader/common.hlsl の DEBUG_VIEW_* と DebugUI の並びと同じ）
 namespace ShaderDebugView
 {
-    constexpr int Final = 0;
-    constexpr int Fullbright = 8;
-    constexpr int AmbientOcclusion = 10;
-    constexpr int FullbrightReflection = 11;
-    constexpr int GrassLod = 12;
+    constexpr int Final = SIGNAL_LOST_DEBUG_VIEW_FINAL;
+    constexpr int Normal = SIGNAL_LOST_DEBUG_VIEW_NORMAL;
+    constexpr int FlashlightShadow = SIGNAL_LOST_DEBUG_VIEW_FLASHLIGHT_SHADOW;
+    constexpr int Lighting = SIGNAL_LOST_DEBUG_VIEW_LIGHTING;
+    constexpr int Puddle = SIGNAL_LOST_DEBUG_VIEW_PUDDLE;
+    constexpr int Reflection = SIGNAL_LOST_DEBUG_VIEW_REFLECTION;
+    constexpr int WallDamp = SIGNAL_LOST_DEBUG_VIEW_WALL_DAMP;
+    constexpr int LightTiles = SIGNAL_LOST_DEBUG_VIEW_LIGHT_TILES;
+    constexpr int Fullbright = SIGNAL_LOST_DEBUG_VIEW_FULLBRIGHT;
+    constexpr int PbrMaterial = SIGNAL_LOST_DEBUG_VIEW_PBR_MATERIAL;
+    constexpr int AmbientOcclusion = SIGNAL_LOST_DEBUG_VIEW_AMBIENT_OCCLUSION;
+    constexpr int FullbrightReflection = SIGNAL_LOST_DEBUG_VIEW_FULLBRIGHT_REFLECTION;
+    constexpr int GrassLod = SIGNAL_LOST_DEBUG_VIEW_GRASS_LOD;
+    constexpr int Count = GrassLod + 1;
 }
 
 // 部屋の角の暗がり（shader/roomOcclusion.hlsli の RoomOcclusionBuffer、b11）と同じ並びにしている。
 struct ROOM_OCCLUSION_BUFFER
 {
     // 壁の数の上限
-    static constexpr unsigned int MaxBoxes = 32;
+    static constexpr unsigned int MaxBoxes = SIGNAL_LOST_MAX_ROOM_OCCLUSION_BOXES;
+    // タイル照明では壁の有無を1つのuintに詰める。
+    static_assert(MaxBoxes <= std::numeric_limits<unsigned int>::digits);
     // 壁を上から見た長方形。x,y = 中心のx・z、z,w = 幅と奥行きの半分。
     DirectX::SimpleMath::Vector4 Boxes[MaxBoxes];
     unsigned int BoxCount;  // 0なら暗がりを付けない
@@ -138,7 +151,7 @@ struct WATER_CAUSTICS_BUFFER
     DirectX::SimpleMath::Vector4 Reflection;
     // 2面の「血の手形」の異変で壁に浮かべる手形（x = 壁の表面のx、y = 高さ、z = 奥行き、w = 見え方0〜1。0なら描かない）
     // shader/waterCausticsLayout.hlsli の WATER_CAUSTICS_MAX_HANDPRINTS と同じ。
-    static constexpr int MaxHandprints = 4;
+    static constexpr int MaxHandprints = SIGNAL_LOST_MAX_WALL_HANDPRINTS;
     DirectX::SimpleMath::Vector4 Handprints[MaxHandprints];
     // 水面にだけ映す人影（xyz = 足もとの位置、w = 見え方0〜1。0なら描かない。負なら天井に逆さまに張り付いた人影）
     DirectX::SimpleMath::Vector4 PuddleFigure;

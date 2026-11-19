@@ -6,9 +6,10 @@
 // ============================================================================
 #ifndef ROOM_OCCLUSION_INCLUDED
 #define ROOM_OCCLUSION_INCLUDED
+#include "renderingConfig.hlsli"
 
 // 壁の数の上限（Renderer.hのROOM_OCCLUSION_BUFFERと同じ）
-static const uint MaxOcclusionBoxes = 32;
+static const uint MaxOcclusionBoxes = SIGNAL_LOST_MAX_ROOM_OCCLUSION_BOXES;
 
 cbuffer RoomOcclusionBuffer : register(b11)
 {
@@ -71,7 +72,7 @@ float ComputeRoomOcclusion(float3 worldPosition, float3 worldNormal, float neare
 // 点光源が壁を抜けて照らさないための判定に使う値。
 // 光源がこの幅より深く壁の箱の中にあるときだけ、その壁を数えない（TiledLighting.cpp の LightMountMargin と同じ値）。
 // 壁に付けたランプの光源は壁の面から少し外にあるので、付いている壁も数える（数えないと、ランプが壁の裏の部屋まで照らした）
-static const float ROOM_LIGHT_MOUNT_MARGIN = 0.0f;
+static const float ROOM_LIGHT_MOUNT_MARGIN = SIGNAL_LOST_ROOM_LIGHT_MOUNT_MARGIN;
 // 自分の乗っている壁を「間の壁」と見ないよう、線分の両端から外す長さ
 static const float ROOM_LIGHT_SURFACE_OFFSET = 0.1f;
 // 0で割らないための小さな値

@@ -647,6 +647,12 @@
     <ClInclude Include="Stage1CeilingGeometry.h">
       <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
     </ClInclude>
+    <ClInclude Include="Stage1FuseProgress.h">
+      <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
+    </ClInclude>
+    <ClInclude Include="CapturePixelFormat.h">
+      <Filter>ヘッダー ファイル\Core</Filter>
+    </ClInclude>
     <ClInclude Include="CubeMapGeometry.h">
       <Filter>ヘッダー ファイル\Rendering\Effects</Filter>
     </ClInclude>

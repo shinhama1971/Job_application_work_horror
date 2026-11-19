@@ -125,8 +125,10 @@ namespace Effect
 
         // 光線の結果（光線の番号 x プローブの番号）、放射照度と距離の八面体マップ（前と今を交互に使う2枚ずつ）、画面の間接光
         GpuTexture m_RayResults;
-        std::array<GpuTexture, 2> m_IrradianceAtlas;
-        std::array<GpuTexture, 2> m_DistanceAtlas;
+        // 更新時は前の結果を読みながら別の画像へ書き込む。
+        static constexpr std::size_t AtlasBufferCount = 2;
+        std::array<GpuTexture, AtlasBufferCount> m_IrradianceAtlas;
+        std::array<GpuTexture, AtlasBufferCount> m_DistanceAtlas;
         GpuTexture m_IndirectLight;
         // 今の（読む）八面体マップの番号（0か1）
         int m_Current = 0;

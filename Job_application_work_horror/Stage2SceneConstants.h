@@ -46,7 +46,10 @@ inline constexpr float Stage2FalseDoorRightZ = -88.0f;
 
 // --- 周回の進行
 // 廊下を繰り返す回数。この回数まで扉を抜けると廊下の始めへ戻り、達したら信号盤のパズルと最後の停電へ進む
+inline constexpr int Stage2SecondLoop = 2;
 inline constexpr int Stage2FinalLoopCount = 3;
+// 信号盤の再挑戦では2回の失敗まで追跡を緩める。
+inline constexpr int Stage2SignalStalkerMaxAssist = 2;
 // 出口の扉（中心 z=140）を抜けたとみなす z。周回を進める判定と、最後のループで階段を上り始める判定に使っている
 inline constexpr float Stage2LoopDoorPassZ = 146.0f;
 // 信号盤が直った後、廊下の中央（この z）より奥へ来たら、最後の停電を始めている

@@ -5,6 +5,7 @@
 // ============================================================================
 
 #pragma once
+#include "Stage2SceneConstants.h"
 
 #include <algorithm>
 
@@ -60,7 +61,7 @@ public:
         {
             return FirstLoopPieceCount;
         }
-        if (loopCount == 2)
+        if (loopCount == Stage2SecondLoop)
         {
             return SecondLoopPieceCount;
         }

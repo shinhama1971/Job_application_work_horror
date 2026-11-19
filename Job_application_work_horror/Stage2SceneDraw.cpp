@@ -197,8 +197,10 @@ void Stage2Scene::Draw(Camera* camera)
             "何かが移動している",
             "信号復旧を開始する"
         };
+        static_assert(std::size(cycleTitles) == Stage2FinalLoopCount);
+        static_assert(std::size(cycleSubtitles) == std::size(cycleTitles));
         const size_t cycleIndex = static_cast<size_t>((std::clamp)(
-            m_LoopCount - 1, 0, 2));
+            m_LoopCount - 1, 0, Stage2FinalLoopCount - 1));
         m_Hud.DrawChapterCard(
             cycleTitles[cycleIndex],
             cycleSubtitles[cycleIndex],

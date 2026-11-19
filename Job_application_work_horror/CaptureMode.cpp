@@ -5,6 +5,7 @@
 // ============================================================================
 
 #include "CaptureMode.h"
+#include "CapturePixelFormat.h"
 #include "MathUtility.h"
 #include "GIUpdateSettings.h"
 #include "PostProcess.h"
@@ -59,10 +60,8 @@ namespace
     constexpr double SlowFramePercentile = 0.99;
     constexpr double MillisecondsPerSecond = 1000.0;
     // 画面写真の BGRA の1画素のバイト数と、不透明な透明度
-    constexpr int BytesPerPixel = 4;
+    using CapturePixelFormat::BytesPerPixel;
     // BGRAでは、末尾のバイトが透明度。
-    constexpr int BgraAlphaByte = BytesPerPixel - 1;
-    constexpr BYTE OpaqueAlpha = 255;
 
     // ------------------------------------------------------------------------
     // 道順（キーフレーム）。時刻と時刻の間は、位置と向きを直線で補間している。
@@ -324,13 +323,7 @@ namespace
         {
             const BYTE* source = rgba + static_cast<size_t>(y) * rowPitch;
             BYTE* destination = bgra.data() + static_cast<size_t>(y) * width * BytesPerPixel;
-            for (UINT x = 0; x < width; ++x)
-            {
-                destination[x * BytesPerPixel + 0] = source[x * BytesPerPixel + 2];
-                destination[x * BytesPerPixel + 1] = source[x * BytesPerPixel + 1];
-                destination[x * BytesPerPixel + 2] = source[x * BytesPerPixel + 0];
-                destination[x * BytesPerPixel + BgraAlphaByte] = OpaqueAlpha;   // 透明度は使わないので不透明にしている
-            }
+            CapturePixelFormat::CopyRgbaToOpaqueBgra(source, destination, width);
         }
         if (FAILED(frame->WritePixels(height, width * BytesPerPixel, static_cast<UINT>(bgra.size()), bgra.data())) ||
             FAILED(frame->Commit()) ||
@@ -650,6 +643,8 @@ namespace
     // 各段階のフレーム数。切り替えた直後はGPU時間の結果が数フレーム遅れて届くため、最初の45フレームは捨てている。
     constexpr int BenchmarkWarmupFrames = 45;
     constexpr int BenchmarkMeasureFrames = 180;
+    // 同じ地点を機能OFFとONの2通りで測る。
+    constexpr int BenchmarkPhaseCount = 2;
     // --figures のとき：水たまりの人影を正面のこの距離に、見えない影を正面のこの距離の少し右に置く（足もとは床の高さ）
     constexpr float BenchmarkPuddleFigureAhead = 26.0f;
     constexpr float BenchmarkUnseenFigureAhead = 34.0f;
@@ -935,7 +930,7 @@ namespace
         }
 
         // OFFとONの両方を測り終えたら、次の地点へ進んでいる
-        if (++g_BenchmarkFrame >= phaseLength * 2)
+        if (++g_BenchmarkFrame >= phaseLength * BenchmarkPhaseCount)
         {
             g_BenchmarkFrame = 0;
             ++g_BenchmarkSpot;

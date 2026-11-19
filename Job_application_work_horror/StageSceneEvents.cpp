@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "StageScene.h"
+#include "Stage1FuseProgress.h"
 #include "ShadowFigureGeometry.h"
 #include "MathUtility.h"
 #include "Application.h"
@@ -94,6 +95,8 @@ namespace
     constexpr float StartDoorShadowBehind = 70.0f;
 
     // --- ヒューズの後に出る影：2本目は中央の廊下（z=-22）、3本目は出口の前（z=118）に出し、見せる秒数を変える
+    // 見張りは2本目から出す。出現位置と通知も取得順で切り替える。
+    constexpr int FirstFuseWatcherPickup = 2;
     constexpr float FuseWatcherSecondZ = -22.0f;
     constexpr float FuseWatcherThirdZ = 118.0f;
     constexpr float FuseWatcherSecondSeconds = 5.8f;
@@ -700,7 +703,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
             middleLight->SetEmergencyLight(false, MiddleLoop1EmergencyOffset);
         }
     }
-    else if (loopPhase == 2)
+    else if (loopPhase == Stage1FuseProgress::LoopsToUnlockLastFuse)
     {
         // 2周目：3本目のヒューズは西棟の奥にある。右の倉庫に西棟の鍵を出し、鍵で西棟の扉を開けさせている。
         // ヒューズは、西棟の排水バルブで水を抜いたときにStage1WestWingが出している。
@@ -992,7 +995,7 @@ void StageScene::EndFuseScare()
 
 void StageScene::StartFuseWatcher(int fuseCount)
 {
-    if (fuseCount < 2 || Core::Game::GetInstance()->IsPowerRestored())
+    if (fuseCount < FirstFuseWatcherPickup || Core::Game::GetInstance()->IsPowerRestored())
     {
         return;
     }
@@ -1008,9 +1011,9 @@ void StageScene::StartFuseWatcher(int fuseCount)
     watcher->SetPosition(
         0.0f,
         FootY,
-        fuseCount == 2 ? FuseWatcherSecondZ : FuseWatcherThirdZ);
+        fuseCount == FirstFuseWatcherPickup ? FuseWatcherSecondZ : FuseWatcherThirdZ);
     watcher->SetActive(true);
-    watcher->EnableGazeScare(fuseCount == 2 ? FuseWatcherSecondSeconds : FuseWatcherThirdSeconds);
+    watcher->EnableGazeScare(fuseCount == FirstFuseWatcherPickup ? FuseWatcherSecondSeconds : FuseWatcherThirdSeconds);
     watcher->SetOnObserved(
         [this]()
         {
@@ -1037,9 +1040,9 @@ void StageScene::StartFuseWatcher(int fuseCount)
         });
 
     m_FuseWatcherState = FuseWatcherState::Watching;
-    m_FuseWatcherNoticeTimer = fuseCount == 2 ? FuseWatcherSecondSeconds : FuseWatcherThirdSeconds;
+    m_FuseWatcherNoticeTimer = fuseCount == FirstFuseWatcherPickup ? FuseWatcherSecondSeconds : FuseWatcherThirdSeconds;
     EventFeedback::HorrorPulse(*game->GetPostProcess(),
-        fuseCount == 2 ? FuseWatcherSecondPulse : FuseWatcherThirdPulse);
+        fuseCount == FirstFuseWatcherPickup ? FuseWatcherSecondPulse : FuseWatcherThirdPulse);
 }
 
 // 電力が戻る演出：戻った瞬間に照明の演出と周回の印を消し、0.38・1.15・2.25秒に画面の光と振動を出している

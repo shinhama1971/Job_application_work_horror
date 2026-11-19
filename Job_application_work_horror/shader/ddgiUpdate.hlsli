@@ -30,6 +30,9 @@ RWTexture2D<float4> OutputAtlas : register(u0);
 
 // 区画の中の画素の新しい値（縁を書くために、グループで共有している）
 // タイルの外周は4辺と4つの隅に分けて配置する。
+#if SIGNAL_LOST_DDGI_BORDER != 1
+#error DDGI border update requires a single texel border.
+#endif
 #define DDGI_BORDER_SIDE_COUNT 4
 #define DDGI_BORDER_CORNER_COUNT 4
 groupshared float4 g_TileValues[DDGI_TILE_TEXELS * DDGI_TILE_TEXELS];

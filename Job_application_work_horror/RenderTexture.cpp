@@ -104,8 +104,8 @@ namespace Graphics
             Renderer::GetDeviceContext();
 
         // このテクスチャ自身をシェーダーから読んだままだと描画先にできないため、t0・t1の読み取りを外している
-        ID3D11ShaderResourceView* nullSRVs[2] = { nullptr, nullptr };
-        context->PSSetShaderResources(0, 2, nullSRVs);
+        ID3D11ShaderResourceView* nullSRVs[] = { nullptr, nullptr };
+        context->PSSetShaderResources(0, ARRAYSIZE(nullSRVs), nullSRVs);
 
         ID3D11RenderTargetView* rtv = m_RTV.Get();
 

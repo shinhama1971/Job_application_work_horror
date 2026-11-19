@@ -82,7 +82,6 @@ namespace
     constexpr float SignalStalkerBaseSpeed = 13.0f;
     constexpr float SignalStalkerSpeedPerStep = 2.0f;
     constexpr float SignalStalkerSlowdownPerAssist = 1.6f;
-    constexpr int SignalStalkerMaxAssist = 2;
     constexpr float SignalStalkerStopDistance = 30.0f;
     constexpr float SignalStalkerGazeScareSeconds = 24.0f;
     // 近いほど危険度を上げる範囲と、この距離まで来たら信号盤をやり直させる距離
@@ -761,7 +760,7 @@ void Stage2Scene::AdvanceLoop(Player& player)
         }
     }
     // 2周目：入口と奥の照明も故障させ、傷を9本にし、肖像画を赤く変え、見つめると照明の演出が起きる影を出している
-    else if (m_LoopCount == 2)
+    else if (m_LoopCount == Stage2SecondLoop)
     {
         SetFalseDoorState(
             m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::FalseDoor), false);
@@ -1019,7 +1018,7 @@ void Stage2Scene::UpdateSignalPuzzle()
             // 順番どおりなら、危険度を少し上げて、対応する照明を明滅させている
             m_PuzzleFeedback.SetType(PuzzleFeedback::NoFeedback);
             const float retryAssist = static_cast<float>((std::min)(
-                m_PuzzleFeedback.GetMistakeCount(), SignalStalkerMaxAssist));
+                m_PuzzleFeedback.GetMistakeCount(), Stage2SignalStalkerMaxAssist));
             m_NoiseThreatSystem.SetThreat((std::min)(
                 1.0f,
                 m_NoiseThreatSystem.GetThreat() + CorrectThreatRise -
@@ -1080,7 +1079,7 @@ void Stage2Scene::UpdateSignalPuzzle()
                     }
                     backward.Normalize();
                     const float assistLevel = static_cast<float>((std::min)(
-                        m_PuzzleFeedback.GetMistakeCount(), SignalStalkerMaxAssist));
+                        m_PuzzleFeedback.GetMistakeCount(), Stage2SignalStalkerMaxAssist));
                     const float spawnDistance =
                         SignalStalkerBaseDistance - m_SignalPuzzle.GetStep() * SignalStalkerDistancePerStep +
                             assistLevel * SignalStalkerDistancePerAssist;

@@ -376,6 +376,8 @@
     <ClInclude Include="PlayerMovement.h" />
     <ClInclude Include="ShadowFigureGeometry.h" />
     <ClInclude Include="Stage1CeilingGeometry.h" />
+    <ClInclude Include="Stage1FuseProgress.h" />
+    <ClInclude Include="CapturePixelFormat.h" />
     <ClInclude Include="CubeMapGeometry.h" />
     <ClInclude Include="ReflectionProbe.h" />
     <ClInclude Include="ScreenSpaceReflection.h" />

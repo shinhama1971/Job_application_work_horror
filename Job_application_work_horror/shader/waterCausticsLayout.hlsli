@@ -1,8 +1,9 @@
 #ifndef WATER_CAUSTICS_LAYOUT_INCLUDED
 #define WATER_CAUSTICS_LAYOUT_INCLUDED
+#include "renderingConfig.hlsli"
 
 // Renderer.h の WATER_CAUSTICS_BUFFER と同じ配列長にする。光の筋も同じ位置から人影を読む。
-#define WATER_CAUSTICS_MAX_HANDPRINTS 4
+#define WATER_CAUSTICS_MAX_HANDPRINTS SIGNAL_LOST_MAX_WALL_HANDPRINTS
 // 反射用の箱1件につき、中心・半分の寸法・色をfloat4で渡す。
 #define REFLECTION_PROP_STRIDE 3
 

@@ -123,7 +123,7 @@ namespace Effect
         m_ParameterBuffer.Reset();
         m_IndirectLight.Reset();
         m_RayResults.Reset();
-        for (int index = 0; index < 2; ++index)
+        for (std::size_t index = 0; index < AtlasBufferCount; ++index)
         {
             m_IrradianceAtlas[index].Reset();
             m_DistanceAtlas[index].Reset();
@@ -153,7 +153,9 @@ namespace Effect
         const auto countFor = [](float extent)
         {
             const uint32_t count = static_cast<uint32_t>(std::ceil(extent / TargetProbeSpacing)) + 1u;
-            return (std::clamp)(count, 2u, MaxProbesPerAxis);
+            // 補間先があるよう、各軸に最低2つ置く。
+            constexpr uint32_t minProbesPerAxis = 2;
+            return (std::clamp)(count, minProbesPerAxis, MaxProbesPerAxis);
         };
         const Vector2 extent = maximum - minimum;
         const float bottom = room.FloorY + ProbeSurfaceMargin;
@@ -171,7 +173,7 @@ namespace Effect
         const uint32_t irradianceTile = IrradianceTexels + 2 * SIGNAL_LOST_DDGI_BORDER;
         const uint32_t distanceTile = DistanceTexels + 2 * SIGNAL_LOST_DDGI_BORDER;
         bool created = m_RayResults.Create(RaysPerProbe, probeCount, DXGI_FORMAT_R16G16B16A16_FLOAT);
-        for (int index = 0; index < 2 && created; ++index)
+        for (std::size_t index = 0; index < AtlasBufferCount && created; ++index)
         {
             created = m_IrradianceAtlas[index].Create(tilesAcross * irradianceTile, m_ProbeCounts[2] * irradianceTile,
                     DXGI_FORMAT_R16G16B16A16_FLOAT) &&

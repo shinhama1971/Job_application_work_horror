@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "StageScene.h"
+#include "Stage1FuseProgress.h"
 
 namespace
 {
@@ -156,7 +157,8 @@ void StageScene::Draw(Camera* camera)
         {
             guideTarget = m_Objects.secondFuse->GetPosition();
         }
-        else if (fuseCount == 2 && m_CorridorLoopCount >= 2)
+        else if (fuseCount == Stage1FuseProgress::BeforeLastFuse &&
+            m_CorridorLoopCount >= Stage1FuseProgress::LoopsToUnlockLastFuse)
         {
             // 3本目：西棟の鍵をまだ拾っていなくて、暗証番号の扉が開いていれば、その部屋の奥のヒューズを指している
             if (m_WestWing.GetStep() == Stage1WestWing::Step::FindKey && m_KeypadDoor.IsSolved() &&

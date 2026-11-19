@@ -4,6 +4,7 @@
 // ============================================================================
 
 #pragma once
+#include "shader/renderingConfig.hlsli"
 #include <wrl/client.h>
 
 #include "VertexBuffer.h"
@@ -90,10 +91,10 @@ class Ground :public Object
 	// 水たまりの形そのもの（岸の線）は、今までどおり床のシェーダー（puddleMask.hlsli）で決めている
 	enum class WaterLevel
 	{
-		DryFloor = 0, // 床の本体
-		Far = 1,      // 遠い：反射の光線を飛ばさない
-		Middle = 2,   // 中くらい：部屋の形との交差だけ
-		Near = 3,     // 近い：SSRと部屋の形の交差（これまでと同じ）
+		DryFloor = SIGNAL_LOST_WATER_LEVEL_DRY_FLOOR, // 床の本体
+		Far = SIGNAL_LOST_WATER_LEVEL_FAR,      // 遠い：反射の光線を飛ばさない
+		Middle = SIGNAL_LOST_WATER_LEVEL_MIDDLE,   // 中くらい：部屋の形との交差だけ
+		Near = SIGNAL_LOST_WATER_LEVEL_NEAR,     // 近い：SSRと部屋の形の交差（これまでと同じ）
 	};
 	// 水たまりのメッシュ1つ（頂点バッファの中の範囲と、画面の外かどうか・遠さを調べる円）
 	struct WaterSurface

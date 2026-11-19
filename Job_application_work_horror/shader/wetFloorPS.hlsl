@@ -18,7 +18,7 @@ TextureCube g_ReflectionProbe : register(t7);
 // 濡れた足跡の最大数（WetFootprints::MaxCount と同じ）
 #define FOOTPRINT_COUNT SIGNAL_LOST_FOOTPRINT_COUNT
 // 天井の雨漏りの最大数（WaterEffectSystem::MaxLeakCount と同じ）
-#define LEAK_COUNT 8
+#define LEAK_COUNT SIGNAL_LOST_MAX_WATER_LEAKS
 cbuffer WetFloorBuffer : register(b10)
 {
     float WetTime;
@@ -38,9 +38,9 @@ cbuffer WetFloorBuffer : register(b10)
 }
 
 // 水たまりのメッシュの細かさ（Ground::WaterLevel と同じ値）。メッシュ1つの中では一定なので、分岐は画素ごとにばらつかない
-#define WATER_LEVEL_DRY_FLOOR 0
-#define WATER_LEVEL_MIDDLE 2
-#define WATER_LEVEL_NEAR 3
+#define WATER_LEVEL_DRY_FLOOR SIGNAL_LOST_WATER_LEVEL_DRY_FLOOR
+#define WATER_LEVEL_MIDDLE SIGNAL_LOST_WATER_LEVEL_MIDDLE
+#define WATER_LEVEL_NEAR SIGNAL_LOST_WATER_LEVEL_NEAR
 // 水たまりの表示（デバッグ）：メッシュの細かさの色（近い = 緑、中くらい = 黄、遠い = 赤）と、濃さの塗り方（最低＋幅）
 #define DEBUG_PUDDLE_NEAR_COLOR float3(0.25f, 1.0f, 0.30f)
 #define DEBUG_PUDDLE_MIDDLE_COLOR float3(1.0f, 0.85f, 0.20f)

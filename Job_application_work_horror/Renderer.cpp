@@ -432,7 +432,7 @@ HRESULT Renderer::CreateConstantBuffers()
     if (FAILED(hr)) return hr;
     m_pDeviceContext->PSSetConstantBuffers(
         DebugViewBufferSlot, 1, m_pDebugViewBuffer.GetAddressOf());
-    SetDebugViewMode(0);
+    SetDebugViewMode(ShaderDebugView::Final);
 
     // 部屋の角の暗がり。最初は壁がない（暗がりなし）状態にしている。
     bufferDesc.ByteWidth = sizeof(ROOM_OCCLUSION_BUFFER);

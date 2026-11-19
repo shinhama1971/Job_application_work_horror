@@ -132,6 +132,7 @@ StructuredBuffer<uint> g_PointLightWallMasks : register(t19);
 
 // タイルの大きさと、1タイルに入れる光源の上限（TiledLighting.hと同じ値）
 #include "tiledLightingConfig.hlsli"
+#include "renderingConfig.hlsli"
 
 // 天井照明の下向きの配光が広がる範囲。壁・床・手元モデルの境界を揃える。
 static const float FIXTURE_BEAM_DOT_START = 0.04f;
@@ -226,23 +227,23 @@ cbuffer TextureBuffer : register(b5)
 // 1 = 法線、2 = 懐中電灯の影、3 = 照明だけ、4 = 水たまりの濃さとメッシュの細かさ（床）、5 = 反射の画像（床）、
 // 6 = 壁の湿り気（壁）、7 = タイルごとの光源の数。
 // static const int にすると wetFloorPS の FXC の最適化が変わってしまうため、ここは #define にしている
-#define DEBUG_VIEW_NORMAL 1
-#define DEBUG_VIEW_FLASHLIGHT_SHADOW 2
-#define DEBUG_VIEW_LIGHTING 3
-#define DEBUG_VIEW_PUDDLE 4
-#define DEBUG_VIEW_REFLECTION 5
-#define DEBUG_VIEW_WALL_DAMP 6
-#define DEBUG_VIEW_LIGHT_TILES 7
+#define DEBUG_VIEW_NORMAL SIGNAL_LOST_DEBUG_VIEW_NORMAL
+#define DEBUG_VIEW_FLASHLIGHT_SHADOW SIGNAL_LOST_DEBUG_VIEW_FLASHLIGHT_SHADOW
+#define DEBUG_VIEW_LIGHTING SIGNAL_LOST_DEBUG_VIEW_LIGHTING
+#define DEBUG_VIEW_PUDDLE SIGNAL_LOST_DEBUG_VIEW_PUDDLE
+#define DEBUG_VIEW_REFLECTION SIGNAL_LOST_DEBUG_VIEW_REFLECTION
+#define DEBUG_VIEW_WALL_DAMP SIGNAL_LOST_DEBUG_VIEW_WALL_DAMP
+#define DEBUG_VIEW_LIGHT_TILES SIGNAL_LOST_DEBUG_VIEW_LIGHT_TILES
 // 照明だけの表示で、明るすぎないよう掛ける割合
 #define DEBUG_VIEW_LIGHTING_SCALE 0.5f
-static const int DEBUG_VIEW_FULLBRIGHT = 8;
+static const int DEBUG_VIEW_FULLBRIGHT = SIGNAL_LOST_DEBUG_VIEW_FULLBRIGHT;
 // PBRの材質を色で見る表示（赤 = 金属らしさ、緑 = 粗さ、青 = 濡れ具合。壁・扉・小物だけ。床は黒）
-static const int DEBUG_VIEW_PBR_MATERIAL = 9;
+static const int DEBUG_VIEW_PBR_MATERIAL = SIGNAL_LOST_DEBUG_VIEW_PBR_MATERIAL;
 // 画面空間の環境遮蔽（SSAO）だけを白黒で見る表示（白 = 遮る物なし、黒 = 囲まれている）
-static const int DEBUG_VIEW_AMBIENT_OCCLUSION = 10;
+static const int DEBUG_VIEW_AMBIENT_OCCLUSION = SIGNAL_LOST_DEBUG_VIEW_AMBIENT_OCCLUSION;
 // 室内を明るくし、水たまりの反射を残す表示と、森の草の LOD を色分けする表示。
-static const int DEBUG_VIEW_FULLBRIGHT_REFLECTION = 11;
-static const int DEBUG_VIEW_GRASS_LOD = 12;
+static const int DEBUG_VIEW_FULLBRIGHT_REFLECTION = SIGNAL_LOST_DEBUG_VIEW_FULLBRIGHT_REFLECTION;
+static const int DEBUG_VIEW_GRASS_LOD = SIGNAL_LOST_DEBUG_VIEW_GRASS_LOD;
 
 bool IsFullbrightDebugView()
 {

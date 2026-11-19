@@ -74,10 +74,10 @@ private:
 public:
     // 水たまりのマス目（82x82）の表の範囲。床（x・z が -500〜500）を覆う 16x16 マスにしている。
     // wetFloorPS.hlsl の PuddleCellBuffer と同じ値にする。
-    static constexpr int PuddleCellMin = -8;
-    static constexpr int PuddleCellCount = 16;
+    static constexpr int PuddleCellMin = SIGNAL_LOST_PUDDLE_CELL_MIN;
+    static constexpr int PuddleCellCount = SIGNAL_LOST_PUDDLE_CELL_COUNT;
     // マス目の表の x が水たまりの有無（0 か 1）。これより小さければ乾いたマス（puddleMask.hlsli の PUDDLE_CELL_THRESHOLD と同じ）
-    static constexpr float PuddleCellPresentThreshold = 0.5f;
+    static constexpr float PuddleCellPresentThreshold = SIGNAL_LOST_PUDDLE_CELL_PRESENT_THRESHOLD;
     // 水たまりの形（puddleMask.hlsli と同じ値にする）：
     // マス目の一辺、水たまりを置くマスの乱数のしきい値（これ以上なら置く）、中心をマスの中でずらす幅、
     // 楕円の半径（横・縦。基本の値＋乱数で足す幅。マスの一辺を1とした値）、岸の線（楕円の距離）と、岸のゆがみの最大の振れ幅
@@ -130,7 +130,7 @@ public:
         float Radius = 0.0f;         // 今の半径
     };
     // シェーダーへ渡す雨漏りの最大数（wetFloorPS の LEAK_COUNT と同じ）
-    static constexpr int MaxLeakCount = 8;
+    static constexpr int MaxLeakCount = SIGNAL_LOST_MAX_WATER_LEAKS;
 
 private:
     std::vector<Leak> m_Leaks;

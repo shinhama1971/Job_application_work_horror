@@ -180,9 +180,11 @@ private:
         const int baseZ = static_cast<int>(std::floor((position.z - m_MinZ) / m_CellSize));
         int bestCell = -1;
         float bestDistance = (std::numeric_limits<float>::max)();
-        for (int dz = -2; dz <= 2; ++dz)
+        // 無効なマスの周囲で、移動可能なマスを探す半径。
+        constexpr int searchRadiusCells = 2;
+        for (int dz = -searchRadiusCells; dz <= searchRadiusCells; ++dz)
         {
-            for (int dx = -2; dx <= 2; ++dx)
+            for (int dx = -searchRadiusCells; dx <= searchRadiusCells; ++dx)
             {
                 if (!IsWalkableCell(baseX + dx, baseZ + dz))
                 {

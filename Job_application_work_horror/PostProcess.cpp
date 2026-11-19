@@ -710,7 +710,7 @@ namespace Effect
         // 最後に、HDRの画面を曲線で0〜1へ移して、バックバッファへ描いている（自動撮影・計測では --tonemap で曲線を選べる）
         const auto toneMapOverride = Tools::CaptureMode::GetToneMapOverride();
         // デバッグ表示の間は、色分けがずれないよう曲線を掛けない
-        const ToneMapMode toneMapMode = Renderer::GetDebugViewMode() != 0
+        const ToneMapMode toneMapMode = Renderer::GetDebugViewMode() != ShaderDebugView::Final
             ? ToneMapMode::Passthrough
             : toneMapOverride.value_or(m_ToneMapMode);
         Renderer::EndHdrScene();

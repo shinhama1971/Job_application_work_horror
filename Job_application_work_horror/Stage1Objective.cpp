@@ -4,19 +4,21 @@
 // ============================================================================
 
 #include "Stage1Objective.h"
+#include "Stage1FuseProgress.h"
+#include "Stage1WestWing.h"
 
 namespace
 {
     // 3本目のヒューズを探す段階（西棟）の文章。目的・ヒント（35秒・18秒）の3種類がある。
     // 水を抜く段階の目的には、回し終えたバルブの数を付けている。
     // 西棟の段階の数と、水を抜く段階（回し終えたバルブの数を付ける段階）、バルブの数（Stage1WestWing::ValveCount と同じ）
-    constexpr int WestWingStepCount = 4;
-    constexpr int DrainStep = 3;
-    constexpr int WestWingValveCount = 3;
+    constexpr int WestWingStepCount = static_cast<int>(Stage1WestWing::Step::FindFuse);
+    constexpr int DrainStep = static_cast<int>(Stage1WestWing::Step::DrainWater);
+    constexpr int WestWingValveCount = Stage1WestWing::ValveCount;
     // 文章の種類の数（目的・35秒のヒント・18秒のヒント）
-    constexpr int WestWingTextVariants = 3;
+    enum TextVariant { ObjectiveText, LongIdleHint, ShortIdleHint, WestWingTextVariants };
 
-    std::string SelectWestWingText(int westWingStep, int valvesOpened, int variant)
+    std::string SelectWestWingText(int westWingStep, int valvesOpened, TextVariant variant)
     {
         static const char* const Texts[WestWingStepCount][WestWingTextVariants] =
         {
@@ -28,7 +30,7 @@ namespace
         // 段階は1〜4の範囲に収めている
         const int step = westWingStep < 1 ? 1 : (westWingStep > WestWingStepCount ? WestWingStepCount : westWingStep);
         std::string text = Texts[step - 1][variant];
-        if (step == DrainStep && variant == 0)
+        if (step == DrainStep && variant == ObjectiveText)
         {
             text += "  " + std::to_string(valvesOpened) + "/" + std::to_string(WestWingValveCount);
         }
@@ -37,22 +39,22 @@ namespace
 
     // 3本目のヒューズを探す段階の文章。西棟の鍵を拾っていれば西棟の文章、暗証番号の扉が開いていればその部屋、
     // どちらもまだなら、2つの手に入れ方を両方示している（一本道にしないため。StageScene::UpdateThirdFuseRoutes）
-    std::string SelectThirdFuseText(const Stage1ObjectiveInput& in, int variant)
+    std::string SelectThirdFuseText(const Stage1ObjectiveInput& in, TextVariant variant)
     {
-        if (in.westWingStep >= 2)
+        if (in.westWingStep >= static_cast<int>(Stage1WestWing::Step::OpenDoor))
         {
             return SelectWestWingText(in.westWingStep, in.westWingValvesOpened, variant);
         }
-        static const char* const KeypadTexts[3] =
+        static const char* const KeypadTexts[WestWingTextVariants] =
         {
             "暗証番号の扉の先、部屋の一番奥でヒューズを探す", "ヒント 閉じ込められた部屋の奥、記録端末の近く", "ヒント 暗証番号の扉の部屋へ戻る"
         };
-        static const char* const ChoiceTexts[3] =
+        static const char* const ChoiceTexts[WestWingTextVariants] =
         {
             "3本目 西棟の奥か、暗証番号の扉の先", "ヒント 右の倉庫の鍵で西棟へ、または壁の光る数字で扉を開ける", "ヒント 右側の部屋か、壁の数字を照らす"
         };
         // 先に部屋を開けていた人には、空だった箱にヒューズが戻ったことを伝えている（ループを2周した合図）
-        if (in.keypadSolved && in.keypadFuseReturned && variant == 0)
+        if (in.keypadSolved && in.keypadFuseReturned && variant == ObjectiveText)
         {
             return "暗証番号の部屋の箱に、何かが戻っている";
         }
@@ -83,11 +85,11 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
             ? "廊下の突き当たりのドアを開けて進む"
             : "左側の部屋でヒューズを探す";
     }
-    else if (in.fuseCount == 2)
+    else if (in.fuseCount == Stage1FuseProgress::BeforeLastFuse)
     {
-        objectiveText = in.corridorLoopCount < 2
+        objectiveText = in.corridorLoopCount < Stage1FuseProgress::LoopsToUnlockLastFuse
             ? "もう一度、廊下の突き当たりのドアを開ける"
-            : SelectThirdFuseText(in, 0);
+            : SelectThirdFuseText(in, ObjectiveText);
     }
     else
     {
@@ -179,7 +181,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         if (in.fuseWatcherState == FuseWatcherState::Watching)
             objectiveText = "影に懐中電灯を向ける";
         else if (in.fuseCount == 1) objectiveText = "ヒューズを1本入手";
-        else if (in.fuseCount == 2) objectiveText = "ヒューズを2本入手";
+        else if (in.fuseCount == Stage1FuseProgress::BeforeLastFuse) objectiveText = "ヒューズを2本入手";
         else objectiveText = "ヒューズを3本入手";
     }
     else if (in.fuseWatcherNotice)
@@ -219,7 +221,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         {
             objectiveText = "廊下の様子が変わった";
         }
-        else if (in.corridorLoopCount == 2)
+        else if (in.corridorLoopCount == Stage1FuseProgress::LoopsToUnlockLastFuse)
         {
             objectiveText = "そのまま歩き続ける";
         }
@@ -251,13 +253,13 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         {
             objectiveText = "ヒント 左奥の部屋を探す";
         }
-        else if (in.fuseCount == 2 && in.corridorLoopCount < 2)
+        else if (in.fuseCount == Stage1FuseProgress::BeforeLastFuse && in.corridorLoopCount < Stage1FuseProgress::LoopsToUnlockLastFuse)
         {
             objectiveText = "ヒント もう一度廊下の奥のドアを開ける";
         }
-        else if (in.fuseCount == 2)
+        else if (in.fuseCount == Stage1FuseProgress::BeforeLastFuse)
         {
-            objectiveText = SelectThirdFuseText(in, 1);
+            objectiveText = SelectThirdFuseText(in, LongIdleHint);
         }
         else
         {
@@ -287,13 +289,13 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
         {
             objectiveText = "ヒント 左側の部屋を確認する";
         }
-        else if (in.fuseCount == 2 && in.corridorLoopCount < 2)
+        else if (in.fuseCount == Stage1FuseProgress::BeforeLastFuse && in.corridorLoopCount < Stage1FuseProgress::LoopsToUnlockLastFuse)
         {
             objectiveText = "ヒント 長い廊下の奥のドアをもう一度";
         }
-        else if (in.fuseCount == 2)
+        else if (in.fuseCount == Stage1FuseProgress::BeforeLastFuse)
         {
-            objectiveText = SelectThirdFuseText(in, 2);
+            objectiveText = SelectThirdFuseText(in, ShortIdleHint);
         }
         else
         {

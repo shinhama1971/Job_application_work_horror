@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "StageScene.h"
+#include "Stage1FuseProgress.h"
 #include "Stage1CeilingGeometry.h"
 #include "MathUtility.h"
 #include "Application.h"
@@ -324,7 +325,8 @@ bool StageScene::ReloadPropLayout()
 bool StageScene::IsThirdFuseStage() const
 {
     const Core::Game* game = Core::Game::GetInstance();
-    return game->GetItemCount() == 2 && m_CorridorLoopCount >= 2 && !game->IsPowerRestored();
+    return game->GetItemCount() == Stage1FuseProgress::BeforeLastFuse &&
+        m_CorridorLoopCount >= Stage1FuseProgress::LoopsToUnlockLastFuse && !game->IsPowerRestored();
 }
 
 // 3本目のヒューズは、次の2つのどちらで手に入れてもよい（一本道にしないため）。
@@ -413,7 +415,8 @@ Stage1RouteLight StageScene::SelectRouteLight() const
             selected = Stage1RouteLight::StartSearch;
         }
         else if ((fuseCount == 1 && m_CorridorLoopCount < 1) ||
-            (fuseCount == 2 && m_CorridorLoopCount < 2))
+            (fuseCount == Stage1FuseProgress::BeforeLastFuse &&
+                m_CorridorLoopCount < Stage1FuseProgress::LoopsToUnlockLastFuse))
         {
             selected = Stage1RouteLight::CorridorDoor;
         }

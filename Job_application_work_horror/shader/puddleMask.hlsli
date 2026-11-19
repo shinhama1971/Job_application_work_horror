@@ -14,8 +14,8 @@
 // マス目ごとの水たまりの表（b13）。WaterEffectSystem::Init がCPUで決めて渡している。
 // x = 水たまりがあれば1、yz = 中心のずれと回転に使う乱数。マス目(PUDDLE_CELL_MIN, PUDDLE_CELL_MIN)から16x16マス。
 // sin を使った乱数をシェーダーで計算すると、GPUの種類で sin の精度が違い、水たまりの場所が変わるため、表にしている。
-#define PUDDLE_CELL_MIN (-8)
-#define PUDDLE_CELL_COUNT 16
+#define PUDDLE_CELL_MIN SIGNAL_LOST_PUDDLE_CELL_MIN
+#define PUDDLE_CELL_COUNT SIGNAL_LOST_PUDDLE_CELL_COUNT
 cbuffer PuddleCellBuffer : register(b13)
 {
     float4 PuddleCells[PUDDLE_CELL_COUNT * PUDDLE_CELL_COUNT];
@@ -62,7 +62,7 @@ static const float PUDDLE_CROSS_WAVE_SPEED = 1.10f;
 static const float PUDDLE_RADIAL_WAVE_WEIGHT = 0.72f;
 static const float PUDDLE_CROSS_WAVE_WEIGHT = 0.28f;
 // マス目に水たまりがあるかの印（0 か 1）を見るしきい値
-#define PUDDLE_CELL_THRESHOLD 0.5f
+#define PUDDLE_CELL_THRESHOLD SIGNAL_LOST_PUDDLE_CELL_PRESENT_THRESHOLD
 
 // その位置の水たまりの濃さ（0〜1）を返し、岸の線と波の模様も返している（timeは波を動かす時間）
 float GetPuddleMask(

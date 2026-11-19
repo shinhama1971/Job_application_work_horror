@@ -1669,7 +1669,7 @@ float Stage2Scene::ComputeThreatRate(const Player& player, bool includeMistakes)
     float threatRate = m_NoiseThreatSystem.GetThreat() * NoiseThreatToHeartbeat;
     // 見えない影が近いほど、心拍も速くなる
     threatRate = (std::max)(threatRate, m_UnseenPresence.GetProximity(player.GetPosition()) * UnseenProximityToHeartbeat);
-    if (includeMistakes && (m_LoopCount == 1 || m_LoopCount == 2))
+    if (includeMistakes && m_LoopCount > 0 && m_LoopCount <= Stage2AnomalyPlan::PlannedLoopCount)
     {
         const float observationDanger =
             static_cast<float>(m_PuzzleFeedback.GetMistakeCount()) / MistakeCountForFullDanger;

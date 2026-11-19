@@ -101,7 +101,7 @@ void ForestRain::Init()
     m_ShelterCount = 0;
     // 同じ森で雨の負荷だけを比べるための起動時の切り替え（草の SIGNAL_LOST_DISABLE_FOREST_GRASS と同じ使い方）。通常は降らせる
     wchar_t disabled[2]{};
-    if (GetEnvironmentVariableW(L"SIGNAL_LOST_DISABLE_FOREST_RAIN", disabled, 2) == 1 && disabled[0] == L'1')
+    if (GetEnvironmentVariableW(L"SIGNAL_LOST_DISABLE_FOREST_RAIN", disabled, ARRAYSIZE(disabled)) == 1 && disabled[0] == L'1')
     {
         m_DisabledByEnvironment = true;
     }

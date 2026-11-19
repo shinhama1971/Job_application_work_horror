@@ -72,6 +72,8 @@ namespace
     // FadeEnd より遠い区画は、描く処理ごと省いている
     constexpr float FadeStart = 330.0f;
     constexpr float FadeEnd = 410.0f;
+    // 頂点シェーダーの t0 は葉、t1 は更新後の状態。
+    constexpr UINT GrassVertexResourceCount = 2;
     constexpr std::uint32_t GroupSize = SIGNAL_LOST_GRASS_GROUP_SIZE;
 
     // 研究所までの小道の曲がり：中心の x が、z に沿ってこの振れ幅・この長さの周期（2π倍）で左右に揺れる
@@ -219,7 +221,7 @@ void ForestGrass::Init()
 {
     // 同じ森で草の負荷だけを比べるための起動時の切り替え。通常は草を使う。
     wchar_t disabled[2]{};
-    m_Disabled = GetEnvironmentVariableW(L"SIGNAL_LOST_DISABLE_FOREST_GRASS", disabled, 2) == 1 && disabled[0] == L'1';
+    m_Disabled = GetEnvironmentVariableW(L"SIGNAL_LOST_DISABLE_FOREST_GRASS", disabled, ARRAYSIZE(disabled)) == 1 && disabled[0] == L'1';
     if (m_Disabled) return;
     m_Shader.CreateRequired("shader/grassVS.hlsl", "shader/grassPS.hlsl", true);
     if (!m_SimulationShader.Create("shader/grassCS.hlsl"))
@@ -587,8 +589,8 @@ void ForestGrass::RunGpuSimulation()
     context->UpdateSubresource(m_SimulationParams.Get(), 0, nullptr, &params, 0, 0);
 
     // 頂点シェーダーが前の描画で読んでいた葉先のバッファを外してから、書き込み先にしている
-    ID3D11ShaderResourceView* nullViews[2] = {};
-    context->VSSetShaderResources(0, 2, nullViews);
+    ID3D11ShaderResourceView* nullViews[GrassVertexResourceCount] = {};
+    context->VSSetShaderResources(0, GrassVertexResourceCount, nullViews);
 
     m_SimulationShader.SetGPU();
     ID3D11Buffer* constantBuffer = m_SimulationParams.Get();
@@ -627,8 +629,8 @@ void ForestGrass::Draw(Camera* camera)
     // 頂点は頂点シェーダーが番号から作るので、頂点バッファも入力レイアウトも使わない
     context->IASetInputLayout(nullptr);
     context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-    ID3D11ShaderResourceView* views[2] = { m_BladeView.Get(), m_StateView.Get() };
-    context->VSSetShaderResources(0, 2, views);
+    ID3D11ShaderResourceView* views[GrassVertexResourceCount] = { m_BladeView.Get(), m_StateView.Get() };
+    context->VSSetShaderResources(0, GrassVertexResourceCount, views);
     ID3D11Buffer* drawBuffer = m_DrawParams.Get();
     context->VSSetConstantBuffers(GrassDrawBufferSlot, 1, &drawBuffer);
 
@@ -690,8 +692,8 @@ void ForestGrass::Draw(Camera* camera)
     }
 
     context->RSSetState(previousRasterizer.Get());
-    ID3D11ShaderResourceView* nullViews[2] = {};
-    context->VSSetShaderResources(0, 2, nullViews);
+    ID3D11ShaderResourceView* nullViews[GrassVertexResourceCount] = {};
+    context->VSSetShaderResources(0, GrassVertexResourceCount, nullViews);
     context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 

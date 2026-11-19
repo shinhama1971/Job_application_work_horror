@@ -10,6 +10,7 @@
 // ============================================================================
 
 #pragma once
+#include "shader/renderingConfig.hlsli"
 
 #include <SimpleMath.h>
 
@@ -23,7 +24,7 @@ class HandprintAnomaly final
 {
 public:
     // 手形の数と、次の手形が現れるまでに照らし続ける秒数、現れるのにかかる秒数
-    static constexpr int PrintCount = 4;
+    static constexpr int PrintCount = SIGNAL_LOST_MAX_WALL_HANDPRINTS;
     static constexpr float RequiredLitSeconds = 0.5f;
     static constexpr float AppearSeconds = 0.8f;
 
@@ -46,6 +47,8 @@ public:
     };
 
 private:
+    // 2つ目が現れた時点で、手形がプレイヤーを追っていると通知する。
+    static constexpr int FollowingStartsAtPrint = 2;
     // 現れている手形の数、手形ごとの見え方（0〜1）、今の手形を照らし続けている秒数、見つけたか、通知の残り秒数
     int m_RevealedCount = 0;
     std::array<float, PrintCount> m_Visibility{};
@@ -120,6 +123,6 @@ public:
         return DirectX::SimpleMath::Vector3(position.x, position.y, position.z);
     }
     bool WasFound() const noexcept { return m_Found; }
-    bool IsFollowing() const noexcept { return m_RevealedCount >= 2 && !m_Found; }
+    bool IsFollowing() const noexcept { return m_RevealedCount >= FollowingStartsAtPrint && !m_Found; }
     float GetNoticeTimer() const noexcept { return m_NoticeTimer; }
 };

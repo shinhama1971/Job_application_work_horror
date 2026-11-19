@@ -4,6 +4,8 @@
 // ============================================================================
 
 #include "DebugUI.h"
+#include <array>
+#include "Stage2SceneConstants.h"
 #include "GIUpdateSettings.h"
 
 #include "Game.h"
@@ -74,7 +76,7 @@ namespace
     float g_FrameTimes[FrameHistoryCount]{};
     int g_FrameTimeOffset = 0;
     // シェーダーのデバッグ表示の番号（0は通常の画面）
-    int g_DebugViewMode = 0;
+    int g_DebugViewMode = ShaderDebugView::Final;
     // 窓と枠の角の丸み
     constexpr float WindowRounding = 3.0f;
     constexpr float FrameRounding = 2.0f;
@@ -366,7 +368,7 @@ namespace
             sceneDebugInfo.puzzleStep, sceneDebugInfo.threatLevel * PercentScale);
         ImGui::Text("失敗回数 %d  再試行補助 %s",
             sceneDebugInfo.puzzleMistakeCount,
-            sceneDebugInfo.puzzleMistakeCount >= 2 ? "強" :
+            sceneDebugInfo.puzzleMistakeCount >= Stage2SignalStalkerMaxAssist ? "強" :
                 (sceneDebugInfo.puzzleMistakeCount == 1 ? "弱" : "なし"));
         ImGui::Text("最終イベント: %s  出口: %s",
             sceneDebugInfo.finalSequenceArmed ? "準備済み" : "待機中",
@@ -410,9 +412,26 @@ namespace
     void DrawShaderDebugView(Core::Game* game)
     {
         // 表示の順番は common.hlsl のデバッグ表示番号に合わせている。
-        const char* debugViews[] = { "Final", "World normals", "Flashlight shadow", "Lighting only", "Puddle mask + mesh LOD (green=near yellow=middle red=far)", "Floor reflection", "Wall damp mask", "Light tiles (lights per 16x16 tile)", "Fullbright (照明・影・霧なしで全体を明るく)", "PBR material (R=metallic G=roughness B=wet)", "Ambient occlusion (SSAO)", "室内を明るく＋水たまりの反射", "森の草LODを色で表示" };
+        static constexpr auto debugViews = []
+        {
+            std::array<const char*, ShaderDebugView::Count> labels{};
+            labels[ShaderDebugView::Final] = "Final";
+            labels[ShaderDebugView::Normal] = "World normals";
+            labels[ShaderDebugView::FlashlightShadow] = "Flashlight shadow";
+            labels[ShaderDebugView::Lighting] = "Lighting only";
+            labels[ShaderDebugView::Puddle] = "Puddle mask + mesh LOD (green=near yellow=middle red=far)";
+            labels[ShaderDebugView::Reflection] = "Floor reflection";
+            labels[ShaderDebugView::WallDamp] = "Wall damp mask";
+            labels[ShaderDebugView::LightTiles] = "Light tiles (lights per 16x16 tile)";
+            labels[ShaderDebugView::Fullbright] = "Fullbright (照明・影・霧なしで全体を明るく)";
+            labels[ShaderDebugView::PbrMaterial] = "PBR material (R=metallic G=roughness B=wet)";
+            labels[ShaderDebugView::AmbientOcclusion] = "Ambient occlusion (SSAO)";
+            labels[ShaderDebugView::FullbrightReflection] = "室内を明るく＋水たまりの反射";
+            labels[ShaderDebugView::GrassLod] = "森の草LODを色で表示";
+            return labels;
+        }();
         ImGui::Combo("Shader debug view", &g_DebugViewMode,
-            debugViews, IM_ARRAYSIZE(debugViews));
+            debugViews.data(), ShaderDebugView::Count);
         if (g_DebugViewMode == GrassLodDebugView)
         {
             ImGui::TextUnformatted("草のLOD  緑: 近距離 / 黄: 中距離 / 赤: 遠距離");

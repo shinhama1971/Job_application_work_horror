@@ -43,6 +43,7 @@ public:
     static constexpr float NearPassingScale = 1.6f;
     static constexpr float CatchDistance = 13.0f;
     static constexpr float PassingDistance = 26.0f;
+    static constexpr float PassingResetDistance = PassingDistance * 2.0f;
     // 歩く速さ（プレイヤーの歩きより遅い）。廊下の奥と入口の折り返す位置
     static constexpr float WalkSpeed = 13.0f;
     static constexpr float FarZ = 125.0f;
@@ -195,7 +196,7 @@ public:
             return Result::Passed;
         }
         // 近くまで来ずに離れた（折り返した）場合は、すれ違いを数え直している
-        if (m_CameClose && distance > PassingDistance * 2.0f)
+        if (m_CameClose && distance > PassingResetDistance)
         {
             m_CameClose = false;
         }

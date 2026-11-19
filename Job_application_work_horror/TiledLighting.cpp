@@ -6,6 +6,7 @@
 // ============================================================================
 
 #include "TiledLighting.h"
+#include "shader/renderingConfig.hlsli"
 
 #include "Application.h"
 #include "Camera.h"
@@ -36,7 +37,7 @@ namespace
     constexpr UINT WallMaskSlot = 19;
     // 光源がこの幅より深く壁の箱の中にあるときだけ、その壁を印に入れない（roomOcclusion.hlsli の ROOM_LIGHT_MOUNT_MARGIN と同じ値）。
     // 壁に付けたランプの光源は壁の面から少し外にあるので、付いている壁も印に入れる（入れないと、ランプが壁の裏の部屋まで照らした）
-    constexpr float LightMountMargin = 0.0f;
+    constexpr float LightMountMargin = SIGNAL_LOST_ROOM_LIGHT_MOUNT_MARGIN;
 
     // 光源の届く円（上から見た位置と半径）に重なる建物の壁の印を求めている。光源が箱の中にある壁は入れない
     uint32_t ComputeWallMask(const ENVIRONMENT_POINT_LIGHT& light, const ROOM_OCCLUSION_BUFFER& room)
