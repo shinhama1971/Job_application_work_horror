@@ -1003,9 +1003,15 @@ namespace Tools::CaptureMode
                 }
                 if (option == L"--debug-view")
                 {
-                    if (value == L"10") g_ViewOverride = ShaderDebugView::AmbientOcclusion;
-                    if (value == L"11") g_ViewOverride = ShaderDebugView::FullbrightReflection;
-                    if (value == L"12") g_ViewOverride = ShaderDebugView::GrassLod;
+                    for (const int mode : { ShaderDebugView::AmbientOcclusion,
+                        ShaderDebugView::FullbrightReflection, ShaderDebugView::GrassLod })
+                    {
+                        if (value == std::to_wstring(mode))
+                        {
+                            g_ViewOverride = mode;
+                            break;
+                        }
+                    }
                 }
                 if (option == L"--reflection" && value.size() == 1)
                 {

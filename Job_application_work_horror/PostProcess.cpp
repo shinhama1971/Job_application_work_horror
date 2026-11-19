@@ -154,8 +154,8 @@ namespace Effect
             MessageBoxW(nullptr, L"画面効果の描画テクスチャを作成できません。", L"描画エラー", MB_OK | MB_ICONERROR);
             return false;
         }
-        // 残像に使う少し前の画面（同じ大きさ・形式にして、そのまま写せるようにしている）
-        if (!m_EchoTexture.Init(
+        // 残像用のHDR画像は通常プレイでだけ使う。撮影と計測のGPUメモリを消費しないよう、ここで分ける。
+        if (!Tools::CaptureMode::IsActive() && !m_EchoTexture.Init(
             Application::GetWidth(),
             Application::GetHeight(),
             Renderer::SceneHdrFormat
@@ -324,7 +324,7 @@ namespace Effect
             m_TargetEchoStrength = 0.0f;
         }
         m_EchoStrength += (m_TargetEchoStrength - m_EchoStrength) * response(EchoResponse);
-        if (m_EchoStrength > EchoMinStrength)
+        if (m_EchoTexture.GetTexture() != nullptr && m_EchoStrength > EchoMinStrength)
         {
             m_EchoCaptureTimer -= deltaTime;
             if (m_EchoCaptureTimer <= 0.0f || !m_EchoValid)
@@ -342,8 +342,9 @@ namespace Effect
         }
         else
         {
-            // 消えている間は、古い画面を残さない（次に出るときは、まず今の画面を写し取る）
+            // 再開時は現在の画面から写す。コマ落ち中などに残った前のコピー要求も取り消す。
             m_EchoValid = false;
+            m_EchoCopyRequested = false;
         }
         // 影のまわりのゆがみ：Scene から渡されなくなったら（場面が変わったときなど）消している
         m_PresenceWarpHold -= deltaTime;

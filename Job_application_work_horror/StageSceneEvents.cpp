@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "StageScene.h"
+#include "CaptureMode.h"
 #include "Stage1FuseProgress.h"
 #include "ShadowFigureGeometry.h"
 #include "MathUtility.h"
@@ -1490,12 +1491,16 @@ void StageScene::UpdatePresenceWarp(const Player& player)
 
 void StageScene::UpdateTensionPulse(const Player& player, float deltaTime)
 {
-    UpdatePresenceWarp(player);
     // 1面には隠れる場所がないため、隠れている扱いにはしていない。
     const float threatRate = ComputeThreatRate(player);
-    // 影がすぐ近くにいるほど、少し前の画面が遅れて重なる残像を強くしている（監視映像を見ている間は出さない）
-    Core::Game::GetInstance()->GetPostProcess()->SetEcho(m_Surveillance.IsViewing() ? 0.0f :
-        MathUtility::SmoothStep(EchoThreatStart, EchoThreatFull, threatRate));
+    // 撮影・計測では両効果を省く。影の位置を画面に投影する計算も不要になる。
+    if (!Tools::CaptureMode::IsActive())
+    {
+        UpdatePresenceWarp(player);
+        // 影が近いほど残像を強くする。監視映像を開いている間は強さを0へ戻す。
+        Core::Game::GetInstance()->GetPostProcess()->SetEcho(m_Surveillance.IsViewing() ? 0.0f :
+            MathUtility::SmoothStep(EchoThreatStart, EchoThreatFull, threatRate));
+    }
     const TensionPulse::Output pulse = m_TensionPulse.Update(deltaTime, threatRate, false);
     PlayTensionPulse(pulse);
     // 緊張が高いほど、画面の端から視界が狭まり、心拍に合わせて脈打つ
