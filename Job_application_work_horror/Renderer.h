@@ -158,9 +158,9 @@ struct WATER_CAUSTICS_BUFFER
     // 2面の「見えない影」の異変で、影だけを落とす人影（xyz = 足もとの位置、w = 見え方0〜1。0なら影を付けない。shader/figureShadow.hlsli）
     DirectX::SimpleMath::Vector4 UnseenFigure;
     // レイ反射で水面に映す小物の箱の最大数と、その箱（[i*3] = 中心、[i*3+1] = 半寸法、[i*3+2] = 色）。数は Reflection.z
-    static constexpr int MaxReflectionProps = 16;
+    static constexpr int MaxReflectionProps = SIGNAL_LOST_MAX_REFLECTION_PROPS;
     // shader/waterCausticsLayout.hlsli の REFLECTION_PROP_STRIDE と同じ。
-    static constexpr int ReflectionPropVectorCount = 3;
+    static constexpr int ReflectionPropVectorCount = SIGNAL_LOST_REFLECTION_PROP_STRIDE;
     DirectX::SimpleMath::Vector4 ReflectionProps[MaxReflectionProps * ReflectionPropVectorCount];
     // 2面の壁の鏡に映す自分の体（xyz = 足もとの位置、w = 映すなら1）、向き（xy = 右の向きのx・z、zw = 前の向きのx・z）、
     // 動き（x = 歩く手足の振り -1〜1）。shader/mirrorPS.hlsl が光線と体の距離場で交差させている（MirrorSelf）
@@ -184,6 +184,8 @@ struct WATER_CAUSTICS_BUFFER
 
 // 長さだけでなく、HLSLが共通して読み取る先頭部と、後半の配列・行列の位置も照合する。
 static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 1264);
+static_assert(offsetof(WATER_CAUSTICS_BUFFER, MirrorSelf) ==
+    offsetof(WATER_CAUSTICS_BUFFER, ReflectionProps) + sizeof(WATER_CAUSTICS_BUFFER::ReflectionProps));
 static_assert(offsetof(WATER_CAUSTICS_BUFFER, Ripple) == 96);
 static_assert(offsetof(WATER_CAUSTICS_BUFFER, Projection) == 112);
 static_assert(offsetof(WATER_CAUSTICS_BUFFER, Handprints) == 192);

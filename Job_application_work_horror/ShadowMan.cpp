@@ -55,7 +55,7 @@ namespace
 	constexpr int GazeScareRumbleFrames = 12;
 	constexpr float GazeScareRumbleStrength = 0.32f;
 	// 崩れる度合いを渡すシェーダーの番号（shadowDissolvePS.hlsl の b7。デバッグ表示の定数と同じ番号なので、描いた後に戻す）
-	constexpr UINT DissolveBufferSlot = 7;
+	constexpr UINT DissolveBufferSlot = SIGNAL_LOST_DEBUG_VIEW_BUFFER_SLOT;
 }
 
 // 状態を初期化し、Mayaで作った人の形のモデルを読み込んでいる

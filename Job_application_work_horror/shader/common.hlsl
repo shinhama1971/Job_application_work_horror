@@ -3,6 +3,8 @@
 // 定数バッファのスロットと入出力の形は、CPU側の定義（Renderer.hなど）と一致させている。
 // ============================================================================
 
+#include "renderingConfig.hlsli"
+
 // ワールド・ビュー・射影の行列（b0〜b2。Renderer::SetWorldMatrixなどが転置して送っている）
 // 既存の床・霧・濡れの高さをそろえるための基準。部屋ごとの遮蔽には RoomFloorY を使う。
 static const float SCENE_BASE_FLOOR_Y = -100.0f;
@@ -57,7 +59,7 @@ struct LIGHT
 };
 
 // デバッグ表示の番号、2面の壁の湿り気の強さ、壁の古さ、周回の深さ（b7）
-cbuffer DebugViewBuffer : register(b7)
+cbuffer DebugViewBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_DEBUG_VIEW_BUFFER_SLOT))
 {
     int DebugViewMode;
     float WallDampStrength;
@@ -132,7 +134,6 @@ StructuredBuffer<uint> g_PointLightWallMasks : register(t19);
 
 // タイルの大きさと、1タイルに入れる光源の上限（TiledLighting.hと同じ値）
 #include "tiledLightingConfig.hlsli"
-#include "renderingConfig.hlsli"
 
 // 天井照明の下向きの配光が広がる範囲。壁・床・手元モデルの境界を揃える。
 static const float FIXTURE_BEAM_DOT_START = 0.04f;

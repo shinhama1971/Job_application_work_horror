@@ -12,7 +12,7 @@
 #include "fastNoise.hlsli"
 
 // ForestLightningFigure.h の LightningFigureBuffer と同じ並び（b7 を一時的に借りている）
-cbuffer LightningFigureBuffer : register(b7)
+cbuffer LightningFigureBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_DEBUG_VIEW_BUFFER_SLOT))
 {
     float FigureTime;
     float FigureVisibility;

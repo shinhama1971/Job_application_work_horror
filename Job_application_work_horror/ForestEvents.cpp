@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 
 using namespace DirectX::SimpleMath;
 
@@ -164,7 +165,7 @@ float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const
         m_Lamps[0].StartTime = m_Time;
         m_Lamps[1].StartTime = m_Time + SecondLampDelay;
     }
-    for (int index = 0; index < 2; ++index)
+    for (std::size_t index = 0; index < std::size(m_Lamps); ++index)
     {
         DyingLamp& lamp = m_Lamps[index];
         Wall* wall = Find(props, lamp.Name);

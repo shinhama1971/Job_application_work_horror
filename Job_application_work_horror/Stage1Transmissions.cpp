@@ -137,13 +137,15 @@ void Stage1Transmissions::Update(const FrameInput& input)
         }
         if (canCall && IsIdle() && m_FuseTimer >= CallDelaySeconds)
         {
-            for (int i = 0; i < 2; ++i)
+            float lineDelay = 0.0f;
+            for (const char* text : StoryText::FalseRadioCallLines)
             {
                 Line line;
                 line.Header = StoryText::FalseRadioHeader;
-                line.Text = StoryText::FalseRadioCallLines[i];
-                line.Delay = i == 0 ? 0.0f : RadioNextLineDelay;
+                line.Text = text;
+                line.Delay = lineDelay;
                 Enqueue(line);
+                lineDelay = RadioNextLineDelay;
             }
             m_Step = RadioStep::Called;
         }

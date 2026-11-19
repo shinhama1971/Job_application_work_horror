@@ -5,7 +5,7 @@
 #include "common.hlsl"
 
 // ShadowMan.cppのDissolveBufferと同じ並び（b7を一時的に借りている）。経過時間、見えている度合い、縁の幅
-cbuffer DissolveBuffer : register(b7)
+cbuffer DissolveBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_DEBUG_VIEW_BUFFER_SLOT))
 {
     float DissolveTime;
     float Visibility;

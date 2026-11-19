@@ -5,10 +5,10 @@
 // Renderer.h の WATER_CAUSTICS_BUFFER と同じ配列長にする。光の筋も同じ位置から人影を読む。
 #define WATER_CAUSTICS_MAX_HANDPRINTS SIGNAL_LOST_MAX_WALL_HANDPRINTS
 // 反射用の箱1件につき、中心・半分の寸法・色をfloat4で渡す。
-#define REFLECTION_PROP_STRIDE 3
+#define REFLECTION_PROP_STRIDE SIGNAL_LOST_REFLECTION_PROP_STRIDE
 
 // レイ反射で水面に映す小物の箱の最大数（Renderer.h の WATER_CAUSTICS_BUFFER::MaxReflectionProps と同じ）
-#define MAX_REFLECTION_PROPS 16
+#define MAX_REFLECTION_PROPS SIGNAL_LOST_MAX_REFLECTION_PROPS
 
 // Renderer.hのWATER_CAUSTICS_BUFFERと同じ並び（b12）。Groundが毎フレーム設定している
 cbuffer WaterCausticsBuffer : register(b12)

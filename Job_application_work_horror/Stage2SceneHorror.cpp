@@ -34,6 +34,7 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    constexpr int FootprintFollowerStartLoop = 2;
     // --- 床と入口（値は Stage2SceneConstants.h）
     constexpr float FloorY = Stage2FloorY;
     constexpr float FootY = Stage2FootY;
@@ -1749,7 +1750,7 @@ void Stage2Scene::UpdateFootprintFollower(const Player& player, float deltaTime)
     Vector2 waterExit;
     const bool leftWater = ground->ConsumeWaterExit(waterExit);
     if (leftWater && !m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Unseen) &&
-        m_LoopCount >= 2 && !m_FootprintFollowerUsedThisLoop &&
+        m_LoopCount >= FootprintFollowerStartLoop && !m_FootprintFollowerUsedThisLoop &&
         !m_FootprintFollower.IsActive() && !m_FinalSequence.IsSequenceActive())
     {
         m_FootprintFollower.Start(waterExit);

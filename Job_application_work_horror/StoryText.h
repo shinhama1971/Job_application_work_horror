@@ -83,7 +83,7 @@ namespace StoryText
     // 照らすと止まる影の前で「ライトを消せ」と言う（壁の文字「あかりを けすな」と逆のことを言う、嘘の指示）。
     inline constexpr const char* FalseRadioHeader = "受信　——　第3研究棟";
     // 1本目のヒューズを拾った後
-    inline constexpr const char* FalseRadioCallLines[2] =
+    inline constexpr const char* FalseRadioCallLines[] =
     {
         "「……聞こえるか。こちら調査員。まだ中にいる。無事だ。」",
         "「書類保管室の奥の机に、予備のヒューズを置いてきた。それを使ってくれ。」",

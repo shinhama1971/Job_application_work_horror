@@ -71,7 +71,7 @@ namespace
 	constexpr UINT LightBufferSlot = 3;
 	constexpr UINT MaterialBufferSlot = 4;
 	constexpr UINT TextureBufferSlot = 5;
-	constexpr UINT DebugViewBufferSlot = 7;
+	constexpr UINT DebugViewBufferSlot = SIGNAL_LOST_DEBUG_VIEW_BUFFER_SLOT;
 	// --- ライトの初期値（Player が最初のフレームから上書きするので、作った直後の一瞬だけ使う）
 	constexpr float InitialLightIntensity = 1.6f;
 	constexpr float InitialLightRange = 260.0f;

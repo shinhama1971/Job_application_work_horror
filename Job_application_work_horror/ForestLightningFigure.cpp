@@ -21,7 +21,7 @@ namespace
     const Color FigureBodyColor(0.025f, 0.03f, 0.027f, 1.0f);
     const Color FigureDiffuse(0.70f, 0.74f, 0.70f, 1.0f);
     // 描く間だけ借りる定数バッファの番号（shader/lightningFigurePS.hlsl の b7。デバッグ表示の定数と同じ番号なので、描いた後に戻す）
-    constexpr UINT FigureBufferSlot = 7;
+    constexpr UINT FigureBufferSlot = SIGNAL_LOST_DEBUG_VIEW_BUFFER_SLOT;
     // これより見え方が小さければ描かない
     constexpr float MinVisibleAmount = 0.001f;
 }
