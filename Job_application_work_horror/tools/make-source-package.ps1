@@ -12,13 +12,16 @@
 #
 # 使い方（リポジトリの直下で）:
 #   powershell -ExecutionPolicy Bypass -File Job_application_work_horror\tools\make-source-package.ps1
+#   文書（.md と docs\）を入れないときは、後ろに -ExcludeDocuments を付ける
 # ============================================================================
 [CmdletBinding()]
 param(
     # 作る場所（既定はリポジトリ直下の release）
     [string]$OutputRoot = "",
     # 展開した zip でのビルドの確認を省く
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    # 文書を入れない（.md のファイルと、docs\ のフォルダ。ソースとビルドに要る物だけにする）
+    [switch]$ExcludeDocuments
 )
 
 $ErrorActionPreference = "Stop"
@@ -57,6 +60,9 @@ foreach ($relative in $files) {
     $source = Join-Path $repoRoot $relative
     # 消したがまだコミットしていないファイルは、一覧にあっても実物がないので飛ばす
     if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+        continue
+    }
+    if ($ExcludeDocuments -and ($relative -like "*.md" -or $relative -like "docs/*")) {
         continue
     }
     $destination = Join-Path $sourceDir $relative
