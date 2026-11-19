@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "ShadowMap.h"
+#include "shader/renderingConfig.hlsli"
 
 #include "Camera.h"
 #include "FlashlightRig.h"
@@ -25,9 +26,9 @@ namespace
     // シェーダーで影を比べるときのずらし
     constexpr float ShaderDepthBias = 0.0012f;
     // シェーダーの番号（flashlightShadow.hlsli の register と合わせる）：影の画像 t5、比較サンプラー s1、影の定数 b8
-    constexpr UINT ShadowTextureSlot = 5;
-    constexpr UINT ComparisonSamplerSlot = 1;
-    constexpr UINT ShadowBufferSlot = 8;
+    constexpr UINT ShadowTextureSlot = SIGNAL_LOST_FLASHLIGHT_SHADOW_TEXTURE_SLOT;
+    constexpr UINT ComparisonSamplerSlot = SIGNAL_LOST_SHADOW_COMPARISON_SAMPLER_SLOT;
+    constexpr UINT ShadowBufferSlot = SIGNAL_LOST_FLASHLIGHT_SHADOW_BUFFER_SLOT;
 }
 
 namespace Effect

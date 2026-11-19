@@ -9,6 +9,8 @@
 // ============================================================================
 
 #pragma once
+#include "StoryText.h"
+#include <iterator>
 
 #include "Hud.h"
 
@@ -28,10 +30,11 @@ public:
 
 private:
     // 受信記録の行の数（StoryText::TransmissionLines と同じ。ForestRadio.cpp で確かめている）
-    static constexpr int LineCount = 3;
+    static constexpr int LineCount = static_cast<int>(std::size(StoryText::TransmissionLines));
     // 行を流し始める、小道の z（1行目は歩き出してすぐ）。最後は「通信途絶」
-    static constexpr float TriggerZ[LineCount + 1] = { -100000.0f, -260.0f, -130.0f, 130.0f };
+    static constexpr float TriggerZ[] = { -100000.0f, -260.0f, -130.0f, 130.0f };
     // 1行目を流し始めるまでの秒数、1秒にタイプする文字の数、タイプし終えてから消え始めるまでの秒数、消える秒数
+    static_assert(std::size(TriggerZ) == LineCount + 1);
     static constexpr float FirstLineDelay = 3.0f;
     static constexpr float TypingCharactersPerSecond = 14.0f;
     static constexpr float HoldSeconds = 4.5f;

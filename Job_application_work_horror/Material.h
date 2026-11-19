@@ -4,6 +4,7 @@
 // ============================================================================
 
 #pragma once
+#include "shader/renderingConfig.hlsli"
 #include	<Windows.h>
 #include	<directxmath.h>
 #include	<d3d11.h>
@@ -28,7 +29,7 @@ class Material {
 	MATERIAL	m_Material{};
 	Microsoft::WRL::ComPtr<ID3D11Buffer> m_pConstantBufferMaterial;
 	// マテリアルの定数のシェーダーの番号（common.hlsl の b4。頂点と画素の両方が読む）
-	static constexpr UINT ConstantBufferSlot = 4;
+	static constexpr UINT ConstantBufferSlot = SIGNAL_LOST_MATERIAL_BUFFER_SLOT;
 
 	// 一緒に設定するシェーダーとテクスチャ（どちらも持ち主は別で、ここでは参照するだけ）
 	Shader* m_pShader;

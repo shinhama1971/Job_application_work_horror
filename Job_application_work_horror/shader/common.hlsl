@@ -9,15 +9,15 @@
 // 既存の床・霧・濡れの高さをそろえるための基準。部屋ごとの遮蔽には RoomFloorY を使う。
 static const float SCENE_BASE_FLOOR_Y = -100.0f;
 
-cbuffer WorldBuffer : register(b0)
+cbuffer WorldBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_WORLD_BUFFER_SLOT))
 {
 	matrix World;
 }
-cbuffer ViewBuffer : register(b1)
+cbuffer ViewBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_VIEW_BUFFER_SLOT))
 {
 	matrix View;
 }
-cbuffer ProjectionBuffer : register(b2)
+cbuffer ProjectionBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_PROJECTION_BUFFER_SLOT))
 {
 	matrix Projection;
 }
@@ -76,7 +76,7 @@ cbuffer DebugViewBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_DEBU
 };
 
 // 懐中電灯と環境光の定数バッファ（b3）
-cbuffer LightBuffer : register(b3)
+cbuffer LightBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_LIGHT_BUFFER_SLOT))
 {
     LIGHT Light;
 }
@@ -112,7 +112,7 @@ struct ENVIRONMENT_POINT_LIGHT
 };
 
 // TiledLighting.cppのShadingParamsと同じ並び（b6）
-cbuffer TiledLightBuffer : register(b6)
+cbuffer TiledLightBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_TILED_LIGHT_BUFFER_SLOT))
 {
     uint PointLightCount;
     uint TiledLightMode;        // 0: 全部の光源、1: タイルごとのリスト
@@ -125,12 +125,12 @@ cbuffer TiledLightBuffer : register(b6)
 };
 
 // 点光源の一覧（t10）、タイルごとの光源の番号の並び（t11）、タイルごとの光源の数（t12）
-StructuredBuffer<ENVIRONMENT_POINT_LIGHT> g_PointLights : register(t10);
-StructuredBuffer<uint> g_TileLightIndices : register(t11);
-StructuredBuffer<uint> g_TileLightCounts : register(t12);
+StructuredBuffer<ENVIRONMENT_POINT_LIGHT> g_PointLights : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_TILED_POINT_LIGHTS_SLOT));
+StructuredBuffer<uint> g_TileLightIndices : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_TILED_LIGHT_INDICES_SLOT));
+StructuredBuffer<uint> g_TileLightCounts : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_TILED_LIGHT_COUNTS_SLOT));
 // 点光源ごとの、光の届く範囲に重なる建物の壁の印（1ビット = 1枚。光源が付いている壁は除く。TiledLighting が CPU で求めている）。
 // 壁を抜けて隣の部屋を照らさない判定（roomOcclusion.hlsli の GetRoomLightVisibility）で、調べる壁を絞るのに使う
-StructuredBuffer<uint> g_PointLightWallMasks : register(t19);
+StructuredBuffer<uint> g_PointLightWallMasks : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_POINT_LIGHT_WALL_MASKS_SLOT));
 
 // タイルの大きさと、1タイルに入れる光源の上限（TiledLighting.hと同じ値）
 #include "tiledLightingConfig.hlsli"
@@ -207,13 +207,13 @@ ENVIRONMENT_POINT_LIGHT GetPixelLight(uint listOffset, uint lightNumber)
 }
 
 // マテリアルの定数バッファ（b4）
-cbuffer MaterialBuffer : register(b4)
+cbuffer MaterialBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_MATERIAL_BUFFER_SLOT))
 {
   MATERIAL Material;
 }
 
 // UV座標を動かす行列（b5）
-cbuffer TextureBuffer : register(b5)
+cbuffer TextureBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_TEXTURE_TRANSFORM_BUFFER_SLOT))
 {
     matrix matrixTex;
 }

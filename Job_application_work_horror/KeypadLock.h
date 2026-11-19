@@ -14,6 +14,7 @@ class KeypadLock final
 public:
     // 桁の数と、4桁の番号の型
     static constexpr int DigitCount = 4;
+    static constexpr int WarningMistakeCount = 3;
     // 1桁で選べる数の種類（0〜9）
     static constexpr int DigitValueCount = 10;
     using Digits = std::array<int, DigitCount>;

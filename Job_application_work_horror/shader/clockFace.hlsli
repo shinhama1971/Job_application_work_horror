@@ -34,16 +34,21 @@ float ClockSegmentDistance(float2 p, float2 a, float2 b)
     return length(p - (a + ab * t));
 }
 
-// ローマ数字の1文字（1 = I、2 = V、3 = X）までの距離。localは文字の中心からの位置（高さ1.3、幅0.6）
+#define CLOCK_EMPTY_GLYPH 0u
+#define CLOCK_I_GLYPH 1u
+#define CLOCK_V_GLYPH 2u
+#define CLOCK_X_GLYPH 3u
+
+// ローマ数字の1文字までの距離。localは文字の中心からの位置（高さ1.3、幅0.6）
 float ClockGlyphDistance(float2 local, uint glyph)
 {
     const float halfHeight = CLOCK_GLYPH_HALF_HEIGHT;
     const float halfWidth = CLOCK_GLYPH_HALF_WIDTH;
-    if (glyph == 1u)
+    if (glyph == CLOCK_I_GLYPH)
     {
         return ClockSegmentDistance(local, float2(0.0f, -halfHeight), float2(0.0f, halfHeight));
     }
-    if (glyph == 2u)
+    if (glyph == CLOCK_V_GLYPH)
     {
         return min(
             ClockSegmentDistance(local, float2(-halfWidth, halfHeight), float2(0.0f, -halfHeight)),
@@ -61,18 +66,18 @@ float ClockGlyphDistance(float2 local, uint glyph)
 #define CLOCK_NUMERAL_GLYPH_MASK 3u
 static const uint ClockNumerals[12] =
 {
-    3u | (1u << 2) | (1u << 4),              // XII
-    1u,                                      // I
-    1u | (1u << 2),                          // II
-    1u | (1u << 2) | (1u << 4),              // III
-    1u | (1u << 2) | (1u << 4) | (1u << 6),  // IIII
-    2u,                                      // V
-    2u | (1u << 2),                          // VI
-    2u | (1u << 2) | (1u << 4),              // VII
-    2u | (1u << 2) | (1u << 4) | (1u << 6),  // VIII
-    1u | (3u << 2),                          // IX
-    3u,                                      // X
-    3u | (1u << 2)                           // XI
+    CLOCK_X_GLYPH | (CLOCK_I_GLYPH << 2) | (CLOCK_I_GLYPH << 4),              // XII
+    CLOCK_I_GLYPH,                                      // I
+    CLOCK_I_GLYPH | (CLOCK_I_GLYPH << 2),                          // II
+    CLOCK_I_GLYPH | (CLOCK_I_GLYPH << 2) | (CLOCK_I_GLYPH << 4),              // III
+    CLOCK_I_GLYPH | (CLOCK_I_GLYPH << 2) | (CLOCK_I_GLYPH << 4) | (CLOCK_I_GLYPH << 6),  // IIII
+    CLOCK_V_GLYPH,                                      // V
+    CLOCK_V_GLYPH | (CLOCK_I_GLYPH << 2),                          // VI
+    CLOCK_V_GLYPH | (CLOCK_I_GLYPH << 2) | (CLOCK_I_GLYPH << 4),              // VII
+    CLOCK_V_GLYPH | (CLOCK_I_GLYPH << 2) | (CLOCK_I_GLYPH << 4) | (CLOCK_I_GLYPH << 6),  // VIII
+    CLOCK_I_GLYPH | (CLOCK_X_GLYPH << 2),                          // IX
+    CLOCK_X_GLYPH,                                      // X
+    CLOCK_X_GLYPH | (CLOCK_I_GLYPH << 2)                           // XI
 };
 
 // 針（中心から angle の向きへ handLength の長さ、根元の太さ width、先が細い。反対側に tail だけ出る）までの近さ（0〜1）
@@ -252,7 +257,7 @@ ClockPaint GetClockFace(float2 uv, float4 hands)
     for (uint glyphIndex = 0u; glyphIndex < CLOCK_MAX_NUMERAL_GLYPHS; ++glyphIndex)
     {
         const uint glyph = (numeral >> (glyphIndex * CLOCK_NUMERAL_GLYPH_BITS)) & CLOCK_NUMERAL_GLYPH_MASK;
-        if (glyph != 0u)
+        if (glyph != CLOCK_EMPTY_GLYPH)
         {
             const float offset = (float(glyphIndex) - (float(glyphCount) - 1.0f) * 0.5f) * glyphSpacing;
             glyphDistance = min(glyphDistance, ClockGlyphDistance(p - numeralCenter - float2(offset, 0.0f), glyph));

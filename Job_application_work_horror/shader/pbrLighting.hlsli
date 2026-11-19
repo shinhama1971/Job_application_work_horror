@@ -10,6 +10,7 @@
 // ============================================================================
 #ifndef PBR_LIGHTING_INCLUDED
 #define PBR_LIGHTING_INCLUDED
+#include "renderingConfig.hlsli"
 
 // ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
 #include "fastNoise.hlsli"
@@ -222,7 +223,7 @@ MetalWear GetMetalWear(float3 baseColor, float metallic, float roughness, float3
 // 環境マップ（カメラの位置から6方向を撮った景色。GameRendering の EnvironmentProbe、ReflectionProbe.cpp）。
 // 縮小画像（ミップ）の段を持ち、粗い面ほど小さくぼやけた段を読んでいる（粗さに応じてぼやけた映り込みの近似）。
 // 1面と2面の間だけ設定している。設定していない場面では黒が返るので、呼ぶ側で環境光と合わせている。
-TextureCube g_EnvironmentProbe : register(t14);
+TextureCube g_EnvironmentProbe : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_ENVIRONMENT_PROBE_TEXTURE_SLOT));
 static const float PBR_ENVIRONMENT_MIP_COUNT = 9.0f; // 256画素から1画素まで（ReflectionProbe::FaceSize と合わせている）
 
 float3 SampleEnvironment(float3 worldDirection, float roughness)

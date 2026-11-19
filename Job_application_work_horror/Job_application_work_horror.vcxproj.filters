@@ -683,6 +683,9 @@
     <ClInclude Include="StoryText.h">
       <Filter>ヘッダー ファイル\Scene\Common</Filter>
     </ClInclude>
+    <ClInclude Include="TitleStageChoices.h">
+      <Filter>ヘッダー ファイル\Scene\Common</Filter>
+    </ClInclude>
     <ClInclude Include="TitleScene.h">
       <Filter>ヘッダー ファイル\Scene\Common</Filter>
     </ClInclude>

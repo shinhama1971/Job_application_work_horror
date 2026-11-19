@@ -5,6 +5,7 @@
 // ============================================================================
 
 #include "Ground.h"
+#include "shader/renderingConfig.hlsli"
 #include "Application.h"
 #include "Game.h"
 #include "Player.h"
@@ -79,8 +80,8 @@ namespace
 	constexpr float RippleObstacleMaxHeight = 1.5f;
 	constexpr float AxisAlignedTolerance = 0.01f;
 	// シェーダーの番号（wetFloorPS.hlsl の register と合わせる）：床の定数 b10、水たまりの表 b13
-	constexpr UINT WetFloorBufferSlot = 10;
-	constexpr UINT PuddleCellBufferSlot = 13;
+	constexpr UINT WetFloorBufferSlot = SIGNAL_LOST_WET_FLOOR_BUFFER_SLOT;
+	constexpr UINT PuddleCellBufferSlot = SIGNAL_LOST_PUDDLE_CELL_BUFFER_SLOT;
 }
 
 //=======================================

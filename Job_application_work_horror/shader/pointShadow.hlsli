@@ -5,9 +5,10 @@
 // ============================================================================
 #ifndef POINT_SHADOW_INCLUDED
 #define POINT_SHADOW_INCLUDED
+#include "renderingConfig.hlsli"
 
 // 電球からの距離（光の届く範囲で割った0〜1）を6方向に書いたキューブマップ
-TextureCube<float> g_PointShadowMap : register(t2);
+TextureCube<float> g_PointShadowMap : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_POINT_SHADOW_TEXTURE_SLOT));
 
 // 少しずらして読む4つの向き（影の縁を少し柔らかくする）
 // サンプル数はテーブルとループで揃え、同じ重みで平均する。

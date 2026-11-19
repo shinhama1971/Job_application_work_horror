@@ -18,7 +18,7 @@ namespace
     // 全解像度に切り替える環境変数の値を、末尾の終端文字込みで読む。
     constexpr std::size_t FullResolutionModeBufferSize = 8;
     constexpr UINT MaxShaftLights = 256;
-    constexpr UINT ShaftResultSlot = 16;
+    constexpr UINT ShaftResultSlot = SIGNAL_LOST_LIGHT_SHAFT_TEXTURE_SLOT;
     constexpr UINT ThreadGroupWidth = SIGNAL_LOST_SHAFT_GROUP_SIZE;
     constexpr UINT ResolutionDivisor = 2;
 

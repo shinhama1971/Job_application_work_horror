@@ -11,6 +11,7 @@
 // ============================================================================
 
 #pragma once
+#include "shader/renderingConfig.hlsli"
 
 #include "CubeMapGeometry.h"
 
@@ -31,7 +32,7 @@ namespace Effect
         static constexpr int FaceSize = 256;
         // キューブマップの面の数と、キューブマップを設定する既定のテクスチャの番号（common.hlsl の t7）
         static constexpr int FaceCount = CubeMapGeometry::FaceCount;
-        static constexpr UINT DefaultTextureSlot = 7;
+        static constexpr UINT DefaultTextureSlot = SIGNAL_LOST_REFLECTION_PROBE_TEXTURE_SLOT;
 
         // slot はキューブマップを設定するテクスチャの番号。withMipChain なら、描くたびに縮小画像（ミップ）も作っている
         void Init(UINT slot = DefaultTextureSlot, bool withMipChain = false);

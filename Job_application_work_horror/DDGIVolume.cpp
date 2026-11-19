@@ -19,7 +19,7 @@ using namespace DirectX::SimpleMath;
 namespace
 {
     // 間接光の画像をピクセルシェーダーへ渡す番号（screenAmbientOcclusion.hlsli の g_ScreenIndirectLight）
-    constexpr UINT IndirectLightSlot = 18;
+    constexpr UINT IndirectLightSlot = SIGNAL_LOST_SCREEN_INDIRECT_LIGHT_TEXTURE_SLOT;
     // Compute Shader の入力の番号（ddgiCommon.hlsli・ddgiTraceCS・ddgiUpdate.hlsli・ddgiApplyCS と同じ）
     constexpr UINT PointLightsSlot = 0;
     constexpr UINT RayResultsSlot = 1;
@@ -33,7 +33,7 @@ namespace
     constexpr UINT AtlasInputCount = DistanceAtlasSlot - IrradianceAtlasSlot + 1;
     constexpr UINT ComputeInputSlotCount = DepthSlot + 1;
     // 部屋の形の定数バッファ（roomOcclusion.hlsli の b11）
-    constexpr UINT RoomShapeSlot = 11;
+    constexpr UINT RoomShapeSlot = SIGNAL_LOST_ROOM_OCCLUSION_BUFFER_SLOT;
 
     // プローブを並べる間隔の目安（1単位は約5cm。約1.5m）と、1方向に並べる数の上限、高さの段の数
     constexpr float TargetProbeSpacing = 30.0f;

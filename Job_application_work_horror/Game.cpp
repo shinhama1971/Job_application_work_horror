@@ -36,7 +36,7 @@
 namespace
 {
     // 環境マップ（キューブマップ）を設定するテクスチャの番号（シェーダーの t14）
-    constexpr UINT EnvironmentProbeTextureSlot = 14;
+    constexpr UINT EnvironmentProbeTextureSlot = SIGNAL_LOST_ENVIRONMENT_PROBE_TEXTURE_SLOT;
     // 環境マップで何も描かれない所の色。闇に溶けるよう、ほとんど黒にわずかな青みを残している
     const DirectX::SimpleMath::Color EnvironmentProbeClearColor(0.012f, 0.013f, 0.014f, 1.0f);
     // ポーズを開け閉めしたときの、コントローラーの短く弱い振動（60fpsで数えたフレーム数と強さ）

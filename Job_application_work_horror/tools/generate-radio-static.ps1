@@ -15,11 +15,26 @@ $durationSeconds = 3.0
 $sampleCount = [int]($sampleRate * $durationSeconds)
 $samples = New-Object double[] $sampleCount
 $random = New-Object System.Random 2024
+$lowPassCutoffHz = 3000.0
+$highPassCutoffHz = 300.0
+$crackleMinSeconds = 0.004
+$crackleExtraSeconds = 0.020
+$crackleMinGain = 0.6
+$crackleExtraGain = 0.9
+$loopBlendSeconds = 0.25
+$targetPeak = 0.7
+$wobbleBase = 0.72
+$wobbleFirstGain = 0.18
+$wobbleSecondGain = 0.10
+$wobbleFirstHz = 2.3
+$wobbleSecondHz = 0.7
+$wobbleSecondPhase = 1.3
+$staticGain = 2.2
 
 # 白い雑音を、小さなラジオのスピーカーのように、低い音と高い音を削った帯域（約300Hz〜3kHz）にしている。
 # 1次の低域通過と高域通過を重ねた、簡単なフィルター。
-$lowPassAlpha = 1.0 - [Math]::Exp(-2.0 * [Math]::PI * 3000.0 / $sampleRate)
-$highPassAlpha = [Math]::Exp(-2.0 * [Math]::PI * 300.0 / $sampleRate)
+$lowPassAlpha = 1.0 - [Math]::Exp(-2.0 * [Math]::PI * $lowPassCutoffHz / $sampleRate)
+$highPassAlpha = [Math]::Exp(-2.0 * [Math]::PI * $highPassCutoffHz / $sampleRate)
 $lowPassed = 0.0
 $previousLowPassed = 0.0
 $highPassed = 0.0
@@ -36,16 +51,16 @@ for ($i = 0; $i -lt $sampleCount; $i++) {
     $lowPassed += $lowPassAlpha * ($white - $lowPassed)
     $highPassed = $highPassAlpha * ($highPassed + $lowPassed - $previousLowPassed)
     $previousLowPassed = $lowPassed
-    $value = $highPassed * 2.2
+    $value = $highPassed * $staticGain
 
     # 電波が揺れるように、音の大きさをゆっくり（2.3Hzと0.7Hz）揺らしている
-    $wobble = 0.72 + 0.18 * [Math]::Sin(2.0 * [Math]::PI * 2.3 * $t) + 0.10 * [Math]::Sin(2.0 * [Math]::PI * 0.7 * $t + 1.3)
+    $wobble = $wobbleBase + $wobbleFirstGain * [Math]::Sin(2.0 * [Math]::PI * $wobbleFirstHz * $t) + $wobbleSecondGain * [Math]::Sin(2.0 * [Math]::PI * $wobbleSecondHz * $t + $wobbleSecondPhase)
     $value *= $wobble
 
     # パチパチ：まれに短く大きな雑音の粒を足している
     if ($crackleTimer -le 0 -and $random.NextDouble() -lt $crackleChancePerSample) {
-        $crackleTimer = [int]($sampleRate * (0.004 + $random.NextDouble() * 0.020))
-        $crackleAmplitude = 0.6 + $random.NextDouble() * 0.9
+        $crackleTimer = [int]($sampleRate * ($crackleMinSeconds + $random.NextDouble() * $crackleExtraSeconds))
+        $crackleAmplitude = $crackleMinGain + $random.NextDouble() * $crackleExtraGain
     }
     if ($crackleTimer -gt 0) {
         $value += ($random.NextDouble() * 2.0 - 1.0) * $crackleAmplitude
@@ -58,7 +73,7 @@ for ($i = 0; $i -lt $sampleCount; $i++) {
 }
 
 # ループしたときにつなぎ目が聞こえないよう、最後の0.25秒と最初の0.25秒を重ねてなめらかにつないでいる
-$blend = [int](0.25 * $sampleRate)
+$blend = [int]($loopBlendSeconds * $sampleRate)
 for ($i = 0; $i -lt $blend; $i++) {
     $weight = $i / $blend
     $tailIndex = $sampleCount - $blend + $i
@@ -71,7 +86,7 @@ $loopSamples = New-Object double[] $loopCount
 # 最大音量を0.7にそろえて16bitへ変換する
 $peak = 0.0
 foreach ($value in $loopSamples) { $peak = [Math]::Max($peak, [Math]::Abs($value)) }
-$scale = 0.7 / $peak
+$scale = $targetPeak / $peak
 
 $outputPath = Join-Path (Split-Path -Parent $PSScriptRoot) "assets\Audio\radio_static.wav"
 $stream = [System.IO.File]::Create($outputPath)

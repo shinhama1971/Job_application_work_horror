@@ -39,7 +39,6 @@ void ForestRadio::Stop()
 
 float ForestRadio::Update(float deltaTime, const DirectX::SimpleMath::Vector3& playerPosition)
 {
-    static_assert(std::size(StoryText::TransmissionLines) == LineCount, "ForestRadio::LineCount must match StoryText");
     m_Time += deltaTime;
     float noise = 0.0f;
 

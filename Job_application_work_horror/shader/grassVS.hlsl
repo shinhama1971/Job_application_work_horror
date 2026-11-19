@@ -1,12 +1,13 @@
 // 葉先の計算結果から、曲がった細い帯を作っている。頂点バッファを持たず、番号から3次ベジェ曲線をたどる。
 #include "common.hlsl"
+#include "renderingConfig.hlsli"
 
-cbuffer ShadowBuffer : register(b8)
+cbuffer ShadowBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_FLASHLIGHT_SHADOW_BUFFER_SLOT))
 {
     matrix ShadowViewProjection;
     float4 ShadowParameters;
 }
-cbuffer GrassDrawBuffer : register(b9)
+cbuffer GrassDrawBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_OBJECT_DRAW_BUFFER_SLOT))
 {
     uint InstanceOffset;
     uint Segments;

@@ -3,10 +3,11 @@
 // 定数バッファのスロットと入出力の形は、CPU側の定義と一致させている。
 // ============================================================================
 
+#include "renderingConfig.hlsli"
 #include "common.hlsl"
 
 // 影の計算に使う、ライトのビュー×射影の行列（ShadowMap.cppと同じ並び）
-cbuffer ShadowBuffer : register(b8)
+cbuffer ShadowBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_FLASHLIGHT_SHADOW_BUFFER_SLOT))
 {
     matrix ShadowViewProjection;
     float4 ShadowParameters;

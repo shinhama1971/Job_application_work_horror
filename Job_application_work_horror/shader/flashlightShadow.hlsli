@@ -3,13 +3,14 @@
 // litTexturePS と wetFloorPS の影の品質を、同じ場所で調整できるようにしている。
 // ============================================================================
 
+#include "renderingConfig.hlsli"
 // シャドウマップ（t5）と、深度を比べて読む比較サンプラー（s1）
-Texture2D<float> g_FlashlightShadowMap : register(t5);
-SamplerComparisonState g_ShadowSampler : register(s1);
+Texture2D<float> g_FlashlightShadowMap : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_FLASHLIGHT_SHADOW_TEXTURE_SLOT));
+SamplerComparisonState g_ShadowSampler : register(SIGNAL_LOST_SAMPLER_REGISTER(SIGNAL_LOST_SHADOW_COMPARISON_SAMPLER_SLOT));
 
 // ライトのビュー×射影の行列と、x=1テクセルの大きさ、y=比較のずれ、z=near、w=far（ShadowMap.cppと同じ並び）、
 // 影の方式（x=0なら影なし、1なら硬い影、2ならPCSS。技術デモで見比べるために切り替えている）
-cbuffer ShadowBuffer : register(b8)
+cbuffer ShadowBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_FLASHLIGHT_SHADOW_BUFFER_SLOT))
 {
     matrix ShadowViewProjection;
     float4 ShadowParameters;

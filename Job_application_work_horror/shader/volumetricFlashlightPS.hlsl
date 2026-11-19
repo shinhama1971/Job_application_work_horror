@@ -2,6 +2,7 @@
 // シェーダーの役割: 懐中電灯の光の筋（空気中の霧やちりで光が見える散乱）を、画面に重ねている。
 // ============================================================================
 
+#include "renderingConfig.hlsli"
 // 頂点シェーダーから受け取る値
 struct PS_IN
 {
@@ -26,13 +27,13 @@ struct LIGHT
     float4 SpotParams;
 };
 
-cbuffer LightBuffer : register(b3)
+cbuffer LightBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_LIGHT_BUFFER_SLOT))
 {
     LIGHT Light;
 };
 
 // シャドウマップの行列とパラメーター（b8。z=near、w=farを使っている）
-cbuffer ShadowBuffer : register(b8)
+cbuffer ShadowBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_FLASHLIGHT_SHADOW_BUFFER_SLOT))
 {
     matrix ShadowViewProjection;
     float4 ShadowParameters;
@@ -44,7 +45,7 @@ cbuffer ShadowBuffer : register(b8)
 #undef WATER_CAUSTICS_COMPACT_BUFFER
 
 // 懐中電灯から見た深度（シャドウマップ、t5）とサンプラー
-Texture2D<float> FlashlightDepth : register(t5);
+Texture2D<float> FlashlightDepth : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_FLASHLIGHT_SHADOW_TEXTURE_SLOT));
 SamplerState LinearSampler : register(s0);
 
 // 疑似乱数の係数（Dave Hoskins の hash12。決まった値）

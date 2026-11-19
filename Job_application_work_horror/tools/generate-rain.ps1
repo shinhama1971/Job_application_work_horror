@@ -19,14 +19,22 @@ $durationSeconds = 8.0
 $sampleCount = [int]($sampleRate * $durationSeconds)
 $samples = New-Object double[] $sampleCount
 $random = New-Object System.Random 1109
+$rainHighCutHz = 6000.0
+$rainLowCutHz = 500.0
+$rumbleCutHz = 250.0
+$fineDropsPerSecond = 90.0
+$largeDropsPerSecond = 2.0
+$dropDecayLengths = 5.0
+$tailBlendSeconds = 0.5
+$targetPeak = 0.7
 
 # 1次の低域通過・高域通過の係数
 function Get-LowPassAlpha([double]$cutoff) { return 1.0 - [Math]::Exp(-2.0 * [Math]::PI * $cutoff / $sampleRate) }
 function Get-HighPassAlpha([double]$cutoff) { return [Math]::Exp(-2.0 * [Math]::PI * $cutoff / $sampleRate) }
 
-$bandLow = Get-LowPassAlpha 6000.0
-$bandHigh = Get-HighPassAlpha 500.0
-$rumbleLow = Get-LowPassAlpha 250.0
+$bandLow = Get-LowPassAlpha $rainHighCutHz
+$bandHigh = Get-HighPassAlpha $rainLowCutHz
+$rumbleLow = Get-LowPassAlpha $rumbleCutHz
 $lowPassed = 0.0
 $previousLowPassed = 0.0
 $highPassed = 0.0
@@ -46,7 +54,7 @@ for ($i = 0; $i -lt $sampleCount; $i++) {
 
 # 短く減衰する音を1つ足している（frequency の正弦波に、少し雑音を混ぜている）
 function Add-Drop([int]$start, [double]$frequency, [double]$decaySeconds, [double]$amplitude) {
-    $length = [int]($decaySeconds * 5.0 * $sampleRate)
+    $length = [int]($decaySeconds * $dropDecayLengths * $sampleRate)
     for ($k = 0; $k -lt $length; $k++) {
         $index = $start + $k
         if ($index -ge $sampleCount) { $index -= $sampleCount }
@@ -58,18 +66,18 @@ function Add-Drop([int]$start, [double]$frequency, [double]$decaySeconds, [doubl
 }
 
 # 細かい粒（ループの端をまたぐ粒は、先頭へ回して足しているので、つなぎ目でも途切れない）
-$fineCount = [int](90 * $durationSeconds)
+$fineCount = [int]($fineDropsPerSecond * $durationSeconds)
 for ($n = 0; $n -lt $fineCount; $n++) {
     Add-Drop ($random.Next($sampleCount)) (2000.0 + $random.NextDouble() * 4000.0) (0.0015 + $random.NextDouble() * 0.003) (0.05 + $random.NextDouble() * 0.12)
 }
 # 大きな滴
-$largeCount = [int](2 * $durationSeconds)
+$largeCount = [int]($largeDropsPerSecond * $durationSeconds)
 for ($n = 0; $n -lt $largeCount; $n++) {
     Add-Drop ($random.Next($sampleCount)) (600.0 + $random.NextDouble() * 900.0) (0.008 + $random.NextDouble() * 0.012) (0.12 + $random.NextDouble() * 0.15)
 }
 
 # ループしたときにつなぎ目が聞こえないよう、最後の0.5秒と最初の0.5秒を重ねてなめらかにつないでいる
-$blend = [int](0.5 * $sampleRate)
+$blend = [int]($tailBlendSeconds * $sampleRate)
 for ($i = 0; $i -lt $blend; $i++) {
     $weight = $i / $blend
     $tailIndex = $sampleCount - $blend + $i
@@ -82,7 +90,7 @@ $loopSamples = New-Object double[] $loopCount
 # 最大音量を0.7にそろえて16bitへ変換する
 $peak = 0.0
 foreach ($value in $loopSamples) { $peak = [Math]::Max($peak, [Math]::Abs($value)) }
-$scale = 0.7 / $peak
+$scale = $targetPeak / $peak
 
 $outputPath = Join-Path (Split-Path -Parent $PSScriptRoot) "assets\Audio\rain.wav"
 $stream = [System.IO.File]::Create($outputPath)

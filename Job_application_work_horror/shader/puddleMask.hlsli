@@ -16,7 +16,7 @@
 // sin を使った乱数をシェーダーで計算すると、GPUの種類で sin の精度が違い、水たまりの場所が変わるため、表にしている。
 #define PUDDLE_CELL_MIN SIGNAL_LOST_PUDDLE_CELL_MIN
 #define PUDDLE_CELL_COUNT SIGNAL_LOST_PUDDLE_CELL_COUNT
-cbuffer PuddleCellBuffer : register(b13)
+cbuffer PuddleCellBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_PUDDLE_CELL_BUFFER_SLOT))
 {
     float4 PuddleCells[PUDDLE_CELL_COUNT * PUDDLE_CELL_COUNT];
     // マス目の区切りをずらす量（xy = x・z）。1面は0、2面は廊下の中心にマス目の中心が来るようにずらしている

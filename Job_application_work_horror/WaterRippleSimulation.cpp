@@ -42,8 +42,8 @@ namespace
     // 1歩ごとに高さに掛ける値。約1.6秒で半分の高さになる（波が遅くなった分、少し長く残している）
     constexpr float Damping = 0.993f;
     // シェーダーの番号：床が読む波の高さ t9（waterCaustics.hlsli）と、波の計算が読む水たまりの表 b13（waterRippleCS.hlsl）
-    constexpr UINT RippleHeightTextureSlot = 9;
-    constexpr UINT PuddleCellBufferSlot = 13;
+    constexpr UINT RippleHeightTextureSlot = SIGNAL_LOST_RIPPLE_HEIGHT_TEXTURE_SLOT;
+    constexpr UINT PuddleCellBufferSlot = SIGNAL_LOST_PUDDLE_CELL_BUFFER_SLOT;
 }
 
 void WaterRippleSimulation::Init(int resolution, float worldSize)

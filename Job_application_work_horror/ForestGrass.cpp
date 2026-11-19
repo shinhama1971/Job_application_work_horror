@@ -210,7 +210,7 @@ namespace
     constexpr float BrightnessRandomMin = 0.8f;
     constexpr float BrightnessRandomRange = 0.4f;
     // 草を描く定数のシェーダーの番号（grassVS.hlsl の b9）
-    constexpr UINT GrassDrawBufferSlot = 9;
+    constexpr UINT GrassDrawBufferSlot = SIGNAL_LOST_OBJECT_DRAW_BUFFER_SLOT;
     // LOD の段階（grassVS.hlsl の色分けと同じ：1 = 近い、2 = 中くらい、3 = 遠い）
     constexpr std::uint32_t NearLodLevel = 1;
     constexpr std::uint32_t MiddleLodLevel = 2;

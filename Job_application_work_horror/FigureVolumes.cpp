@@ -17,9 +17,9 @@
 namespace
 {
     // ピクセルシェーダーの番号（shader/figureVolume.hlsli と同じ）
-    constexpr UINT SelfSlot = 6;
-    constexpr UINT FigureSlot = 13;
-    constexpr UINT SamplerSlot = 2;
+    constexpr UINT SelfSlot = SIGNAL_LOST_SELF_VOLUME_TEXTURE_SLOT;
+    constexpr UINT FigureSlot = SIGNAL_LOST_FIGURE_VOLUME_TEXTURE_SLOT;
+    constexpr UINT SamplerSlot = SIGNAL_LOST_FIGURE_VOLUME_SAMPLER_SLOT;
 
     // tools/maya/build_figure_volumes.py が書き出す識別子・形式番号と、float16 の格納単位。
     constexpr char VolumeMagic[] = "SDFV";

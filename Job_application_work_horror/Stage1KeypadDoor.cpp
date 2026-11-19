@@ -25,7 +25,6 @@ namespace
     constexpr int DialRumbleFrames = 1;
     constexpr float DialRumbleStrength = 0.03f;
     // この回数以上間違えると、扉の向こうの気配を強くする（配管を叩く音の高さと音量、画面の脈打ち）
-    constexpr int WarningMistakeCount = 3;
     constexpr float WarningKnockPitch = 0.82f;
     constexpr float WarningKnockVolume = 1.3f;
     constexpr float WarningPulseStrength = 0.20f;
@@ -185,7 +184,7 @@ void Stage1KeypadDoor::HandleInput(Player& player)
     m_WrongTimer = WrongFeedbackSeconds;
     m_Lock.ResetEntry();
     m_Parts.door->Interact(player);
-    if (m_Lock.GetMistakes() >= WarningMistakeCount)
+    if (m_Lock.GetMistakes() >= KeypadLock::WarningMistakeCount)
     {
         // 何度も（3回以上）間違えると、扉の向こうの気配を強くしている。
         game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, m_Parts.door->GetPosition(), WarningKnockPitch, WarningKnockVolume);

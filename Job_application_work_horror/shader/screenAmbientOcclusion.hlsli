@@ -5,10 +5,11 @@
 // ============================================================================
 #ifndef SCREEN_AMBIENT_OCCLUSION_INCLUDED
 #define SCREEN_AMBIENT_OCCLUSION_INCLUDED
+#include "renderingConfig.hlsli"
 
 // x = 環境遮蔽（1 = 遮る物なし、0 = 完全に囲まれている）、y = 天井の照明の接触影（1 = 影なし）。
 // 描く範囲の縦横半分の大きさで、描く範囲の左上が(0, 0)（ambientOcclusionCS.hlsl）
-Texture2D<float2> g_ScreenAmbientOcclusion : register(t15);
+Texture2D<float2> g_ScreenAmbientOcclusion : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_SCREEN_AO_TEXTURE_SLOT));
 
 // 各 Compute Shader が書く解像度に合わせて、本描画の画素を読み取り先へ変換する。
 #define SCREEN_OCCLUSION_UV_SCALE 0.5f
@@ -36,7 +37,7 @@ float GetScreenAmbientOcclusion(float2 pixelPosition)
 
 // DDGI の間接光（壁や床で跳ね返った光。DDGIVolume の ddgiApplyCS が縦横半分の解像度で求めた画像。t18）。
 // 環境遮蔽と同じく、本描画のときだけ使う（使わない場面では0）
-Texture2D<float4> g_ScreenIndirectLight : register(t18);
+Texture2D<float4> g_ScreenIndirectLight : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_SCREEN_INDIRECT_LIGHT_TEXTURE_SLOT));
 // 間接光を、照明（lighting）に足す強さ
 static const float SCREEN_INDIRECT_LIGHT_INTENSITY = 1.0f;
 

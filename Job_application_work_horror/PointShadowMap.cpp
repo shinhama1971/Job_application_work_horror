@@ -37,7 +37,7 @@ namespace
         { Vector3(0.0f, 0.0f, 1.0f), Vector3(0.0f, 1.0f, 0.0f) },
     };
     // キューブマップを設定するテクスチャの番号
-    constexpr UINT ShadowSlot = 2;
+    constexpr UINT ShadowSlot = SIGNAL_LOST_POINT_SHADOW_TEXTURE_SLOT;
 }
 
 namespace Effect

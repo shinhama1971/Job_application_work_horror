@@ -68,7 +68,7 @@ namespace
     constexpr float StreakIntensityBase = 0.6f;
     constexpr float StreakIntensityRange = 0.4f;
     // 雨を描く定数のシェーダーの番号（rainVS.hlsl の b9）
-    constexpr UINT RainDrawBufferSlot = 9;
+    constexpr UINT RainDrawBufferSlot = SIGNAL_LOST_OBJECT_DRAW_BUFFER_SLOT;
     // 雨の4頂点の板（1粒・1つのしぶきごと）
     constexpr UINT RainQuadVertexCount = 4;
 }

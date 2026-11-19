@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "Stage2Layout.h"
+#include "shader/renderingConfig.hlsli"
 
 #include "SceneLayoutBuilder.h"
 
@@ -72,7 +73,7 @@ namespace
     constexpr float SignalMarkerShininess = 48.0f;
 
     // 肖像画（古い油絵のニスの弱い光沢）
-    const Color PortraitColor(0.075f, 0.058f, 0.044f, 1.0f);
+    const Color PortraitColor(SIGNAL_LOST_PORTRAIT_BASE_RGB, 1.0f);
     constexpr float PortraitShininess = 18.0f;
     // 肖像画の額縁（くすんだ金色）。PBRでは金箔の金属として描くので、色は金の映り込みの色（黒ずんだ分だけ暗く）にし、
     // 埃の膜の分だけ金属らしさを下げている
@@ -82,7 +83,7 @@ namespace
     constexpr float PortraitFrameRoughness = 0.45f;
 
     // 時計の文字盤の地の色と、覆っているガラスのなめらかさ（PBR）
-    const Color ClockFaceColor(0.095f, 0.086f, 0.070f, 1.0f);
+    const Color ClockFaceColor(SIGNAL_LOST_CLOCK_BASE_RGB, 1.0f);
     constexpr float ClockGlassMetallic = 0.0f;
     constexpr float ClockGlassRoughness = 0.12f;
 
@@ -112,7 +113,7 @@ namespace
     constexpr float DoorIndicatorShininess = 24.0f;
 
     // 偽の扉：板の色、取っ手の色（作るときの色と、くすんだ真鍮の映り込みの色）、光沢となめらかさ
-    const Color FalseDoorPanelColor(0.07f, 0.025f, 0.018f, 1.0f);
+    const Color FalseDoorPanelColor(SIGNAL_LOST_FALSE_DOOR_BASE_RGB, 1.0f);
     const Color FalseDoorHandleColor(0.16f, 0.09f, 0.025f, 1.0f);
     const Color FalseDoorBrassColor(0.72f, 0.50f, 0.20f, 1.0f);
     constexpr float FalseDoorHandleShininess = 40.0f;

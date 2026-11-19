@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "Hud.h"
+#include "TitleStageChoices.h"
 #include "StoryText.h"
 
 #include <algorithm>
@@ -135,7 +136,7 @@ namespace TitleLayout
 
     // --- 始める面の選択：枠の幅と高さ（4つでも下の位置が3つのときと同じになるよう低め）、すき間、文字の大きさ、上の位置、
     // 選んでいる面・いない面の地の色、縁の太さ、左の太い印の幅、文字の字下げ
-    constexpr int StageCount = 4;
+    constexpr int StageCount = TitleStageChoices::Count;
     constexpr float StageBoxWidth = 340.0f;
     constexpr float StageBoxHeight = 34.0f;
     constexpr float StageBoxGap = 6.0f;
@@ -158,7 +159,6 @@ namespace TitleLayout
     // 操作の説明（左下）：下からの位置、行の間隔、行の数
     constexpr float ControlsBottom = 118.0f;
     constexpr float ControlsLineSpacing = 24.0f;
-    constexpr int ControlLineCount = 3;
 
     // --- 右上の受信表示：右端からの距離、明滅（1秒のうち点いている割合）、印の位置と大きさ、色（受信中・信号なし）、
     // 文字の位置（印からの距離・上の位置・2行目・時刻の横の位置）と大きさ、信号なしにするノイズの強さ
@@ -270,15 +270,6 @@ void Hud::DrawTitle(
     AddText(Left + Indent, TitleY + titleHeight + TaglineGap, "終わらない廊下から脱出する", TaglinePixelSize, TextColor);
 
     // --- 始める面の選択：縦に4つ並べ、選んでいる面の枠を明るくし、その下に説明を出している（試作中の3面は一番下）
-    constexpr std::string_view stageNames[StageCount] =
-        { "1面  森から研究所へ", "2面  ループする廊下", "1面  森を飛ばして始める", "3面  通信室（試作）" };
-    constexpr std::string_view stageNotes[StageCount] =
-    {
-        "雨の森を歩いて研究所に入る  クリアの記録が残る",
-        "2面から遊ぶ  クリアしても記録には残らない",
-        "受信記録を見て、研究所の中から始める",
-        "試作中の3面から遊ぶ  クリアしても記録には残らない"
-    };
     const int stage = (std::clamp)(selectedStage, 0, StageCount - 1);
     for (int index = 0; index < StageCount; ++index)
     {
@@ -298,10 +289,10 @@ void Hud::DrawTitle(
             AddRectangle(Left, boxY, BorderWidth, StageBoxHeight, DimGreen);
         }
         AddText(Left + StageTextIndent, boxY + (StageBoxHeight - StageTextPixelSize * GlyphRows) * 0.5f,
-            stageNames[index], StageTextPixelSize, selected ? TitleGreen : FaintColor);
+            TitleStageChoices::Entries[index].Name, StageTextPixelSize, selected ? TitleGreen : FaintColor);
     }
     const float afterStages = StageTop + StageCount * (StageBoxHeight + StageBoxGap);
-    AddText(Left + Indent, afterStages + NoteGap, stageNotes[stage], NotePixelSize, TextColor);
+    AddText(Left + Indent, afterStages + NoteGap, TitleStageChoices::Entries[stage].Description, NotePixelSize, TextColor);
 
     // 開始と終了の操作
     const bool controller = Input::IsControllerConnected();
@@ -321,13 +312,13 @@ void Hud::DrawTitle(
     }
 
     // 操作の説明（左下）。コントローラーがつながっていれば、コントローラーのボタン名で表示している
-    const std::string_view controls[ControlLineCount] =
+    const std::string_view controls[] =
     {
         controller ? "左スティック 移動  右スティック 視点  A 調べる" : "WASD 移動  マウス 視点  E 調べる",
         controller ? "左スティック押し込み 走る  Y ライト" : "SHIFT 走る  F ライト",
         controller ? "LB ヒント  START ポーズ" : "H ヒント  ESC または P ポーズ",
     };
-    for (int line = 0; line < ControlLineCount; ++line)
+    for (int line = 0; line < static_cast<int>(std::size(controls)); ++line)
     {
         AddText(Left + Indent, screenHeight - ControlsBottom + static_cast<float>(line) * ControlsLineSpacing,
             controls[line], NotePixelSize, FaintColor);
@@ -1067,7 +1058,6 @@ namespace KeypadLayout
     constexpr float ArrowTopGap = 22.0f;
     constexpr float ArrowBottomGap = 19.0f;
     // 扉の向こうの気配を知らせる間違いの回数
-    constexpr int WarningMistakeCount = 3;
     // 下のメッセージと操作の説明：位置と大きさ
     constexpr float MessageY = 222.0f;
     constexpr float MessagePixelSize = 2.4f;
@@ -1140,7 +1130,7 @@ void Hud::DrawKeypad(
 
     // 下のメッセージ：間違えた直後は「番号が違う」、3回以上間違えると扉の向こうの気配を知らせている
     const std::string_view message = wrongRate > 0.0f
-        ? (mistakes >= WarningMistakeCount ? "扉の向こうで何かが動いた" : "番号が違う")
+        ? (mistakes >= KeypadLock::WarningMistakeCount ? "扉の向こうで何かが動いた" : "番号が違う")
         : "壁の数字を懐中電灯で探す";
     AddCenteredText(panelY + MessageY, message, MessagePixelSize, wrongRate > 0.0f ? Red : Pale);
     AddCenteredText(panelY + HelpY,

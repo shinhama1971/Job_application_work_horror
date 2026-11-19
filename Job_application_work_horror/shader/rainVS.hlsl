@@ -6,8 +6,9 @@
 // ・しぶき：地面の上に寝かせた四角形。0.45秒ごとに場所を変え、ピクセルシェーダーで広がる輪にしている。
 // ・屋根やひさしの下（Occluders）と、地面より下の雨粒は描かない。
 #include "common.hlsl"
+#include "renderingConfig.hlsli"
 
-cbuffer ShadowBuffer : register(b8)
+cbuffer ShadowBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_FLASHLIGHT_SHADOW_BUFFER_SLOT))
 {
     matrix ShadowViewProjection;
     float4 ShadowParameters;
@@ -16,7 +17,7 @@ cbuffer ShadowBuffer : register(b8)
 #define RAIN_MAX_OCCLUDERS 8
 #define RAIN_ROOF_HEIGHTS_PER_VECTOR 4u
 // ForestRain.cpp の RainDrawParams と同じ並び（b9）
-cbuffer RainDrawBuffer : register(b9)
+cbuffer RainDrawBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_OBJECT_DRAW_BUFFER_SLOT))
 {
     float3 CameraPosition;
     float Time;

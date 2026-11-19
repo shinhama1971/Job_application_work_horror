@@ -10,9 +10,10 @@
 // ============================================================================
 #ifndef VIEW_MODEL_INCLUDED
 #define VIEW_MODEL_INCLUDED
+#include "renderingConfig.hlsli"
 
 // FirstPersonHands.cpp の VIEW_MODEL_BUFFER と同じ並び（b9。頂点シェーダーとピクセルシェーダーの両方で使う）
-cbuffer ViewModelBuffer : register(b9)
+cbuffer ViewModelBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_OBJECT_DRAW_BUFFER_SLOT))
 {
     // 手元を描く射影行列（本描画より画角を狭め、手前の面を0.1まで描く）
     matrix ViewModelProjection;

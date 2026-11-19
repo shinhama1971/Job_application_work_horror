@@ -10,6 +10,7 @@
 // ============================================================================
 #ifndef WATER_CAUSTICS_INCLUDED
 #define WATER_CAUSTICS_INCLUDED
+#include "renderingConfig.hlsli"
 
 // ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
 #include "fastNoise.hlsli"
@@ -17,7 +18,7 @@
 
 
 // 水たまりの波のシミュレーションの高さ（t9。WaterRippleSimulationが毎フレーム計算している）。x = 今の高さ、y = 1つ前の高さ
-Texture2D<float2> g_WaterRipples : register(t9);
+Texture2D<float2> g_WaterRipples : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_RIPPLE_HEIGHT_TEXTURE_SLOT));
 // 波のマス目の数（1面・2面は256、外の森は768）。テクスチャの大きさから読んでいる
 int GetWaterRippleResolution()
 {

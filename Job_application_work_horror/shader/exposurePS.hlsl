@@ -4,6 +4,7 @@
 // 定数バッファのスロットと入出力の形は、CPU側の定義と一致させている。
 // ============================================================================
 
+#include "renderingConfig.hlsli"
 // 頂点シェーダー（unlitTextureVS）から受け取る値
 struct PS_IN
 {
@@ -20,7 +21,7 @@ Texture2D sceneTexture : register(t0);
 SamplerState sceneSampler : register(s0);
 
 // 自動露出の結果（autoExposureCS.hlslが書いている）。[0]は慣れた明るさ、[1]は露出の倍率
-StructuredBuffer<float> AutoExposureState : register(t3);
+StructuredBuffer<float> AutoExposureState : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_AUTO_EXPOSURE_TEXTURE_SLOT));
 
 // 画面内の暗がりは近傍の標本を使って判定する。
 #define EXPOSURE_LOCAL_SAMPLE_OFFSET_TEXELS 5.0f

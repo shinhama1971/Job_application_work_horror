@@ -54,6 +54,7 @@ namespace
     constexpr float EntranceBehindFlickerSeconds = 1.12f;
 
     // --- 左の倉庫の演出：2回目に倉庫の奥（x・z がこれより小さい所）へ入ったら、物音の後に影を出す
+    constexpr int StorageScareEndsAtFuseCount = 2;
     constexpr float StorageScareEnterMaxX = -110.0f;
     constexpr float StorageScareEnterMaxZ = -108.0f;
     // 物音から影を出すまでの秒数と、そのときまだ倉庫の中（x・z がこれより小さい所）にいるか
@@ -425,7 +426,7 @@ void StageScene::UpdateStorageScare(Player& player)
 
     Core::Game* game = Core::Game::GetInstance();
     const Vector3 position = player.GetPosition();
-    if (game->IsPowerRestored() || game->GetItemCount() >= 2)
+    if (game->IsPowerRestored() || game->GetItemCount() >= StorageScareEndsAtFuseCount)
     {
         m_StorageScarePhase = StorageScarePhase::Finished;
         return;

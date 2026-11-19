@@ -12,9 +12,9 @@
 namespace
 {
     // 前のフレームの画面と、写し取った深度を読むテクスチャの番号
-    constexpr UINT SceneSlot = 4;
-    constexpr UINT DepthSlot = 8;
-    constexpr UINT PreviousDepthSlot = 17;
+    constexpr UINT SceneSlot = SIGNAL_LOST_SSR_SCENE_TEXTURE_SLOT;
+    constexpr UINT DepthSlot = SIGNAL_LOST_SSR_DEPTH_TEXTURE_SLOT;
+    constexpr UINT PreviousDepthSlot = SIGNAL_LOST_SSR_PREVIOUS_DEPTH_TEXTURE_SLOT;
     // rayReflection.hlsli の SSR_HISTORY_MAX_BLUR_LOD に対応する LOD 0〜3。
     constexpr UINT HistoryMipLevels = SIGNAL_LOST_SSR_HISTORY_MIP_LEVELS;
 }

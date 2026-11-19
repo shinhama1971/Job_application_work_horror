@@ -19,7 +19,7 @@ struct PS_IN
 // 描いた画面（t0）とサンプラー（s0）
 Texture2D SceneTexture : register(t0);
 // 残像に使う、少し前に写し取って止めておいた画面（PostProcess の m_EchoTexture）
-Texture2D EchoTexture : register(t1);
+Texture2D EchoTexture : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_CRT_ECHO_TEXTURE_SLOT));
 SamplerState LinearSampler : register(s0);
 
 // 粒状のノイズには、三角関数を使わない FastHash21 を共用する。

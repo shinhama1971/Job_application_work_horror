@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "FullScreenQuad.h"
+#include "shader/renderingConfig.hlsli"
 #include "Application.h"
 
 using namespace DirectX::SimpleMath;
@@ -15,7 +16,7 @@ namespace
     // 画面を覆う四角形の頂点の数（三角形の帯で描く）
     constexpr UINT QuadVertexCount = 4;
     // 残像の少し前の画面を読むテクスチャの番号（crtOverlayPS.hlsl の t1）
-    constexpr UINT EchoTextureSlot = 1;
+    constexpr UINT EchoTextureSlot = SIGNAL_LOST_CRT_ECHO_TEXTURE_SLOT;
     // 三角形ストリップの順に、位置とUVで同じ四隅を参照する。
     constexpr UINT TopLeftVertex = 0;
     constexpr UINT TopRightVertex = 1;
@@ -24,7 +25,7 @@ namespace
     // コマ落ちしているかを見るしきい値（0 か 1。crtOverlayPS.hlsl の CRT_FRAME_HOLD_THRESHOLD と同じ）
     constexpr float FrameHoldThreshold = 0.5f;
     // 自動露出の倍率を読むシェーダーの番号（exposurePS.hlsl の t3）
-    constexpr UINT AutoExposureTextureSlot = 3;
+    constexpr UINT AutoExposureTextureSlot = SIGNAL_LOST_AUTO_EXPOSURE_TEXTURE_SLOT;
 }
 
 namespace Graphics

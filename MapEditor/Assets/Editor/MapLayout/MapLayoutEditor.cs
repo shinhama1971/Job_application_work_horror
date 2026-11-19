@@ -614,7 +614,9 @@ namespace MapLayout.Editor
                         result[item] = item.LineIndex;
                         continue;
                     }
-                    var matches = Enumerable.Range(0, document.Lines.Count).Where(MatchesSource).Take(2).ToArray();
+                    // 一意かを判断できた時点で検索を打ち切る。
+                    const int ambiguousMatchCount = 2;
+                    var matches = Enumerable.Range(0, document.Lines.Count).Where(MatchesSource).Take(ambiguousMatchCount).ToArray();
                     result[item] = matches.Length == 1 ? matches[0] : -1;
                 }
                 else if (Matches(item.LineIndex))

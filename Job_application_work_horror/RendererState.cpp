@@ -15,9 +15,9 @@ namespace
 	// シェーダーの番号（common.hlsl・roomOcclusion.hlsli・waterCaustics.hlsli の register と合わせる）：
 	// デバッグ表示の b7、部屋の形の b11、水面の光と反射の b12、水たまりの波の高さの t9
 	constexpr UINT DebugViewBufferSlot = SIGNAL_LOST_DEBUG_VIEW_BUFFER_SLOT;
-	constexpr UINT RoomOcclusionBufferSlot = 11;
-	constexpr UINT WaterCausticsBufferSlot = 12;
-	constexpr UINT RippleHeightTextureSlot = 9;
+	constexpr UINT RoomOcclusionBufferSlot = SIGNAL_LOST_ROOM_OCCLUSION_BUFFER_SLOT;
+	constexpr UINT WaterCausticsBufferSlot = SIGNAL_LOST_WATER_CAUSTICS_BUFFER_SLOT;
+	constexpr UINT RippleHeightTextureSlot = SIGNAL_LOST_RIPPLE_HEIGHT_TEXTURE_SLOT;
 }
 
 //--------------------------------------------------------------------------------------

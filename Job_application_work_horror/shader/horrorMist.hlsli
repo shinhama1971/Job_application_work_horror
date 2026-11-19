@@ -10,6 +10,7 @@
 // ============================================================================
 #ifndef HORROR_MIST_INCLUDED
 #define HORROR_MIST_INCLUDED
+#include "renderingConfig.hlsli"
 
 // ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
 #include "fastNoise.hlsli"
@@ -128,7 +129,7 @@ float3 ApplyHorrorMist(float3 color, float3 worldPosition, float3 viewPosition, 
 #define MIST_IGN_SCALE 52.9829189f
 #define MIST_IGN_DIRECTION float2(0.06711056f, 0.00583715f)
 
-Texture2D<float4> g_HalfLightShafts : register(t16);
+Texture2D<float4> g_HalfLightShafts : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_LIGHT_SHAFT_TEXTURE_SLOT));
 float3 GetLightShafts(float3 worldPosition, uint lightListOffset, uint lightCount, float2 pixelPosition)
 {
     const float3 eye = GetMistEyePosition();

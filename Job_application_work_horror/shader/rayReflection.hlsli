@@ -18,12 +18,12 @@
 #include "fastNoise.hlsli"
 
 // SSRの前のフレームの画面（t4。縮小画像の段を持つ）と、深度プリパスの深度（t8）（ScreenSpaceReflection）
-Texture2D g_SsrScene : register(t4);
-Texture2D<float> g_SsrDepth : register(t8);
-Texture2D<float> g_PreviousSsrDepth : register(t17);
+Texture2D g_SsrScene : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_SSR_SCENE_TEXTURE_SLOT));
+Texture2D<float> g_SsrDepth : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_SSR_DEPTH_TEXTURE_SLOT));
+Texture2D<float> g_PreviousSsrDepth : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_SSR_PREVIOUS_DEPTH_TEXTURE_SLOT));
 // 環境マップ（t14。カメラの位置から6方向を撮った本物の景色。GameRendering の EnvironmentProbe。pbrLighting.hlsli と同じ物）。
 // 水たまりのレイ反射で、画面の外の物の色に使っている。撮れているときだけ ReflectionParams.w が1
-TextureCube g_RayEnvironmentProbe : register(t14);
+TextureCube g_RayEnvironmentProbe : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_ENVIRONMENT_PROBE_TEXTURE_SLOT));
 // 環境マップで読む一番小さい段（256画素の3段下 = 32画素。これより小さい段を引き伸ばすと四角いブロックが見える）
 static const float RAY_ENVIRONMENT_MAX_BLUR_MIP = 3.0f;
 static const float RAY_ENVIRONMENT_BLUR_ROUGHNESS_WEIGHT = 0.45f;

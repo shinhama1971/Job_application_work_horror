@@ -5,6 +5,7 @@
 // ============================================================================
 
 #include "TitleScene.h"
+#include "TitleStageChoices.h"
 
 #include "Application.h"
 #include "Game.h"
@@ -137,10 +138,10 @@ void TitleScene::Update()
     if (Input::GetKeyTrigger(VK_RIGHT) || Input::GetKeyTrigger(VK_D) || Input::GetKeyTrigger(VK_DOWN) ||
         Input::GetKeyTrigger(VK_S) || Input::GetButtonTrigger(XINPUT_RIGHT) || Input::GetButtonTrigger(XINPUT_DOWN) || stickRight)
     {
-        s_SelectedStage = (std::min)(StageChoiceCount - 1, s_SelectedStage + 1);
+        s_SelectedStage = (std::min)(TitleStageChoices::Count - 1, s_SelectedStage + 1);
     }
     // 数字キー（1から順に）で、その番号の面を直接選んでいる
-    for (int stage = 0; stage < StageChoiceCount; ++stage)
+    for (int stage = 0; stage < TitleStageChoices::Count; ++stage)
     {
         if (Input::GetKeyTrigger(static_cast<BYTE>(VK_1 + stage)))
         {
@@ -158,8 +159,7 @@ void TitleScene::Update()
     {
         // 1面は、雨の森を歩いて研究所に入ってから始める（森で研究棟からの無線を聞き、玄関で目的の画面を見る）。
         // 3つ目は、森を飛ばして、導入（受信記録と目的の画面）から1面を始める。4つ目（一番下）は、試作中の3面から始める
-        constexpr SceneName stages[StageChoiceCount] = { SceneName::Forest, SceneName::Stage2, SceneName::Intro, SceneName::Stage3 };
-        Core::Game::GetInstance()->RequestSceneChange(stages[s_SelectedStage]);
+        Core::Game::GetInstance()->RequestSceneChange(TitleStageChoices::Entries[s_SelectedStage].Scene);
     }
 }
 

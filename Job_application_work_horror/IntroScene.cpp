@@ -210,32 +210,3 @@ void IntroScene::Draw(Camera* camera)
             game->GetCaughtCount());
     }
 }
-
-namespace
-{
-    // 導入の通信の行数（字幕の時刻の表と同じ数）
-    constexpr std::size_t IntroLineCount = 4;
-    constexpr const wchar_t* IntroStoryText[] =
-    {
-        L"受信記録を確認。",
-        L"対象地点は森の中。",
-        L"玄関から建物へ入る。",
-        L"通信を終了する。"
-    };
-
-    static_assert(
-        std::size(IntroStoryText) == IntroLineCount,
-        "StoryText must contain four lines");
-}
-
-static constexpr float LineStartTimes[IntroLineCount] =
-{
-    2.2f,
-    8.4f,
-    13.8f,
-    18.6f
-};
-
-static_assert(
-    std::size(LineStartTimes) == std::size(IntroStoryText),
-    "LineStartTimes must match StoryText");

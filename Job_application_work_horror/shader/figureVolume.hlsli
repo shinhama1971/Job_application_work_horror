@@ -10,10 +10,11 @@
 // ============================================================================
 #ifndef FIGURE_VOLUME_INCLUDED
 #define FIGURE_VOLUME_INCLUDED
+#include "renderingConfig.hlsli"
 
-Texture3D<float4> g_SelfVolume : register(t6);
-Texture3D<float> g_FigureVolume : register(t13);
-SamplerState g_VolumeSampler : register(s2);
+Texture3D<float4> g_SelfVolume : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_SELF_VOLUME_TEXTURE_SLOT));
+Texture3D<float> g_FigureVolume : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_FIGURE_VOLUME_TEXTURE_SLOT));
+SamplerState g_VolumeSampler : register(SIGNAL_LOST_SAMPLER_REGISTER(SIGNAL_LOST_FIGURE_VOLUME_SAMPLER_SLOT));
 
 // 格子の間隔と、範囲（最小の角・大きさ）・格子の数（build_figure_volumes.py と同じ）
 static const float FIGURE_VOLUME_VOXEL = 0.4f;

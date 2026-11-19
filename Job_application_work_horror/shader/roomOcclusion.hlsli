@@ -11,7 +11,7 @@
 // 壁の数の上限（Renderer.hのROOM_OCCLUSION_BUFFERと同じ）
 static const uint MaxOcclusionBoxes = SIGNAL_LOST_MAX_ROOM_OCCLUSION_BOXES;
 
-cbuffer RoomOcclusionBuffer : register(b11)
+cbuffer RoomOcclusionBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_ROOM_OCCLUSION_BUFFER_SLOT))
 {
     // 壁を上から見た長方形。xy = 中心のx・z、zw = 幅と奥行きの半分。
     float4 OcclusionBoxes[MaxOcclusionBoxes];

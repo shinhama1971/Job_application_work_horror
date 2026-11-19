@@ -22,9 +22,9 @@ using namespace DirectX::SimpleMath;
 namespace
 {
     // ピクセルシェーダーが参照するスロット。今あるテクスチャ(t0〜t6)と重ならない番号にしている。
-    constexpr UINT PointLightSlot = 10;
-    constexpr UINT TileIndexSlot = 11;
-    constexpr UINT TileCountSlot = 12;
+    constexpr UINT PointLightSlot = SIGNAL_LOST_TILED_POINT_LIGHTS_SLOT;
+    constexpr UINT TileIndexSlot = SIGNAL_LOST_TILED_LIGHT_INDICES_SLOT;
+    constexpr UINT TileCountSlot = SIGNAL_LOST_TILED_LIGHT_COUNTS_SLOT;
     static_assert(TileIndexSlot == PointLightSlot + 1);
     static_assert(TileCountSlot == TileIndexSlot + 1);
     // 本描画の t10〜t12 をまとめて設定・解除する。
@@ -32,9 +32,9 @@ namespace
     // tiledLightCullingCS.hlsl の t0〜t1（ライトと深度）と u0〜u1（番号と個数）。
     constexpr UINT CullingInputCount = 2;
     constexpr UINT CullingOutputCount = 2;
-    constexpr UINT ShadingParamsSlot = 6;
+    constexpr UINT ShadingParamsSlot = SIGNAL_LOST_TILED_LIGHT_BUFFER_SLOT;
     // ライトごとの壁の印（common.hlsl の g_PointLightWallMasks）
-    constexpr UINT WallMaskSlot = 19;
+    constexpr UINT WallMaskSlot = SIGNAL_LOST_POINT_LIGHT_WALL_MASKS_SLOT;
     // 光源がこの幅より深く壁の箱の中にあるときだけ、その壁を印に入れない（roomOcclusion.hlsli の ROOM_LIGHT_MOUNT_MARGIN と同じ値）。
     // 壁に付けたランプの光源は壁の面から少し外にあるので、付いている壁も印に入れる（入れないと、ランプが壁の裏の部屋まで照らした）
     constexpr float LightMountMargin = SIGNAL_LOST_ROOM_LIGHT_MOUNT_MARGIN;

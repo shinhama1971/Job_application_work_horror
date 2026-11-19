@@ -18,6 +18,14 @@ $random = New-Object System.Random 1971
 # 金属管の響き。管の固有振動は基音の整数倍にならない（1 : 2.76 : 5.40 : 8.93）ため、
 # この比で重ねると「カーン」という金属らしい音になる。高い音ほど早く消える。
 $baseFrequency = 212.0
+$thumpGain = 0.45
+$thumpDecaySeconds = 0.06
+$thumpFrequencyHz = 74.0
+$impactNoiseSeconds = 0.012
+$impactNoiseGain = 0.35
+$attackSeconds = 0.002
+$tailFadeSeconds = 0.3
+$targetPeak = 0.8
 $modes = @(
     @{ Ratio = 1.00; Amplitude = 0.55; Decay = 1.40 },
     @{ Ratio = 1.012; Amplitude = 0.22; Decay = 1.10 },   # わずかにずれた音で「うなり」を作る
@@ -36,15 +44,15 @@ for ($i = 0; $i -lt $sampleCount; $i++) {
     }
 
     # 叩いた瞬間の低い「ドン」
-    $value += 0.45 * [Math]::Exp(-$t / 0.06) * [Math]::Sin(2.0 * [Math]::PI * 74.0 * $t)
+    $value += $thumpGain * [Math]::Exp(-$t / $thumpDecaySeconds) * [Math]::Sin(2.0 * [Math]::PI * $thumpFrequencyHz * $t)
 
     # 叩いた瞬間の短い雑音（最初の約10ミリ秒）
-    if ($t -lt 0.012) {
-        $value += 0.35 * (1.0 - $t / 0.012) * ($random.NextDouble() * 2.0 - 1.0)
+    if ($t -lt $impactNoiseSeconds) {
+        $value += $impactNoiseGain * (1.0 - $t / $impactNoiseSeconds) * ($random.NextDouble() * 2.0 - 1.0)
     }
 
     # 立ち上がりの2ミリ秒だけなめらかにし、プツッという音を防ぐ
-    $value *= [Math]::Min(1.0, $t / 0.002)
+    $value *= [Math]::Min(1.0, $t / $attackSeconds)
     $samples[$i] = $value
 }
 
@@ -62,7 +70,7 @@ foreach ($echo in $echoes) {
 }
 
 # 最後の0.3秒で音を消し、ループ時の途切れを防ぐ
-$fadeStart = $sampleCount - [int](0.3 * $sampleRate)
+$fadeStart = $sampleCount - [int]($tailFadeSeconds * $sampleRate)
 for ($i = $fadeStart; $i -lt $sampleCount; $i++) {
     $samples[$i] *= ($sampleCount - $i) / ($sampleCount - $fadeStart)
 }
@@ -70,7 +78,7 @@ for ($i = $fadeStart; $i -lt $sampleCount; $i++) {
 # 最大音量を0.8にそろえて16bitへ変換する
 $peak = 0.0
 foreach ($value in $samples) { $peak = [Math]::Max($peak, [Math]::Abs($value)) }
-$scale = 0.8 / $peak
+$scale = $targetPeak / $peak
 
 $outputPath = Join-Path (Split-Path -Parent $PSScriptRoot) "assets\Audio\pipe_knock.wav"
 $stream = [System.IO.File]::Create($outputPath)

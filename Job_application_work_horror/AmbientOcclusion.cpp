@@ -20,7 +20,7 @@ namespace
     // 遮蔽・ぼかしとも t0 は深度、t1 は各パスの入力（点光源または遮蔽結果）。
     constexpr UINT OcclusionInputCount = 2;
     // 環境遮蔽をピクセルシェーダーへ渡すテクスチャの番号
-    constexpr UINT OcclusionSlot = 15;
+    constexpr UINT OcclusionSlot = SIGNAL_LOST_SCREEN_AO_TEXTURE_SLOT;
     // 遮蔽とぼかしで同じ縮小画像を扱うため、画素変換とスレッド数を共有する。
     constexpr int OcclusionDownsampleFactor = SIGNAL_LOST_OCCLUSION_DOWNSAMPLE_FACTOR;
     constexpr UINT OcclusionThreadGroupSize = SIGNAL_LOST_OCCLUSION_GROUP_SIZE;

@@ -65,12 +65,12 @@ namespace
 	constexpr UINT DefaultMaxAnisotropy = 4;
 	constexpr UINT DefaultSamplerSlot = 0;
 	// --- 定数バッファの番号（シェーダーの b0〜b7。common.hlsl と同じ）
-	constexpr UINT WorldBufferSlot = 0;
-	constexpr UINT ViewBufferSlot = 1;
-	constexpr UINT ProjectionBufferSlot = 2;
-	constexpr UINT LightBufferSlot = 3;
-	constexpr UINT MaterialBufferSlot = 4;
-	constexpr UINT TextureBufferSlot = 5;
+	constexpr UINT WorldBufferSlot = SIGNAL_LOST_WORLD_BUFFER_SLOT;
+	constexpr UINT ViewBufferSlot = SIGNAL_LOST_VIEW_BUFFER_SLOT;
+	constexpr UINT ProjectionBufferSlot = SIGNAL_LOST_PROJECTION_BUFFER_SLOT;
+	constexpr UINT LightBufferSlot = SIGNAL_LOST_LIGHT_BUFFER_SLOT;
+	constexpr UINT MaterialBufferSlot = SIGNAL_LOST_MATERIAL_BUFFER_SLOT;
+	constexpr UINT TextureBufferSlot = SIGNAL_LOST_TEXTURE_TRANSFORM_BUFFER_SLOT;
 	constexpr UINT DebugViewBufferSlot = SIGNAL_LOST_DEBUG_VIEW_BUFFER_SLOT;
 	// --- ライトの初期値（Player が最初のフレームから上書きするので、作った直後の一瞬だけ使う）
 	constexpr float InitialLightIntensity = 1.6f;

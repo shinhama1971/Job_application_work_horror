@@ -701,9 +701,9 @@ float GetWallTrickle(float3 worldPosition, float3 worldNormal, float damp)
 
 // --- 画素の色の計算（main）の値
 // 計算で描く絵の、普段のマテリアルの色（C++ の Stage2Layout と同じ値。異変で変わった色は、この色との比で掛ける）
-static const float3 PORTRAIT_BASE_DIFFUSE = float3(0.075f, 0.058f, 0.044f);
-static const float3 CLOCK_BASE_DIFFUSE = float3(0.095f, 0.086f, 0.070f);
-static const float3 DOOR_BASE_DIFFUSE = float3(0.07f, 0.025f, 0.018f);
+static const float3 PORTRAIT_BASE_DIFFUSE = float3(SIGNAL_LOST_PORTRAIT_BASE_RGB);
+static const float3 CLOCK_BASE_DIFFUSE = float3(SIGNAL_LOST_CLOCK_BASE_RGB);
+static const float3 DOOR_BASE_DIFFUSE = float3(SIGNAL_LOST_FALSE_DOOR_BASE_RGB);
 // 崩れて現れる・消える物：ノイズの細かさ、3つのノイズ（ずらし・細かさ・割合）、しきい値の広げ方、燃える縁の幅
 static const float DISSOLVE_NOISE_SCALE = 0.55f;
 static const float DISSOLVE_DEPTH_SKEW = 0.37f;

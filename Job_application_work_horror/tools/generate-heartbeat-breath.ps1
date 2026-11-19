@@ -67,32 +67,45 @@ function Add-Thump([double[]]$target, [double]$start, [double]$frequency, [doubl
     }
 }
 
+$secondBeatSeconds = 0.235
+$heartFadeSeconds = 0.1
+$heartPeak = 0.85
 Add-Thump $heart 0.000 52.0 1.00 0.085   # 「ドッ」
 Add-Thump $heart 0.000 96.0 0.28 0.040   # 「ドッ」の輪郭
-Add-Thump $heart 0.235 64.0 0.68 0.070   # 「クン」
-Add-Thump $heart 0.235 118.0 0.18 0.030
+Add-Thump $heart $secondBeatSeconds 64.0 0.68 0.070   # 「クン」
+Add-Thump $heart $secondBeatSeconds 118.0 0.18 0.030
 
 # 体の中を伝わるこもった雑音をわずかに足す（1次のローパスで高い音を除く）
 $noise = 0.0
 for ($i = 0; $i -lt $heartCount; $i++) {
     $t = $i / $sampleRate
     $noise += (($random.NextDouble() * 2.0 - 1.0) - $noise) * 0.02
-    $burst = [Math]::Exp(-$t / 0.05) + 0.7 * [Math]::Exp(-[Math]::Max(0.0, $t - 0.235) / 0.04) * [double]($t -ge 0.235)
+    $burst = [Math]::Exp(-$t / 0.05) + 0.7 * [Math]::Exp(-[Math]::Max(0.0, $t - $secondBeatSeconds) / 0.04) * [double]($t -ge $secondBeatSeconds)
     $heart[$i] += $noise * 0.9 * $burst
 }
 
 # 最後の0.1秒で消す
-$fadeStart = $heartCount - [int](0.1 * $sampleRate)
+$fadeStart = $heartCount - [int]($heartFadeSeconds * $sampleRate)
 for ($i = $fadeStart; $i -lt $heartCount; $i++) {
     $heart[$i] *= ($heartCount - $i) / ($heartCount - $fadeStart)
 }
-Write-MonoWav $heart "heartbeat.wav" 0.85
+Write-MonoWav $heart "heartbeat.wav" $heartPeak
 
 # ---------------------------------------------------------------------------
 # 呼吸音: 口から漏れる息の雑音を、帯域を絞って「吐く（強め）→吸う（弱め）」の形に整える。
 # ---------------------------------------------------------------------------
 $random = New-Object System.Random 1973
 $breathSeconds = 2.1
+$exhaleStart = 0.05
+$exhaleEnd = 0.95
+$exhaleLength = 0.90
+$inhaleStart = 1.15
+$inhaleEnd = 1.95
+$inhaleLength = 0.80
+$inhaleGain = 0.55
+$breathPeak = 0.7
+$breathUpperBandResponse = 0.22
+$breathLowerBandResponse = 0.04
 $breathCount = [int]($sampleRate * $breathSeconds)
 $breath = New-Object double[] $breathCount
 
@@ -102,21 +115,21 @@ $lowB = 0.0
 for ($i = 0; $i -lt $breathCount; $i++) {
     $t = $i / $sampleRate
     $white = $random.NextDouble() * 2.0 - 1.0
-    $lowA += ($white - $lowA) * 0.22
-    $lowB += ($white - $lowB) * 0.04
+    $lowA += ($white - $lowA) * $breathUpperBandResponse
+    $lowB += ($white - $lowB) * $breathLowerBandResponse
     $band = $lowA - $lowB
 
     # 吐く: 0.05〜0.95秒、吸う: 1.15〜1.95秒。sinの2乗で滑らかに立ち上げて消す
     $exhale = 0.0
-    if ($t -ge 0.05 -and $t -le 0.95) {
-        $exhale = [Math]::Pow([Math]::Sin([Math]::PI * ($t - 0.05) / 0.90), 2.0)
+    if ($t -ge $exhaleStart -and $t -le $exhaleEnd) {
+        $exhale = [Math]::Pow([Math]::Sin([Math]::PI * ($t - $exhaleStart) / $exhaleLength), 2.0)
     }
     $inhale = 0.0
-    if ($t -ge 1.15 -and $t -le 1.95) {
-        $inhale = 0.55 * [Math]::Pow([Math]::Sin([Math]::PI * ($t - 1.15) / 0.80), 2.0)
+    if ($t -ge $inhaleStart -and $t -le $inhaleEnd) {
+        $inhale = $inhaleGain * [Math]::Pow([Math]::Sin([Math]::PI * ($t - $inhaleStart) / $inhaleLength), 2.0)
     }
 
     # 吐く息は少し低く太く、吸う息は細く高くするため、吸うときだけ高い成分を足す
     $breath[$i] = $band * $exhale + ($band * 0.6 + ($white - $lowA) * 0.25) * $inhale
 }
-Write-MonoWav $breath "breath.wav" 0.7
+Write-MonoWav $breath "breath.wav" $breathPeak

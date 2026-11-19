@@ -12,14 +12,14 @@ SamplerState g_SamplerState : register(s0);
 #include "pointShadow.hlsli"
 
 // 反射の方式の比較で使うキューブマップ（t7、ReflectionProbe）。SSRの画面と深度（t4・t8）は rayReflection.hlsli で読んでいる
-TextureCube g_ReflectionProbe : register(t7);
+TextureCube g_ReflectionProbe : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_REFLECTION_PROBE_TEXTURE_SLOT));
 
 // Ground.cppのWetFloorBufferと同じ並び（b10）。経過時間、波紋の強さ、反射の強さ、水面の細かさ
 // 濡れた足跡の最大数（WetFootprints::MaxCount と同じ）
 #define FOOTPRINT_COUNT SIGNAL_LOST_FOOTPRINT_COUNT
 // 天井の雨漏りの最大数（WaterEffectSystem::MaxLeakCount と同じ）
 #define LEAK_COUNT SIGNAL_LOST_MAX_WATER_LEAKS
-cbuffer WetFloorBuffer : register(b10)
+cbuffer WetFloorBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_WET_FLOOR_BUFFER_SLOT))
 {
     float WetTime;
     float RippleStrength;

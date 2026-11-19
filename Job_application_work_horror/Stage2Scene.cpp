@@ -157,7 +157,7 @@ bool Stage2Scene::TryGetDebugInfo(SceneDebugInfo& info) const
     info.finalSequenceArmed = m_FinalSequenceArmed;
     info.exitReady = m_FinalDoorReady;
     info.firstAnomaly = Stage2AnomalyPlan::GetName(m_AnomalyPlan.GetRequired(1));
-    info.secondAnomaly = Stage2AnomalyPlan::GetName(m_AnomalyPlan.GetRequired(2));
+    info.secondAnomaly = Stage2AnomalyPlan::GetName(m_AnomalyPlan.GetRequired(Stage2SecondLoop));
     return true;
 }
 
@@ -245,7 +245,7 @@ void Stage2Scene::Init()
     // 今回出る異変は、リザルト画面の「今回の発見」に出している。
     game->SetStage2Anomalies(
         static_cast<int>(m_AnomalyPlan.GetRequired(1)),
-        static_cast<int>(m_AnomalyPlan.GetRequired(2)));
+        static_cast<int>(m_AnomalyPlan.GetRequired(Stage2SecondLoop)));
     m_PuzzleFeedback.Reset();
     m_NoiseThreatSystem.Reset();
     m_TensionPulse.Reset();

@@ -11,7 +11,7 @@
 #define MAX_REFLECTION_PROPS SIGNAL_LOST_MAX_REFLECTION_PROPS
 
 // Renderer.hのWATER_CAUSTICS_BUFFERと同じ並び（b12）。Groundが毎フレーム設定している
-cbuffer WaterCausticsBuffer : register(b12)
+cbuffer WaterCausticsBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_WATER_CAUSTICS_BUFFER_SLOT))
 {
     // プレイヤーの視点のビュー行列。懐中電灯はこの視点から照らしているため、反射を描くときもこの行列を使っている
     // （ビュー行列のb1は頂点シェーダーにしか設定していないため、ピクセルシェーダーで使う分はここで受け取っている）

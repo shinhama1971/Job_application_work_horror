@@ -27,7 +27,7 @@ namespace
     constexpr float HandNearPlane = 0.1f;
     constexpr float HandFarPlane = 60.0f;
     // 手と懐中電灯の定数のシェーダーの番号（viewModel.hlsli の b9）
-    constexpr UINT ViewModelBufferSlot = 9;
+    constexpr UINT ViewModelBufferSlot = SIGNAL_LOST_OBJECT_DRAW_BUFFER_SLOT;
 
     // 握る所の中ほど（ビュー空間。1単位は約5cm）と、懐中電灯を向ける先（画面の中央の遠く）
     const Vector3 GripPosition(2.15f, -1.95f, 5.0f);
