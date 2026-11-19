@@ -29,7 +29,7 @@ namespace
         Vector3 Forward;
         Vector3 Up;
     };
-    const FaceDirection FaceDirections[6] =
+    const FaceDirection FaceDirections[] =
     {
         { Vector3(1.0f, 0.0f, 0.0f), Vector3(0.0f, 1.0f, 0.0f) },
         { Vector3(-1.0f, 0.0f, 0.0f), Vector3(0.0f, 1.0f, 0.0f) },
@@ -38,6 +38,7 @@ namespace
         { Vector3(0.0f, 0.0f, -1.0f), Vector3(0.0f, 1.0f, 0.0f) },
         { Vector3(0.0f, 0.0f, 1.0f), Vector3(0.0f, 1.0f, 0.0f) },
     };
+    static_assert(sizeof(FaceDirections) / sizeof(FaceDirections[0]) == Effect::ReflectionProbe::FaceCount);
 }
 
 namespace Effect
@@ -53,7 +54,7 @@ namespace Effect
         textureDesc.Height = FaceSize;
         // 0は、1画素まで縮めた縮小画像をすべて持つ指定
         textureDesc.MipLevels = withMipChain ? 0 : 1;
-        textureDesc.ArraySize = 6;
+        textureDesc.ArraySize = FaceCount;
         // 本描画と同じHDRの形式にし、映り込む電球や懐中電灯の光を1で切らずに残している
         textureDesc.Format = Renderer::SceneHdrFormat;
         textureDesc.SampleDesc.Count = 1;
@@ -64,7 +65,7 @@ namespace Effect
         bool created = SUCCEEDED(device->CreateTexture2D(&textureDesc, nullptr, m_Texture.ReleaseAndGetAddressOf()));
 
         // 6面それぞれを描画先にする口と、6面まとめてキューブとして読む口
-        for (UINT face = 0; face < 6 && created; ++face)
+        for (UINT face = 0; face < FaceCount && created; ++face)
         {
             D3D11_RENDER_TARGET_VIEW_DESC faceDesc{};
             faceDesc.Format = textureDesc.Format;
@@ -149,8 +150,8 @@ namespace Effect
     {
         camera.ClearOverrideMatrices();
         Renderer::SetBackBufferRenderTarget();
-        m_NextFace = (m_NextFace + 1) % 6;
-        if (m_FacesDrawn < 6)
+        m_NextFace = (m_NextFace + 1) % FaceCount;
+        if (m_FacesDrawn < FaceCount)
         {
             ++m_FacesDrawn;
         }

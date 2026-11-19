@@ -9,6 +9,7 @@
 
 #include <array>
 #include <cmath>
+#include <iterator>
 
 using namespace DirectX::SimpleMath;
 
@@ -99,7 +100,7 @@ void VoiceRecorder::AppendBox(const Vector3& center, const Vector3& size)
             base + 2, base + 1, base + 0,
             base + 3, base + 1, base + 2
         };
-        m_Indices.insert(m_Indices.end(), faceIndices, faceIndices + 12);
+        m_Indices.insert(m_Indices.end(), std::begin(faceIndices), std::end(faceIndices));
     };
     const Vector3 c = center;
     // 前・後ろ・右・左・上・下の6面

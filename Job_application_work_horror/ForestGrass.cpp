@@ -135,7 +135,10 @@ namespace
             static_cast<std::uint32_t>(static_cast<std::int32_t>(y)) * 668265263u;
         hash = (hash ^ (hash >> 13)) * 1274126177u;
         hash ^= hash >> 16;
-        return static_cast<float>(hash & 0x00FFFFFFu) / static_cast<float>(0x01000000u);
+        // 下位24ビットを、1には届かない0〜1未満の値に変える。
+        constexpr std::uint32_t HashFractionMask = 0x00FFFFFFu;
+        constexpr std::uint32_t HashFractionDivisor = HashFractionMask + 1u;
+        return static_cast<float>(hash & HashFractionMask) / static_cast<float>(HashFractionDivisor);
     }
 
     float ValueNoise(float x, float y)
@@ -200,6 +203,10 @@ namespace
     constexpr float BrightnessRandomRange = 0.4f;
     // 草を描く定数のシェーダーの番号（grassVS.hlsl の b9）
     constexpr UINT GrassDrawBufferSlot = 9;
+    // LOD の段階（grassVS.hlsl の色分けと同じ：1 = 近い、2 = 中くらい、3 = 遠い）
+    constexpr std::uint32_t NearLodLevel = 1;
+    constexpr std::uint32_t MiddleLodLevel = 2;
+    constexpr std::uint32_t FarLodLevel = 3;
 }
 
 void ForestGrass::Init()
@@ -333,7 +340,9 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
         }
     }
 
-    std::mt19937 random(20261106u);
+    // プレイ時も撮影時も、草を毎回同じ場所に置く。
+    constexpr unsigned int ForestGrassPlacementSeed = 20261106u;
+    std::mt19937 random(ForestGrassPlacementSeed);
     std::uniform_real_distribution<float> unit(0.0f, 1.0f);
     const int countX = static_cast<int>(halfX * 2.0f / spacing);
     const int countZ = static_cast<int>(halfZ * 2.0f / spacing);
@@ -637,7 +646,7 @@ void ForestGrass::Draw(Camera* camera)
         // LOD：区画のいちばん近い所までの距離で、描く本数の割合と葉の節の数を決めている
         float fraction = 1.0f;
         std::uint32_t segments = NearSegments;
-        std::uint32_t lodLevel = 1;
+        std::uint32_t lodLevel = NearLodLevel;
         if constexpr (lodMode == Tools::TechDemo::GrassLodMode::Off)
         {
             // LODなし：遠くまで全部の葉を一番細かく描く（比べるための方式）
@@ -646,13 +655,13 @@ void ForestGrass::Draw(Camera* camera)
         {
             fraction = FarBladeFraction;
             segments = FarSegments;
-            lodLevel = 3;
+            lodLevel = FarLodLevel;
         }
         else if (nearestDistance > NearDistance)
         {
             fraction = 1.0f - MiddleBladeReduction * MathUtility::SmoothStep(NearDistance, MiddleDistance, nearestDistance);
             segments = MiddleSegments;
-            lodLevel = 2;
+            lodLevel = MiddleLodLevel;
         }
         const std::uint32_t count = (std::max)(1u, static_cast<std::uint32_t>(chunk.Count * fraction));
 

@@ -26,6 +26,11 @@ namespace
     constexpr UINT TileCountSlot = 12;
     static_assert(TileIndexSlot == PointLightSlot + 1);
     static_assert(TileCountSlot == TileIndexSlot + 1);
+    // 本描画の t10〜t12 をまとめて設定・解除する。
+    constexpr UINT ShadingInputCount = TileCountSlot - PointLightSlot + 1;
+    // tiledLightCullingCS.hlsl の t0〜t1（ライトと深度）と u0〜u1（番号と個数）。
+    constexpr UINT CullingInputCount = 2;
+    constexpr UINT CullingOutputCount = 2;
     constexpr UINT ShadingParamsSlot = 6;
     // ライトごとの壁の印（common.hlsl の g_PointLightWallMasks）
     constexpr UINT WallMaskSlot = 19;
@@ -173,9 +178,9 @@ namespace Effect
     // ピクセルシェーダーから外してから、全部のバッファを解放している
     void TiledLighting::Uninit()
     {
-        ID3D11ShaderResourceView* nullViews[3] = {};
+        ID3D11ShaderResourceView* nullViews[ShadingInputCount] = {};
         Renderer::GetDeviceContext()->PSSetShaderResources(
-            PointLightSlot, 3, nullViews);
+            PointLightSlot, ShadingInputCount, nullViews);
         Renderer::GetDeviceContext()->PSSetShaderResources(
             WallMaskSlot, 1, nullViews);
 
@@ -284,8 +289,8 @@ namespace Effect
         context->UpdateSubresource(m_CullingParamsBuffer.Get(), 0, nullptr, &params, 0, 0);
 
         // 同じバッファをSRVとUAVに同時に設定できないため、先に描画側から外している。
-        ID3D11ShaderResourceView* nullViews[3] = {};
-        context->PSSetShaderResources(PointLightSlot, 3, nullViews);
+        ID3D11ShaderResourceView* nullViews[ShadingInputCount] = {};
+        context->PSSetShaderResources(PointLightSlot, ShadingInputCount, nullViews);
 
         m_CullingShader.SetGPU();
         ID3D11Buffer* cullingParams = m_CullingParamsBuffer.Get();
@@ -295,22 +300,22 @@ namespace Effect
         context->OMSetRenderTargets(1, &backBuffer, nullptr);
 
         // t0にライトの一覧、t1に深度プリパスの深度を設定している
-        ID3D11ShaderResourceView* csViews[2] = {
+        ID3D11ShaderResourceView* csViews[CullingInputCount] = {
             m_LightSRV.Get(), Renderer::GetDepthShaderResourceView() };
-        context->CSSetShaderResources(0, 2, csViews);
-        ID3D11UnorderedAccessView* uavs[2] = {
+        context->CSSetShaderResources(0, CullingInputCount, csViews);
+        ID3D11UnorderedAccessView* uavs[CullingOutputCount] = {
             m_TileIndexUAV.Get(), m_TileCountUAV.Get() };
-        context->CSSetUnorderedAccessViews(0, 2, uavs, nullptr);
+        context->CSSetUnorderedAccessViews(0, CullingOutputCount, uavs, nullptr);
 
         // 1タイル = 1スレッドグループ。グループ内の64スレッドで、ライトを分担して判定している。
         context->Dispatch(m_TilesX, m_TilesY, 1);
 
         // Compute Shaderからバッファを外し、ピクセルシェーダーがタイルのリストを使う設定にしている
-        ID3D11UnorderedAccessView* nullUAVs[2] = {};
-        context->CSSetUnorderedAccessViews(0, 2, nullUAVs, nullptr);
+        ID3D11UnorderedAccessView* nullUAVs[CullingOutputCount] = {};
+        context->CSSetUnorderedAccessViews(0, CullingOutputCount, nullUAVs, nullptr);
         // 深度バッファの読み取りを外してから、本描画の描画先（色と深度）に戻している
-        ID3D11ShaderResourceView* nullSRVs[2] = {};
-        context->CSSetShaderResources(0, 2, nullSRVs);
+        ID3D11ShaderResourceView* nullSRVs[CullingInputCount] = {};
+        context->CSSetShaderResources(0, CullingInputCount, nullSRVs);
         context->CSSetShader(nullptr, nullptr, 0);
         context->OMSetRenderTargets(1, &backBuffer, Renderer::GetDepthStencilView());
 
@@ -339,9 +344,9 @@ namespace Effect
         ID3D11DeviceContext* context = Renderer::GetDeviceContext();
         ID3D11Buffer* shadingParams = m_ShadingParamsBuffer.Get();
         context->PSSetConstantBuffers(ShadingParamsSlot, 1, &shadingParams);
-        ID3D11ShaderResourceView* views[3] = {
+        ID3D11ShaderResourceView* views[ShadingInputCount] = {
             m_LightSRV.Get(), m_TileIndexSRV.Get(), m_TileCountSRV.Get() };
-        context->PSSetShaderResources(PointLightSlot, 3, views);
+        context->PSSetShaderResources(PointLightSlot, ShadingInputCount, views);
         ID3D11ShaderResourceView* wallMasks = m_WallMaskSRV.Get();
         context->PSSetShaderResources(WallMaskSlot, 1, &wallMasks);
     }

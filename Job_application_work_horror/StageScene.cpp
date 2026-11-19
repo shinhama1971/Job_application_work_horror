@@ -32,6 +32,10 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // デバッグで「4周目以降のドア」を見せるときの周回の数（StageSceneEvents の StartDoorHauntedGapLoop と同じ）と、
+    // ドアの開き方の段階（Door の一番最後の段階）
+    constexpr int DebugHauntedDoorLoop = 4;
+    constexpr int DebugHauntedDoorPhase = 3;
     constexpr float RoomOcclusionFloorY = -100.0f;
     constexpr float RoomOcclusionCeilingY = -48.5f;
     constexpr float RoomOcclusionStrength = 0.55f;
@@ -80,7 +84,6 @@ namespace
     constexpr float FusePickupRumbleStrengthPerFuse = 0.025f;
     // --- 非常用充電器：物音で呼ぶ影の強さ（ヒューズ2本目と同じ）、揺らす照明の番号、明滅・光・振動
     constexpr int ChargerWatcherFuseCount = 2;
-    constexpr int ChargerCeilingLightIndex = 2;
     constexpr FlickerSpec ChargerFlicker{ 0.92f, 0.84f };
     constexpr PulseSpec ChargerBloom{ 0.66f, 0.24f };
     constexpr RumbleSpec ChargerRumble{ 6, 0.14f };
@@ -197,7 +200,7 @@ void StageScene::Init()
     m_LastFuseCount = game->GetItemCount();
     m_FuseNoticeTimer = 0.0f;
     m_FuseWatcherNoticeTimer = 0.0f;
-    m_FuseWatcherState = 0;
+    m_FuseWatcherState = FuseWatcherState::None;
     m_ChargerNoticeTimer = 0.0f;
     m_ChargerHandled = false;
     m_EvidenceNoticeTimer = 0.0f;
@@ -212,8 +215,8 @@ void StageScene::Init()
     m_StartDoorKnockEvents = 0;
     m_EntranceEventTriggered = false;
     m_EntranceEventTimer = -1.0f;
-    m_EntranceEventPhase = -1;
-    m_StorageScarePhase = 0;
+    m_EntranceEventPhase = EntranceEventPhase::NotStarted;
+    m_StorageScarePhase = StorageScarePhase::Waiting;
     m_StorageScareTimer = 0.0f;
     m_StorageScareNoticeTimer = 0.0f;
     m_ScareLightSequence.Reset();
@@ -411,7 +414,7 @@ Stage1RouteLight StageScene::SelectRouteLight() const
         {
             selected = Stage1RouteLight::LeftStorage;
         }
-        else if (fuseCount >= 3)
+        else if (fuseCount >= Core::GameState::RequiredFuseCount)
         {
             selected = Stage1RouteLight::MainPower;
         }
@@ -503,8 +506,8 @@ void StageScene::RequestDebugAction(SceneDebugAction action)
     }
     if (action == SceneDebugAction::ShowHauntedStartDoor && m_Objects.startDoor != nullptr)
     {
-        m_CorridorLoopCount = 4;
-        m_Objects.startDoor->ResetClosed(3);
+        m_CorridorLoopCount = DebugHauntedDoorLoop;
+        m_Objects.startDoor->ResetClosed(DebugHauntedDoorPhase);
         m_Objects.startDoor->SetLocked(true);
         return;
     }
@@ -669,7 +672,7 @@ void StageScene::UpdateFusePickup()
     {
         ShadowMan* watcher = m_Objects.fuseWatcher;
         if (watcher != nullptr) watcher->SetActive(false);
-        m_FuseWatcherState = 0;
+        m_FuseWatcherState = FuseWatcherState::None;
     }
 }
 
@@ -689,7 +692,7 @@ void StageScene::UpdateEmergencyCharger(Player& player)
     // 充電器の物音には、ヒューズ2本目と同じ強さの影を使う。
     StartFuseWatcher(ChargerWatcherFuseCount);
 
-    CeilingLight* chargerLight = m_Objects.CeilingLightAt(ChargerCeilingLightIndex);
+    CeilingLight* chargerLight = m_Objects.CeilingLightAt(Stage1LightNumber::LeftStorage);
     if (chargerLight != nullptr)
     {
         EventFeedback::Flicker(*chargerLight, ChargerFlicker);

@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <iterator>
 
 using namespace DirectX::SimpleMath;
 
@@ -154,8 +155,11 @@ void Wall::Init()
 {
     m_Vertices.clear();
     m_Indices.clear();
-    m_Vertices.reserve(24);
-    m_Indices.reserve(72);
+    // 6面 × 4頂点、6面 × 表と裏の2枚 × 2つの三角形 × 3
+    constexpr size_t BoxVertexCount = 24;
+    constexpr size_t BoxIndexCount = 72;
+    m_Vertices.reserve(BoxVertexCount);
+    m_Indices.reserve(BoxIndexCount);
 
     const Color vertexColor(1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -194,8 +198,8 @@ void Wall::Init()
         };
         m_Indices.insert(
             m_Indices.end(),
-            faceIndices,
-            faceIndices + 12
+            std::begin(faceIndices),
+            std::end(faceIndices)
         );
     };
 

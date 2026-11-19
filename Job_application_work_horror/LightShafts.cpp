@@ -12,6 +12,10 @@ using DirectX::SimpleMath::Vector4;
 
 namespace
 {
+    // lightShaftsCS.hlsl の t0（深度）と t1（ライト一覧）。
+    constexpr UINT ShaftInputCount = 2;
+    // 全解像度に切り替える環境変数の値を、末尾の終端文字込みで読む。
+    constexpr std::size_t FullResolutionModeBufferSize = 8;
     constexpr UINT MaxShaftLights = 256;
     constexpr UINT ShaftResultSlot = 16;
     // lightShaftsCS.hlsl の numthreads と同じ値。
@@ -46,7 +50,7 @@ namespace Effect
     void LightShafts::Init(int width, int height)
     {
         // 比較時は全解像度のピクセルシェーダーへ戻す。
-        char mode[8]{};
+        char mode[FullResolutionModeBufferSize]{};
         size_t length = 0;
         getenv_s(&length, mode, sizeof(mode), "SIGNAL_LOST_FULLRES_SHAFTS");
         m_Enabled = mode[0] != '1';
@@ -127,8 +131,8 @@ namespace Effect
         context->OMSetRenderTargets(1, &target, nullptr);
         auto* buffer = m_Parameters.Get();
         context->CSSetConstantBuffers(0, 1, &buffer);
-        ID3D11ShaderResourceView* inputs[] = { Renderer::GetDepthShaderResourceView(), m_LightView.Get() };
-        context->CSSetShaderResources(0, 2, inputs);
+        ID3D11ShaderResourceView* inputs[ShaftInputCount] = { Renderer::GetDepthShaderResourceView(), m_LightView.Get() };
+        context->CSSetShaderResources(0, ShaftInputCount, inputs);
         auto* output = m_Output.Get();
         context->CSSetUnorderedAccessViews(0, 1, &output, nullptr);
 
@@ -138,9 +142,9 @@ namespace Effect
         context->Dispatch(DivideRoundUp(width, ThreadGroupWidth), DivideRoundUp(height, ThreadGroupWidth), 1);
 
         ID3D11UnorderedAccessView* noOutput = nullptr;
-        ID3D11ShaderResourceView* noInputs[2]{};
+        ID3D11ShaderResourceView* noInputs[ShaftInputCount]{};
         context->CSSetUnorderedAccessViews(0, 1, &noOutput, nullptr);
-        context->CSSetShaderResources(0, 2, noInputs);
+        context->CSSetShaderResources(0, ShaftInputCount, noInputs);
         context->CSSetShader(nullptr, nullptr, 0);
         context->OMSetRenderTargets(1, &target, Renderer::GetDepthStencilView());
         auto* result = m_Result.Get();

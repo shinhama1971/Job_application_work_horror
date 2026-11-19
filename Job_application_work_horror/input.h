@@ -30,9 +30,6 @@
 // 数字キーと英字キーの仮想キーコード（Windowsのヘッダーには定義がないため、ここで定義している）
 #define VK_0 0x30
 #define VK_1 0x31
-#define VK_2 0x32
-#define VK_3 0x33
-#define VK_4 0x34
 #define VK_A 0x41
 #define VK_B 0x42
 #define VK_C 0x43
@@ -55,8 +52,10 @@ private:
 	static std::unique_ptr<Input> m_Instance;
 
 	// 今のフレームと前のフレームのキーの状態（256個の仮想キー）
-	BYTE keyState[256];
-	BYTE keyState_old[256];
+	// GetKeyboardState が仮想キーごとに1バイト返す。前フレームにも同じ幅を使う。
+	static constexpr unsigned int VirtualKeyCount = 256;
+	BYTE keyState[VirtualKeyCount];
+	BYTE keyState_old[VirtualKeyCount];
 
 	// 今のフレームと前のフレームのコントローラーの状態、つながっているか、何番目のコントローラーか
 	XINPUT_STATE controllerState;
@@ -85,20 +84,14 @@ public:
 	// キー入力
 	static bool GetKeyPress(int key);   // 押している間ずっとtrue
 	static bool GetKeyTrigger(int key); // 押した瞬間だけtrue
-	static bool GetKeyRelease(int key); // 離した瞬間だけtrue
 
 	// アナログスティック（-1〜1。中心付近の遊びは0にしている）
 	static DirectX::XMFLOAT2 GetLeftAnalogStick(void);
 	static DirectX::XMFLOAT2 GetRightAnalogStick(void);
 
-	// アナログトリガー（0〜1）
-	static float GetLeftTrigger(void);
-	static float GetRightTrigger(void);
-
 	// コントローラーのボタン入力
 	static bool GetButtonPress(WORD btn);   // 押している間ずっとtrue
 	static bool GetButtonTrigger(WORD btn); // 押した瞬間だけtrue
-	static bool GetButtonRelease(WORD btn); // 離した瞬間だけtrue
 
 	// コントローラーを振動させている
 	// frame：振動を続ける時間（60fpsで数えたフレーム数。実際は秒に直して使っている）

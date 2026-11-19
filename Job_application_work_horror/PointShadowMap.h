@@ -37,8 +37,10 @@ namespace Effect
         Shader& GetShader() { return m_Shader; }
 
     private:
+        // キューブマップの面の数
+        static constexpr int FaceCount = 6;
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_Texture;
-        std::array<Microsoft::WRL::ComPtr<ID3D11RenderTargetView>, 6> m_FaceViews;
+        std::array<Microsoft::WRL::ComPtr<ID3D11RenderTargetView>, FaceCount> m_FaceViews;
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_CubeView;
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_DepthTexture;
         Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_DepthView;

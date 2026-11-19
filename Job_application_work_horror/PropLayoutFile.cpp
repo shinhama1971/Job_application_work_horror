@@ -30,7 +30,9 @@ namespace
     // 数を短く書いている（小数3桁まで。後ろの0と小数点は省く）
     std::string FormatNumber(float value)
     {
-        char text[32];
+        // 配置値を小数3桁まで文字列にするための作業領域（終端文字を含む）。
+        constexpr std::size_t LayoutNumberTextCapacity = 32;
+        char text[LayoutNumberTextCapacity];
         std::snprintf(text, sizeof(text), "%.3f", value);
         std::string result(text);
         result.erase(result.find_last_not_of('0') + 1);
@@ -477,7 +479,9 @@ namespace PropLayoutFile
     {
         // 名前の後ろをそろえ、位置・大きさ・見た目の間を広めに空けて、手で書いた行と見た目を合わせている
         std::string text = "prop " + description.Name;
-        text.append(description.Name.size() < 24 ? 24 - description.Name.size() : 1, ' ');
+        // 名前の列の幅（これより長い名前の後ろは空白1つ）
+        constexpr size_t NameColumnWidth = 24;
+        text.append(description.Name.size() < NameColumnWidth ? NameColumnWidth - description.Name.size() : 1, ' ');
         text += FormatNumber(description.Position.x) + " " + FormatNumber(description.Position.y) + " " +
             FormatNumber(description.Position.z) + "   ";
         text += FormatNumber(description.Scale.x) + " " + FormatNumber(description.Scale.y) + " " +

@@ -116,7 +116,8 @@ class Ground :public Object
 	std::vector<WaterSurface> m_DynamicSurfaces;
 	unsigned int m_DynamicSurfaceCapacity = 0;
 	// 細かさごとの、このフレームに描いた水たまりのメッシュの数（デバッグ画面に出す）
-	int m_DrawnSurfaceCounts[4] = {};
+	static constexpr int WaterLevelCount = static_cast<int>(WaterLevel::Near) + 1;
+	int m_DrawnSurfaceCounts[WaterLevelCount] = {};
 
 	// 床と同じ高さ・同じUVの、水平な多角形を足している（中心から扇形に三角形を並べる）
 	void AppendWaterPolygon(std::vector<VERTEX_3D>& vertices,
@@ -139,7 +140,7 @@ public:
 	void Update();
 	void Draw(Camera* cam);
 	// 細かさごとの、このフレームに描いた水たまりのメッシュの数（[1] 遠い、[2] 中くらい、[3] 近い）
-	int GetDrawnWaterSurfaceCount(int level) const { return level >= 0 && level < 4 ? m_DrawnSurfaceCounts[level] : 0; }
+	int GetDrawnWaterSurfaceCount(int level) const { return level >= 0 && level < WaterLevelCount ? m_DrawnSurfaceCounts[level] : 0; }
 	int GetWaterSurfaceTotal() const { return static_cast<int>(m_PuddleSurfaces.size() + m_DynamicSurfaces.size()); }
 	// 床は不透明なので、深度プリパスに床の面と水たまりのメッシュを描いている（水滴・波紋の半透明の板は描かない）
 	bool WritesDepthPrepass() const override { return true; }

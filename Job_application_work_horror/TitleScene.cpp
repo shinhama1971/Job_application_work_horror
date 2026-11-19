@@ -139,21 +139,13 @@ void TitleScene::Update()
     {
         s_SelectedStage = (std::min)(StageChoiceCount - 1, s_SelectedStage + 1);
     }
-    if (Input::GetKeyTrigger(VK_1))
+    // 数字キー（1から順に）で、その番号の面を直接選んでいる
+    for (int stage = 0; stage < StageChoiceCount; ++stage)
     {
-        s_SelectedStage = 0;
-    }
-    if (Input::GetKeyTrigger(VK_2))
-    {
-        s_SelectedStage = 1;
-    }
-    if (Input::GetKeyTrigger(VK_3))
-    {
-        s_SelectedStage = 2;
-    }
-    if (Input::GetKeyTrigger(VK_4))
-    {
-        s_SelectedStage = 3;
+        if (Input::GetKeyTrigger(static_cast<BYTE>(VK_1 + stage)))
+        {
+            s_SelectedStage = stage;
+        }
     }
     if (s_SelectedStage != previousStage)
     {

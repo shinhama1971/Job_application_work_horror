@@ -38,7 +38,7 @@ public:
     template<typename RandomEngine>
     void Randomize(RandomEngine& random)
     {
-        std::array<Stage2Anomaly, 8> candidates =
+        std::array candidates =
         {
             Stage2Anomaly::FalseDoor, Stage2Anomaly::Clock,
             Stage2Anomaly::Portrait, Stage2Anomaly::Knocking,

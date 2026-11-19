@@ -26,6 +26,10 @@ namespace
     constexpr float LightShaftsFullEffectScale = 1.0f;
     constexpr float AtmosphereResponseSeconds = 0.075f;
     // 演出強度が低くても、照明のにじみを一部残す。
+    // ブルームの中間画像は縦横ともにこの比率で縮小する。端の画素も含めるため切り上げる。
+    constexpr int BloomResolutionDivisor = 4;
+    // コマ落ちの周期を選ぶ乱数には、下位24ビットを使う。
+    constexpr unsigned int FrameHoldRandomMask = 0xFFFFFFu;
     constexpr float BloomBaseScale = 0.72f;
     constexpr float BloomEffectScaleWeight = 0.28f;
     constexpr float MaxAdjustedBloom = 1.25f;
@@ -137,8 +141,8 @@ namespace Effect
 
         // ブルームは縦横1/4の解像度で処理している。元の画面は拡大しないため、
         // 物の輪郭そのものははっきりしたまま、光っている部分だけが外側へにじむ。
-        const int bloomWidth = (Application::GetWidth() + 3) / 4;
-        const int bloomHeight = (Application::GetHeight() + 3) / 4;
+        const int bloomWidth = (Application::GetWidth() + (BloomResolutionDivisor - 1)) / BloomResolutionDivisor;
+        const int bloomHeight = (Application::GetHeight() + (BloomResolutionDivisor - 1)) / BloomResolutionDivisor;
         // 明るさが1を超える値も残せるよう、16ビットの浮動小数点のテクスチャにしている（コンピュートシェーダーから書けるようUAV付き）
         constexpr DXGI_FORMAT bloomFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
@@ -418,10 +422,8 @@ namespace Effect
 
     float PostProcess::NextFrameHoldRandom()
     {
-        m_FrameHoldRandom ^= m_FrameHoldRandom << 13;
-        m_FrameHoldRandom ^= m_FrameHoldRandom >> 17;
-        m_FrameHoldRandom ^= m_FrameHoldRandom << 5;
-        return static_cast<float>(m_FrameHoldRandom & 0xFFFFFFu) / static_cast<float>(0xFFFFFF);
+        MathUtility::NextXorShift32(m_FrameHoldRandom);
+        return static_cast<float>(m_FrameHoldRandom & FrameHoldRandomMask) / static_cast<float>(FrameHoldRandomMask);
     }
 
     // UAVとSRVを同時に設定しないようにしながら、明るい部分の抽出と、2方向のぼかしを順番に実行している。

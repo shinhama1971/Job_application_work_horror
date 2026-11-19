@@ -17,7 +17,9 @@ private:
     // 演出を始めたか、残り秒数、次に起こす段階（-1なら始まっていない）
     bool m_Triggered = false;
     float m_Timer = 0.0f;
-    int m_Phase = -1;
+    // 次に起こす段階（NotStarted なら始まっていない）
+    static constexpr int NotStarted = -1;
+    int m_Phase = NotStarted;
 
 public:
     // 始まる前の状態に戻している
@@ -25,7 +27,7 @@ public:
     {
         m_Triggered = false;
         m_Timer = 0.0f;
-        m_Phase = -1;
+        m_Phase = NotStarted;
     }
 
     // 演出を始めている（3.2秒の演出）
@@ -49,7 +51,7 @@ public:
         constexpr float RemainingTimes[] = { 2.45f, 1.35f };
         constexpr int BeatCount =
             static_cast<int>(sizeof(RemainingTimes) / sizeof(RemainingTimes[0]));
-        if (!m_Triggered || m_Phase < 0 || m_Phase >= BeatCount ||
+        if (!m_Triggered || m_Phase == NotStarted || m_Phase >= BeatCount ||
             m_Timer > RemainingTimes[m_Phase])
         {
             return -1;

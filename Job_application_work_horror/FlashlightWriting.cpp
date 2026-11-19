@@ -22,24 +22,28 @@ namespace
     constexpr float MinimumPresence = 0.001f;
     constexpr float WritingRoughness = 0.85f;
     constexpr float MinimumReadDistance = 0.001f;
+    // 読めるとみなす文字の濃さ（半分より薄い文字は読めない）
+    constexpr float ReadablePresence = 0.5f;
 }
 
 void FlashlightWriting::Init()
 {
     // 原点を中心にした1x1の板。法線は-Z向きで、+Z向きに見たとき文字が正しく読めるUVにしている。
     const Vector3 normal(0.0f, 0.0f, -1.0f);
-    const Vector3 positions[4] =
+    // 壁の文字は四隅の位置とUVを同じ順で並べ、索引表で表裏を描く。
+    constexpr int WritingQuadVertexCount = 4;
+    const Vector3 positions[WritingQuadVertexCount] =
     {
         Vector3(-0.5f, 0.5f, 0.0f), Vector3(0.5f, 0.5f, 0.0f),
         Vector3(-0.5f, -0.5f, 0.0f), Vector3(0.5f, -0.5f, 0.0f)
     };
-    const Vector2 uvs[4] =
+    const Vector2 uvs[WritingQuadVertexCount] =
     {
         Vector2(0.0f, 0.0f), Vector2(1.0f, 0.0f),
         Vector2(0.0f, 1.0f), Vector2(1.0f, 1.0f)
     };
     m_Vertices.clear();
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < WritingQuadVertexCount; ++i)
     {
         VERTEX_3D vertex{};
         vertex.position = positions[i];
@@ -190,7 +194,7 @@ bool FlashlightWriting::IsBeingRead(
     const Vector3& cameraForward,
     bool flashlightOn) const
 {
-    if (!flashlightOn || m_Presence < 0.5f)
+    if (!flashlightOn || m_Presence < ReadablePresence)
     {
         return false;
     }

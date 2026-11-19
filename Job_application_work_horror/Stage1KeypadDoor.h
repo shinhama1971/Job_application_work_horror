@@ -63,5 +63,5 @@ private:
     bool m_InputOpen = false;
     float m_InputDelayTimer = 0.0f;
     float m_WrongTimer = 0.0f;
-    std::mt19937 m_Random{ Tools::CaptureMode::MakeRandomSeed(1104u) };
+    std::mt19937 m_Random{ Tools::CaptureMode::MakeRandomSeed(Tools::CaptureMode::RandomSeed::KeypadCode) };
 };

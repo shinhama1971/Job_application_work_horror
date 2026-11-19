@@ -13,7 +13,7 @@ namespace
     // 最後のドアを指すときの高さ（ドアの中心）
     constexpr float EndDoorTargetY = -74.0f;
     // 主電源を戻すのに要るヒューズの数
-    constexpr int RequiredFuseCount = 3;
+    constexpr int RequiredFuseCount = Core::GameState::RequiredFuseCount;
 }
 #include "MathUtility.h"
 #include "Game.h"

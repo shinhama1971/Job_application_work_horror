@@ -194,7 +194,9 @@ public:
         m_VertexBuffer.SetGPU();
         context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         context->PSSetShaderResources(0, 1, &m_Feed);
-        context->Draw(6, 0);
+        // 映像を貼る板（三角形2枚）
+        constexpr UINT FeedPanelVertexCount = 6;
+        context->Draw(FeedPanelVertexCount, 0);
         ID3D11ShaderResourceView* none = nullptr;
         context->PSSetShaderResources(0, 1, &none);
     }

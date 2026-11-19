@@ -35,7 +35,7 @@ private:
     static constexpr float FirstKnockDelay = 3.0f;
 
     // 乱数、今の出どころ、今の連打で残っている回数、次のノックまでの秒数、聞き続けている秒数、通知の残り秒数、見つけたか
-    std::mt19937 m_Random{ Tools::CaptureMode::MakeRandomSeed(1101u) };
+    std::mt19937 m_Random{ Tools::CaptureMode::MakeRandomSeed(Tools::CaptureMode::RandomSeed::KnockingAnomaly) };
     int m_Spot = 0;
     int m_KnocksLeftInBurst = 0;
     float m_KnockTimer = FirstKnockDelay;

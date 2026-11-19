@@ -12,6 +12,15 @@ namespace
 {
     // 画面効果がこれより弱ければ、その効果の描画を省く
     constexpr float EffectEpsilon = 0.001f;
+    // 画面を覆う四角形の頂点の数（三角形の帯で描く）
+    constexpr UINT QuadVertexCount = 4;
+    // 三角形ストリップの順に、位置とUVで同じ四隅を参照する。
+    constexpr UINT TopLeftVertex = 0;
+    constexpr UINT TopRightVertex = 1;
+    constexpr UINT BottomLeftVertex = 2;
+    constexpr UINT BottomRightVertex = 3;
+    // コマ落ちしているかを見るしきい値（0 か 1。crtOverlayPS.hlsl の CRT_FRAME_HOLD_THRESHOLD と同じ）
+    constexpr float FrameHoldThreshold = 0.5f;
     // 自動露出の倍率を読むシェーダーの番号（exposurePS.hlsl の t3）
     constexpr UINT AutoExposureTextureSlot = 3;
 }
@@ -21,25 +30,25 @@ namespace Graphics
     // 画面と同じ大きさの四角形（左上が原点の画素単位）と、5種類の画面効果のシェーダー、定数バッファを作っている
     bool FullScreenQuad::Init()
     {
-        m_Vertices.resize(4);
+        m_Vertices.resize(QuadVertexCount);
 
         float w = (float)Application::GetWidth();
         float h = (float)Application::GetHeight();
 
-        m_Vertices[0].position = Vector3(0.0f, 0.0f, 0.0f);
-        m_Vertices[1].position = Vector3(w, 0.0f, 0.0f);
-        m_Vertices[2].position = Vector3(0.0f, h, 0.0f);
-        m_Vertices[3].position = Vector3(w, h, 0.0f);
+        m_Vertices[TopLeftVertex].position = Vector3(0.0f, 0.0f, 0.0f);
+        m_Vertices[TopRightVertex].position = Vector3(w, 0.0f, 0.0f);
+        m_Vertices[BottomLeftVertex].position = Vector3(0.0f, h, 0.0f);
+        m_Vertices[BottomRightVertex].position = Vector3(w, h, 0.0f);
 
-        m_Vertices[0].color = Color(1, 1, 1, 1);
-        m_Vertices[1].color = Color(1, 1, 1, 1);
-        m_Vertices[2].color = Color(1, 1, 1, 1);
-        m_Vertices[3].color = Color(1, 1, 1, 1);
+        m_Vertices[TopLeftVertex].color = Color(1, 1, 1, 1);
+        m_Vertices[TopRightVertex].color = Color(1, 1, 1, 1);
+        m_Vertices[BottomLeftVertex].color = Color(1, 1, 1, 1);
+        m_Vertices[BottomRightVertex].color = Color(1, 1, 1, 1);
 
-        m_Vertices[0].uv = Vector2(0, 0);
-        m_Vertices[1].uv = Vector2(1, 0);
-        m_Vertices[2].uv = Vector2(0, 1);
-        m_Vertices[3].uv = Vector2(1, 1);
+        m_Vertices[TopLeftVertex].uv = Vector2(0, 0);
+        m_Vertices[TopRightVertex].uv = Vector2(1, 0);
+        m_Vertices[BottomLeftVertex].uv = Vector2(0, 1);
+        m_Vertices[BottomRightVertex].uv = Vector2(1, 1);
 
         m_VertexBuffer.Create(m_Vertices);
 
@@ -103,7 +112,7 @@ namespace Graphics
         context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
         Renderer::SetBlendState(BS_NONE);
         context->PSSetShaderResources(0, 1, &hdrSceneSRV);
-        context->DrawIndexed(4, 0, 0);
+        context->DrawIndexed(QuadVertexCount, 0, 0);
 
         // 次のフレームでHDRの描き先へ描けるよう、読み取りを外している
         ID3D11ShaderResourceView* nullResource = nullptr;
@@ -197,7 +206,7 @@ namespace Graphics
         context->PSSetShaderResources(0, 1, &sceneSRV);
         // 自動露出の倍率は、Compute Shaderが書いたバッファをそのまま読んでいる（CPUへは読み戻さない）
         context->PSSetShaderResources(AutoExposureTextureSlot, 1, &autoExposureSRV);
-        context->DrawIndexed(4, 0, 0);
+        context->DrawIndexed(QuadVertexCount, 0, 0);
         context->PSSetShaderResources(0, 1, &nullResource);
         // 次のフレームでCompute Shaderが書き込めるよう、読み取りを外している
         context->PSSetShaderResources(AutoExposureTextureSlot, 1, &nullResource);
@@ -209,7 +218,7 @@ namespace Graphics
             m_BloomShader.SetGPU();
             Renderer::SetBlendState(BS_ADDITIVE);
             context->PSSetShaderResources(0, BloomLevelCount, bloomSRVs);
-            context->DrawIndexed(4, 0, 0);
+            context->DrawIndexed(QuadVertexCount, 0, 0);
         }
 
         // 次の描画で同じテクスチャへ書き込めるよう、読み取りの設定を外している
@@ -222,18 +231,18 @@ namespace Graphics
         {
             m_VolumeShader.SetGPU();
             Renderer::SetBlendState(BS_ADDITIVE);
-            context->DrawIndexed(4, 0, 0);
+            context->DrawIndexed(QuadVertexCount, 0, 0);
         }
 
         // CRT風の効果は半透明の重ね描きとして合成し、画面全体を黒で塗りつぶさないようにしている。
         if (noiseAmount > 0.0f || horrorPulseStrength > EffectEpsilon ||
             lensMoisture > EffectEpsilon || filmGradeStrength > EffectEpsilon ||
-            signalInterference > EffectEpsilon || frameHold > 0.5f || fearVision > EffectEpsilon)
+            signalInterference > EffectEpsilon || frameHold > FrameHoldThreshold || fearVision > EffectEpsilon)
         {
             m_OverlayShader.SetGPU();
             Renderer::SetBlendState(BS_ALPHABLEND);
             context->PSSetShaderResources(0, 1, &sceneSRV);
-            context->DrawIndexed(4, 0, 0);
+            context->DrawIndexed(QuadVertexCount, 0, 0);
             context->PSSetShaderResources(0, 1, &nullResource);
         }
 

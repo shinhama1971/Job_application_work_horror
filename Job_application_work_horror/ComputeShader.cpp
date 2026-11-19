@@ -10,22 +10,7 @@
 // HLSLファイルをcs_5_0としてコンパイルし（入口はmain関数）、コンピュートシェーダーを作っている。失敗したらfalseを返している
 bool ComputeShader::Create(const char* fileName)
 {
-    std::vector<unsigned char> shaderObject;
-
-    const HRESULT compileResult = Renderer::CompileShader(
-        fileName, "main", "cs_5_0", shaderObject);
-    if (FAILED(compileResult))
-    {
-        return false;
-    }
-
-    const HRESULT createResult = Renderer::GetDevice()->CreateComputeShader(
-        shaderObject.data(),
-        shaderObject.size(),
-        nullptr,
-        m_Shader.ReleaseAndGetAddressOf());
-
-    return SUCCEEDED(createResult);
+    return SUCCEEDED(Renderer::CreateComputeShader(m_Shader.ReleaseAndGetAddressOf(), fileName));
 }
 
 // このコンピュートシェーダーを、次のDispatchで使うよう設定している

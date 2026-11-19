@@ -13,10 +13,15 @@
 
 namespace
 {
-    // スティックの値（-32768〜32767）を -1〜1 にする割る数（負の側・正の側）と、トリガーの値（0〜255）の最大
+    // GetKeyboardStateが返す各バイトでは、上位ビットが押下状態を表す。
+    constexpr BYTE VirtualKeyDownMask = 0x80;
+}
+
+namespace
+{
+    // スティックの値（-32768〜32767）を -1〜1 にする割る数（負の側・正の側）
     constexpr float StickNegativeRange = 32768.0f;
     constexpr float StickPositiveRange = 32767.0f;
-    constexpr float TriggerRange = 255.0f;
 	constexpr float VibrationFramesPerSecond = 60.0f;
 	constexpr WORD MaximumMotorSpeed = (std::numeric_limits<WORD>::max)();
 
@@ -170,15 +175,11 @@ void Input::Release()
 // キー入力（最上位ビットが1なら押されている）
 bool Input::GetKeyPress(int key) // 押している間ずっとtrue
 {
-	return m_Instance->keyState[key] & 0x80;
+	return m_Instance->keyState[key] & VirtualKeyDownMask;
 }
 bool Input::GetKeyTrigger(int key) // 押した瞬間だけtrue
 {
-	return (m_Instance->keyState[key] & 0x80) && !(m_Instance->keyState_old[key] & 0x80);
-}
-bool Input::GetKeyRelease(int key) // 離した瞬間だけtrue
-{
-	return !(m_Instance->keyState[key] & 0x80) && (m_Instance->keyState_old[key] & 0x80);
+	return (m_Instance->keyState[key] & VirtualKeyDownMask) && !(m_Instance->keyState_old[key] & VirtualKeyDownMask);
 }
 
 // 左スティック
@@ -206,19 +207,6 @@ DirectX::XMFLOAT2 Input::GetRightAnalogStick(void)
 	);
 }
 
-// 左トリガー
-float Input::GetLeftTrigger(void)
-{
-	BYTE t = m_Instance->controllerState.Gamepad.bLeftTrigger; // 0〜255
-	return t / TriggerRange;
-}
-// 右トリガー
-float Input::GetRightTrigger(void)
-{
-	BYTE t = m_Instance->controllerState.Gamepad.bRightTrigger; // 0〜255
-	return t / TriggerRange;
-}
-
 // ボタン入力
 bool Input::GetButtonPress(WORD btn) // 押している間ずっとtrue
 {
@@ -227,10 +215,6 @@ bool Input::GetButtonPress(WORD btn) // 押している間ずっとtrue
 bool Input::GetButtonTrigger(WORD btn) // 押した瞬間だけtrue
 {
 	return (m_Instance->controllerState.Gamepad.wButtons & btn) != 0 && (m_Instance->controllerState_old.Gamepad.wButtons & btn) == 0;
-}
-bool Input::GetButtonRelease(WORD btn) // 離した瞬間だけtrue
-{
-	return (m_Instance->controllerState.Gamepad.wButtons & btn) == 0 && (m_Instance->controllerState_old.Gamepad.wButtons & btn) != 0;
 }
 
 // 振動を始めている

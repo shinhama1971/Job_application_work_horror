@@ -22,6 +22,8 @@ static const float LENS_DIRT_FINE_PHASE = 1.73f;
 static const float LENS_DIRT_CROSS_MODULATION = 2.35f;
 static const float LENS_DIRT_BROAD_MODULATION = 1.15f;
 static const float LENS_DIRT_FINE_WEIGHT = 0.24f;
+// 3つの波を足す前の、汚れの濃さの基準（波が0のときの濃さ）
+#define LENS_DIRT_BASE 0.50f
 static const float LENS_DIRT_CROSS_WEIGHT = 0.31f;
 static const float LENS_DIRT_BROAD_WEIGHT = 0.45f;
 
@@ -54,7 +56,7 @@ float LensDirtWave(float2 uv)
         dot(uv, LENS_DIRT_CROSS_FREQUENCY) + first * LENS_DIRT_CROSS_MODULATION);
     const float broad = sin(
         dot(uv, LENS_DIRT_BROAD_FREQUENCY) + second * LENS_DIRT_BROAD_MODULATION);
-    return saturate(first * LENS_DIRT_FINE_WEIGHT + second * LENS_DIRT_CROSS_WEIGHT + broad * LENS_DIRT_BROAD_WEIGHT + 0.50f);
+    return saturate(first * LENS_DIRT_FINE_WEIGHT + second * LENS_DIRT_CROSS_WEIGHT + broad * LENS_DIRT_BROAD_WEIGHT + LENS_DIRT_BASE);
 }
 
 // ぼかしたブルームの画像の段（t0 = 縦横1/4、t1 = 1/8、t2 = 1/16、t3 = 1/32）とサンプラー（s0）

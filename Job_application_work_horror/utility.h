@@ -6,6 +6,7 @@
 #pragma once
 #include	<filesystem>
 #include	<functional>
+#include	<iosfwd>
 #include	<string>
 #include	<string_view>
 
@@ -27,12 +28,16 @@ namespace utility
         ReplaceFailed
     };
 
+    // 書き込み先と同じフォルダに一意の一時ファイルを作り、閉じた結果まで確認して差し替える。
+    AtomicWriteResult WriteFileAtomically(const std::filesystem::path& path,
+        const std::function<void(std::ofstream&)>& write, const std::function<bool()>& canReplace = {});
+
     // 隣の一時ファイルを閉じてから差し替える。差し替え直前に元のファイルを再確認する処理も渡せる。
     AtomicWriteResult WriteTextAtomically(const std::filesystem::path& path, std::string_view text,
         const std::function<bool()>& canReplace = {});
 
     // 保存フォルダを作り、完成した内容でセーブファイルを差し替える。
-    void WriteSaveFile(std::string const& fileName, std::string_view text);
+    bool WriteSaveFile(std::string const& fileName, std::string_view text);
 
 	// 文字コードの変換（UTF-16→Shift-JIS、UTF-8→UTF-16、UTF-8→Shift-JIS）
 	std::string wide_to_multi_winapi(std::wstring const& src);

@@ -36,6 +36,9 @@ public:
 private:
     // 水から出た後に足跡が残る歩数、乾くまでの秒数、足の間の横の幅（歩いた線から片側への距離）
     static constexpr int WetStepCount = 9;
+    // 足跡の濡れは残り歩数に応じて弱まり、最後の数歩でも基準の濃さは残す。
+    static constexpr float FootstepWetnessBase = 0.35f;
+    static constexpr float FootstepWetnessByRemainingSteps = 0.65f;
     static constexpr float DrySeconds = 40.0f;
     static constexpr float SideOffset = 2.4f;
 
@@ -96,7 +99,7 @@ public:
                 const float yaw = std::atan2(direction.x, direction.y);
                 // 歩いた線から、右足は右へ、左足は左へずらしている（右 = 前を時計回りに90度）
                 const DirectX::SimpleMath::Vector2 right(std::cos(yaw), -std::sin(yaw));
-                const float wetness = 0.35f + 0.65f * static_cast<float>(m_WetStepsLeft) / WetStepCount;
+                const float wetness = FootstepWetnessBase + FootstepWetnessByRemainingSteps * static_cast<float>(m_WetStepsLeft) / WetStepCount;
                 Add(step + right * (SideOffset * m_NextSide), yaw, m_NextSide, false, wetness);
                 m_NextSide = -m_NextSide;
             }

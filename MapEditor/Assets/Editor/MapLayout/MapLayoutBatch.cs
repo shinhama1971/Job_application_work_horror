@@ -19,6 +19,26 @@ namespace MapLayout.Editor
 {
     public static class MapLayoutBatch
     {
+        // 確認用の撮影（目の高さの見え方）：環境光、カメラの画角・近い面・遠い面、背景色、足もとから目までの高さ
+        static readonly Color ViewAmbientLight = new Color(0.55f, 0.55f, 0.58f);
+        const float ViewFieldOfView = 60.0f;
+        const float ViewNearClip = 1.0f;
+        const float ViewFarClip = 1000.0f;
+        static readonly Color ViewBackground = new Color(0.05f, 0.05f, 0.06f);
+        const float ViewEyeHeight = 40.0f;
+        // 撮影する画像の深度の精度（ビット）
+        const int CaptureDepthBits = 24;
+        // 真上からの撮影：天井の物とみなす高さ（床から45より上）、光の強さと向き、周りの余白、カメラを置く高さ、背景色、遠い面の余裕
+        const float TopViewCeilingY = -55.0f;
+        // 俯瞰画像は真下を向けて撮る。
+        const float TopViewPitchDegrees = 90.0f;
+        const float TopViewLightIntensity = 1.1f;
+        static readonly Vector3 TopViewLightAngles = new Vector3(60.0f, -30.0f, 0.0f);
+        const float TopViewMargin = 10.0f;
+        const float TopViewCameraHeight = 100.0f;
+        static readonly Color TopViewBackground = new Color(0.08f, 0.08f, 0.09f);
+        const float TopViewFarMargin = 300.0f;
+
         public static void Check()
         {
             var outputDirectory = GetArgument("-outputDir") ?? Path.Combine(Application.dataPath, "..", "Temp");
@@ -173,26 +193,24 @@ namespace MapLayout.Editor
             for (var index = 0; index < lines.Length; ++index)
             {
                 var tokens = Regex.Matches(lines[index].Split('#')[0], @"\S+").Cast<Match>().Select(match => match.Value).ToArray();
-                if (tokens.Length < 2 || (tokens[0] != "prop" && tokens[0] != "place"))
+                if (tokens.Length < 2 || (tokens[MapLayoutColumn.Command] != "prop" && tokens[MapLayoutColumn.Command] != "place"))
                 {
                     continue;
                 }
-                if (!names.Add(tokens[0] + " " + tokens[1]))
+                if (!names.Add(tokens[MapLayoutColumn.Command] + " " + tokens[MapLayoutColumn.Name]))
                 {
-                    problems.Add($"{index + 1}行目: 同じ名前が2回ある {tokens[1]}");
+                    problems.Add($"{index + 1}行目: 同じ名前が2回ある {tokens[MapLayoutColumn.Name]}");
                 }
-                var allowed = tokens[0] == "prop"
+                var allowed = tokens[MapLayoutColumn.Command] == "prop"
                     ? new[] { "noshadow", "weathering", "room", "glow", "model" }
                     : new[] { "yaw", "size" };
-                const int PropOptionsStart = 12;
-                const int PlaceOptionsStart = 5;
-                var options = tokens.Skip(tokens[0] == "prop" ? PropOptionsStart : PlaceOptionsStart).Where(token => !float.TryParse(token,
+                var options = tokens.Skip(tokens[MapLayoutColumn.Command] == "prop" ? MapLayoutColumn.PropOptionsStart : MapLayoutColumn.PlaceOptionsStart).Where(token => !float.TryParse(token,
                     System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _));
-                foreach (var option in options.Where(option => !allowed.Contains(option) && tokens[0] == "place"))
+                foreach (var option in options.Where(option => !allowed.Contains(option) && tokens[MapLayoutColumn.Command] == "place"))
                 {
                     problems.Add($"{index + 1}行目: place の知らない指定 {option}");
                 }
-                if (tokens[0] == "prop" && tokens.Skip(PropOptionsStart).Contains("yaw"))
+                if (tokens[MapLayoutColumn.Command] == "prop" && tokens.Skip(MapLayoutColumn.PropOptionsStart).Contains("yaw"))
                 {
                     problems.Add($"{index + 1}行目: prop に yaw が書かれた");
                 }
@@ -203,10 +221,10 @@ namespace MapLayout.Editor
                 var tokens = line == null ? null : Regex.Matches(line.Split('#')[0], @"\S+").Cast<Match>().Select(match => match.Value).ToArray();
                 return tokens != null && check(tokens) ? null : $"{name} の {what} が違う: {line}";
             }
-            problems.Add(Expect("prop", "Wall8_copy", tokens => tokens[2] == "136" && tokens[4] == "-30", "位置（コピーを2回目に動かした値）"));
-            problems.Add(Expect("prop", "Wall8", tokens => tokens[2] == "135" && tokens[4] == "-70", "位置（コピーの元）"));
-            problems.Add(Expect("prop", "Wall9", tokens => tokens[2] == "-85", "位置"));
-            problems.Add(Expect("prop", "Wall10", tokens => tokens[2] == "90", "位置（動かしていない）"));
+            problems.Add(Expect("prop", "Wall8_copy", tokens => tokens[MapLayoutColumn.PositionX] == "136" && tokens[MapLayoutColumn.PositionZ] == "-30", "位置（コピーを2回目に動かした値）"));
+            problems.Add(Expect("prop", "Wall8", tokens => tokens[MapLayoutColumn.PositionX] == "135" && tokens[MapLayoutColumn.PositionZ] == "-70", "位置（コピーの元）"));
+            problems.Add(Expect("prop", "Wall9", tokens => tokens[MapLayoutColumn.PositionX] == "-85", "位置"));
+            problems.Add(Expect("prop", "Wall10", tokens => tokens[MapLayoutColumn.PositionX] == "90", "位置（動かしていない）"));
             problems.Add(Expect("place", "Door", tokens => tokens.Contains("yaw") && tokens[Array.IndexOf(tokens, "yaw") + 1] == "30", "向き"));
             problems.RemoveAll(problem => problem == null);
 
@@ -241,25 +259,25 @@ namespace MapLayout.Editor
         static void RenderView(MapLayoutRoot root, Vector3 foot, Vector2 target, float pitch, string path)
         {
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.55f, 0.55f, 0.58f);
+            RenderSettings.ambientLight = ViewAmbientLight;
             foreach (var sceneLight in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
             {
                 sceneLight.shadows = LightShadows.None;
             }
             var cameraObject = new GameObject("撮影用のカメラ");
             var camera = cameraObject.AddComponent<Camera>();
-            camera.fieldOfView = 60.0f;
-            camera.nearClipPlane = 1.0f;
-            camera.farClipPlane = 1000.0f;
+            camera.fieldOfView = ViewFieldOfView;
+            camera.nearClipPlane = ViewNearClip;
+            camera.farClipPlane = ViewFarClip;
             camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = new Color(0.05f, 0.05f, 0.06f);
-            var eye = foot + new Vector3(0.0f, 40.0f, 0.0f);
+            camera.backgroundColor = ViewBackground;
+            var eye = foot + new Vector3(0.0f, ViewEyeHeight, 0.0f);
             var yaw = Mathf.Atan2(target.x - foot.x, target.y - foot.z) * Mathf.Rad2Deg;
             camera.transform.SetPositionAndRotation(eye, Quaternion.Euler(-pitch * Mathf.Rad2Deg, yaw, 0.0f));
 
             const int width = 1280;
             const int height = 720;
-            var renderTarget = new RenderTexture(width, height, 24);
+            var renderTarget = new RenderTexture(width, height, CaptureDepthBits);
             camera.targetTexture = renderTarget;
             camera.aspect = (float)width / height;
             camera.Render();
@@ -311,7 +329,7 @@ namespace MapLayout.Editor
             {
                 bounds.Encapsulate(renderer.bounds);
                 // 天井の板・照明・配管（床から45より上）は、上から見ると間取りを隠すので、撮るときだけ隠している
-                if (renderer.bounds.center.y > -55.0f)
+                if (renderer.bounds.center.y > TopViewCeilingY)
                 {
                     renderer.enabled = false;
                 }
@@ -319,22 +337,22 @@ namespace MapLayout.Editor
             var lightObject = new GameObject("撮影用の光");
             var light = lightObject.AddComponent<Light>();
             light.type = LightType.Directional;
-            light.intensity = 1.1f;
-            lightObject.transform.rotation = Quaternion.Euler(60.0f, -30.0f, 0.0f);
+            light.intensity = TopViewLightIntensity;
+            lightObject.transform.rotation = Quaternion.Euler(TopViewLightAngles);
 
             var cameraObject = new GameObject("撮影用のカメラ");
             var camera = cameraObject.AddComponent<Camera>();
             camera.orthographic = true;
-            camera.orthographicSize = Mathf.Max(bounds.extents.z, bounds.extents.x) + 10.0f;
-            camera.transform.position = bounds.center + Vector3.up * (bounds.extents.y + 100.0f);
-            camera.transform.rotation = Quaternion.Euler(90.0f, 0.0f, 0.0f);
+            camera.orthographicSize = Mathf.Max(bounds.extents.z, bounds.extents.x) + TopViewMargin;
+            camera.transform.position = bounds.center + Vector3.up * (bounds.extents.y + TopViewCameraHeight);
+            camera.transform.rotation = Quaternion.Euler(TopViewPitchDegrees, 0.0f, 0.0f);
             camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = new Color(0.08f, 0.08f, 0.09f);
-            camera.nearClipPlane = 1.0f;
-            camera.farClipPlane = bounds.size.y + 300.0f;
+            camera.backgroundColor = TopViewBackground;
+            camera.nearClipPlane = ViewNearClip;
+            camera.farClipPlane = bounds.size.y + TopViewFarMargin;
 
             const int size = 1600;
-            var target = new RenderTexture(size, size, 24);
+            var target = new RenderTexture(size, size, CaptureDepthBits);
             camera.targetTexture = target;
             camera.Render();
             RenderTexture.active = target;

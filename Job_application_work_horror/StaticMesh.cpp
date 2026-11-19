@@ -6,6 +6,7 @@
 
 #include	"StaticMesh.h"
 #include	"AssimpPerse.h"
+#include	"utility.h"
 
 #include <algorithm>
 #include <cfloat>
@@ -13,6 +14,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 
 namespace
 {
@@ -79,17 +81,31 @@ namespace
 		}
 	}
 
+	// 件数の読み違いで過大な確保をしないよう、値が残りのファイル内に収まるか確かめる。
+	bool HasCacheBytes(std::ifstream& stream, std::uintmax_t fileSize, std::uintmax_t bytes)
+	{
+		const std::streamoff offset = stream.tellg();
+		return offset >= 0 && static_cast<std::uintmax_t>(offset) <= fileSize &&
+			bytes <= fileSize - static_cast<std::uintmax_t>(offset) &&
+			bytes <= static_cast<std::uintmax_t>((std::numeric_limits<std::streamsize>::max)());
+	}
+
 	template <typename T>
-	bool ReadArray(std::ifstream& stream, std::vector<T>& values)
+	bool ReadArray(std::ifstream& stream, std::uintmax_t fileSize, std::vector<T>& values)
 	{
 		std::uint32_t count = 0;
 		if (!ReadValue(stream, count))
 		{
 			return false;
 		}
+		const auto byteCount = static_cast<std::uintmax_t>(count) * sizeof(T);
+		if (!HasCacheBytes(stream, fileSize, byteCount) || count > values.max_size())
+		{
+			return false;
+		}
 		values.resize(count);
 		return count == 0 ||
-			static_cast<bool>(stream.read(reinterpret_cast<char*>(values.data()), static_cast<std::streamsize>(count * sizeof(T))));
+			static_cast<bool>(stream.read(reinterpret_cast<char*>(values.data()), static_cast<std::streamsize>(byteCount)));
 	}
 
 	void WriteString(std::ofstream& stream, const std::string& text)
@@ -98,10 +114,10 @@ namespace
 		stream.write(text.data(), static_cast<std::streamsize>(text.size()));
 	}
 
-	bool ReadString(std::ifstream& stream, std::string& text)
+	bool ReadString(std::ifstream& stream, std::uintmax_t fileSize, std::string& text)
 	{
 		std::uint32_t length = 0;
-		if (!ReadValue(stream, length))
+		if (!ReadValue(stream, length) || !HasCacheBytes(stream, fileSize, length) || length > text.max_size())
 		{
 			return false;
 		}
@@ -252,18 +268,25 @@ bool StaticMesh::LoadConverted(const std::string& filename, const std::string& t
 	{
 		return false;
 	}
-	std::ifstream stream(GetConvertedPath(filename), std::ios::binary);
+	std::ifstream stream(GetConvertedPath(filename), std::ios::binary | std::ios::ate);
 	if (!stream)
 	{
 		return false;
 	}
 
-	char magic[4] = {};
+	const std::streamoff end = stream.tellg();
+	if (end < 0 || !stream.seekg(0))
+	{
+		return false;
+	}
+	const auto fileSize = static_cast<std::uintmax_t>(end);
+
+	char magic[sizeof(ConvertedMagic)] = {};
 	std::uint32_t version = 0;
 	std::uint32_t vertexSize = 0;
 	std::uint32_t materialSize = 0;
 	SourceStamp saved;
-	if (!ReadValue(stream, magic) || !std::equal(magic, magic + 4, ConvertedMagic) ||
+	if (!ReadValue(stream, magic) || !std::equal(magic, magic + sizeof(magic), ConvertedMagic) ||
 		!ReadValue(stream, version) || version != ConvertedVersion ||
 		!ReadValue(stream, vertexSize) || vertexSize != sizeof(VERTEX_3D) ||
 		!ReadValue(stream, materialSize) || materialSize != sizeof(MATERIAL) ||
@@ -279,27 +302,55 @@ bool StaticMesh::LoadConverted(const std::string& filename, const std::string& t
 	std::vector<MATERIAL> materials;
 	std::vector<std::string> texturenames;
 	std::uint32_t subsetCount = 0;
-	if (!ReadArray(stream, vertices) || !ReadArray(stream, indices) || !ReadValue(stream, subsetCount))
+	if (!ReadArray(stream, fileSize, vertices) || !ReadArray(stream, fileSize, indices) || !ReadValue(stream, subsetCount))
+	{
+		return false;
+	}
+	// 名前の長さと、描画範囲・材質番号の固定部分は各サブセットに最低限必要。
+	constexpr std::uintmax_t MinSubsetBytes = sizeof(std::uint32_t) + sizeof(SUBSET::IndexNum) +
+		sizeof(SUBSET::VertexNum) + sizeof(SUBSET::IndexBase) + sizeof(SUBSET::VertexBase) + sizeof(SUBSET::MaterialIdx);
+	if (!HasCacheBytes(stream, fileSize, MinSubsetBytes * subsetCount) || subsetCount > subsets.max_size())
 	{
 		return false;
 	}
 	subsets.resize(subsetCount);
 	for (SUBSET& subset : subsets)
 	{
-		if (!ReadString(stream, subset.MtrlName) || !ReadValue(stream, subset.IndexNum) || !ReadValue(stream, subset.VertexNum) ||
+		if (!ReadString(stream, fileSize, subset.MtrlName) || !ReadValue(stream, subset.IndexNum) || !ReadValue(stream, subset.VertexNum) ||
 			!ReadValue(stream, subset.IndexBase) || !ReadValue(stream, subset.VertexBase) || !ReadValue(stream, subset.MaterialIdx))
 		{
 			return false;
 		}
 	}
-	if (!ReadArray(stream, materials))
+	if (!ReadArray(stream, fileSize, materials))
+	{
+		return false;
+	}
+	// インデックスはサブセット内の頂点番号。対応する描画範囲と材質番号を確かめる。
+	for (const auto& subset : subsets)
+	{
+		if (subset.VertexBase > vertices.size() || subset.VertexNum > vertices.size() - subset.VertexBase ||
+			subset.IndexBase > indices.size() || subset.IndexNum > indices.size() - subset.IndexBase ||
+			subset.MaterialIdx >= materials.size())
+		{
+			return false;
+		}
+		for (std::size_t offset = 0; offset < subset.IndexNum; ++offset)
+		{
+			if (indices[static_cast<std::size_t>(subset.IndexBase) + offset] >= subset.VertexNum)
+			{
+				return false;
+			}
+		}
+	}
+	if (!HasCacheBytes(stream, fileSize, static_cast<std::uintmax_t>(materials.size()) * sizeof(std::uint32_t)))
 	{
 		return false;
 	}
 	texturenames.resize(materials.size());
 	for (std::string& texturename : texturenames)
 	{
-		if (!ReadString(stream, texturename))
+		if (!ReadString(stream, fileSize, texturename))
 		{
 			return false;
 		}
@@ -340,16 +391,15 @@ void StaticMesh::SaveConverted(const std::string& filename) const
 		return;
 	}
 	const std::filesystem::path path = GetConvertedPath(filename);
-	std::filesystem::path temporaryPath = path;
-	temporaryPath += ".tmp";
+
 	std::error_code error;
 	std::filesystem::create_directories(path.parent_path(), error);
+	if (error)
 	{
-		std::ofstream stream(temporaryPath, std::ios::binary | std::ios::trunc);
-		if (!stream)
-		{
-			return;
-		}
+		return;
+	}
+	const auto result = utility::WriteFileAtomically(path, [&](std::ofstream& stream)
+	{
 		stream.write(ConvertedMagic, sizeof(ConvertedMagic));
 		WriteValue(stream, ConvertedVersion);
 		WriteValue(stream, static_cast<std::uint32_t>(sizeof(VERTEX_3D)));
@@ -373,14 +423,9 @@ void StaticMesh::SaveConverted(const std::string& filename) const
 		{
 			WriteString(stream, index < m_texturenames.size() ? m_texturenames[index] : std::string());
 		}
-		if (!stream)
-		{
-			return;
-		}
-	}
-	std::filesystem::rename(temporaryPath, path, error);
-	if (error)
+	});
+	if (result != utility::AtomicWriteResult::Success)
 	{
-		std::filesystem::remove(temporaryPath, error);
+		OutputDebugStringW((L"モデルキャッシュを保存できません: " + path.wstring() + L"\n").c_str());
 	}
 }

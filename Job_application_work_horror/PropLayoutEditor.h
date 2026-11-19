@@ -12,6 +12,7 @@
 
 #include "PropLayoutFile.h"
 
+#include <cstddef>
 #include <string>
 #include <utility>
 
@@ -61,7 +62,9 @@ private:
     std::string m_Selected;
     std::string m_Highlighted;
     // 一覧の絞り込みの文字
-    char m_Filter[64] = {};
+    // 配置物を名前で探す入力欄の容量（終端文字を含む）。
+    static constexpr std::size_t FilterTextCapacity = 64;
+    char m_Filter[FilterTextCapacity] = {};
     // 天井の板のような、古さを描く大きな面を選ばないか（見上げたときに天井ばかり選ばれないように）
     bool m_IgnoreWeatheredSurfaces = true;
     // 窓に出す英語の状態と、HUDに出す日本語の理由

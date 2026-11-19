@@ -106,5 +106,5 @@ private:
     // 知らせの文章とその残り秒数、乱数
     std::string_view m_NoticeText;
     float m_NoticeTimer = 0.0f;
-    std::mt19937 m_Random{ Tools::CaptureMode::MakeRandomSeed(1102u) };
+    std::mt19937 m_Random{ Tools::CaptureMode::MakeRandomSeed(Tools::CaptureMode::RandomSeed::HiddenRoom) };
 };

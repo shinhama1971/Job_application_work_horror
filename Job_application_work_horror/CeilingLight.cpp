@@ -22,6 +22,14 @@ namespace
     constexpr float StartupStaggerSeconds = 0.10f;
     constexpr float StartupSeconds = 0.58f;
     constexpr float StartupPulsesPerSecond = 24.0f;
+    // 点き始めの明滅の並び：最初に点く刻み（0・3・4）と、安定して点き始める刻み（ここから3刻みごとに1回だけ消える）
+    constexpr int StartupFirstOnPulse = 0;
+    constexpr int StartupSecondOnPulse = 3;
+    constexpr int StartupThirdOnPulse = 4;
+    constexpr int StartupSteadyPulse = 7;
+    // 安定してからの明滅の周期（刻み）と、その中で消える刻み
+    constexpr int FlickerPulseCycle = 3;
+    constexpr int FlickerOffPulseInCycle = 1;
     constexpr float StartupWarmupBrightness = 0.40f;  // 点き始めの明るさ（ここから、この幅だけ上げて1にする）
     constexpr float StartupWarmupRise = 0.60f;
     constexpr float StartupOffBrightness = 0.025f;    // 明滅で消えている間の明るさ
@@ -61,6 +69,10 @@ namespace
 
     // --- 影が出たときなどの演出の明滅：1秒あたりの切り替えの回数、消えている間の明るさ
     constexpr float EventPulsesPerSecond = 26.0f;
+    // 出来事の明滅の並び：最初に点く刻み（0・2）と、点いたり消えたりを続け始める刻み
+    constexpr int EventFirstOnPulse = 0;
+    constexpr int EventSecondOnPulse = 2;
+    constexpr int EventSteadyPulse = 4;
     constexpr float EventOffBrightness = 0.008f;
 
     // --- 点光源：ほとんど消えている器具は登録しない明るさ、発光パネルから下げる距離、照らす範囲（電力が戻った後・停電中）
@@ -302,8 +314,8 @@ void CeilingLight::Update()
             // 1/24秒ごとに、点いているか消えているかを決まった並びで切り替えている（点き始めの蛍光灯の明滅）
             const int pulse = static_cast<int>(startupTime * StartupPulsesPerSecond);
             const bool tubeIsOn =
-                (pulse == 0) || (pulse == 3) || (pulse == 4) ||
-                (pulse >= 7 && (pulse % 3) != 1);
+                (pulse == StartupFirstOnPulse) || (pulse == StartupSecondOnPulse) || (pulse == StartupThirdOnPulse) ||
+                (pulse >= StartupSteadyPulse && (pulse % FlickerPulseCycle) != FlickerOffPulseInCycle);
             const float warmup =
                 StartupWarmupBrightness + (startupTime / StartupSeconds) * StartupWarmupRise;
             targetBrightness = tubeIsOn ? warmup : StartupOffBrightness;
@@ -400,8 +412,8 @@ void CeilingLight::Update()
             m_EventFlickerDuration - m_EventFlickerTimer;
         const int pulse = static_cast<int>(elapsed * EventPulsesPerSecond);
         const bool tubeOn =
-            (pulse == 0) || (pulse == 2) ||
-            (pulse >= 4 && (pulse % 3) != 1);
+            (pulse == EventFirstOnPulse) || (pulse == EventSecondOnPulse) ||
+            (pulse >= EventSteadyPulse && (pulse % FlickerPulseCycle) != FlickerOffPulseInCycle);
         const float flareBrightness =
             EventFlareBrightness + m_EventFlickerStrength * EventFlareRange;
         targetBrightness = tubeOn

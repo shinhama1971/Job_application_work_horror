@@ -876,7 +876,9 @@ void Player::StartStairClimb(const StairClimb& climb)
     m_Climb = ClimbState{};
     m_Climb.Settings = climb;
     Vector3 direction(climb.Direction.x, 0.0f, climb.Direction.z);
-    if (direction.LengthSquared() < 1e-6f)
+    // ほぼ同じ地点を指す場合は、誤差から向きを決めない。
+    constexpr float MinDirectionLengthSquared = 1e-6f;
+    if (direction.LengthSquared() < MinDirectionLengthSquared)
     {
         direction = Vector3(0.0f, 0.0f, 1.0f);
     }

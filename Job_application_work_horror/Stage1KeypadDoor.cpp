@@ -59,9 +59,12 @@ void Stage1KeypadDoor::Init(const Parts& parts)
     m_Lock.SetCode(code);
 #ifdef _DEBUG
     // 動作確認用に、Visual Studioの出力ウィンドウへ正解の番号を出している（Debug構成のみ）。
-    const std::string message = "[Stage1KeypadDoor] code = " +
-        std::to_string(code[0]) + std::to_string(code[1]) +
-        std::to_string(code[2]) + std::to_string(code[3]) + "\n";
+    std::string message = "[Stage1KeypadDoor] code = ";
+    for (int digit : code)
+    {
+        message += std::to_string(digit);
+    }
+    message += '\n';
     OutputDebugStringA(message.c_str());
 #endif
 
@@ -147,7 +150,7 @@ void Stage1KeypadDoor::HandleInput(Player& player)
     else
     {
         // キーボードでは数字キーで直接入力でき、入力すると次の桁へ進んでいる。
-        for (int digit = 0; digit <= 9; ++digit)
+        for (int digit = 0; digit < KeypadLock::DigitValueCount; ++digit)
         {
             if (Input::GetKeyTrigger(static_cast<BYTE>(VK_0 + digit)))
             {

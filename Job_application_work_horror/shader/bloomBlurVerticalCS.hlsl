@@ -74,6 +74,6 @@ void main(
     result += (LoadShared(localIndex - 1) + LoadShared(localIndex + 1)) * BLOOM_GAUSS_WEIGHT_1;
     result += (LoadShared(localIndex - 2) + LoadShared(localIndex + 2)) * BLOOM_GAUSS_WEIGHT_2;
     result += (LoadShared(localIndex - 3) + LoadShared(localIndex + 3)) * BLOOM_GAUSS_WEIGHT_3;
-    result += (LoadShared(localIndex - 4) + LoadShared(localIndex + 4)) * BLOOM_GAUSS_WEIGHT_4;
+    result += (LoadShared(localIndex - Radius) + LoadShared(localIndex + Radius)) * BLOOM_GAUSS_WEIGHT_4;
     OutputTexture[dispatchThreadId.xy] = float4(result, 1.0f);
 }

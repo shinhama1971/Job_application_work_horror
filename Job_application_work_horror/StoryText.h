@@ -10,6 +10,14 @@
 
 namespace StoryText
 {
+    // UTF-8の継続バイトは、上位2ビットが10になる。
+    constexpr bool IsUtf8ContinuationByte(unsigned char byte)
+    {
+        constexpr unsigned int ContinuationPrefixMask = 0xC0u;
+        constexpr unsigned int ContinuationPrefix = 0x80u;
+        return (byte & ContinuationPrefixMask) == ContinuationPrefix;
+    }
+
     // 受信記録の見出しと、途切れ途切れに届く3行
     inline constexpr const char* TransmissionHeader = "受信記録　——　第3研究棟";
     inline constexpr const char* TransmissionLines[3] =
@@ -93,7 +101,7 @@ namespace StoryText
         {
             const unsigned char byte = static_cast<unsigned char>(*p);
             // 文字の先頭のバイト（続きのバイト 10xxxxxx 以外）で数えている
-            if ((byte & 0xC0) != 0x80)
+            if (!IsUtf8ContinuationByte(byte))
             {
                 if (characters >= count)
                 {
@@ -112,7 +120,7 @@ namespace StoryText
         int characters = 0;
         for (const char* p = text; *p != '\0'; ++p)
         {
-            if ((static_cast<unsigned char>(*p) & 0xC0) != 0x80)
+            if (!IsUtf8ContinuationByte(static_cast<unsigned char>(*p)))
             {
                 ++characters;
             }

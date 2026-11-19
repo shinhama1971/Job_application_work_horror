@@ -22,6 +22,12 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // 平面にほぼ平行な光線を扱うときは、方向成分での除算を避ける。
+    constexpr float RayParallelTolerance = 1.0e-6f;
+    // 箱との交差をワールドのX・Y・Z軸ごとに確かめる。
+    constexpr int WorldAxisCount = 3;
+    // 編集範囲を十分に超える距離を、交差なしの初期値として使う。
+    constexpr float NoPropHitDistance = 1.0e9f;
     // 床の高さ（全ステージ共通）
     constexpr float FloorY = -100.0f;
 
@@ -53,17 +59,17 @@ namespace
     // 光線が箱（中心と大きさ）に当たるかを、軸ごとの出入りの範囲（スラブ法）で調べ、当たった距離を返している
     bool RayHitsBox(const Vector3& origin, const Vector3& direction, const Vector3& center, const Vector3& size, float& distance)
     {
-        const float origins[3] = { origin.x, origin.y, origin.z };
-        const float directions[3] = { direction.x, direction.y, direction.z };
-        const float centers[3] = { center.x, center.y, center.z };
-        const float halves[3] = { std::abs(size.x) * 0.5f, std::abs(size.y) * 0.5f, std::abs(size.z) * 0.5f };
+        const float origins[WorldAxisCount] = { origin.x, origin.y, origin.z };
+        const float directions[WorldAxisCount] = { direction.x, direction.y, direction.z };
+        const float centers[WorldAxisCount] = { center.x, center.y, center.z };
+        const float halves[WorldAxisCount] = { std::abs(size.x) * 0.5f, std::abs(size.y) * 0.5f, std::abs(size.z) * 0.5f };
         float enter = 0.0f;
-        float leave = 1.0e9f;
-        for (int axis = 0; axis < 3; ++axis)
+        float leave = NoPropHitDistance;
+        for (int axis = 0; axis < WorldAxisCount; ++axis)
         {
             const float minimum = centers[axis] - halves[axis];
             const float maximum = centers[axis] + halves[axis];
-            if (std::abs(directions[axis]) < 1.0e-6f)
+            if (std::abs(directions[axis]) < RayParallelTolerance)
             {
                 // この軸に平行な光線は、範囲の外なら当たらない
                 if (origins[axis] < minimum || origins[axis] > maximum)
@@ -127,7 +133,7 @@ Wall* PropLayoutEditor::FindWall(PropLayoutFile::SpawnedProps& props, const std:
 
 void PropLayoutEditor::PickAlongRay(const Vector3& origin, const Vector3& direction)
 {
-    float nearest = 1.0e9f;
+    float nearest = NoPropHitDistance;
     for (const PropDescription& description : m_Layout.Props)
     {
         if (m_IgnoreWeatheredSurfaces && description.Weathering)

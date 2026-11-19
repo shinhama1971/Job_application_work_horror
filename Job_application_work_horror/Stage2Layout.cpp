@@ -272,8 +272,8 @@ namespace
             Wall* clockFace = CreatePlacedWall("Stage2ClockFace", ClockFaceColor, false);
             clockFace->SetCastsShadow(false);
             // 時計の枠の見た目は、鏡や肖像画と同じ溝の入った額縁の棒（Mayaで作ったモデル）
-            std::array<Wall*, 4> frames{};
-            const char* frameNames[] = { "Stage2ClockFrameTop", "Stage2ClockFrameBottom", "Stage2ClockFrameNear", "Stage2ClockFrameFar" };
+            constexpr const char* frameNames[] = { "Stage2ClockFrameTop", "Stage2ClockFrameBottom", "Stage2ClockFrameNear", "Stage2ClockFrameFar" };
+            std::array<Wall*, std::size(frameNames)> frames{};
             for (std::size_t index = 0; index < frames.size(); ++index)
             {
                 frames[index] = CreatePlacedWall(frameNames[index], TrimColor, false);

@@ -5,6 +5,7 @@
 // ============================================================================
 
 #include <chrono>
+#include <cstdlib>
 #include <algorithm>
 #include <thread>
 #include "Application.h"
@@ -69,20 +70,29 @@ Application::~Application()
 //-----------------------------------------------------------------------------
 // 実行：拡大率への対応・起動オプションの読み取り・初期化・メインループ・終了処理を順に呼んでいる
 //-----------------------------------------------------------------------------
-void Application::Run()
+int Application::Run()
 {
     // 画面の拡大率（125%など）で引き伸ばされず、モニター本来の解像度で描けるようにしている。
     EnableDpiAwareness();
 
     // 起動オプション --capture <出力フォルダ>（または --benchmark）があれば、自動撮影・計測モードにしている。
     Tools::CaptureMode::ConfigureFromCommandLine();
+    if (const int result = Tools::CaptureMode::GetExitCode(); result != EXIT_SUCCESS)
+    {
+        return result;
+    }
     // WICと動画出力が使う初期化回数を、音声側とは別に管理する。
     const bool captureComInitialized = Tools::CaptureMode::IsActive() &&
         SUCCEEDED(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
 
+    int exitCode = EXIT_FAILURE;
     if (InitApp())
     {
-        MainLoop();
+        exitCode = MainLoop();
+    }
+    else if (Tools::CaptureMode::IsActive())
+    {
+        Tools::CaptureMode::Abort("撮影・計測用のウィンドウを初期化できません。");
     }
     UninitApp();
 
@@ -90,6 +100,8 @@ void Application::Run()
     {
         CoUninitialize();
     }
+    const int captureExitCode = Tools::CaptureMode::GetExitCode();
+    return captureExitCode == EXIT_SUCCESS ? exitCode : captureExitCode;
 }
 
 //-----------------------------------------------------------------------------
@@ -270,19 +282,24 @@ void Application::UninitApp()
 //-----------------------------------------------------------------------------
 // メインループ：Windowsのメッセージを処理しながら、ゲームの更新と描画を毎フレーム呼んでいる
 //-----------------------------------------------------------------------------
-void Application::MainLoop()
+int Application::MainLoop()
 {
     MSG msg = {};
 
     // ゲーム全体（描画・音・入力・最初のScene）を初期化している。失敗したら原因の候補を表示して終わる。
     if (!Core::Game::Init())
     {
+        if (Tools::CaptureMode::IsActive())
+        {
+            Tools::CaptureMode::Abort("撮影・計測でDirectX 11を初期化できません。");
+            return EXIT_FAILURE;
+        }
         // 日本語はワイド文字（MessageBoxW）で出している（MessageBoxA だと、UTF-8 の文字列が Shift_JIS として読まれて化ける）
         MessageBoxW(m_hWnd,
             L"DirectX 11の初期化に失敗しました。\n"
             L"グラフィックドライバーとDirectX 11対応環境を確認してください。",
             L"起動エラー", MB_OK | MB_ICONERROR);
-        return;
+        return EXIT_FAILURE;
     }
 
     // 経過時間は、システム時刻の変更に影響されないsteady_clockで測っている。
@@ -362,6 +379,7 @@ void Application::MainLoop()
     }
 
     Core::Game::Uninit();
+    return static_cast<int>(msg.wParam);
 }
 
 //-----------------------------------------------------------------------------

@@ -10,6 +10,23 @@
 #include <string>
 #include <string_view>
 
+// ヒューズを拾った後の影の状態（出ていない・出ていてライトを向ける段階・照らして消した）
+enum class FuseWatcherState
+{
+    None,
+    Watching,
+    Observed
+};
+
+// 左の倉庫の演出の段階（待っている・背後で物音がした・影が出た・終わった）
+enum class StorageScarePhase
+{
+    Waiting,
+    NoiseHeard,
+    ShadowShown,
+    Finished
+};
+
 // 目的表示を選ぶために必要な状態。bool の知らせは「その知らせの残り時間が0より大きい」ことを表している。
 struct Stage1ObjectiveInput
 {
@@ -38,10 +55,10 @@ struct Stage1ObjectiveInput
     bool patrolNotice = false;
     std::string_view patrolNoticeText;
 
-    // 人影の演出（fuseWatcherState: 1なら影が出ていてライトを向ける段階）
-    int fuseWatcherState = 0;
+    // 人影の演出（Watching なら影が出ていてライトを向ける段階）
+    FuseWatcherState fuseWatcherState = FuseWatcherState::None;
     // 左の倉庫の演出の段階、出口の前兆の残り秒数、照明の演出の知らせの残り秒数
-    int storageScarePhase = 0;
+    StorageScarePhase storageScarePhase = StorageScarePhase::Waiting;
     float exitOmenSeconds = 0.0f;
     float scareLightNoticeSeconds = 0.0f;
 

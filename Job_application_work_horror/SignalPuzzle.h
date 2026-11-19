@@ -19,9 +19,13 @@ public:
         Completed
     };
 
+public:
+    // 信号盤の数（青・黄・赤）
+    static constexpr int SignalCount = 3;
+
 private:
     // 各信号盤を受け付けたか、次に操作すべき番号、解けたか
-    std::array<bool, 3> m_Accepted{ false, false, false };
+    std::array<bool, SignalCount> m_Accepted{ false, false, false };
     int m_Step = 0;
     bool m_Complete = false;
 
@@ -38,14 +42,14 @@ public:
     void ForceComplete()
     {
         m_Accepted.fill(true);
-        m_Step = 3;
+        m_Step = SignalCount;
         m_Complete = true;
     }
 
     // 信号盤を操作している。順番どおりなら受け付け、違えば最初からやり直している
     AcceptResult Accept(int signalIndex)
     {
-        if (signalIndex < 0 || signalIndex >= 3 || signalIndex != m_Step)
+        if (signalIndex < 0 || signalIndex >= SignalCount || signalIndex != m_Step)
         {
             Reset();
             return AcceptResult::WrongOrder;
@@ -53,7 +57,7 @@ public:
 
         m_Accepted[signalIndex] = true;
         ++m_Step;
-        if (m_Step >= 3)
+        if (m_Step >= SignalCount)
         {
             m_Complete = true;
             return AcceptResult::Completed;
@@ -64,7 +68,7 @@ public:
     // その信号盤を受け付けたか、次の番号、解けたかを返している
     bool IsAccepted(int signalIndex) const
     {
-        return signalIndex >= 0 && signalIndex < 3 &&
+        return signalIndex >= 0 && signalIndex < SignalCount &&
             m_Accepted[signalIndex];
     }
 

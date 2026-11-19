@@ -52,15 +52,17 @@ public:
     }
 
     // 見せる傷の数：1周目は3本、2周目は9本、それ以降は全部
+    static constexpr int FirstLoopPieceCount = 3;
+    static constexpr int SecondLoopPieceCount = 9;
     int GetVisiblePieceCount(int loopCount, int totalCount) const noexcept
     {
         if (loopCount == 1)
         {
-            return 3;
+            return FirstLoopPieceCount;
         }
         if (loopCount == 2)
         {
-            return 9;
+            return SecondLoopPieceCount;
         }
         return totalCount;
     }

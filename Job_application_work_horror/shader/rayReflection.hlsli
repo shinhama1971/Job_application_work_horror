@@ -52,11 +52,11 @@ static const float SSR_SINGLE_SAMPLE_BLUR_LIMIT = 0.35f;
 #define SSR_BLUR_TAP_WEIGHT 0.25f
 
 // 部屋の形との交差：上下を向くとみなす向きの下限、0で割らないよう丸める向きの下限、
-// 定数の印（1 = 使う）を見るしきい値、小物の箱の並び（中心・半分の大きさ・色の3つ）、扉とみなす向きの長さの2乗、壁とみなす法線の縦の上限
+// 定数の印（1 = 使う）を見るしきい値、扉とみなす向きの長さの2乗、壁とみなす法線の縦の上限
 #define ROOM_REFLECTION_MIN_VERTICAL_DIRECTION 0.0001f
 #define ROOM_REFLECTION_MIN_DIRECTION 1e-5f
 #define ROOM_REFLECTION_FLAG_THRESHOLD 0.5f
-#define REFLECTION_PROP_STRIDE 3
+#include "waterCausticsLayout.hlsli"
 #define ROOM_REFLECTION_DOOR_AXIS_THRESHOLD 0.5f
 #define ROOM_REFLECTION_WALL_NORMAL_LIMIT 0.5f
 // 扉の鏡板（横の縁のぼかし始め・終わり、縦の縁のぼかし始め・終わり、中心の高さ、暗さ）と、扉以外の小物の暗さ

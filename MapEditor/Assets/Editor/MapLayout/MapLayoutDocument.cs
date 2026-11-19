@@ -17,6 +17,33 @@ using UnityEngine;
 
 namespace MapLayout.Editor
 {
+    // 配置ファイルの列（0始まり）。ゲーム側の PropLayoutFile::Load と同じ順番。
+    internal static class MapLayoutColumn
+    {
+        public const int Command = 0;
+        public const int Name = 1;
+
+        // prop / place / spot の位置。prop だけはこの直後に寸法が続く。
+        public const int PositionX = 2;
+        public const int PositionY = 3;
+        public const int PositionZ = 4;
+        public const int PlaceOptionsStart = 5;
+        public const int PropWidth = 5;
+        public const int PropHeight = 6;
+        public const int PropDepth = 7;
+        public const int PropDiffuse = 8;
+        public const int PropEmission = 9;
+        public const int PropShininess = 10;
+        public const int PropCollision = 11;
+        // 固定列にはこの前に光沢と当たり判定がある。
+        public const int PropOptionsStart = 12;
+
+        // color 行には位置の代わりに RGB が並ぶ。
+        public const int ColorRed = 2;
+        public const int ColorGreen = 3;
+        public const int ColorBlue = 4;
+    }
+
     public sealed class MapLayoutDocument
     {
         // 1行分。Content は「#」より前、Comment は「#」から後ろ。Tokens は Content を空白で区切った値と、その位置
@@ -26,7 +53,7 @@ namespace MapLayout.Editor
             public string Comment;
             public readonly List<Token> Tokens = new List<Token>();
 
-            public string Command => Tokens.Count > 0 ? Tokens[0].Text : string.Empty;
+            public string Command => Tokens.Count > MapLayoutColumn.Command ? Tokens[MapLayoutColumn.Command].Text : string.Empty;
             public string Text => Content + Comment;
 
             private string SourceLocation { get; set; }
@@ -42,6 +69,13 @@ namespace MapLayout.Editor
                     line.Tokens.Add(new Token { Start = match.Index, Text = match.Value });
                 }
                 return line;
+            }
+
+            public string TokenText(int index)
+            {
+                if (index < 0 || index >= Tokens.Count)
+                    throw new FormatException($"{SourceLocation} {Command}: {index + 1}列目がありません。");
+                return Tokens[index].Text;
             }
 
             public float Number(int index)
@@ -138,9 +172,12 @@ namespace MapLayout.Editor
                 document.Lines.Add(line);
                 if (line.Command == "color")
                 {
-                    if (line.Tokens.Count < 5)
+                    if (line.Tokens.Count <= MapLayoutColumn.ColorBlue)
                         throw new FormatException($"{path}:{lineNumber} color: 名前と RGB の3値が必要です。");
-                    document.Colors[line.Tokens[1].Text] = new Color(line.Number(2), line.Number(3), line.Number(4));
+                    document.Colors[line.Tokens[MapLayoutColumn.Name].Text] = new Color(
+                        line.Number(MapLayoutColumn.ColorRed),
+                        line.Number(MapLayoutColumn.ColorGreen),
+                        line.Number(MapLayoutColumn.ColorBlue));
                 }
             }
             return document;

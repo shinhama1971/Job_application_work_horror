@@ -19,7 +19,7 @@ public:
     // コンストラクタ／デストラクタでタイマー精度を上げ下げし、Runで起動から終了までを実行している。
     Application();
     ~Application();
-    void Run();
+    int Run();
 
     // 描画解像度の幅を返している（バックバッファ・画面効果・HUDはこの大きさで描いている）
     static uint32_t GetWidth() {
@@ -77,7 +77,7 @@ private:
     static void DecideRenderSize();
     static bool InitApp(); // ウィンドウクラスの登録とウィンドウの生成
     static void UninitApp(); // ウィンドウクラスの登録解除
-    static void MainLoop(); // メッセージ処理と、ゲームの更新・描画を繰り返すループ
+    static int MainLoop(); // メッセージ処理と、ゲームの更新・描画を繰り返すループ
 
     // Windowsから届くメッセージを処理する関数
     static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp);

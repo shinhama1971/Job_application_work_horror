@@ -35,6 +35,19 @@ namespace
     // 影を落とす物の範囲に足すゆとり（影の端が切れないように）と、反射に映す物の画面の外の判定のゆとり
     constexpr float ShadowBoundsMargin = 3.0f;
     constexpr float ReflectionCullMargin = 18.0f;
+    // 扉の向きの長さの2乗がこれより大きければ扉として扱う（扉以外の小物は向きが0。rayReflection.hlsli と同じしきい値）
+    constexpr float DoorAxisThreshold = 0.5f;
+    // 影の画像を描き直す間隔（フレーム。演出の強さが高い・中・低）と、低い画質で環境マップを撮り直す間隔（フレーム）
+    constexpr unsigned int ShadowIntervalHigh = 1u;
+    constexpr unsigned int ShadowIntervalStandard = 2u;
+    constexpr unsigned int ShadowIntervalLow = 3u;
+    constexpr unsigned int LowQualityEnvironmentInterval = 4u;
+    // キューブマップの面の数
+    constexpr int CubeFaceCount = 6;
+    static_assert(CubeFaceCount == Effect::ReflectionProbe::FaceCount);
+    // 描画対象の選別に使う基準距離。影と反射は別々に調整する。
+    constexpr float ShadowCasterRange = 292.0f;
+    constexpr float ReflectionObjectRange = 230.0f;
 }
 
 namespace
@@ -86,7 +99,7 @@ namespace
             bounds.Center - camera.GetPosition();
         // 影の投影のfar=280の境目に大きな物の一部が掛かる場合も残すため、
         // 中心までの距離の判定には半径と固定の余白を足している。
-        const float shadowRange = 292.0f + radius;
+        const float shadowRange = ShadowCasterRange + radius;
         const float distanceSquared =
             offset.x * offset.x + offset.y * offset.y + offset.z * offset.z;
         return distanceSquared <= shadowRange * shadowRange &&
@@ -103,7 +116,7 @@ namespace
             bounds.Center - camera.GetPosition();
         // キューブマップの反射と環境マップでは見分けにくい遠くの物は省いている。大きな物だけは半径の分を
         // 判定の距離に足し、背景になる壁が欠けないようにしている。
-        const float reflectionRange = 230.0f + radius;
+        const float reflectionRange = ReflectionObjectRange + radius;
         return offset.x * offset.x + offset.y * offset.y + offset.z * offset.z <=
             reflectionRange * reflectionRange;
     }
@@ -182,7 +195,7 @@ namespace Core
             game.DrawDepthPrepass();
         }
         // 深度プリパスの深度を使う画面の効果（SSAO・DDGI・光の筋）は、濡れた床のある場面で、画質が低以外のときだけ使う
-        const bool screenEffects = useDepthPrepass && hasWetFloor && quality >= 1;
+        const bool screenEffects = useDepthPrepass && hasWetFloor && quality >= GameSettings::StandardEffectLevel;
         game.ComputeAmbientOcclusion(context, screenEffects && Tools::TechDemo::UseAmbientOcclusion);
         game.ComputeGlobalIllumination(context, screenEffects && Tools::TechDemo::UseAmbientOcclusion &&
             Debug::UI::IsGlobalIlluminationEnabled() && Tools::CaptureMode::UsesGlobalIllumination());
@@ -243,7 +256,7 @@ namespace Core
     // フレームの始めに、画質と技術デモの設定を描画の仕組みへ渡し、本描画だけで使う物を外している
     void Game::PrepareFrameState(int quality)
     {
-        m_TiledLighting->SetLightShaftsDisabled(quality == 0 || !Tools::TechDemo::UseLightShafts);
+        m_TiledLighting->SetLightShaftsDisabled(quality == GameSettings::LowEffectLevel || !Tools::TechDemo::UseLightShafts);
         // PBRを止めたとき、壁と小物のシェーダーは拡散反射だけで描く（技術デモの比較用。印はb8で渡している）
         m_ShadowMap->SetPbrEnabled(Tools::TechDemo::UsePbr);
         // 画面空間の環境遮蔽は本描画の直前に作るまで使わせない（反射・環境マップ・影など、先に描くほかの視点では使わない）
@@ -259,7 +272,7 @@ namespace Core
         struct ReflectionPropCandidate
         {
             float DistanceSquared;
-            DirectX::SimpleMath::Vector4 Box[3];
+            DirectX::SimpleMath::Vector4 Box[WATER_CAUSTICS_BUFFER::ReflectionPropVectorCount];
         };
         std::vector<ReflectionPropCandidate> candidates;
         {
@@ -276,7 +289,7 @@ namespace Core
                 const auto& half = proxy.HalfSize;
                 const auto& axis = proxy.DoorWidthAxis;
                 const DirectX::SimpleMath::Vector2 offset(eye.x - center.x, eye.z - center.z);
-                const DirectX::SimpleMath::Vector2 localOffset = axis.LengthSquared() > 0.5f
+                const DirectX::SimpleMath::Vector2 localOffset = axis.LengthSquared() > DoorAxisThreshold
                     ? DirectX::SimpleMath::Vector2(offset.Dot(axis), offset.Dot({ -axis.y, axis.x }))
                     : offset;
                 const float dx = (std::max)(std::abs(localOffset.x) - half.x, 0.0f);
@@ -301,12 +314,13 @@ namespace Core
                 });
             candidates.resize(keep);
         }
-        std::array<DirectX::SimpleMath::Vector4, WATER_CAUSTICS_BUFFER::MaxReflectionProps * 3> props{};
+        constexpr int PropVectors = WATER_CAUSTICS_BUFFER::ReflectionPropVectorCount;
+        std::array<DirectX::SimpleMath::Vector4, WATER_CAUSTICS_BUFFER::MaxReflectionProps * PropVectors> props{};
         for (std::size_t index = 0; index < candidates.size(); ++index)
         {
-            for (int corner = 0; corner < 3; ++corner)
+            for (int corner = 0; corner < PropVectors; ++corner)
             {
-                props[index * 3 + corner] = candidates[index].Box[corner];
+                props[index * PropVectors + corner] = candidates[index].Box[corner];
             }
         }
         Renderer::SetReflectionProps(props.data(), static_cast<int>(candidates.size()));
@@ -347,9 +361,9 @@ namespace Core
     void Game::DrawShadowPass(ID3D11DeviceContext* context, DrawStats& stats)
     {
         const unsigned int shadowInterval =
-            m_Settings.GetEffectLevel() >= 2
-                ? 1u
-                : (m_Settings.GetEffectLevel() == 1 ? 2u : 3u);
+            m_Settings.GetEffectLevel() >= GameSettings::HighEffectLevel
+                ? ShadowIntervalHigh
+                : (m_Settings.GetEffectLevel() == GameSettings::StandardEffectLevel ? ShadowIntervalStandard : ShadowIntervalLow);
         const bool updateShadow = (m_ShadowFrameIndex++ % shadowInterval) == 0u;
         if (updateShadow)
         {
@@ -400,7 +414,7 @@ namespace Core
             }
         }
 
-        if (shadowBulb == nullptr || quality < 2 || !Tools::TechDemo::UseBulbShadow)
+        if (shadowBulb == nullptr || quality < GameSettings::HighEffectLevel || !Tools::TechDemo::UseBulbShadow)
         {
             m_ShadowMap->SetPointShadow(DirectX::SimpleMath::Vector3::Zero, 0.0f, false);
             m_PointShadowMap->Unbind();
@@ -413,7 +427,7 @@ namespace Core
         const float lightRange = shadowBulb->GetLightRange();
         m_ShadowMap->SetPointShadow(lightPosition, lightRange, true);
         m_ShadowMap->SetShaderOverride(&m_PointShadowMap->GetShader());
-        for (int face = 0; face < 6; ++face)
+        for (int face = 0; face < CubeFaceCount; ++face)
         {
             m_PointShadowMap->BeginFace(face, lightPosition);
             for (auto& o : m_ObjectManager.GetAllObjects())
@@ -466,7 +480,7 @@ namespace Core
         }
 
         m_GpuTimer->BeginPass(GpuPass::Reflection, context);
-        const int faceCount = m_ReflectionProbe->HasAllFaces() ? 1 : 6;
+        const int faceCount = m_ReflectionProbe->HasAllFaces() ? 1 : CubeFaceCount;
         for (int face = 0; face < faceCount; ++face)
         {
             m_ReflectionProbe->BeginFace(m_Camera, m_Camera.GetPosition());
@@ -490,10 +504,10 @@ namespace Core
     // その面の視点へ回して渡し、プレイヤーが照らしている壁が、そのまま金属に映るようにしている。
     void Game::DrawEnvironmentProbe(ID3D11DeviceContext* context, int quality, bool hasWetFloor)
     {
-        const bool updateEnvironment = quality >= 2 || !m_EnvironmentProbe->HasAllFaces() ||
-            (m_EnvironmentQualityFrame % 4u) == 0u;
+        const bool updateEnvironment = quality >= GameSettings::HighEffectLevel || !m_EnvironmentProbe->HasAllFaces() ||
+            (m_EnvironmentQualityFrame % LowQualityEnvironmentInterval) == 0u;
         // PBRを止めているとき（技術デモ）は映り込みを使わないので、環境マップも撮らない
-        const bool usesEnvironment = hasWetFloor && quality >= 1 && Tools::TechDemo::UsePbr;
+        const bool usesEnvironment = hasWetFloor && quality >= GameSettings::StandardEffectLevel && Tools::TechDemo::UsePbr;
         if (usesEnvironment && updateEnvironment)
         {
             m_GpuTimer->BeginPass(GpuPass::EnvironmentProbe, context);
@@ -508,7 +522,7 @@ namespace Core
                     mainView.Invert());
             // 別の視点から描くので、プレイヤー視点のタイルのリストではなく、全部の光源を順に計算させている
             m_TiledLighting->BindAllLights();
-            const int faceCount = m_EnvironmentProbe->HasAllFaces() ? 1 : 6;
+            const int faceCount = m_EnvironmentProbe->HasAllFaces() ? 1 : CubeFaceCount;
             for (int face = 0; face < faceCount; ++face)
             {
                 m_EnvironmentProbe->BeginFace(m_Camera, m_Camera.GetPosition());

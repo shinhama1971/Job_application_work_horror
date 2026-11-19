@@ -12,6 +12,9 @@
 #include <filesystem>
 #include <fstream>
 #include <mutex>
+#include <limits>
+#include <cstdint>
+#include <d3d11shader.h>
 #include <string>
 #include <unordered_map>
 
@@ -19,10 +22,6 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
-	// ビルド時の事前コンパイル（--compile-shaders）の間は、エラーを画面に出さずにためている（ビルドを止めないため）
-	bool g_CollectShaderErrors = false;
-	std::string g_ShaderErrors;
-
 	// シェーダーのファイルごとの「自分と、#include しているファイル（入れ子も含む）のうち一番新しい更新時刻」を覚えている。
 	// 同じ .hlsli を多くのシェーダーが読むので、1回調べたファイルは覚えておき、調べ直さない。
 	// 事前コンパイルでは複数のスレッドから呼ぶので、覚えている表に鍵（mutex）を掛けている
@@ -66,11 +65,12 @@ namespace
 		while (std::getline(file, line))
 		{
 			const size_t start = line.find_first_not_of(" \t");
-			if (start == std::string::npos || line.compare(start, 8, "#include") != 0)
+			constexpr std::string_view IncludeDirective = "#include";
+			if (start == std::string::npos || line.compare(start, IncludeDirective.size(), IncludeDirective) != 0)
 			{
 				continue;
 			}
-			const size_t open = line.find('"', start + 8);
+			const size_t open = line.find('"', start + IncludeDirective.size());
 			const size_t close = open == std::string::npos ? std::string::npos : line.find('"', open + 1);
 			if (close == std::string::npos)
 			{
@@ -109,6 +109,66 @@ namespace
 		return sourceTime != (std::filesystem::file_time_type::max)() && compiledTime >= sourceTime;
 	}
 
+	// 空や破損したコンテナーと、別のステージ向けのCSOを新しいキャッシュとして扱わない。
+	bool ReadShaderCache(const std::filesystem::path& path, std::string_view shaderModel,
+		std::vector<unsigned char>& bytes)
+	{
+		std::ifstream file(path, std::ios::binary | std::ios::ate);
+		if (!file)
+		{
+			return false;
+		}
+		const std::streamoff size = file.tellg();
+		if (size <= 0 || static_cast<std::uintmax_t>(size) > bytes.max_size() ||
+			size > (std::numeric_limits<std::streamsize>::max)())
+		{
+			return false;
+		}
+		bytes.resize(static_cast<std::size_t>(size));
+		file.seekg(0);
+		if (!file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(size)))
+		{
+			return false;
+		}
+
+		Microsoft::WRL::ComPtr<ID3D11ShaderReflection> reflection;
+		D3D11_SHADER_DESC description{};
+		if (FAILED(D3DReflect(bytes.data(), bytes.size(), IID_PPV_ARGS(reflection.GetAddressOf()))) ||
+			FAILED(reflection->GetDesc(&description)))
+		{
+			return false;
+		}
+		const auto expectedType = shaderModel == "vs_5_0" ? D3D11_SHVER_VERTEX_SHADER :
+			shaderModel == "cs_5_0" ? D3D11_SHVER_COMPUTE_SHADER : D3D11_SHVER_PIXEL_SHADER;
+		return D3D11_SHVER_GET_TYPE(description.Version) == static_cast<UINT>(expectedType) &&
+			D3D11_SHVER_GET_MAJOR(description.Version) == 5 &&
+			D3D11_SHVER_GET_MINOR(description.Version) == 0;
+	}
+
+	template<class Create>
+	HRESULT CreateShaderWithCacheRetry(const char* fileName, const char* model, const Create& create)
+	{
+		std::vector<unsigned char> bytes;
+		bool usedCache = false;
+		HRESULT hr = Renderer::CompileShader(fileName, "main", model, bytes, &usedCache);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+		hr = create(bytes);
+		std::error_code sourceError;
+		if (FAILED(hr) && usedCache && std::filesystem::exists(std::filesystem::path(fileName), sourceError))
+		{
+			// リフレクションに出ない命令の不具合は、実際のGPU作成で失敗したときに再コンパイルする。
+			hr = Renderer::CompileShader(fileName, "main", model, bytes, nullptr, true);
+			if (SUCCEEDED(hr))
+			{
+				hr = create(bytes);
+			}
+		}
+		return hr;
+	}
+
 	// .hlsl を1つコンパイルし、成功したら隣に .cso として保存している。画面にも共有の変数にも触らないので、
 	// 事前コンパイルで複数のスレッドから同時に呼んでも安全。失敗したときは、コンパイラーのエラーの文を errorText に入れる
 	HRESULT CompileShaderFile(
@@ -116,7 +176,7 @@ namespace
 		LPCSTR entryPoint,
 		LPCSTR shaderModel,
 		std::vector<unsigned char>& shaderObject,
-		std::string& errorText)
+		std::string& errorText, bool requireCacheWrite = false)
 	{
 		// シェーダーのコンパイルの設定（古い書き方を許さない）
 		DWORD shaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
@@ -148,14 +208,19 @@ namespace
 		shaderObject.resize(blob->GetBufferSize());
 		memcpy(shaderObject.data(), blob->GetBufferPointer(), shaderObject.size());
 
-		// 次の起動ではコンパイルせずに読めるよう、.csoとして保存している（書けなくても、そのまま続ける）
-		std::filesystem::path csoPath = sourcePath;
+		// 途中まで書いたCSOを別プロセスが読まないよう、閉じて確認したファイルだけを公開する。
+		auto csoPath = sourcePath;
 		csoPath.replace_extension(".cso");
-		std::ofstream compiledFile(csoPath, std::ios::binary | std::ios::trunc);
-		if (compiledFile)
+		if (utility::WriteTextAtomically(csoPath, {reinterpret_cast<const char*>(shaderObject.data()), shaderObject.size()})
+			!= utility::AtomicWriteResult::Success)
 		{
-			compiledFile.write(reinterpret_cast<const char*>(shaderObject.data()),
-				static_cast<std::streamsize>(shaderObject.size()));
+			if (requireCacheWrite)
+			{
+				errorText = "シェーダーキャッシュを保存できません: " + csoPath.string();
+				return E_FAIL;
+			}
+			// 実行時はメモリ上のコンパイル結果で続行できる。配布用の事前コンパイルだけは保存を必須とする。
+			OutputDebugStringW((L"シェーダーキャッシュを保存できません: " + csoPath.wstring() + L"\n").c_str());
 		}
 		return S_OK;
 	}
@@ -167,74 +232,34 @@ HRESULT Renderer::CompileShader(
 	const char* szFileName,
 	LPCSTR szEntryPoint,
 	LPCSTR szShaderModel,
-	std::vector<unsigned char>& shaderObject)
+	std::vector<unsigned char>& shaderObject, bool* loadedFromCache, bool forceSource)
 {
 	shaderObject.clear();
-	// 拡張子をcsoに置き換えたファイル名を作っている。
-	// 固定長のバッファを使わないため、長いパスでもあふれない。
-	std::filesystem::path csoPath(szFileName);
-	csoPath.replace_extension(".cso");
-
-	// 新しいcsoファイルがあれば開いている
-	FILE* fp = nullptr;
-	const int ret = IsCompiledShaderUpToDate(csoPath, std::filesystem::path(szFileName))
-		? fopen_s(&fp, csoPath.string().c_str(), "rb")
-		: -1;
-	if (ret == 0)
+	if (loadedFromCache != nullptr)
 	{
-		// ファイルの大きさを取得している
-		fseek(fp, 0, SEEK_END);
-		int size = ftell(fp);
-		fseek(fp, 0, SEEK_SET);
-
-		if (size <= 0)
-		{
-			fclose(fp);
-			return E_FAIL;
-		}
-
-		shaderObject.resize(static_cast<size_t>(size));
-		const size_t readSize = fread(
-			shaderObject.data(), 1, shaderObject.size(), fp);
-		fclose(fp);
-
-		if (readSize != shaderObject.size())
-		{
-			shaderObject.clear();
-			return E_FAIL;
-		}
+		*loadedFromCache = false;
 	}
-	// csoファイルが無いか古ければ、hlslファイルをコンパイルしている
-	else
+	const std::filesystem::path sourcePath(szFileName);
+	auto cachePath = sourcePath;
+	cachePath.replace_extension(".cso");
+	if (!forceSource && IsCompiledShaderUpToDate(cachePath, sourcePath) &&
+		ReadShaderCache(cachePath, szShaderModel, shaderObject))
 	{
-		WCHAR	filename[512];
-		size_t 	wLen = 0;
-
-		// 文字コードを Shift-JIS → UTF-16 に変換している
-		setlocale(LC_ALL, "japanese");  // ロケールを日本語にしている（Windowsの日本語のパスを正しく変換するため）
-		mbstowcs_s(&wLen, filename, 512, szFileName, _TRUNCATE);
-
-		// HLSLファイルをコンパイルし、.cso として保存している（CompileShaderFile）
-		std::string errorText;
-		if (FAILED(CompileShaderFile(filename, szEntryPoint, szShaderModel, shaderObject, errorText)))
+		if (loadedFromCache != nullptr)
 		{
-			// コンパイルに失敗したら、エラーの内容を表示している（ビルド時の事前コンパイルの間は、ためて最後にまとめて出す）
-			if (!errorText.empty())
-			{
-				if (g_CollectShaderErrors)
-				{
-					g_ShaderErrors += errorText + "\n";
-				}
-				else
-				{
-					MessageBoxA(NULL, errorText.c_str(), "Error", MB_OK);
-				}
-			}
-			return E_FAIL;
+			*loadedFromCache = true;
 		}
+		return S_OK;
 	}
 
-	return S_OK;
+	shaderObject.clear();
+	std::string errorText;
+	const HRESULT hr = CompileShaderFile(sourcePath, szEntryPoint, szShaderModel, shaderObject, errorText);
+	if (FAILED(hr) && !errorText.empty())
+	{
+		MessageBoxA(nullptr, errorText.c_str(), "Shader error", MB_OK | MB_ICONERROR);
+	}
+	return hr;
 }
 
 // フォルダの中のシェーダーを、名前の最後（VS・PS・CS）か頭（PS_）からシェーダーモデルを決めて、まとめてコンパイルしている。
@@ -243,8 +268,7 @@ HRESULT Renderer::CompileShader(
 // （1つの .hlsli を変えたときは、それを読んでいるシェーダーだけが、並んで作り直しになる）
 bool Renderer::PrecompileShaders(const std::filesystem::path& folder, std::string& errors)
 {
-	g_CollectShaderErrors = true;
-	g_ShaderErrors.clear();
+	errors.clear();
 	bool succeeded = true;
 	int shaderCount = 0;
 	// 作り直すシェーダー1つ分（ファイル・シェーダーモデル）と、その結果
@@ -280,7 +304,8 @@ bool Renderer::PrecompileShaders(const std::filesystem::path& folder, std::strin
 		++shaderCount;
 		std::filesystem::path csoPath = entry.path();
 		csoPath.replace_extension(".cso");
-		if (!IsCompiledShaderUpToDate(csoPath, entry.path()))
+		std::vector<unsigned char> cached;
+		if (!IsCompiledShaderUpToDate(csoPath, entry.path()) || !ReadShaderCache(csoPath, shaderModel, cached))
 		{
 			jobs.push_back(CompileJob{ entry.path(), shaderModel });
 		}
@@ -291,32 +316,29 @@ bool Renderer::PrecompileShaders(const std::filesystem::path& folder, std::strin
 	std::for_each(std::execution::par, jobs.begin(), jobs.end(), [](CompileJob& job)
 	{
 		std::vector<unsigned char> shaderObject;
-		job.Succeeded = SUCCEEDED(CompileShaderFile(job.Source, "main", job.ShaderModel, shaderObject, job.ErrorText));
+		job.Succeeded = SUCCEEDED(CompileShaderFile(job.Source, "main", job.ShaderModel, shaderObject, job.ErrorText, true));
 	});
 	for (const CompileJob& job : jobs)
 	{
 		if (!job.Succeeded)
 		{
-			g_ShaderErrors += job.ErrorText + "\n";
-			g_ShaderErrors += "コンパイルに失敗: " + job.Source.filename().string() + "\n";
+			errors += job.ErrorText + "\n";
+			errors += "コンパイルに失敗: " + job.Source.filename().string() + "\n";
 			succeeded = false;
 		}
 	}
 
 	if (error)
 	{
-		g_ShaderErrors += "シェーダーのフォルダを開けません: " + folder.string() + "\n";
+		errors += "シェーダーのフォルダを開けません: " + folder.string() + "\n";
 		succeeded = false;
 	}
 	else if (shaderCount == 0 && succeeded)
 	{
-		g_ShaderErrors += "コンパイルするシェーダーが見つかりません: " + folder.string() + "\n";
+		errors += "コンパイルするシェーダーが見つかりません: " + folder.string() + "\n";
 		succeeded = false;
 	}
 
-	errors = g_ShaderErrors;
-	g_CollectShaderErrors = false;
-	g_ShaderErrors.clear();
 	return succeeded;
 }
 
@@ -325,41 +347,29 @@ bool Renderer::PrecompileShaders(const std::filesystem::path& folder, std::strin
 //--------------------------------------------------------------------------------------
 HRESULT Renderer::CreateVertexShader(ID3D11VertexShader** ppVertexShader, ID3D11InputLayout** ppVertexLayout, D3D11_INPUT_ELEMENT_DESC* pLayout, unsigned int numElements, const char* szFileName)
 {
-	std::vector<unsigned char> shaderObject;
-
-	// vs_5_0としてコンパイルしている（入口はmain関数）
-	HRESULT hr = CompileShader(
-		szFileName, "main", "vs_5_0", shaderObject);
-	if (FAILED(hr)) return hr;
-
-	// 頂点シェーダーを作っている
-	hr = m_pDevice->CreateVertexShader(
-		shaderObject.data(), shaderObject.size(), NULL, ppVertexShader);
-
-	if (FAILED(hr))
+	return CreateShaderWithCacheRetry(szFileName, "vs_5_0", [&](const std::vector<unsigned char>& bytes)
 	{
-		return hr;
-	}
-	// 頂点番号から形を作る草には、頂点バッファの並び方は不要。ほかのモデルはこれまでどおり作る。
-	if (numElements == 0)
-	{
-		*ppVertexLayout = nullptr;
+		Microsoft::WRL::ComPtr<ID3D11VertexShader> shader;
+		HRESULT hr = m_pDevice->CreateVertexShader(bytes.data(), bytes.size(), nullptr, shader.GetAddressOf());
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		// 頂点番号から形を作る草は入力レイアウト不要。両方作れたときだけ呼び出し元へ渡す。
+		Microsoft::WRL::ComPtr<ID3D11InputLayout> layout;
+		if (numElements != 0)
+		{
+			hr = m_pDevice->CreateInputLayout(pLayout, numElements, bytes.data(), bytes.size(), layout.GetAddressOf());
+			if (FAILED(hr))
+			{
+				return hr;
+			}
+		}
+		*ppVertexShader = shader.Detach();
+		*ppVertexLayout = layout.Detach();
 		return S_OK;
-	}
-	// 頂点の並び方（入力レイアウト）を、シェーダーの入力と照らし合わせて作っている
-	hr = m_pDevice->CreateInputLayout(
-		pLayout,
-		numElements,
-		shaderObject.data(),
-		shaderObject.size(),
-		ppVertexLayout);
-	
-	if (FAILED(hr))
-	{
-		return hr;
-	}
-
-	return S_OK;
+	});
 }
 
 //--------------------------------------------------------------------------------------
@@ -367,21 +377,18 @@ HRESULT Renderer::CreateVertexShader(ID3D11VertexShader** ppVertexShader, ID3D11
 //--------------------------------------------------------------------------------------
 HRESULT Renderer::CreatePixelShader(ID3D11PixelShader** ppPixelShader, const char* szFileName)
 {
-	std::vector<unsigned char> shaderObject;
-
-	// ps_5_0としてコンパイルしている（入口はmain関数）
-	HRESULT hr = CompileShader(
-		szFileName, "main", "ps_5_0", shaderObject);
-	if (FAILED(hr)) return hr;
-
-	// ピクセルシェーダーを作っている
-	hr = m_pDevice->CreatePixelShader(
-		shaderObject.data(), shaderObject.size(), nullptr, ppPixelShader);
-	if (FAILED(hr))
+	return CreateShaderWithCacheRetry(szFileName, "ps_5_0", [&](const std::vector<unsigned char>& bytes)
 	{
-		return hr;
-	}
-	return S_OK;
+		return m_pDevice->CreatePixelShader(bytes.data(), bytes.size(), nullptr, ppPixelShader);
+	});
+}
+
+HRESULT Renderer::CreateComputeShader(ID3D11ComputeShader** shader, const char* fileName)
+{
+	return CreateShaderWithCacheRetry(fileName, "cs_5_0", [&](const std::vector<unsigned char>& bytes)
+	{
+		return m_pDevice->CreateComputeShader(bytes.data(), bytes.size(), nullptr, shader);
+	});
 }
 
 //--------------------------------------------------------------------------------------
@@ -414,37 +421,6 @@ bool Renderer::CreateIndexBuffer(
 	return true;
 }
 
-//--------------------------------------------------------------------------------------
-// 頂点バッファを作っている（中身は後から書き換えない）
-//--------------------------------------------------------------------------------------
-bool Renderer::CreateVertexBuffer(
-	unsigned int stride,				// 1頂点あたりのバイト数
-	unsigned int vertexnum,				// 頂点の数
-	void* vertexdata,					// 頂点データの先頭アドレス
-	ID3D11Buffer** pVertexBuffer) {		// 作ったバッファを受け取る場所
-
-	HRESULT hr;
-
-	// 頂点バッファの設定
-	D3D11_BUFFER_DESC bd;
-	ZeroMemory(&bd, sizeof(bd));
-	bd.Usage = D3D11_USAGE_DEFAULT;				// GPUだけで読み書きする
-	bd.ByteWidth = stride * vertexnum;			// バッファの大きさ
-	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;	// 頂点バッファとして使う
-	bd.CPUAccessFlags = 0;						// CPUからは書き換えない
-
-	D3D11_SUBRESOURCE_DATA InitData;
-	ZeroMemory(&InitData, sizeof(InitData));
-	InitData.pSysMem = vertexdata;				// バッファの最初の中身
-
-	hr = m_pDevice->CreateBuffer(&bd, &InitData, pVertexBuffer);		// バッファを作っている
-	if (FAILED(hr)) {
-		MessageBox(nullptr, "CreateBuffer(vertex buffer) error", "Error", MB_OK);
-		return false;
-	}
-
-	return true;
-}
 
 //--------------------------------------------------------------------------------------
 // 頂点バッファを作っている（CPUからMapで書き換えられる）
@@ -543,26 +519,4 @@ void Renderer::EndHdrScene()
 {
 	m_pRenderTargetView = m_pSwapChainRenderTargetView;
 	SetBackBufferRenderTarget();
-}
-
-// バックバッファを指定の色で消している
-void Renderer::ClearBackBuffer(float r, float g, float b, float a)
-{
-	float clearColor[4] = { r, g, b, a };
-
-	m_pDeviceContext->ClearRenderTargetView(
-		m_pRenderTargetView.Get(),
-		clearColor
-	);
-}
-
-// 深度バッファを一番奥（1.0）で消している
-void Renderer::ClearDepth()
-{
-	m_pDeviceContext->ClearDepthStencilView(
-		m_pDepthStencilView.Get(),
-		D3D11_CLEAR_DEPTH,
-		1.0f,
-		0
-	);
 }

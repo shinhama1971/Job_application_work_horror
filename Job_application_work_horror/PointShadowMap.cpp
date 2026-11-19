@@ -27,7 +27,7 @@ namespace
         Vector3 Forward;
         Vector3 Up;
     };
-    const FaceDirection FaceDirections[6] =
+    const FaceDirection FaceDirections[] =
     {
         { Vector3(1.0f, 0.0f, 0.0f), Vector3(0.0f, 1.0f, 0.0f) },
         { Vector3(-1.0f, 0.0f, 0.0f), Vector3(0.0f, 1.0f, 0.0f) },
@@ -44,6 +44,7 @@ namespace Effect
 {
     bool PointShadowMap::Init()
     {
+        static_assert(sizeof(FaceDirections) / sizeof(FaceDirections[0]) == FaceCount);
         ID3D11Device* device = Renderer::GetDevice();
 
         // 距離を1つの値（32ビットの小数）で書く、6面のテクスチャ
@@ -51,7 +52,7 @@ namespace Effect
         textureDesc.Width = FaceSize;
         textureDesc.Height = FaceSize;
         textureDesc.MipLevels = 1;
-        textureDesc.ArraySize = 6;
+        textureDesc.ArraySize = FaceCount;
         textureDesc.Format = DXGI_FORMAT_R32_FLOAT;
         textureDesc.SampleDesc.Count = 1;
         textureDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -59,7 +60,7 @@ namespace Effect
         textureDesc.MiscFlags = D3D11_RESOURCE_MISC_TEXTURECUBE;
         bool created = SUCCEEDED(device->CreateTexture2D(&textureDesc, nullptr, m_Texture.ReleaseAndGetAddressOf()));
 
-        for (UINT face = 0; face < 6 && created; ++face)
+        for (UINT face = 0; face < FaceCount && created; ++face)
         {
             D3D11_RENDER_TARGET_VIEW_DESC faceDesc{};
             faceDesc.Format = textureDesc.Format;

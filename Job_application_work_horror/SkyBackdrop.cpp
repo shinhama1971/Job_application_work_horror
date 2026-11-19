@@ -29,6 +29,7 @@ void SkyBackdrop::Draw(Camera* camera)
     // 深度の判定はそのまま（手前に描かれた物は残す）、深度の書き込みだけを止めている
     Renderer::SetDepthEnable(false);
     // 画面全体を覆う、大きな三角形1枚
-    context->Draw(3, 0);
+    constexpr UINT FullScreenTriangleVertexCount = 3;
+    context->Draw(FullScreenTriangleVertexCount, 0);
     Renderer::SetDepthEnable(true);
 }

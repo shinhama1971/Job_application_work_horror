@@ -5,6 +5,8 @@
 
 #pragma once
 #include	<vector>
+#include	<cstddef>
+#include	<limits>
 #include	<wrl/client.h>
 #include	"Renderer.h"
 #include	"utility.h"
@@ -17,6 +19,7 @@ using Microsoft::WRL::ComPtr;
 template <typename T> class VertexBuffer{
 
 	ComPtr<ID3D11Buffer> m_VertexBuffer;
+	std::size_t m_VertexCapacity = 0;
 
 public:
 	// 頂点の配列から、GPUの頂点バッファを作っている（後からModifyで書き換えられるようDYNAMICにしている）
@@ -26,6 +29,12 @@ public:
 		ID3D11Device* device = nullptr;
 		device = Renderer::GetDevice();
 		assert(device); // デバイスがあることを確かめている
+
+		// ByteWidthはUINT。件数を変換する前にバイト数が表現できるか確認する。
+		if (vertices.empty() || vertices.size() > (std::numeric_limits<UINT>::max)() / sizeof(T))
+		{
+			utility::ReportFatalError("頂点バッファの容量が不正です。");
+		}
 
 		// 頂点バッファを作っている
 		const bool created = Renderer::CreateVertexBufferWrite(
@@ -39,6 +48,7 @@ public:
 		{
 			utility::ReportFatalError("頂点バッファを作成できませんでした。");
 		}
+		m_VertexCapacity = vertices.size();
 	}
 
 	// この頂点バッファを、次の描画で使うよう設定している
@@ -55,18 +65,20 @@ public:
 	}
 
 	// 頂点バッファの中身を書き換えている（前の中身は捨てる）
-	void Modify(const std::vector<T>& vertices)
+	[[nodiscard]] bool Modify(const std::vector<T>& vertices)
 	{
-		// バッファをCPUから書ける状態にして、頂点データを写している
-		D3D11_MAPPED_SUBRESOURCE msr;
-		HRESULT hr = Renderer::GetDeviceContext()->Map(
-			m_VertexBuffer.Get(), 
-			0,
-			D3D11_MAP_WRITE_DISCARD, 0, &msr);
-
-		if (SUCCEEDED(hr)) {
-			memcpy(msr.pData, vertices.data(), vertices.size() * sizeof(T));
-			Renderer::GetDeviceContext()->Unmap(m_VertexBuffer.Get(), 0);
+		if (!m_VertexBuffer || vertices.empty() || vertices.size() > m_VertexCapacity)
+		{
+			return false;
 		}
+		auto* context = Renderer::GetDeviceContext();
+		D3D11_MAPPED_SUBRESOURCE mapped{};
+		if (FAILED(context->Map(m_VertexBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped)))
+		{
+			return false;
+		}
+		memcpy(mapped.pData, vertices.data(), vertices.size() * sizeof(T));
+		context->Unmap(m_VertexBuffer.Get(), 0);
+		return true;
 	}
 };

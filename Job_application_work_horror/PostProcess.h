@@ -116,7 +116,9 @@ namespace Effect
         float m_FrameHoldTimer = 0.0f;
         float m_FrameHoldCooldown = 1.0f;
         float m_FrameHoldOffset = 0.0f;
-        unsigned int m_FrameHoldRandom = 0x9E3779B9u;
+        // xorshiftをゼロ以外の固定値から始め、コマ落ち間隔の系列を再現する。
+        static constexpr unsigned int FrameHoldInitialSeed = 0x9E3779B9u;
+        unsigned int m_FrameHoldRandom = FrameHoldInitialSeed;
         // 0〜1の乱数（xorshift）
         float NextFrameHoldRandom();
 

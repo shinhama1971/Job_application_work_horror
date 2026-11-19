@@ -23,6 +23,8 @@ namespace
     constexpr float StickYawSpeed = 3.9f;
     constexpr float StickPitchSpeed = 3.0f;
     constexpr float ArrowKeyYawSpeed = 6.0f;
+    // 矢印キーの上下回転は左右より遅くし、視点の上下移動を抑える。
+    constexpr float ArrowKeyPitchSpeed = 1.8f;
     // 視線が真上・真下に近く、右方向を作れないとみなす長さの2乗
     constexpr float MinimumRightLengthSquared = 0.0001f;
 
@@ -141,7 +143,7 @@ void Camera::Update()
             m_CameraDirection -= ArrowKeyYawSpeed * m_LookSensitivityScale * deltaTime;
         }
 
-        const float pitchStep = 1.8f * m_LookSensitivityScale * deltaTime;
+        const float pitchStep = ArrowKeyPitchSpeed * m_LookSensitivityScale * deltaTime;
 
         if (Input::GetKeyPress(VK_UP))
         {

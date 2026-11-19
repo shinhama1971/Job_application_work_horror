@@ -18,9 +18,9 @@ public:
     // MP4ファイルを作り、出力（H.264、8Mbps）と入力（RGB32の非圧縮画像）の形式を設定している
     bool Open(const std::wstring& path, UINT width, UINT height, UINT fps);
     // rgbaは上の行から並んだRGBA。RGB32（BGRA、下の行から並ぶ）へ詰め替えてから渡している。
-    void WriteFrame(const BYTE* rgba, UINT rowPitch);
+    bool WriteFrame(const BYTE* rgba, UINT rowPitch);
     // 書き込みを終えてファイルを閉じ、Media Foundationを終了している
-    void Close();
+    bool Close();
     // 書き込める状態か
     bool IsOpen() const { return m_Open; }
 

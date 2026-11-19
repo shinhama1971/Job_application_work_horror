@@ -75,6 +75,8 @@ public:
     // wetFloorPS.hlsl の PuddleCellBuffer と同じ値にする。
     static constexpr int PuddleCellMin = -8;
     static constexpr int PuddleCellCount = 16;
+    // マス目の表の x が水たまりの有無（0 か 1）。これより小さければ乾いたマス（puddleMask.hlsli の PUDDLE_CELL_THRESHOLD と同じ）
+    static constexpr float PuddleCellPresentThreshold = 0.5f;
     // 水たまりの形（puddleMask.hlsli と同じ値にする）：
     // マス目の一辺、水たまりを置くマスの乱数のしきい値（これ以上なら置く）、中心をマスの中でずらす幅、
     // 楕円の半径（横・縦。基本の値＋乱数で足す幅。マスの一辺を1とした値）、岸の線（楕円の距離）と、岸のゆがみの最大の振れ幅

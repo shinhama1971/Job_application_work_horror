@@ -11,6 +11,8 @@ struct QuietRecovery
 {
     // 2秒続ければ成功し、成功した後は10秒間使えない
     static constexpr float RequiredSeconds = 2.0f;
+    // 処理落ちが起きても、休息の進行が1フレームで大きく進まないようにする。
+    static constexpr float MaxElapsedPerFrame = 0.1f;
     // 息を潜めきったことを知らせる秒数
     static constexpr float SuccessNoticeSeconds = 2.5f;
     static constexpr float CooldownSeconds = 10.0f;
@@ -29,7 +31,7 @@ struct QuietRecovery
         bool lightOff, bool nearbyThreat)
     {
         // 止まっていた後の大きな経過時間で一気に進まないよう、0.1秒までにしている
-        const float dt = (std::clamp)(deltaTime, 0.0f, 0.1f);
+        const float dt = (std::clamp)(deltaTime, 0.0f, MaxElapsedPerFrame);
         cooldown = (std::max)(0.0f, cooldown - dt);
         successNotice = (std::max)(0.0f, successNotice - dt);
         tooClose = eligible && nearbyThreat;

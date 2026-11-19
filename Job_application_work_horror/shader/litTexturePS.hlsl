@@ -44,7 +44,6 @@ SamplerState g_SamplerState : register(s0);
 
 // --- 2面の「血の手形」の異変の値
 // 手形の数（WallHandprints の数）、画素の大きさの下限（0で割らないため）
-static const int ANOMALY_HANDPRINT_COUNT = 4;
 static const float MIN_PIXEL_FOOTPRINT = 0.0001f;
 // 手形の壁の面とみなす範囲：x の離れ具合と、法線の x の大きさ
 static const float HANDPRINT_SURFACE_DEPTH = 0.6f;
@@ -73,7 +72,7 @@ float GetAnomalyHandprint(float3 worldPosition, float3 worldNormal)
     const float footprint = max(length(fwidth(worldPosition.zy)), MIN_PIXEL_FOOTPRINT);
     float mask = 0.0f;
     [unroll]
-    for (int index = 0; index < ANOMALY_HANDPRINT_COUNT; ++index)
+    for (int index = 0; index < WATER_CAUSTICS_MAX_HANDPRINTS; ++index)
     {
         const float4 print = WallHandprints[index];
         // 浮かんでいない手形と、その手形の壁の面ではない所（x が離れている・壁の向きではない）は描かない
@@ -772,6 +771,8 @@ static const float SOFT_LAMBERT_RANGE = 0.80f;
 static const float FIXTURE_SIDE_LIGHT = 0.22f;
 // 懐中電灯に掛ける部屋の角の暗がりの割合
 static const float FLASHLIGHT_ROOM_OCCLUSION = 0.4f;
+// 技術デモで PBR を止める印（PointShadowOptions.y が 0 か 1）を見るしきい値
+#define PBR_DISABLED_THRESHOLD 0.5f
 
 // 画素の色を計算している：元の色 → 汚れと古さ → 環境光・天井灯・懐中電灯 → 濡れた光沢 → 自己発光 → 霧 → 色調
 #if defined(PRINTED_SURFACE)
@@ -1131,7 +1132,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
     // 拡散反射（金属ほど弱い）と鏡面反射を合わせている。湿った壁の冷たい光沢も、濡れて粗さが下がった鏡面反射として出ている。
     // 技術デモでPBRを止めているときは、これまでの拡散反射だけの描き方にしている（金属も色のまま、鏡面反射なし）
-    color.rgb = PointShadowOptions.y > 0.5f
+    color.rgb = PointShadowOptions.y > PBR_DISABLED_THRESHOLD
         ? color.rgb * lighting
         : surface.diffuseColor * lighting + specularLighting;
 #else

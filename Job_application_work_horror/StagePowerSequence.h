@@ -12,9 +12,11 @@ private:
     // 前フレームで電力が戻っていたか、電力の演出の経過秒と次の段階、出口の演出の経過秒と次の段階、出口の演出が終わったか
     bool m_WasPowerRestored = false;
     float m_RestoreTimer = -1.0f;
-    int m_RestorePhase = -1;
+    // 次に起こす段階（NotStarted なら始まっていない）
+    static constexpr int NotStarted = -1;
+    int m_RestorePhase = NotStarted;
     float m_ExitTimer = -1.0f;
-    int m_ExitPhase = -1;
+    int m_ExitPhase = NotStarted;
     bool m_ExitComplete = false;
 
 public:
@@ -23,9 +25,9 @@ public:
     {
         m_WasPowerRestored = false;
         m_RestoreTimer = -1.0f;
-        m_RestorePhase = -1;
+        m_RestorePhase = NotStarted;
         m_ExitTimer = -1.0f;
-        m_ExitPhase = -1;
+        m_ExitPhase = NotStarted;
         m_ExitComplete = false;
     }
 
@@ -51,7 +53,7 @@ public:
         constexpr float BeatTimes[] = { 0.38f, 1.15f, 2.25f };
         constexpr int BeatCount =
             static_cast<int>(sizeof(BeatTimes) / sizeof(BeatTimes[0]));
-        if (m_RestoreTimer < 0.0f || m_RestorePhase < 0 ||
+        if (m_RestoreTimer < 0.0f || m_RestorePhase == NotStarted ||
             m_RestorePhase >= BeatCount ||
             m_RestoreTimer < BeatTimes[m_RestorePhase])
         {
@@ -81,7 +83,7 @@ public:
         constexpr float BeatTimes[] = { 0.28f, 0.78f, 1.30f };
         constexpr int BeatCount =
             static_cast<int>(sizeof(BeatTimes) / sizeof(BeatTimes[0]));
-        if (m_ExitComplete || m_ExitTimer < 0.0f || m_ExitPhase < 0 ||
+        if (m_ExitComplete || m_ExitTimer < 0.0f || m_ExitPhase == NotStarted ||
             m_ExitPhase >= BeatCount || m_ExitTimer < BeatTimes[m_ExitPhase])
         {
             return -1;

@@ -220,7 +220,7 @@ namespace
     constexpr float FrameGraphMaxMilliseconds = 33.33f;
     constexpr float FrameGraphHeight = 72.0f;
     // 森の草の LOD を色で見せるデバッグ表示の番号（common.hlsl の番号と同じ）
-    constexpr int GrassLodDebugView = 12;
+    constexpr int GrassLodDebugView = ShaderDebugView::GrassLod;
     // 画面効果の演出を試しに再生する強さと長さ
     constexpr float TestBloomPeak = 1.65f;
     constexpr float TestBloomSeconds = 0.65f;

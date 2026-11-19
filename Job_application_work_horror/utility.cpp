@@ -102,8 +102,8 @@ namespace utility {
         return std::filesystem::path(L"save") / fileName;
     }
 
-    AtomicWriteResult WriteTextAtomically(const std::filesystem::path& path, std::string_view text,
-        const std::function<bool()>& canReplace)
+    AtomicWriteResult WriteFileAtomically(const std::filesystem::path& path,
+        const std::function<void(std::ofstream&)>& write, const std::function<bool()>& canReplace)
     {
         const auto directory = path.has_parent_path() ? path.parent_path() : std::filesystem::path(L".");
         wchar_t temporaryName[MAX_PATH]{};
@@ -124,7 +124,11 @@ namespace utility {
         } temporary{temporaryName};
 
         std::ofstream file(std::filesystem::path(temporary.name), std::ios::binary | std::ios::trunc);
-        file.write(text.data(), static_cast<std::streamsize>(text.size()));
+        if (!file)
+        {
+            return AtomicWriteResult::TemporaryFileFailed;
+        }
+        write(file);
         file.close();
         if (!file)
         {
@@ -142,7 +146,16 @@ namespace utility {
         return AtomicWriteResult::Success;
     }
 
-    void WriteSaveFile(std::string const& fileName, std::string_view text)
+    AtomicWriteResult WriteTextAtomically(const std::filesystem::path& path, std::string_view text,
+        const std::function<bool()>& canReplace)
+    {
+        return WriteFileAtomically(path, [text](std::ofstream& file)
+        {
+            file.write(text.data(), static_cast<std::streamsize>(text.size()));
+        }, canReplace);
+    }
+
+    bool WriteSaveFile(std::string const& fileName, std::string_view text)
     {
         const auto directory = GetSaveDirectory();
         const auto path = directory / fileName;
@@ -151,7 +164,9 @@ namespace utility {
         if (error || WriteTextAtomically(path, text) != AtomicWriteResult::Success)
         {
             ::OutputDebugStringW((L"セーブファイルを書き込めない: " + path.wstring() + L"\n").c_str());
+            return false;
         }
+        return true;
     }
 
     // 出力ウィンドウとダイアログにエラーを出し、すぐにプロセスを終えている

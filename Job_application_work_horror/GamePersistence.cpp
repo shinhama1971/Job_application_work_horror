@@ -61,20 +61,20 @@ namespace Core
     }
 
     // ベスト記録を %LOCALAPPDATA%\SignalLost\best_record.txt に書き出している（フォルダが無ければ作っている）
-    void Game::SaveBestRecord() const
+    bool Game::SaveBestRecord() const
     {
         const float clearTime = m_State.GetBestClearTimeSeconds();
         const int caughtCount = m_State.GetBestCaughtCount();
         if (!m_State.HasClearRecord() || !IsValidBestRecord(clearTime, caughtCount))
         {
-            return;
+            return true;
         }
 
         // 読み直したときに、同じ float に戻る桁数で保存する。
         std::ostringstream text;
         text << std::setprecision(std::numeric_limits<float>::max_digits10)
             << clearTime << ' ' << caughtCount << "\r\n";
-        utility::WriteSaveFile(BestRecordFileName, text.str());
+        return utility::WriteSaveFile(BestRecordFileName, text.str());
     }
 
 }

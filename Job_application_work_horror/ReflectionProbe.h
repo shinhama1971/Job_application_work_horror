@@ -27,12 +27,15 @@ namespace Effect
         // 1面の大きさ（画素）。60fpsに抑えて空いたGPUの時間で、128から256へ上げ、水たまりと金属に映る画面の外の景色を細かくしている。
         // 縮小画像の段の数（256画素から1画素まで9段）は、シェーダーの PBR_ENVIRONMENT_MIP_COUNT と合わせている
         static constexpr int FaceSize = 256;
+        // キューブマップの面の数と、キューブマップを設定する既定のテクスチャの番号（common.hlsl の t7）
+        static constexpr int FaceCount = 6;
+        static constexpr UINT DefaultTextureSlot = 7;
 
         // slot はキューブマップを設定するテクスチャの番号。withMipChain なら、描くたびに縮小画像（ミップ）も作っている
-        void Init(UINT slot = 7, bool withMipChain = false);
+        void Init(UINT slot = DefaultTextureSlot, bool withMipChain = false);
         void Uninit();
         // 6面がそろっているか（そろっていなければ、そろうまで1フレームに6面とも描いている）
-        bool HasAllFaces() const { return m_FacesDrawn >= 6; }
+        bool HasAllFaces() const { return m_FacesDrawn >= FaceCount; }
         // 次の1面を描き始めている：描画先をその面にし、position から面の向きを見るカメラの行列に差し替えている
         void BeginFace(Camera& camera, const DirectX::SimpleMath::Vector3& position);
         // 1面を描き終えている：カメラと描画先を戻し、キューブマップを 決めた番号 に設定している
@@ -58,7 +61,7 @@ namespace Effect
 
     private:
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_Texture;
-        std::array<Microsoft::WRL::ComPtr<ID3D11RenderTargetView>, 6> m_FaceViews;
+        std::array<Microsoft::WRL::ComPtr<ID3D11RenderTargetView>, FaceCount> m_FaceViews;
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_CubeView;
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_DepthTexture;
         Microsoft::WRL::ComPtr<ID3D11DepthStencilView> m_DepthView;
@@ -66,7 +69,7 @@ namespace Effect
         int m_NextFace = 0;
         int m_FacesDrawn = 0;
         // キューブマップを設定するテクスチャの番号と、縮小画像を作るか
-        UINT m_Slot = 7;
+        UINT m_Slot = DefaultTextureSlot;
         bool m_HasMipChain = false;
         DirectX::SimpleMath::Matrix m_FaceView;
         DirectX::SimpleMath::Vector3 m_CaptureCenter = DirectX::SimpleMath::Vector3::Zero;

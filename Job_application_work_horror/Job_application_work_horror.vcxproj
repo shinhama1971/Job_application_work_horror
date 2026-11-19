@@ -413,6 +413,7 @@
     <ClInclude Include="sound.h" />
     <ClInclude Include="StageScene.h" />
     <ClInclude Include="Stage1Layout.h" />
+    <ClInclude Include="Stage1LightNumber.h" />
     <ClInclude Include="Stage1Objective.h" />
     <ClInclude Include="StageSurveillanceController.h" />
     <ClInclude Include="Stage1AmbientSounds.h" />
@@ -492,6 +493,7 @@
     <ClInclude Include="shader\ddgiUpdate.hlsli" />
     <ClInclude Include="shader\roomOcclusion.hlsli" />
     <ClInclude Include="shader\waterCaustics.hlsli" />
+    <ClInclude Include="shader\waterCausticsLayout.hlsli" />
     <ClInclude Include="shader\puddleMask.hlsli" />
     <ClInclude Include="shader\horrorMarks.hlsli" />
     <ClInclude Include="shader\portraitPainting.hlsli" />

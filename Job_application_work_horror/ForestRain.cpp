@@ -19,6 +19,12 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // 雨を止める屋根の最大数（shader/rainVS.hlsl の Occluders と ForestRain::MaxShelters と同じ）
+    constexpr int RainMaxOccluders = 8;
+    // HLSLは屋根の高さをfloat4単位で読む。末尾まで4件ずつ詰まることを確認する。
+    constexpr int RoofHeightsPerVector = 4;
+    static_assert(RainMaxOccluders % RoofHeightsPerVector == 0);
+
     // shader/rainVS.hlsl の RainDrawBuffer と同じ並び（b9）
     struct RainDrawParams
     {
@@ -36,10 +42,10 @@ namespace
         float SplashRadius;
         std::uint32_t OccluderCount;
         float Padding[2];
-        Vector4 Occluders[8];
-        float OccluderBottoms[8];
+        Vector4 Occluders[RainMaxOccluders];
+        float OccluderBottoms[RainMaxOccluders];
     };
-    static_assert(sizeof(RainDrawParams) == 80 + 16 * 8 + 32, "RainDrawParams must match HLSL layout");
+    static_assert(sizeof(RainDrawParams) == 80 + 16 * RainMaxOccluders + 32, "RainDrawParams must match HLSL layout");
 
     // 雨の大きさ（目の高さが40なので、1メートル ≒ 24）。秒速およそ9メートルで落ち、北東の風で少し斜めに流れる
     constexpr float FallSpeed = 210.0f;
@@ -53,6 +59,8 @@ namespace
     // 雨をさえぎる屋根とみなす物：地面からこの高さより上にあり、上から見た面積がこれより広く、まっすぐか横向き（誤差のラジアン）
     constexpr float ShelterMinHeight = 15.0f;
     constexpr float ShelterMinArea = 150.0f;
+    // 屋根の一覧を集め直す間隔（秒）
+    constexpr float ShelterRefreshSeconds = 2.0f;
     constexpr float AxisAlignedTolerance = 0.01f;
     // 時間を戻す秒数（長く続けても値の細かさが落ちないように。雨の見え方が変わらない周期）
     constexpr float TimeWrapSeconds = 3600.0f;
@@ -61,6 +69,8 @@ namespace
     constexpr float StreakIntensityRange = 0.4f;
     // 雨を描く定数のシェーダーの番号（rainVS.hlsl の b9）
     constexpr UINT RainDrawBufferSlot = 9;
+    // 雨の4頂点の板（1粒・1つのしぶきごと）
+    constexpr UINT RainQuadVertexCount = 4;
 }
 
 void ForestRain::Init()
@@ -158,7 +168,7 @@ void ForestRain::Update()
     if (m_ShelterTimer <= 0.0f)
     {
         CollectShelters();
-        m_ShelterTimer = 2.0f;
+        m_ShelterTimer = ShelterRefreshSeconds;
     }
 }
 
@@ -181,6 +191,8 @@ void ForestRain::Draw(Camera* camera)
     Renderer::SetWorldMatrix(&world);
     ID3D11DeviceContext* context = Renderer::GetDeviceContext();
 
+    // CPUで集める屋根は、HLSLに渡す配列に収まる数にそろえる。
+    static_assert(MaxShelters == RainMaxOccluders);
     RainDrawParams params{};
     params.CameraPosition = camera->GetPosition();
     params.Time = m_Time;
@@ -223,7 +235,7 @@ void ForestRain::Draw(Camera* camera)
     Renderer::SetBlendState(BS_ADDITIVE);
     Renderer::SetDepthEnable(false);
     // 雨粒1つ・しぶき1つ = 4頂点の四角形1枚
-    context->DrawInstanced(4, dropCount + splashCount, 0, 0);
+    context->DrawInstanced(RainQuadVertexCount, dropCount + splashCount, 0, 0);
     Renderer::SetDepthEnable(true);
     Renderer::SetBlendState(BS_NONE);
     context->RSSetState(previousRasterizer.Get());

@@ -17,7 +17,16 @@ private:
     // 脱出の演出中か、演出の経過秒、演出の段階、移る先のシーン、調べられるか
     bool m_IsEscaping = false;
     float m_EscapeTimer = 0.0f;
-    int m_EscapePhase = 0;
+    // 脱出の演出の段階（始めた・光らせた・画面を乱した・最も強く光らせた・次のシーンを要求した）
+    enum class EscapePhase
+    {
+        Started,
+        Flashed,
+        Disturbed,
+        Peaked,
+        SceneRequested
+    };
+    EscapePhase m_EscapePhase = EscapePhase::Started;
     SceneName m_NextScene;
     bool m_InteractionEnabled = true;
     // 階段を上って次の階へ移る演出にするか（1面の最後の扉）。光とノイズの代わりに、上りながら暗くしている

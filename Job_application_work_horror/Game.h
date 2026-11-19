@@ -115,7 +115,7 @@ namespace Core
         void ChangeScene(SceneName sName);
         // ベスト記録を読み込む・保存する
         void LoadBestRecord();
-        void SaveBestRecord() const;
+        bool SaveBestRecord() const;
         // 音量の設定を反映している（ポーズ中は小さくしている）
         void ApplyAudioVolume(bool paused);
         // 明るさ・演出の強さ・視点の感度を、PostProcessとCameraへ反映している。

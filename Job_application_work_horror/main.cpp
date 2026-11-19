@@ -66,7 +66,9 @@ int PrecompileShadersFromCommandLine()
 // 素材とシェーダーを読めるようにするため。開発中（exe は x64\Release にあり、隣に assets がない）は何もしない
 static void UseExecutableFolderWhenPackaged()
 {
-	wchar_t modulePath[MAX_PATH * 4] = {};
+	// 深いフォルダに展開しても実行ファイルのパスを保持できるよう、余裕を持たせる。
+	constexpr std::size_t ModulePathCapacity = MAX_PATH * 4;
+	wchar_t modulePath[ModulePathCapacity] = {};
 	const DWORD length = GetModuleFileNameW(nullptr, modulePath, static_cast<DWORD>(_countof(modulePath)));
 	if (length == 0 || length >= _countof(modulePath))
 	{
@@ -102,7 +104,5 @@ int main(void)
 
 	// アプリケーションを実行している（ウィンドウを閉じるまで戻らない）
 	Application app;
-	app.Run();
-
-	return 0;
+	return app.Run();
 }

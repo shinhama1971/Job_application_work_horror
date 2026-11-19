@@ -132,7 +132,9 @@ public:
             if (m_SeenSeconds <= 0.0f)
             {
                 DirectX::SimpleMath::Vector3 flat(forward.x, 0.0f, forward.z);
-                if (flat.LengthSquared() > 1e-4f)
+                // 真上に近い視線では水平成分で人影の向きを決めない。
+                constexpr float MinFlatViewLengthSquared = 1e-4f;
+                if (flat.LengthSquared() > MinFlatViewLengthSquared)
                 {
                     flat.Normalize();
                 }

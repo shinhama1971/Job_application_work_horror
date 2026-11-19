@@ -72,6 +72,8 @@ namespace
     constexpr int StartDoorKnockLoop = 2;
     constexpr int StartDoorRattleLoop = 3;
     constexpr int StartDoorHauntedGapLoop = 4;
+    // 開始地点に戻ったとき、背後に一度だけ人影を出す周回（壁の文字の警告どおり）
+    constexpr int BehindShadowLoop = 3;
     // 開始地点の部屋の範囲（z がこれより小さく、x の絶対値がこれより小さい）
     constexpr float StartRoomMaxZ = -70.0f;
     constexpr float StartRoomHalfWidth = 90.0f;
@@ -133,12 +135,6 @@ namespace
     using EventFeedback::SoundSpec;
 
     // 1面の天井の照明の番号（StageObjects::CeilingLightAt）
-    constexpr int StartRoomLightIndex = 1;
-    constexpr int StorageLightIndex = 2;
-    constexpr int MiddleCorridorLightIndex = 4;
-    constexpr int CentralHallLightIndex = 5;
-    constexpr int LoopExitLightIndex = 7;
-    constexpr int CornerLightIndex = 8;
 
     // 入口：踏み込んだ瞬間に後ろの照明、少し後に前の照明、最後にもう一度後ろの照明を弱く明滅させる
     constexpr FlickerSpec EntranceFirstFlicker{ 0.38f, 0.52f };
@@ -292,10 +288,10 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
         // 操作を奪わず、プレイヤー自身が異変に気づける演出にしている。
         m_EntranceEventTriggered = true;
         m_EntranceEventTimer = 0.0f;
-        m_EntranceEventPhase = 0;
+        m_EntranceEventPhase = EntranceEventPhase::Started;
 
         CeilingLight* lightBehind =
-            m_Objects.CeilingLightAt(MiddleCorridorLightIndex);
+            m_Objects.CeilingLightAt(Stage1LightNumber::MiddleCorridor);
         if (lightBehind != nullptr)
         {
             EventFeedback::Flicker(*lightBehind, EntranceFirstFlicker);
@@ -313,16 +309,16 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
     if (game->IsPowerRestored())
     {
         m_EntranceEventTimer = -1.0f;
-        m_EntranceEventPhase = -1;
+        m_EntranceEventPhase = EntranceEventPhase::NotStarted;
         return;
     }
 
     // 0.38秒で前の照明、1.12秒で後ろの照明を明滅させて終えている
     m_EntranceEventTimer += deltaTime;
-    if (m_EntranceEventPhase == 0 && m_EntranceEventTimer >= EntranceAheadFlickerSeconds)
+    if (m_EntranceEventPhase == EntranceEventPhase::Started && m_EntranceEventTimer >= EntranceAheadFlickerSeconds)
     {
         CeilingLight* lightAhead =
-            m_Objects.CeilingLightAt(CentralHallLightIndex);
+            m_Objects.CeilingLightAt(Stage1LightNumber::CentralHall);
         if (lightAhead != nullptr)
         {
             EventFeedback::Flicker(*lightAhead, EntranceAheadFlicker);
@@ -330,27 +326,27 @@ void StageScene::UpdateEntranceThresholdEvent(Player& player)
 
         EventFeedback::HorrorPulse(*game->GetPostProcess(), EntranceAheadPulse);
         EventFeedback::Rumble(EntranceAheadRumble);
-        m_EntranceEventPhase = 1;
+        m_EntranceEventPhase = EntranceEventPhase::AheadFlickered;
     }
-    else if (m_EntranceEventPhase == 1 &&
+    else if (m_EntranceEventPhase == EntranceEventPhase::AheadFlickered &&
         m_EntranceEventTimer >= EntranceBehindFlickerSeconds)
     {
         CeilingLight* lightBehind =
-            m_Objects.CeilingLightAt(MiddleCorridorLightIndex);
+            m_Objects.CeilingLightAt(Stage1LightNumber::MiddleCorridor);
         if (lightBehind != nullptr)
         {
             EventFeedback::Flicker(*lightBehind, EntranceBehindFlicker);
         }
 
         m_EntranceEventTimer = -1.0f;
-        m_EntranceEventPhase = 2;
+        m_EntranceEventPhase = EntranceEventPhase::Finished;
     }
 }
 
 // 左の倉庫の演出：2本目のヒューズを探しに入ると、物音の後に背後へ影を出している
 void StageScene::UpdateStorageScare(Player& player)
 {
-    if (m_StorageScarePhase >= 2)
+    if (m_StorageScarePhase >= StorageScarePhase::ShadowShown)
     {
         return;
     }
@@ -359,11 +355,11 @@ void StageScene::UpdateStorageScare(Player& player)
     const Vector3 position = player.GetPosition();
     if (game->IsPowerRestored() || game->GetItemCount() >= 2)
     {
-        m_StorageScarePhase = 3;
+        m_StorageScarePhase = StorageScarePhase::Finished;
         return;
     }
 
-    if (m_StorageScarePhase == 0)
+    if (m_StorageScarePhase == StorageScarePhase::Waiting)
     {
         // 2回目に左の倉庫へ踏み込んだとき、先に物音と照明で背後を意識させている。
         if (m_CorridorLoopCount < 1 || game->GetItemCount() != 1 ||
@@ -372,11 +368,11 @@ void StageScene::UpdateStorageScare(Player& player)
             return;
         }
 
-        m_StorageScarePhase = 1;
+        m_StorageScarePhase = StorageScarePhase::NoiseHeard;
         m_StorageScareTimer = 0.0f;
         m_StorageScareNoticeTimer = StorageNoiseNoticeSeconds;
         game->PlayAudioCue(SOUND_CUE_DOOR, StorageNoiseDoorSound.Pitch, StorageNoiseDoorSound.Volume);
-        CeilingLight* light = m_Objects.CeilingLightAt(StorageLightIndex);
+        CeilingLight* light = m_Objects.CeilingLightAt(Stage1LightNumber::LeftStorage);
         if (light != nullptr)
         {
             EventFeedback::Flicker(*light, StorageNoiseFlicker);
@@ -389,19 +385,19 @@ void StageScene::UpdateStorageScare(Player& player)
     {
         return;
     }
-    m_StorageScarePhase = 2;
+    m_StorageScarePhase = StorageScarePhase::ShadowShown;
 
     // 倉庫から離れた場合は出さず、視界の外に人影が突然残るのを防いでいる。
     if (position.x > StorageScareStayMaxX || position.z > StorageScareStayMaxZ)
     {
-        m_StorageScarePhase = 3;
+        m_StorageScarePhase = StorageScarePhase::Finished;
         return;
     }
 
     ShadowMan* shadow = m_Objects.storageShadow;
     if (shadow == nullptr)
     {
-        m_StorageScarePhase = 3;
+        m_StorageScarePhase = StorageScarePhase::Finished;
         return;
     }
     shadow->SetPosition(StorageShadowPosition.x, StorageShadowPosition.y, StorageShadowPosition.z);
@@ -413,10 +409,10 @@ void StageScene::UpdateStorageScare(Player& player)
     {
         Core::Game* currentGame = Core::Game::GetInstance();
         currentGame->RegisterAnomalyHandled();
-        m_StorageScarePhase = 3;
+        m_StorageScarePhase = StorageScarePhase::Finished;
         m_StorageScareNoticeTimer = StorageObservedNoticeSeconds;
         CeilingLight* light =
-            m_Objects.CeilingLightAt(StorageLightIndex);
+            m_Objects.CeilingLightAt(Stage1LightNumber::LeftStorage);
         if (light != nullptr)
         {
             EventFeedback::Flicker(*light, StorageObservedFlicker);
@@ -615,11 +611,11 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     }
 
     CeilingLight* entranceLight =
-        m_Objects.CeilingLightAt(StartRoomLightIndex);
+        m_Objects.CeilingLightAt(Stage1LightNumber::StartRoom);
     CeilingLight* middleLight =
-        m_Objects.CeilingLightAt(MiddleCorridorLightIndex);
+        m_Objects.CeilingLightAt(Stage1LightNumber::MiddleCorridor);
     CeilingLight* cornerLight =
-        m_Objects.CeilingLightAt(CornerLightIndex);
+        m_Objects.CeilingLightAt(Stage1LightNumber::NorthCorner);
 
     // 1周目：左の倉庫に2本目のヒューズを出している
     if (loopPhase == 1)
@@ -680,7 +676,7 @@ void StageScene::AdvanceCorridorLoop(Player& player)
         }
 
         // 3周目だけ、壁の文字の警告どおり、プレイヤーの背後に一度だけ人影を出している（見ると照明の連鎖が始まる）。
-        if (m_CorridorLoopCount == 3)
+        if (m_CorridorLoopCount == BehindShadowLoop)
         {
             game->RequestAddObject<ShadowMan>(
                 [this](ShadowMan& shadow)
@@ -709,15 +705,15 @@ void StageScene::StartScareLightSequence()
     m_ScareLightSequence.Start();
 
     CeilingLight* entrance =
-        m_Objects.CeilingLightAt(StartRoomLightIndex);
+        m_Objects.CeilingLightAt(Stage1LightNumber::StartRoom);
     CeilingLight* middle =
-        m_Objects.CeilingLightAt(MiddleCorridorLightIndex);
+        m_Objects.CeilingLightAt(Stage1LightNumber::MiddleCorridor);
     CeilingLight* hall =
-        m_Objects.CeilingLightAt(CentralHallLightIndex);
+        m_Objects.CeilingLightAt(Stage1LightNumber::CentralHall);
     CeilingLight* corner =
-        m_Objects.CeilingLightAt(CornerLightIndex);
+        m_Objects.CeilingLightAt(Stage1LightNumber::NorthCorner);
     CeilingLight* loopExit =
-        m_Objects.CeilingLightAt(LoopExitLightIndex);
+        m_Objects.CeilingLightAt(Stage1LightNumber::LoopExitCorridor);
 
     if (entrance != nullptr)
     {
@@ -762,15 +758,15 @@ void StageScene::UpdateScareLightSequence()
     m_ScareLightSequence.Advance(deltaTime);
 
     CeilingLight* entrance =
-        m_Objects.CeilingLightAt(StartRoomLightIndex);
+        m_Objects.CeilingLightAt(Stage1LightNumber::StartRoom);
     CeilingLight* middle =
-        m_Objects.CeilingLightAt(MiddleCorridorLightIndex);
+        m_Objects.CeilingLightAt(Stage1LightNumber::MiddleCorridor);
     CeilingLight* hall =
-        m_Objects.CeilingLightAt(CentralHallLightIndex);
+        m_Objects.CeilingLightAt(Stage1LightNumber::CentralHall);
     CeilingLight* corner =
-        m_Objects.CeilingLightAt(CornerLightIndex);
+        m_Objects.CeilingLightAt(Stage1LightNumber::NorthCorner);
     CeilingLight* loopExit =
-        m_Objects.CeilingLightAt(LoopExitLightIndex);
+        m_Objects.CeilingLightAt(Stage1LightNumber::LoopExitCorridor);
 
     switch (m_ScareLightSequence.ConsumePendingBeat())
     {
@@ -868,7 +864,7 @@ void StageScene::StartFuseWatcher(int fuseCount)
     watcher->SetOnObserved(
         [this]()
         {
-            m_FuseWatcherState = 2;
+            m_FuseWatcherState = FuseWatcherState::Observed;
             m_FuseWatcherNoticeTimer = FuseWatcherObservedNoticeSeconds;
 
             Core::Game* game = Core::Game::GetInstance();
@@ -881,7 +877,7 @@ void StageScene::StartFuseWatcher(int fuseCount)
             }
 
             CeilingLight* reactionLight =
-                m_Objects.CeilingLightAt(MiddleCorridorLightIndex);
+                m_Objects.CeilingLightAt(Stage1LightNumber::MiddleCorridor);
             if (reactionLight != nullptr)
             {
                 EventFeedback::Flicker(*reactionLight, FuseWatcherObservedFlicker);
@@ -890,7 +886,7 @@ void StageScene::StartFuseWatcher(int fuseCount)
             EventFeedback::Rumble(FuseWatcherObservedRumble);
         });
 
-    m_FuseWatcherState = 1;
+    m_FuseWatcherState = FuseWatcherState::Watching;
     m_FuseWatcherNoticeTimer = fuseCount == 2 ? FuseWatcherSecondSeconds : FuseWatcherThirdSeconds;
     EventFeedback::HorrorPulse(*game->GetPostProcess(),
         fuseCount == 2 ? FuseWatcherSecondPulse : FuseWatcherThirdPulse);
@@ -958,8 +954,8 @@ void StageScene::UpdateExitPowerSequence()
     {
         m_ProgressHintTimer = 0.0f;
 
-        CeilingLight* corner = m_Objects.CeilingLightAt(LoopExitLightIndex);
-        CeilingLight* exitLight = m_Objects.CeilingLightAt(CornerLightIndex);
+        CeilingLight* corner = m_Objects.CeilingLightAt(Stage1LightNumber::LoopExitCorridor);
+        CeilingLight* exitLight = m_Objects.CeilingLightAt(Stage1LightNumber::NorthCorner);
         if (corner != nullptr) corner->SetForcedOff(true);
         if (exitLight != nullptr) exitLight->SetForcedOff(true);
         EventFeedback::HorrorPulse(*game->GetPostProcess(), ExitPowerCutPulse);
@@ -976,7 +972,7 @@ void StageScene::UpdateExitPowerSequence()
     {
     case 0:
     {
-        CeilingLight* corner = m_Objects.CeilingLightAt(LoopExitLightIndex);
+        CeilingLight* corner = m_Objects.CeilingLightAt(Stage1LightNumber::LoopExitCorridor);
         if (corner != nullptr)
         {
             corner->SetForcedOff(false);
@@ -989,7 +985,7 @@ void StageScene::UpdateExitPowerSequence()
     }
     case 1:
     {
-        CeilingLight* exitLight = m_Objects.CeilingLightAt(CornerLightIndex);
+        CeilingLight* exitLight = m_Objects.CeilingLightAt(Stage1LightNumber::NorthCorner);
         if (exitLight != nullptr)
         {
             exitLight->SetForcedOff(false);
@@ -1022,7 +1018,7 @@ void StageScene::UpdateExitOmen(Player& player)
         case 0:
         {
             CeilingLight* lightBehind =
-                m_Objects.CeilingLightAt(CornerLightIndex);
+                m_Objects.CeilingLightAt(Stage1LightNumber::NorthCorner);
             if (lightBehind != nullptr)
             {
                 lightBehind->SetForcedOff(true);
@@ -1034,7 +1030,7 @@ void StageScene::UpdateExitOmen(Player& player)
         case 1:
         {
             CeilingLight* exitLight =
-                m_Objects.CeilingLightAt(LoopExitLightIndex);
+                m_Objects.CeilingLightAt(Stage1LightNumber::LoopExitCorridor);
             if (exitLight != nullptr)
             {
                 exitLight->SetFaulted(true);
@@ -1068,7 +1064,7 @@ void StageScene::UpdateExitOmen(Player& player)
         shadow->EnableGazeScare(ExitOmenGazeSeconds);
     }
 
-    for (int lightNumber : { LoopExitLightIndex, CornerLightIndex })
+    for (int lightNumber : { Stage1LightNumber::LoopExitCorridor, Stage1LightNumber::NorthCorner })
     {
         CeilingLight* light = m_Objects.CeilingLightAt(lightNumber);
         if (light != nullptr)
@@ -1100,8 +1096,8 @@ bool StageScene::IsAmbientSoundAllowed() const
         !m_ScareLightSequence.IsActive() &&
         !m_HiddenRoom.IsTrapped() &&
         m_EntranceEventTimer < 0.0f &&
-        m_StorageScarePhase != 1 &&
-        m_FuseWatcherState != 1 &&
+        m_StorageScarePhase != StorageScarePhase::NoiseHeard &&
+        m_FuseWatcherState != FuseWatcherState::Watching &&
         m_ExitOmenSequence.GetTimer() <= 0.0f &&
         !powerRestoring &&
         m_SafeLights.GetCalm() < SafeLightQuietCalm &&

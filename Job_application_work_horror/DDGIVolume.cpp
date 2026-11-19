@@ -27,6 +27,10 @@ namespace
     static_assert(DistanceAtlasSlot == IrradianceAtlasSlot + 1);
     constexpr UINT PreviousAtlasSlot = 4;
     constexpr UINT DepthSlot = 5;
+    // 光線の追跡は t0〜t3（t1 は空）。解除は適用パスの深度 t5 まで含める。
+    constexpr UINT TraceInputCount = DistanceAtlasSlot - PointLightsSlot + 1;
+    constexpr UINT AtlasInputCount = DistanceAtlasSlot - IrradianceAtlasSlot + 1;
+    constexpr UINT ComputeInputSlotCount = DepthSlot + 1;
     // 部屋の形の定数バッファ（roomOcclusion.hlsli の b11）
     constexpr UINT RoomShapeSlot = 11;
 
@@ -45,8 +49,6 @@ namespace
     constexpr float BounceStrength = 0.8f;
     // 光線を追う一番遠い距離
     constexpr float MaxRayDistance = 600.0f;
-    // 光線の向きを毎フレーム回す乱数の、自動撮影と計測のときの種
-    constexpr unsigned int CaptureRandomSeed = 1301;
     // 円周率（光線の向きの乱数に使う）
     constexpr float Pi = MathUtility::Pi;
     // 間接光の画像を縦横何分の1の解像度で作るか、Compute Shader の1グループの縦横の数
@@ -84,7 +86,7 @@ namespace Effect
     {
         m_Width = (std::max)(1, (width + OutputDownscale - 1) / OutputDownscale);
         m_Height = (std::max)(1, (height + OutputDownscale - 1) / OutputDownscale);
-        m_Random.seed(Tools::CaptureMode::MakeRandomSeed(CaptureRandomSeed));
+        m_Random.seed(Tools::CaptureMode::MakeRandomSeed(Tools::CaptureMode::RandomSeed::DdgiProbeSampling));
 
         D3D11_SAMPLER_DESC samplerDesc{};
         samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -209,7 +211,9 @@ namespace Effect
         // 光線の向きを、毎フレーム乱数で回している（同じ向きだけを調べて、決まった模様が出ないように）
         std::uniform_real_distribution<float> unit(0.0f, 1.0f);
         Vector3 axis(unit(m_Random) * 2.0f - 1.0f, unit(m_Random) * 2.0f - 1.0f, unit(m_Random) * 2.0f - 1.0f);
-        if (axis.LengthSquared() < 1e-6f)
+        // ほぼゼロの軸を正規化すると回転が不安定になるため、既定の軸に置き換える。
+        constexpr float MinRotationAxisLengthSquared = 1e-6f;
+        if (axis.LengthSquared() < MinRotationAxisLengthSquared)
         {
             axis = Vector3::UnitY;
         }
@@ -263,20 +267,20 @@ namespace Effect
         const int previous = m_Current;
         const int next = 1 - m_Current;
         ID3D11UnorderedAccessView* nullUAV = nullptr;
-        ID3D11ShaderResourceView* nullSRVs[6] = {};
+        ID3D11ShaderResourceView* nullSRVs[ComputeInputSlotCount] = {};
 
         // 1. 光線を飛ばす（t0 = 点光源、t2・t3 = 前の八面体マップ、u0 = 光線の結果）。1グループ = 1プローブ
         m_TraceShader.SetGPU();
-        ID3D11ShaderResourceView* traceInputs[4] = {
+        ID3D11ShaderResourceView* traceInputs[TraceInputCount] = {
             pointLights, nullptr, m_IrradianceAtlas[previous].SRV.Get(), m_DistanceAtlas[previous].SRV.Get() };
-        context->CSSetShaderResources(PointLightsSlot, 4, traceInputs);
+        context->CSSetShaderResources(PointLightsSlot, TraceInputCount, traceInputs);
         ID3D11UnorderedAccessView* rayUAV = m_RayResults.UAV.Get();
         context->CSSetUnorderedAccessViews(0, 1, &rayUAV, nullptr);
         const UINT probeGroups =
             (GetProbeCount() - p.ProbeUpdatePhase + p.ProbeUpdateStride - 1u) / p.ProbeUpdateStride;
         context->Dispatch(probeGroups, 1, 1);
         context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
-        context->CSSetShaderResources(0, 6, nullSRVs);
+        context->CSSetShaderResources(0, ComputeInputSlotCount, nullSRVs);
 
         // 2. 八面体マップを更新する（t1 = 光線の結果、t4 = 前の画像、u0 = 新しい画像）。1グループ = 1プローブの区画
         const auto runUpdate = [&](const ComputeShader& shader, const GpuTexture& previousAtlas, const GpuTexture& nextAtlas)
@@ -295,7 +299,7 @@ namespace Effect
             context->CSSetUnorderedAccessViews(0, 1, &output, nullptr);
             context->Dispatch(probeGroups, 1, 1);
             context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
-            context->CSSetShaderResources(0, 6, nullSRVs);
+            context->CSSetShaderResources(0, ComputeInputSlotCount, nullSRVs);
         };
         runUpdate(m_IrradianceUpdateShader, m_IrradianceAtlas[previous], m_IrradianceAtlas[next]);
         runUpdate(m_DistanceUpdateShader, m_DistanceAtlas[previous], m_DistanceAtlas[next]);
@@ -338,9 +342,9 @@ namespace Effect
         ID3D11SamplerState* sampler = m_LinearClamp.Get();
         context->CSSetSamplers(0, 1, &sampler);
         m_ApplyShader.SetGPU();
-        ID3D11ShaderResourceView* atlases[2] = {
+        ID3D11ShaderResourceView* atlases[AtlasInputCount] = {
             m_IrradianceAtlas[m_Current].SRV.Get(), m_DistanceAtlas[m_Current].SRV.Get() };
-        context->CSSetShaderResources(IrradianceAtlasSlot, 2, atlases);
+        context->CSSetShaderResources(IrradianceAtlasSlot, AtlasInputCount, atlases);
         ID3D11ShaderResourceView* depth = Renderer::GetDepthShaderResourceView();
         context->CSSetShaderResources(DepthSlot, 1, &depth);
         ID3D11UnorderedAccessView* output = m_IndirectLight.UAV.Get();
@@ -350,9 +354,9 @@ namespace Effect
             (static_cast<UINT>(m_Parameters.OutputSize.y) + ApplyGroupSize - 1) / ApplyGroupSize, 1);
 
         ID3D11UnorderedAccessView* nullUAV = nullptr;
-        ID3D11ShaderResourceView* nullSRVs[6] = {};
+        ID3D11ShaderResourceView* nullSRVs[ComputeInputSlotCount] = {};
         context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
-        context->CSSetShaderResources(0, 6, nullSRVs);
+        context->CSSetShaderResources(0, ComputeInputSlotCount, nullSRVs);
         context->CSSetShader(nullptr, nullptr, 0);
 
         // 本描画の描画先（色と深度）に戻して、結果を t18 に設定している

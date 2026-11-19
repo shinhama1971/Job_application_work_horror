@@ -19,6 +19,8 @@
 // タイルの一番奥の面に持たせる余裕（奥行きに掛ける割合・足す長さ）
 #define TILE_FAR_LIMIT_SCALE 1.02f
 #define TILE_FAR_LIMIT_MARGIN 2.0f
+// 奥側で絞らないときの距離（float の最大値）
+#define TILE_NO_FAR_LIMIT 3.402823e38f
 
 struct POINT_LIGHT
 {
@@ -49,7 +51,9 @@ RWStructuredBuffer<uint> TileLightCounts : register(u1);    // タイルごと�
 // グループ内で共有する、タイルの光源の数・光源の番号・視錐台の4つの平面・一番奥の深度
 groupshared uint g_TileLightCount;
 groupshared uint g_TileLightIds[MAX_LIGHTS_PER_TILE];
-groupshared float4 g_TilePlanes[4];
+// 画面上のタイル外周に沿って作る側面の枚数。四隅から順に作る。
+#define TILE_SIDE_PLANE_COUNT 4
+groupshared float4 g_TilePlanes[TILE_SIDE_PLANE_COUNT];
 // 0〜1の正の浮動小数点は、ビット列を整数として比べても大小が同じなので、InterlockedMaxで最大値を求めている
 groupshared uint g_TileMaxDepthBits;
 
@@ -88,7 +92,7 @@ void main(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
             1.0f - minPixel.y / ViewportSize.y * 2.0f);
 
         const float3 eye = CameraPosition.xyz;
-        float3 corners[4];
+        float3 corners[TILE_SIDE_PLANE_COUNT];
         corners[0] = UnprojectFar(float2(ndcMin.x, ndcMin.y));
         corners[1] = UnprojectFar(float2(ndcMax.x, ndcMin.y));
         corners[2] = UnprojectFar(float2(ndcMax.x, ndcMax.y));
@@ -96,12 +100,12 @@ void main(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
         const float3 center = (corners[0] + corners[1] + corners[2] + corners[3]) * 0.25f;
 
         [unroll]
-        for (uint side = 0; side < 4; ++side)
+        for (uint side = 0; side < TILE_SIDE_PLANE_COUNT; ++side)
         {
             // 視点と、遠い平面の隣り合う2隅を通る平面。法線はタイルの内側へ向けている。
             float3 normal = normalize(cross(
                 corners[side] - eye,
-                corners[(side + 1) % 4] - eye));
+                corners[(side + 1) % TILE_SIDE_PLANE_COUNT] - eye));
             if (dot(normal, center - eye) < 0.0f)
             {
                 normal = -normal;
@@ -140,7 +144,7 @@ void main(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
     // 一番奥の深度を、カメラの向きに沿った距離にしている。透視投影では深度が同じ点は
     // カメラからの前向きの距離も同じなので、画面の中心の点で求めている。
     // 何も描いていない画素（1.0）があるタイルや、深度を使わないフレームでは、奥側では絞らない。
-    float farLimit = 3.402823e38f;
+    float farLimit = TILE_NO_FAR_LIMIT;
     const float tileMaxDepth = asfloat(g_TileMaxDepthBits);
     if (UseDepthBounds != 0 && tileMaxDepth < 1.0f)
     {
@@ -161,7 +165,7 @@ void main(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
             dot(CameraForward.xyz, positionRange.xyz - CameraPosition.xyz);
         bool overlaps = lightDistance - positionRange.w <= farLimit;
         [unroll]
-        for (uint plane = 0; plane < 4; ++plane)
+        for (uint plane = 0; plane < TILE_SIDE_PLANE_COUNT; ++plane)
         {
             // 光源の球が、4つの平面のどれかの外側に完全に出ていたら、このタイルには影響しない
             const float signedDistance =

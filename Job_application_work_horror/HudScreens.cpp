@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "Hud.h"
+#include "StoryText.h"
 
 #include <algorithm>
 #include <array>
@@ -32,7 +33,7 @@ namespace
         size_t count = 0;
         for (unsigned char byte : text)
         {
-            if ((byte & 0xC0u) != 0x80u)
+            if (!StoryText::IsUtf8ContinuationByte(byte))
             {
                 ++count;
             }
@@ -333,7 +334,9 @@ void Hud::DrawTitle(
     const bool lost = noise > LostNoiseLevel;
     const std::string_view status = lost ? "信号なし" : "受信中...";
     const int clock = static_cast<int>(time);
-    char timeText[16];
+    // 時・分・秒の区切りと終端文字を含めた監視時計の書式用バッファ。
+    constexpr std::size_t SurveillanceClockTextCapacity = 16;
+    char timeText[SurveillanceClockTextCapacity];
     std::snprintf(timeText, sizeof(timeText), "%02d:%02d:%02d", ClockStartHour + clock / SecondsPerHour,
         (ClockStartMinute + clock / SecondsPerMinute) % SecondsPerMinute, (ClockStartSecond + clock) % SecondsPerMinute);
     const float statusX = screenWidth - StatusRightMargin;
@@ -1039,7 +1042,7 @@ namespace KeypadLayout
     constexpr float TitleY = 20.0f;
     constexpr float TitlePixelSize = 3.4f;
     // 桁の箱：数、幅と高さ、すき間、数字の大きさ、パネルの上からの位置、枠の太さ（選んでいる・いない）
-    constexpr int DigitCount = 4;
+    constexpr int DigitCount = KeypadLock::DigitCount;
     constexpr float BoxWidth = 70.0f;
     constexpr float BoxHeight = 92.0f;
     constexpr float BoxGap = 20.0f;
@@ -1067,7 +1070,7 @@ namespace KeypadLayout
 
 // 画面の中央に4桁の入力盤を出している。選んでいる桁は緑の枠で示し、上下の三角で増減できることを伝えている。
 void Hud::DrawKeypad(
-    const std::array<int, 4>& entered,
+    const KeypadLock::Digits& entered,
     int cursor,
     float wrongRate,
     int mistakes)

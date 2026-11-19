@@ -30,6 +30,9 @@ static const float3 DDGI_CEILING_ALBEDO = float3(0.28f, 0.28f, 0.27f);
 static const float DDGI_BACKFACE_DISTANCE = -0.01f;
 // 懐中電灯の明るさの割合（本描画の懐中電灯は面の向きの影響を 0.22〜0.45 に抑えているので、同じくらいの強さにそろえている）
 static const float DDGI_FLASHLIGHT_SCALE = 0.45f;
+// 定数の印（0 か 1）を見るしきい値と、床・天井とみなす法線の縦の成分（約60度より水平に近ければ壁）
+#define DDGI_FLAG_THRESHOLD 0.5f
+#define DDGI_HORIZONTAL_SURFACE_NORMAL_Y 0.5f
 
 // 光線（origin から direction）が当たる一番近い壁・床・天井までの距離と、当たった面の法線。
 // 光線の出発点が壁の中なら backface を true にする
@@ -109,7 +112,7 @@ float3 GetDirectLight(float3 position, float3 normal)
     }
 
     // 懐中電灯：照らした壁の光が、まわりへ跳ね返る
-    if (FlashlightEnabled > 0.5f)
+    if (FlashlightEnabled > DDGI_FLAG_THRESHOLD)
     {
         const float3 toFlashlight = FlashlightPosition - position;
         const float flashlightDistance = length(toFlashlight);
@@ -154,13 +157,13 @@ void main(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
     }
 
     const float3 hitPosition = origin + direction * hitDistance;
-    const float3 albedo = hitNormal.y > 0.5f ? DDGI_FLOOR_ALBEDO
-        : (hitNormal.y < -0.5f ? DDGI_CEILING_ALBEDO : DDGI_WALL_ALBEDO);
+    const float3 albedo = hitNormal.y > DDGI_HORIZONTAL_SURFACE_NORMAL_Y ? DDGI_FLOOR_ALBEDO
+        : (hitNormal.y < -DDGI_HORIZONTAL_SURFACE_NORMAL_Y ? DDGI_CEILING_ALBEDO : DDGI_WALL_ALBEDO);
     // 直接光に、前のフレームの間接光（プローブから読む）を足して、2回目以降の跳ね返りも少しずつ積み重ねている
     float3 incoming = GetDirectLight(hitPosition, hitNormal);
     // 格子を作り直した最初のフレームは、まだ書き込んでいないマップを読まない。
     [branch]
-    if (ResetHistory < 0.5f)
+    if (ResetHistory < DDGI_FLAG_THRESHOLD)
     {
         incoming += GetDDGIIrradiance(hitPosition, hitNormal, 0.0f, false) * BounceStrength;
     }

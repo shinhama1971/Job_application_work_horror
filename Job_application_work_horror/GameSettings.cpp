@@ -44,7 +44,7 @@ namespace Core
     }
 
     // settings.txtへ、全項目を1行で書き出している（フォルダが無ければ作っている）
-    void GameSettings::Save() const
+    bool GameSettings::Save() const
     {
         std::ostringstream text;
         text << m_BrightnessLevel << ' '
@@ -53,6 +53,6 @@ namespace Core
             << m_VolumeLevel << ' '
             << m_GuideLevel << ' '
             << m_ResolutionLevel << "\r\n";
-        utility::WriteSaveFile(SettingsFileName, text.str());
+        return utility::WriteSaveFile(SettingsFileName, text.str());
     }
 }

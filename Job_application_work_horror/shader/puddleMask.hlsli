@@ -60,6 +60,8 @@ static const float PUDDLE_CROSS_WAVE_Z_FREQUENCY = 41.0f;
 static const float PUDDLE_CROSS_WAVE_SPEED = 1.10f;
 static const float PUDDLE_RADIAL_WAVE_WEIGHT = 0.72f;
 static const float PUDDLE_CROSS_WAVE_WEIGHT = 0.28f;
+// マス目に水たまりがあるかの印（0 か 1）を見るしきい値
+#define PUDDLE_CELL_THRESHOLD 0.5f
 
 // その位置の水たまりの濃さ（0〜1）を返し、岸の線と波の模様も返している（timeは波を動かす時間）
 float GetPuddleMask(
@@ -86,7 +88,7 @@ float GetPuddleMask(
     const float hasPuddle = cellValue.x;
     // 大半の床のマス目は乾いているため、対象外のマス目では、回転・輪郭のノイズ・波の計算を省いている。
     // （この分岐はワールド空間の大きなマス目の単位でそろうので、画素ごとにばらつかない）
-    if (hasPuddle < 0.5f)
+    if (hasPuddle < PUDDLE_CELL_THRESHOLD)
     {
         shore = 0.0f;
         ripplePattern = 0.0f;

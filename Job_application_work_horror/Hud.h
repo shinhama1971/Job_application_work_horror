@@ -10,6 +10,7 @@
 #include <string_view>
 #include <vector>
 
+#include "KeypadLock.h"
 #include "Shader.h"
 #include "VertexBuffer.h"
 
@@ -119,7 +120,7 @@ public:
         bool wrongReportVisible);
     // 暗証番号の入力画面。wrongRateは不正解の直後に1から0へ下がり、枠を赤く点滅させている。
     void DrawKeypad(
-        const std::array<int, 4>& entered,
+        const KeypadLock::Digits& entered,
         int cursor,
         float wrongRate,
         int mistakes);

@@ -159,7 +159,7 @@ void StageSurveillanceController::Init(const StageObjects& objects)
     m_Feed.InitRequired(FeedWidth, FeedHeight, "監視カメラの映像");
     for (Graphics::RenderTexture& reference : m_References)
     {
-        reference.InitRequired(960, 540, "監視カメラの比較画像");
+        reference.InitRequired(FeedWidth, FeedHeight, "監視カメラの比較画像");
     }
 }
 
@@ -443,12 +443,14 @@ SurveillancePatrol::Anomaly StageSurveillanceController::ChooseAnomaly()
     // カメラごとに、その場所で起こせる異常だけを候補にしている。
     const StageSurveillanceCamera& camera =
         StageSurveillanceCameras[anomaly.camera];
-    SurveillancePatrol::AnomalyType candidates[3] =
+    // 人影・消灯・開かずの扉の各種類が1件ずつ入る。
+    constexpr int MaxCameraAnomalyTypes = 3;
+    SurveillancePatrol::AnomalyType candidates[MaxCameraAnomalyTypes] =
     {
         SurveillancePatrol::AnomalyType::Figure
     };
     int candidateCount = 1;
-    CeilingLight* anomalyLight = camera.LightNumber > 0
+    CeilingLight* anomalyLight = camera.LightNumber > StageSurveillanceTarget::NoLight
         ? m_Objects->CeilingLightAt(camera.LightNumber)
         : nullptr;
     // 停電中にもともと消えている普通の照明を選ぶと映像に差が出ないため、
@@ -459,7 +461,7 @@ SurveillancePatrol::Anomaly StageSurveillanceController::ChooseAnomaly()
     {
         candidates[candidateCount++] = SurveillancePatrol::AnomalyType::LightOut;
     }
-    if (camera.SealedDoorIndex >= 0)
+    if (camera.SealedDoorIndex > StageSurveillanceTarget::NoSealedDoor)
     {
         candidates[candidateCount++] = SurveillancePatrol::AnomalyType::DoorOpen;
     }

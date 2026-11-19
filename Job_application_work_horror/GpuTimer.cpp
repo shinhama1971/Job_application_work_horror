@@ -13,6 +13,8 @@ namespace
 {
     // GPU の時刻の差（1秒あたりの刻み）をミリ秒に直す倍率
     constexpr double MillisecondsPerSecond = 1000.0;
+    // 環境変数の値の最大の長さ（Windows の上限）
+    constexpr DWORD MaxEnvironmentValueLength = 32768;
 
     // 段階の列挙値を、配列の添字に変えている
     constexpr std::size_t ToIndex(GpuPass pass)
@@ -25,7 +27,7 @@ namespace
     {
         static const std::string logPath = []
         {
-            char path[32768]{};
+            char path[MaxEnvironmentValueLength]{};
             const DWORD pathLength = GetEnvironmentVariableA(
                 "GPU_TIMER_LOG_PATH", path,
                 static_cast<DWORD>(sizeof(path)));

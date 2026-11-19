@@ -71,10 +71,12 @@ float4 main(RAIN_PS_IN input) : SV_TARGET
     else
     {
         const float radius = length(input.uv);
-        const float ringRadius = lerp(RAIN_SPLASH_INITIAL_RADIUS, 1.0f, sqrt(input.life));
+        // 頂点側の経過は0〜1。補間誤差で平方根や累乗に範囲外の値が入らないようにする。
+        const float life = saturate(input.life);
+        const float ringRadius = lerp(RAIN_SPLASH_INITIAL_RADIUS, 1.0f, sqrt(life));
         const float ringOffset = (radius - ringRadius) / RAIN_SPLASH_RING_WIDTH;
-        const float ring = exp(-ringOffset * ringOffset) * pow(1.0f - input.life, RAIN_SPLASH_RING_FADE_EXPONENT) * RAIN_SPLASH_RING_GAIN;
-        const float burst = exp(-radius * radius / RAIN_SPLASH_BURST_WIDTH) * (1.0f - smoothstep(0.0f, RAIN_SPLASH_BURST_FADE_END, input.life)) * RAIN_SPLASH_BURST_GAIN;
+        const float ring = exp(-ringOffset * ringOffset) * pow(saturate(1.0f - life), RAIN_SPLASH_RING_FADE_EXPONENT) * RAIN_SPLASH_RING_GAIN;
+        const float burst = exp(-radius * radius / RAIN_SPLASH_BURST_WIDTH) * (1.0f - smoothstep(0.0f, RAIN_SPLASH_BURST_FADE_END, life)) * RAIN_SPLASH_BURST_GAIN;
         shape = (ring + burst) * (1.0f - smoothstep(RAIN_SPLASH_OUTER_FADE_START, 1.0f, radius));
     }
     const float alpha = input.alpha * shape;

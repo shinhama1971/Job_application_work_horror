@@ -98,10 +98,12 @@ struct Stage2Objects
     std::array<CeilingLight*, static_cast<std::size_t>(Stage2Light::Count)> lights{};
     std::array<FuseBox*, 2> evidenceTerminals{};
     std::array<Wall*, 2> evidenceMarkers{};
-    std::array<Wall*, 3> cycleMarks{};
+    // 廊下の周回を表す傷の数。信号盤の数とは独立している。
+    static constexpr int CycleMarkCount = 3;
+    std::array<Wall*, CycleMarkCount> cycleMarks{};
     // 信号盤とその色の目印、壁の引っかき傷
-    std::array<FuseBox*, 3> signalTerminals{};
-    std::array<Wall*, 3> signalMarkers{};
+    std::array<FuseBox*, Stage2SignalTerminalCount> signalTerminals{};
+    std::array<Wall*, Stage2SignalTerminalCount> signalMarkers{};
     std::array<Wall*, Stage2ScratchCount> scratches{};
     // 周回ごとに1か所ずつ増える天井の雨漏り（1〜3周目）。xy = 真下の水たまりの中心の x・z、z = 広がりきったときの半径。
     // 配置ファイルの place Stage2LoopLeak1〜3（size の幅が直径）から読んでいる

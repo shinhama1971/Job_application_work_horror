@@ -9,9 +9,16 @@ namespace
 {
     // 3本目のヒューズを探す段階（西棟）の文章。目的・ヒント（35秒・18秒）の3種類がある。
     // 水を抜く段階の目的には、回し終えたバルブの数を付けている。
+    // 西棟の段階の数と、水を抜く段階（回し終えたバルブの数を付ける段階）、バルブの数（Stage1WestWing::ValveCount と同じ）
+    constexpr int WestWingStepCount = 4;
+    constexpr int DrainStep = 3;
+    constexpr int WestWingValveCount = 3;
+    // 文章の種類の数（目的・35秒のヒント・18秒のヒント）
+    constexpr int WestWingTextVariants = 3;
+
     std::string SelectWestWingText(int westWingStep, int valvesOpened, int variant)
     {
-        static const char* const Texts[4][3] =
+        static const char* const Texts[WestWingStepCount][WestWingTextVariants] =
         {
             { "右側の部屋で鍵を探す", "ヒント 右奥の部屋に鍵が落ちている", "ヒント 右側の部屋を確認する" },
             { "西側の壁の扉を鍵で開ける", "ヒント 配電盤の近く、左の壁の扉", "ヒント 西側の壁沿いを探す" },
@@ -19,11 +26,11 @@ namespace
             { "水の引いた西棟の奥でヒューズを探す", "ヒント 仕切りの奥のポンプ室", "ヒント 西棟の奥へ進む" },
         };
         // 段階は1〜4の範囲に収めている
-        const int step = westWingStep < 1 ? 1 : (westWingStep > 4 ? 4 : westWingStep);
+        const int step = westWingStep < 1 ? 1 : (westWingStep > WestWingStepCount ? WestWingStepCount : westWingStep);
         std::string text = Texts[step - 1][variant];
-        if (step == 3 && variant == 0)
+        if (step == DrainStep && variant == 0)
         {
-            text += "  " + std::to_string(valvesOpened) + "/3";
+            text += "  " + std::to_string(valvesOpened) + "/" + std::to_string(WestWingValveCount);
         }
         return text;
     }
@@ -151,7 +158,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
     // 一時的な知らせ（充電・監視カメラ・倉庫の物音・ヒューズを拾った・影が消えた）
     else if (in.chargerNotice)
     {
-        objectiveText = in.fuseWatcherState == 1
+        objectiveText = in.fuseWatcherState == FuseWatcherState::Watching
             ? "充電音で影が現れた ライトを向ける"
             : "バッテリーを充電した";
     }
@@ -161,15 +168,15 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
     }
     else if (in.storageScareNotice)
     {
-        objectiveText = in.storageScarePhase == 1
+        objectiveText = in.storageScarePhase == StorageScarePhase::NoiseHeard
             ? "背後で金属音がした"
-            : (in.storageScarePhase == 2
+            : (in.storageScarePhase == StorageScarePhase::ShadowShown
                 ? "背後に気配がある"
                 : "影は光の中へ消えた");
     }
     else if (in.fuseNotice)
     {
-        if (in.fuseWatcherState == 1)
+        if (in.fuseWatcherState == FuseWatcherState::Watching)
             objectiveText = "影に懐中電灯を向ける";
         else if (in.fuseCount == 1) objectiveText = "ヒューズを1本入手";
         else if (in.fuseCount == 2) objectiveText = "ヒューズを2本入手";
@@ -177,7 +184,7 @@ std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
     }
     else if (in.fuseWatcherNotice)
     {
-        objectiveText = in.fuseWatcherState == 1
+        objectiveText = in.fuseWatcherState == FuseWatcherState::Watching
             ? "影を正面から懐中電灯で照らす"
             : "影が光の中へ消えた";
     }

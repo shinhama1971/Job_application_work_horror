@@ -24,6 +24,8 @@
 #include "VideoWriter.h"
 
 #include <SimpleMath.h>
+#include <cstdlib>
+#include <string_view>
 #include <Windows.h>
 #include <mfapi.h>
 #include <mfidl.h>
@@ -55,6 +57,11 @@ namespace
     constexpr double SlowFramePercentile = 0.99;
     constexpr double MillisecondsPerSecond = 1000.0;
     constexpr UINT PlayVideoFps = 30;
+    // 画面写真の BGRA の1画素のバイト数と、不透明な透明度
+    constexpr int BytesPerPixel = 4;
+    // BGRAでは、末尾のバイトが透明度。
+    constexpr int BgraAlphaByte = BytesPerPixel - 1;
+    constexpr BYTE OpaqueAlpha = 255;
 
     // ------------------------------------------------------------------------
     // 道順（キーフレーム）。時刻と時刻の間は、位置と向きを直線で補間している。
@@ -307,21 +314,24 @@ namespace
         }
         // PNGの書き出しはBGRAの並びを使っている（RGBAのまま渡すと赤と青が入れ替わるため、並べ替えてから渡している）。
         WICPixelFormatGUID format = GUID_WICPixelFormat32bppBGRA;
-        frame->SetPixelFormat(&format);
-        std::vector<BYTE> bgra(static_cast<size_t>(width) * height * 4);
+        if (FAILED(frame->SetPixelFormat(&format)) || !IsEqualGUID(format, GUID_WICPixelFormat32bppBGRA))
+        {
+            return false;
+        }
+        std::vector<BYTE> bgra(static_cast<size_t>(width) * height * BytesPerPixel);
         for (UINT y = 0; y < height; ++y)
         {
             const BYTE* source = rgba + static_cast<size_t>(y) * rowPitch;
-            BYTE* destination = bgra.data() + static_cast<size_t>(y) * width * 4;
+            BYTE* destination = bgra.data() + static_cast<size_t>(y) * width * BytesPerPixel;
             for (UINT x = 0; x < width; ++x)
             {
-                destination[x * 4 + 0] = source[x * 4 + 2];
-                destination[x * 4 + 1] = source[x * 4 + 1];
-                destination[x * 4 + 2] = source[x * 4 + 0];
-                destination[x * 4 + 3] = 255;   // 透明度は使わないので不透明にしている
+                destination[x * BytesPerPixel + 0] = source[x * BytesPerPixel + 2];
+                destination[x * BytesPerPixel + 1] = source[x * BytesPerPixel + 1];
+                destination[x * BytesPerPixel + 2] = source[x * BytesPerPixel + 0];
+                destination[x * BytesPerPixel + BgraAlphaByte] = OpaqueAlpha;   // 透明度は使わないので不透明にしている
             }
         }
-        if (FAILED(frame->WritePixels(height, width * 4, static_cast<UINT>(bgra.size()), bgra.data())) ||
+        if (FAILED(frame->WritePixels(height, width * BytesPerPixel, static_cast<UINT>(bgra.size()), bgra.data())) ||
             FAILED(frame->Commit()) ||
             FAILED(encoder->Commit()))
         {
@@ -335,6 +345,7 @@ namespace
     // ------------------------------------------------------------------------
     // 撮影モードが有効か、保存先のフォルダ、動画、動画を開こうとしたか、画面の読み戻し用テクスチャ
     bool g_Active = false;
+    bool g_CaptureFailed = false;
     std::filesystem::path g_OutputDirectory;
     VideoWriter g_Video;
     bool g_VideoTried = false;
@@ -370,12 +381,28 @@ namespace
     int g_FramesWritten = 0;
     // 見て回り終えてから終了するまでの残りフレーム数（最後のスクリーンショットを確実に保存するため）。
     int g_QuitCountdown = -1;
+    // 計測を終えてから終了するまでのフレーム数
+    constexpr int BenchmarkQuitDelayFrames = 3;
+    // 計測の表の列の幅（値・差）
+    constexpr int BenchmarkValueWidth = 9;
+    constexpr int BenchmarkDiffWidth = 8;
 
     // 撮影の経過を capture_log.txt に残している（うまく撮れなかったときの確認用）。
     void Log(const std::string& message)
     {
         std::ofstream file(g_OutputDirectory / L"capture_log.txt", std::ios::app);
         file << "[frame " << g_FramesWritten << "] " << message << "\n";
+    }
+
+    void RecordCaptureFailure(const char* reason)
+    {
+        g_CaptureFailed = true;
+        const std::string message = std::string("エラー: ") + reason;
+        if (!g_OutputDirectory.empty())
+        {
+            Log(message);
+        }
+        OutputDebugStringA((message + "\n").c_str());
     }
 
     // ログに書くシーンの名前
@@ -739,7 +766,7 @@ namespace
     }
 
     // 全地点の結果を表にして benchmark_result.txt に書き出している
-    void WriteBenchmarkResult()
+    bool WriteBenchmarkResult()
     {
         Core::Game* game = Core::Game::GetInstance();
         std::ostringstream text;
@@ -778,8 +805,8 @@ namespace
             // 1行分（項目名・ライトOFF・ライトON・差）を書く関数。差には+-の符号を付けている
             const auto row = [&text](const char* label, double off, double on)
             {
-                text << "  " << label << "\t" << std::setw(9) << off << "   " << std::setw(9) << on
-                     << "   " << std::showpos << std::setw(8) << (on - off) << std::noshowpos << "\n";
+                text << "  " << label << "\t" << std::setw(BenchmarkValueWidth) << off << "   " << std::setw(BenchmarkValueWidth) << on
+                     << "   " << std::showpos << std::setw(BenchmarkDiffWidth) << (on - off) << std::noshowpos << "\n";
             };
             const double offFrame = Average(result.Off.FrameMs);
             const double onFrame = Average(result.On.FrameMs);
@@ -799,8 +826,12 @@ namespace
 
         std::ofstream file(g_OutputDirectory / L"benchmark_result.txt", std::ios::binary);
         const std::string body = text.str();
-        file.write("\xEF\xBB\xBF", 3);   // メモ帳で文字化けしないよう、BOM付きUTF-8にしている
+        // メモ帳で文字化けしないよう、UTF-8のバイト順マークだけを書き込む。
+        constexpr char Utf8Bom[] = "\xEF\xBB\xBF";
+        file.write(Utf8Bom, sizeof(Utf8Bom) - 1);
         file.write(body.data(), static_cast<std::streamsize>(body.size()));
+        file.close();
+        return static_cast<bool>(file);
     }
 
     // 計測モードの1フレーム分。地点に立たせ、ライトを切り替えながら値を集めている。
@@ -832,10 +863,14 @@ namespace
         // 全地点を測り終えたら結果を書き出し、数フレーム後に終了している
         if (g_BenchmarkSpot >= GetBenchmarkSpots().size())
         {
-            WriteBenchmarkResult();
+            if (!WriteBenchmarkResult())
+            {
+                Tools::CaptureMode::Abort("計測結果を書き出せません。");
+                return;
+            }
             Log("benchmark finished");
             g_Finished = true;
-            g_QuitCountdown = 3;
+            g_QuitCountdown = BenchmarkQuitDelayFrames;
             return;
         }
         // 新しい地点に来たら、結果を入れる場所を用意している
@@ -931,16 +966,25 @@ namespace Tools::CaptureMode
         {
             return;
         }
-        for (int index = 1; index + 1 < argumentCount; ++index)
+        for (int index = 1; index < argumentCount; ++index)
         {
             const std::wstring option = arguments[index];
             if (option == L"--capture" || option == L"--benchmark" || option == L"--capture-features")
             {
+                if (index + 1 >= argumentCount || std::wstring_view(arguments[index + 1]).starts_with(L"--"))
+                {
+                    RecordCaptureFailure("撮影・計測の保存先を指定してください。");
+                    break;
+                }
                 g_OutputDirectory = arguments[index + 1];
                 std::error_code error;
                 // 保存先のフォルダを作り、作れたときだけ有効にしている
                 std::filesystem::create_directories(g_OutputDirectory, error);
                 g_Active = !error;
+                if (!g_Active)
+                {
+                    RecordCaptureFailure("撮影・計測の保存先を作れません。");
+                }
                 g_Benchmark = g_Active && option == L"--benchmark";
                 g_FeatureTour = g_Active && option == L"--capture-features";
                 break;
@@ -956,9 +1000,9 @@ namespace Tools::CaptureMode
                     g_EffectOverride = static_cast<int>(value[0] - L'1');
                 if (option == L"--debug-view")
                 {
-                    if (value == L"10") g_ViewOverride = 10;
-                    if (value == L"11") g_ViewOverride = 11;
-                    if (value == L"12") g_ViewOverride = 12;
+                    if (value == L"10") g_ViewOverride = ShaderDebugView::AmbientOcclusion;
+                    if (value == L"11") g_ViewOverride = ShaderDebugView::FullbrightReflection;
+                    if (value == L"12") g_ViewOverride = ShaderDebugView::GrassLod;
                 }
                 if (option == L"--reflection" && value.size() == 1 && value[0] >= L'0' && value[0] <= L'3')
                     g_ReflectionOverride = static_cast<int>(value[0] - L'0');
@@ -990,6 +1034,20 @@ namespace Tools::CaptureMode
     }
 
     // 自動撮影モード（または計測モード）が有効かを返している
+    void Abort(const char* reason)
+    {
+        RecordCaptureFailure(reason);
+        if (g_Active)
+        {
+            PostQuitMessage(EXIT_FAILURE);
+        }
+    }
+
+    int GetExitCode()
+    {
+        return g_CaptureFailed ? EXIT_FAILURE : EXIT_SUCCESS;
+    }
+
     bool IsActive()
     {
         return g_Active;
@@ -1042,8 +1100,8 @@ namespace Tools::CaptureMode
         constexpr float FeatureStage1FlashlightOnStart = 10.0f;
         constexpr float FeatureStage1FlashlightOnEnd = 13.0f;
         constexpr float FeatureStage1FullbrightEnd = 21.0f;
-        constexpr int FullbrightDebugView = 8;           // common.hlsl のデバッグ表示の番号（照明・影・霧なしで全体を明るく）
-        constexpr int NormalDebugView = 0;
+        constexpr int FullbrightDebugView = ShaderDebugView::Fullbright;   // 照明・影・霧なしで全体を明るく
+        constexpr int NormalDebugView = ShaderDebugView::Final;
         // 機能の撮影では、3面の観測の場面を足す分だけ、後半の操作の時刻を遅らせる
         constexpr float FeatureStage3RouteDelay = 4.0f;
 
@@ -1407,8 +1465,15 @@ namespace Tools::CaptureMode
             {
                 screenName = L"benchmark_spot" + std::to_wstring(g_BenchmarkSpot) + L"_light_on.png";
             }
-            if (!screenName.empty() && context != nullptr && backBuffer != nullptr)
+            if (!screenName.empty())
             {
+                // 計測結果の数値は残すが、付属画像を保存できなければ終了コードを失敗にする。
+                if (context == nullptr || backBuffer == nullptr)
+                {
+                    RecordCaptureFailure(("計測用画像の画面を取得できません: " + std::filesystem::path(screenName).string()).c_str());
+                    return;
+                }
+                bool saved = false;
                 // CPUから読めるステージングテクスチャを作り、バックバッファをコピーして読み出している
                 D3D11_TEXTURE2D_DESC description{};
                 backBuffer->GetDesc(&description);
@@ -1426,11 +1491,15 @@ namespace Tools::CaptureMode
                     context->CopyResource(staging.Get(), backBuffer);
                     if (SUCCEEDED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped)))
                     {
-                        SavePng((g_OutputDirectory / screenName).wstring(),
+                        saved = SavePng((g_OutputDirectory / screenName).wstring(),
                             static_cast<const BYTE*>(mapped.pData), mapped.RowPitch,
                             description.Width, description.Height);
                         context->Unmap(staging.Get(), 0);
                     }
+                }
+                if (!saved)
+                {
+                    RecordCaptureFailure(("計測用画像を保存できません: " + std::filesystem::path(screenName).string()).c_str());
                 }
             }
             return;
@@ -1454,7 +1523,7 @@ namespace Tools::CaptureMode
             context->GetDevice(&device);
             if (FAILED(device->CreateTexture2D(&stagingDescription, nullptr, &g_Staging)))
             {
-                g_Active = false;
+                Abort("撮影用の読み戻しテクスチャを作れません。");
                 return;
             }
         }
@@ -1462,8 +1531,12 @@ namespace Tools::CaptureMode
         if (!g_VideoTried)
         {
             g_VideoTried = true;
-            g_Video.Open((g_OutputDirectory / L"プレイ動画.mp4").wstring(),
-                description.Width, description.Height, PlayVideoFps);
+            if (!g_Video.Open((g_OutputDirectory / L"プレイ動画.mp4").wstring(),
+                description.Width, description.Height, PlayVideoFps))
+            {
+                Abort("プレイ動画を開けません。");
+                return;
+            }
         }
 
         // バックバッファをステージングテクスチャへコピーし、CPUから読める状態にしてから書き出している
@@ -1471,22 +1544,34 @@ namespace Tools::CaptureMode
         D3D11_MAPPED_SUBRESOURCE mapped{};
         if (FAILED(context->Map(g_Staging.Get(), 0, D3D11_MAP_READ, 0, &mapped)))
         {
+            Abort("撮影する画面を読み戻せません。");
             return;
         }
         const BYTE* pixels = static_cast<const BYTE*>(mapped.pData);
-        g_Video.WriteFrame(pixels, mapped.RowPitch);
+        if (!g_Video.WriteFrame(pixels, mapped.RowPitch))
+        {
+            context->Unmap(g_Staging.Get(), 0);
+            Abort("プレイ動画にフレームを書き込めません。");
+            return;
+        }
         ++g_FramesWritten;
         // 予約されたスクリーンショットがあれば、同じ画面をPNGでも保存している
         if (g_PendingShot != nullptr)
         {
-            Log("shot at " + std::to_string(g_TourTime) + "s");
             if (g_FeatureTour)
             {
                 if (Door* door = Core::Game::GetInstance()->GetObj<Door>("Stage1StartDoor"))
                     Log("door angle = " + std::to_string(door->GetOpenAngle()));
             }
-            SavePng((g_OutputDirectory / (std::wstring(g_PendingShot) + L".png")).wstring(),
+            const bool saved = SavePng((g_OutputDirectory / (std::wstring(g_PendingShot) + L".png")).wstring(),
                 pixels, mapped.RowPitch, description.Width, description.Height);
+            if (!saved)
+            {
+                context->Unmap(g_Staging.Get(), 0);
+                Abort("スクリーンショットを保存できません。");
+                return;
+            }
+            Log("shot at " + std::to_string(g_TourTime) + "s");
             g_PendingShot = nullptr;
         }
         context->Unmap(g_Staging.Get(), 0);
@@ -1499,7 +1584,14 @@ namespace Tools::CaptureMode
         {
             Log("shutdown, video frames = " + std::to_string(g_FramesWritten));
         }
-        g_Video.Close();
+        if (!g_Video.Close())
+        {
+            RecordCaptureFailure("プレイ動画を正常に閉じられません。");
+        }
+        if (g_Active && !g_CaptureFailed && (!g_Finished || (!g_Benchmark && g_FramesWritten == 0)))
+        {
+            RecordCaptureFailure("撮影・計測が完了する前に終了しました。");
+        }
         g_Staging.Reset();
     }
 }

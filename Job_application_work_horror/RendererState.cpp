@@ -206,7 +206,7 @@ void Renderer::SetWallHandprints(const Vector4* handprints, int count)
 	{
 		return;
 	}
-	for (int index = 0; index < 4; ++index)
+	for (int index = 0; index < WATER_CAUSTICS_BUFFER::MaxHandprints; ++index)
 	{
 		m_WaterCaustics.Handprints[index] = (handprints != nullptr && index < count) ? handprints[index] : Vector4::Zero;
 	}
@@ -316,7 +316,7 @@ void Renderer::SetReflectionProps(const Vector4* props, int count)
 		return;
 	}
 	const int clamped = props == nullptr ? 0 : (std::clamp)(count, 0, WATER_CAUSTICS_BUFFER::MaxReflectionProps);
-	for (int index = 0; index < clamped * 3; ++index)
+	for (int index = 0; index < clamped * WATER_CAUSTICS_BUFFER::ReflectionPropVectorCount; ++index)
 	{
 		m_WaterCaustics.ReflectionProps[index] = props[index];
 	}

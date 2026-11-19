@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 
 using namespace DirectX::SimpleMath;
 
@@ -74,7 +75,8 @@ namespace
         const unsigned int base = static_cast<unsigned int>(vertices.size());
         const Vector3 positions[] = { a, b, c };
         const Vector3 normals[] = { na, nb, nc };
-        for (int index = 0; index < 3; ++index)
+        static_assert(std::size(positions) == std::size(normals));
+        for (std::size_t index = 0; index < std::size(positions); ++index)
         {
             VERTEX_3D vertex{};
             vertex.position = positions[index];
@@ -83,7 +85,7 @@ namespace
             vertices.push_back(vertex);
         }
         const unsigned int faces[] = { base, base + 1, base + 2, base + 2, base + 1, base };
-        indices.insert(indices.end(), faces, faces + 6);
+        indices.insert(indices.end(), std::begin(faces), std::end(faces));
     }
 
     // y軸に沿った円柱（上の高さtop、下の高さbottom、半径radius）を足している

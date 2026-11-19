@@ -98,8 +98,6 @@ namespace
     constexpr float ScareNoisePower = 0.7f;
     // 曲がり角の暗がりを補う通常の器具の大きさ
     const Vector3 CornerFixtureScale = CeilingLight::StandardSize;
-    // ヒューズの置き場所を選ぶ乱数の種（自動撮影・計測では毎回同じ種にする。場所ごとに決めた番号）
-    constexpr unsigned int FuseRandomSeedSalt = 1107u;
 
     // 天井の照明：名前、停電中も赤い非常灯として光るか、点滅の周期をずらす値（そろって点滅すると機械的に見えるため）
     struct CeilingLightSpec
@@ -134,6 +132,8 @@ namespace
         { "Stage1WestWingLight3", false, 4.1f },
     };
     constexpr std::size_t WestWingLightCount = std::size(WestWingLights);
+    // CornerFixtures の並びに対応する。施設の8灯とは別の、部屋の入口に足した器具。
+    constexpr std::size_t MainPowerCornerFixture = 3;
     // 曲がり角の器具（進む先の照明の誘導で使う）
     constexpr CeilingLightSpec CornerFixtures[] =
     {
@@ -149,7 +149,7 @@ namespace
     public:
         Stage1Builder(Core::Game& game, StageObjects& objects, const PropLayout& layout)
             : m_Builder(game, objects.objectNames), m_Objects(objects), m_Layout(layout),
-            m_FuseRandom(Tools::CaptureMode::MakeRandomSeed(FuseRandomSeedSalt))
+            m_FuseRandom(Tools::CaptureMode::MakeRandomSeed(Tools::CaptureMode::RandomSeed::Stage1FusePlacement))
         {
         }
 
@@ -626,7 +626,7 @@ namespace
             CeilingLight* leftEntranceLight = corners[0];
             CeilingLight* rightEntranceLight = corners[1];
             CeilingLight* westEntranceLight = corners[2];
-            CeilingLight* mainPowerLight = corners[3];
+            CeilingLight* mainPowerLight = corners[MainPowerCornerFixture];
 
             // 通路と部屋の天井に、照明を一通り並べている。懐中電灯を消すとほとんど何も見えないため、
             // 足した照明はすべて非常回路につなぎ、停電中も赤い非常灯の光だまりが点々と続くようにしている（電力が戻ると普通の照明になる）。
@@ -643,18 +643,18 @@ namespace
             CeilingLight* westWingLight1 = m_WestWingLights[0];
             CeilingLight* westWingLight2 = m_WestWingLights[1];
             CeilingLight* westWingLight3 = m_WestWingLights[2];
-            route(Stage1RouteLight::StartSearch) = { light(1) };
-            route(Stage1RouteLight::HallEntrance) = { light(4) };
-            route(Stage1RouteLight::CorridorDoor) = { light(4), light(5), light(8), light(7) };
-            route(Stage1RouteLight::LeftStorage) = { leftEntranceLight, light(2) };
-            route(Stage1RouteLight::RightStorage) = { rightEntranceLight, light(3) };
+            route(Stage1RouteLight::StartSearch) = { light(Stage1LightNumber::StartRoom) };
+            route(Stage1RouteLight::HallEntrance) = { light(Stage1LightNumber::MiddleCorridor) };
+            route(Stage1RouteLight::CorridorDoor) = { light(Stage1LightNumber::MiddleCorridor), light(Stage1LightNumber::CentralHall), light(Stage1LightNumber::NorthCorner), light(Stage1LightNumber::LoopExitCorridor) };
+            route(Stage1RouteLight::LeftStorage) = { leftEntranceLight, light(Stage1LightNumber::LeftStorage) };
+            route(Stage1RouteLight::RightStorage) = { rightEntranceLight, light(Stage1LightNumber::RightStorage) };
             route(Stage1RouteLight::WestWing) = { westEntranceLight, westWingLight1 };
             route(Stage1RouteLight::PumpRoom) = { westWingLight2, westWingLight3 };
             route(Stage1RouteLight::MainPower) = { westWingLight2, westWingLight1, mainPowerLight };
-            route(Stage1RouteLight::ExitPower) = { light(4), light(5), light(8), light(7) };
-            route(Stage1RouteLight::ExitDoor) = { light(7) };
+            route(Stage1RouteLight::ExitPower) = { light(Stage1LightNumber::MiddleCorridor), light(Stage1LightNumber::CentralHall), light(Stage1LightNumber::NorthCorner), light(Stage1LightNumber::LoopExitCorridor) };
+            route(Stage1RouteLight::ExitDoor) = { light(Stage1LightNumber::LoopExitCorridor) };
             // 暗証番号の扉（x=45・z=110）は、中央の廊下の CeilingLight5 のすぐ東
-            route(Stage1RouteLight::KeypadRoom) = { light(4), light(5) };
+            route(Stage1RouteLight::KeypadRoom) = { light(Stage1LightNumber::MiddleCorridor), light(Stage1LightNumber::CentralHall) };
         }
 
     private:

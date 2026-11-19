@@ -107,14 +107,14 @@ namespace MapLayout.Editor
                 }
                 s_WallModels = new Dictionary<string, WallModel>();
                 var text = File.ReadAllText(Path.Combine(GameDirectory, "Wall.cpp"));
-                var pattern = new Regex(@"\{\s*""(\w+)"",\s*""assets/model/([^""]+)"",\s*Vector3\(([^)]*)\),\s*(true|false)");
+                var pattern = new Regex(@"\{\s*""(?<name>\w+)"",\s*""assets/model/(?<assetPath>[^""]+)"",\s*Vector3\((?<size>[^)]*)\),\s*(?<followsLongestAxis>true|false)");
                 foreach (Match match in pattern.Matches(text))
                 {
-                    s_WallModels[match.Groups[1].Value] = new WallModel
+                    s_WallModels[match.Groups["name"].Value] = new WallModel
                     {
-                        AssetPath = match.Groups[2].Value,
-                        Size = ParseVector(match.Groups[3].Value),
-                        FollowsLongestAxis = match.Groups[4].Value == "true",
+                        AssetPath = match.Groups["assetPath"].Value,
+                        Size = ParseVector(match.Groups["size"].Value),
+                        FollowsLongestAxis = match.Groups["followsLongestAxis"].Value == "true",
                     };
                 }
                 return s_WallModels;
@@ -184,7 +184,7 @@ namespace MapLayout.Editor
             if (s_PartColors == null)
             {
                 s_PartColors = new Dictionary<string, Dictionary<string, Color>>();
-                var colorPattern = new Regex(@"\{\s*""(\w+)"",\s*(?:Color\(([^)]*)\)|(\w+))\s*[,}]");
+                var colorPattern = new Regex(@"\{\s*""(?<partName>\w+)"",\s*(?:Color\((?<literal>[^)]*)\)|(?<namedColor>\w+))\s*[,}]");
                 foreach (var file in Directory.GetFiles(GameDirectory, "*.cpp"))
                 {
                     var text = File.ReadAllText(file);
@@ -202,16 +202,16 @@ namespace MapLayout.Editor
                         var parts = new Dictionary<string, Color>();
                         foreach (Match part in colorPattern.Matches(call.Groups[2].Value))
                         {
-                            if (part.Groups[2].Success)
+                            if (part.Groups["literal"].Success)
                             {
-                                if (TryParseColor(part.Groups[2].Value, out var literalColor))
+                                if (TryParseColor(part.Groups["literal"].Value, out var literalColor))
                                 {
-                                    parts[part.Groups[1].Value] = literalColor;
+                                    parts[part.Groups["partName"].Value] = literalColor;
                                 }
                             }
-                            else if (named.TryGetValue(part.Groups[3].Value, out var color))
+                            else if (named.TryGetValue(part.Groups["namedColor"].Value, out var color))
                             {
-                                parts[part.Groups[1].Value] = color;
+                                parts[part.Groups["partName"].Value] = color;
                             }
                         }
                         s_PartColors[call.Groups[1].Value] = parts;
@@ -237,7 +237,9 @@ namespace MapLayout.Editor
         {
             color = Color.white;
             var parts = text.Split(',');
-            if (parts.Length < 3 ||
+            // RGBの3成分を読み、4つ目以降は従来どおり参照しない。
+            const int RgbComponentCount = 3;
+            if (parts.Length < RgbComponentCount ||
                 !float.TryParse(parts[0].Trim().TrimEnd('f'), NumberStyles.Float, CultureInfo.InvariantCulture, out var r) ||
                 !float.TryParse(parts[1].Trim().TrimEnd('f'), NumberStyles.Float, CultureInfo.InvariantCulture, out var g) ||
                 !float.TryParse(parts[2].Trim().TrimEnd('f'), NumberStyles.Float, CultureInfo.InvariantCulture, out var b))
@@ -263,7 +265,8 @@ namespace MapLayout.Editor
         }
 
         // ゲームとUnityで、同じFBXが180度回った向きになる分（上の説明）
-        public static readonly Quaternion AxisCorrection = Quaternion.Euler(0.0f, 180.0f, 0.0f);
+        const float GameToUnityYawCorrectionDegrees = 180.0f;
+        public static readonly Quaternion AxisCorrection = Quaternion.Euler(0.0f, GameToUnityYawCorrectionDegrees, 0.0f);
 
         static Vector3 ParseVector(string text)
         {

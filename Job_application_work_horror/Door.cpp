@@ -121,8 +121,11 @@ void Door::Init()
 {
     m_Vertices.clear();
     m_Indices.clear();
-    m_Vertices.reserve(96);
-    m_Indices.reserve(288);
+    // モデルを読む前に確保しておく頂点とインデックスの数（読み込みで足りなければ増える）
+    constexpr size_t ReservedVertexCount = 96;
+    constexpr size_t ReservedIndexCount = 288;
+    m_Vertices.reserve(ReservedVertexCount);
+    m_Indices.reserve(ReservedIndexCount);
 
     // 扉の表と裏の鏡板・縁の飾り・レバーの取っ手（tools/maya/build_props.py）。
     // モデルは幅30・高さ50・厚さ4の実際の大きさなので、標準の拡大率で割って読み込んでいる。
@@ -138,8 +141,10 @@ void Door::Init()
         DoorSize, m_Vertices, m_Indices);
     // 取っ手は金属のマテリアルで、足元の漏れ光は別のマテリアルで描くので、インデックスの位置を覚えている。
     // 漏れ光は、扉の下の隙間から漏れる奥の部屋の光で、影を落とさない
-    m_HandleIndexStart = ranges[2].Start;
-    m_DoorIndexCount = ranges[3].Start;
+    constexpr std::size_t HandlePartIndex = 2;
+    constexpr std::size_t LightLeakPartIndex = 3;
+    m_HandleIndexStart = ranges[HandlePartIndex].Start;
+    m_DoorIndexCount = ranges[LightLeakPartIndex].Start;
 
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);

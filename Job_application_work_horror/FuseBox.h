@@ -20,6 +20,7 @@ private:
     std::vector<VERTEX_3D> m_Vertices;
     std::vector<unsigned int> m_Indices;
     VertexBuffer<VERTEX_3D> m_VertexBuffer;
+    bool m_VertexUploadPending = false;
     IndexBuffer m_IndexBuffer;
     std::unique_ptr<Material> m_Material;
 

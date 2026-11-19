@@ -199,6 +199,9 @@ static const float MIRROR_DUST_BLEND = 0.35f;
 #define MIRROR_RAY_ROUGHNESS 0.12f
 // SSR を使うかのしきい値
 #define MIRROR_SSR_ENABLE_THRESHOLD 0.5f
+// 鏡の SSR の歩数と歩幅の広げ方（水たまりより近くを映すので細かくしている。以前は20歩・1.22倍で輪郭が階段状にずれていた）
+#define MIRROR_SSR_STEPS 32
+#define MIRROR_SSR_GROWTH 1.14f
 // 人影の色（霧の色に掛ける暗さ）
 #define MIRROR_FIGURE_DARKNESS 0.10f
 // 銀の剥げのしみのノイズ（粗い方：細かさ・ずらし・重み、細かい方：細かさ・ずらし・重み）、点々の剥げのノイズ（細かさ・ずらし）
@@ -238,8 +241,8 @@ float4 main(MIRROR_PS_IN input) : SV_Target
     if (ReflectionParams.y > MIRROR_SSR_ENABLE_THRESHOLD)
     {
         // 鏡は水たまりより近くを映すので、歩幅を細かくしている（32歩・1.14倍。以前は20歩・1.22倍で、映る物の輪郭が階段状にずれていた）
-        const int mirrorSsrSteps = 32;
-        const float mirrorSsrGrowth = 1.14f;
+        const int mirrorSsrSteps = MIRROR_SSR_STEPS;
+        const float mirrorSsrGrowth = MIRROR_SSR_GROWTH;
         const float4 screen = TraceScreenSpaceReflection(input.worldPos, mirrorNormal, mirrorSsrSteps, mirrorSsrGrowth);
         color = lerp(color, screen.rgb, screen.w);
     }

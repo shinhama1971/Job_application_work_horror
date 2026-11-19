@@ -15,7 +15,9 @@ private:
     // 演出の経過秒（負なら演出していない）、通知の残り秒数、次に起こす段階（-1なら始まっていない）
     float m_Timer = -1.0f;
     float m_NoticeTimer = 0.0f;
-    int m_Phase = -1;
+    // 次に起こす段階（NotStarted なら始まっていない）
+    static constexpr int NotStarted = -1;
+    int m_Phase = NotStarted;
 
 public:
     // 演出していない状態に戻している
@@ -23,7 +25,7 @@ public:
     {
         m_Timer = -1.0f;
         m_NoticeTimer = 0.0f;
-        m_Phase = -1;
+        m_Phase = NotStarted;
     }
 
     // 演出を始め、3.8秒の通知を出している
@@ -38,7 +40,7 @@ public:
     void Cancel() noexcept
     {
         m_Timer = -1.0f;
-        m_Phase = -1;
+        m_Phase = NotStarted;
     }
 
     // 通知を消している

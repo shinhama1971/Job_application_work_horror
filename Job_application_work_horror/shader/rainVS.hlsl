@@ -12,6 +12,9 @@ cbuffer ShadowBuffer : register(b8)
     matrix ShadowViewProjection;
     float4 ShadowParameters;
 }
+// ForestRain.cpp の RainMaxOccluders と RoofHeightsPerVector に対応する。
+#define RAIN_MAX_OCCLUDERS 8
+#define RAIN_ROOF_HEIGHTS_PER_VECTOR 4u
 // ForestRain.cpp の RainDrawParams と同じ並び（b9）
 cbuffer RainDrawBuffer : register(b9)
 {
@@ -29,8 +32,8 @@ cbuffer RainDrawBuffer : register(b9)
     float SplashRadius;      // しぶきを置く、カメラのまわりの範囲（半分の一辺）
     uint OccluderCount;      // 屋根の数
     float2 RainPadding;
-    float4 Occluders[8];     // 屋根を上から見た長方形（xy = 最小のx・z、zw = 最大のx・z）
-    float4 OccluderBottoms[2]; // 屋根の下の面の高さ（8個を4つずつ詰めている）
+    float4 Occluders[RAIN_MAX_OCCLUDERS];     // 屋根を上から見た長方形（xy = 最小のx・z、zw = 最大のx・z）
+    float4 OccluderBottoms[RAIN_MAX_OCCLUDERS / RAIN_ROOF_HEIGHTS_PER_VECTOR]; // 屋根の下の面の高さ（8個を4つずつ詰めている）
 }
 
 struct RAIN_PS_IN
@@ -100,7 +103,7 @@ bool IsSheltered(float3 position)
     for (uint index = 0; index < OccluderCount; ++index)
     {
         const float4 rect = Occluders[index];
-        const float bottom = OccluderBottoms[index / 4u][index % 4u];
+        const float bottom = OccluderBottoms[index / RAIN_ROOF_HEIGHTS_PER_VECTOR][index % RAIN_ROOF_HEIGHTS_PER_VECTOR];
         if (position.y < bottom && position.x > rect.x && position.x < rect.z &&
             position.z > rect.y && position.z < rect.w)
         {

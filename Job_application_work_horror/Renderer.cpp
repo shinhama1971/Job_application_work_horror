@@ -10,6 +10,7 @@
 #include "Application.h"
 #include "CaptureMode.h"
 #include <wrl/client.h>
+#include <cstdlib>
 #include <dxgi1_6.h>
 #include <algorithm>
 #include <chrono>
@@ -656,13 +657,23 @@ void Renderer::DrawEnd()
 		{
 			Tools::CaptureMode::OnFrameRendered(m_pDeviceContext.Get(), backBuffer.Get());
 		}
+		else
+		{
+			Tools::CaptureMode::Abort("撮影・計測用の画面を取得できません。");
+			return;
+		}
 	}
 
 	// 計測モード（--benchmark）は垂直同期を待たず、本来の処理時間を測れるようにしている（--vsync を付けたときは待つ）。
 	if (Tools::CaptureMode::IsBenchmark())
 	{
 		const auto presentStart = std::chrono::steady_clock::now();
-		m_pSwapChain->Present(Tools::CaptureMode::UsesBenchmarkVsync() ? 1 : 0, 0);
+		const HRESULT presentResult = m_pSwapChain->Present(Tools::CaptureMode::UsesBenchmarkVsync() ? 1 : 0, 0);
+		if (FAILED(presentResult))
+		{
+			Tools::CaptureMode::Abort("計測中に画面を表示できません。");
+			return;
+		}
 		Tools::CaptureMode::OnPresentTimed(std::chrono::duration<double, std::milli>(
 			std::chrono::steady_clock::now() - presentStart).count());
 		return;
@@ -670,6 +681,11 @@ void Renderer::DrawEnd()
 	// 通常プレイの周期はApplicationで決める。Presentでは垂直同期を待たない。
 	// 自動撮影の動画時間はCaptureModeが管理する。
 	const HRESULT presentResult = m_pSwapChain->Present(Tools::CaptureMode::IsActive() ? 1 : 0, 0);
+	if (Tools::CaptureMode::IsActive() && FAILED(presentResult))
+	{
+		Tools::CaptureMode::Abort("撮影中に画面を表示できません。");
+		return;
+	}
 
 	// GPUのドライバーが再起動した（デバイスの消失）ときは、そのまま描き続けても画面が止まったままになる。
 	// 原因の候補を一度だけ伝えて、ゲームを終わらせている。
@@ -683,7 +699,7 @@ void Renderer::DrawEnd()
 				L"グラフィックドライバーが応答しなくなったため、ゲームを終了します。\n"
 				L"ドライバーを更新するか、PCを再起動してからもう一度起動してください。",
 				L"描画エラー", MB_OK | MB_ICONERROR);
-			PostQuitMessage(0);
+			PostQuitMessage(EXIT_FAILURE);
 		}
 	}
 }

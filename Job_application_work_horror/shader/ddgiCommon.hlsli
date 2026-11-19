@@ -13,6 +13,9 @@
 #ifndef DDGI_COMMON_INCLUDED
 #define DDGI_COMMON_INCLUDED
 
+// 1つのセルを囲み、三線形補間に使うプローブの数。
+#define DDGI_CELL_CORNER_COUNT 8
+
 // DDGIVolume.cpp の DDGIParameters と同じ並び（b0）
 cbuffer DDGIBuffer : register(b0)
 {
@@ -234,7 +237,7 @@ float3 GetDDGIIrradiance(float3 worldPosition, float3 normal, float3 viewDirecti
     float3 irradianceSum = 0.0f;
     float weightSum = 0.0f;
     [unroll]
-    for (uint corner = 0; corner < 8; ++corner)
+    for (uint corner = 0; corner < DDGI_CELL_CORNER_COUNT; ++corner)
     {
         const uint3 offset = uint3(corner & 1, (corner >> 1) & 1, (corner >> 2) & 1);
         const uint3 grid = uint3(baseGrid) + offset;

@@ -78,6 +78,8 @@ namespace
     // 消える前の激しいまたたき：乱数の倍率、消えている間の明るさ
     constexpr float DyingHashScale = 2.3f;
     constexpr float DyingOffBrightness = 0.05f;
+    // またたきで消えている割合（乱数がこれより小さい間は消える）
+    constexpr float DyingOffChance = 0.5f;
     // 灯が消える瞬間の「カチッ」（懐中電灯のスイッチの音を低くして使う。高さと音量）：街灯、窓の明かり
     constexpr float LampClickPitch = 0.55f;
     constexpr float LampClickVolume = 0.9f;
@@ -87,6 +89,9 @@ namespace
     constexpr float LampMinInstability = 0.15f;
     constexpr float LampInstabilityRange = 0.85f;
     // 窓の明かりの乱数の種、玄関の灯の乱数の種と不安定さ（最低＋近さの幅）
+    // 隣り合う器具が同時に明滅しないよう、器具番号から異なる種を作る。
+    constexpr float FixtureFlickerSeedStride = 4.7f;
+    constexpr float FixtureFlickerSeedBase = 1.3f;
     constexpr float WindowSeed = 9.1f;
     constexpr float PorchSeed = 17.0f;
     constexpr float PorchMinInstability = 0.3f;
@@ -143,7 +148,7 @@ float ForestEvents::DyingBrightness(float elapsed, float seed)
         return 0.0f;
     }
     const float step = std::floor(elapsed * LampDyingFlickersPerSecond);
-    return Hash(step * DyingHashScale + seed) < 0.5f ? DyingOffBrightness : 1.0f;
+    return Hash(step * DyingHashScale + seed) < DyingOffChance ? DyingOffBrightness : 1.0f;
 }
 
 float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const PropLayoutFile::SpawnedProps& props)
@@ -167,7 +172,7 @@ float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const
         {
             continue;
         }
-        const float seed = static_cast<float>(index) * 4.7f + 1.3f;
+        const float seed = static_cast<float>(index) * FixtureFlickerSeedStride + FixtureFlickerSeedBase;
         float brightness = 1.0f;
         if (lamp.StartTime >= 0.0f && m_Time >= lamp.StartTime)
         {

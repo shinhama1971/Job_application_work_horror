@@ -6,8 +6,10 @@
 
 #pragma once
 
+#include "GameState.h"
 #include "Stage1HiddenRoomEvent.h"
 #include "Stage1KeypadDoor.h"
+#include "Stage1LightNumber.h"
 #include "PropLayoutFile.h"
 #include "Stage1SafeLights.h"
 #include "Stage1WallWritings.h"
@@ -69,6 +71,9 @@ struct StageObjects
 {
     // 天井照明の数
     static constexpr int CeilingLightCount = 8;
+    // 周回の進行を数える目印と、各周回で読める壁文字は別に管理する。
+    static constexpr std::size_t LoopMarkerCount = 3;
+    static constexpr std::size_t LapWritingCount = 3;
 
     // プレイヤー
     Player* player = nullptr;
@@ -93,7 +98,7 @@ struct StageObjects
     // 開始地点の奥のドアの裏側にある、最後のドアの上と同じ赤い表示（移った瞬間に同じ景色に見せるため）
     Wall* startDoorSign = nullptr;
     Wall* doorIndicator = nullptr;
-    std::array<Wall*, 3> loopMarkers{};
+    std::array<Wall*, LoopMarkerCount> loopMarkers{};
     // 進み具合ごとの、進む先の天井照明の候補（手前から奥の順）
     std::array<std::vector<CeilingLight*>, static_cast<std::size_t>(Stage1RouteLight::Count)> routeLights{};
     // 光の安全地帯（停電しても消えない、暖かい色の電球の下）の場所と広さ
@@ -115,7 +120,7 @@ struct StageObjects
     // 3本目を探す段階になると現れ、西棟のヒューズとどちらか一方を取ればよい（取った方ではない方は消える。StageScene::UpdateThirdFuseRoutes）
     Item* keypadRoomFuse = nullptr;
     // ボイスレコーダー（並びは StoryText::Recordings と同じ。調べると Stage1Transmissions が録音の字幕を流す）
-    std::array<VoiceRecorder*, 4> recorders{};
+    std::array<VoiceRecorder*, Core::GameState::TotalRecordingCount> recorders{};
     // 天井照明と、監視カメラの異常で使う開かずの扉
     std::array<CeilingLight*, CeilingLightCount> ceilingLights{};
     std::array<Door*, StageSealedDoorCount> sealedDoors{};
@@ -124,7 +129,7 @@ struct StageObjects
     // 配電盤の横の施設案内図。廊下を一周すると図の中の扉だけが消える。
     FlashlightWriting* facilityMap = nullptr;
     // 突き当たりのドアを通って開始地点へ戻るたびに、開始地点の部屋に1つずつ浮かぶ文字（1周目・2周目・3周目）
-    std::array<FlashlightWriting*, 3> lapWritings{};
+    std::array<FlashlightWriting*, LapWritingCount> lapWritings{};
     // 暗証番号の扉・入力盤・番号の手がかり（任意で探索）
     Stage1KeypadDoor::Parts keypad;
     // 暗証番号の扉の先の部屋に閉じ込められるイベント（鍵・記録端末・影。扉はkeypad.doorと同じ）

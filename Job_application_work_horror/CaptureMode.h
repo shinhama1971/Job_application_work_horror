@@ -25,8 +25,34 @@ namespace Effect { enum class ToneMapMode : unsigned int; }
 
 namespace Tools::CaptureMode
 {
+    // 乱数の系列ごとに種を分け、撮影・計測時に別の処理が同じ並びにならないようにする。
+    namespace RandomSeed
+    {
+        // ノックの発生の系列。
+        constexpr unsigned int KnockingAnomaly = 1101u;
+        // 隠し部屋の鍵と物音の系列。
+        constexpr unsigned int HiddenRoom = 1102u;
+        // 1面の環境音の系列。
+        constexpr unsigned int Stage1AmbientSounds = 1103u;
+        // 暗証番号の系列。
+        constexpr unsigned int KeypadCode = 1104u;
+        // 西棟の演出の系列。
+        constexpr unsigned int WestWing = 1105u;
+        // 監視カメラの演出の系列。
+        constexpr unsigned int Surveillance = 1106u;
+        // 1面のヒューズ配置の系列。
+        constexpr unsigned int Stage1FusePlacement = 1107u;
+        // 2面の気配の系列。
+        constexpr unsigned int Stage2Presence = 1201u;
+        // 間接光プローブの光線の系列。
+        constexpr unsigned int DdgiProbeSampling = 1301u;
+    }
+
     // 起動オプションを読み、--capture か --benchmark があれば有効にしている（ウィンドウを作る前に呼んでいる）。
     void ConfigureFromCommandLine();
+    // 撮影・計測の失敗を記録し、実行中なら終了を要求する。
+    void Abort(const char* reason);
+    int GetExitCode();
     // 自動撮影モード（または計測モード）で起動したかどうか
     bool IsActive();
     // 乱数の種を作っている。普段は毎回ちがう種（std::random_device）、自動撮影・計測の間は captureSeed をそのまま返す。

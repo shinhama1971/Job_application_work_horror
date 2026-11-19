@@ -16,6 +16,8 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+    // 遮蔽・ぼかしとも t0 は深度、t1 は各パスの入力（点光源または遮蔽結果）。
+    constexpr UINT OcclusionInputCount = 2;
     // 環境遮蔽をピクセルシェーダーへ渡すテクスチャの番号
     constexpr UINT OcclusionSlot = 15;
     // 環境遮蔽とぼかしの両 Compute Shader の画素変換と numthreads に揃える。
@@ -121,8 +123,8 @@ namespace Effect
         // 1回目：環境遮蔽と接触影を求めている（t0 = 深度、t1 = 点光源、u0 = ぼかす前）
         m_OcclusionShader.SetGPU();
         ID3D11ShaderResourceView* depth = Renderer::GetDepthShaderResourceView();
-        ID3D11ShaderResourceView* occlusionInputs[2] = { depth, pointLights };
-        context->CSSetShaderResources(0, 2, occlusionInputs);
+        ID3D11ShaderResourceView* occlusionInputs[OcclusionInputCount] = { depth, pointLights };
+        context->CSSetShaderResources(0, OcclusionInputCount, occlusionInputs);
         ID3D11UnorderedAccessView* rawUAV = m_RawUAV.Get();
         context->CSSetUnorderedAccessViews(0, 1, &rawUAV, nullptr);
         context->Dispatch(groupsX, groupsY, 1);
@@ -131,16 +133,16 @@ namespace Effect
         ID3D11UnorderedAccessView* nullUAV = nullptr;
         context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
         m_BlurShader.SetGPU();
-        ID3D11ShaderResourceView* blurInputs[2] = { depth, m_RawSRV.Get() };
-        context->CSSetShaderResources(0, 2, blurInputs);
+        ID3D11ShaderResourceView* blurInputs[OcclusionInputCount] = { depth, m_RawSRV.Get() };
+        context->CSSetShaderResources(0, OcclusionInputCount, blurInputs);
         ID3D11UnorderedAccessView* blurredUAV = m_BlurredUAV.Get();
         context->CSSetUnorderedAccessViews(0, 1, &blurredUAV, nullptr);
         context->Dispatch(groupsX, groupsY, 1);
 
         // Compute Shaderから外し、本描画の描画先（色と深度）に戻して、結果を t15 に設定している
         context->CSSetUnorderedAccessViews(0, 1, &nullUAV, nullptr);
-        ID3D11ShaderResourceView* nullSRVs[2] = {};
-        context->CSSetShaderResources(0, 2, nullSRVs);
+        ID3D11ShaderResourceView* nullSRVs[OcclusionInputCount] = {};
+        context->CSSetShaderResources(0, OcclusionInputCount, nullSRVs);
         context->CSSetShader(nullptr, nullptr, 0);
         context->OMSetRenderTargets(1, &backBuffer, Renderer::GetDepthStencilView());
         ID3D11ShaderResourceView* blurred = m_BlurredSRV.Get();

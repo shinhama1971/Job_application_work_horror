@@ -8,6 +8,12 @@
 #include	"stb_image.h"
 #include	"Renderer.h"
 
+namespace
+{
+	// RGBA の1画素のバイト数（チャンネルの数）
+	constexpr int BytesPerPixel = 4;
+}
+
 // コンストラクタ（何もしない）
 Texture::Texture()
 {
@@ -24,7 +30,7 @@ bool Texture::Load(const std::string& filename)
 	unsigned char* pixels=nullptr;
 
 	// 画像を読み込んでいる（どの形式でもRGBAの4チャンネルにそろえている）
-	pixels = stbi_load(filename.c_str(), &m_width, &m_height, &m_bpp, 4);
+	pixels = stbi_load(filename.c_str(), &m_width, &m_height, &m_bpp, BytesPerPixel);
 	if (pixels == nullptr) {
 		std::cout << filename.c_str() << " Load error " << std::endl;
 		return false;
@@ -47,7 +53,7 @@ bool Texture::Load(const std::string& filename)
 
 	D3D11_SUBRESOURCE_DATA subResource{};
 	subResource.pSysMem = pixels;
-	subResource.SysMemPitch = desc.Width * 4;			// RGBAは1画素4バイト
+	subResource.SysMemPitch = desc.Width * BytesPerPixel;			// RGBAは1画素4バイト
 	subResource.SysMemSlicePitch = 0;
 
 	ID3D11Device* device = Renderer::GetDevice();
@@ -101,7 +107,7 @@ bool Texture::LoadFromMemory(const unsigned char* Data,int len) {
 
 	D3D11_SUBRESOURCE_DATA subResource{};
 	subResource.pSysMem = pixels;
-	subResource.SysMemPitch = desc.Width * 4;			// RGBAは1画素4バイト
+	subResource.SysMemPitch = desc.Width * BytesPerPixel;			// RGBAは1画素4バイト
 	subResource.SysMemSlicePitch = 0;
 
 	ID3D11Device* device = Renderer::GetDevice();

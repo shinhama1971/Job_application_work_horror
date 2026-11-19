@@ -55,6 +55,8 @@ cbuffer WetFloorBuffer : register(b10)
 // 遠くの波の輪の光（波の傾きに掛ける強さ）と、水たまりで直射光の光沢を抑える割合
 #define PUDDLE_WAVE_GLINT_SLOPE_GAIN 3.0f
 #define PUDDLE_SPECULAR_SCALE 0.58f
+// 定数の印（0 か 1）を見るしきい値（雨漏りの部屋の反射を使うか、SSR を使うか）
+#define FLOOR_FLAG_THRESHOLD 0.5f
 
 // 頂点シェーダー（litTextureVS）から受け取る値（影と反射の座標も使っている）
 struct LIT_PS_IN
@@ -378,7 +380,7 @@ float3 TraceRayReflection(float3 worldPosition, float3 worldNormal, float roughn
     figure = 0.0f;
     nearVertical = 0.0f;
     // 遠くでは部屋の反射を霧の色へなじませる。技術デモでは距離による簡略化を切り替えられる。
-    const float roomWeight = LeakInfo.y > 0.5f ? 1.0f - smoothstep(ROOM_REFLECTION_FADE_START, ROOM_REFLECTION_FADE_END, distanceFromCamera) : 1.0f;
+    const float roomWeight = LeakInfo.y > FLOOR_FLAG_THRESHOLD ? 1.0f - smoothstep(ROOM_REFLECTION_FADE_START, ROOM_REFLECTION_FADE_END, distanceFromCamera) : 1.0f;
     const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb, LoopDepth);
     [branch]
     if (roomWeight <= 0.0f)
@@ -396,7 +398,7 @@ float3 TraceRayReflection(float3 worldPosition, float3 worldNormal, float roughn
     // 60fpsに抑えて空いたGPUの時間で、SSRで本物の景色を映す範囲を、カメラから105〜155から160〜230へ広げている
     const float nearWeight = 1.0f - smoothstep(SsrFadeStartDistance, SsrFadeEndDistance, distanceFromCamera);
     [branch]
-    if (nearWeight > 0.0f && ReflectionParams.y > 0.5f)
+    if (nearWeight > 0.0f && ReflectionParams.y > FLOOR_FLAG_THRESHOLD)
     {
         // 近い水たまりは、画面の中を細かい歩幅で多めにたどっている（48歩、1歩ごとに歩幅を1.10倍。届く距離は約146）。
         // 歩幅が粗いと光線が物をすり抜けて外れ、部屋の形の簡単な色で埋めることになり、映り込みが濁るため。
@@ -1006,7 +1008,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         }
         else if (reflectionMode == 2)
         {
-            if (ReflectionParams.y > 0.5f)
+            if (ReflectionParams.y > FLOOR_FLAG_THRESHOLD)
             {
                 alternateReflection = TraceScreenSpaceReflection(input.worldPos, reflectionNormal,
                     WATER_SSR_STEP_COUNT, WATER_SSR_STEP_GROWTH, 1.0f / WATER_SSR_DISTANCE_PER_MIP,

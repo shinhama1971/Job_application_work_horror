@@ -78,7 +78,7 @@ namespace
     };
 
     // 影が現れる場所の候補（各通路の端）。棚にめり込まない候補のうち、プレイヤーから一番遠い所を選んでいる。
-    const std::array<Vector3, 5> ShadowSpawnPoints =
+    const std::array ShadowSpawnPoints =
     {
         Vector3(64.0f, -99.0f, 160.0f),
         Vector3(100.0f, -99.0f, 58.0f),

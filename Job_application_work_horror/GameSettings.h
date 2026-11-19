@@ -21,6 +21,10 @@ namespace Core
         static constexpr float MinLookSensitivity = 0.60f;
         static constexpr float LookSensitivityStep = 0.20f;
         static constexpr int MaxEffectLevel = 2;
+        // 演出の強さの段階（画面の「画質1〜3」）：低い（光の筋なし）・普通・高い（裸電球の影と毎フレームの環境マップ）
+        static constexpr int LowEffectLevel = 0;
+        static constexpr int StandardEffectLevel = 1;
+        static constexpr int HighEffectLevel = MaxEffectLevel;
         static constexpr int MaxLookSensitivityLevel = 4;
         static constexpr int MaxVolumeLevel = 4;
         static constexpr int MaxGuideLevel = 1;
@@ -52,7 +56,7 @@ namespace Core
     public:
         // %LOCALAPPDATA%\SignalLost\settings.txt から読み込み・保存している。
         void Load();
-        void Save() const;
+        bool Save() const;
         // Set系は範囲外の値や同じ値なら何もせずfalseを返す。trueのときだけ、呼び出し側で保存と反映を行っている。
 
         bool SetBrightnessLevel(int level)

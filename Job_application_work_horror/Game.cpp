@@ -328,7 +328,12 @@ namespace Core
         {
             ApplyVisualSettings();
             ApplyAudioVolume(true);
-            m_Settings.Save();
+            if (!m_Settings.Save())
+            {
+                MessageBoxW(Application::GetWindow(),
+                    L"設定を保存できませんでした。変更は今回のプレイ中だけ反映されます。",
+                    L"保存エラー", MB_OK | MB_ICONWARNING);
+            }
             if (result.changedItem == PauseMenu::Item::Volume)
             {
                 // 変更した後の音量を確かめられるよう、短い効果音を鳴らしている。
@@ -421,9 +426,10 @@ namespace Core
         const SceneName previousScene = m_CurrentScene;
         const bool introFromForest = sName == SceneName::Intro && previousScene == SceneName::Forest;
         // リザルト画面へ移るときは、プレイを終えた記録を付けてベスト記録を保存している
-        if (sName == SceneName::Result && m_State.CompleteRun(!Tools::CaptureMode::IsActive()))
+        if (sName == SceneName::Result && m_State.CompleteRun(!Tools::CaptureMode::IsActive()) && !SaveBestRecord())
         {
-            SaveBestRecord();
+            MessageBoxW(Application::GetWindow(), L"ベスト記録を保存できませんでした。",
+                L"保存エラー", MB_OK | MB_ICONWARNING);
         }
 
         // ポーズメニューを閉じ、音量を戻し、前のシーンを解放している。反射と影の描き直しの数え方も最初からにしている

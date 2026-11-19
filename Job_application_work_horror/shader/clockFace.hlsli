@@ -55,6 +55,10 @@ float ClockGlyphDistance(float2 local, uint glyph)
 }
 
 // 時計の数字（12, 1, 2 … 11）を、1文字2ビット（下の桁から左の文字の順）で表にしている。古い時計に多い「IIII」で4を書いている
+// ローマ数字は最大4文字。表には1文字を下位から2ビットずつ詰める。
+#define CLOCK_MAX_NUMERAL_GLYPHS 4u
+#define CLOCK_NUMERAL_GLYPH_BITS 2u
+#define CLOCK_NUMERAL_GLYPH_MASK 3u
 static const uint ClockNumerals[12] =
 {
     3u | (1u << 2) | (1u << 4),              // XII
@@ -139,6 +143,8 @@ float ClockHand(float2 p, float angle, float handLength, float width, float tail
 // 目盛りの数（分の目盛り60本は π/30 ずつ、時の位置12は π/6 ずつ）
 #define CLOCK_MINUTE_STEPS 30.0f
 #define CLOCK_HOUR_STEPS 6.0f
+// 文字盤の時の数（12時間）
+#define CLOCK_HOURS 12
 // 真鍮の縁：黒ずんだ所の暗さ、盛り上がり
 #define CLOCK_BEZEL_TARNISH_DARK 0.55f
 #define CLOCK_BEZEL_RELIEF 0.4f
@@ -230,22 +236,22 @@ ClockPaint GetClockFace(float2 uv, float4 hands)
 
     // ローマ数字：一番近い時の位置の数字だけを計算している（文字は傾けず、立てたまま並べている）
     const float hourIndex = round(angle / (CLOCK_PI / CLOCK_HOUR_STEPS));
-    const uint hour = ((uint)((int)hourIndex + 12)) % 12u;
+    const uint hour = ((uint)((int)hourIndex + CLOCK_HOURS)) % (uint)CLOCK_HOURS;
     const float hourAngle = hourIndex * (CLOCK_PI / CLOCK_HOUR_STEPS);
     const float2 numeralCenter = float2(sin(hourAngle), cos(hourAngle)) * CLOCK_NUMERAL_RADIUS;
     const uint numeral = ClockNumerals[hour];
     uint glyphCount = 0u;
     [unroll]
-    for (uint countIndex = 0u; countIndex < 4u; ++countIndex)
+    for (uint countIndex = 0u; countIndex < CLOCK_MAX_NUMERAL_GLYPHS; ++countIndex)
     {
-        glyphCount += ((numeral >> (countIndex * 2u)) & 3u) != 0u ? 1u : 0u;
+        glyphCount += ((numeral >> (countIndex * CLOCK_NUMERAL_GLYPH_BITS)) & CLOCK_NUMERAL_GLYPH_MASK) != 0u ? 1u : 0u;
     }
     const float glyphSpacing = CLOCK_GLYPH_SPACING;
     float glyphDistance = CLOCK_GLYPH_FAR_DISTANCE;
     [unroll]
-    for (uint glyphIndex = 0u; glyphIndex < 4u; ++glyphIndex)
+    for (uint glyphIndex = 0u; glyphIndex < CLOCK_MAX_NUMERAL_GLYPHS; ++glyphIndex)
     {
-        const uint glyph = (numeral >> (glyphIndex * 2u)) & 3u;
+        const uint glyph = (numeral >> (glyphIndex * CLOCK_NUMERAL_GLYPH_BITS)) & CLOCK_NUMERAL_GLYPH_MASK;
         if (glyph != 0u)
         {
             const float offset = (float(glyphIndex) - (float(glyphCount) - 1.0f) * 0.5f) * glyphSpacing;

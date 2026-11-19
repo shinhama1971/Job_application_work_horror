@@ -17,6 +17,8 @@ namespace Core
         static constexpr int TotalWallWritingCount = 4;
         // 1面のボイスレコーダーの録音の数（StoryText::RecordingCount と同じ。Stage1Layout.cpp で確かめている）。
         static constexpr int TotalRecordingCount = 4;
+        // 1面の配電盤に入れるヒューズの数（これだけ拾うと電力を戻せる）
+        static constexpr int RequiredFuseCount = 3;
 
     private:
         // 1回のプレイ分の進行の値。面をやり直すとき丸ごと巻き戻せるよう、1つにまとめている。
@@ -69,7 +71,7 @@ namespace Core
         // 2面を始めるときの値は、前の版と同じく、ヒューズ3個・電力が戻った状態にそろえている。
         void EnterStage2()
         {
-            m_Run.ItemCount = 3;
+            m_Run.ItemCount = RequiredFuseCount;
             m_Run.PowerRestored = true;
             m_Stage2Start = m_Run;
         }

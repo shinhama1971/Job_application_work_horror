@@ -38,21 +38,10 @@ cbuffer ShadowBuffer : register(b8)
     float4 ShadowParameters;
 };
 
-// 水面の光の揺らぎの定数バッファ（b12。shader/waterCaustics.hlsli と同じ並びの、見えない影の人影まで）。
-// 本描画で設定したまま残っているものを、プレイヤーの視点のビュー行列と見えない影の人影の位置のために読んでいる
-cbuffer WaterCausticsBuffer : register(b12)
-{
-    matrix CausticView;
-    float4 CausticFloodRect;
-    float4 CausticParameters;
-    float4 CausticRipple;
-    matrix CausticProjection;
-    float4 ReflectionParams;
-    float4 WallHandprints[4];
-    float4 PuddleFigure;
-    // 見えない影の人影（xyz = 足もと、w = 見え方。0なら光の帯に影を付けない）
-    float4 UnseenFigure;
-};
+
+#define WATER_CAUSTICS_COMPACT_BUFFER
+#include "waterCausticsLayout.hlsli"
+#undef WATER_CAUSTICS_COMPACT_BUFFER
 
 // 懐中電灯から見た深度（シャドウマップ、t5）とサンプラー
 Texture2D<float> FlashlightDepth : register(t5);

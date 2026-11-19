@@ -45,7 +45,7 @@ void ExitTrigger::Init()
 {
     m_IsEscaping = false;
     m_EscapeTimer = 0.0f;
-    m_EscapePhase = 0;
+    m_EscapePhase = EscapePhase::Started;
     m_NextScene = SceneName::Result;
     m_InteractionEnabled = true;
 }
@@ -65,24 +65,24 @@ void ExitTrigger::Update()
     // 階段を上る演出：光やノイズは出さず、上り切る頃に次のシーンへ移っている（暗くするのはシーンの描画）
     if (m_StairClimb)
     {
-        if (m_EscapePhase == 0 && m_EscapeTimer >= StairClimbSeconds)
+        if (m_EscapePhase == EscapePhase::Started && m_EscapeTimer >= StairClimbSeconds)
         {
-            m_EscapePhase = 4;
+            m_EscapePhase = EscapePhase::SceneRequested;
             game->RequestSceneChange(m_NextScene);
         }
         return;
     }
     // 0.28秒：画面を明るく光らせ、振動させている
-    if (m_EscapePhase == 0 && m_EscapeTimer >= FlashPhaseSeconds)
+    if (m_EscapePhase == EscapePhase::Started && m_EscapeTimer >= FlashPhaseSeconds)
     {
         constexpr float InitialBloomPeak = 0.92f;
         constexpr float InitialBloomSeconds = 0.52f;
         game->GetPostProcess()->TriggerBloomPulse(InitialBloomPeak, InitialBloomSeconds);
         Input::SetVibration(FlashRumbleFrames, FlashRumbleStrength);
-        m_EscapePhase = 1;
+        m_EscapePhase = EscapePhase::Flashed;
     }
     // 0.86秒：画面を乱し、ブラウン管のようなノイズを0.72秒出している
-    else if (m_EscapePhase == 1 && m_EscapeTimer >= DisturbPhaseSeconds)
+    else if (m_EscapePhase == EscapePhase::Flashed && m_EscapeTimer >= DisturbPhaseSeconds)
     {
         game->GetPostProcess()->TriggerHorrorPulse(DisturbPulseStrength, DisturbPulseSeconds);
         Input::SetVibration(DisturbRumbleFrames, DisturbRumbleStrength);
@@ -95,19 +95,19 @@ void ExitTrigger::Update()
             crt->SetActive(true);
             crt->SetTimer(DisturbNoiseSeconds);
         }
-        m_EscapePhase = 2;
+        m_EscapePhase = EscapePhase::Disturbed;
     }
     // 1.48秒：最も強く光らせ、強く振動させている
-    else if (m_EscapePhase == 2 && m_EscapeTimer >= PeakPhaseSeconds)
+    else if (m_EscapePhase == EscapePhase::Disturbed && m_EscapeTimer >= PeakPhaseSeconds)
     {
         game->GetPostProcess()->TriggerBloomPulse(PeakBloom, PeakBloomSeconds);
         Input::SetVibration(PeakRumbleFrames, PeakRumbleStrength);
-        m_EscapePhase = 3;
+        m_EscapePhase = EscapePhase::Peaked;
     }
     // 2.12秒：次のシーンへの切り替えを要求している（実際の切り替えはフレームの終わりに安全に行われる）
-    else if (m_EscapePhase == 3 && m_EscapeTimer >= EscapeSeconds)
+    else if (m_EscapePhase == EscapePhase::Peaked && m_EscapeTimer >= EscapeSeconds)
     {
-        m_EscapePhase = 4;
+        m_EscapePhase = EscapePhase::SceneRequested;
         game->RequestSceneChange(m_NextScene);
     }
 }
@@ -132,7 +132,7 @@ void ExitTrigger::BeginEscape(Player& player)
 
     m_IsEscaping = true;
     m_EscapeTimer = 0.0f;
-    m_EscapePhase = 0;
+    m_EscapePhase = EscapePhase::Started;
     player.SetCanControl(false);
     // 階段を上る演出では、扉を抜けた瞬間の画面の乱れは小さくしている（上る様子を見せるため）
     game->GetPostProcess()->TriggerHorrorPulse(m_StairClimb ? StairEntryPulse : EntryPulse, EntryPulseSeconds);

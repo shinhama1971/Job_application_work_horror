@@ -6,6 +6,9 @@
 #include "common.hlsl"
 #include "flashlightShadow.hlsli"
 
+// 光の届く範囲で0を割らないための下限
+#define POINT_SHADOW_DEPTH_MIN_RANGE 0.001f
+
 struct POINT_SHADOW_PS_IN
 {
     float4 pos : SV_POSITION;
@@ -14,5 +17,5 @@ struct POINT_SHADOW_PS_IN
 
 float main(in POINT_SHADOW_PS_IN input) : SV_Target
 {
-    return saturate(length(input.worldPos - PointShadowLight.xyz) / max(PointShadowLight.w, 0.001f));
+    return saturate(length(input.worldPos - PointShadowLight.xyz) / max(PointShadowLight.w, POINT_SHADOW_DEPTH_MIN_RANGE));
 }

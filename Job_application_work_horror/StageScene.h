@@ -179,7 +179,7 @@ private:
     int m_LastFuseCount = 0;
     float m_FuseNoticeTimer = 0.0f;
     float m_FuseWatcherNoticeTimer = 0.0f;
-    int m_FuseWatcherState = 0;
+    FuseWatcherState m_FuseWatcherState = FuseWatcherState::None;
     // 充電の知らせと使ったか、監視カメラの知らせ、ループを続けて進めないための待ち、ループの知らせ
     float m_ChargerNoticeTimer = 0.0f;
     bool m_ChargerHandled = false;
@@ -199,8 +199,16 @@ private:
     // 入口の演出（起きたか・経過秒・段階）、左の倉庫の演出（段階・経過秒・知らせ）
     bool m_EntranceEventTriggered = false;
     float m_EntranceEventTimer = -1.0f;
-    int m_EntranceEventPhase = -1;
-    int m_StorageScarePhase = 0;
+    // 入口の演出の段階（始まっていない・始まった・前の照明を明滅させた・終わった）
+    enum class EntranceEventPhase
+    {
+        NotStarted,
+        Started,
+        AheadFlickered,
+        Finished
+    };
+    EntranceEventPhase m_EntranceEventPhase = EntranceEventPhase::NotStarted;
+    StorageScarePhase m_StorageScarePhase = StorageScarePhase::Waiting;
     float m_StorageScareTimer = 0.0f;
     float m_StorageScareNoticeTimer = 0.0f;
     // 見た目の演出に使う経過時間、進行が止まっている時間（ヒント用）

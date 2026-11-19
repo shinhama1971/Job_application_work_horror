@@ -34,6 +34,12 @@ float DoorRoundedBox(float2 p, float2 center, float2 halfSize, float corner)
 // 数字1文字の形：幅の半分・高さの半分、どの線より遠い距離（一番近い線を探し始める値）、線の数
 #define DOOR_DIGIT_HALF_WIDTH 0.4f
 #define DOOR_DIGIT_HALF_HEIGHT 0.8f
+// 0〜9の各数字を、点灯する線7本の組み合わせで描く。
+#define DOOR_DIGIT_VALUE_COUNT 10u
+#define DOOR_DIGIT_SEGMENT_COUNT 7u
+// 扉の意匠として並べる羽目板の列と段。
+#define DOOR_PANEL_COLUMN_COUNT 2
+#define DOOR_PANEL_ROW_COUNT 3
 #define DOOR_DIGIT_FAR_DISTANCE 10.0f
 
 float DoorSegment(float2 p, float2 a, float2 b)
@@ -47,11 +53,11 @@ float DoorSegment(float2 p, float2 a, float2 b)
 float DoorDigit(float2 local, uint digit)
 {
     // 数字ごとに、使う線をビットで持っている（下の桁から 上・右上・右下・下・左下・左上・中 の順）
-    static const uint segments[10] = { 0x3Fu, 0x06u, 0x5Bu, 0x4Fu, 0x66u, 0x6Du, 0x7Du, 0x07u, 0x7Fu, 0x6Fu };
-    const uint mask = segments[digit % 10u];
+    static const uint segments[DOOR_DIGIT_VALUE_COUNT] = { 0x3Fu, 0x06u, 0x5Bu, 0x4Fu, 0x66u, 0x6Du, 0x7Du, 0x07u, 0x7Fu, 0x6Fu };
+    const uint mask = segments[digit % DOOR_DIGIT_VALUE_COUNT];
     const float w = DOOR_DIGIT_HALF_WIDTH;
     const float h = DOOR_DIGIT_HALF_HEIGHT;
-    const float2 ends[7][2] =
+    const float2 ends[DOOR_DIGIT_SEGMENT_COUNT][2] =
     {
         { float2(-w, h), float2(w, h) },
         { float2(w, h), float2(w, 0.0f) },
@@ -63,7 +69,7 @@ float DoorDigit(float2 local, uint digit)
     };
     float distance = DOOR_DIGIT_FAR_DISTANCE;
     [unroll]
-    for (uint segment = 0u; segment < 7u; ++segment)
+    for (uint segment = 0u; segment < DOOR_DIGIT_SEGMENT_COUNT; ++segment)
     {
         if ((mask >> segment) & 1u)
         {
@@ -189,10 +195,10 @@ DoorPaint GetDoorPainting(float2 uv, float4 params)
     float relief = 0.0f;
     float panelShade = 0.0f;
     [unroll]
-    for (int column = 0; column < 2; ++column)
+    for (int column = 0; column < DOOR_PANEL_COLUMN_COUNT; ++column)
     {
         [unroll]
-        for (int row = 0; row < 3; ++row)
+        for (int row = 0; row < DOOR_PANEL_ROW_COUNT; ++row)
         {
             const float2 center = float2(column == 0 ? -DOOR_PANEL_COLUMN_X : DOOR_PANEL_COLUMN_X,
                 row == 0 ? DOOR_PANEL_TOP_Y : (row == 1 ? DOOR_PANEL_MIDDLE_Y : DOOR_PANEL_BOTTOM_Y));

@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "Hud.h"
+#include "StoryText.h"
 
 #include <algorithm>
 #include <array>
@@ -34,7 +35,7 @@ namespace
     constexpr float GaugePanelWidth = 230.0f;
     constexpr float GaugeLabelX = 43.0f;
     // ヒューズの数（左下の3つの四角）
-    constexpr int FuseSlotCount = 3;
+    constexpr int FuseSlotCount = Core::GameState::RequiredFuseCount;
     // 電池とスタミナの最大値（%）と、色を変える割合（電池：半分以下で黄、2割以下で赤。スタミナ：4割以下で黄、2割以下で赤）
     constexpr float GaugeMaximum = 100.0f;
     constexpr float BatteryWarningRate = 0.5f;
@@ -165,7 +166,7 @@ namespace
         size_t count = 0;
         for (unsigned char byte : text)
         {
-            if ((byte & 0xC0u) != 0x80u)
+            if (!StoryText::IsUtf8ContinuationByte(byte))
             {
                 ++count;
             }
@@ -232,7 +233,11 @@ void Hud::DrawTextureRectangle(
     m_Vertices.push_back(makeVertex(x, bottom, 0.0f, 1.0f));
     m_Vertices.push_back(makeVertex(right, y, 1.0f, 0.0f));
     m_Vertices.push_back(makeVertex(right, bottom, 1.0f, 1.0f));
-    m_VertexBuffer.Modify(m_Vertices);
+    // 前の頂点で今回の件数を描かないよう、転送できたときだけ描画する。
+    if (!m_VertexBuffer.Modify(m_Vertices))
+    {
+        return;
+    }
 
     // 座標はHUDのキャンバス単位なので、キャンバス全体が画面全体になる行列にしている。
     Renderer::SetWorldViewProjection2D(GetCanvasWidth(), GetCanvasHeight());
@@ -500,7 +505,11 @@ void Hud::Flush()
         return;
     }
 
-    m_VertexBuffer.Modify(m_Vertices);
+    // 前の頂点で今回の件数を描かないよう、転送できたときだけ描画する。
+    if (!m_VertexBuffer.Modify(m_Vertices))
+    {
+        return;
+    }
 
     Renderer::SetDepthEnable(false);
     Renderer::SetBlendState(BS_ALPHABLEND);
@@ -517,7 +526,9 @@ void Hud::Flush()
 // 四角形を1つためている。キャンバス座標（左上が原点、下向きが+y）を、-1〜1の画面の座標に変換している
 void Hud::AddRectangle(float x, float y, float width, float height, const Color& color)
 {
-    if (m_Vertices.size() + 6 > MaxVertices)
+    // 四角形1つ（三角形2枚）の頂点の数
+    constexpr size_t QuadVertexCount = 6;
+    if (m_Vertices.size() + QuadVertexCount > MaxVertices)
     {
         return;
     }
@@ -576,6 +587,40 @@ namespace
     constexpr float JapaneseFontScaleToAscii = 0.34f;
     constexpr int MinimumJapaneseFontHeight = 6;
 
+    // GDIの白黒画像は32ビット境界で行をそろえ、各バイトを上位ビットから読む。
+    constexpr unsigned int GlyphBitmapBitsPerByte = 8;
+    constexpr unsigned int GlyphBitmapRowAlignmentBytes = 4;
+    constexpr unsigned int GlyphBitmapRowAlignmentBits = GlyphBitmapRowAlignmentBytes * GlyphBitmapBitsPerByte;
+    constexpr unsigned int GlyphBitmapLeftmostBitMask = 0x80u;
+    // キャッシュキーの下位32ビットを文字、上位をフォントの高さに使う。
+    constexpr unsigned int GlyphCacheFontHeightShift = 32u;
+
+    // UTF-8の先頭バイトは上位の印で長さを、残りのビットで文字番号の一部を表す。
+    constexpr unsigned int Utf8FirstNonAsciiByte = 0x80u;
+    constexpr unsigned int Utf8TwoBytePrefixMask = 0xE0u;
+    constexpr unsigned int Utf8TwoBytePrefix = 0xC0u;
+    constexpr unsigned int Utf8ThreeBytePrefixMask = 0xF0u;
+    constexpr unsigned int Utf8ThreeBytePrefix = 0xE0u;
+    constexpr unsigned int Utf8FourBytePrefixMask = 0xF8u;
+    constexpr unsigned int Utf8FourBytePrefix = 0xF0u;
+    constexpr int Utf8TwoByteLength = 2;
+    constexpr int Utf8ThreeByteLength = 3;
+    constexpr int Utf8FourByteLength = 4;
+    constexpr unsigned int Utf8TwoByteLeadPayloadMask = 0x1Fu;
+    constexpr unsigned int Utf8ThreeByteLeadPayloadMask = 0x0Fu;
+    constexpr unsigned int Utf8FourByteLeadPayloadMask = 0x07u;
+    // 続きのバイトからは印の上位2ビットを除き、下位6ビットだけをつなぐ。
+    constexpr unsigned int Utf8ContinuationPayloadBits = 6u;
+    constexpr unsigned int Utf8ContinuationPayloadMask = 0x3Fu;
+    // 正規の長さより短い値や、UTF-16で予約されている値は文字として表示しない。
+    constexpr unsigned int Utf8TwoByteMinimum = 0x80u;
+    constexpr unsigned int Utf8ThreeByteMinimum = 0x800u;
+    constexpr unsigned int Utf8FourByteMinimum = 0x10000u;
+    constexpr unsigned int UnicodeSurrogateStart = 0xD800u;
+    constexpr unsigned int UnicodeSurrogateEnd = 0xDFFFu;
+    constexpr unsigned int UnicodeMaximum = 0x10FFFFu;
+    constexpr char UnsupportedTextGlyph = '?';
+
     // GDIで作った1文字分の画像（幅・高さ・次の文字までの送り幅・ずれ・白黒の画素）
     struct RasterGlyph
     {
@@ -619,7 +664,7 @@ namespace
         const RasterGlyph& Get(wchar_t character, int fontHeight)
         {
             const std::uint64_t key =
-                (static_cast<std::uint64_t>(fontHeight) << 32u) | static_cast<std::uint64_t>(character);
+                (static_cast<std::uint64_t>(fontHeight) << GlyphCacheFontHeightShift) | static_cast<std::uint64_t>(character);
             const auto found = m_Glyphs.find(key);
             if (found != m_Glyphs.end())
             {
@@ -652,7 +697,7 @@ namespace
                 glyph.offsetX = metrics.gmptGlyphOrigin.x;
                 glyph.offsetY = m_Ascent - metrics.gmptGlyphOrigin.y - m_TopInset;
                 // GDIの白黒画像は1行が4バイト単位にそろえられているので、その幅でビットを1画素ずつ取り出している
-                const unsigned int pitch = ((glyph.width + 31u) / 32u) * 4u;
+                const unsigned int pitch = ((glyph.width + GlyphBitmapRowAlignmentBits - 1u) / GlyphBitmapRowAlignmentBits) * GlyphBitmapRowAlignmentBytes;
                 std::vector<unsigned char> packed(size);
                 if (GetGlyphOutlineW(
                     m_DC, character, GGO_BITMAP, &metrics,
@@ -663,9 +708,9 @@ namespace
                     {
                         for (unsigned int column = 0; column < glyph.width; ++column)
                         {
-                            const unsigned char byte = packed[row * pitch + column / 8u];
+                            const unsigned char byte = packed[row * pitch + column / GlyphBitmapBitsPerByte];
                             glyph.bitmap[row * glyph.width + column] =
-                                (byte & (0x80u >> (column % 8u))) != 0 ? 1 : 0;
+                                (byte & (GlyphBitmapLeftmostBitMask >> (column % GlyphBitmapBitsPerByte))) != 0 ? 1 : 0;
                         }
                     }
                 }
@@ -817,28 +862,38 @@ void Hud::AddText(
         const unsigned char firstByte =
             static_cast<unsigned char>(text[textIndex]);
         // 先頭のバイトが0x80以上なら、UTF-8の2〜4バイトの文字としてコードポイントを取り出している
-        if (firstByte >= 0x80u)
+        if (firstByte >= Utf8FirstNonAsciiByte)
         {
             int sequenceLength = 0;
-            if ((firstByte & 0xE0u) == 0xC0u) sequenceLength = 2;
-            else if ((firstByte & 0xF0u) == 0xE0u) sequenceLength = 3;
-            else sequenceLength = 4;
-
-            if (textIndex + static_cast<size_t>(sequenceLength) > text.size())
-            {
-                break;
-            }
+            if ((firstByte & Utf8TwoBytePrefixMask) == Utf8TwoBytePrefix) sequenceLength = Utf8TwoByteLength;
+            else if ((firstByte & Utf8ThreeBytePrefixMask) == Utf8ThreeBytePrefix) sequenceLength = Utf8ThreeByteLength;
+            else if ((firstByte & Utf8FourBytePrefixMask) == Utf8FourBytePrefix) sequenceLength = Utf8FourByteLength;
 
             unsigned int codePoint = firstByte &
-                (sequenceLength == 2 ? 0x1Fu :
-                 sequenceLength == 3 ? 0x0Fu : 0x07u);
-            for (int byteIndex = 1; byteIndex < sequenceLength; ++byteIndex)
+                (sequenceLength == Utf8TwoByteLength ? Utf8TwoByteLeadPayloadMask :
+                 sequenceLength == Utf8ThreeByteLength ? Utf8ThreeByteLeadPayloadMask : Utf8FourByteLeadPayloadMask);
+            bool valid = sequenceLength > 0 && static_cast<size_t>(sequenceLength) <= text.size() - textIndex;
+            for (int byteIndex = 1; valid && byteIndex < sequenceLength; ++byteIndex)
             {
-                codePoint = (codePoint << 6u) |
-                    (static_cast<unsigned char>(text[textIndex + byteIndex]) & 0x3Fu);
+                const auto byte = static_cast<unsigned char>(text[textIndex + byteIndex]);
+                valid = StoryText::IsUtf8ContinuationByte(byte);
+                codePoint = (codePoint << Utf8ContinuationPayloadBits) | (byte & Utf8ContinuationPayloadMask);
             }
-            textIndex += static_cast<size_t>(sequenceLength);
-            cursorX += AddJapaneseCharacter(cursorX, y, static_cast<wchar_t>(codePoint), pixelSize, color);
+            const unsigned int minimum = sequenceLength == Utf8TwoByteLength ? Utf8TwoByteMinimum :
+                sequenceLength == Utf8ThreeByteLength ? Utf8ThreeByteMinimum : Utf8FourByteMinimum;
+            valid = valid && codePoint >= minimum && codePoint <= UnicodeMaximum &&
+                (codePoint < UnicodeSurrogateStart || codePoint > UnicodeSurrogateEnd);
+            // 壊れた並びは1バイトだけ進める。4バイト文字は1文字分を読み、GDIの1文字描画では代替表示にする。
+            textIndex += valid ? static_cast<size_t>(sequenceLength) : 1;
+            if (valid && sequenceLength != Utf8FourByteLength)
+            {
+                cursorX += AddJapaneseCharacter(cursorX, y, static_cast<wchar_t>(codePoint), pixelSize, color);
+            }
+            else
+            {
+                AddAsciiCharacter(cursorX, y, UnsupportedTextGlyph, pixelSize, color);
+                cursorX += pixelSize * GlyphAdvance;
+            }
             continue;
         }
 

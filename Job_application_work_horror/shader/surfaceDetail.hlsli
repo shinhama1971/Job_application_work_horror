@@ -6,6 +6,9 @@
 #ifndef SURFACE_DETAIL_INCLUDED
 #define SURFACE_DETAIL_INCLUDED
 
+// 画面の微分で作る接線の行列式の下限（面を真横から見たときに0で割らないため）
+#define SURFACE_DETAIL_MIN_DETERMINANT 0.0001f
+
 // normal は元のワールドの法線、height はその画素の高さ（へこみは負）、strength は凹凸の強さ。
 float3 ApplyHeightToNormal(float3 worldPosition, float3 normal, float height, float strength)
 {
@@ -21,7 +24,7 @@ float3 ApplyHeightToNormal(float3 worldPosition, float3 normal, float height, fl
     const float determinant = dot(positionDx, gradientX);
     const float inverseDeterminant =
         (determinant < 0.0f ? -1.0f : 1.0f) /
-        max(abs(determinant), 0.0001f);
+        max(abs(determinant), SURFACE_DETAIL_MIN_DETERMINANT);
     const float3 surfaceGradient =
         (gradientX * heightDx + gradientY * heightDy) *
         inverseDeterminant;

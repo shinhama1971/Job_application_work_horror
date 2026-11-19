@@ -87,15 +87,15 @@ namespace
         Vector3 Start;
         Vector3 End;
     };
-    const std::array<PipeSegment, 6> PipeSegments =
-    {{
+    const PipeSegment PipeSegments[] =
+    {
         { Vector3(-205.0f, -55.0f, -165.0f), Vector3(-205.0f, -55.0f, 285.0f) },
         { Vector3(205.0f, -55.0f, -165.0f), Vector3(205.0f, -55.0f, 285.0f) },
         { Vector3(-202.0f, -52.5f, 37.0f), Vector3(-28.0f, -52.5f, 37.0f) },
         { Vector3(28.0f, -52.5f, 37.0f), Vector3(202.0f, -52.5f, 37.0f) },
         { Vector3(-205.0f, -52.5f, 177.0f), Vector3(-45.0f, -52.5f, 177.0f) },
         { Vector3(45.0f, -52.5f, 177.0f), Vector3(205.0f, -52.5f, 177.0f) }
-    }};
+    };
 
     // 聞き手から見て、距離が範囲内で、しかも視線の外にある場所かどうかを返している。
     bool IsUnseenSpot(
@@ -201,7 +201,7 @@ bool Stage1AmbientSounds::TryStartEvent(
 {
     // 同じ種類が続かないよう、前回と違う種類から順に試している。
     // 扉の音は目立つので、足音・配管より出にくくしている。
-    std::array<Kind, 3> order = { Kind::CeilingSteps, Kind::PipeKnocks, Kind::DistantDoor };
+    std::array order = { Kind::CeilingSteps, Kind::PipeKnocks, Kind::DistantDoor };
     std::shuffle(order.begin(), order.end(), m_Random);
     if (RandomRange(0.0f, 1.0f) < DoorPostponeChance && order[0] == Kind::DistantDoor)
     {
@@ -312,7 +312,7 @@ bool Stage1AmbientSounds::SchedulePipeKnocks(
     const Vector3& listenerForward)
 {
     std::uniform_int_distribution<int> segmentDistribution(
-        0, static_cast<int>(PipeSegments.size()) - 1);
+        0, static_cast<int>(std::size(PipeSegments)) - 1);
     // 配管の線分の上から、視線の外で60〜200離れた場所を探している
     for (int attempt = 0; attempt < PipeSpotAttempts; ++attempt)
     {

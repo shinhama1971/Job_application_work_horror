@@ -6,6 +6,17 @@
 
 #pragma once
 
+#include "Stage1LightNumber.h"
+
+// 異常の対象を持たない場合の印と、開かずの扉の配置表の添字。
+namespace StageSurveillanceTarget
+{
+    constexpr int NoLight = 0;
+    constexpr int NoSealedDoor = -1;
+    constexpr int StorageDoor = 0;
+    constexpr int HallDoor = 1;
+}
+
 // 監視カメラ1台分の設定
 struct StageSurveillanceCamera
 {
@@ -22,17 +33,17 @@ inline constexpr StageSurveillanceCamera StageSurveillanceCameras[] =
 {
     { "CAM 01   右側倉庫",
         { 150.0f, -57.0f, -82.0f }, { 150.0f, -82.0f, -150.0f },
-        3, { 150.0f, -99.0f, -150.0f }, -1 },
+        Stage1LightNumber::RightStorage, { 150.0f, -99.0f, -150.0f }, StageSurveillanceTarget::NoSealedDoor },
     { "CAM 02   左側倉庫",
         { -150.0f, -57.0f, -82.0f }, { -150.0f, -82.0f, -150.0f },
-        2, { -165.0f, -99.0f, -155.0f }, 0 },
+        Stage1LightNumber::LeftStorage, { -165.0f, -99.0f, -155.0f }, StageSurveillanceTarget::StorageDoor },
     { "CAM 03   中央ホール",
         { -60.0f, -57.0f, -60.0f }, { 20.0f, -85.0f, 20.0f },
-        4, { -30.0f, -99.0f, 0.0f }, -1 },
+        Stage1LightNumber::MiddleCorridor, { -30.0f, -99.0f, 0.0f }, StageSurveillanceTarget::NoSealedDoor },
     // 自分が操作している端末の背後を映すカメラ（映像に自分の後ろが映る怖さを狙っている）。
     { "CAM 04   端末前",
         { 150.0f, -57.0f, 20.0f }, { 200.0f, -88.0f, -40.0f },
-        0, { 185.0f, -99.0f, -15.0f }, 1 },
+        StageSurveillanceTarget::NoLight, { 185.0f, -99.0f, -15.0f }, StageSurveillanceTarget::HallDoor },
 };
 
 // 監視カメラの台数

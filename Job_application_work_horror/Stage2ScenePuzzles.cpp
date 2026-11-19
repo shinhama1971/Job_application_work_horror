@@ -195,7 +195,6 @@ namespace
     constexpr int LoopStartRumbleFramesPerLoop = 3;
     constexpr float LoopStartRumbleStrength = 0.18f;
     // 入口の右の壁の、周回の数だけ出す傷の印：数、浮かび上がる秒数、地の色、自己発光（基本＋周回ごと）、光沢
-    constexpr int CycleMarkCount = 3;
     constexpr float MarkDissolveSeconds = 1.6f;
     const Color CycleMarkDiffuse(0.24f, 0.006f, 0.003f, 1.0f);
     constexpr float CycleMarkEmissionBase = 0.10f;
@@ -251,7 +250,6 @@ namespace
     constexpr float MistakeRumbleStrengthPerRate = 0.12f;
 
     // --- 信号盤パズル：信号盤の数
-    constexpr int SignalTerminalCount = 3;
     // 順番をまちがえたとき
     constexpr float WrongOrderThreat = 0.92f;
     constexpr PulseSpec WrongOrderPulse{ 0.62f, 0.42f };
@@ -697,7 +695,7 @@ void Stage2Scene::AdvanceLoop(Player& player)
     Input::SetVibration(LoopStartRumbleBaseFrames + m_LoopCount * LoopStartRumbleFramesPerLoop, LoopStartRumbleStrength);
 
     // 周回の数だけ、入口の右の壁に傷の印を出している
-    for (int markIndex = 0; markIndex < CycleMarkCount; ++markIndex)
+    for (int markIndex = 0; markIndex < Stage2Objects::CycleMarkCount; ++markIndex)
     {
         Wall* cycleMark = m_Objects.cycleMarks[static_cast<std::size_t>(markIndex)];
         if (cycleMark == nullptr)
@@ -981,7 +979,7 @@ void Stage2Scene::UpdateSignalPuzzle()
 
     const bool puzzleActive =
         m_LoopCount >= Stage2FinalLoopCount && !m_SignalPuzzle.IsComplete();
-    for (int signalIndex = 0; signalIndex < SignalTerminalCount; ++signalIndex)
+    for (int signalIndex = 0; signalIndex < Stage2SignalTerminalCount; ++signalIndex)
     {
         FuseBox* terminal = m_Objects.signalTerminals[static_cast<std::size_t>(signalIndex)];
         if (terminal != nullptr)
@@ -992,7 +990,7 @@ void Stage2Scene::UpdateSignalPuzzle()
 
     if (puzzleActive)
     {
-        for (int signalIndex = 0; signalIndex < SignalTerminalCount; ++signalIndex)
+        for (int signalIndex = 0; signalIndex < Stage2SignalTerminalCount; ++signalIndex)
         {
             FuseBox* terminal = m_Objects.signalTerminals[static_cast<std::size_t>(signalIndex)];
             if (terminal == nullptr || !terminal->IsActivated() ||
@@ -1124,7 +1122,7 @@ void Stage2Scene::UpdateSignalPuzzle()
 
     // 目印：受け付けた信号盤は緑に、次に押す信号盤は明るく脈打たせている
     const float pulse = std::sin(m_VisualTimer * MarkerPulseSpeed) * 0.5f + 0.5f;
-    for (int signalIndex = 0; signalIndex < SignalTerminalCount; ++signalIndex)
+    for (int signalIndex = 0; signalIndex < Stage2SignalTerminalCount; ++signalIndex)
     {
         Wall* marker = m_Objects.signalMarkers[static_cast<std::size_t>(signalIndex)];
         if (marker == nullptr)
@@ -1171,7 +1169,7 @@ void Stage2Scene::ApplySignalLightingState()
     };
     constexpr float flickerOffsets[] = { 2.8f, 1.4f, 0.2f };
 
-    for (int lightIndex = 0; lightIndex < SignalTerminalCount; ++lightIndex)
+    for (int lightIndex = 0; lightIndex < Stage2SignalTerminalCount; ++lightIndex)
     {
         CeilingLight* light = m_Objects.Light(restorationLights[lightIndex]);
         if (light == nullptr)

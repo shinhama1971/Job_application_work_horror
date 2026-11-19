@@ -13,6 +13,7 @@
 #include	<vector>
 #include	<d3dcompiler.h>
 #include	<filesystem>
+#include	<cstddef>
 #include	<locale.h>
 #include	<wrl/client.h>
 
@@ -91,6 +92,16 @@ struct DEBUG_VIEW_BUFFER
 
 static_assert(sizeof(DEBUG_VIEW_BUFFER) == 32, "Debug view buffer must be 32 bytes");
 
+// デバッグ表示の番号（DEBUG_VIEW_BUFFER::Mode。shader/common.hlsl の DEBUG_VIEW_* と DebugUI の並びと同じ）
+namespace ShaderDebugView
+{
+    constexpr int Final = 0;
+    constexpr int Fullbright = 8;
+    constexpr int AmbientOcclusion = 10;
+    constexpr int FullbrightReflection = 11;
+    constexpr int GrassLod = 12;
+}
+
 // 部屋の角の暗がり（shader/roomOcclusion.hlsli の RoomOcclusionBuffer、b11）と同じ並びにしている。
 struct ROOM_OCCLUSION_BUFFER
 {
@@ -126,14 +137,18 @@ struct WATER_CAUSTICS_BUFFER
     // y = SSRの深度と前のフレームの画面が用意されているか
     DirectX::SimpleMath::Vector4 Reflection;
     // 2面の「血の手形」の異変で壁に浮かべる手形（x = 壁の表面のx、y = 高さ、z = 奥行き、w = 見え方0〜1。0なら描かない）
-    DirectX::SimpleMath::Vector4 Handprints[4];
+    // shader/waterCausticsLayout.hlsli の WATER_CAUSTICS_MAX_HANDPRINTS と同じ。
+    static constexpr int MaxHandprints = 4;
+    DirectX::SimpleMath::Vector4 Handprints[MaxHandprints];
     // 水面にだけ映す人影（xyz = 足もとの位置、w = 見え方0〜1。0なら描かない。負なら天井に逆さまに張り付いた人影）
     DirectX::SimpleMath::Vector4 PuddleFigure;
     // 2面の「見えない影」の異変で、影だけを落とす人影（xyz = 足もとの位置、w = 見え方0〜1。0なら影を付けない。shader/figureShadow.hlsli）
     DirectX::SimpleMath::Vector4 UnseenFigure;
-    // レイ反射で水面に映す小物の箱の最大数と、その箱（[i*3] = 最小の角、[i*3+1] = 最大の角、[i*3+2] = 色）。数は Reflection.z
+    // レイ反射で水面に映す小物の箱の最大数と、その箱（[i*3] = 中心、[i*3+1] = 半寸法、[i*3+2] = 色）。数は Reflection.z
     static constexpr int MaxReflectionProps = 16;
-    DirectX::SimpleMath::Vector4 ReflectionProps[MaxReflectionProps * 3];
+    // shader/waterCausticsLayout.hlsli の REFLECTION_PROP_STRIDE と同じ。
+    static constexpr int ReflectionPropVectorCount = 3;
+    DirectX::SimpleMath::Vector4 ReflectionProps[MaxReflectionProps * ReflectionPropVectorCount];
     // 2面の壁の鏡に映す自分の体（xyz = 足もとの位置、w = 映すなら1）、向き（xy = 右の向きのx・z、zw = 前の向きのx・z）、
     // 動き（x = 歩く手足の振り -1〜1）。shader/mirrorPS.hlsl が光線と体の距離場で交差させている（MirrorSelf）
     DirectX::SimpleMath::Vector4 MirrorSelf;
@@ -154,7 +169,14 @@ struct WATER_CAUSTICS_BUFFER
     DirectX::SimpleMath::Vector4 DrainTrace;
 };
 
-static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 1264, "Water caustics buffer must match HLSL layout");
+// 長さだけでなく、HLSLが共通して読み取る先頭部と、後半の配列・行列の位置も照合する。
+static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 1264);
+static_assert(offsetof(WATER_CAUSTICS_BUFFER, Ripple) == 96);
+static_assert(offsetof(WATER_CAUSTICS_BUFFER, Projection) == 112);
+static_assert(offsetof(WATER_CAUSTICS_BUFFER, Handprints) == 192);
+static_assert(offsetof(WATER_CAUSTICS_BUFFER, UnseenFigure) == 272);
+static_assert(offsetof(WATER_CAUSTICS_BUFFER, ReflectionProps) == 288);
+static_assert(offsetof(WATER_CAUSTICS_BUFFER, PreviousReflectionViewProjection) == 1168);
 
 // サブセット（モデルの中で、同じマテリアルで描く部分）
 struct SUBSET{
@@ -294,17 +316,17 @@ public:
 		const char* szFileName,
 		LPCSTR szEntryPoint,
 		LPCSTR szShaderModel,
-		std::vector<unsigned char>& shaderObject);
+		std::vector<unsigned char>& shaderObject, bool* loadedFromCache = nullptr, bool forceSource = false);
 	// フォルダの中のシェーダー（名前の最後が VS・PS・CS の.hlsl）を、まとめて.csoへコンパイルしている（ビルド時に使う）。
 	// 失敗したシェーダーがあればfalseを返し、errorsにコンパイラーのエラーを入れている
 	static bool PrecompileShaders(const std::filesystem::path& folder, std::string& errors);
 	// 頂点シェーダー（と入力レイアウト）、ピクセルシェーダーを作っている
 	static HRESULT CreateVertexShader(ID3D11VertexShader** ppVertexShader, ID3D11InputLayout** ppVertexLayout, D3D11_INPUT_ELEMENT_DESC* pLayout, unsigned int numElements, const char* szFileName);
 	static HRESULT CreatePixelShader(ID3D11PixelShader** PixelShader, const char* FileName);
+	static HRESULT CreateComputeShader(ID3D11ComputeShader** shader, const char* fileName);
 
-	// インデックスバッファと、書き換えない頂点バッファを作っている
+	// インデックスバッファを作っている
 	static bool CreateIndexBuffer(unsigned int indexnum, void* indexdata, ID3D11Buffer** pIndexBuffer);
-	static bool CreateVertexBuffer(unsigned int stride, unsigned int vertexnum, void* vertexdata, ID3D11Buffer** pVertexBuffer);
 	// CPUから毎フレーム書き換える頂点バッファ（DYNAMIC）を作っている。
 	static bool CreateVertexBufferWrite(unsigned int stride, unsigned int vertexnum, void* vertexdata, ID3D11Buffer** pVertexBuffer);
 
@@ -411,19 +433,17 @@ public:
 	// 画面以外へ描いた後、描画先をバックバッファへ戻している。
 	static void SetBackBufferRenderTarget();
 
-	// バックバッファを指定の色で消している
-	static void ClearBackBuffer(float r, float g, float b, float a);
 
-	// 深度バッファを消している
-	static void ClearDepth();
 
 	// 合成のしかたを切り替えている（EBlendState: なし・半透明・加算・減算）。
 	static void SetBlendState(int nBlendState)
 	{
 		if (nBlendState >= 0 && nBlendState < MAX_BLENDSTATE) {
 			float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+			// MSAAのサンプルを除外せず、すべてにブレンドを適用する。
+			constexpr UINT AllSamplesMask = 0xffffffffu;
 			m_pDeviceContext->OMSetBlendState(
-				m_pBlendState[nBlendState].Get(), blendFactor, 0xffffffff);
+				m_pBlendState[nBlendState].Get(), blendFactor, AllSamplesMask);
 		}
 	}
 	

@@ -39,7 +39,9 @@ private:
     Player* m_Player = nullptr;
     FuseBox* m_Relay = nullptr;
     FuseBox* m_Log = nullptr;
-    std::array<FuseBox*, 3> m_RouteControls{};
+    // 回線室へ進む前に操作する回線盤の数。
+    static constexpr std::size_t RouteControlCount = 3;
+    std::array<FuseBox*, RouteControlCount> m_RouteControls{};
     std::size_t m_RouteProgress = 0;
     FuseBox* m_ObservationStart = nullptr;
     FuseBox* m_ObservationEnd = nullptr;

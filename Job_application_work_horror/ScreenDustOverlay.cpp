@@ -7,6 +7,17 @@
 #include "Renderer.h"
 #include "Application.h"
 
+namespace
+{
+    // 画面を覆う四角形の頂点の数（三角形の帯で描く）
+    constexpr UINT QuadVertexCount = 4;
+    // 三角形ストリップの順に、位置とUVで同じ四隅を参照する。
+    constexpr UINT TopLeftVertex = 0;
+    constexpr UINT TopRightVertex = 1;
+    constexpr UINT BottomLeftVertex = 2;
+    constexpr UINT BottomRightVertex = 3;
+}
+
 using namespace DirectX::SimpleMath;
 
 // 画面と同じ大きさの四角形と、埃を描くシェーダー（PS_HorrorDust）、定数バッファを作っている
@@ -15,22 +26,22 @@ void ScreenDustOverlay::Init()
     float w = (float)Application::GetWidth();
     float h = (float)Application::GetHeight();
 
-    m_Vertices.resize(4);
+    m_Vertices.resize(QuadVertexCount);
 
-    m_Vertices[0].position = Vector3(0.0f, 0.0f, 0.0f);
-    m_Vertices[1].position = Vector3(w, 0.0f, 0.0f);
-    m_Vertices[2].position = Vector3(0.0f, h, 0.0f);
-    m_Vertices[3].position = Vector3(w, h, 0.0f);
+    m_Vertices[TopLeftVertex].position = Vector3(0.0f, 0.0f, 0.0f);
+    m_Vertices[TopRightVertex].position = Vector3(w, 0.0f, 0.0f);
+    m_Vertices[BottomLeftVertex].position = Vector3(0.0f, h, 0.0f);
+    m_Vertices[BottomRightVertex].position = Vector3(w, h, 0.0f);
 
-    m_Vertices[0].color = Color(1, 1, 1, 1);
-    m_Vertices[1].color = Color(1, 1, 1, 1);
-    m_Vertices[2].color = Color(1, 1, 1, 1);
-    m_Vertices[3].color = Color(1, 1, 1, 1);
+    m_Vertices[TopLeftVertex].color = Color(1, 1, 1, 1);
+    m_Vertices[TopRightVertex].color = Color(1, 1, 1, 1);
+    m_Vertices[BottomLeftVertex].color = Color(1, 1, 1, 1);
+    m_Vertices[BottomRightVertex].color = Color(1, 1, 1, 1);
 
-    m_Vertices[0].uv = Vector2(0, 0);
-    m_Vertices[1].uv = Vector2(1, 0);
-    m_Vertices[2].uv = Vector2(0, 1);
-    m_Vertices[3].uv = Vector2(1, 1);
+    m_Vertices[TopLeftVertex].uv = Vector2(0, 0);
+    m_Vertices[TopRightVertex].uv = Vector2(1, 0);
+    m_Vertices[BottomLeftVertex].uv = Vector2(0, 1);
+    m_Vertices[BottomRightVertex].uv = Vector2(1, 1);
 
     m_VertexBuffer.Create(m_Vertices);
 
@@ -112,7 +123,7 @@ void ScreenDustOverlay::Draw(Camera* /*camera*/)
         D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP
     );
 
-    context->DrawIndexed(4, 0, 0);
+    context->DrawIndexed(QuadVertexCount, 0, 0);
 
     Renderer::SetDepthEnable(true);
 }

@@ -54,13 +54,15 @@ inline constexpr float Stage2FinalSequenceStartZ = -8.0f;
 // 周回が切り替わるときの演出の長さ（秒）
 inline constexpr float Stage2LoopTransitionSeconds = 4.2f;
 // 信号盤（青・黄・赤）の上の目印の色（普段の色と光る色）。配置（Stage2Layout）と、パズルの進み具合で光らせる処理（Stage2Scene）で使う
-inline const DirectX::SimpleMath::Color Stage2SignalDiffuse[3] =
+// 青・黄・赤の信号盤で、端末と目印および色表の要素数をそろえる。
+inline constexpr int Stage2SignalTerminalCount = 3;
+inline const DirectX::SimpleMath::Color Stage2SignalDiffuse[Stage2SignalTerminalCount] =
 {
     DirectX::SimpleMath::Color(0.015f, 0.055f, 0.13f, 1.0f),
     DirectX::SimpleMath::Color(0.13f, 0.075f, 0.012f, 1.0f),
     DirectX::SimpleMath::Color(0.13f, 0.018f, 0.012f, 1.0f)
 };
-inline const DirectX::SimpleMath::Color Stage2SignalEmission[3] =
+inline const DirectX::SimpleMath::Color Stage2SignalEmission[Stage2SignalTerminalCount] =
 {
     DirectX::SimpleMath::Color(0.015f, 0.18f, 0.48f, 1.0f),
     DirectX::SimpleMath::Color(0.40f, 0.17f, 0.008f, 1.0f),

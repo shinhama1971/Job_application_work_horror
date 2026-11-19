@@ -24,13 +24,15 @@ static const float SkyFarDistance = 1000.0f;
 static const float SkyZenithDistance = 380.0f;
 // 背景の色（Renderer.cpp の画面を消す色と同じ、わずかに青みのある黒）
 #define SKY_BACKDROP_COLOR float3(0.003f, 0.005f, 0.008f)
+// 霧の距離を地平線（奥の端まで）から真上の距離へ変える、向きの上向きの成分の範囲の終わり（約30度）
+#define SKY_FOG_ZENITH_DIRECTION 0.5f
 
 float4 main(SKY_PS_IN input) : SV_TARGET
 {
     const float3 worldDirection = normalize(input.worldDirection);
     const float3 viewDirection = normalize(input.viewDirection);
     // 地平線の近くは奥の端まで、上を見るほど短い距離の霧にしている
-    const float distanceFromCamera = lerp(SkyFarDistance, SkyZenithDistance, smoothstep(0.0f, 0.5f, worldDirection.y));
+    const float distanceFromCamera = lerp(SkyFarDistance, SkyZenithDistance, smoothstep(0.0f, SKY_FOG_ZENITH_DIRECTION, worldDirection.y));
     const float3 eye = GetMistEyePosition();
     const float3 worldPosition = eye + worldDirection * distanceFromCamera;
     const float3 viewPosition = viewDirection * distanceFromCamera;

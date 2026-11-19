@@ -40,7 +40,7 @@ namespace
     constexpr float MaterialMetallic = 0.30f;
     constexpr float MaterialRoughness = 0.48f;
     // 主電源を戻すのに要るヒューズの数
-    constexpr int RequiredFuseCount = 3;
+    constexpr int RequiredFuseCount = Core::GameState::RequiredFuseCount;
 
     // --- 操作したときの演出の強さと長さ
     using EventFeedback::PulseSpec;
@@ -137,7 +137,7 @@ const char* FuseBox::GetInteractionPrompt() const
             : "先に主電源を復旧する";
     }
 
-    return Core::Game::GetInstance()->GetItemCount() < 3
+    return Core::Game::GetInstance()->GetItemCount() < RequiredFuseCount
         ? "ヒューズが3本必要"
         : "電力を復旧する";
 }
@@ -159,7 +159,7 @@ void FuseBox::Interact(Player& player)
         m_IsPowered = true;
         game->PlayAudioCueAt(SOUND_CUE_POWER, m_Position);
         BuildGeometry();
-        m_VertexBuffer.Modify(m_Vertices);
+        m_VertexUploadPending = !m_VertexBuffer.Modify(m_Vertices);
         EventFeedback::BloomPulse(*game->GetPostProcess(), SwitchBloom);
         EventFeedback::HorrorPulse(*game->GetPostProcess(), SwitchPulse);
         EventFeedback::Rumble(SwitchRumble);
@@ -180,7 +180,7 @@ void FuseBox::Interact(Player& player)
         EventFeedback::HorrorPulse(*game->GetPostProcess(), ExitPowerPulse);
 
         BuildGeometry();
-        m_VertexBuffer.Modify(m_Vertices);
+        m_VertexUploadPending = !m_VertexBuffer.Modify(m_Vertices);
         EventFeedback::Rumble(ExitPowerRumble);
 
         ScreenDustOverlay* crt = game->GetObj<ScreenDustOverlay>("CRTNoise");
@@ -205,7 +205,7 @@ void FuseBox::Interact(Player& player)
     EventFeedback::BloomPulse(*game->GetPostProcess(), MainPowerBloom);
     EventFeedback::HorrorPulse(*game->GetPostProcess(), MainPowerPulse);
     BuildGeometry();
-    m_VertexBuffer.Modify(m_Vertices);
+    m_VertexUploadPending = !m_VertexBuffer.Modify(m_Vertices);
     EventFeedback::Rumble(MainPowerRumble);
 
     // 画面にブラウン管のようなノイズを0.7秒出している
@@ -224,12 +224,21 @@ void FuseBox::ResetActivation()
 {
     m_IsPowered = false;
     BuildGeometry();
-    m_VertexBuffer.Modify(m_Vertices);
+    m_VertexUploadPending = !m_VertexBuffer.Modify(m_Vertices);
 }
 
 // 箱を描いている
 void FuseBox::Draw(Camera* camera)
 {
+    // 操作の進行は維持し、頂点転送に失敗したときだけ描画側で再試行する。
+    if (m_VertexUploadPending)
+    {
+        m_VertexUploadPending = !m_VertexBuffer.Modify(m_Vertices);
+        if (m_VertexUploadPending)
+        {
+            return;
+        }
+    }
     camera->SetCamera();
 
     const Matrix rotation = Matrix::CreateFromYawPitchRoll(

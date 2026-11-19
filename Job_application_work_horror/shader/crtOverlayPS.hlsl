@@ -274,13 +274,16 @@ static const float CRT_FILM_HIGHLIGHT_ALPHA = 0.022f;
 static const float3 CRT_FILM_COLD_SHADOW = float3(0.020f, 0.040f, 0.052f);
 static const float3 CRT_FILM_WARM_LIGHT = float3(0.160f, 0.095f, 0.040f);
 static const float CRT_FILM_WARM_GAIN = 1.35f;
+// コマ落ちしているかを見るしきい値（PostProcess が 0 か 1 で渡す）と、裂け目の色を青緑と赤に分ける乱数のしきい値
+#define CRT_FRAME_HOLD_THRESHOLD 0.5f
+#define CRT_TEAR_COLOR_SPLIT 0.5f
 
 float4 main(PS_IN input) : SV_TARGET
 {
     // コマ落ち：影が近くラジオの雑音が強いとき、一瞬だけ映像が止まる。止まった画面は縦に少しずれ、
     // ずれの継ぎ目に黒い帯が走り、色が少し抜ける（古いビデオの同期が外れたように見せている）
     [branch]
-    if (frameHold > 0.5f)
+    if (frameHold > CRT_FRAME_HOLD_THRESHOLD)
     {
         const float heldY = frac(input.uv.y + frameHoldOffset);
         float3 held = SceneTexture.SampleLevel(LinearSampler, float2(input.uv.x, heldY), 0.0f).rgb;
@@ -501,7 +504,7 @@ float4 main(PS_IN input) : SV_TARGET
         saturate(dustAlpha / max(darkAlpha + dustAlpha, CRT_MIN_DIVISOR))
     );
     float channelChoice = FastHash21(float2(bandId + CRT_TEAR_CHANNEL_SEED, floor(time * CRT_TEAR_UPDATES_PER_SECOND)));
-    float3 tearColor = channelChoice < 0.5f
+    float3 tearColor = channelChoice < CRT_TEAR_COLOR_SPLIT
         ? CRT_TEAR_CYAN
         : CRT_TEAR_RED;
     tearColor = lerp(shiftedScene, tearColor, CRT_TEAR_COLOR_BLEND);

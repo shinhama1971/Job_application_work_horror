@@ -20,6 +20,8 @@ static const float DDGI_DISTANCE_SHARPNESS = 50.0f;
 #else
 #define DDGI_TILE_TEXELS DDGI_IRRADIANCE_TEXELS
 #endif
+// 履歴を捨てる印（0 か 1）を見るしきい値
+#define DDGI_RESET_THRESHOLD 0.5f
 
 // このフレームの光線の結果（ddgiTraceCS）と、前の画像（ピンポンのもう片方）、書き込む画像
 Texture2D<float4> RayResults : register(t1);
@@ -27,6 +29,9 @@ Texture2D<float4> PreviousAtlas : register(t4);
 RWTexture2D<float4> OutputAtlas : register(u0);
 
 // 区画の中の画素の新しい値（縁を書くために、グループで共有している）
+// タイルの外周は4辺と4つの隅に分けて配置する。
+#define DDGI_BORDER_SIDE_COUNT 4
+#define DDGI_BORDER_CORNER_COUNT 4
 groupshared float4 g_TileValues[DDGI_TILE_TEXELS * DDGI_TILE_TEXELS];
 
 // 縁の画素（区画の左上が0、中は1〜N）に写す、中の画素の位置（八面体マップの折り返し）
@@ -114,9 +119,9 @@ void main(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
     if (weightSum > DDGI_EPSILON)
     {
         const float4 current = sum / weightSum;
-        value = ResetHistory > 0.5f ? current : lerp(current, previous, Hysteresis);
+        value = ResetHistory > DDGI_RESET_THRESHOLD ? current : lerp(current, previous, Hysteresis);
     }
-    else if (ResetHistory > 0.5f)
+    else if (ResetHistory > DDGI_RESET_THRESHOLD)
     {
         value = 0.0f;
     }
@@ -127,7 +132,8 @@ void main(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThreadID)
     // 区画の中の画素がそろってから、縁の画素を書いている
     GroupMemoryBarrierWithGroupSync();
     const uint threadIndex = local.y * DDGI_TILE_TEXELS + local.x;
-    const uint borderCount = DDGI_TILE_TEXELS * 4 + 4;
+    // 辺ごとの画素と、2辺がつながる隅の画素をコピーする。
+    const uint borderCount = DDGI_TILE_TEXELS * DDGI_BORDER_SIDE_COUNT + DDGI_BORDER_CORNER_COUNT;
     if (threadIndex < borderCount)
     {
         const uint2 border = GetBorderTexel(threadIndex);

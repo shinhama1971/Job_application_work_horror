@@ -18,6 +18,18 @@ namespace MathUtility
     inline constexpr float TwoPi = DirectX::XM_2PI;
     inline constexpr float HalfPi = DirectX::XM_PIDIV2;
 
+    // 32ビットの xorshift（Marsaglia 2003）で、乱数の状態を1つ進めている。見た目だけに使う、決まった並びの乱数
+    inline unsigned int NextXorShift32(unsigned int& state) noexcept
+    {
+        constexpr unsigned int ShiftA = 13;
+        constexpr unsigned int ShiftB = 17;
+        constexpr unsigned int ShiftC = 5;
+        state ^= state << ShiftA;
+        state ^= state >> ShiftB;
+        state ^= state << ShiftC;
+        return state;
+    }
+
     // 0〜1の t を、両端でゆっくり、真ん中で速く変わる曲線に通している（t*t*(3-2t)）。
     // t はすでに0〜1に収めてあるものとして、ここでは収めない
     constexpr float SmoothCurve(float t) noexcept

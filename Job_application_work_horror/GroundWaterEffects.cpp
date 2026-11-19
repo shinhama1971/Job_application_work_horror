@@ -17,6 +17,8 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
+	// 水滴を落とす水たまりを探す範囲（プレイヤーのいるマス目から前後左右に何マスまで）
+	constexpr int DropSearchCellRadius = 4;
 	// --- 高さ：水滴が落ち始める天井の下の高さ（ここから乱数の分だけ下げる）、水滴が床に着く高さ、着水のしぶきの高さ、波紋を描く水面の高さ
 	constexpr float DropStartY = -52.0f;
 	constexpr float DropLandY = -99.35f;
@@ -358,9 +360,9 @@ void WaterEffectSystem::BuildPuddles(const PuddleLayout& layout)
 		}
 
 		// 水滴はプレイヤーが通る範囲の水たまりから選ぶ。
-		for (int cellZ = -4; cellZ <= 4; ++cellZ)
+		for (int cellZ = -DropSearchCellRadius; cellZ <= DropSearchCellRadius; ++cellZ)
 		{
-			for (int cellX = -4; cellX <= 4; ++cellX)
+			for (int cellX = -DropSearchCellRadius; cellX <= DropSearchCellRadius; ++cellX)
 			{
 				const float puddleSeed = hash21(
 					static_cast<float>(cellX) + PuddlePresenceOffset.x,
@@ -512,7 +514,7 @@ bool WaterEffectSystem::IsInsidePuddle(const Vector3& position) const
 		return false;
 	}
 	const Vector4& entry = m_PuddleCellData.Cells[row * PuddleCellCount + column];
-	if (entry.x < 0.5f)
+	if (entry.x < PuddleCellPresentThreshold)
 	{
 		return false;
 	}
@@ -815,7 +817,7 @@ bool Ground::IsNearVisiblePuddle(const Vector3& position, float margin) const
 				continue;
 			}
 			const Vector4& cell = data.Cells[static_cast<std::size_t>(row * WaterEffectSystem::PuddleCellCount + column)];
-			if (cell.x < 0.5f)
+			if (cell.x < WaterEffectSystem::PuddleCellPresentThreshold)
 			{
 				continue;
 			}

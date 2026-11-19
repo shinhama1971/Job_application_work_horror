@@ -11,6 +11,7 @@
 #include "TechDemo.h"
 #include "utility.h"
 #include "Wall.h"
+#include "MathUtility.h"
 #include <algorithm>
 #include <cmath>
 using namespace DirectX::SimpleMath;
@@ -26,6 +27,12 @@ namespace
 	// 水たまり・雨漏りの多角形の辺の数
 	constexpr int PuddleOutlineSegments = 32;
 	constexpr int LeakOutlineSegments = 24;
+	// 浸水範囲は長方形。水面は中心から各辺に三角形を1枚ずつ張る。
+	constexpr int FloodOutlineSegments = 4;
+	constexpr int WaterTriangleVertexCount = 3;
+	// 多角形で覆う水面は、雨漏りの半径より外側まで広げて縁の欠けを防ぐ。
+	constexpr float LeakRadiusMargin = 3.0f;
+	constexpr float LeakOutlineMargin = 0.5f;
 	// 床の格子のマス数（縦横）、床の高さ、1マスの大きさ（全体で1000x1000）
 	constexpr int GridCellCount = 50;
 	constexpr int VerticesPerCell = 6;
@@ -66,7 +73,8 @@ namespace
 	constexpr float RainRingStrength = 0.3f;
 	constexpr float RainRingStrengthRange = 0.25f;
 	// 乱数（xorshift）の下位16ビットを 0〜1 にする割る数
-	constexpr float RandomMax = 65535.0f;
+	// 雨の乱数から下位16ビットを取り出し、同じ最大値で0〜1に変換する。
+	constexpr unsigned int RainRandomMask = 0xFFFFu;
 	// 波を止める壁：床からこの高さより上にある壁は数えない。まっすぐ・横向きとみなす角度の誤差（ラジアン）
 	constexpr float RippleObstacleMaxHeight = 1.5f;
 	constexpr float AxisAlignedTolerance = 0.01f;
@@ -97,7 +105,7 @@ void Ground::Init()
 	{
 		for (int x = 0; x < m_SizeX; x++)
 		{
-			int n = z * m_SizeX * 6 + x * 6;
+			int n = z * m_SizeX * VerticesPerCell + x * VerticesPerCell;
 			m_Vertices[n + 0].position = Vector3(-0.5f + x - m_SizeX / 2, 0, 0.5f - z + m_SizeZ / 2);
 			m_Vertices[n + 1].position = Vector3(0.5f + x - m_SizeX / 2, 0, 0.5f - z + m_SizeZ / 2);
 			m_Vertices[n + 2].position = Vector3(-0.5f + x - m_SizeX / 2, 0, -0.5f - z + m_SizeZ / 2);
@@ -134,7 +142,7 @@ void Ground::Init()
 	{
 		for (int x = 0; x < m_SizeX; x++)
 		{
-			int n = z * m_SizeX * 6 + x * 6;
+			int n = z * m_SizeX * VerticesPerCell + x * VerticesPerCell;
 
 			// 三角形の2辺のベクトル
 			Vector3 v1 = m_Vertices[n + 1].position - m_Vertices[n + 0].position;
@@ -161,13 +169,13 @@ void Ground::Init()
 	m_VertexBuffer.Create(m_Vertices);
 
 	// インデックスデータ（頂点を順番どおりに使っている）
-	m_Indices.resize(6 * m_SizeX * m_SizeZ);
+	m_Indices.resize(VerticesPerCell * m_SizeX * m_SizeZ);
 
 	for (int z = 0; z < m_SizeZ; z++)
 	{
 		for (int x = 0; x < m_SizeX; x++)
 		{
-			int n = z * m_SizeX * 6 + x * 6;
+			int n = z * m_SizeX * VerticesPerCell + x * VerticesPerCell;
 			m_Indices[n + 0] = n + 0;
 			m_Indices[n + 1] = n + 1;
 			m_Indices[n + 2] = n + 2;
@@ -217,7 +225,7 @@ void Ground::Init()
 
 	// 雨漏りと浸水した範囲のメッシュの頂点バッファ（毎フレーム書き換えるので、入りきる大きさで先に作っている）
 	m_DynamicSurfaceCapacity = static_cast<unsigned int>(
-		(WaterEffectSystem::MaxLeakCount * LeakOutlineSegments + 4) * 3);
+		(WaterEffectSystem::MaxLeakCount * LeakOutlineSegments + FloodOutlineSegments) * WaterTriangleVertexCount);
 	m_DynamicSurfaceBuffer.Create(std::vector<VERTEX_3D>(m_DynamicSurfaceCapacity));
 	m_DynamicSurfaces.clear();
 	m_PuddleSurfacesDirty = true;
@@ -283,7 +291,7 @@ void Ground::BuildPuddleSurfaces()
 		for (int column = 0; column < WaterEffectSystem::PuddleCellCount; ++column)
 		{
 			const Vector4& cell = data.Cells[static_cast<std::size_t>(row * WaterEffectSystem::PuddleCellCount + column)];
-			if (cell.x < 0.5f)
+			if (cell.x < WaterEffectSystem::PuddleCellPresentThreshold)
 			{
 				continue;
 			}
@@ -346,7 +354,7 @@ void Ground::BuildDynamicSurfaces()
 	for (int leakIndex = 0; leakIndex < leakCount; ++leakIndex)
 	{
 		const WaterEffectSystem::Leak& leak = leaks[static_cast<std::size_t>(leakIndex)];
-		const float radius = (leak.Radius + 3.0f) * polygonScale + 0.5f;
+		const float radius = (leak.Radius + LeakRadiusMargin) * polygonScale + LeakOutlineMargin;
 		outline.resize(LeakOutlineSegments);
 		for (int point = 0; point < LeakOutlineSegments; ++point)
 		{
@@ -378,11 +386,8 @@ void Ground::BuildDynamicSurfaces()
 			m_DynamicSurfaces.push_back(surface);
 		}
 	}
-	if (!m_DynamicSurfaceVertices.empty() && m_DynamicSurfaceVertices.size() <= m_DynamicSurfaceCapacity)
-	{
-		m_DynamicSurfaceBuffer.Modify(m_DynamicSurfaceVertices);
-	}
-	else if (m_DynamicSurfaceVertices.size() > m_DynamicSurfaceCapacity)
+	// 転送に失敗したフレームでは、新しい描画範囲で古い頂点を読まない。
+	if (!m_DynamicSurfaceVertices.empty() && !m_DynamicSurfaceBuffer.Modify(m_DynamicSurfaceVertices))
 	{
 		m_DynamicSurfaces.clear();
 	}
@@ -499,10 +504,8 @@ void Ground::AddRainRipples(float deltaTime)
 	auto nextRandom = [this]()
 	{
 		// 簡単な乱数（xorshift）。見た目だけに使うので、決まった並びで十分
-		m_RainSeed ^= m_RainSeed << 13;
-		m_RainSeed ^= m_RainSeed >> 17;
-		m_RainSeed ^= m_RainSeed << 5;
-		return static_cast<float>(m_RainSeed & 0xFFFFu) / RandomMax;
+		MathUtility::NextXorShift32(m_RainSeed);
+		return static_cast<float>(m_RainSeed & RainRandomMask) / static_cast<float>(RainRandomMask);
 	};
 	int rings = 0;
 	while (m_PendingRainDrops >= 1.0f && rings < MaxRingsPerFrame)

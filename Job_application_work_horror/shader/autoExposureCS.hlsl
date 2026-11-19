@@ -47,6 +47,8 @@ static const float AUTO_EXPOSURE_MIN_ACCUMULATED_WEIGHT = 0.0001f;
 // 真っ暗な画面でも、露出の比率とべき乗を計算できる範囲に収める。
 static const float AUTO_EXPOSURE_MIN_LUMINANCE = 0.0001f;
 static const float AUTO_EXPOSURE_MIN_RATIO = 0.0001f;
+// 定数の印（0 か 1）を見るしきい値
+#define AUTO_EXPOSURE_FLAG_THRESHOLD 0.5f
 
 // 各スレッドの、重みを掛けた明るさの対数の合計と、重みの合計
 groupshared float g_LogLuminance[THREAD_COUNT];
@@ -113,7 +115,7 @@ void main(uint3 threadId : SV_GroupThreadID, uint threadIndex : SV_GroupIndex)
     // 前のフレームまでに慣れた明るさから、今の明るさへ近づけている。
     // 明るくなるときは素早く、暗くなるときはゆっくり慣れる（人の目の慣れ方に近づけている）。
     float adaptedLogLuminance = frameLogLuminance;
-    if (ResetAdaptation < 0.5f)
+    if (ResetAdaptation < AUTO_EXPOSURE_FLAG_THRESHOLD)
     {
         const float previous = ExposureState[0];
         const float speed = frameLogLuminance > previous ? LightAdaptSpeed : DarkAdaptSpeed;
@@ -126,7 +128,7 @@ void main(uint3 threadId : SV_GroupThreadID, uint threadIndex : SV_GroupIndex)
     const float adaptedLuminance = max(exp(adaptedLogLuminance) - AUTO_EXPOSURE_LOG_OFFSET, AUTO_EXPOSURE_MIN_LUMINANCE);
     const float luminanceRatio = max(TargetLuminance / adaptedLuminance, AUTO_EXPOSURE_MIN_RATIO);
     float gain = clamp(pow(luminanceRatio, AUTO_EXPOSURE_GAIN_EXPONENT), MinGain, MaxGain);
-    if (Enabled < 0.5f)
+    if (Enabled < AUTO_EXPOSURE_FLAG_THRESHOLD)
     {
         gain = 1.0f;
     }
