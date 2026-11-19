@@ -40,19 +40,41 @@ struct LIT_PS_IN
 // 光が弱まると、文字も同じだけ薄くなる。
 static const float NominalFlashlightIntensity = 1.5f;
 
+// 文字の画像で実際に描く透明度の範囲と、デバッグ表示の明るさ。
+#define WRITING_MASK_MIN_ALPHA 0.01f
+#define WRITING_DEBUG_MIN_PRESENCE 0.001f
+#define WRITING_DEBUG_BRIGHTNESS 2.2f
+
+// 文字が現れる境目は、場所と時間でゆっくり変化する。
+#define WRITING_EDGE_NOISE_XY_SCALE 0.21f
+#define WRITING_EDGE_NOISE_Z_SCALE 0.17f
+#define WRITING_EDGE_NOISE_FLOW_X 0.35f
+#define WRITING_EDGE_NOISE_FLOW_Y 0.22f
+#define WRITING_REVEAL_BASE_THRESHOLD 0.18f
+#define WRITING_REVEAL_NOISE_WEIGHT 0.34f
+#define WRITING_REVEAL_BLEND_WIDTH 0.30f
+#define WRITING_REVEAL_LIGHT_GAIN 1.35f
+
+// 薄すぎる部分は描かず、光の中心は文字を読めるように少し明るくする。
+#define WRITING_MIN_VISIBLE_ALPHA 0.002f
+#define WRITING_INK_BASE_GAIN 0.28f
+#define WRITING_INK_RECEIVED_GAIN 0.72f
+#define WRITING_INK_GLINT_START 0.55f
+#define WRITING_INK_GLINT_GAIN 0.12f
+
 float4 main(in LIT_PS_IN input) : SV_Target
 {
     // 文字の形の外は描かない
     const float shape = g_Texture.Sample(g_SamplerState, input.tex).a;
-    clip(shape - 0.01f);
+    clip(shape - WRITING_MASK_MIN_ALPHA);
 
     const float presence = input.col.a;
     const float distanceFromCamera = length(input.viewPos);
     // フルブライト表示（デバッグ）では、ライトが当たっていなくても文字をそのまま見せ、配置を確かめられるようにしている。
     if (IsFullbrightDebugView())
     {
-        clip(presence - 0.001f);
-        return float4(Material.Diffuse.rgb * 2.2f, saturate(shape * presence));
+        clip(presence - WRITING_DEBUG_MIN_PRESENCE);
+        return float4(Material.Diffuse.rgb * WRITING_DEBUG_BRIGHTNESS, saturate(shape * presence));
     }
     if (!Light.Enable || !Light.FlashlightEnabled ||
         presence <= 0.001f || distanceFromCamera <= 0.001f)
@@ -76,13 +98,13 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
     // 光の中心ほど濃く現れる。境目はノイズで崩し、染みが広がるように見せている。
     const float time = Material.Emission.x;
-    const float edgeNoise = FastValueNoise(input.worldPos.xy * 0.21f +
-        input.worldPos.zz * 0.17f + float2(time * 0.35f, -time * 0.22f));
-    const float threshold = 0.18f + edgeNoise * 0.34f;
-    const float reveal = smoothstep(threshold, threshold + 0.30f, received * 1.35f);
+    const float edgeNoise = FastValueNoise(input.worldPos.xy * WRITING_EDGE_NOISE_XY_SCALE +
+        input.worldPos.zz * WRITING_EDGE_NOISE_Z_SCALE + float2(time * WRITING_EDGE_NOISE_FLOW_X, -time * WRITING_EDGE_NOISE_FLOW_Y));
+    const float threshold = WRITING_REVEAL_BASE_THRESHOLD + edgeNoise * WRITING_REVEAL_NOISE_WEIGHT;
+    const float reveal = smoothstep(threshold, threshold + WRITING_REVEAL_BLEND_WIDTH, received * WRITING_REVEAL_LIGHT_GAIN);
 
     const float alpha = saturate(shape * reveal * presence);
-    if (alpha <= 0.002f)
+    if (alpha <= WRITING_MIN_VISIBLE_ALPHA)
     {
         discard;
     }
@@ -90,8 +112,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 光を受けた量で明るさを変え、壁に染み込んだ暗い色が照らされているように見せている。
     // 光の中心は少しだけ自ら光らせ、暗い画面でも読めるようにしている。
     const float3 inkColor = Material.Diffuse.rgb;
-    float3 color = inkColor * (0.28f + received * 0.72f) +
-        inkColor * smoothstep(0.55f, 1.0f, received) * 0.12f;
+    float3 color = inkColor * (WRITING_INK_BASE_GAIN + received * WRITING_INK_RECEIVED_GAIN) +
+        inkColor * smoothstep(WRITING_INK_GLINT_START, 1.0f, received) * WRITING_INK_GLINT_GAIN;
 
     // 壁と同じ距離の霧をかけ、文字だけが浮いて見えないようにしている。
     const float distanceFog = GetHorrorDistanceFog(distanceFromCamera, LoopDepth);

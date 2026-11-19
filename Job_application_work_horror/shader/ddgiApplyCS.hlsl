@@ -26,7 +26,11 @@ float3 ViewPositionAt(int2 pixel)
     return position.xyz / position.w;
 }
 
-[numthreads(8, 8, 1)]
+// DDGIVolume.cpp の OutputDownscale と ApplyGroupSize に対応する。
+#define DDGI_APPLY_DOWNSAMPLE_FACTOR 2
+#define DDGI_APPLY_GROUP_SIZE 8
+
+[numthreads(DDGI_APPLY_GROUP_SIZE, DDGI_APPLY_GROUP_SIZE, 1)]
 void main(uint3 id : SV_DispatchThreadID)
 {
     const int2 outputPixel = int2(id.xy);
@@ -34,7 +38,7 @@ void main(uint3 id : SV_DispatchThreadID)
     {
         return;
     }
-    const int2 pixel = min(outputPixel * 2, int2(ViewportSize) - 1);
+    const int2 pixel = min(outputPixel * DDGI_APPLY_DOWNSAMPLE_FACTOR, int2(ViewportSize) - 1);
     const float depth = SceneDepth.Load(int3(pixel + int2(ViewportOffset), 0));
     if (depth >= 1.0f)
     {

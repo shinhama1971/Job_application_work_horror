@@ -20,13 +20,24 @@ cbuffer RoomOcclusionBuffer : register(b11)
     float OcclusionStrength;    // 角で一番暗くなる割合（0〜1）
 }
 
+// 壁がない場合の距離と、現在乗っている壁を数えないための余白。
+#define ROOM_NEAREST_WALL_FALLBACK_DISTANCE 1000.0f
+#define ROOM_SELF_WALL_DISTANCE_MARGIN 0.05f
+
+// 床際と天井際の暗がりは面から離れるほど弱める。壁同士の隅も別に調整する。
+#define ROOM_CORNER_FALLOFF_DISTANCE 5.0f
+#define ROOM_VERTICAL_OCCLUSION_GAIN 1.5f
+#define ROOM_FLOOR_EDGE_FALLOFF_DISTANCE 5.0f
+#define ROOM_CEILING_EDGE_FALLOFF_DISTANCE 4.0f
+#define ROOM_CEILING_EDGE_GAIN 0.85f
+
 // 近くの壁までの距離を返している（壁の箱がないときは1000）。自分が乗っている壁（距離がほぼ0）は数えないので、
 // 壁の面では「交わる別の壁」まで、床と天井では「一番近い壁」までの距離になる。
 // 床の壁際の埃（wetFloorPS）にも使っている。
 float GetNearestWallDistance(float2 worldPositionXZ)
 {
     // 壁ごとの比較は距離の二乗で行い、最も近い壁が決まってから平方根を取る。
-    float nearestWallSquared = 1000.0f * 1000.0f;
+    float nearestWallSquared = ROOM_NEAREST_WALL_FALLBACK_DISTANCE * ROOM_NEAREST_WALL_FALLBACK_DISTANCE;
     const uint boxCount = min(OcclusionBoxCount, MaxOcclusionBoxes);
     [loop]
     for (uint i = 0; i < boxCount; ++i)
@@ -35,7 +46,7 @@ float GetNearestWallDistance(float2 worldPositionXZ)
         const float2 outside = max(abs(worldPositionXZ - box.xy) - box.zw, 0.0f);
         const float distanceSquared = dot(outside, outside);
         nearestWallSquared = min(nearestWallSquared,
-            distanceSquared > 0.05f * 0.05f ? distanceSquared : nearestWallSquared);
+            distanceSquared > ROOM_SELF_WALL_DISTANCE_MARGIN * ROOM_SELF_WALL_DISTANCE_MARGIN ? distanceSquared : nearestWallSquared);
     }
     return sqrt(nearestWallSquared);
 }
@@ -44,12 +55,12 @@ float GetNearestWallDistance(float2 worldPositionXZ)
 float ComputeRoomOcclusion(float3 worldPosition, float3 worldNormal, float nearestWall)
 {
     // 床と壁・天井と壁・壁と壁の角は、角から離れるにつれてなだらかに明るくしている。
-    const float cornerOcclusion = exp(-nearestWall / 5.0f);
+    const float cornerOcclusion = exp(-nearestWall / ROOM_CORNER_FALLOFF_DISTANCE);
 
     // 壁の面だけ、床際と天井際も暗くしている（床や天井の面自体には使わない）。
-    const float verticalSurface = saturate(1.0f - abs(worldNormal.y) * 1.5f);
-    const float floorOcclusion = exp(-max(worldPosition.y - OcclusionFloorY, 0.0f) / 5.0f);
-    const float ceilingOcclusion = exp(-max(OcclusionCeilingY - worldPosition.y, 0.0f) / 4.0f) * 0.85f;
+    const float verticalSurface = saturate(1.0f - abs(worldNormal.y) * ROOM_VERTICAL_OCCLUSION_GAIN);
+    const float floorOcclusion = exp(-max(worldPosition.y - OcclusionFloorY, 0.0f) / ROOM_FLOOR_EDGE_FALLOFF_DISTANCE);
+    const float ceilingOcclusion = exp(-max(OcclusionCeilingY - worldPosition.y, 0.0f) / ROOM_CEILING_EDGE_FALLOFF_DISTANCE) * ROOM_CEILING_EDGE_GAIN;
     const float edgeOcclusion = verticalSurface * max(floorOcclusion, ceilingOcclusion);
 
     // 2つの暗がりが重なる角（床と2枚の壁が交わる隅）は、より暗くしている。

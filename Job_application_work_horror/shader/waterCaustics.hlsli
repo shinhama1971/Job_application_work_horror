@@ -131,20 +131,46 @@ float GetRippleCausticFocus(float2 positionXZ)
     return saturate(laplacian * 0.9f) * CausticRipple.w;
 }
 
+// 揺らぎで網目の位置を曲げ、二層のノイズを違う速さで動かす。
+#define CAUSTIC_GRID_SCALE 0.12f
+#define CAUSTIC_WARP_NOISE_SCALE 0.6f
+#define CAUSTIC_WARP_FLOW_AX 0.15f
+#define CAUSTIC_WARP_FLOW_AZ 0.07f
+#define CAUSTIC_WARP_FLOW_BX 0.12f
+#define CAUSTIC_WARP_FLOW_BZ 0.10f
+#define CAUSTIC_WARP_NOISE_SEED 17.3f
+#define CAUSTIC_WARP_AMPLITUDE 2.2f
+#define CAUSTIC_FIRST_LAYER_FLOW 0.20f
+#define CAUSTIC_SECOND_LAYER_SCALE 1.37f
+#define CAUSTIC_SECOND_LAYER_WARP 0.8f
+#define CAUSTIC_SECOND_LAYER_FLOW 0.17f
+#define CAUSTIC_SECOND_LAYER_SEED 5.1f
+
+// ノイズの尾根だけを細い光にし、重なる二層の明るさを別に調整する。
+#define CAUSTIC_RIDGE_EXPONENT 6.0f
+#define CAUSTIC_FIRST_RIDGE_WEIGHT 0.85f
+#define CAUSTIC_SECOND_RIDGE_WEIGHT 0.65f
+
+// 水面付近では交差が不安定になりやすいため、視点と投影される面に同じ余白を設ける。
+#define CAUSTIC_WATER_SURFACE_MARGIN 0.05f
+
+// 浸水範囲の縁では、壁へ映る光を急に切らずになじませる。
+#define CAUSTIC_FLOOD_EDGE_WIDTH 6.0f
+
 // 水面の点（x・z）での、波が光を集めてできる網目模様（0〜1）を返している。
 // 流れるノイズで座標をゆがめ、ノイズの値が0.5になる線（尾根）を細く明るくして、2枚を重ねている。
 float GetCausticPattern(float2 waterPositionXZ, float time)
 {
-    const float2 position = waterPositionXZ * 0.12f;
+    const float2 position = waterPositionXZ * CAUSTIC_GRID_SCALE;
     const float2 warp = float2(
-        FastValueNoise(position * 0.6f + float2(time * 0.15f, time * 0.07f)),
-        FastValueNoise(position * 0.6f + float2(-time * 0.12f, time * 0.10f) + 17.3f)) * 2.2f;
-    const float first = FastValueNoise(position + warp + time * 0.20f);
-    const float second = FastValueNoise(position * 1.37f - warp * 0.8f - time * 0.17f + 5.1f);
+        FastValueNoise(position * CAUSTIC_WARP_NOISE_SCALE + float2(time * CAUSTIC_WARP_FLOW_AX, time * CAUSTIC_WARP_FLOW_AZ)),
+        FastValueNoise(position * CAUSTIC_WARP_NOISE_SCALE + float2(-time * CAUSTIC_WARP_FLOW_BX, time * CAUSTIC_WARP_FLOW_BZ) + CAUSTIC_WARP_NOISE_SEED)) * CAUSTIC_WARP_AMPLITUDE;
+    const float first = FastValueNoise(position + warp + time * CAUSTIC_FIRST_LAYER_FLOW);
+    const float second = FastValueNoise(position * CAUSTIC_SECOND_LAYER_SCALE - warp * CAUSTIC_SECOND_LAYER_WARP - time * CAUSTIC_SECOND_LAYER_FLOW + CAUSTIC_SECOND_LAYER_SEED);
     // 1 - |2n - 1| は、ノイズが0.5の所で1になる尾根。6乗して細い光の線にしている
     const float firstRidge = 1.0f - abs(first * 2.0f - 1.0f);
     const float secondRidge = 1.0f - abs(second * 2.0f - 1.0f);
-    return saturate(pow(firstRidge, 6.0f) * 0.85f + pow(secondRidge, 6.0f) * 0.65f);
+    return saturate(pow(firstRidge, CAUSTIC_RIDGE_EXPONENT) * CAUSTIC_FIRST_RIDGE_WEIGHT + pow(secondRidge, CAUSTIC_RIDGE_EXPONENT) * CAUSTIC_SECOND_RIDGE_WEIGHT);
 }
 
 // 壁や天井の点（ワールド座標）に、水面で跳ね返って届く懐中電灯の光の明るさ（色は掛ける前）を返している
@@ -152,7 +178,7 @@ float GetWaterCausticLight(float3 worldPosition, float3 worldNormal)
 {
     // 効果がない面（浸水した範囲も水たまりの波もない）・懐中電灯を消しているとき・水面より下の点では計算しない
     if ((CausticStrength <= 0.0f && CausticRipple.w <= 0.0f) || !Light.Enable || !Light.FlashlightEnabled ||
-        worldPosition.y <= CausticWaterY + 0.05f)
+        worldPosition.y <= CausticWaterY + CAUSTIC_WATER_SURFACE_MARGIN)
     {
         return 0.0f;
     }
@@ -160,7 +186,7 @@ float GetWaterCausticLight(float3 worldPosition, float3 worldNormal)
     // カメラの位置をビュー行列から求めている（ビュー空間 = ワールド × CausticView なので、目の位置 = -(回転) × 平行移動）
     const float3 eye = -mul((float3x3)CausticView, CausticView[3].xyz);
     // 水面より下に目がある（水に潜っている）ときは計算しない
-    if (eye.y <= CausticWaterY + 0.05f)
+    if (eye.y <= CausticWaterY + CAUSTIC_WATER_SURFACE_MARGIN)
     {
         return 0.0f;
     }
@@ -176,7 +202,7 @@ float GetWaterCausticLight(float3 worldPosition, float3 worldNormal)
     const float2 toMaximum = CausticFloodRect.zw - waterPoint.xz;
     const float insideDistance = min(
         min(fromMinimum.x, fromMinimum.y), min(toMaximum.x, toMaximum.y));
-    const float flood = smoothstep(0.0f, 6.0f, insideDistance) * CausticStrength;
+    const float flood = smoothstep(0.0f, CAUSTIC_FLOOD_EDGE_WIDTH, insideDistance) * CausticStrength;
     // 水たまりの波（足音・水滴でできた本物の波）が光を集めている所。波のない所・乾いた床では0になる
     const float rippleFocus = GetRippleCausticFocus(waterPoint.xz);
     if (flood <= 0.0f && rippleFocus <= 0.0f)

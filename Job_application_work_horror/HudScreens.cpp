@@ -73,6 +73,8 @@ namespace TitleLayout
     constexpr float BandWidth = 560.0f;
     constexpr float FadeWidth = 260.0f;
     constexpr int FadeSteps = 26;
+    // 段の継ぎ目に描き残しが出ないよう、隣の段へ少し重ねる。
+    constexpr float FadeStripOverlap = 0.5f;
     constexpr float ScanlineSpacing = 6.0f;
     constexpr float SideLineX = 56.0f;
     constexpr float SideLineMargin = 120.0f;
@@ -86,6 +88,8 @@ namespace TitleLayout
     constexpr float NoiseJitter = 28.0f;
     // 色のにじみ：起こすノイズの強さ、左右のずれ（最低＋ノイズの幅）、赤と青緑の色
     constexpr float NoiseVisibleLevel = 0.05f;
+    // 青緑のにじみは横だけでなく縦もずらし、題名と完全には重ならないようにする。
+    constexpr float SplitCyanVerticalOffset = 1.0f;
     constexpr float SplitBase = 4.0f;
     constexpr float SplitRange = 10.0f;
     const Color SplitRed(0.95f, 0.18f, 0.16f, 0.55f);
@@ -155,7 +159,9 @@ namespace TitleLayout
     // --- 右上の受信表示：右端からの距離、明滅（1秒のうち点いている割合）、印の位置と大きさ、色（受信中・信号なし）、
     // 文字の位置（印からの距離・上の位置・2行目・時刻の横の位置）と大きさ、信号なしにするノイズの強さ
     constexpr float StatusRightMargin = 250.0f;
-    constexpr float StatusBlinkOn = 0.6f;
+    // 監視映像の状態ランプは、周期ごとに点灯時間と消灯時間を繰り返す。
+    constexpr float StatusBlinkCycleSeconds = 1.0f;
+    constexpr float StatusBlinkOnSeconds = 0.6f;
     constexpr float StatusMarkY = 46.0f;
     constexpr float StatusMarkSize = 10.0f;
     const Color LostMarkColor(0.92f, 0.22f, 0.18f, 0.90f);
@@ -213,7 +219,7 @@ void Hud::DrawTitle(
     {
         const float t = (static_cast<float>(step) + 0.5f) / static_cast<float>(FadeSteps);
         AddRectangle(BandWidth - FadeWidth + FadeWidth * static_cast<float>(step) / FadeSteps, 0.0f,
-            FadeWidth / FadeSteps + 0.5f, screenHeight, Faded(BandColor, (1.0f - t) * (1.0f - t)));
+            FadeWidth / FadeSteps + FadeStripOverlap, screenHeight, Faded(BandColor, (1.0f - t) * (1.0f - t)));
     }
     // 画面全体の薄い走査線（古いモニターや監視映像のような見た目）
     for (float y = 0.0f; y < screenHeight; y += ScanlineSpacing)
@@ -233,7 +239,7 @@ void Hud::DrawTitle(
         // 色のにじみ（赤と青緑を、左右に少しずらして重ねている）
         const float split = SplitBase + SplitRange * noise;
         AddText(Left + jitter - split, TitleY, title, TitlePixelSize, Faded(SplitRed, noise));
-        AddText(Left + jitter + split, TitleY + 1.0f, title, TitlePixelSize, Faded(SplitCyan, noise));
+        AddText(Left + jitter + split, TitleY + SplitCyanVerticalOffset, title, TitlePixelSize, Faded(SplitCyan, noise));
     }
     // 本体の文字。乱れている間は、ときどき一瞬暗くしている（電波が途切れる）
     const float dropout = (noise > DropoutNoiseLevel && hash(noiseStep + DropoutSeedOffset) < DropoutChance) ? DropoutAlpha : 1.0f;
@@ -331,7 +337,7 @@ void Hud::DrawTitle(
     std::snprintf(timeText, sizeof(timeText), "%02d:%02d:%02d", ClockStartHour + clock / SecondsPerHour,
         (ClockStartMinute + clock / SecondsPerMinute) % SecondsPerMinute, (ClockStartSecond + clock) % SecondsPerMinute);
     const float statusX = screenWidth - StatusRightMargin;
-    const bool blink = std::fmod(time, 1.0f) < StatusBlinkOn;
+    const bool blink = std::fmod(time, StatusBlinkCycleSeconds) < StatusBlinkOnSeconds;
     if (blink || lost)
     {
         AddRectangle(statusX, StatusMarkY, StatusMarkSize, StatusMarkSize, lost ? LostMarkColor : LiveMarkColor);

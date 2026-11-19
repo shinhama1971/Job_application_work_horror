@@ -55,6 +55,13 @@ float2 LoadPrevious(int2 texel)
     return PreviousState.Load(int3(texel, 0));
 }
 
+// 岸の水マスクを残しつつ、計算範囲の端で波を吸収する。
+static const float RIPPLE_WATER_MASK_GAIN = 1.5f;
+static const float RIPPLE_BOUNDARY_FADE_CELLS = 8.0f;
+
+// 複数の足音が重なっても、高さを安定する範囲へ収める。
+static const float RIPPLE_MAX_HEIGHT = 4.0f;
+
 [numthreads(GROUP_SIZE, GROUP_SIZE, 1)]
 void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 {
@@ -84,7 +91,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     const float2 fromMinimum = worldPosition - FloodRect.xy;
     const float2 toMaximum = FloodRect.zw - worldPosition;
     const float flood = step(0.0f, min(min(fromMinimum.x, fromMinimum.y), min(toMaximum.x, toMaximum.y)));
-    const float water = saturate(max(puddle, flood) * 1.5f);
+    const float water = saturate(max(puddle, flood) * RIPPLE_WATER_MASK_GAIN);
     // 床に立った柱や脚の中も高さを0に固定し、波がその周りで跳ね返るようにしている
     float blocked = 0.0f;
     for (int obstacle = 0; obstacle < ObstacleCount; ++obstacle)
@@ -94,8 +101,8 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     }
     // 範囲の縁の8マスでは少しずつ弱め、縁で跳ね返った波が戻ってこないようにしている
     const int2 edgeDistance = min(texel, GetRippleResolution() - 1 - texel);
-    const float edgeFade = saturate(min(edgeDistance.x, edgeDistance.y) / 8.0f);
+    const float edgeFade = saturate(min(edgeDistance.x, edgeDistance.y) / RIPPLE_BOUNDARY_FADE_CELLS);
     const float keep = water * edgeFade * (1.0f - blocked);
 
-    NextState[texel] = float2(clamp(height, -4.0f, 4.0f) * keep, current.x * keep);
+    NextState[texel] = float2(clamp(height, -RIPPLE_MAX_HEIGHT, RIPPLE_MAX_HEIGHT) * keep, current.x * keep);
 }

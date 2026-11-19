@@ -1,6 +1,10 @@
 #ifndef LIGHT_SHAFT_SEGMENT_INCLUDED
 #define LIGHT_SHAFT_SEGMENT_INCLUDED
 
+// 光の筋は真下に集め、外側に向けて薄くする。FXC に渡すリテラルを保つため展開する。
+#define LIGHT_SHAFT_CONE_START 0.55f
+#define LIGHT_SHAFT_CONE_FULL 0.92f
+
 static const float LIGHT_SHAFT_DENSITY = 0.0018f;
 // 壁の表示灯を除き、天井付近の照明だけを積分する。
 static const float LIGHT_SHAFT_MIN_HEIGHT = -58.0f;
@@ -35,7 +39,7 @@ float2 GetLightShaftSegment(float3 eye, float3 rayDirection, float rayLength,
 float GetLightShaftConeWeight(float3 toLight, float lightDistance)
 {
     const float downward = saturate(toLight.y / max(lightDistance, 0.001f));
-    return smoothstep(0.55f, 0.92f, downward);
+    return smoothstep(LIGHT_SHAFT_CONE_START, LIGHT_SHAFT_CONE_FULL, downward);
 }
 
 #endif

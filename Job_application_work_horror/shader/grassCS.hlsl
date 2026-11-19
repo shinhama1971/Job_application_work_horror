@@ -50,6 +50,38 @@ cbuffer GrassSimulationBuffer : register(b0)
 StructuredBuffer<GrassBlade> g_Blades : register(t0);
 RWStructuredBuffer<GrassState> g_States : register(u0);
 
+// 場所ごとに位相をずらし、草むらを渡る突風と葉ごとの細かい動きを重ねる。
+static const float GRASS_GUST_SPATIAL_SCALE = 0.011f;
+static const float GRASS_GUST_FLOW_SPEED = 0.22f;
+static const float GRASS_GUST_COARSE_WEIGHT = 0.7f;
+static const float GRASS_GUST_FINE_WEIGHT = 0.3f;
+static const float GRASS_GUST_FINE_SCALE = 2.7f;
+static const float GRASS_GUST_FINE_SEED = 9.0f;
+static const float GRASS_FLUTTER_BASE_RATE = 2.3f;
+static const float GRASS_FLUTTER_STIFFNESS_RATE = 0.05f;
+static const float2 GRASS_FLUTTER_PHASE_WEIGHTS = float2(0.71f, 0.53f);
+static const float GRASS_WIND_BASE_GAIN = 0.15f;
+static const float GRASS_WIND_GUST_GAIN = 1.1f;
+static const float GRASS_FLUTTER_AMPLITUDE = 0.05f;
+
+// プレイヤーと見えない影は、草を外へ押す強さと葉の低さが異なる。
+static const float GRASS_PLAYER_PUSH_GAIN = 2.2f;
+static const float GRASS_PLAYER_HEIGHT_REDUCTION = 0.7f;
+static const float GRASS_UNSEEN_FLATTEN_GAIN = 3.4f;
+static const float GRASS_UNSEEN_HEIGHT_REDUCTION = 0.92f;
+
+// 倒れた目標の葉先を地面にめり込ませない。grassVS の視点補正でも同じ下限を使う。
+static const float GRASS_MIN_TARGET_UP_COMPONENT = 0.12f;
+
+// 影が通り過ぎたあとも倒れ具合を残し、毎秒一定の割合で元に戻す。
+static const float GRASS_FLATTEN_RECOVERY_PER_SECOND = 0.2f;
+static const float GRASS_UNSEEN_FOOTPRINT_CENTER_WEIGHT = 1.3f;
+
+// 葉の硬さに応じて減衰を増やし、物理計算後にも地面へのめり込みを抑える。
+static const float GRASS_DAMPING_BASE = 3.2f;
+static const float GRASS_DAMPING_STIFFNESS_GAIN = 0.12f;
+static const float GRASS_MIN_UPDATED_UP_COMPONENT = 0.10f;
+
 // 何もないときの葉先と、風とプレイヤーの力を足した、この瞬間の目標の葉先（根元からのずれ）を返している
 float3 GetTargetTip(GrassBlade blade, float flatten, float flattenAngle)
 {
@@ -57,10 +89,10 @@ float3 GetTargetTip(GrassBlade blade, float flatten, float flattenAngle)
     float3 target = normalize(float3(0.0f, 1.0f, 0.0f) + leanDirection * blade.Lean);
 
     // 風：大きなノイズを風の向きへ流して、草むらを渡っていく突風の波にしている。葉ごとの細かいそよぎも重ねている
-    const float2 windSample = blade.Root.xz * 0.011f - WindDirection * Time * 0.22f;
-    const float gust = FastValueNoise(windSample) * 0.7f + FastValueNoise(windSample * 2.7f + 9.0f) * 0.3f;
-    const float flutter = sin(Time * (2.3f + blade.Stiffness * 0.05f) + dot(blade.Root.xz, float2(0.71f, 0.53f)));
-    const float windAmount = WindStrength * (0.15f + gust * gust * 1.1f) + flutter * 0.05f;
+    const float2 windSample = blade.Root.xz * GRASS_GUST_SPATIAL_SCALE - WindDirection * Time * GRASS_GUST_FLOW_SPEED;
+    const float gust = FastValueNoise(windSample) * GRASS_GUST_COARSE_WEIGHT + FastValueNoise(windSample * GRASS_GUST_FINE_SCALE + GRASS_GUST_FINE_SEED) * GRASS_GUST_FINE_WEIGHT;
+    const float flutter = sin(Time * (GRASS_FLUTTER_BASE_RATE + blade.Stiffness * GRASS_FLUTTER_STIFFNESS_RATE) + dot(blade.Root.xz, GRASS_FLUTTER_PHASE_WEIGHTS));
+    const float windAmount = WindStrength * (GRASS_WIND_BASE_GAIN + gust * gust * GRASS_WIND_GUST_GAIN) + flutter * GRASS_FLUTTER_AMPLITUDE;
     target += float3(WindDirection.x, 0.0f, WindDirection.y) * windAmount;
 
     // プレイヤー：足元のまわりの葉を、外へ押し倒している（近いほど強く、真ん中の葉はほぼ寝る）
@@ -70,20 +102,20 @@ float3 GetTargetTip(GrassBlade blade, float flatten, float flattenAngle)
     if (push > 0.0f)
     {
         const float2 pushDirection = away / max(distanceToPlayer, 0.001f);
-        target += float3(pushDirection.x, 0.0f, pushDirection.y) * push * 2.2f;
-        target.y *= 1.0f - push * 0.7f;
+        target += float3(pushDirection.x, 0.0f, pushDirection.y) * push * GRASS_PLAYER_PUSH_GAIN;
+        target.y *= 1.0f - push * GRASS_PLAYER_HEIGHT_REDUCTION;
     }
 
     // 「見えない何か」に踏まれた葉：踏まれた向きへ倒れたまま、ゆっくり起き上がる（倒れ具合 flatten は葉ごとに覚えている）
     if (flatten > 0.0f)
     {
-        target += float3(cos(flattenAngle), 0.0f, sin(flattenAngle)) * flatten * 3.4f;
-        target.y *= 1.0f - flatten * 0.92f;
+        target += float3(cos(flattenAngle), 0.0f, sin(flattenAngle)) * flatten * GRASS_UNSEEN_FLATTEN_GAIN;
+        target.y *= 1.0f - flatten * GRASS_UNSEEN_HEIGHT_REDUCTION;
     }
 
     // 長さをそろえ、寝ても地面より少し上に葉先が残るようにしている
     target = normalize(target);
-    target.y = max(target.y, 0.12f);
+    target.y = max(target.y, GRASS_MIN_TARGET_UP_COMPONENT);
     return normalize(target) * blade.Height;
 }
 
@@ -99,13 +131,13 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     GrassState state = g_States[index];
     // 「見えない何か」に踏まれた倒れ具合（Tip.w。0〜1）と、倒れる向き（Velocity.w。xz の角度）。
     // 踏まれている間は 1 にし、離れたら約5秒で 0 へ戻している（通った跡が草むらに残り、ゆっくり消える）
-    float flatten = max(state.Tip.w - DeltaTime * 0.2f, 0.0f);
+    float flatten = max(state.Tip.w - DeltaTime * GRASS_FLATTEN_RECOVERY_PER_SECOND, 0.0f);
     float flattenAngle = state.Velocity.w;
     if (UnseenStrength > 0.0f)
     {
         const float2 fromWalker = blade.Root.xz - UnseenPosition;
         const float walkerDistance = length(fromWalker);
-        const float stepOn = UnseenStrength * saturate(1.3f - walkerDistance / max(UnseenRadius, 0.001f));
+        const float stepOn = UnseenStrength * saturate(GRASS_UNSEEN_FOOTPRINT_CENTER_WEIGHT - walkerDistance / max(UnseenRadius, 0.001f));
         if (stepOn > flatten)
         {
             flatten = saturate(stepOn);
@@ -118,7 +150,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     const float stepSeconds = DeltaTime * 0.5f;
     float3 tip = state.Tip.xyz;
     float3 velocity = state.Velocity.xyz;
-    const float damping = 3.2f + blade.Stiffness * 0.12f;
+    const float damping = GRASS_DAMPING_BASE + blade.Stiffness * GRASS_DAMPING_STIFFNESS_GAIN;
     [unroll]
     for (int step = 0; step < 2; ++step)
     {
@@ -129,7 +161,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 
     // 葉の長さを保ち、地面にめり込ませない
     tip = normalize(tip + float3(0.0f, 0.0001f, 0.0f));
-    tip.y = max(tip.y, 0.10f);
+    tip.y = max(tip.y, GRASS_MIN_UPDATED_UP_COMPONENT);
     tip = normalize(tip) * blade.Height;
 
     state.Tip = float4(tip, flatten);

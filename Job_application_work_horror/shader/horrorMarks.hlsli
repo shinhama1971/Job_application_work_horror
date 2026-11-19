@@ -20,6 +20,9 @@ struct HorrorMarks
 };
 
 // 点pから線分abまでの距離
+// 遠くにある細い手形や傷を薄め、画素より細い線のちらつきを抑える。
+static const float HORROR_MARKS_FINE_DETAIL_FOOTPRINT = 0.6f;
+
 float HorrorSegmentDistance(float2 p, float2 a, float2 b)
 {
     const float2 pa = p - a;
@@ -54,6 +57,47 @@ float HorrorHandprint(float2 p, float mirror, float footprint)
 }
 
 // 壁に沿った横の座標 alongWall、床からの高さ heightFromFloor、壁の面の位置 planeCoordinate から、その点の跡を返している
+// 血の付き方のむらと、手形・引っかき傷・垂れ跡の出る乱数の範囲。
+#define HORROR_MARK_BLOOD_MIN_COVERAGE 0.55f
+#define HORROR_MARK_BLOOD_COVERAGE_RANGE 0.45f
+#define HORROR_MARK_HANDPRINT_CUTOFF 0.12f
+#define HORROR_MARK_SCRATCH_CUTOFF 0.24f
+#define HORROR_MARK_DRIP_CUTOFF 0.36f
+
+// 手を押し付ける高さと、床側へ引きずる長さをばらつかせる。
+#define HORROR_MARK_HAND_HEIGHT_MIN 20.0f
+#define HORROR_MARK_HAND_HEIGHT_RANGE 12.0f
+#define HORROR_MARK_HAND_ROTATION_RANGE 0.6f
+#define HORROR_MARK_SECOND_HAND_BLEND 0.8f
+#define HORROR_MARK_HAND_DRAG_MIN_LENGTH 6.0f
+#define HORROR_MARK_HAND_DRAG_LENGTH_RANGE 10.0f
+#define HORROR_MARK_HAND_DRAG_STRIPE_RATE 7.0f
+#define HORROR_MARK_HAND_DRAG_ALPHA 0.75f
+
+// 爪の溝は端ほど細くなり、血が入る溝も一部に限る。
+#define HORROR_MARK_SCRATCH_MIN_HEIGHT 14.0f
+#define HORROR_MARK_SCRATCH_HEIGHT_RANGE 16.0f
+#define HORROR_MARK_SCRATCH_ROTATION_RANGE 1.2f
+#define HORROR_MARK_SCRATCH_MIN_HALF_LENGTH 5.0f
+#define HORROR_MARK_SCRATCH_HALF_LENGTH_RANGE 4.0f
+#define HORROR_MARK_SCRATCH_COUNT 4
+#define HORROR_MARK_SCRATCH_SPACING 0.75f
+#define HORROR_MARK_SCRATCH_CURVATURE 0.012f
+#define HORROR_MARK_SCRATCH_WIDTH 0.10f
+#define HORROR_MARK_SCRATCH_BLOOD_GAIN 0.7f
+
+// 垂れる筋ごとに長さと幅を変え、下端に光の当たる小さな雫を作る。
+#define HORROR_MARK_DRIP_MIN_HEIGHT 30.0f
+#define HORROR_MARK_DRIP_HEIGHT_RANGE 14.0f
+#define HORROR_MARK_DRIP_COUNT 5
+#define HORROR_MARK_DRIP_MIN_LENGTH 4.0f
+#define HORROR_MARK_DRIP_LENGTH_RANGE 16.0f
+#define HORROR_MARK_DRIP_MIN_WIDTH 0.16f
+#define HORROR_MARK_DRIP_WIDTH_RANGE 0.14f
+#define HORROR_MARK_DRIP_WIDTH_SEED 7.9f
+#define HORROR_MARK_DRIP_BULB_CORE 1.2f
+#define HORROR_MARK_DRIP_BULB_EDGE 1.8f
+
 HorrorMarks ComputeHorrorMarks(float alongWall, float heightFromFloor, float planeCoordinate, float footprint)
 {
     HorrorMarks marks;
@@ -87,78 +131,78 @@ HorrorMarks ComputeHorrorMarks(float alongWall, float heightFromFloor, float pla
     {
         return marks;
     }
-    const float fade = saturate(1.0f - footprint / 0.6f);
+    const float fade = saturate(1.0f - footprint / HORROR_MARKS_FINE_DETAIL_FOOTPRINT);
     // 血の付き方のむら（かすれ）
-    const float smudge = 0.55f + 0.45f * FastValueNoise(local * 0.8f + cellKey * 7.0f);
+    const float smudge = HORROR_MARK_BLOOD_MIN_COVERAGE + HORROR_MARK_BLOOD_COVERAGE_RANGE * FastValueNoise(local * 0.8f + cellKey * 7.0f);
 
     [branch]
-    if (kind < 0.12f)
+    if (kind < HORROR_MARK_HANDPRINT_CUTOFF)
     {
         // --- 血の手形。1つか2つ、少し傾けて押し付け、片方は下へ引きずった跡を付けている
         // 手形の大きさ（手のひらの幅が約5。目の高さが床から40なので、人の手と同じくらい）
         const float HandScale = 1.25f;
-        const float handHeight = 20.0f + seedB * 12.0f;
-        const float angle = (seedC - 0.5f) * 0.6f;
+        const float handHeight = HORROR_MARK_HAND_HEIGHT_MIN + seedB * HORROR_MARK_HAND_HEIGHT_RANGE;
+        const float angle = (seedC - 0.5f) * HORROR_MARK_HAND_ROTATION_RANGE;
         const float2x2 rotation = float2x2(cos(angle), -sin(angle), sin(angle), cos(angle));
         const float2 handPoint = mul(rotation, local - float2(0.0f, handHeight));
         float hand = HorrorHandprint(handPoint / HandScale, seedB < 0.5f ? 1.0f : -1.0f, footprint / HandScale);
         if (seedC > 0.45f)
         {
             const float2 secondPoint = mul(rotation, local - float2(6.5f, handHeight - 3.0f));
-            hand = max(hand, HorrorHandprint(secondPoint / HandScale, seedB < 0.5f ? -1.0f : 1.0f, footprint / HandScale) * 0.8f);
+            hand = max(hand, HorrorHandprint(secondPoint / HandScale, seedB < 0.5f ? -1.0f : 1.0f, footprint / HandScale) * HORROR_MARK_SECOND_HAND_BLEND);
         }
         // 手のひらの下へ、指の筋を残して引きずった跡（下へ行くほど薄くかすれる）
-        const float dragLength = 6.0f + seedA * 10.0f;
+        const float dragLength = HORROR_MARK_HAND_DRAG_MIN_LENGTH + seedA * HORROR_MARK_HAND_DRAG_LENGTH_RANGE;
         const float dragAcross = 1.0f - smoothstep(1.5f * HandScale, 2.0f * HandScale + footprint, abs(handPoint.x));
         const float dragAlong = saturate(-handPoint.y / dragLength);
-        const float dragStreaks = 0.5f + 0.5f * sin(handPoint.x * 7.0f + FastValueNoise(handPoint * 0.8f) * 2.0f);
-        const float drag = dragAcross * step(0.0f, -handPoint.y) * (1.0f - dragAlong) * dragStreaks * 0.75f;
+        const float dragStreaks = 0.5f + 0.5f * sin(handPoint.x * HORROR_MARK_HAND_DRAG_STRIPE_RATE + FastValueNoise(handPoint * 0.8f) * 2.0f);
+        const float drag = dragAcross * step(0.0f, -handPoint.y) * (1.0f - dragAlong) * dragStreaks * HORROR_MARK_HAND_DRAG_ALPHA;
         marks.blood = max(hand, drag) * smudge * fade;
     }
-    else if (kind < 0.24f)
+    else if (kind < HORROR_MARK_SCRATCH_CUTOFF)
     {
         // --- 引っかき傷。4本の細い溝が、斜めに少し曲がりながら並んでいる
-        const float scratchCenter = 14.0f + seedB * 16.0f;
-        const float angle = (seedC - 0.5f) * 1.2f;
+        const float scratchCenter = HORROR_MARK_SCRATCH_MIN_HEIGHT + seedB * HORROR_MARK_SCRATCH_HEIGHT_RANGE;
+        const float angle = (seedC - 0.5f) * HORROR_MARK_SCRATCH_ROTATION_RANGE;
         const float2x2 rotation = float2x2(cos(angle), -sin(angle), sin(angle), cos(angle));
         const float2 p = mul(rotation, local - float2(0.0f, scratchCenter));
-        const float halfLength = 5.0f + seedA * 4.0f;
+        const float halfLength = HORROR_MARK_SCRATCH_MIN_HALF_LENGTH + seedA * HORROR_MARK_SCRATCH_HALF_LENGTH_RANGE;
         const float along = saturate(abs(p.y) / halfLength);
         // 端ほど細く浅くなる
         const float taper = 1.0f - along * along;
         float gouge = 0.0f;
         [unroll]
-        for (int scratch = 0; scratch < 4; ++scratch)
+        for (int scratch = 0; scratch < HORROR_MARK_SCRATCH_COUNT; ++scratch)
         {
-            const float offset = (float(scratch) - 1.5f) * 0.75f;
+            const float offset = (float(scratch) - 1.5f) * HORROR_MARK_SCRATCH_SPACING;
             // 爪が滑ったように、下へ行くほど外へ少し曲がる
-            const float curve = p.y * p.y * 0.012f * (float(scratch) - 1.5f);
-            const float width = 0.10f * taper + footprint;
+            const float curve = p.y * p.y * HORROR_MARK_SCRATCH_CURVATURE * (float(scratch) - 1.5f);
+            const float width = HORROR_MARK_SCRATCH_WIDTH * taper + footprint;
             const float lineMask = 1.0f - smoothstep(width * 0.4f, width, abs(p.x - offset - curve));
             gouge = max(gouge, lineMask * taper);
         }
         marks.gouge = gouge * step(abs(p.y), halfLength) * fade;
         // 半分ほどの傷には、溝に血が残っている
-        marks.blood = marks.gouge * step(0.5f, seedB) * 0.7f;
+        marks.blood = marks.gouge * step(0.5f, seedB) * HORROR_MARK_SCRATCH_BLOOD_GAIN;
     }
-    else if (kind < 0.36f)
+    else if (kind < HORROR_MARK_DRIP_CUTOFF)
     {
         // --- 血の垂れ跡。上の方の染みから、長さの違う筋が下へ垂れ、先に雫がたまっている
-        const float top = 30.0f + seedB * 14.0f;
+        const float top = HORROR_MARK_DRIP_MIN_HEIGHT + seedB * HORROR_MARK_DRIP_HEIGHT_RANGE;
         const float2 blobPoint = (local - float2(0.0f, top)) / float2(2.8f, 1.3f);
         float blood = 1.0f - smoothstep(0.85f, 1.05f, length(blobPoint) +
             (FastValueNoise(local * 1.3f + cellKey) - 0.5f) * 0.5f);
         [unroll]
-        for (int drip = 0; drip < 5; ++drip)
+        for (int drip = 0; drip < HORROR_MARK_DRIP_COUNT; ++drip)
         {
             const float dripSeed = FastHash21(cellKey + float(drip) * 3.3f);
             const float x = (float(drip) - 2.0f) * 1.0f + (dripSeed - 0.5f) * 0.5f;
-            const float dripLength = 4.0f + dripSeed * 16.0f;
-            const float width = 0.16f + 0.14f * FastHash21(cellKey + float(drip) * 7.9f);
+            const float dripLength = HORROR_MARK_DRIP_MIN_LENGTH + dripSeed * HORROR_MARK_DRIP_LENGTH_RANGE;
+            const float width = HORROR_MARK_DRIP_MIN_WIDTH + HORROR_MARK_DRIP_WIDTH_RANGE * FastHash21(cellKey + float(drip) * HORROR_MARK_DRIP_WIDTH_SEED);
             const float below = top - heightFromFloor;
             const float stem = (1.0f - smoothstep(width * 0.5f, width + footprint, abs(local.x - x))) *
                 step(0.0f, below) * step(below, dripLength);
-            const float bulb = 1.0f - smoothstep(width * 1.2f, width * 1.8f + footprint,
+            const float bulb = 1.0f - smoothstep(width * HORROR_MARK_DRIP_BULB_CORE, width * HORROR_MARK_DRIP_BULB_EDGE + footprint,
                 length(float2(local.x - x, heightFromFloor - (top - dripLength))));
             blood = max(blood, max(stem, bulb));
         }

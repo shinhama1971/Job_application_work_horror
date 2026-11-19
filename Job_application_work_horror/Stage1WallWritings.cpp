@@ -80,7 +80,9 @@ bool Stage1WallWritings::Update(
         flatForward.y = 0.0f;
         const float distance = toWriting.Length();
         const float forwardLength = flatForward.Length();
-        const float facing = distance > 0.001f && forwardLength > 0.001f
+        // 真上・真下を向いた場合など、水平な方向がほぼゼロなら正規化を避ける。
+        constexpr float MinimumHorizontalLength = 0.001f;
+        const float facing = distance > MinimumHorizontalLength && forwardLength > MinimumHorizontalLength
             ? (flatForward / forwardLength).Dot(toWriting / distance)
             : 1.0f;
         if (facing <= TurnedAwayFacing)

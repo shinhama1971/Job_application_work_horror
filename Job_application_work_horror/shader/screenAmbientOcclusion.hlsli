@@ -10,6 +10,10 @@
 // 描く範囲の縦横半分の大きさで、描く範囲の左上が(0, 0)（ambientOcclusionCS.hlsl）
 Texture2D<float2> g_ScreenAmbientOcclusion : register(t15);
 
+// 各 Compute Shader が書く解像度に合わせて、本描画の画素を読み取り先へ変換する。
+#define SCREEN_OCCLUSION_UV_SCALE 0.5f
+#define SCREEN_INDIRECT_LIGHT_UV_SCALE 0.5f
+
 // 環境遮蔽と接触影を、画素の位置から読んでいる（使わないときは、どちらも1）
 float2 LoadScreenOcclusion(float2 pixelPosition)
 {
@@ -18,7 +22,7 @@ float2 LoadScreenOcclusion(float2 pixelPosition)
     if (ScreenAmbientOcclusionEnabled > 0.5f)
     {
         // 縦横半分の解像度で持っているので、画素の位置を半分にして読んでいる
-        occlusion = g_ScreenAmbientOcclusion.Load(int3(int2((pixelPosition - LightViewportOffset) * 0.5f), 0));
+        occlusion = g_ScreenAmbientOcclusion.Load(int3(int2((pixelPosition - LightViewportOffset) * SCREEN_OCCLUSION_UV_SCALE), 0));
     }
     return occlusion;
 }
@@ -40,7 +44,7 @@ float3 GetScreenIndirectLight(float2 pixelPosition)
     [branch]
     if (ScreenAmbientOcclusionEnabled > 0.5f)
     {
-        indirect = g_ScreenIndirectLight.Load(int3(int2((pixelPosition - LightViewportOffset) * 0.5f), 0)).rgb *
+        indirect = g_ScreenIndirectLight.Load(int3(int2((pixelPosition - LightViewportOffset) * SCREEN_INDIRECT_LIGHT_UV_SCALE), 0)).rgb *
             SCREEN_INDIRECT_LIGHT_INTENSITY;
     }
     return indirect;

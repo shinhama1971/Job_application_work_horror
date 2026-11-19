@@ -25,6 +25,13 @@ namespace
     constexpr float ArrowKeyYawSpeed = 6.0f;
     // 視線が真上・真下に近く、右方向を作れないとみなす長さの2乗
     constexpr float MinimumRightLengthSquared = 0.0001f;
+
+    // プレイヤー視点の射影と、その視点で行うカリングで描画距離を揃える。
+    constexpr float MainCameraFarPlane = 1000.0f;
+    // 軽量な視錐台近似で境界の壁が消えないように、奥行きと投影半径に余裕を持たせる。
+    constexpr float CullingNearDepth = 0.5f;
+    constexpr float CullingRadiusScale = 1.35f;
+    constexpr float CullingExtraMargin = 2.0f;
 }
 
 // 初期位置と向きを決め、マウスで視点を動かせる状態にしている（カーソルは隠している）。
@@ -206,12 +213,11 @@ void Camera::GetMainMatrices(Matrix& view, Matrix& projection) const
 
     constexpr float fieldOfView = DirectX::XMConvertToRadians(60.0f);
     constexpr float nearPlane = 1.0f;
-    constexpr float farPlane = 1000.0f;
     const float aspectRatio =
         static_cast<float>(Application::GetWidth()) /
         static_cast<float>(Application::GetHeight());
     projection = DirectX::XMMatrixPerspectiveFovLH(
-        fieldOfView, aspectRatio, nearPlane, farPlane);
+        fieldOfView, aspectRatio, nearPlane, MainCameraFarPlane);
 }
 
 // 反射や監視カメラなど別の視点で描く間だけ、SetCamera(0)が使う行列を差し替えている。
@@ -259,7 +265,7 @@ bool Camera::IsSphereVisible(
     const Vector3 offset = center - m_Position;
     const float distanceSquared =
         offset.x * offset.x + offset.y * offset.y + offset.z * offset.z;
-    const float farDistance = 1000.0f + radius;
+    const float farDistance = MainCameraFarPlane + radius;
     if (distanceSquared > farDistance * farDistance)
     {
         return false;
@@ -269,7 +275,7 @@ bool Camera::IsSphereVisible(
     const Vector3 forward = GetForward();
     const float depth =
         offset.x * forward.x + offset.y * forward.y + offset.z * forward.z;
-    if (depth + radius < 0.5f)
+    if (depth + radius < CullingNearDepth)
     {
         return false;
     }
@@ -294,7 +300,7 @@ bool Camera::IsSphereVisible(
     const float height = static_cast<float>((std::max)(Application::GetHeight(), 1u));
     const float aspect = static_cast<float>(Application::GetWidth()) / height;
     const float positiveDepth = (std::max)(depth, 0.0f);
-    const float safetyRadius = radius * 1.35f + 2.0f;
+    const float safetyRadius = radius * CullingRadiusScale + CullingExtraMargin;
     // 左右：奥行きに応じた視野の幅（＋余白）より外にあれば見えない
     const float horizontal = std::abs(
         offset.x * right.x + offset.y * right.y + offset.z * right.z);

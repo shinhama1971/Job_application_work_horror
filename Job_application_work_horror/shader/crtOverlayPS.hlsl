@@ -13,20 +13,40 @@ struct PS_IN
 
 // 画面効果の値（FullScreenQuad.cppのTimeBufferと同じ並び）
 #include "postProcessBuffer.hlsli"
+#include "fastNoise.hlsli"
 
 // 描いた画面（t0）とサンプラー（s0）
 Texture2D SceneTexture : register(t0);
 SamplerState LinearSampler : register(s0);
 
-// 2次元の値から0〜1の疑似乱数を作っている
-float Hash(float2 value)
-{
-    // 全画面の粒状のノイズは、1画素あたり何度もこれを呼ぶ。sin()を使わない計算式の乱数にして、
-    // 古いアナログ映像のような不安定な模様を保ちつつ、計算を軽くしている。
-    float3 p3 = frac(float3(value.xyx) * 0.1031f);
-    p3 += dot(p3, p3.yzx + 33.33f);
-    return frac((p3.x + p3.y) * p3.z);
-}
+// 粒状のノイズには、三角関数を使わない FastHash21 を共用する。
+// 水滴の縁と中身を半径に対する割合で決め、反射と屈折で輪郭を揃える。
+static const float CRT_DROP_RIM_INNER = 0.06f;
+static const float CRT_DROP_RIM_OUTER = 0.22f;
+static const float CRT_DROP_RIM_RADIUS = 0.86f;
+static const float CRT_DROP_BODY_INNER = 0.58f;
+static const float CRT_DROP_BODY_OUTER = 0.96f;
+static const float CRT_DROP_HIGHLIGHT_INNER = 0.16f;
+static const float CRT_DROP_HIGHLIGHT_OUTER = 0.52f;
+static const float CRT_DROP_HIGHLIGHT_X = 0.30f;
+static const float CRT_DROP_HIGHLIGHT_Y = 0.28f;
+static const float CRT_DROP_REFRACTION_INNER = 0.80f;
+static const float CRT_DROP_REFRACTION_SCALE = 1.7f;
+
+// 信号が乱れたときにだけ、帯の一部を一定間隔で横にずらす。
+static const float CRT_SIGNAL_BAND_COUNT = 54.0f;
+static const float CRT_SIGNAL_UPDATES_PER_SECOND = 18.0f;
+static const float CRT_SIGNAL_GATE_START = 0.70f;
+static const float CRT_SIGNAL_GATE_END = 0.96f;
+static const float CRT_SIGNAL_JITTER_LIMIT = 0.010f;
+
+// 黒帯の継ぎ目、走査線と彩度を変えて、止まった映像を識別できるようにする。
+static const float CRT_HOLD_SEAM_WIDTH = 0.018f;
+static const float CRT_HOLD_SCANLINE_BASE = 0.86f;
+static const float CRT_HOLD_SCANLINE_GAIN = 0.14f;
+static const float CRT_HOLD_SCANLINE_COUNT = 240.0f;
+static const float CRT_HOLD_SATURATION = 0.65f;
+static const float CRT_HOLD_SEAM_BRIGHTNESS = 0.08f;
 
 // 画面に付いた1粒の水滴の形を返している（x=縁、y=本体、z=光る所）。
 // stretch は、流れ落ちる間に縦へ伸びる量（0 = 丸い粒）。縁の幅は粒の大きさに合わせ、小さな粒が輪に見えないようにしている
@@ -40,17 +60,17 @@ float3 GetLensDrop(
     const float2 offset = (uv - center) * float2(aspect, 1.0f / (1.0f + stretch));
     const float distanceToCenter = length(offset);
     const float rim = 1.0f - smoothstep(
-        radius * 0.06f,
-        radius * 0.22f,
-        abs(distanceToCenter - radius * 0.86f));
+        radius * CRT_DROP_RIM_INNER,
+        radius * CRT_DROP_RIM_OUTER,
+        abs(distanceToCenter - radius * CRT_DROP_RIM_RADIUS));
     const float body = 1.0f - smoothstep(
-        radius * 0.58f,
-        radius * 0.96f,
+        radius * CRT_DROP_BODY_INNER,
+        radius * CRT_DROP_BODY_OUTER,
         distanceToCenter);
     const float highlight = (1.0f - smoothstep(
-        radius * 0.16f,
-        radius * 0.52f,
-        length(offset - float2(-radius * 0.30f, -radius * 0.28f)))) *
+        radius * CRT_DROP_HIGHLIGHT_INNER,
+        radius * CRT_DROP_HIGHLIGHT_OUTER,
+        length(offset - float2(-radius * CRT_DROP_HIGHLIGHT_X, -radius * CRT_DROP_HIGHLIGHT_Y)))) *
         body;
     return float3(rim, body, highlight);
 }
@@ -67,15 +87,113 @@ float2 GetLensDropRefraction(
         (uv - center) * float2(aspect, 1.0f / (1.0f + stretch));
     const float distanceToCenter = length(aspectOffset);
     const float body = 1.0f - smoothstep(
-        radius * 0.80f,
-        radius * 0.96f,
+        radius * CRT_DROP_REFRACTION_INNER,
+        radius * CRT_DROP_BODY_OUTER,
         distanceToCenter);
     // 水滴は小さな凸レンズなので、粒の中には後ろの景色が小さく、上下左右が逆さに映る。
     // 中心から見た位置を逆向きに0.7倍した所を読むよう、ずらす量を返している（uv + ずれ = 中心 - 0.7 ×（uv - 中心））
-    return -(uv - center) * 1.7f * body;
+    return -(uv - center) * CRT_DROP_REFRACTION_SCALE * body;
 }
 
+// 画面の端で暗くなり始める位置と、暗さが最大になる位置。
+static const float CRT_VIGNETTE_START = 0.22f;
+static const float CRT_VIGNETTE_END = 0.80f;
+static const float CRT_VIGNETTE_GAIN = 0.55f;
+
+// 走査線は2画素を周期にして、ブラウン管風の横線を薄く重ねる。
+static const float CRT_SCANLINE_PHASE_PER_PIXEL = 3.14159265f;
+static const float CRT_SCANLINE_OPACITY = 0.018f;
+
+// 粒の更新を秒間30回に抑え、暗い所ほど粒を目立たせる。
+static const float CRT_GRAIN_UPDATES_PER_SECOND = 30.0f;
+static const float CRT_GRAIN_BASE_STRENGTH = 0.35f;
+static const float CRT_GRAIN_BRIGHT_REGION_SCALE = 0.40f;
+static const float CRT_GRAIN_FADE_START = 0.02f;
+static const float CRT_GRAIN_FADE_END = 0.30f;
+static const float CRT_DARK_GRAIN_THRESHOLD = 0.55f;
+static const float CRT_DARK_GRAIN_OPACITY = 0.080f;
+static const float CRT_BRIGHT_GRAIN_THRESHOLD = 0.62f;
+static const float CRT_BRIGHT_GRAIN_OPACITY = 0.055f;
+
 // 重ねる層の色と透明度を返している（アルファブレンドで画面に重なる）
+// 緊張が最大に近づいたときだけ、ふだんの揺れより強い歪みを加える。
+static const float CRT_HIGH_TENSION_START = 0.62f;
+static const float CRT_HIGH_TENSION_FULL = 0.92f;
+static const float CRT_PULSE_WARP_GAIN = 1.15f;
+static const float CRT_TENSION_WARP_GAIN = 0.32f;
+
+// 画面の縁で色ずれを出し、歪みの量は高い緊張度に応じて加える。
+static const float CRT_ABERRATION_EDGE_START = 0.20f;
+static const float CRT_ABERRATION_EDGE_FULL = 0.72f;
+static const float CRT_BASE_RADIAL_WARP = 0.0015f;
+static const float CRT_TENSION_RADIAL_WARP_GAIN = 0.0040f;
+
+// 色ずれの基準量と、恐怖パルス・緊張・信号異常で足す量。すべてUV単位。
+static const float CRT_BASE_CHROMA_OFFSET = 0.0014f;
+static const float CRT_PULSE_CHROMA_OFFSET_GAIN = 0.0038f;
+static const float CRT_TENSION_CHROMA_OFFSET_GAIN = 0.0012f;
+static const float CRT_SIGNAL_CHROMA_OFFSET_GAIN = 0.0024f;
+
+// 演出・緊張・信号異常が粒状ノイズと周辺減光へ伝わる強さ。
+static const float CRT_PULSE_NOISE_GAIN = 1.20f;
+static const float CRT_TENSION_NOISE_GAIN = 0.16f;
+static const float CRT_SIGNAL_NOISE_GAIN = 0.48f;
+static const float CRT_PULSE_VIGNETTE_GAIN = 0.52f;
+static const float CRT_TENSION_VIGNETTE_GAIN = 0.18f;
+
+// 普段のレンズの色ずれに、緊張や信号異常の分を重ねる。
+static const float CRT_BASE_ABERRATION = 0.30f;
+static const float CRT_TENSION_ABERRATION_GAIN = 0.22f;
+static const float CRT_SIGNAL_ABERRATION_GAIN = 0.72f;
+
+// 歪みや色ずれで元の画面との差が出た領域を、必要な強さだけ混ぜる。
+static const float CRT_WARP_ALPHA_BASE = 0.008f;
+static const float CRT_WARP_ALPHA_TENSION_GAIN = 0.012f;
+static const float CRT_WARP_DIFFERENCE_GAIN = 0.08f;
+static const float CRT_CHROMA_ALPHA_BASE = 0.022f;
+static const float CRT_CHROMA_ALPHA_PULSE_GAIN = 0.75f;
+static const float CRT_CHROMA_ALPHA_EDGE_GAIN = 0.45f;
+
+// 粒がほぼ乾いたら、粒の形と屈折用のテクスチャ参照を両方省く。
+static const float CRT_LENS_DROP_MIN_MOISTURE = 0.001f;
+static const int CRT_LENS_DROP_COUNT = 6;
+static const float CRT_LENS_DROP_SEED_SCALE = 977.0f;
+static const float CRT_LENS_DROP_INDEX_SEED_X = 13.7f;
+static const float CRT_LENS_DROP_INDEX_SEED_Y = 5.3f;
+static const float CRT_LENS_DROP_SEED_OFFSET_Y = 1.9f;
+static const float CRT_LENS_DROP_SEED_Y = 41.0f;
+static const float CRT_LENS_DROP_SEED_SIZE = 83.0f;
+static const float CRT_LENS_DROP_SEED_SPEED = 127.0f;
+
+// レンズの下側へ粒を散らし、半径によって落ち始めるまでの差をつける。
+static const float CRT_LENS_DROP_LEFT_MARGIN = 0.06f;
+static const float CRT_LENS_DROP_HORIZONTAL_SPAN = 0.88f;
+static const float CRT_LENS_DROP_TOP = 0.60f;
+static const float CRT_LENS_DROP_VERTICAL_SPAN = 0.34f;
+static const float CRT_LENS_DROP_MIN_RADIUS = 0.005f;
+static const float CRT_LENS_DROP_MAX_RADIUS = 0.017f;
+static const float CRT_LENS_DROP_MAX_SPEED = 0.05f;
+static const float CRT_LENS_DROP_SLIDE_START_RADIUS = 0.008f;
+static const float CRT_LENS_DROP_SLIDE_FULL_RADIUS = 0.016f;
+
+// 落下した距離が長いほど粒を縦に伸ばす。加速の式にある半分の係数はそのまま使う。
+static const float CRT_LENS_DROP_FALL_ACCELERATION_SCALE = 0.6f;
+static const float CRT_LENS_DROP_STRETCH_PER_DISTANCE = 6.0f;
+static const float CRT_LENS_DROP_MAX_STRETCH = 0.8f;
+
+// 恐怖パルスに合わせて画面を裂く帯を出し、横方向のずれを抑える。
+static const float CRT_TEAR_LINE_CORE = 0.02f;
+static const float CRT_TEAR_LINE_EDGE = 0.12f;
+static const float CRT_TEAR_BAND_COUNT = 38.0f;
+static const float CRT_TEAR_MAX_OFFSET = 0.030f;
+
+// 信号異常の横線は表示帯と同じ間隔に置き、線の外側でも薄く残す。
+static const float CRT_TEAR_LINE_ALPHA = 0.16f;
+static const float CRT_SIGNAL_LINE_CORE = 0.015f;
+static const float CRT_SIGNAL_LINE_EDGE = 0.085f;
+static const float CRT_SIGNAL_LINE_ALPHA = 0.055f;
+static const float CRT_SIGNAL_BACKGROUND_ALPHA = 0.006f;
+
 float4 main(PS_IN input) : SV_TARGET
 {
     // コマ落ち：影が近くラジオの雑音が強いとき、一瞬だけ映像が止まる。止まった画面は縦に少しずれ、
@@ -85,20 +203,20 @@ float4 main(PS_IN input) : SV_TARGET
     {
         const float heldY = frac(input.uv.y + frameHoldOffset);
         float3 held = SceneTexture.SampleLevel(LinearSampler, float2(input.uv.x, heldY), 0.0f).rgb;
-        const float seam = smoothstep(0.0f, 0.018f, min(heldY, 1.0f - heldY));
-        const float scanline = 0.86f + 0.14f * step(0.5f, frac(input.uv.y * 240.0f));
-        held = lerp(dot(held, float3(0.2126f, 0.7152f, 0.0722f)).xxx, held, 0.65f);
-        return float4(held * scanline * lerp(0.08f, 1.0f, seam), 1.0f);
+        const float seam = smoothstep(0.0f, CRT_HOLD_SEAM_WIDTH, min(heldY, 1.0f - heldY));
+        const float scanline = CRT_HOLD_SCANLINE_BASE + CRT_HOLD_SCANLINE_GAIN * step(0.5f, frac(input.uv.y * CRT_HOLD_SCANLINE_COUNT));
+        held = lerp(dot(held, float3(0.2126f, 0.7152f, 0.0722f)).xxx, held, CRT_HOLD_SATURATION);
+        return float4(held * scanline * lerp(CRT_HOLD_SEAM_BRIGHTNESS, 1.0f, seam), 1.0f);
     }
     const float2 center = float2(0.5f, 0.5f);
     float2 centered = input.uv - center;
     // ノイズと周辺減光の強さ：驚かせる演出・緊張・信号の乱れで強めている
     const float eventNoise = saturate(
-        noiseAmount + horrorPulseStrength * 1.20f +
-        corridorTension * 0.16f + signalInterference * 0.48f);
+        noiseAmount + horrorPulseStrength * CRT_PULSE_NOISE_GAIN +
+        corridorTension * CRT_TENSION_NOISE_GAIN + signalInterference * CRT_SIGNAL_NOISE_GAIN);
     const float eventVignette =
-        vignetteStrength + horrorPulseStrength * 0.52f +
-        corridorTension * 0.18f;
+        vignetteStrength + horrorPulseStrength * CRT_PULSE_VIGNETTE_GAIN +
+        corridorTension * CRT_TENSION_VIGNETTE_GAIN;
 
     // 遊ぶのに必要な情報を隠さない程度の、柔らかい周辺減光。
     float edgeDistance = length(centered * float2(1.15f, 1.0f));
@@ -106,37 +224,37 @@ float4 main(PS_IN input) : SV_TARGET
         max(length(centered), 0.001f);
     // 普段の緊張感だけでは、元の画像をずらさない。色ずれと歪みは、
     // 驚かせる演出・信号の異常・終盤の強い緊張のときだけにしている。
-    const float highTension = smoothstep(0.62f, 0.92f, corridorTension);
+    const float highTension = smoothstep(CRT_HIGH_TENSION_START, CRT_HIGH_TENSION_FULL, corridorTension);
     const float distortionEvent = saturate(
-        horrorPulseStrength * 1.15f +
-        highTension * 0.32f +
+        horrorPulseStrength * CRT_PULSE_WARP_GAIN +
+        highTension * CRT_TENSION_WARP_GAIN +
         signalInterference);
     // 画面の端には、いつもわずかな色ずれを残している（古いレンズのような、P.T. の画面の質感）
     const float eventAberration = saturate(
-        0.30f + horrorPulseStrength +
-        highTension * lensDistortionStrength * 0.22f +
-        signalInterference * 0.72f);
-    const float edgeAberration = smoothstep(0.20f, 0.72f, edgeDistance);
+        CRT_BASE_ABERRATION + horrorPulseStrength +
+        highTension * lensDistortionStrength * CRT_TENSION_ABERRATION_GAIN +
+        signalInterference * CRT_SIGNAL_ABERRATION_GAIN);
+    const float edgeAberration = smoothstep(CRT_ABERRATION_EDGE_START, CRT_ABERRATION_EDGE_FULL, edgeDistance);
     const float2 aspectCentered =
         centered * float2(screenAspect, 1.0f);
     const float radialSquared = dot(aspectCentered, aspectCentered);
     const float radialWarp = lensDistortionStrength * distortionEvent *
-        (0.0015f + highTension * 0.0040f);
+        (CRT_BASE_RADIAL_WARP + highTension * CRT_TENSION_RADIAL_WARP_GAIN);
     // 信号の復旧に失敗すると、画面が横の帯ごとにばらばらにずれる。
     // ずれる量にはわざと上限を付け、プレイヤーが進む方向を見失わないようにしている。
-    const float signalBand = floor(input.uv.y * 54.0f);
-    const float signalFrame = floor(time * 18.0f);
-    const float signalSeed = Hash(float2(signalBand, signalFrame));
-    const float signalGate = smoothstep(0.70f, 0.96f, signalSeed);
-    const float signalJitter = (signalSeed - 0.5f) * 0.010f *
+    const float signalBand = floor(input.uv.y * CRT_SIGNAL_BAND_COUNT);
+    const float signalFrame = floor(time * CRT_SIGNAL_UPDATES_PER_SECOND);
+    const float signalSeed = FastHash21(float2(signalBand, signalFrame));
+    const float signalGate = smoothstep(CRT_SIGNAL_GATE_START, CRT_SIGNAL_GATE_END, signalSeed);
+    const float signalJitter = (signalSeed - 0.5f) * CRT_SIGNAL_JITTER_LIMIT *
         signalInterference * signalGate;
     const float2 distortedUv = saturate(
         input.uv + centered * radialSquared * radialWarp +
         float2(signalJitter, 0.0f));
     const float chromaOffset =
-        (0.0014f + horrorPulseStrength * 0.0038f +
-         highTension * lensDistortionStrength * 0.0012f) *
-        edgeAberration + signalInterference * signalGate * 0.0024f;
+        (CRT_BASE_CHROMA_OFFSET + horrorPulseStrength * CRT_PULSE_CHROMA_OFFSET_GAIN +
+         highTension * lensDistortionStrength * CRT_TENSION_CHROMA_OFFSET_GAIN) *
+        edgeAberration + signalInterference * signalGate * CRT_SIGNAL_CHROMA_OFFSET_GAIN;
     const float3 sceneCenter = SceneTexture.SampleLevel(
         LinearSampler,
         input.uv,
@@ -174,34 +292,34 @@ float4 main(PS_IN input) : SV_TARGET
         abs(distortedScene - sceneCenter));
     const float distortionAlpha = saturate(
         edgeAberration * lensDistortionStrength * distortionEvent *
-        (0.008f + highTension * 0.012f) +
-        distortionDifference * distortionEvent * 0.08f);
+        (CRT_WARP_ALPHA_BASE + highTension * CRT_WARP_ALPHA_TENSION_GAIN) +
+        distortionDifference * distortionEvent * CRT_WARP_DIFFERENCE_GAIN);
     const float chromaDifference = length(
         abs(chromaticScene - sceneCenter));
     const float chromaAlpha = saturate(
-        eventAberration * edgeAberration * 0.022f +
-        chromaDifference * (horrorPulseStrength * 0.75f + edgeAberration * 0.45f));
+        eventAberration * edgeAberration * CRT_CHROMA_ALPHA_BASE +
+        chromaDifference * (horrorPulseStrength * CRT_CHROMA_ALPHA_PULSE_GAIN + edgeAberration * CRT_CHROMA_ALPHA_EDGE_GAIN));
     // 周辺減光は強めにし、画面の端から闇が迫って見えるようにしている（中央は暗くしない）
-    float vignette = smoothstep(0.22f, 0.80f, edgeDistance) *
-        0.55f * eventVignette;
+    float vignette = smoothstep(CRT_VIGNETTE_START, CRT_VIGNETTE_END, edgeDistance) *
+        CRT_VIGNETTE_GAIN * eventVignette;
 
     // 1行おきの走査線。SV_POSITIONを使っているので、
     // ウィンドウの解像度が違っても線の太さが変わらない。
-    float scanWave = sin(input.pos.y * 3.14159265f) * 0.5f + 0.5f;
-    float scanline = (1.0f - scanWave) * 0.018f * eventNoise;
+    float scanWave = sin(input.pos.y * CRT_SCANLINE_PHASE_PER_PIXEL) * 0.5f + 0.5f;
+    float scanline = (1.0f - scanWave) * CRT_SCANLINE_OPACITY * eventNoise;
 
     // 1/30秒ごとに変わる粒状のノイズ（暗い粒）
-    float frame = floor(time * 30.0f);
-    float noise = Hash(floor(input.pos.xy) + frame * float2(17.0f, 31.0f));
+    float frame = floor(time * CRT_GRAIN_UPDATES_PER_SECOND);
+    float noise = FastHash21(floor(input.pos.xy) + frame * float2(17.0f, 31.0f));
     // 粒は暗い所ほど強く出し、闇がざらついて見えるようにしている
     const float grainLuminance = dot(sceneCenter,
         float3(0.2126f, 0.7152f, 0.0722f));
     // フィルムの粒：暗い粒と明るい粒の両方を、はっきり見える強さで出している（サイレントヒルの画面の粒を参考）。
     // 暗い所ほど強く出し、闇がざらついて見えるようにしている
-    const float grainStrength = (0.35f + eventNoise) * lerp(1.0f, 0.40f, smoothstep(0.02f, 0.30f, grainLuminance));
-    float darkGrain = smoothstep(0.55f, 1.0f, noise) * 0.080f * grainStrength;
-    const float brightNoise = Hash(floor(input.pos.xy) + frame * float2(31.0f, 17.0f) + 7.3f);
-    const float brightGrain = smoothstep(0.62f, 1.0f, brightNoise) * 0.055f * grainStrength;
+    const float grainStrength = (CRT_GRAIN_BASE_STRENGTH + eventNoise) * lerp(1.0f, CRT_GRAIN_BRIGHT_REGION_SCALE, smoothstep(CRT_GRAIN_FADE_START, CRT_GRAIN_FADE_END, grainLuminance));
+    float darkGrain = smoothstep(CRT_DARK_GRAIN_THRESHOLD, 1.0f, noise) * CRT_DARK_GRAIN_OPACITY * grainStrength;
+    const float brightNoise = FastHash21(floor(input.pos.xy) + frame * float2(31.0f, 17.0f) + 7.3f);
+    const float brightGrain = smoothstep(CRT_BRIGHT_GRAIN_THRESHOLD, 1.0f, brightNoise) * CRT_BRIGHT_GRAIN_OPACITY * grainStrength;
 
     // ごく薄い、ゆっくり流れる帯で、アナログ映像らしい動きを出している。
     float rolling = sin(input.uv.y * 10.0f - time * 1.8f) * 0.5f + 0.5f;
@@ -221,24 +339,24 @@ float4 main(PS_IN input) : SV_TARGET
     const float moisture = saturate(lensMoisture);
     // レンズのしぶきは、ほとんどの時間は出ていない。しぶきが付くまで、粒の距離の計算を普段の全画面の処理から外している。
     [branch]
-    if (moisture > 0.001f)
+    if (moisture > CRT_LENS_DROP_MIN_MOISTURE)
     {
         [unroll]
-        for (int dropIndex = 0; dropIndex < 6; ++dropIndex)
+        for (int dropIndex = 0; dropIndex < CRT_LENS_DROP_COUNT; ++dropIndex)
         {
-            const float2 seed = float2(lensDropSeed * 977.0f + dropIndex * 13.7f, dropIndex * 5.3f + 1.9f);
-            const float randomX = Hash(seed);
-            const float randomY = Hash(seed + 41.0f);
-            const float randomSize = Hash(seed + 83.0f);
-            const float randomSpeed = Hash(seed + 127.0f);
+            const float2 seed = float2(lensDropSeed * CRT_LENS_DROP_SEED_SCALE + dropIndex * CRT_LENS_DROP_INDEX_SEED_X, dropIndex * CRT_LENS_DROP_INDEX_SEED_Y + CRT_LENS_DROP_SEED_OFFSET_Y);
+            const float randomX = FastHash21(seed);
+            const float randomY = FastHash21(seed + CRT_LENS_DROP_SEED_Y);
+            const float randomSize = FastHash21(seed + CRT_LENS_DROP_SEED_SIZE);
+            const float randomSpeed = FastHash21(seed + CRT_LENS_DROP_SEED_SPEED);
             // 画面の下の方（下から4割まで）の、左右に散らばった位置に付く
-            const float2 start = float2(0.06f + randomX * 0.88f, 0.60f + randomY * 0.34f);
+            const float2 start = float2(CRT_LENS_DROP_LEFT_MARGIN + randomX * CRT_LENS_DROP_HORIZONTAL_SPAN, CRT_LENS_DROP_TOP + randomY * CRT_LENS_DROP_VERTICAL_SPAN);
             // 大きい粒ほど重く、早く流れる。小さい粒は、ほとんど止まったまま乾く
-            const float radius = lerp(0.005f, 0.017f, randomSize * randomSize);
-            const float speed = lerp(0.0f, 0.05f, randomSpeed) * smoothstep(0.008f, 0.016f, radius);
+            const float radius = lerp(CRT_LENS_DROP_MIN_RADIUS, CRT_LENS_DROP_MAX_RADIUS, randomSize * randomSize);
+            const float speed = lerp(0.0f, CRT_LENS_DROP_MAX_SPEED, randomSpeed) * smoothstep(CRT_LENS_DROP_SLIDE_START_RADIUS, CRT_LENS_DROP_SLIDE_FULL_RADIUS, radius);
             // 流れた量（最初の速さに、少しずつの加速を足している。2.6秒で、速い粒は画面の高さの約2割流れる）
-            const float fall = speed * lensDropAge + 0.5f * speed * 0.6f * lensDropAge * lensDropAge;
-            const float stretch = saturate(fall * 6.0f) * 0.8f;
+            const float fall = speed * lensDropAge + 0.5f * speed * CRT_LENS_DROP_FALL_ACCELERATION_SCALE * lensDropAge * lensDropAge;
+            const float stretch = saturate(fall * CRT_LENS_DROP_STRETCH_PER_DISTANCE) * CRT_LENS_DROP_MAX_STRETCH;
             const float2 dropCenter = start + float2(0.0f, fall);
             lensDrop = max(lensDrop, GetLensDrop(input.uv, dropCenter, radius, screenAspect, stretch));
             lensRefraction += GetLensDropRefraction(input.uv, dropCenter, radius, screenAspect, stretch);
@@ -247,7 +365,7 @@ float4 main(PS_IN input) : SV_TARGET
     // 水滴が付いている間だけ、ずらした位置の景色を読んでいる
     float3 refractedScene = sceneCenter;
     [branch]
-    if (moisture > 0.001f)
+    if (moisture > CRT_LENS_DROP_MIN_MOISTURE)
     {
         refractedScene = SceneTexture.SampleLevel(
             LinearSampler,
@@ -263,15 +381,15 @@ float4 main(PS_IN input) : SV_TARGET
     // 驚かせる演出では、半透明の同期の乱れ（横の裂け目）を加えている。この層は景色を置き換えないので、
     // テクスチャが無くても画面が真っ黒になることはない。
     float bandId = floor(input.uv.y * 38.0f);
-    float bandNoise = Hash(float2(bandId, floor(time * 24.0f)));
+    float bandNoise = FastHash21(float2(bandId, floor(time * 24.0f)));
     float tear = step(0.86f, bandNoise) * horrorPulseStrength;
     tear = max(tear, signalGate * signalInterference * 0.58f);
     float thinLine = 1.0f - smoothstep(
-        0.02f,
-        0.12f,
-        abs(frac(input.uv.y * 38.0f) - 0.5f));
+        CRT_TEAR_LINE_CORE,
+        CRT_TEAR_LINE_EDGE,
+        abs(frac(input.uv.y * CRT_TEAR_BAND_COUNT) - 0.5f));
     const float tearOffset =
-        (bandNoise - 0.5f) * 0.030f * horrorPulseStrength * thinLine;
+        (bandNoise - 0.5f) * CRT_TEAR_MAX_OFFSET * horrorPulseStrength * thinLine;
     float3 shiftedScene = sceneCenter;
     [branch]
     if (horrorPulseStrength > 0.001f || signalInterference > 0.001f)
@@ -282,13 +400,13 @@ float4 main(PS_IN input) : SV_TARGET
             0.0f).rgb;
     }
     // 信号の乱れの横線
-    float tearAlpha = tear * thinLine * 0.16f;
+    float tearAlpha = tear * thinLine * CRT_TEAR_LINE_ALPHA;
     const float signalLine = 1.0f - smoothstep(
-        0.015f, 0.085f,
-        abs(frac(input.uv.y * 54.0f) - 0.5f));
+        CRT_SIGNAL_LINE_CORE, CRT_SIGNAL_LINE_EDGE,
+        abs(frac(input.uv.y * CRT_SIGNAL_BAND_COUNT) - 0.5f));
     const float signalAlpha = signalInterference *
-        (signalGate * signalLine * 0.055f +
-         (1.0f - signalLine) * 0.006f);
+        (signalGate * signalLine * CRT_SIGNAL_LINE_ALPHA +
+         (1.0f - signalLine) * CRT_SIGNAL_BACKGROUND_ALPHA);
     float alpha = saturate(
         darkAlpha + dustAlpha + tearAlpha + dropAlpha +
         dropRefractionAlpha + chromaAlpha + distortionAlpha +
@@ -301,7 +419,7 @@ float4 main(PS_IN input) : SV_TARGET
         float3(0.62f, 0.65f, 0.62f),
         saturate(dustAlpha / max(darkAlpha + dustAlpha, 0.0001f))
     );
-    float channelChoice = Hash(float2(bandId + 13.0f, floor(time * 24.0f)));
+    float channelChoice = FastHash21(float2(bandId + 13.0f, floor(time * 24.0f)));
     float3 tearColor = channelChoice < 0.5f
         ? float3(0.12f, 0.72f, 0.80f)
         : float3(0.82f, 0.12f, 0.20f);

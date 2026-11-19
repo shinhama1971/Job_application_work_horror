@@ -47,6 +47,21 @@ float ShadowHash21(float2 value)
 }
 
 // 影の明るさ（0=影、1=光が当たる）を返している
+// 深度に応じて受け面のバイアスを変え、距離による自己遮蔽を抑える。
+#define FLASHLIGHT_SHADOW_NEAR_BIAS_SCALE 1.10f
+#define FLASHLIGHT_SHADOW_FAR_BIAS_SCALE 0.82f
+#define FLASHLIGHT_SHADOW_BIAS_START_DEPTH 0.04f
+#define FLASHLIGHT_SHADOW_BIAS_BLEND_RANGE 0.86f
+
+// 遮る物を探す半径をシャドウマップのテクセル単位で決める。
+#define FLASHLIGHT_SHADOW_BLOCKER_SEARCH_TEXELS 10.0f
+
+// 半影の幅の換算にシャドウマップの半画角の正接を使い、最大ぼけ幅を抑える。
+#define FLASHLIGHT_SHADOW_TAN_HALF_FOV 0.6494f
+
+// 細い影が溶けるほど大きくぼかさないよう、テクセル単位で制限する。
+#define FLASHLIGHT_SHADOW_MAX_FILTER_TEXELS 12.0f
+
 float GetFlashlightShadow(float4 shadowPosition)
 {
     // ライトの後ろや、シャドウマップの範囲の外は、影ではないことにしている（「影なし」の方式も同じ）
@@ -73,7 +88,7 @@ float GetFlashlightShadow(float4 shadowPosition)
     //    物の根元の影はくっきり、遠くの壁に落ちた影はぼんやりする。
     // 3. その幅の円の中で、比較を8か所行って平均する。
     const float receiverBias = ShadowParameters.y *
-        lerp(1.10f, 0.82f, saturate((projected.z - 0.04f) / 0.86f));
+        lerp(FLASHLIGHT_SHADOW_NEAR_BIAS_SCALE, FLASHLIGHT_SHADOW_FAR_BIAS_SCALE, saturate((projected.z - FLASHLIGHT_SHADOW_BIAS_START_DEPTH) / FLASHLIGHT_SHADOW_BIAS_BLEND_RANGE));
     const float compareDepth = projected.z - receiverBias;
     const float texel = ShadowParameters.x;
     // 「硬い影」の方式は、1か所だけ比べる（PCSSと見比べるため）
@@ -98,7 +113,7 @@ float GetFlashlightShadow(float4 shadowPosition)
     [unroll]
     for (int searchIndex = 0; searchIndex < 8; ++searchIndex)
     {
-        const float2 offset = mul(g_ShadowDisk[searchIndex], rotation) * (texel * 10.0f);
+        const float2 offset = mul(g_ShadowDisk[searchIndex], rotation) * (texel * FLASHLIGHT_SHADOW_BLOCKER_SEARCH_TEXELS);
         const int2 texelPosition = int2(saturate(shadowUV + offset) * (shadowSize - 1.0f));
         const float occluderDepth = g_FlashlightShadowMap.Load(int3(texelPosition, 0));
         if (occluderDepth < compareDepth)
@@ -119,9 +134,9 @@ float GetFlashlightShadow(float4 shadowPosition)
     const float penumbraWidth = FlashlightLensSize *
         max(receiverDistance - blockerDistance, 0.0f) / max(blockerDistance, 0.001f);
     const float penumbraRadius = 0.5f * penumbraWidth /
-        (2.0f * receiverDistance * 0.6494f);
+        (2.0f * receiverDistance * FLASHLIGHT_SHADOW_TAN_HALF_FOV);
     // 細い物の影が消えないよう最小1テクセル、ぼやけすぎないよう最大12テクセルにしている
-    const float filterRadius = clamp(penumbraRadius, texel, texel * 12.0f);
+    const float filterRadius = clamp(penumbraRadius, texel, texel * FLASHLIGHT_SHADOW_MAX_FILTER_TEXELS);
 
     // 3. 中心と、回した8か所の比較を平均している
     float visibility = g_FlashlightShadowMap.SampleCmpLevelZero(

@@ -18,6 +18,9 @@ namespace
 {
     // 環境遮蔽をピクセルシェーダーへ渡すテクスチャの番号
     constexpr UINT OcclusionSlot = 15;
+    // 環境遮蔽とぼかしの両 Compute Shader の画素変換と numthreads に揃える。
+    constexpr int OcclusionDownsampleFactor = 2;
+    constexpr UINT OcclusionThreadGroupSize = 8;
     // 調べる半球の半径（ワールドの長さ。約30cm）、暗くする強さ、自分の面で暗くならないための深さのずれ、計算する一番遠い距離
     constexpr float OcclusionRadius = 6.0f;
     constexpr float OcclusionIntensity = 1.35f;
@@ -52,9 +55,11 @@ namespace Effect
     {
         m_Width = (std::max)(width, 1);
         m_Height = (std::max)(height, 1);
+        const int occlusionWidth = (m_Width + (OcclusionDownsampleFactor - 1)) / OcclusionDownsampleFactor;
+        const int occlusionHeight = (m_Height + (OcclusionDownsampleFactor - 1)) / OcclusionDownsampleFactor;
         const bool created =
-            CreateOcclusionTexture((m_Width + 1) / 2, (m_Height + 1) / 2, m_RawTexture, m_RawUAV, m_RawSRV) &&
-            CreateOcclusionTexture((m_Width + 1) / 2, (m_Height + 1) / 2, m_BlurredTexture, m_BlurredUAV, m_BlurredSRV) &&
+            CreateOcclusionTexture(occlusionWidth, occlusionHeight, m_RawTexture, m_RawUAV, m_RawSRV) &&
+            CreateOcclusionTexture(occlusionWidth, occlusionHeight, m_BlurredTexture, m_BlurredUAV, m_BlurredSRV) &&
             Renderer::CreateConstantBuffer(sizeof(Parameters), m_ParameterBuffer.ReleaseAndGetAddressOf()) &&
             m_OcclusionShader.Create("shader/ambientOcclusionCS.hlsl") &&
             m_BlurShader.Create("shader/ambientOcclusionBlurCS.hlsl");
@@ -98,8 +103,9 @@ namespace Effect
         parameters.Bias = OcclusionBias;
         parameters.MaxDistance = OcclusionMaxDistance;
         // 縦横半分の解像度で計算している（画面全体の1/4の画素数。ぼかすので、半分でも粗さは目立たない）
+        constexpr float occlusionScale = 1.0f / static_cast<float>(OcclusionDownsampleFactor);
         parameters.OcclusionSize = Vector2(
-            std::ceil(parameters.ViewportSize.x * 0.5f), std::ceil(parameters.ViewportSize.y * 0.5f));
+            std::ceil(parameters.ViewportSize.x * occlusionScale), std::ceil(parameters.ViewportSize.y * occlusionScale));
         context->UpdateSubresource(m_ParameterBuffer.Get(), 0, nullptr, &parameters, 0, 0);
 
         // 書き込む画像を、ピクセルシェーダーの読み取りから外している。深度バッファも、描画先に設定したままでは読めないため外している
@@ -109,8 +115,8 @@ namespace Effect
 
         ID3D11Buffer* parameterBuffer = m_ParameterBuffer.Get();
         context->CSSetConstantBuffers(0, 1, &parameterBuffer);
-        const UINT groupsX = (static_cast<UINT>(parameters.OcclusionSize.x) + 7) / 8;
-        const UINT groupsY = (static_cast<UINT>(parameters.OcclusionSize.y) + 7) / 8;
+        const UINT groupsX = (static_cast<UINT>(parameters.OcclusionSize.x) + (OcclusionThreadGroupSize - 1)) / OcclusionThreadGroupSize;
+        const UINT groupsY = (static_cast<UINT>(parameters.OcclusionSize.y) + (OcclusionThreadGroupSize - 1)) / OcclusionThreadGroupSize;
 
         // 1回目：環境遮蔽と接触影を求めている（t0 = 深度、t1 = 点光源、u0 = ぼかす前）
         m_OcclusionShader.SetGPU();

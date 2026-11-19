@@ -171,7 +171,9 @@ void ForestRain::Draw(Camera* camera)
     const std::uint32_t dropCount = (std::max)(1u, static_cast<std::uint32_t>(static_cast<float>(DropCount) * m_Intensity));
     const std::uint32_t splashCount = static_cast<std::uint32_t>(static_cast<float>(SplashCount) * m_Intensity);
     // 小さな雨粒ほど遅く落ちるので、弱い雨は少しゆっくり落とし、筋も短くしている
-    const float speedScale = 0.78f + 0.22f * m_Intensity;
+    constexpr float LightRainSpeedScale = 0.78f;
+    constexpr float RainSpeedScaleRange = 0.22f;
+    const float speedScale = LightRainSpeedScale + RainSpeedScaleRange * m_Intensity;
     camera->SetCamera();
     Matrix world = Matrix::Identity;
     Renderer::SetWorldMatrix(&world);

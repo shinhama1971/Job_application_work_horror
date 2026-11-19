@@ -19,7 +19,7 @@ struct SKY_PS_IN
     float3 worldDirection : TEXCOORD1;
 };
 
-// 描画の奥の端（Camera.cpp の farPlane と同じ）と、真上を見たときに霧を通る長さ
+// 描画の奥の端（Camera.cpp の MainCameraFarPlane と同じ）と、真上を見たときに霧を通る長さ
 static const float SkyFarDistance = 1000.0f;
 static const float SkyZenithDistance = 380.0f;
 
@@ -37,9 +37,10 @@ float4 main(SKY_PS_IN input) : SV_TARGET
     float3 color = float3(0.003f, 0.005f, 0.008f);
     // 以下は litTexturePS・grassPS と同じ霧の式
     const float distanceFog = GetHorrorDistanceFog(distanceFromCamera, LoopDepth);
-    const float heightDensity = exp(-max(worldPosition.y - SCENE_BASE_FLOOR_Y, 0.0f) * 0.055f);
-    const float heightFog = heightDensity * smoothstep(35.0f, 150.0f, distanceFromCamera) *
-        (0.78f + FastValueNoise(worldPosition.xz * 0.018f + 21.0f) * 0.22f) * 0.22f * GetHorrorHeightFogScale(LoopDepth);
+    const float heightDensity = exp(-max(worldPosition.y - SCENE_BASE_FLOOR_Y, 0.0f) * HEIGHT_FOG_DECAY);
+    const float heightFog = heightDensity * smoothstep(HEIGHT_FOG_NEAR_START, HEIGHT_FOG_NEAR_END, distanceFromCamera) *
+        (HEIGHT_FOG_BASE_VARIATION + FastValueNoise(worldPosition.xz * HEIGHT_FOG_NOISE_SCALE + HEIGHT_FOG_NOISE_OFFSET) * HEIGHT_FOG_NOISE_WEIGHT) *
+        HEIGHT_FOG_STRENGTH * GetHorrorHeightFogScale(LoopDepth);
     color = lerp(color, GetHorrorFogColor(Light.Ambient.rgb, LoopDepth), saturate(distanceFog + heightFog));
     color = ApplyHorrorMist(color, worldPosition, viewPosition, 0.0f);
     color = ApplyFilmicHorrorGrade(color, LoopDepth);

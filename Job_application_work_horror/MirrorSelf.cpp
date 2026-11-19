@@ -78,11 +78,13 @@ void MirrorSelf::Update()
     m_Rotation = Vector3(0.0f, pose.Yaw, 0.0f);
 
     // 歩く速さ（0.1秒前との差）から、手足を振る大きさと速さを決めている
-    const PoseSample& earlier = GetSample(delaySamples + 6);
+    constexpr int WalkSpeedSampleSpan = 6;
+    constexpr float FullSwingSpeed = 35.0f;
+    const PoseSample& earlier = GetSample(delaySamples + WalkSpeedSampleSpan);
     Vector3 moved = pose.Position - earlier.Position;
     moved.y = 0.0f;
-    const float speed = moved.Length() / (6.0f * SampleInterval);
-    const float targetAmount = (std::clamp)(speed / 35.0f, 0.0f, 1.0f);
+    const float speed = moved.Length() / (static_cast<float>(WalkSpeedSampleSpan) * SampleInterval);
+    const float targetAmount = (std::clamp)(speed / FullSwingSpeed, 0.0f, 1.0f);
     m_WalkAmount += (targetAmount - m_WalkAmount) * (std::min)(deltaTime * WalkBlendRate, 1.0f);
     m_WalkPhase += speed / StrideCycleDistance * DirectX::XM_2PI * deltaTime;
     if (m_WalkPhase > DirectX::XM_2PI * WalkPhaseWrapCycles)

@@ -63,6 +63,14 @@ static const uint ClockNumerals[12] =
 };
 
 // 針（中心から angle の向きへ handLength の長さ、根元の太さ width、先が細い。反対側に tail だけ出る）までの近さ（0〜1）
+// 長針と短針は見分けが付くよう、長さと線の太さを変える。座標は時計の文字盤を基準にする。
+static const float CLOCK_HOUR_HAND_LENGTH = 4.6f;
+static const float CLOCK_HOUR_HAND_HALF_WIDTH = 0.34f;
+static const float CLOCK_HOUR_HAND_TAIL = 0.9f;
+static const float CLOCK_MINUTE_HAND_LENGTH = 7.3f;
+static const float CLOCK_MINUTE_HAND_HALF_WIDTH = 0.24f;
+static const float CLOCK_MINUTE_HAND_TAIL = 1.3f;
+
 float ClockHand(float2 p, float angle, float handLength, float width, float tail, float footprint)
 {
     const float2 direction = float2(sin(angle), cos(angle));
@@ -75,6 +83,46 @@ float ClockHand(float2 p, float angle, float handLength, float width, float tail
 
 // 文字盤のUV（u は見る人から見て右から左へ増える。v は上から下）と、針の角度（x = 時針、y = 分針。12時が0、右回りが+）から、
 // その点の色と凹凸を求めている
+// 木枠の木目は縦方向に細かくし、木の色と凹凸を別に調整する。
+#define CLOCK_CASE_GRAIN_X 0.35f
+#define CLOCK_CASE_GRAIN_Y 4.0f
+#define CLOCK_CASE_GRAIN_SEED 3.0f
+#define CLOCK_CASE_COLOR float3(0.075f, 0.050f, 0.032f)
+#define CLOCK_CASE_BASE_GAIN 0.80f
+#define CLOCK_CASE_GRAIN_GAIN 0.35f
+#define CLOCK_CASE_GRAIN_RELIEF 0.2f
+
+// 真鍮の縁と黄ばんだ文字盤の境界を分け、染みが文字盤にだけ出るようにする。
+#define CLOCK_BEZEL_OUTER_RADIUS 9.3f
+#define CLOCK_BEZEL_INNER_RADIUS 9.2f
+#define CLOCK_BEZEL_TARNISH_SCALE 0.8f
+#define CLOCK_BEZEL_TARNISH_SEED 17.0f
+#define CLOCK_BEZEL_COLOR float3(0.32f, 0.23f, 0.10f)
+#define CLOCK_DIAL_OUTER_RADIUS 8.65f
+#define CLOCK_DIAL_INNER_RADIUS 8.55f
+#define CLOCK_DIAL_STAIN_START 0.62f
+#define CLOCK_DIAL_STAIN_FULL 0.85f
+#define CLOCK_DIAL_FOXING_START 0.86f
+#define CLOCK_DIAL_FOXING_FULL 0.92f
+#define CLOCK_DIAL_PAPER_COLOR float3(0.46f, 0.42f, 0.33f)
+#define CLOCK_DIAL_STAIN_COLOR float3(0.30f, 0.22f, 0.13f)
+
+// 時と分を見分けやすくするため、目盛りの長さと幅を変える。
+#define CLOCK_MINUTE_TICKS_PER_HOUR_TICK 5.0f
+#define CLOCK_MINUTE_TICK_INNER_RADIUS 7.75f
+#define CLOCK_HOUR_TICK_INNER_RADIUS 7.10f
+#define CLOCK_MINUTE_TICK_HALF_WIDTH 0.05f
+#define CLOCK_HOUR_TICK_HALF_WIDTH 0.14f
+#define CLOCK_TICK_OUTER_RADIUS 8.3f
+#define CLOCK_TICK_PIXEL_FILTER 1.5f
+
+// 染みの上のインクを薄くし、針と中心軸の色を文字盤から分ける。
+#define CLOCK_INK_CLEAR_PAPER_GAIN 0.92f
+#define CLOCK_INK_STAINED_PAPER_GAIN 0.6f
+#define CLOCK_INK_RECESS 0.3f
+#define CLOCK_HAND_COLOR float3(0.035f, 0.035f, 0.055f)
+#define CLOCK_AXLE_COLOR float3(0.30f, 0.22f, 0.10f)
+
 ClockPaint GetClockFace(float2 uv, float4 hands)
 {
     // 文字盤の単位（幅・高さ20、中心が0、上が+、右が+）。見る人から見て右が+になるよう、uを反転している
@@ -83,22 +131,22 @@ ClockPaint GetClockFace(float2 uv, float4 hands)
     const float radius = length(p);
 
     // 外側：黒ずんだ木の箱（木目のノイズ）
-    const float grain = FastValueNoise(float2(p.x * 0.35f, p.y * 4.0f) + 3.0f);
-    float3 color = float3(0.075f, 0.050f, 0.032f) * (0.80f + grain * 0.35f);
-    float relief = grain * 0.2f;
+    const float grain = FastValueNoise(float2(p.x * CLOCK_CASE_GRAIN_X, p.y * CLOCK_CASE_GRAIN_Y) + CLOCK_CASE_GRAIN_SEED);
+    float3 color = CLOCK_CASE_COLOR * (CLOCK_CASE_BASE_GAIN + grain * CLOCK_CASE_GRAIN_GAIN);
+    float relief = grain * CLOCK_CASE_GRAIN_RELIEF;
 
     // 真鍮の縁（くすんで、ところどころ黒ずんでいる）
-    const float bezel = smoothstep(9.3f + footprint, 9.2f, radius);
-    const float tarnish = FastValueNoise(p * 0.8f + 17.0f);
-    color = lerp(color, float3(0.32f, 0.23f, 0.10f) * lerp(0.55f, 1.0f, tarnish), bezel);
+    const float bezel = smoothstep(CLOCK_BEZEL_OUTER_RADIUS + footprint, CLOCK_BEZEL_INNER_RADIUS, radius);
+    const float tarnish = FastValueNoise(p * CLOCK_BEZEL_TARNISH_SCALE + CLOCK_BEZEL_TARNISH_SEED);
+    color = lerp(color, CLOCK_BEZEL_COLOR * lerp(0.55f, 1.0f, tarnish), bezel);
     relief += bezel * 0.4f;
 
     // 文字盤：黄ばんだ象牙色の紙。縁ほど暗く、茶色い染みが散っている
-    const float dial = smoothstep(8.65f + footprint, 8.55f, radius);
-    const float stain = smoothstep(0.62f, 0.85f, FastValueNoise(p * 0.45f + 5.0f));
-    const float foxing = smoothstep(0.86f, 0.92f, FastValueNoise(p * 2.3f - 9.0f));
-    float3 paper = float3(0.46f, 0.42f, 0.33f) * lerp(1.0f, 0.70f, smoothstep(5.0f, 8.6f, radius));
-    paper = lerp(paper, float3(0.30f, 0.22f, 0.13f), stain * 0.45f + foxing * 0.55f);
+    const float dial = smoothstep(CLOCK_DIAL_OUTER_RADIUS + footprint, CLOCK_DIAL_INNER_RADIUS, radius);
+    const float stain = smoothstep(CLOCK_DIAL_STAIN_START, CLOCK_DIAL_STAIN_FULL, FastValueNoise(p * 0.45f + 5.0f));
+    const float foxing = smoothstep(CLOCK_DIAL_FOXING_START, CLOCK_DIAL_FOXING_FULL, FastValueNoise(p * 2.3f - 9.0f));
+    float3 paper = CLOCK_DIAL_PAPER_COLOR * lerp(1.0f, 0.70f, smoothstep(5.0f, 8.6f, radius));
+    paper = lerp(paper, CLOCK_DIAL_STAIN_COLOR, stain * 0.45f + foxing * 0.55f);
     color = lerp(color, paper, dial);
     relief -= dial * 0.4f;
 
@@ -110,11 +158,11 @@ ClockPaint GetClockFace(float2 uv, float4 hands)
     const float minuteIndex = round(angle / (3.14159265f / 30.0f));
     const float minuteAngle = minuteIndex * (3.14159265f / 30.0f);
     const float2 minuteDirection = float2(sin(minuteAngle), cos(minuteAngle));
-    const float isHourTick = step(abs(fmod(abs(minuteIndex), 5.0f)), 0.5f);
-    const float tickInner = lerp(7.75f, 7.10f, isHourTick);
-    const float tickWidth = lerp(0.05f, 0.14f, isHourTick);
-    const float tickDistance = ClockSegmentDistance(p, minuteDirection * tickInner, minuteDirection * 8.3f);
-    inkAmount = max(inkAmount, 1.0f - smoothstep(tickWidth, tickWidth + footprint * 1.5f, tickDistance));
+    const float isHourTick = step(abs(fmod(abs(minuteIndex), CLOCK_MINUTE_TICKS_PER_HOUR_TICK)), 0.5f);
+    const float tickInner = lerp(CLOCK_MINUTE_TICK_INNER_RADIUS, CLOCK_HOUR_TICK_INNER_RADIUS, isHourTick);
+    const float tickWidth = lerp(CLOCK_MINUTE_TICK_HALF_WIDTH, CLOCK_HOUR_TICK_HALF_WIDTH, isHourTick);
+    const float tickDistance = ClockSegmentDistance(p, minuteDirection * tickInner, minuteDirection * CLOCK_TICK_OUTER_RADIUS);
+    inkAmount = max(inkAmount, 1.0f - smoothstep(tickWidth, tickWidth + footprint * CLOCK_TICK_PIXEL_FILTER, tickDistance));
 
     // ローマ数字：一番近い時の位置の数字だけを計算している（文字は傾けず、立てたまま並べている）
     const float hourIndex = round(angle / (3.14159265f / 6.0f));
@@ -149,17 +197,17 @@ ClockPaint GetClockFace(float2 uv, float4 hands)
     inkAmount = max(inkAmount, 1.0f - smoothstep(0.10f, 0.10f + footprint * 1.5f, min(glyphDistance, serif + 0.03f)));
 
     // 色あせたインク：染みの所は薄く
-    color = lerp(color, ink, inkAmount * dial * lerp(0.92f, 0.6f, stain));
-    relief -= inkAmount * dial * 0.3f;
+    color = lerp(color, ink, inkAmount * dial * lerp(CLOCK_INK_CLEAR_PAPER_GAIN, CLOCK_INK_STAINED_PAPER_GAIN, stain));
+    relief -= inkAmount * dial * CLOCK_INK_RECESS;
 
     // 針（青く焼けた鋼）と、真鍮の中心の軸
-    const float hourHand = ClockHand(p, hands.x, 4.6f, 0.34f, 0.9f, footprint);
-    const float minuteHand = ClockHand(p, hands.y, 7.3f, 0.24f, 1.3f, footprint);
-    const float3 steel = float3(0.035f, 0.035f, 0.055f);
+    const float hourHand = ClockHand(p, hands.x, CLOCK_HOUR_HAND_LENGTH, CLOCK_HOUR_HAND_HALF_WIDTH, CLOCK_HOUR_HAND_TAIL, footprint);
+    const float minuteHand = ClockHand(p, hands.y, CLOCK_MINUTE_HAND_LENGTH, CLOCK_MINUTE_HAND_HALF_WIDTH, CLOCK_MINUTE_HAND_TAIL, footprint);
+    const float3 steel = CLOCK_HAND_COLOR;
     color = lerp(color, steel, saturate(hourHand + minuteHand));
     relief += saturate(hourHand + minuteHand) * 0.6f;
     const float cap = smoothstep(0.50f + footprint, 0.45f, radius);
-    color = lerp(color, float3(0.30f, 0.22f, 0.10f), cap);
+    color = lerp(color, CLOCK_AXLE_COLOR, cap);
 
     // ガラス：くもりと、斜めの淡い映り込み、それに右側から走る1本のひび
     const float sheen = smoothstep(1.2f, 0.0f, abs(p.x * 0.7f + p.y * 0.7f - 3.0f)) * 0.06f;

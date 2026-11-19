@@ -556,7 +556,9 @@ namespace
                 continue;
             }
             const Keyframe& previous = tour[index - 1];
-            const float span = (std::max)(next.Time - previous.Time, 0.001f);
+            // 同時刻のキーフレームがあっても、補間率の分母をゼロにしない。
+            constexpr float MinimumKeyframeIntervalSeconds = 0.001f;
+            const float span = (std::max)(next.Time - previous.Time, MinimumKeyframeIntervalSeconds);
             const float t = (time - previous.Time) / span;
             Keyframe result = previous;
             result.Position = Vector3::Lerp(previous.Position, next.Position, t);

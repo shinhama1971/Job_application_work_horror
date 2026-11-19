@@ -43,6 +43,122 @@ namespace
     constexpr float StaminaDangerRate = 0.20f;
     // 右上に「電池残量が少ない」と出す残量（%）
     constexpr float LowBatteryNoticePercent = 20.0f;
+    // 背景と通常の文字色は複数の表示で共通にし、ヒューズとゲージの色を揃える。
+    namespace HudPalette
+    {
+        const Color Text = Color(0.88f, 0.92f, 0.90f, 0.85f);
+        const Color Panel = Color(0.015f, 0.02f, 0.02f, 0.72f);
+        const Color Inactive = Color(0.16f, 0.19f, 0.18f, 0.85f);
+        const Color Collected = Color(0.72f, 0.86f, 0.66f, 0.95f);
+    }
+
+    // 操作できるときだけ十字を広げ、操作できない対象は赤で知らせる。
+    namespace ReticleLayout
+    {
+        constexpr float TargetExtent = 11.0f;
+        constexpr float CenterGap = 2.0f;
+        constexpr float StrokeWidth = 2.0f;
+        constexpr float IdleExtent = 9.0f;
+        const Color LockedColor = Color(0.92f, 0.28f, 0.20f, 0.96f);
+        const Color TargetColor = Color(0.62f, 0.92f, 0.70f, 0.98f);
+    }
+
+    // 左上に目的を置き、必要な幅だけ文字の後ろを暗くする。
+    namespace ObjectiveLayout
+    {
+        constexpr float TextPixelSize = 3.0f;
+        constexpr float CharacterWidth = 18.0f;
+        constexpr float PanelExtraWidth = 24.0f;
+        constexpr float PanelHeight = 39.0f;
+        constexpr float AccentWidth = 4.0f;
+        constexpr float TextX = 48.0f;
+        constexpr float TextY = 37.0f;
+        const Color SafeColor = Color(0.52f, 0.92f, 0.58f, 0.95f);
+        const Color DefaultColor = Color(0.88f, 0.82f, 0.62f, 0.95f);
+    }
+
+    // 記録と電池の知らせの高さ、文字サイズ、上下の間隔を揃える。
+    namespace TopRightNoticeLayout
+    {
+        constexpr float EvidencePanelY = 74.0f;
+        constexpr float EvidenceTextY = 82.0f;
+        constexpr float PanelHeight = 34.0f;
+        constexpr float TextPixelSize = 2.0f;
+        const Color EvidenceCompleteColor = Color(0.92f, 0.78f, 0.34f, 0.96f);
+        const Color EvidenceProgressColor = Color(0.62f, 0.78f, 0.70f, 0.88f);
+    }
+
+    // ヒューズは固定間隔のスロットで取得済みと未取得を見分ける。
+    namespace FuseLayout
+    {
+        constexpr float PanelBottomOffset = 112.0f;
+        constexpr float PanelWidth = 112.0f;
+        constexpr float PanelHeight = 36.0f;
+        constexpr float FirstSlotX = 46.0f;
+        constexpr float SlotSpacing = 32.0f;
+        constexpr float SlotBottomOffset = 101.0f;
+        constexpr float SlotWidth = 20.0f;
+        constexpr float SlotHeight = 14.0f;
+    }
+
+    // 電池とスタミナで横位置と文字の大きさを揃え、縦位置と高さを分ける。
+    namespace GaugeLayout
+    {
+        constexpr float BatteryFillBottomOffset = 57.0f;
+        constexpr float BatteryPanelBottomOffset = 66.0f;
+        constexpr float BatteryLabelBottomOffset = 58.0f;
+        constexpr float BatteryPanelHeight = 30.0f;
+        constexpr float BatteryFillHeight = 12.0f;
+        constexpr float StaminaPanelBottomOffset = 32.0f;
+        constexpr float StaminaLabelBottomOffset = 26.0f;
+        constexpr float StaminaFillBottomOffset = 25.0f;
+        constexpr float StaminaPanelHeight = 24.0f;
+        constexpr float StaminaFillHeight = 10.0f;
+        constexpr float LabelPixelSize = 1.5f;
+        constexpr float FillX = 104.0f;
+        constexpr float FillWidth = 152.0f;
+        const Color BatteryNormalColor = Color(0.42f, 0.82f, 0.48f, 0.95f);
+        const Color StaminaNormalColor = Color(0.34f, 0.70f, 0.86f, 0.95f);
+        const Color BatteryDangerColor = Color(0.92f, 0.18f, 0.12f, 0.95f);
+        const Color BatteryWarningColor = Color(0.92f, 0.68f, 0.16f, 0.95f);
+        const Color StaminaDangerColor = Color(0.90f, 0.25f, 0.16f, 0.95f);
+        const Color StaminaWarningColor = Color(0.90f, 0.62f, 0.16f, 0.95f);
+    }
+
+    // 操作キーの枠を固定し、操作名の長さに合わせて全体の幅を広げる。
+    namespace InteractionPromptLayout
+    {
+        constexpr float PanelExtraWidth = 88.0f;
+        constexpr float PanelHeight = 58.0f;
+        constexpr float PanelBottomOffset = 106.0f;
+        constexpr float KeyPanelInset = 10.0f;
+        constexpr float KeyPanelWidth = 44.0f;
+        constexpr float KeyPanelHeight = 38.0f;
+        constexpr float KeyGlyphX = 20.0f;
+        constexpr float KeyGlyphY = 17.0f;
+        constexpr float KeyGlyphSize = 24.0f;
+        constexpr float TextX = 68.0f;
+        constexpr float TextY = 22.0f;
+        constexpr float TextPixelSize = 2.0f;
+        const Color LockedTextColor = Color(0.85f, 0.22f, 0.18f, 0.95f);
+    }
+
+    // 電池の回復と残量警告を、記録の表示より上に置く。
+    namespace BatteryNoticeLayout
+    {
+        constexpr float TextY = 36.0f;
+        const Color RecoveryColor = Color(0.52f, 0.92f, 0.58f, 0.96f);
+        const Color LowColor = Color(0.94f, 0.30f, 0.18f, 0.96f);
+    }
+
+    // 透明に近い暗転は四角形を描かずに済ませる。
+    constexpr float BlinkDrawThreshold = 0.001f;
+
+    // ボタンの印は小さくしても線がつぶれない太さに保つ。
+    constexpr float KeyGlyphMinStroke = 2.0f;
+    constexpr float KeyGlyphStrokeRatio = 0.18f;
+    constexpr float KeyGlyphEMiddleWidthRatio = 0.82f;
+
     // UTF-8の文字列で、画面に出る文字の数を数えている（2バイト目以降のバイトは数えない）
     size_t CountDisplayedCharacters(std::string_view text)
     {
@@ -146,10 +262,6 @@ void Hud::Draw(
 {
     m_Vertices.clear();
 
-    const Color white(0.88f, 0.92f, 0.90f, 0.85f);
-    const Color dark(0.015f, 0.02f, 0.02f, 0.72f);
-    const Color inactive(0.16f, 0.19f, 0.18f, 0.85f);
-    const Color active(0.72f, 0.86f, 0.66f, 0.95f);
     // 調べる対象がある・開かない対象のときは、照準の色を緑・赤に変えている
     const bool hasInteractionTarget = !interactionPrompt.empty();
     const bool interactionLocked = hasInteractionTarget && (
@@ -160,10 +272,10 @@ void Hud::Draw(
         interactionPrompt.find("必要") != std::string_view::npos ||
         interactionPrompt.find("開かない") != std::string_view::npos);
     const Color reticleColor = interactionLocked
-        ? Color(0.92f, 0.28f, 0.20f, 0.96f)
+        ? ReticleLayout::LockedColor
         : (hasInteractionTarget
-            ? Color(0.62f, 0.92f, 0.70f, 0.98f)
-            : white);
+            ? ReticleLayout::TargetColor
+            : HudPalette::Text);
 
     const float screenWidth = GetCanvasWidth();
     const float screenHeight = GetCanvasHeight();
@@ -171,10 +283,9 @@ void Hud::Draw(
     // 左上：今の目的。逃げる・電力が戻ったなどの安全な目的は緑、それ以外は黄色で出している
     if (!objectiveText.empty())
     {
-        const float pixelSize = 3.0f;
         const float objectiveWidth =
             static_cast<float>(CountDisplayedCharacters(objectiveText)) *
-            18.0f + 24.0f;
+            ObjectiveLayout::CharacterWidth + ObjectiveLayout::PanelExtraWidth;
         const bool isSafeObjective =
             objectiveText == "ESCAPE" ||
             objectiveText == "ESCAPED" ||
@@ -182,12 +293,12 @@ void Hud::Draw(
             objectiveText == "OPEN THE DOOR" ||
             objectiveText == "LEAVE";
         const Color objectiveColor = isSafeObjective
-            ? Color(0.52f, 0.92f, 0.58f, 0.95f)
-            : Color(0.88f, 0.82f, 0.62f, 0.95f);
+            ? ObjectiveLayout::SafeColor
+            : ObjectiveLayout::DefaultColor;
 
-        AddRectangle(LeftMargin, TopMargin, objectiveWidth, 39.0f, dark);
-        AddRectangle(LeftMargin, TopMargin, 4.0f, 39.0f, objectiveColor);
-        AddText(48.0f, 37.0f, objectiveText, pixelSize, objectiveColor);
+        AddRectangle(LeftMargin, TopMargin, objectiveWidth, ObjectiveLayout::PanelHeight, HudPalette::Panel);
+        AddRectangle(LeftMargin, TopMargin, ObjectiveLayout::AccentWidth, ObjectiveLayout::PanelHeight, objectiveColor);
+        AddText(ObjectiveLayout::TextX, ObjectiveLayout::TextY, objectiveText, ObjectiveLayout::TextPixelSize, objectiveColor);
     }
 
     // 任意で探せる情報（記録の数）は、必ず進める目的より控えめに表示し、両方を同時に分かるようにしている。
@@ -199,42 +310,46 @@ void Hud::Draw(
     const std::string evidenceText =
         "記録 " + std::to_string(evidenceCount) + " / " +
         std::to_string(Core::GameState::TotalEvidenceCount);
-    constexpr float evidencePixelSize = 2.0f;
     const float evidenceWidth =
         static_cast<float>(CountDisplayedCharacters(evidenceText)) *
-        evidencePixelSize * GlyphAdvance;
+        TopRightNoticeLayout::TextPixelSize * GlyphAdvance;
     const float evidenceX = screenWidth - evidenceWidth - RightMargin;
     const Color evidenceColor = evidenceCount >= Core::GameState::TotalEvidenceCount
-        ? Color(0.92f, 0.78f, 0.34f, 0.96f)
-        : Color(0.62f, 0.78f, 0.70f, 0.88f);
+        ? TopRightNoticeLayout::EvidenceCompleteColor
+        : TopRightNoticeLayout::EvidenceProgressColor;
     if (m_EvidenceVisible)
     {
-        AddRectangle(evidenceX - NoticePadding, 74.0f + m_TopRightOffset,
-            evidenceWidth + NoticePadding * 2.0f, 34.0f, dark);
-        AddText(evidenceX, 82.0f + m_TopRightOffset,
-            evidenceText, evidencePixelSize, evidenceColor);
+        AddRectangle(evidenceX - NoticePadding, TopRightNoticeLayout::EvidencePanelY + m_TopRightOffset,
+            evidenceWidth + NoticePadding * 2.0f, TopRightNoticeLayout::PanelHeight, HudPalette::Panel);
+        AddText(evidenceX, TopRightNoticeLayout::EvidenceTextY + m_TopRightOffset,
+            evidenceText, TopRightNoticeLayout::TextPixelSize, evidenceColor);
     }
 
     // 視線の位置だけを伝える、小さな十字の照準を画面の中央に描いている。
-    const float reticleExtent = hasInteractionTarget ? 11.0f : 9.0f;
-    AddRectangle(screenWidth * 0.5f - reticleExtent, screenHeight * 0.5f - 1.0f, reticleExtent - 2.0f, 2.0f, reticleColor);
-    AddRectangle(screenWidth * 0.5f + 2.0f, screenHeight * 0.5f - 1.0f, reticleExtent - 2.0f, 2.0f, reticleColor);
-    AddRectangle(screenWidth * 0.5f - 1.0f, screenHeight * 0.5f - reticleExtent, 2.0f, reticleExtent - 2.0f, reticleColor);
-    AddRectangle(screenWidth * 0.5f - 1.0f, screenHeight * 0.5f + 2.0f, 2.0f, reticleExtent - 2.0f, reticleColor);
+    const float reticleExtent = hasInteractionTarget ? ReticleLayout::TargetExtent : ReticleLayout::IdleExtent;
+    const float centerX = screenWidth * 0.5f;
+    const float centerY = screenHeight * 0.5f;
+    const float stroke = ReticleLayout::StrokeWidth;
+    const float gap = ReticleLayout::CenterGap;
+    const float armLength = reticleExtent - gap;
+    AddRectangle(centerX - reticleExtent, centerY - stroke * 0.5f, armLength, stroke, reticleColor);
+    AddRectangle(centerX + gap, centerY - stroke * 0.5f, armLength, stroke, reticleColor);
+    AddRectangle(centerX - stroke * 0.5f, centerY - reticleExtent, stroke, armLength, reticleColor);
+    AddRectangle(centerX - stroke * 0.5f, centerY + gap, stroke, armLength, reticleColor);
 
     // 負の個数を「ヒューズの表示なし」として扱い、ヒューズのない面でも電池のHUDを共用している。
     if (fuseCount >= 0)
     {
-        AddRectangle(LeftMargin, screenHeight - 112.0f, 112.0f, 36.0f, dark);
+        AddRectangle(LeftMargin, screenHeight - FuseLayout::PanelBottomOffset, FuseLayout::PanelWidth, FuseLayout::PanelHeight, HudPalette::Panel);
         const int clampedFuseCount = std::clamp(fuseCount, 0, FuseSlotCount);
         for (int i = 0; i < FuseSlotCount; ++i)
         {
             AddRectangle(
-                46.0f + static_cast<float>(i) * 32.0f,
-                screenHeight - 101.0f,
-                20.0f,
-                14.0f,
-                i < clampedFuseCount ? active : inactive
+                FuseLayout::FirstSlotX + static_cast<float>(i) * FuseLayout::SlotSpacing,
+                screenHeight - FuseLayout::SlotBottomOffset,
+                FuseLayout::SlotWidth,
+                FuseLayout::SlotHeight,
+                i < clampedFuseCount ? HudPalette::Collected : HudPalette::Inactive
             );
         }
     }
@@ -242,54 +357,52 @@ void Hud::Draw(
     // 懐中電灯の電池の枠と残りのゲージを描いている（50%以下で黄色、20%以下で赤）。
     const float batteryRate = std::clamp(
         player.GetBattery() / GaugeMaximum, 0.0f, 1.0f);
-    Color batteryColor(0.42f, 0.82f, 0.48f, 0.95f);
+    Color batteryColor = GaugeLayout::BatteryNormalColor;
     if (batteryRate <= BatteryDangerRate)
     {
-        batteryColor = Color(0.92f, 0.18f, 0.12f, 0.95f);
+        batteryColor = GaugeLayout::BatteryDangerColor;
     }
     else if (batteryRate <= BatteryWarningRate)
     {
-        batteryColor = Color(0.92f, 0.68f, 0.16f, 0.95f);
+        batteryColor = GaugeLayout::BatteryWarningColor;
     }
 
-    constexpr float barFillX = 104.0f;
-    constexpr float barFillWidth = 152.0f;
-    AddRectangle(LeftMargin, screenHeight - 66.0f, GaugePanelWidth, 30.0f, dark);
-    AddText(GaugeLabelX, screenHeight - 58.0f,
-        "ライト", 1.5f, white);
-    AddRectangle(barFillX, screenHeight - 57.0f,
-        barFillWidth, 12.0f, inactive);
+    AddRectangle(LeftMargin, screenHeight - GaugeLayout::BatteryPanelBottomOffset, GaugePanelWidth, GaugeLayout::BatteryPanelHeight, HudPalette::Panel);
+    AddText(GaugeLabelX, screenHeight - GaugeLayout::BatteryLabelBottomOffset,
+        "ライト", GaugeLayout::LabelPixelSize, HudPalette::Text);
+    AddRectangle(GaugeLayout::FillX, screenHeight - GaugeLayout::BatteryFillBottomOffset,
+        GaugeLayout::FillWidth, GaugeLayout::BatteryFillHeight, HudPalette::Inactive);
     if (batteryRate > 0.0f)
     {
-        AddRectangle(barFillX, screenHeight - 57.0f,
-            barFillWidth * batteryRate, 12.0f, batteryColor);
+        AddRectangle(GaugeLayout::FillX, screenHeight - GaugeLayout::BatteryFillBottomOffset,
+            GaugeLayout::FillWidth * batteryRate, GaugeLayout::BatteryFillHeight, batteryColor);
     }
 
     // スタミナのゲージの色（40%以下で黄色、20%以下で赤）
     const float staminaRate = std::clamp(
         player.GetStamina() / GaugeMaximum, 0.0f, 1.0f);
-    Color staminaColor(0.34f, 0.70f, 0.86f, 0.95f);
+    Color staminaColor = GaugeLayout::StaminaNormalColor;
     if (staminaRate <= StaminaDangerRate)
     {
-        staminaColor = Color(0.90f, 0.25f, 0.16f, 0.95f);
+        staminaColor = GaugeLayout::StaminaDangerColor;
     }
     else if (staminaRate <= StaminaWarningRate)
     {
-        staminaColor = Color(0.90f, 0.62f, 0.16f, 0.95f);
+        staminaColor = GaugeLayout::StaminaWarningColor;
     }
 
     // 走れない間はスタミナを使わないため、ゲージ自体を出していない。
     if (player.IsSprintAllowed())
     {
-        AddRectangle(LeftMargin, screenHeight - 32.0f, GaugePanelWidth, 24.0f, dark);
-        AddText(GaugeLabelX, screenHeight - 26.0f,
-            "スタミナ", 1.5f, white);
-        AddRectangle(barFillX, screenHeight - 25.0f,
-            barFillWidth, 10.0f, inactive);
+        AddRectangle(LeftMargin, screenHeight - GaugeLayout::StaminaPanelBottomOffset, GaugePanelWidth, GaugeLayout::StaminaPanelHeight, HudPalette::Panel);
+        AddText(GaugeLabelX, screenHeight - GaugeLayout::StaminaLabelBottomOffset,
+            "スタミナ", GaugeLayout::LabelPixelSize, HudPalette::Text);
+        AddRectangle(GaugeLayout::FillX, screenHeight - GaugeLayout::StaminaFillBottomOffset,
+            GaugeLayout::FillWidth, GaugeLayout::StaminaFillHeight, HudPalette::Inactive);
         if (staminaRate > 0.0f)
         {
-            AddRectangle(barFillX, screenHeight - 25.0f,
-                barFillWidth * staminaRate, 10.0f, staminaColor);
+            AddRectangle(GaugeLayout::FillX, screenHeight - GaugeLayout::StaminaFillBottomOffset,
+                GaugeLayout::FillWidth * staminaRate, GaugeLayout::StaminaFillHeight, staminaColor);
         }
     }
 
@@ -298,38 +411,37 @@ void Hud::Draw(
     if (!interactionPrompt.empty())
     {
         const Color promptColor = interactionLocked
-            ? Color(0.85f, 0.22f, 0.18f, 0.95f)
-            : white;
-        constexpr float promptPixelSize = 2.0f;
+            ? InteractionPromptLayout::LockedTextColor
+            : HudPalette::Text;
         const float promptTextWidth =
             static_cast<float>(CountDisplayedCharacters(interactionPrompt)) *
-            promptPixelSize * GlyphAdvance;
-        const float panelWidth = 88.0f + promptTextWidth;
-        const float panelHeight = 58.0f;
+            InteractionPromptLayout::TextPixelSize * GlyphAdvance;
+        const float panelWidth = InteractionPromptLayout::PanelExtraWidth + promptTextWidth;
+        const float panelHeight = InteractionPromptLayout::PanelHeight;
         const float panelX = (screenWidth - panelWidth) * 0.5f;
-        const float panelY = screenHeight - 106.0f;
+        const float panelY = screenHeight - InteractionPromptLayout::PanelBottomOffset;
 
-        AddRectangle(panelX, panelY, panelWidth, panelHeight, dark);
-        AddRectangle(panelX + 10.0f, panelY + 10.0f,
-            44.0f, 38.0f, inactive);
+        AddRectangle(panelX, panelY, panelWidth, panelHeight, HudPalette::Panel);
+        AddRectangle(panelX + InteractionPromptLayout::KeyPanelInset, panelY + InteractionPromptLayout::KeyPanelInset,
+            InteractionPromptLayout::KeyPanelWidth, InteractionPromptLayout::KeyPanelHeight, HudPalette::Inactive);
         // コントローラーがつながっていればA、なければEの印を出している
         if (Input::IsControllerConnected())
         {
-            AddLetterA(panelX + 20.0f, panelY + 17.0f,
-                24.0f, promptColor);
+            AddLetterA(panelX + InteractionPromptLayout::KeyGlyphX, panelY + InteractionPromptLayout::KeyGlyphY,
+                InteractionPromptLayout::KeyGlyphSize, promptColor);
         }
         else
         {
-            AddLetterE(panelX + 20.0f, panelY + 17.0f,
-                24.0f, promptColor);
+            AddLetterE(panelX + InteractionPromptLayout::KeyGlyphX, panelY + InteractionPromptLayout::KeyGlyphY,
+                InteractionPromptLayout::KeyGlyphSize, promptColor);
         }
-        AddText(panelX + 68.0f, panelY + 22.0f,
-            interactionPrompt, promptPixelSize, promptColor);
+        AddText(panelX + InteractionPromptLayout::TextX, panelY + InteractionPromptLayout::TextY,
+            interactionPrompt, InteractionPromptLayout::TextPixelSize, promptColor);
     }
 
     // 右上：電池を拾った直後は「回復した」、20%以下なら「残量が少ない」と出している
     std::string_view batteryNotice;
-    Color batteryNoticeColor(0.52f, 0.92f, 0.58f, 0.96f);
+    Color batteryNoticeColor = BatteryNoticeLayout::RecoveryColor;
     if (player.GetBatteryNoticeTimer() > 0.0f)
     {
         batteryNotice = "電池を回復した";
@@ -337,19 +449,18 @@ void Hud::Draw(
     else if (player.GetBattery() <= LowBatteryNoticePercent)
     {
         batteryNotice = "電池残量が少ない";
-        batteryNoticeColor = Color(0.94f, 0.30f, 0.18f, 0.96f);
+        batteryNoticeColor = BatteryNoticeLayout::LowColor;
     }
     if (!batteryNotice.empty())
     {
-        constexpr float noticePixelSize = 2.0f;
         const float noticeWidth =
             static_cast<float>(CountDisplayedCharacters(batteryNotice)) *
-            noticePixelSize * GlyphAdvance;
+            TopRightNoticeLayout::TextPixelSize * GlyphAdvance;
         const float noticeX = screenWidth - noticeWidth - RightMargin;
         AddRectangle(noticeX - NoticePadding, TopMargin + m_TopRightOffset,
-            noticeWidth + NoticePadding * 2.0f, 34.0f, dark);
-        AddText(noticeX, 36.0f + m_TopRightOffset,
-            batteryNotice, noticePixelSize, batteryNoticeColor);
+            noticeWidth + NoticePadding * 2.0f, TopRightNoticeLayout::PanelHeight, HudPalette::Panel);
+        AddText(noticeX, BatteryNoticeLayout::TextY + m_TopRightOffset,
+            batteryNotice, TopRightNoticeLayout::TextPixelSize, batteryNoticeColor);
     }
 
     Flush();
@@ -360,7 +471,7 @@ void Hud::Draw(
 void Hud::DrawBlink(float opacity, float maximumOpacity)
 {
     const float blinkOpacity = (std::clamp)(opacity, 0.0f, maximumOpacity);
-    if (blinkOpacity <= 0.001f)
+    if (blinkOpacity <= BlinkDrawThreshold)
     {
         return;
     }
@@ -438,17 +549,17 @@ void Hud::AddRectangle(float x, float y, float width, float height, const Color&
 // 操作ボタンの印「E」を、縦線と3本の横線で組み立てている
 void Hud::AddLetterE(float x, float y, float size, const Color& color)
 {
-    const float stroke = (std::max)(2.0f, size * 0.18f);
+    const float stroke = (std::max)(KeyGlyphMinStroke, size * KeyGlyphStrokeRatio);
     AddRectangle(x, y, stroke, size, color);
     AddRectangle(x, y, size, stroke, color);
-    AddRectangle(x, y + size * 0.5f - stroke * 0.5f, size * 0.82f, stroke, color);
+    AddRectangle(x, y + size * 0.5f - stroke * 0.5f, size * KeyGlyphEMiddleWidthRatio, stroke, color);
     AddRectangle(x, y + size - stroke, size, stroke, color);
 }
 
 // 操作ボタンの印「A」を、左右の縦線と2本の横線で組み立てている（角ばった形）
 void Hud::AddLetterA(float x, float y, float size, const Color& color)
 {
-    const float stroke = (std::max)(2.0f, size * 0.18f);
+    const float stroke = (std::max)(KeyGlyphMinStroke, size * KeyGlyphStrokeRatio);
     AddRectangle(x, y, stroke, size, color);
     AddRectangle(x + size - stroke, y, stroke, size, color);
     AddRectangle(x, y, size, stroke, color);

@@ -30,6 +30,18 @@ namespace MapLayout.Editor
         public static string LayoutDirectory =>
             Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "Job_application_work_horror", "assets", "layout"));
 
+        // 書き出しでは、ごく小さい回転を新しい yaw として追記しない。
+        const float YawExportThresholdDegrees = 0.01f;
+
+        // 実寸の配置物と簡略表示の配置物で、向きを示す印の大きさを変える。
+        const float SizedPlaceFacingMarkerOffset = 0.75f;
+        const float DefaultFacingMarkerOffset = 4.0f;
+        static readonly Vector3 SizedPlaceFacingMarkerScale = new Vector3(0.1f, 0.1f, 0.5f);
+        static readonly Vector3 DefaultFacingMarkerScale = new Vector3(0.5f, 0.5f, 5.0f);
+        static readonly Vector3 GroundMarkerScale = new Vector3(50.0f, 0.02f, 50.0f);
+        const float PlaceMarkerEmission = 0.4f;
+        const float SpotMarkerEmission = 0.5f;
+
         static readonly Color PlaceColor = new Color(0.75f, 0.25f, 0.95f);
         static readonly Color SpotColor = new Color(1.0f, 0.85f, 0.15f);
         static readonly Color SizedPlaceColor = new Color(0.42f, 0.38f, 0.50f);
@@ -247,7 +259,7 @@ namespace MapLayout.Editor
             // 大きさのある物（肖像画・時計・目印・傷など、色をコードが決める板）は、目立ちすぎないよう落ち着いた色にしている
             var material = item.HasSize
                 ? GetMaterial(materials, "#placeSized", SizedPlaceColor, Color.black)
-                : GetMaterial(materials, "#place", PlaceColor, PlaceColor * 0.4f);
+                : GetMaterial(materials, "#place", PlaceColor, PlaceColor * PlaceMarkerEmission);
             var marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
             marker.name = "印";
             Object.DestroyImmediate(marker.GetComponent<Collider>());
@@ -258,14 +270,14 @@ namespace MapLayout.Editor
             facing.name = "正面";
             Object.DestroyImmediate(facing.GetComponent<Collider>());
             facing.transform.SetParent(placeObject.transform, false);
-            facing.transform.localPosition = new Vector3(0.0f, 0.0f, item.HasSize ? 0.75f : 4.0f);
-            facing.transform.localScale = item.HasSize ? new Vector3(0.1f, 0.1f, 0.5f) : new Vector3(0.5f, 0.5f, 5.0f);
+            facing.transform.localPosition = new Vector3(0.0f, 0.0f, item.HasSize ? SizedPlaceFacingMarkerOffset : DefaultFacingMarkerOffset);
+            facing.transform.localScale = item.HasSize ? SizedPlaceFacingMarkerScale : DefaultFacingMarkerScale;
             facing.GetComponent<MeshRenderer>().sharedMaterial = material;
 
             // 床（Ground）は、50×50の板を大きさで伸ばしている（ゲームの床は、置いた大きさの50倍の広さ）。印の代わりに実際の広さで表示している
             if (GameModelCatalog.PlaceTypes.TryGetValue(name, out var placeType) && placeType == "Ground")
             {
-                marker.transform.localScale = new Vector3(50.0f, 0.02f, 50.0f);
+                marker.transform.localScale = GroundMarkerScale;
                 marker.GetComponent<MeshRenderer>().sharedMaterial = GetMaterial(materials, "#ground", GroundColor, Color.black);
                 facing.SetActive(false);
                 return;
@@ -301,7 +313,7 @@ namespace MapLayout.Editor
             sphere.transform.SetParent(groupTransform, false);
             sphere.transform.localPosition = ReadVector(line, 2);
             sphere.transform.localScale = new Vector3(3.0f, 3.0f, 3.0f);
-            sphere.GetComponent<MeshRenderer>().sharedMaterial = GetMaterial(materials, "#spot", SpotColor, SpotColor * 0.5f);
+            sphere.GetComponent<MeshRenderer>().sharedMaterial = GetMaterial(materials, "#spot", SpotColor, SpotColor * SpotMarkerEmission);
             AddItem(sphere, MapLayoutKind.Spot, index, group).SpotSourceLine = line.Content.Trim();
         }
 
@@ -537,7 +549,7 @@ namespace MapLayout.Editor
             {
                 line.SetNumber(yawIndex + 1, yaw);
             }
-            else if (Mathf.Abs(yaw) > 0.01f)
+            else if (Mathf.Abs(yaw) > YawExportThresholdDegrees)
             {
                 line.Append("yaw " + MapLayoutDocument.FormatNumber(yaw));
             }

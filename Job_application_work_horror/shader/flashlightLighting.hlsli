@@ -8,13 +8,39 @@
 // ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
 #include "fastNoise.hlsli"
 
+// 上向きの面と下向きの面で環境光の色と明るさを変える。
+#define HEMISPHERE_GROUND_TINT float3(0.84f, 0.82f, 0.78f)
+#define HEMISPHERE_SKY_TINT float3(0.92f, 0.98f, 1.06f)
+#define HEMISPHERE_GROUND_GAIN 0.90f
+#define HEMISPHERE_SKY_GAIN 1.06f
+
+// 光が浅く当たる面を見えるようにし、正面の白飛びも抑える。
+#define FLASHLIGHT_DIFFUSE_GRAZING 0.22f
+#define FLASHLIGHT_DIFFUSE_FACE_ON 0.45f
+
+// 円錐の中心に向かって強め、軟らかい縁を残す。
+#define FLASHLIGHT_CONE_MIN_EXPONENT 0.01f
+#define FLASHLIGHT_CONE_EDGE_GAIN 0.82f
+#define FLASHLIGHT_CONE_CENTER_GAIN 1.08f
+#define FLASHLIGHT_CONE_CENTER_BLEND_START 0.38f
+
+// 中心に集まらなかった弱い光を外側の広い範囲に足す。
+#define FLASHLIGHT_SPILL_OUTER_COS 0.41f
+#define FLASHLIGHT_SPILL_INNER_COS 0.95f
+#define FLASHLIGHT_SPILL_GAIN 0.22f
+
+// 光の中心は青みを残し、外周では暖かい色へ寄せる。
+#define FLASHLIGHT_TINT_EDGE_START 0.15f
+#define FLASHLIGHT_TINT_CENTER float3(0.96f, 1.0f, 1.07f)
+#define FLASHLIGHT_TINT_EDGE float3(1.10f, 0.88f, 0.58f)
+
 // 上を向いた面はわずかに青白く、下を向いた面はわずかに暖かい色にした環境光を返している
 float3 GetHemisphereAmbient(float3 worldNormal)
 {
     const float skyAmount = saturate(normalize(worldNormal).y * 0.5f + 0.5f);
-    const float3 tint = lerp(float3(0.84f, 0.82f, 0.78f),
-        float3(0.92f, 0.98f, 1.06f), skyAmount);
-    return Light.Ambient.rgb * tint * lerp(0.90f, 1.06f, skyAmount);
+    const float3 tint = lerp(HEMISPHERE_GROUND_TINT,
+        HEMISPHERE_SKY_TINT, skyAmount);
+    return Light.Ambient.rgb * tint * lerp(HEMISPHERE_GROUND_GAIN, HEMISPHERE_SKY_GAIN, skyAmount);
 }
 
 // 懐中電灯の拡散光の強さを、面と光の角度（lambert）から返している。床と壁で共通。
@@ -22,7 +48,7 @@ float3 GetHemisphereAmbient(float3 worldNormal)
 // （1面の暗さは、面の向きによらず下限の0.25で当たっていたころに合わせて決めたため。凹凸の陰影はこの幅の中で出る）
 float GetFlashlightDiffuseResponse(float lambert)
 {
-    return lerp(0.22f, 0.45f, lambert);
+    return lerp(FLASHLIGHT_DIFFUSE_GRAZING, FLASHLIGHT_DIFFUSE_FACE_ON, lambert);
 }
 
 // 懐中電灯の円錐の中での明るさ（内側の円錐で最大、外側の円錐で0）を返している
@@ -30,8 +56,8 @@ float GetFlashlightBeamProfile(float3 pixelDirection)
 {
     const float coneDot = dot(pixelDirection, normalize(Light.Direction.xyz));
     const float cone = smoothstep(Light.SpotParams.y, Light.SpotParams.x, coneDot);
-    const float shapedCone = pow(saturate(cone), max(Light.SpotParams.z, 0.01f));
-    return shapedCone * lerp(0.82f, 1.08f, smoothstep(0.38f, 1.0f, cone));
+    const float shapedCone = pow(saturate(cone), max(Light.SpotParams.z, FLASHLIGHT_CONE_MIN_EXPONENT));
+    return shapedCone * lerp(FLASHLIGHT_CONE_EDGE_GAIN, FLASHLIGHT_CONE_CENTER_GAIN, smoothstep(FLASHLIGHT_CONE_CENTER_BLEND_START, 1.0f, cone));
 }
 
 // 光の色（下で定義している。翼の光でも使うので、先に宣言している）
@@ -44,8 +70,8 @@ float GetFlashlightSpillProfile(float3 pixelDirection)
 {
     const float coneDot = dot(pixelDirection, normalize(Light.Direction.xyz));
     // cos(66度) ≒ 0.41、cos(18度) ≒ 0.95
-    const float spill = smoothstep(0.41f, 0.95f, coneDot);
-    return spill * spill * 0.22f;
+    const float spill = smoothstep(FLASHLIGHT_SPILL_OUTER_COS, FLASHLIGHT_SPILL_INNER_COS, coneDot);
+    return spill * spill * FLASHLIGHT_SPILL_GAIN;
 }
 
 // 翼の光で面が受ける光。懐中電灯は目のすぐそばにあるので、目に見えている面には懐中電灯からも光が届く（さえぎる物がない）。
@@ -72,8 +98,8 @@ float3 GetFlashlightTint(float3 pixelDirection)
 {
     const float coneDot = dot(pixelDirection, normalize(Light.Direction.xyz));
     const float cone = smoothstep(Light.SpotParams.y, Light.SpotParams.x, coneDot);
-    const float edge = smoothstep(0.15f, 1.0f, 1.0f - cone);
-    return lerp(float3(0.96f, 1.0f, 1.07f), float3(1.10f, 0.88f, 0.58f), edge);
+    const float edge = smoothstep(FLASHLIGHT_TINT_EDGE_START, 1.0f, 1.0f - cone);
+    return lerp(FLASHLIGHT_TINT_CENTER, FLASHLIGHT_TINT_EDGE, edge);
 }
 
 // ---- 懐中電灯の光の形（GetFlashlightLensPattern）の値。半径は、外側の円錐の縁を1とした円の中の距離 ----
@@ -110,6 +136,30 @@ static const float BEAM_REFLECTOR_WARP_SCALE = 2.5f;
 
 // 懐中電灯のレンズの模様：中心の明るい芯、芯の縁の明るい輪と暗い隙間、反射鏡の細かい輪、レンズの汚れのむら、
 // 指紋のくもりと傷の影を付けている。電池が弱るほど（Light.SpotParams.w）、芯がぼやけて暗くなり、輪のむらがはっきりする
+// レンズのむらを円錐の外周で薄め、大きい埃と小さい埃を別の密度で描く。
+#define FLASHLIGHT_LENS_PATTERN_FADE_START 0.38f
+#define FLASHLIGHT_LENS_PATTERN_FADE_END 1.02f
+#define FLASHLIGHT_LENS_COARSE_DUST_SCALE 6.2f
+#define FLASHLIGHT_LENS_COARSE_DUST_SEED 13.7f
+#define FLASHLIGHT_LENS_FINE_DUST_SCALE 17.0f
+#define FLASHLIGHT_LENS_FINE_DUST_SEED 5.2f
+#define FLASHLIGHT_LENS_COARSE_DUST_WEIGHT 0.030f
+#define FLASHLIGHT_LENS_FINE_DUST_WEIGHT 0.012f
+
+// 反射鏡の輪は中心から少し外れたところで現れる。
+#define FLASHLIGHT_REFLECTOR_WARP_SEED 7.3f
+#define FLASHLIGHT_REFLECTOR_RING_START 0.15f
+
+// レンズの曇りは偏った位置に置き、細い傷とは別の強さで暗くする。
+#define FLASHLIGHT_LENS_SMUDGE_CENTER float2(0.35f, 0.25f)
+#define FLASHLIGHT_LENS_SMUDGE_RADIUS float2(0.35f, 0.22f)
+#define FLASHLIGHT_LENS_SMUDGE_DEPTH 0.06f
+#define FLASHLIGHT_LENS_SCRATCH_WIDTH 0.012f
+#define FLASHLIGHT_LENS_SCRATCH_SLOPE 0.4f
+#define FLASHLIGHT_LENS_SCRATCH_OFFSET 0.18f
+#define FLASHLIGHT_LENS_SCRATCH_DEPTH 0.07f
+#define FLASHLIGHT_LENS_SCRATCH_HALF_LENGTH 0.6f
+
 float GetFlashlightLensPattern(float3 pixelDirection)
 {
     const float outerCosine = max(Light.SpotParams.y, 0.05f);
@@ -127,12 +177,12 @@ float GetFlashlightLensPattern(float3 pixelDirection)
     const float radius = length(lensUV);
 
     const float patternFade =
-        1.0f - smoothstep(0.38f, 1.02f, radius);
-    const float largeDust = FastValueNoise(lensUV * 6.2f + 13.7f);
-    const float fineDust = FastValueNoise(lensUV * 17.0f - 5.2f);
+        1.0f - smoothstep(FLASHLIGHT_LENS_PATTERN_FADE_START, FLASHLIGHT_LENS_PATTERN_FADE_END, radius);
+    const float largeDust = FastValueNoise(lensUV * FLASHLIGHT_LENS_COARSE_DUST_SCALE + FLASHLIGHT_LENS_COARSE_DUST_SEED);
+    const float fineDust = FastValueNoise(lensUV * FLASHLIGHT_LENS_FINE_DUST_SCALE - FLASHLIGHT_LENS_FINE_DUST_SEED);
     const float lensDirt =
-        ((largeDust - 0.5f) * 0.030f +
-         (fineDust - 0.5f) * 0.012f) * patternFade;
+        ((largeDust - 0.5f) * FLASHLIGHT_LENS_COARSE_DUST_WEIGHT +
+         (fineDust - 0.5f) * FLASHLIGHT_LENS_FINE_DUST_WEIGHT) * patternFade;
 
     // 電池の弱り具合（0〜1。Player が SpotParams.w で渡している）。弱るほど、光のむらがはっきりする
     const float weakness = saturate(Light.SpotParams.w);
@@ -152,22 +202,26 @@ float GetFlashlightLensPattern(float3 pixelDirection)
     // 反射鏡の細かい同心円の輪。本物の反射鏡はきれいな円ではないので、向きによって輪の位置を少しずらしている
     // （向きの単位ベクトルからノイズを作るので、角度の境目で模様が切れない）
     const float2 ringDirection = lensUV / max(radius, 0.001f);
-    const float ringWarp = FastValueNoise(ringDirection * BEAM_REFLECTOR_WARP_SCALE + 7.3f) - 0.5f;
+    const float ringWarp = FastValueNoise(ringDirection * BEAM_REFLECTOR_WARP_SCALE + FLASHLIGHT_REFLECTOR_WARP_SEED) - 0.5f;
     const float rings = sin(radius * BEAM_REFLECTOR_RING_FREQUENCY + ringWarp * BEAM_REFLECTOR_RING_WARP) * 0.5f + 0.5f;
     const float ringPattern =
         (rings - 0.5f) *
         lerp(BEAM_REFLECTOR_RING_AMPLITUDE_FULL, BEAM_REFLECTOR_RING_AMPLITUDE_WEAK, weakness) *
-        smoothstep(0.15f, 0.5f, radius) * patternFade;
+        smoothstep(FLASHLIGHT_REFLECTOR_RING_START, 0.5f, radius) * patternFade;
     // レンズに残った指紋のようなくもり（右上が少し暗い）と、1本の細い傷の影
     const float smudge = -(1.0f - smoothstep(0.0f, 1.0f,
-        length((lensUV - float2(0.35f, 0.25f)) / float2(0.35f, 0.22f)))) * 0.06f;
-    const float scratch = -(1.0f - smoothstep(0.0f, 0.012f, abs(lensUV.y - lensUV.x * 0.4f + 0.18f))) *
-        0.07f * step(abs(lensUV.x), 0.6f);
+        length((lensUV - FLASHLIGHT_LENS_SMUDGE_CENTER) / FLASHLIGHT_LENS_SMUDGE_RADIUS))) * FLASHLIGHT_LENS_SMUDGE_DEPTH;
+    const float scratch = -(1.0f - smoothstep(0.0f, FLASHLIGHT_LENS_SCRATCH_WIDTH, abs(lensUV.y - lensUV.x * FLASHLIGHT_LENS_SCRATCH_SLOPE + FLASHLIGHT_LENS_SCRATCH_OFFSET))) *
+        FLASHLIGHT_LENS_SCRATCH_DEPTH * step(abs(lensUV.x), FLASHLIGHT_LENS_SCRATCH_HALF_LENGTH);
 
     // 1を超える明るさも残している（HDR。中心の芯は周りの2倍ほど明るい）
     return max(
         (beamShape + lensDirt * (1.0f + weakness) + ringPattern + smudge + scratch) * BEAM_ENERGY_NORMALIZATION,
         0.0f);
 }
+
+// 壁と床で、距離の二乗で弱まる照明を同じ割合だけ混ぜる。
+static const float FLASHLIGHT_PHYSICAL_FALLOFF_SCALE = 0.000018f;
+static const float FLASHLIGHT_PHYSICAL_FALLOFF_BLEND = 0.32f;
 
 #endif

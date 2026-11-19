@@ -222,8 +222,13 @@ void ShadowMan::Update()
 		if (!m_ReactedToGaze)
 		{
 			m_ReactedToGaze = true;
-			const float pulseStrength = m_GazeScareEnabled ? 0.62f : 0.20f;
-			const float pulseDuration = m_GazeScareEnabled ? 0.48f : 0.28f;
+			// 視線で驚かせる演出が有効なら、通常の発見時より画面の衝撃を強く長くする。
+			constexpr float GazeScarePulseStrength = 0.62f;
+			constexpr float ObservedFadePulseStrength = 0.20f;
+			constexpr float GazeScarePulseSeconds = 0.48f;
+			constexpr float ObservedFadePulseSeconds = 0.28f;
+			const float pulseStrength = m_GazeScareEnabled ? GazeScarePulseStrength : ObservedFadePulseStrength;
+			const float pulseDuration = m_GazeScareEnabled ? GazeScarePulseSeconds : ObservedFadePulseSeconds;
 			game->GetPostProcess()->TriggerHorrorPulse(
 				pulseStrength,
 				pulseDuration);

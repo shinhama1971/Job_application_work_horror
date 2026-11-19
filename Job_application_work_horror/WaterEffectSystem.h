@@ -78,6 +78,7 @@ public:
     // 水たまりの形（puddleMask.hlsli と同じ値にする）：
     // マス目の一辺、水たまりを置くマスの乱数のしきい値（これ以上なら置く）、中心をマスの中でずらす幅、
     // 楕円の半径（横・縦。基本の値＋乱数で足す幅。マスの一辺を1とした値）、岸の線（楕円の距離）と、岸のゆがみの最大の振れ幅
+    // shader/puddleMask.hlsli の PUDDLE_GRID_CELL_SIZE・PUDDLE_CENTER_JITTER・PUDDLE_AXIS_*・PUDDLE_SHORE_RADIUS と揃える。
     static constexpr float PuddleCellSize = 82.0f;
     static constexpr float PuddleChance = 0.62f;
     static constexpr float PuddleCenterJitter = 0.22f;

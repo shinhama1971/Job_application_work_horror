@@ -57,9 +57,13 @@ struct LIT_PS_IN
 
 
 // 2次元の値から0〜1の疑似乱数を作っている（水滴の輪とノイズに使う。水たまりの位置は PuddleCells の表で決めている）
+// GroundWaterEffects.cpp の Hash21FrequencyX/Y と HashAmplitude に対応する係数。
+static const float2 WATER_HASH21_FREQUENCY = float2(127.1f, 311.7f);
+static const float WATER_HASH21_AMPLITUDE = 43758.5453f;
+
 float Hash21(float2 value)
 {
-    return frac(sin(dot(value, float2(127.1f, 311.7f))) * 43758.5453f);
+    return frac(sin(dot(value, WATER_HASH21_FREQUENCY)) * WATER_HASH21_AMPLITUDE);
 }
 
 // 格子の4隅の乱数を、なめらかに補間した値のノイズ
@@ -110,6 +114,38 @@ struct FloorAgeing
 };
 
 // 床の古さを計算している（amountは古さの濃さ）
+// 床材の係数はプリプロセッサで展開する。FXC が型付き定数で生じさせる丸め差を避けるため。
+// 床版の大きさと継ぎ目の幅。大きな床版にしてタイルに見えないようにする。
+#define FLOOR_SLAB_SIZE (56.0f)
+#define FLOOR_JOINT_CORE (0.05f)
+#define FLOOR_JOINT_EDGE (0.20f)
+#define FLOOR_SLAB_TINT_SEED (11.0f)
+
+// ひびの太さ、現れる領域、遠くで薄める境界を別々に調整する。
+#define FLOOR_CRACK_LINE_WIDTH (0.014f)
+#define FLOOR_CRACK_LINE_FILTER (0.04f)
+#define FLOOR_CRACK_NOISE_SCALE (0.06f)
+#define FLOOR_CRACK_NOISE_SEED (17.0f)
+#define FLOOR_CRACK_MASK_START (0.60f)
+#define FLOOR_CRACK_MASK_FULL (0.78f)
+#define FLOOR_CRACK_MASK_SCALE (0.015f)
+#define FLOOR_CRACK_MASK_SEED (4.0f)
+#define FLOOR_CRACK_DISTANCE_FILTER (0.35f)
+
+// 引きずった跡は一方向に伸ばし、遠くでは薄めてちらつきを抑える。
+#define FLOOR_SCUFF_LINE_START (0.72f)
+#define FLOOR_SCUFF_LINE_FULL (0.90f)
+#define FLOOR_SCUFF_NOISE_X (0.04f)
+#define FLOOR_SCUFF_NOISE_Z (0.9f)
+#define FLOOR_SCUFF_NOISE_SEED (53.0f)
+#define FLOOR_SCUFF_MASK_FULL (0.70f)
+#define FLOOR_SCUFF_MASK_SCALE (0.012f)
+#define FLOOR_SCUFF_MASK_SEED (2.0f)
+#define FLOOR_SCUFF_DISTANCE_FILTER (0.6f)
+
+// 壁際の埃は壁までの距離が増えるほど薄くする。
+#define FLOOR_WALL_DUST_FALLOFF_DISTANCE (4.5f)
+
 FloorAgeing ComputeFloorAgeing(float2 position, float amount)
 {
     FloorAgeing ageing;
@@ -117,21 +153,21 @@ FloorAgeing ComputeFloorAgeing(float2 position, float amount)
     const float footprint = max(length(fwidth(position)), 0.0001f);
 
     // --- 床版の目地（56四方。細く浅くして、タイル張りに見えないようにしている）。床版ごとに色をわずかに変えている
-    const float slabSize = 56.0f;
+    const float slabSize = FLOOR_SLAB_SIZE;
     const float2 slabUV = position / slabSize;
     const float2 edgeDistance = (0.5f - abs(frac(slabUV) - 0.5f)) * slabSize;
-    const float joint = 1.0f - smoothstep(0.05f, 0.20f + footprint, min(edgeDistance.x, edgeDistance.y));
-    const float slabShade = FastHash21(floor(slabUV) + 11.0f);
+    const float joint = 1.0f - smoothstep(FLOOR_JOINT_CORE, FLOOR_JOINT_EDGE + footprint, min(edgeDistance.x, edgeDistance.y));
+    const float slabShade = FastHash21(floor(slabUV) + FLOOR_SLAB_TINT_SEED);
 
     // --- ひび（遠くでは1画素より細くなるため、計算を省いている）
     float crack = 0.0f;
     [branch]
     if (footprint < 0.5f)
     {
-        const float crackLine = 1.0f - smoothstep(0.0f, 0.014f + footprint * 0.04f,
-            abs(FastValueNoise(position * 0.06f + 17.0f) - 0.5f));
-        crack = crackLine * smoothstep(0.60f, 0.78f, FastValueNoise(position * 0.015f + 4.0f)) *
-            saturate(1.0f - footprint / 0.35f);
+        const float crackLine = 1.0f - smoothstep(0.0f, FLOOR_CRACK_LINE_WIDTH + footprint * FLOOR_CRACK_LINE_FILTER,
+            abs(FastValueNoise(position * FLOOR_CRACK_NOISE_SCALE + FLOOR_CRACK_NOISE_SEED) - 0.5f));
+        crack = crackLine * smoothstep(FLOOR_CRACK_MASK_START, FLOOR_CRACK_MASK_FULL, FastValueNoise(position * FLOOR_CRACK_MASK_SCALE + FLOOR_CRACK_MASK_SEED)) *
+            saturate(1.0f - footprint / FLOOR_CRACK_DISTANCE_FILTER);
     }
 
     // --- 油や水の染み（大きな黒ずみ）
@@ -139,13 +175,13 @@ FloorAgeing ComputeFloorAgeing(float2 position, float amount)
         (0.6f + 0.4f * FastValueNoise(position * 0.2f + 7.0f));
 
     // --- 物を引きずった跡（一方向に伸びた細い筋。出る場所を別のノイズで絞っている）
-    const float scuffLine = smoothstep(0.72f, 0.90f,
-        FastValueNoise(float2(position.x * 0.04f, position.y * 0.9f) + 53.0f));
-    const float scuff = scuffLine * smoothstep(0.50f, 0.70f, FastValueNoise(position * 0.012f + 2.0f)) *
-        saturate(1.0f - footprint / 0.6f);
+    const float scuffLine = smoothstep(FLOOR_SCUFF_LINE_START, FLOOR_SCUFF_LINE_FULL,
+        FastValueNoise(float2(position.x * FLOOR_SCUFF_NOISE_X, position.y * FLOOR_SCUFF_NOISE_Z) + FLOOR_SCUFF_NOISE_SEED));
+    const float scuff = scuffLine * smoothstep(0.50f, FLOOR_SCUFF_MASK_FULL, FastValueNoise(position * FLOOR_SCUFF_MASK_SCALE + FLOOR_SCUFF_MASK_SEED)) *
+        saturate(1.0f - footprint / FLOOR_SCUFF_DISTANCE_FILTER);
 
     // --- 壁際にたまった埃（部屋の角の暗がりと同じ壁の形から、壁までの距離を求めている）
-    const float dust = exp(-GetNearestWallDistance(position) / 4.5f);
+    const float dust = exp(-GetNearestWallDistance(position) / FLOOR_WALL_DUST_FALLOFF_DISTANCE);
 
     // 目地とひびを、へこみの高さにしている
     ageing.height = -(joint * 0.5f + crack * 0.4f) * amount;
@@ -221,6 +257,47 @@ float TracePuddleFigure(float3 origin, float3 direction)
 }
 
 // 水たまりのSSR：光線をたどる回数と、1歩ごとに歩幅を広げる割合
+// 波紋で反射像が揺れる強さ。傾きを制限して、反射が大きく飛ばないようにする。
+static const float PUDDLE_REFLECTION_SLOPE_SCALE = 0.28f;
+static const float PUDDLE_REFLECTION_MAX_SLOPE = 0.045f;
+
+// 水を正面から見たときと斜めから見たときの反射を調整し、汚れのある箇所では弱める。
+static const float PUDDLE_REFLECTION_FACE = 0.07f;
+static const float PUDDLE_REFLECTION_NEAR_WALL = 0.62f;
+static const float PUDDLE_REFLECTION_GRAZING_START = 0.04f;
+static const float PUDDLE_REFLECTION_GRAZING_END = 0.27f;
+static const float PUDDLE_REFLECTION_GRAZING = 0.72f;
+static const float PUDDLE_REFLECTION_GRIME_MIN = 0.80f;
+static const float PUDDLE_REFLECTION_GRIME_START = 0.25f;
+static const float PUDDLE_REFLECTION_GRIME_END = 0.75f;
+
+// 反射が強いところでは、映り込みを読み取れるよう流れる霧を少し薄める。
+static const float PUDDLE_REFLECTION_MIST_REDUCTION = 0.16f;
+
+// 水面は正面から見たときに反射を抑え、浅い角度で見たときに強く出す。
+static const float PUDDLE_FRESNEL_EXPONENT = 4.0f;
+
+// 法線の上向き成分で、床の水・岸・濡れた足跡を同じ範囲に制限する。
+static const float WET_FLOOR_UPWARD_START = 0.55f;
+static const float WET_FLOOR_UPWARD_FULL = 0.92f;
+
+// 水面SSRは反射距離でぼけを増やし、床への自己交差を除外する。
+static const float WATER_SSR_DISTANCE_PER_MIP = 85.0f;
+static const float WATER_SSR_BASE_BLUR = 0.55f;
+static const float WATER_SSR_MIN_HIT_HEIGHT = 1.5f;
+// 通常のSSRと、レイ反射を補うSSRはそれぞれの歩数と歩幅を使う。
+static const int WATER_SSR_STEP_COUNT = 40;
+static const float WATER_SSR_STEP_GROWTH = 1.12f;
+// 遠くでも波紋が分かるよう、距離に応じて波の傾きと光沢を強める。
+static const float WATER_RIPPLE_FAR_BOOST = 1.5f;
+static const float WATER_RIPPLE_BOOST_START_DISTANCE = 40.0f;
+static const float WATER_RIPPLE_BOOST_FULL_DISTANCE = 240.0f;
+
+// 排水が進む境界をなだらかにし、残った水の周囲に湿った床を出す。
+static const float DRAIN_WATER_EDGE_BLEND_DISTANCE = 5.0f;
+static const float DRAIN_POOL_EDGE_START = 0.55f;
+static const float DRAIN_DAMP_EDGE_START = 0.35f;
+
 static const int SsrStepCount = 48;
 static const float SsrStepGrowth = 1.10f;
 // 水たまりのSSR：カメラからこの距離の間で、SSRの映り込みを薄めて消している（遠くは部屋の形と環境マップで映す）
@@ -264,7 +341,7 @@ float3 TraceRayReflection(float3 worldPosition, float3 worldNormal, float roughn
         // 粗い水面（浅い縁や波の強い所）は、最初から少しぼかしている
         // 水面より1.5以上高い物に当たったときだけ映し、床そのものへの誤った当たりは捨てている（かくかくした映り込みを防ぐ）
         const float4 screen = TraceScreenSpaceReflection(worldPosition, worldNormal, SsrStepCount, SsrStepGrowth,
-            1.0f / 85.0f, 0.55f + roughness, 1.5f);
+            1.0f / WATER_SSR_DISTANCE_PER_MIP, WATER_SSR_BASE_BLUR + roughness, WATER_SSR_MIN_HIT_HEIGHT);
         // 画面に見えている物は、部屋の形で近づけた色より本物なので、SSRが当たった所はその色を主にしている
         color = lerp(color, screen.rgb, screen.w * nearWeight * 0.85f);
         // SSRが水面より上に立つ物（ポンプ・机・扉など）に当たったときは、箱で映す小物と同じく「近くの縦の面」として扱い、
@@ -284,10 +361,25 @@ float3 TraceRayReflection(float3 worldPosition, float3 worldNormal, float roughn
 }
 
 // 2次元の値から、0〜1の乱数を2つ作っている
+// GroundWaterEffects.cpp の Hash22OffsetA/B と同じ2組のずらしを使う。
+static const float2 WATER_HASH22_OFFSET_A = float2(17.3f, 41.7f);
+static const float2 WATER_HASH22_OFFSET_B = float2(93.1f, 11.8f);
+
+// 水滴を一部のマスにだけ作り、波紋が薄くなりながら広がる範囲を決める。
+static const float WATER_DRIP_CELL_SIZE = 15.0f;
+static const float WATER_DRIP_CELL_MARGIN = 0.18f;
+static const float WATER_DRIP_CENTER_RANGE = 0.64f;
+static const float2 WATER_DRIP_SEED_OFFSET = float2(31.7f, 19.3f);
+static const float WATER_DRIP_ACTIVITY_THRESHOLD = 0.76f;
+static const float WATER_DRIP_CYCLES_PER_SECOND = 0.11f;
+static const float WATER_DRIP_RING_MAX_RADIUS = 0.48f;
+static const float WATER_DRIP_RING_CORE = 0.012f;
+static const float WATER_DRIP_RING_EDGE = 0.035f;
+
 float2 Hash22(float2 value)
 {
-    const float first = Hash21(value + float2(17.3f, 41.7f));
-    const float second = Hash21(value + float2(93.1f, 11.8f));
+    const float first = Hash21(value + WATER_HASH22_OFFSET_A);
+    const float second = Hash21(value + WATER_HASH22_OFFSET_B);
     return float2(first, second);
 }
 
@@ -295,23 +387,56 @@ float2 Hash22(float2 value)
 float GetDripRing(float2 worldPosition)
 {
     // 水滴はまばらに起こし、雨には見せずに、水たまりへ小さな動きを加えている。
-    const float cellSize = 15.0f;
+    const float cellSize = WATER_DRIP_CELL_SIZE;
     const float2 cell = floor(worldPosition / cellSize);
     const float2 localPosition = frac(worldPosition / cellSize);
-    const float2 dropPosition = 0.18f + Hash22(cell) * 0.64f;
-    const float dropSeed = Hash21(cell + float2(31.7f, 19.3f));
-    const float activeDrop = step(0.76f, dropSeed);
-    const float phase = frac(WetTime * 0.11f + dropSeed);
-    const float radius = phase * 0.48f;
+    const float2 dropPosition = WATER_DRIP_CELL_MARGIN + Hash22(cell) * WATER_DRIP_CENTER_RANGE;
+    const float dropSeed = Hash21(cell + WATER_DRIP_SEED_OFFSET);
+    const float activeDrop = step(WATER_DRIP_ACTIVITY_THRESHOLD, dropSeed);
+    const float phase = frac(WetTime * WATER_DRIP_CYCLES_PER_SECOND + dropSeed);
+    const float radius = phase * WATER_DRIP_RING_MAX_RADIUS;
     const float distanceToDrop = length(localPosition - dropPosition);
     const float ring = 1.0f - smoothstep(
-        0.012f,
-        0.035f,
+        WATER_DRIP_RING_CORE,
+        WATER_DRIP_RING_EDGE,
         abs(distanceToDrop - radius));
     return ring * activeDrop * (1.0f - phase);
 }
 
 // 床の画素の色を計算している：床の色と古さ → 水たまり → 照明 → 光沢 → 反射 → 霧 → 色調
+// 水面と濡れた足跡は別の色と強さで光を返す。
+#define PUDDLE_SKY_GLINT_TINT float3(0.12f, 0.15f, 0.16f)
+#define PUDDLE_SKY_GLINT_BASE 0.07f
+#define PUDDLE_SKY_GLINT_FRESNEL 0.54f
+#define WET_FOOTPRINT_GLINT_TINT float3(0.08f, 0.10f, 0.11f)
+#define WET_FOOTPRINT_GLINT_BASE 0.06f
+#define WET_FOOTPRINT_GLINT_FRESNEL 0.55f
+
+// 水滴の輪と波の傾き、岸の縁に明るさの差を付け、照明が弱くても水が分かるようにする。
+#define PUDDLE_PATTERN_GLINT_EXPONENT 10.0f
+#define PUDDLE_PATTERN_GLINT_TINT float3(0.12f, 0.16f, 0.17f)
+#define PUDDLE_PATTERN_GLINT_GAIN 0.22f
+#define PUDDLE_WAVE_GLINT_TINT float3(0.07f, 0.09f, 0.10f)
+#define PUDDLE_WAVE_GLINT_BASE 0.30f
+#define PUDDLE_WAVE_GLINT_FRESNEL 0.70f
+#define PUDDLE_DRIP_GLINT_TINT float3(0.28f, 0.34f, 0.35f)
+#define PUDDLE_DRIP_GLINT_GAIN 0.20f
+#define PUDDLE_SHORE_GLINT_TINT float3(0.10f, 0.13f, 0.125f)
+#define PUDDLE_SHORE_GLINT_BASE 0.24f
+#define PUDDLE_SHORE_GLINT_FRESNEL 0.46f
+
+// 水面の油膜と汚れに時間変化を与え、荒さは波と水の浅さでも変える。
+#define PUDDLE_FILM_FLOW_X 0.006f
+#define PUDDLE_FILM_FLOW_Z 0.004f
+#define PUDDLE_FILM_NOISE_SCALE 0.045f
+#define PUDDLE_GRIME_NOISE_SCALE 0.021f
+#define PUDDLE_GRIME_NOISE_SEED 37.0f
+#define PUDDLE_BASE_ROUGHNESS 0.18f
+#define PUDDLE_FILM_ROUGHNESS_WEIGHT 0.50f
+#define PUDDLE_WAVE_ROUGHNESS_WEIGHT 0.22f
+#define PUDDLE_SHALLOW_MASK_GAIN 1.6f
+#define PUDDLE_SHALLOW_ROUGHNESS_WEIGHT 0.35f
+
 float4 main(in LIT_PS_IN input) : SV_Target
 {
     float4 color = input.col;
@@ -418,20 +543,22 @@ float4 main(in LIT_PS_IN input) : SV_Target
     if (DrainTrace.w > 0.0f && DrainTrace.z > input.worldPos.z &&
         abs(fromDrainColumn.x) < 32.0f && abs(fromDrainColumn.y) < 27.0f)
     {
-        const float exposed = smoothstep(0.0f, 5.0f, DrainTrace.z - input.worldPos.z);
+        const float exposed = smoothstep(0.0f, DRAIN_WATER_EDGE_BLEND_DISTANCE, DrainTrace.z - input.worldPos.z);
         const float edgeNoise = (FastValueNoise(input.worldPos.xz * 0.22f) - 0.5f) * 0.28f;
         const float poolDistance = length((fromDrainColumn - float2(13.0f, -8.0f)) / float2(13.0f, 8.0f)) + edgeNoise;
-        remainingWater = (1.0f - smoothstep(0.55f, 1.0f, poolDistance)) * exposed;
+        remainingWater = (1.0f - smoothstep(DRAIN_POOL_EDGE_START, 1.0f, poolDistance)) * exposed;
         puddle = max(puddle, remainingWater * 0.92f);
-        const float dampDistance = length((fromDrainColumn - float2(7.0f, -5.0f)) / float2(23.0f, 18.0f)) + edgeNoise;
-        drainedDamp = (1.0f - smoothstep(0.35f, 1.0f, dampDistance)) * exposed * (1.0f - remainingWater);
+        const float dampDistance = length((fromDrainColumn - float2(7.0f, -DRAIN_WATER_EDGE_BLEND_DISTANCE)) / float2(23.0f, 18.0f)) + edgeNoise;
+        drainedDamp = (1.0f - smoothstep(DRAIN_DAMP_EDGE_START, 1.0f, dampDistance)) * exposed * (1.0f - remainingWater);
     }
     // 上を向いた面（床）だけを水たまりにしている
-    puddle *= smoothstep(0.55f, 0.92f, saturate(input.worldNormal.y));
-    shore *= smoothstep(0.55f, 0.92f, saturate(input.worldNormal.y));
+    const float upwardMask = smoothstep(WET_FLOOR_UPWARD_START, WET_FLOOR_UPWARD_FULL,
+        saturate(input.worldNormal.y));
+    puddle *= upwardMask;
+    shore *= upwardMask;
     // 濡れた足跡（水たまりの外の乾いた床だけ。WetFootprints が場所と濡れ具合を渡している）
     const float footprintWet = GetWetFootprints(input.worldPos.xz) *
-        smoothstep(0.55f, 0.92f, saturate(input.worldNormal.y)) * (1.0f - saturate(puddle * 2.0f));
+        upwardMask * (1.0f - saturate(puddle * 2.0f));
 
     float dripRing = 0.0f;
     float3 detailWorldNormal = agedWorldNormal;
@@ -495,10 +622,10 @@ float4 main(in LIT_PS_IN input) : SV_Target
         ? -input.viewPos / distanceFromCamera
         : float3(0.0f, 1.0f, 0.0f);
     // 離れるほど波の輪が細く見えるので、距離40から240にかけて輪の光り方を最大2.5倍まで強め、遠くの水たまりでも雨の輪が分かるようにしている
-    const float farRippleBoost = 1.0f + 1.5f * smoothstep(40.0f, 240.0f, distanceFromCamera);
+    const float farRippleBoost = 1.0f + WATER_RIPPLE_FAR_BOOST * smoothstep(WATER_RIPPLE_BOOST_START_DISTANCE, WATER_RIPPLE_BOOST_FULL_DISTANCE, distanceFromCamera);
     const float fresnel = pow(
         1.0f - saturate(dot(normalize(input.viewNormal), viewDirection)),
-        4.0f);
+        PUDDLE_FRESNEL_EXPONENT);
 
     // 天井の点光源は、パネルだけでなく、近くの床と壁も照らしている。
     uint pointLightListOffset;
@@ -547,7 +674,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
         const float fixtureDistribution = lerp(
             0.22f,
             1.0f,
-            smoothstep(0.04f, 0.72f, downwardAmount));
+            smoothstep(FIXTURE_BEAM_DOT_START, FIXTURE_BEAM_DOT_END, downwardAmount));
 
         lighting += pointLight.ColorIntensity.rgb
             * pointLight.ColorIntensity.a
@@ -595,9 +722,9 @@ float4 main(in LIT_PS_IN input) : SV_Target
             const float lensPattern = GetFlashlightLensPattern(pixelDirection);
             const float3 flashlightColor = Light.Diffuse.rgb * GetFlashlightTint(pixelDirection);
             const float physicalFalloff = rcp(
-                1.0f + distanceFromCamera * distanceFromCamera * 0.000018f);
+                1.0f + distanceFromCamera * distanceFromCamera * FLASHLIGHT_PHYSICAL_FALLOFF_SCALE);
             const float naturalAttenuation = attenuation *
-                lerp(1.0f, physicalFalloff, 0.32f);
+                lerp(1.0f, physicalFalloff, FLASHLIGHT_PHYSICAL_FALLOFF_BLEND);
 
             // 1面は目地・ひび・水の波の凹凸を懐中電灯にも反映している（2面は前と同じく平らな面で計算）。
             const float3 normal = WallWeathering > 0.0f
@@ -652,35 +779,35 @@ float4 main(in LIT_PS_IN input) : SV_Target
     const float3 floorBaseColor = color.rgb;
     color.rgb *= lighting;
     // 水面の空の映り込み・波の光・水滴の輪・岸の光を足している
-    specularLighting += float3(0.12f, 0.15f, 0.16f)
-        * puddle * (0.07f + fresnel * 0.54f);
-    specularLighting += float3(0.08f, 0.10f, 0.11f) * footprintWet * (0.06f + fresnel * 0.55f);
+    specularLighting += PUDDLE_SKY_GLINT_TINT
+        * puddle * (PUDDLE_SKY_GLINT_BASE + fresnel * PUDDLE_SKY_GLINT_FRESNEL);
+    specularLighting += WET_FOOTPRINT_GLINT_TINT * footprintWet * (WET_FOOTPRINT_GLINT_BASE + fresnel * WET_FOOTPRINT_GLINT_FRESNEL);
     const float rippleHighlight = pow(
         saturate(ripplePattern * 0.5f + 0.5f),
-        10.0f) * puddle;
-    specularLighting += float3(0.12f, 0.16f, 0.17f) * rippleHighlight * 0.22f;
+        PUDDLE_PATTERN_GLINT_EXPONENT) * puddle;
+    specularLighting += PUDDLE_PATTERN_GLINT_TINT * rippleHighlight * PUDDLE_PATTERN_GLINT_GAIN;
     // 足音や水滴の波の、傾いた斜面が光を返して、輪が細く光る
     // （懐中電灯が当たっていない所でも、暗い中でうっすら輪が分かる程度に光らせている）
-    specularLighting += float3(0.07f, 0.09f, 0.10f) *
-        saturate(length(rippleWave.yz) * 3.0f * farRippleBoost) * (0.30f + fresnel * 0.70f) * farRippleBoost;
-    specularLighting += float3(0.28f, 0.34f, 0.35f)
-        * dripRing * 0.20f * RippleStrength;
-    specularLighting += float3(0.10f, 0.13f, 0.125f)
-        * shore * (0.24f + fresnel * 0.46f);
+    specularLighting += PUDDLE_WAVE_GLINT_TINT *
+        saturate(length(rippleWave.yz) * 3.0f * farRippleBoost) * (PUDDLE_WAVE_GLINT_BASE + fresnel * PUDDLE_WAVE_GLINT_FRESNEL) * farRippleBoost;
+    specularLighting += PUDDLE_DRIP_GLINT_TINT
+        * dripRing * PUDDLE_DRIP_GLINT_GAIN * RippleStrength;
+    specularLighting += PUDDLE_SHORE_GLINT_TINT
+        * shore * (PUDDLE_SHORE_GLINT_BASE + fresnel * PUDDLE_SHORE_GLINT_FRESNEL);
     // 床が透けるようになった分、直射光の光沢で白い金属板のように見えない強さに抑える。
     color.rgb += specularLighting * lerp(1.0f, 0.58f, puddle);
     color.rgb += Material.Emission.rgb;
 
     // 水面のむら：浮いた埃や油膜を、ゆっくり流れる2つのノイズで表している。
     // filmは水面の荒さ（反射のぼけ）に、grimeは映り込みの強さに使い、場所ごとに映り方が変わるようにしている。
-    const float2 filmFlow = float2(WetTime * 0.006f, -WetTime * 0.004f);
-    const float film = FastValueNoise(input.worldPos.xz * 0.045f + filmFlow);
-    const float grime = FastValueNoise(input.worldPos.xz * 0.021f - filmFlow * 0.5f + 37.0f);
+    const float2 filmFlow = float2(WetTime * PUDDLE_FILM_FLOW_X, -WetTime * PUDDLE_FILM_FLOW_Z);
+    const float film = FastValueNoise(input.worldPos.xz * PUDDLE_FILM_NOISE_SCALE + filmFlow);
+    const float grime = FastValueNoise(input.worldPos.xz * PUDDLE_GRIME_NOISE_SCALE - filmFlow * 0.5f + PUDDLE_GRIME_NOISE_SEED);
     // 荒さ（0=鏡、1=ぼやけた反射）：浅い縁（水たまりの濃さが低い所）と、波が強い所ほど荒くしている
     const float waterRoughness = saturate(
-        0.18f + film * 0.50f +
-        abs(ripplePattern) * 0.22f +
-        (1.0f - saturate(puddle * 1.6f)) * 0.35f);
+        PUDDLE_BASE_ROUGHNESS + film * PUDDLE_FILM_ROUGHNESS_WEIGHT +
+        abs(ripplePattern) * PUDDLE_WAVE_ROUGHNESS_WEIGHT +
+        (1.0f - saturate(puddle * PUDDLE_SHALLOW_MASK_GAIN)) * PUDDLE_SHALLOW_ROUGHNESS_WEIGHT);
 
     // 水は正面に近いほど床が透け、浅い角度で反射が強くなる。床を見下ろしても鏡のように光らない幅にする。
     const float grazing = 1.0f - saturate(dot(normalize(input.viewNormal), viewDirection));
@@ -690,8 +817,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     float4 alternateReflection = 0.0f;
     // 反射像は実際に広がる波の傾きで少しだけ揺らす。床の凹凸と細かいノイズは光沢と波の輪に使う。
     // 遠くの水たまりは、映った景色の揺れも少し大きくして、輪が映り込みを乱す様子が見えるようにしている
-    const float2 reflectionSlope = clamp(-rippleWave.yz * 0.28f * farRippleBoost,
-        -0.045f * farRippleBoost, 0.045f * farRippleBoost);
+    const float2 reflectionSlope = clamp(-rippleWave.yz * PUDDLE_REFLECTION_SLOPE_SCALE * farRippleBoost,
+        -PUDDLE_REFLECTION_MAX_SLOPE * farRippleBoost, PUDDLE_REFLECTION_MAX_SLOPE * farRippleBoost);
     const float3 reflectionNormal = normalize(float3(reflectionSlope.x, 1.0f, reflectionSlope.y));
     // 「水たまり」の異変の人影が、反射の光線を遮った度合い（レイ反射のときだけ求めている）
     float puddleFigure = 0.0f;
@@ -708,7 +835,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
             if (ReflectionParams.y > 0.5f)
             {
                 alternateReflection = TraceScreenSpaceReflection(input.worldPos, reflectionNormal,
-                    40, 1.12f, 1.0f / 85.0f, 0.55f + waterRoughness, 1.5f);
+                    WATER_SSR_STEP_COUNT, WATER_SSR_STEP_GROWTH, 1.0f / WATER_SSR_DISTANCE_PER_MIP,
+                    WATER_SSR_BASE_BLUR + waterRoughness, WATER_SSR_MIN_HIT_HEIGHT);
             }
         }
         else
@@ -720,11 +848,11 @@ float4 main(in LIT_PS_IN input) : SV_Target
     }
     // 映り込みの強さ：水たまりの濃さ・光線が当たった度合い・見る角度（フレネル）・反射の強さの設定・水面の汚れを掛け合わせている。
     // 濡れた床と波紋を残しつつ、近くの壁や扉は斜めからでも輪郭が分かる強さで映す。
-    const float faceReflection = lerp(0.07f, 0.62f, nearVertical * smoothstep(0.04f, 0.27f, grazing));
+    const float faceReflection = lerp(PUDDLE_REFLECTION_FACE, PUDDLE_REFLECTION_NEAR_WALL, nearVertical * smoothstep(PUDDLE_REFLECTION_GRAZING_START, PUDDLE_REFLECTION_GRAZING_END, grazing));
     const float reflectionStrength = saturate(
         puddle * alternateReflection.w *
-        lerp(faceReflection, 0.72f, viewAngleReflection) * ReflectionStrength *
-        lerp(0.80f, 1.0f, smoothstep(0.25f, 0.75f, grime)));
+        lerp(faceReflection, PUDDLE_REFLECTION_GRAZING, viewAngleReflection) * ReflectionStrength *
+        lerp(PUDDLE_REFLECTION_GRIME_MIN, 1.0f, smoothstep(PUDDLE_REFLECTION_GRIME_START, PUDDLE_REFLECTION_GRIME_END, grime)));
     if (DebugViewMode == DEBUG_VIEW_FULLBRIGHT_REFLECTION)
     {
         // 床の材質を明るくし、通常と同じ水面マスクと反射像を重ねる。
@@ -751,13 +879,13 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 2面の周回が進むほど、霧が近くから濃くなる（LoopDepth。horrorGrade.hlsli）
     const float distanceFog = GetHorrorDistanceFog(distanceFromCamera, LoopDepth);
     const float heightFromFloor = max(input.worldPos.y - SCENE_BASE_FLOOR_Y, 0.0f);
-    const float heightDensity = exp(-heightFromFloor * 0.055f);
+    const float heightDensity = exp(-heightFromFloor * HEIGHT_FOG_DECAY);
     const float nearSuppression =
-        smoothstep(35.0f, 150.0f, distanceFromCamera);
-    const float fogVariation = 0.78f +
-        saturate(FastValueNoise(input.worldPos.xz * 0.018f + 21.0f)) * 0.22f;
+        smoothstep(HEIGHT_FOG_NEAR_START, HEIGHT_FOG_NEAR_END, distanceFromCamera);
+    const float fogVariation = HEIGHT_FOG_BASE_VARIATION +
+        saturate(FastValueNoise(input.worldPos.xz * HEIGHT_FOG_NOISE_SCALE + HEIGHT_FOG_NOISE_OFFSET)) * HEIGHT_FOG_NOISE_WEIGHT;
     const float heightFog =
-        heightDensity * nearSuppression * fogVariation * 0.22f * GetHorrorHeightFogScale(LoopDepth);
+        heightDensity * nearSuppression * fogVariation * HEIGHT_FOG_STRENGTH * GetHorrorHeightFogScale(LoopDepth);
     const float fogFactor = saturate(distanceFog + heightFog);
     // 遠くは灰色のもやではなく、闇に溶けていく
     const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb, LoopDepth);
@@ -766,7 +894,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 映り込みの強い所だけ霧を少し薄める。
     const float3 beforeMist = color.rgb;
     color.rgb = ApplyHorrorMist(color.rgb, input.worldPos, input.viewPos, lighting);
-    color.rgb = lerp(color.rgb, beforeMist, reflectionStrength * 0.16f);
+    color.rgb = lerp(color.rgb, beforeMist, reflectionStrength * PUDDLE_REFLECTION_MIST_REDUCTION);
     // 天井の照明や非常灯から下へ落ちる光の筋（霧に散った光。horrorMist.hlsli）
     color.rgb += GetLightShafts(input.worldPos, pointLightListOffset, pointLightCount, input.pos.xy);
     color.rgb = ApplyFilmicHorrorGrade(color.rgb, LoopDepth);

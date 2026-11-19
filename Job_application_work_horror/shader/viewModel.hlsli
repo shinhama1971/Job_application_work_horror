@@ -66,7 +66,7 @@ void AccumulateViewModelPointLights(
         float attenuation = saturate(1.0f - lightDistance / range);
         attenuation *= attenuation;
         // 天井の照明は下向きに広がる面の光源なので、横に近い向き（目の高さの手）には弱くしか届かない（litTexturePS と同じ近似）
-        const float fixtureDistribution = lerp(0.22f, 1.0f, smoothstep(0.04f, 0.72f, toLight.y));
+        const float fixtureDistribution = lerp(0.22f, 1.0f, smoothstep(FIXTURE_BEAM_DOT_START, FIXTURE_BEAM_DOT_END, toLight.y));
         const float3 radiance = pointLight.ColorIntensity.rgb * pointLight.ColorIntensity.a * attenuation *
             fixtureDistribution * GetPointLightShadow(worldPosition, worldNormal, pointLight.PositionRange.xyz);
         const float lambert = saturate((dot(worldNormal, toLight) + wrap) / (1.0f + wrap));

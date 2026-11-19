@@ -19,6 +19,10 @@ namespace
 {
     // 調べる対象がこれより近いときは、向きを計算しない（0で割らないため）
     constexpr float MinimumInteractionDistance = 0.001f;
+    // 距離だけで選ばず、プレイヤーが正面に見ている対象を優先する。
+    constexpr float InteractionFacingWeight = 2.0f;
+    // 前の対象に少し点を足し、わずかな視線移動で候補が切り替わるのを防ぐ。
+    constexpr float InteractionFocusBonus = 0.08f;
 }
 
 // 調べられる対象の中から一番よいものを選び、Eキー（コントローラーはA）が押されたら調べている
@@ -65,8 +69,8 @@ void InteractionSystem::Update(Player& player)
 
         // 点数：正面に近いほど高く、遠いほど低い。前のフレームで選んでいた対象は少し高くし、選ぶ対象がちらちら変わらないようにしている
         const float distanceRate = distance / MaxInteractionDistance;
-        const float focusPersistence = candidate == previousFocus ? 0.08f : 0.0f;
-        const float score = facingDot * 2.0f - distanceRate + focusPersistence;
+        const float focusPersistence = candidate == previousFocus ? InteractionFocusBonus : 0.0f;
+        const float score = facingDot * InteractionFacingWeight - distanceRate + focusPersistence;
 
         if (score > bestScore)
         {

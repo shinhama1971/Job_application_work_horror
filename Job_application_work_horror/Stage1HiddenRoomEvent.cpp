@@ -306,7 +306,11 @@ void Stage1HiddenRoomEvent::SpawnShadow(const Player& player)
 
     // 影が出た場所の天井近くで、低く配管の音を鳴らして気配を知らせている
     Core::Game* game = Core::Game::GetInstance();
-    game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, *farthest + Vector3(0.0f, 20.0f, 0.0f), 0.55f, 1.4f);
+    constexpr float ShadowKnockHeight = 20.0f;
+    constexpr float ShadowKnockPitch = 0.55f;
+    constexpr float ShadowKnockVolume = 1.4f;
+    game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, *farthest + Vector3(0.0f, ShadowKnockHeight, 0.0f),
+        ShadowKnockPitch, ShadowKnockVolume);
     ShowNotice("何かが部屋にいる ライトを向ける", ShadowAppearedNoticeSeconds);
 }
 

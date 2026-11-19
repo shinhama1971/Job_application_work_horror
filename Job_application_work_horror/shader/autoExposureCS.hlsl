@@ -35,6 +35,17 @@ static const float AUTO_EXPOSURE_GAIN_EXPONENT = 0.35f;
 // log(0) を避けるために足し、線形値へ戻すときに同じ値を引く。
 static const float AUTO_EXPOSURE_LOG_OFFSET = 0.002f;
 
+// 中央の輝度を優先しつつ、周辺にも測定の重みを残す。
+static const float AUTO_EXPOSURE_CENTER_WEIGHT_RADIUS = 0.9f;
+static const float AUTO_EXPOSURE_EDGE_WEIGHT_FLOOR = 0.15f;
+
+// 集計時の重み、復元した輝度、露出の比率にそれぞれ下限を設ける。
+static const float AUTO_EXPOSURE_MIN_ACCUMULATED_WEIGHT = 0.0001f;
+
+// 真っ暗な画面でも、露出の比率とべき乗を計算できる範囲に収める。
+static const float AUTO_EXPOSURE_MIN_LUMINANCE = 0.0001f;
+static const float AUTO_EXPOSURE_MIN_RATIO = 0.0001f;
+
 // 各スレッドの、重みを掛けた明るさの対数の合計と、重みの合計
 groupshared float g_LogLuminance[THREAD_COUNT];
 groupshared float g_Weight[THREAD_COUNT];
@@ -67,7 +78,7 @@ void main(uint3 threadId : SV_GroupThreadID, uint threadIndex : SV_GroupIndex)
 
             // 画面の中央ほど重くしている（視線と懐中電灯が向く所を優先して測る）。端も少しは数えている
             const float2 centered = (uv - 0.5f) * float2(aspect, 1.0f);
-            const float weight = max(1.0f - length(centered) / 0.9f, 0.15f);
+            const float weight = max(1.0f - length(centered) / AUTO_EXPOSURE_CENTER_WEIGHT_RADIUS, AUTO_EXPOSURE_EDGE_WEIGHT_FLOOR);
 
             // 真っ黒（0）の対数は求められないため、小さな値を足している
             logSum += weight * log(luminance + AUTO_EXPOSURE_LOG_OFFSET);
@@ -95,7 +106,7 @@ void main(uint3 threadId : SV_GroupThreadID, uint threadIndex : SV_GroupIndex)
         return;
     }
 
-    const float frameLogLuminance = g_LogLuminance[0] / max(g_Weight[0], 0.0001f);
+    const float frameLogLuminance = g_LogLuminance[0] / max(g_Weight[0], AUTO_EXPOSURE_MIN_ACCUMULATED_WEIGHT);
 
     // 前のフレームまでに慣れた明るさから、今の明るさへ近づけている。
     // 明るくなるときは素早く、暗くなるときはゆっくり慣れる（人の目の慣れ方に近づけている）。
@@ -110,8 +121,8 @@ void main(uint3 threadId : SV_GroupThreadID, uint threadIndex : SV_GroupIndex)
 
     // 慣れた明るさが目標より暗いほど倍率を上げている。0.35乗にして、明るさの差をそのまま埋めずに控えめにしている
     // （ホラーの暗さを残しつつ、真っ暗な場所でも少しだけ見えるようになる程度にとどめている）。
-    const float adaptedLuminance = max(exp(adaptedLogLuminance) - AUTO_EXPOSURE_LOG_OFFSET, 0.0001f);
-    const float luminanceRatio = max(TargetLuminance / adaptedLuminance, 0.0001f);
+    const float adaptedLuminance = max(exp(adaptedLogLuminance) - AUTO_EXPOSURE_LOG_OFFSET, AUTO_EXPOSURE_MIN_LUMINANCE);
+    const float luminanceRatio = max(TargetLuminance / adaptedLuminance, AUTO_EXPOSURE_MIN_RATIO);
     float gain = clamp(pow(luminanceRatio, AUTO_EXPOSURE_GAIN_EXPONENT), MinGain, MaxGain);
     if (Enabled < 0.5f)
     {

@@ -27,7 +27,7 @@ namespace
 			? static_cast<float>(value) / StickNegativeRange
 			: static_cast<float>(value) / StickPositiveRange;
 		const float magnitude = std::abs(normalized);
-		const float deadZoneRate = static_cast<float>(deadZone) / 32767.0f;
+		const float deadZoneRate = static_cast<float>(deadZone) / StickPositiveRange;
 
 		if (magnitude <= deadZoneRate)
 		{

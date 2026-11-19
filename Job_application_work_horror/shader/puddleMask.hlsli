@@ -22,6 +22,45 @@ cbuffer PuddleCellBuffer : register(b13)
     float4 PuddleGridOffset;
 }
 
+// WaterEffectSystem::PuddleCellSize と同じワールド単位。CPU と水面の区画を揃える。
+static const float PUDDLE_GRID_CELL_SIZE = 82.0f;
+
+// 中心のずれと楕円の大きさ。WaterEffectSystem の PuddleCenterJitter・PuddleAxisX/Z・PuddleAxisX/ZRange と揃える。
+static const float PUDDLE_CENTER_JITTER = 0.22f;
+static const float PUDDLE_FULL_TURN = 6.2831853f;
+static const float PUDDLE_AXIS_X = 0.72f;
+static const float PUDDLE_AXIS_X_RANGE = 0.25f;
+static const float PUDDLE_AXIS_Z = 0.43f;
+static const float PUDDLE_AXIS_Z_RANGE = 0.20f;
+
+// 岸のうねりとノイズ。GroundWaterEffects.cpp の ShoreWave*・ShoreNoise* と同じ値で、濡れ判定と輪郭を揃える。
+static const float PUDDLE_SHORE_WAVE_A_COUNT = 5.0f;
+static const float PUDDLE_SHORE_WAVE_B_COUNT = 9.0f;
+static const float PUDDLE_SHORE_WAVE_A_SEED = 9.0f;
+static const float PUDDLE_SHORE_WAVE_B_SEED = 13.0f;
+static const float PUDDLE_SHORE_WAVE_A_AMOUNT = 0.045f;
+static const float PUDDLE_SHORE_WAVE_B_AMOUNT = 0.022f;
+static const float PUDDLE_SHORE_NOISE_SCALE = 0.052f;
+static const float PUDDLE_SHORE_NOISE_CELL_SCALE = 1.73f;
+static const float PUDDLE_SHORE_NOISE_WARP = 0.22f;
+
+// 水面の端を滑らかにし、境界の中心に細い岸の線を出す。岸の半径は WaterEffectSystem::PuddleShoreRadius と同じ値。
+static const float PUDDLE_EDGE_INNER = 0.34f;
+static const float PUDDLE_EDGE_OUTER = 0.40f;
+static const float PUDDLE_SHORE_LINE_INNER = 0.012f;
+static const float PUDDLE_SHORE_LINE_OUTER = 0.070f;
+static const float PUDDLE_SHORE_RADIUS = 0.37f;
+
+// 放射状に広がる波と斜めに横切る波を重ね、単調な同心円を減らす。
+static const float PUDDLE_RADIAL_WAVE_FREQUENCY = 48.0f;
+static const float PUDDLE_RADIAL_WAVE_EDGE_WARP = 18.0f;
+static const float PUDDLE_RADIAL_WAVE_SPEED = 1.65f;
+static const float PUDDLE_CROSS_WAVE_X_FREQUENCY = 76.0f;
+static const float PUDDLE_CROSS_WAVE_Z_FREQUENCY = 41.0f;
+static const float PUDDLE_CROSS_WAVE_SPEED = 1.10f;
+static const float PUDDLE_RADIAL_WAVE_WEIGHT = 0.72f;
+static const float PUDDLE_CROSS_WAVE_WEIGHT = 0.28f;
+
 // その位置の水たまりの濃さ（0〜1）を返し、岸の線と波の模様も返している（timeは波を動かす時間）
 float GetPuddleMask(
     float2 worldPosition,
@@ -33,8 +72,7 @@ float GetPuddleMask(
     ripplePattern = 0.0f;
     // 大きなワールド空間のマス目ごとに、不規則に回した水たまりを1つ置いている。
     // 半径をマス目の境目より小さくし、床全体を一様に濡らさず、独立した水たまりにしている。
-    const float cellSize = 82.0f;
-    const float2 gridPosition = (worldPosition + PuddleGridOffset.xy) / cellSize;
+    const float2 gridPosition = (worldPosition + PuddleGridOffset.xy) / PUDDLE_GRID_CELL_SIZE;
     const float2 cell = floor(gridPosition);
     float2 localPosition = frac(gridPosition) - 0.5f;
 
@@ -57,42 +95,42 @@ float GetPuddleMask(
 
     // 水たまりの中心をずらし、ランダムに回した楕円にしている
     const float2 randomValue = cellValue.yz;
-    localPosition -= (randomValue - 0.5f) * 0.22f;
+    localPosition -= (randomValue - 0.5f) * PUDDLE_CENTER_JITTER;
 
-    const float angle = randomValue.x * 6.2831853f;
+    const float angle = randomValue.x * PUDDLE_FULL_TURN;
     const float cosine = cos(angle);
     const float sine = sin(angle);
     const float2 rotated = float2(
         localPosition.x * cosine - localPosition.y * sine,
         localPosition.x * sine + localPosition.y * cosine);
     const float2 axes = float2(
-        0.72f + randomValue.x * 0.25f,
-        0.43f + randomValue.y * 0.20f);
+        PUDDLE_AXIS_X + randomValue.x * PUDDLE_AXIS_X_RANGE,
+        PUDDLE_AXIS_Z + randomValue.y * PUDDLE_AXIS_Z_RANGE);
 
     // 縁をノイズと波形でゆがませ、自然な形の水たまりにしている
     const float radialDistance = length(rotated / axes);
     const float polarAngle = atan2(rotated.y, rotated.x);
     const float organicLobes =
-        sin(polarAngle * 5.0f + randomValue.x * 9.0f) * 0.045f +
-        sin(polarAngle * 9.0f + randomValue.y * 13.0f) * 0.022f;
+        sin(polarAngle * PUDDLE_SHORE_WAVE_A_COUNT + randomValue.x * PUDDLE_SHORE_WAVE_A_SEED) * PUDDLE_SHORE_WAVE_A_AMOUNT +
+        sin(polarAngle * PUDDLE_SHORE_WAVE_B_COUNT + randomValue.y * PUDDLE_SHORE_WAVE_B_SEED) * PUDDLE_SHORE_WAVE_B_AMOUNT;
     const float edgeWarp =
-        (FastValueNoise(worldPosition * 0.052f + cell * 1.73f) - 0.5f) * 0.22f +
+        (FastValueNoise(worldPosition * PUDDLE_SHORE_NOISE_SCALE + cell * PUDDLE_SHORE_NOISE_CELL_SCALE) - 0.5f) * PUDDLE_SHORE_NOISE_WARP +
         organicLobes;
     const float irregularDistance = radialDistance + edgeWarp;
 
     // 水たまりの濃さ、岸の細い線、ゆっくり広がる波と交差する波の模様
     const float puddle =
-        (1.0f - smoothstep(0.34f, 0.40f, irregularDistance)) * hasPuddle;
+        (1.0f - smoothstep(PUDDLE_EDGE_INNER, PUDDLE_EDGE_OUTER, irregularDistance)) * hasPuddle;
     shore = (1.0f - smoothstep(
-        0.012f,
-        0.070f,
-        abs(irregularDistance - 0.37f))) * hasPuddle;
+        PUDDLE_SHORE_LINE_INNER,
+        PUDDLE_SHORE_LINE_OUTER,
+        abs(irregularDistance - PUDDLE_SHORE_RADIUS))) * hasPuddle;
     const float slowWave = sin(
-        radialDistance * 48.0f + edgeWarp * 18.0f - time * 1.65f);
+        radialDistance * PUDDLE_RADIAL_WAVE_FREQUENCY + edgeWarp * PUDDLE_RADIAL_WAVE_EDGE_WARP - time * PUDDLE_RADIAL_WAVE_SPEED);
     const float crossingWave = sin(
-        rotated.x * 76.0f - rotated.y * 41.0f + time * 1.10f);
+        rotated.x * PUDDLE_CROSS_WAVE_X_FREQUENCY - rotated.y * PUDDLE_CROSS_WAVE_Z_FREQUENCY + time * PUDDLE_CROSS_WAVE_SPEED);
     ripplePattern =
-        (slowWave * 0.72f + crossingWave * 0.28f) * puddle;
+        (slowWave * PUDDLE_RADIAL_WAVE_WEIGHT + crossingWave * PUDDLE_CROSS_WAVE_WEIGHT) * puddle;
     return puddle;
 }
 

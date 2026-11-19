@@ -116,6 +116,57 @@ float LinearizeDepth(float depth, float nearPlane, float farPlane)
         max(farPlane - depth * (farPlane - nearPlane), 0.001f);
 }
 
+// 画面下端で光を薄め、床の輪郭を隠さないための開始位置と終了位置。
+static const float VOLUME_FLOOR_FADE_START = 0.62f;
+static const float VOLUME_FLOOR_FADE_END = 0.98f;
+
+// 静かな場面の光の濃さと、恐怖・緊張の演出で加える濃さ。
+static const float VOLUME_BASE_DENSITY = 0.026f;
+static const float VOLUME_DENSITY_VARIATION = 0.010f;
+static const float VOLUME_SMOKE_DENSITY = 0.040f;
+static const float VOLUME_HORROR_DENSITY_GAIN = 0.32f;
+static const float VOLUME_TENSION_DENSITY_GAIN = 0.48f;
+
+// 通常時の暖色から緊張時の青白い色へ寄せる。基準の光量で強さを正規化する。
+static const float3 VOLUME_BEAM_WARM_TINT = float3(1.0f, 0.78f, 0.50f);
+static const float3 VOLUME_BEAM_COLD_TINT = float3(0.76f, 0.84f, 0.88f);
+static const float VOLUME_BEAM_TENSION_BLEND = 0.34f;
+static const float VOLUME_BEAM_REFERENCE_INTENSITY = 1.35f;
+
+// 遮蔽物までの距離と、人影までの距離を同じ範囲で光の濃さへ変換する。
+static const float VOLUME_VISIBLE_LENGTH_START = 2.0f;
+static const float VOLUME_VISIBLE_LENGTH_RANGE = 120.0f;
+static const float VOLUME_FIGURE_SCATTER_ATTENUATION = 0.55f;
+
+// 光の円錐に粒を2層で漂わせ、近い粒と遠い粒の分布を変える。
+static const float VOLUME_DUST_FLOW_X = 0.42f;
+static const float VOLUME_DUST_FLOW_Y = 0.24f;
+static const float VOLUME_NEAR_DUST_NOISE_SCALE = 0.045f;
+static const float VOLUME_FAR_DUST_NOISE_SCALE = 0.019f;
+static const float VOLUME_FAR_DUST_FLOW_SCALE = 0.57f;
+static const float VOLUME_FAR_DUST_SEED = 19.7f;
+static const float VOLUME_NEAR_DUST_START = 0.78f;
+static const float VOLUME_NEAR_DUST_FULL = 0.96f;
+static const float VOLUME_NEAR_DUST_WEIGHT = 0.055f;
+static const float VOLUME_FAR_DUST_START = 0.84f;
+static const float VOLUME_FAR_DUST_FULL = 0.98f;
+static const float VOLUME_FAR_DUST_WEIGHT = 0.028f;
+
+// 大きさと向きが違う煙を重ね、光の筋の濃さを場所によって変える。
+static const float VOLUME_SMOKE_LARGE_SCALE_X = 4.5f;
+static const float VOLUME_SMOKE_LARGE_SCALE_Y = 3.2f;
+static const float VOLUME_SMOKE_LARGE_FLOW_X = 0.055f;
+static const float VOLUME_SMOKE_LARGE_FLOW_Y = 0.030f;
+static const float VOLUME_SMOKE_SMALL_SCALE_X = 10.0f;
+static const float VOLUME_SMOKE_SMALL_SCALE_Y = 7.0f;
+static const float VOLUME_SMOKE_SMALL_FLOW_X = 0.085f;
+static const float VOLUME_SMOKE_SMALL_FLOW_Y = 0.045f;
+static const float VOLUME_SMOKE_SMALL_SEED = 5.0f;
+static const float VOLUME_SMOKE_START = 0.30f;
+static const float VOLUME_SMOKE_FULL = 0.85f;
+static const float VOLUME_SMOKE_LARGE_WEIGHT = 0.65f;
+static const float VOLUME_SMOKE_SMALL_WEIGHT = 0.35f;
+
 float4 main(PS_IN input) : SV_Target
 {
     // ライトが消えているときや、効果が0のときは何も足さない
@@ -159,7 +210,7 @@ float4 main(PS_IN input) : SV_Target
     const float softBeam = radial * radial * (3.0f - 2.0f * radial);
     // 平方根で変化させ、壁の近くの短い光線も見せつつ、長い廊下では散乱した光を多くためている。
     float visibleLength = sqrt(saturate(
-        (occluderDistance - 2.0f) / 120.0f));
+        (occluderDistance - VOLUME_VISIBLE_LENGTH_START) / VOLUME_VISIBLE_LENGTH_RANGE));
     // 見えない影の人影が光の帯の中に立つと、その先の霧には光が届かず、帯の中に人の形の暗い切れ目ができる
     // （目には見えないが、照らすと形が浮かぶ。照らされた影は気づいて寄ってくる。UnseenPresenceAnomaly.h）
     float figureDistance;
@@ -170,46 +221,46 @@ float4 main(PS_IN input) : SV_Target
     if (figureOcclusion > 0.0f && figureDistance < occluderDistance)
     {
         // 人影までの短い区間の霧だけが光り、その先は暗い（人影の手前の霧も少し薄くして、輪郭をはっきりさせている）
-        const float lengthToFigure = sqrt(saturate((figureDistance - 2.0f) / 120.0f)) * 0.55f;
+        const float lengthToFigure = sqrt(saturate((figureDistance - VOLUME_VISIBLE_LENGTH_START) / VOLUME_VISIBLE_LENGTH_RANGE)) * VOLUME_FIGURE_SCATTER_ATTENUATION;
         visibleLength = lerp(visibleLength, lengthToFigure, figureOcclusion);
     }
     // 画面の下の方（床）では薄くしている
-    const float floorFade = 1.0f - smoothstep(0.62f, 0.98f, input.uv.y);
+    const float floorFade = 1.0f - smoothstep(VOLUME_FLOOR_FADE_START, VOLUME_FLOOR_FADE_END, input.uv.y);
 
     // 連続した画面の流れを使い、毎フレーム乱数を変えるテレビのノイズのようなちらつきを避けている。
     // 速さの違う2つの層で、光の円錐の中の違う奥行きに漂う粒を表している。
-    const float2 dustFlow = float2(time * 0.42f, -time * 0.24f);
+    const float2 dustFlow = float2(time * VOLUME_DUST_FLOW_X, -time * VOLUME_DUST_FLOW_Y);
     const float nearDustNoise = ValueNoise(
-        input.pos.xy * 0.045f + dustFlow);
+        input.pos.xy * VOLUME_NEAR_DUST_NOISE_SCALE + dustFlow);
     // 遠くの粒は補間しないセルのノイズで十分なため、4回の乱数の計算を1回にしている。
     const float farDustNoise = Hash(floor(
-        input.pos.xy * 0.019f - dustFlow * 0.57f + 19.7f));
+        input.pos.xy * VOLUME_FAR_DUST_NOISE_SCALE - dustFlow * VOLUME_FAR_DUST_FLOW_SCALE + VOLUME_FAR_DUST_SEED));
     const float nearDust =
-        smoothstep(0.78f, 0.96f, nearDustNoise) * 0.055f;
+        smoothstep(VOLUME_NEAR_DUST_START, VOLUME_NEAR_DUST_FULL, nearDustNoise) * VOLUME_NEAR_DUST_WEIGHT;
     const float farDust =
-        smoothstep(0.84f, 0.98f, farDustNoise) * 0.028f;
+        smoothstep(VOLUME_FAR_DUST_START, VOLUME_FAR_DUST_FULL, farDustNoise) * VOLUME_FAR_DUST_WEIGHT;
     const float driftingDust = nearDust + farDust;
     const float slowVariation =
         sin(input.uv.y * 38.0f - time * 1.7f) * 0.5f + 0.5f;
     // 光の中に漂う煙：大きさの違う2つのノイズを逆向きにゆっくり流し、光の筋に濃い所と薄い所のむらを作っている
     const float smokeLarge = ValueNoise(
-        input.uv * float2(4.5f * screenAspect, 3.2f) + float2(time * 0.055f, -time * 0.030f));
+        input.uv * float2(VOLUME_SMOKE_LARGE_SCALE_X * screenAspect, VOLUME_SMOKE_LARGE_SCALE_Y) + float2(time * VOLUME_SMOKE_LARGE_FLOW_X, -time * VOLUME_SMOKE_LARGE_FLOW_Y));
     const float smokeSmall = ValueNoise(
-        input.uv * float2(10.0f * screenAspect, 7.0f) + float2(-time * 0.085f, time * 0.045f) + 5.0f);
-    const float smoke = smoothstep(0.30f, 0.85f, smokeLarge * 0.65f + smokeSmall * 0.35f);
+        input.uv * float2(VOLUME_SMOKE_SMALL_SCALE_X * screenAspect, VOLUME_SMOKE_SMALL_SCALE_Y) + float2(-time * VOLUME_SMOKE_SMALL_FLOW_X, time * VOLUME_SMOKE_SMALL_FLOW_Y) + VOLUME_SMOKE_SMALL_SEED);
+    const float smoke = smoothstep(VOLUME_SMOKE_START, VOLUME_SMOKE_FULL, smokeLarge * VOLUME_SMOKE_LARGE_WEIGHT + smokeSmall * VOLUME_SMOKE_SMALL_WEIGHT);
 
     // 光の筋の濃さ：驚かせる演出や緊張が高いほど濃くしている
     float density =
-        (0.026f + slowVariation * 0.010f + driftingDust + smoke * 0.040f) *
+        (VOLUME_BASE_DENSITY + slowVariation * VOLUME_DENSITY_VARIATION + driftingDust + smoke * VOLUME_SMOKE_DENSITY) *
         softBeam * visibleLength * floorFade * volumeIntensity;
-    density *= 1.0f + horrorPulseStrength * 0.32f;
-    density *= 1.0f + corridorTension * 0.48f;
+    density *= 1.0f + horrorPulseStrength * VOLUME_HORROR_DENSITY_GAIN;
+    density *= 1.0f + corridorTension * VOLUME_TENSION_DENSITY_GAIN;
     // 光の筋の色：普段は暖かい色、緊張が高いと青白くしている
     const float3 beamColor = lerp(
-        float3(1.0f, 0.78f, 0.50f),
-        float3(0.76f, 0.84f, 0.88f),
-        corridorTension * 0.34f) *
-        saturate(Light.Intensity / 1.35f);
+        VOLUME_BEAM_WARM_TINT,
+        VOLUME_BEAM_COLD_TINT,
+        corridorTension * VOLUME_BEAM_TENSION_BLEND) *
+        saturate(Light.Intensity / VOLUME_BEAM_REFERENCE_INTENSITY);
 
     // 色と濃さを返している（アルファブレンドではなく加算合成で重ねている）
     return float4(beamColor, saturate(density));

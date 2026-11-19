@@ -13,6 +13,13 @@
 #ifndef BARK_SURFACE_INCLUDED
 #define BARK_SURFACE_INCLUDED
 
+// 溝と苔は光を広く散らし、剥がれた樹皮の面は光沢を残す。
+static const float BARK_TONE_ROUGHNESS_VARIATION = 0.08f;
+static const float BARK_FURROW_ROUGHNESS = 0.98f;
+static const float BARK_FURROW_ROUGHNESS_BLEND = 0.7f;
+static const float BARK_PEELED_ROUGHNESS = 0.62f;
+static const float BARK_MOSS_ROUGHNESS = 0.97f;
+
 // ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
 #include "fastNoise.hlsli"
 
@@ -60,20 +67,41 @@ struct BarkPlates
     float plateTone;    // 板ごとの色の違い（0〜1）
 };
 
+// 縦溝の間隔を決め、幹を横切るノイズと高さ方向のノイズで線をずらす。
+#define BARK_PLATE_SPACING_SCALE 0.85f
+#define BARK_FURROW_SWAY_COARSE_X 0.25f
+#define BARK_FURROW_SWAY_COARSE_Y 0.045f
+#define BARK_FURROW_SWAY_COARSE_SEED 3.0f
+#define BARK_FURROW_SWAY_COARSE_GAIN 2.6f
+#define BARK_FURROW_SWAY_FINE_X 1.3f
+#define BARK_FURROW_SWAY_FINE_Y 0.22f
+#define BARK_FURROW_SWAY_FINE_SEED 9.0f
+
+// 板によって溝の幅を変え、溝が途切れる場所を別の模様で決める。
+#define BARK_FURROW_MIN_WIDTH 0.07f
+#define BARK_FURROW_MAX_WIDTH 0.15f
+#define BARK_FURROW_WIDTH_SEED 5.0f
+#define BARK_FURROW_BLEND_WIDTH 0.05f
+#define BARK_FURROW_BREAK_START 0.30f
+#define BARK_FURROW_BREAK_FULL 0.50f
+#define BARK_FURROW_BREAK_SCALE_X 0.9f
+#define BARK_FURROW_BREAK_SCALE_Y 0.11f
+#define BARK_FURROW_BREAK_SEED 31.0f
+
 BarkPlates GetBarkPlates(float2 uv, float footprint)
 {
     BarkPlates plates;
-    const float spacing = 0.85f;
-    const float sway = (BarkSmoothNoise(float2(uv.x * 0.25f, uv.y * 0.045f) + 3.0f) - 0.5f) * 2.6f +
-        (BarkSmoothNoise(float2(uv.x * 1.3f, uv.y * 0.22f) + 9.0f) - 0.5f) * 0.5f;
+    const float spacing = BARK_PLATE_SPACING_SCALE;
+    const float sway = (BarkSmoothNoise(float2(uv.x * BARK_FURROW_SWAY_COARSE_X, uv.y * BARK_FURROW_SWAY_COARSE_Y) + BARK_FURROW_SWAY_COARSE_SEED) - 0.5f) * BARK_FURROW_SWAY_COARSE_GAIN +
+        (BarkSmoothNoise(float2(uv.x * BARK_FURROW_SWAY_FINE_X, uv.y * BARK_FURROW_SWAY_FINE_Y) + BARK_FURROW_SWAY_FINE_SEED) - 0.5f) * 0.5f;
     const float phase = uv.x * spacing + sway;
     const float plateId = floor(phase);
     const float distanceToFurrow = abs(frac(phase) - 0.5f);
     // 溝の幅は板ごとに少し変え、遠くでは画素の大きさの分だけ広げて、ちらつきを抑えている
-    const float width = lerp(0.07f, 0.15f, FastHash21(float2(plateId, 5.0f)));
-    const float furrowLine = 1.0f - smoothstep(width, width + 0.05f + footprint * spacing, distanceToFurrow);
+    const float width = lerp(BARK_FURROW_MIN_WIDTH, BARK_FURROW_MAX_WIDTH, FastHash21(float2(plateId, BARK_FURROW_WIDTH_SEED)));
+    const float furrowLine = 1.0f - smoothstep(width, width + BARK_FURROW_BLEND_WIDTH + footprint * spacing, distanceToFurrow);
     // 溝が途切れて、隣の板とつながる所
-    const float bridge = smoothstep(0.30f, 0.50f, BarkSmoothNoise(float2(uv.x * 0.9f, uv.y * 0.11f) + 31.0f));
+    const float bridge = smoothstep(BARK_FURROW_BREAK_START, BARK_FURROW_BREAK_FULL, BarkSmoothNoise(float2(uv.x * BARK_FURROW_BREAK_SCALE_X, uv.y * BARK_FURROW_BREAK_SCALE_Y) + BARK_FURROW_BREAK_SEED));
     plates.furrow = furrowLine * bridge;
     // 板の横のひび：板ごとに間隔とずれを変え、4割ほどの板にだけ入れている。ひびの線は少し波打たせ、
     // 板の端（溝の近く）へ向かって細くして消している（端で急に切れると、黒い四角に見えるため）
@@ -86,6 +114,42 @@ BarkPlates GetBarkPlates(float2 uv, float footprint)
     plates.plateTone = FastHash21(float2(plateId, 61.0f));
     return plates;
 }
+
+// 樹皮の板とは別に、木目に沿う細い繊維を重ねる。
+#define BARK_FIBRE_NOISE_SCALE float2(5.5f, 0.45f)
+#define BARK_FIBRE_NOISE_SEED 11.0f
+
+// 剥がれた領域は木目に沿って伸ばし、別のノイズで縁をぎざぎざにする。
+#define BARK_PEEL_PATCH_SCALE float2(0.22f, 0.06f)
+#define BARK_PEEL_PATCH_SEED 41.0f
+#define BARK_PEEL_EDGE_SCALE float2(1.6f, 0.4f)
+#define BARK_PEEL_EDGE_SEED 43.0f
+#define BARK_PEEL_EDGE_VARIATION 0.16f
+#define BARK_PEEL_START 0.76f
+#define BARK_PEEL_FULL 0.78f
+#define BARK_PEEL_RIM_START 0.71f
+
+// 根元と上向きの面で湿りやすさを分け、苔の範囲をまだらにする。
+#define BARK_MOSS_PATCH_START 0.45f
+#define BARK_MOSS_PATCH_FULL 0.70f
+#define BARK_MOSS_PATCH_SCALE float2(0.22f, 0.10f)
+#define BARK_MOSS_PATCH_SEED 61.0f
+#define BARK_MOSS_FIBRE_WEIGHT 0.15f
+#define BARK_MOSS_UP_START 0.30f
+#define BARK_MOSS_UP_FULL 0.80f
+#define BARK_MOSS_GROUND_FADE_START 2.0f
+#define BARK_MOSS_GROUND_FADE_END 14.0f
+#define BARK_MOSS_GROUND_GAIN 0.85f
+
+// 地衣類の小さな斑点を大きな分布で間引く。
+#define BARK_LICHEN_SPOT_START 0.66f
+#define BARK_LICHEN_SPOT_FULL 0.74f
+#define BARK_LICHEN_SPOT_SCALE float2(1.2f, 1.0f)
+#define BARK_LICHEN_SPOT_SEED 83.0f
+#define BARK_LICHEN_AREA_START 0.52f
+#define BARK_LICHEN_AREA_FULL 0.72f
+#define BARK_LICHEN_AREA_SCALE float2(0.12f, 0.08f)
+#define BARK_LICHEN_AREA_SEED 97.0f
 
 // grainAxis は木目の向き（ワールド）、baseColor は配置ファイルの色（頂点の環境遮蔽を掛けた後）、
 // baseRoughness はその色の粗さ（rough。bark は0.92）
@@ -116,26 +180,26 @@ BarkSurface GetBarkSurface(float3 worldPosition, float3 worldNormal, float3 grai
     const float crossCrack = (platesX.crossCrack * weights.x + platesZ.crossCrack * weights.z) * 0.8f;
     const float plateTone = (platesX.plateTone * weights.x + platesZ.plateTone * weights.z) + 0.5f * weights.y;
     // --- 細かい繊維（木目の向きに長い、細かな筋）
-    const float fibre = BarkNoise(grain, weights, float2(5.5f, 0.45f), 11.0f);
+    const float fibre = BarkNoise(grain, weights, BARK_FIBRE_NOISE_SCALE, BARK_FIBRE_NOISE_SEED);
 
     // --- 剥がれ：樹皮が落ちて、灰色に枯れた地の木が出ている所（枯れ木らしさ）。木目に沿って細長く、縁はぎざぎざで、
     //     縁の樹皮は少し盛り上がって残っている
-    const float peelNoise = BarkNoise(grain, weights, float2(0.22f, 0.06f), 41.0f) +
-        (BarkNoise(grain, weights, float2(1.6f, 0.4f), 43.0f) - 0.5f) * 0.16f;
-    const float peel = smoothstep(0.76f, 0.78f, peelNoise) * sideWeight;
-    const float peelRim = smoothstep(0.71f, 0.76f, peelNoise) * (1.0f - peel) * sideWeight;
+    const float peelNoise = BarkNoise(grain, weights, BARK_PEEL_PATCH_SCALE, BARK_PEEL_PATCH_SEED) +
+        (BarkNoise(grain, weights, BARK_PEEL_EDGE_SCALE, BARK_PEEL_EDGE_SEED) - 0.5f) * BARK_PEEL_EDGE_VARIATION;
+    const float peel = smoothstep(BARK_PEEL_START, BARK_PEEL_FULL, peelNoise) * sideWeight;
+    const float peelRim = smoothstep(BARK_PEEL_RIM_START, BARK_PEEL_START, peelNoise) * (1.0f - peel) * sideWeight;
 
     // --- 苔：上を向いた面（倒木の上・太い枝の上）と、根元の湿った所に、まだらに生えている
     const float heightFromGround = worldPosition.y - BarkGroundY;
-    const float mossPatch = smoothstep(0.45f, 0.70f,
-        BarkNoise(grain, weights, float2(0.22f, 0.10f), 61.0f) + fibre * 0.15f);
-    const float mossPlace = max(smoothstep(0.30f, 0.80f, normal.y),
-        (1.0f - smoothstep(2.0f, 14.0f, heightFromGround)) * 0.85f);
+    const float mossPatch = smoothstep(BARK_MOSS_PATCH_START, BARK_MOSS_PATCH_FULL,
+        BarkNoise(grain, weights, BARK_MOSS_PATCH_SCALE, BARK_MOSS_PATCH_SEED) + fibre * BARK_MOSS_FIBRE_WEIGHT);
+    const float mossPlace = max(smoothstep(BARK_MOSS_UP_START, BARK_MOSS_UP_FULL, normal.y),
+        (1.0f - smoothstep(BARK_MOSS_GROUND_FADE_START, BARK_MOSS_GROUND_FADE_END, heightFromGround)) * BARK_MOSS_GROUND_GAIN);
     const float moss = mossPlace * mossPatch * (1.0f - peel);
 
     // --- 地衣類：樹皮の上の、白っぽい灰緑の小さな斑点
-    const float lichenSpots = smoothstep(0.66f, 0.74f, BarkNoise(grain, weights, float2(1.2f, 1.0f), 83.0f));
-    const float lichenArea = smoothstep(0.52f, 0.72f, BarkNoise(grain, weights, float2(0.12f, 0.08f), 97.0f));
+    const float lichenSpots = smoothstep(BARK_LICHEN_SPOT_START, BARK_LICHEN_SPOT_FULL, BarkNoise(grain, weights, BARK_LICHEN_SPOT_SCALE, BARK_LICHEN_SPOT_SEED));
+    const float lichenArea = smoothstep(BARK_LICHEN_AREA_START, BARK_LICHEN_AREA_FULL, BarkNoise(grain, weights, BARK_LICHEN_AREA_SCALE, BARK_LICHEN_AREA_SEED));
     const float lichen = lichenSpots * lichenArea * (1.0f - moss) * (1.0f - peel) * fineFade;
 
     // --- 地面との境目の湿り（根元と倒木の下側が、地面の水を吸って黒ずんでいる）
@@ -157,10 +221,10 @@ BarkSurface GetBarkSurface(float3 worldPosition, float3 worldNormal, float3 grai
     bark.albedo = albedo;
 
     // 粗さ：樹皮はざらざら、溝の奥と苔はさらに粗く、剥がれた地の木は少しなめらか（濡れた所は MakePbrSurface が下げる）
-    float roughness = baseRoughness + (plateTone - 0.5f) * 0.08f;
-    roughness = lerp(roughness, 0.98f, furrow * 0.7f);
-    roughness = lerp(roughness, 0.62f, peel);
-    roughness = lerp(roughness, 0.97f, moss);
+    float roughness = baseRoughness + (plateTone - 0.5f) * BARK_TONE_ROUGHNESS_VARIATION;
+    roughness = lerp(roughness, BARK_FURROW_ROUGHNESS, furrow * BARK_FURROW_ROUGHNESS_BLEND);
+    roughness = lerp(roughness, BARK_PEELED_ROUGHNESS, peel);
+    roughness = lerp(roughness, BARK_MOSS_ROUGHNESS, moss);
     bark.roughness = clamp(roughness, 0.045f, 1.0f);
 
     // 濡れ具合：地面との境目と、溝の奥にたまった水

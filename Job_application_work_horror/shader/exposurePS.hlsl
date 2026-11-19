@@ -22,6 +22,31 @@ SamplerState sceneSampler : register(s0);
 // 自動露出の結果（autoExposureCS.hlslが書いている）。[0]は慣れた明るさ、[1]は露出の倍率
 StructuredBuffer<float> AutoExposureState : register(t3);
 
+// 画面内の暗がりは近傍の標本を使って判定する。
+#define EXPOSURE_LOCAL_SAMPLE_OFFSET_TEXELS 5.0f
+
+// 周りが暗い所だけを明るくし、光が当たる面は変化を抑える。
+#define EXPOSURE_LOCAL_DARK_START 0.025f
+#define EXPOSURE_LOCAL_DARK_END 0.18f
+#define EXPOSURE_HIGHLIGHT_PROTECT_START 0.14f
+#define EXPOSURE_HIGHLIGHT_PROTECT_END 0.58f
+
+// 視点の近くを優先し、露出を上げたい場面でだけ暗部を持ち上げる。
+#define EXPOSURE_LIFT_CENTER_START 0.18f
+#define EXPOSURE_LIFT_CENTER_END 0.76f
+#define EXPOSURE_LIFT_GAIN_START 1.025f
+#define EXPOSURE_LIFT_GAIN_RANGE 0.125f
+#define EXPOSURE_LIFT_BASE_STRENGTH 0.0045f
+#define EXPOSURE_LIFT_CENTER_STRENGTH 0.0095f
+
+// 緊張が強いほど暗部に青白さを加える。
+#define EXPOSURE_LIFT_TINT float3(0.92f, 0.95f, 1.0f)
+#define EXPOSURE_TENSION_LIFT_TINT float3(0.74f, 0.87f, 1.0f)
+#define EXPOSURE_LIFT_TENSION_TINT_WEIGHT 0.48f
+#define EXPOSURE_TENSION_HAZE_START 0.025f
+#define EXPOSURE_TENSION_HAZE_END 0.22f
+#define EXPOSURE_TENSION_HAZE_TINT float3(0.020f, 0.034f, 0.040f)
+
 // 元の画面に「足す分の明るさ」だけを返している（加算合成で画面に足される）
 float4 main(PS_IN input) : SV_TARGET
 {
@@ -32,7 +57,7 @@ float4 main(PS_IN input) : SV_TARGET
     uint sceneHeight;
     sceneTexture.GetDimensions(sceneWidth, sceneHeight);
     const float2 texelSize = rcp(float2(sceneWidth, sceneHeight));
-    const float2 localOffset = texelSize * 5.0f;
+    const float2 localOffset = texelSize * EXPOSURE_LOCAL_SAMPLE_OFFSET_TEXELS;
     // 中心と斜めの2点で、周りの明るさを取っている。十字の5点との違いは、暗い所の判定では
     // 小さく、全画面の描画のテクスチャの読み取りを40%減らせる。
     const float3 localAverage =
@@ -66,28 +91,28 @@ float4 main(PS_IN input) : SV_TARGET
         float3(0.2126f, 0.7152f, 0.0722f));
     // 周りが暗く、明るい部分ではない所を、画面の中心ほど強く持ち上げている（露出を上げる設定のときだけ）
     const float localDarkness =
-        1.0f - smoothstep(0.025f, 0.18f, localLuminance);
+        1.0f - smoothstep(EXPOSURE_LOCAL_DARK_START, EXPOSURE_LOCAL_DARK_END, localLuminance);
     const float highlightProtection =
-        1.0f - smoothstep(0.14f, 0.58f, luminance);
+        1.0f - smoothstep(EXPOSURE_HIGHLIGHT_PROTECT_START, EXPOSURE_HIGHLIGHT_PROTECT_END, luminance);
     const float2 centered =
         (input.uv - float2(0.5f, 0.5f)) * float2(screenAspect, 1.0f);
     const float centerPriority =
-        1.0f - smoothstep(0.18f, 0.76f, length(centered));
+        1.0f - smoothstep(EXPOSURE_LIFT_CENTER_START, EXPOSURE_LIFT_CENTER_END, length(centered));
     const float adaptationRequest = saturate(
-        (adaptedExposure - 1.025f) / 0.125f);
+        (adaptedExposure - EXPOSURE_LIFT_GAIN_START) / EXPOSURE_LIFT_GAIN_RANGE);
     const float localLiftStrength =
         adaptationRequest * localDarkness * highlightProtection *
-        (0.0045f + centerPriority * 0.0095f);
+        (EXPOSURE_LIFT_BASE_STRENGTH + centerPriority * EXPOSURE_LIFT_CENTER_STRENGTH);
     // 持ち上げる光の色：緊張が高いほど青白くしている
     const float3 adaptationTint = lerp(
-        float3(0.92f, 0.95f, 1.0f),
-        float3(0.74f, 0.87f, 1.0f),
-        corridorTension * 0.48f);
+        EXPOSURE_LIFT_TINT,
+        EXPOSURE_TENSION_LIFT_TINT,
+        corridorTension * EXPOSURE_LIFT_TENSION_TINT_WEIGHT);
     const float3 localAdaptation =
         adaptationTint * localLiftStrength;
     // 緊張が高いときは、暗い所に青みがかった霧を薄く足している
-    const float shadowMask = 1.0f - smoothstep(0.025f, 0.22f, luminance);
-    const float3 tensionHaze = float3(0.020f, 0.034f, 0.040f) *
+    const float shadowMask = 1.0f - smoothstep(EXPOSURE_TENSION_HAZE_START, EXPOSURE_TENSION_HAZE_END, luminance);
+    const float3 tensionHaze = EXPOSURE_TENSION_HAZE_TINT *
         corridorTension * shadowMask;
     return float4(
         adaptationLight + localAdaptation + tensionHaze,

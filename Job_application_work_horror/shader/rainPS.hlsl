@@ -18,6 +18,37 @@ struct RAIN_PS_IN
     float life : TEXCOORD6;
 };
 
+// 雨粒は落ちる向きの先を強くし、筋の入り口は滑らかに消す。
+static const float RAIN_STREAK_HEAD_MIN_GAIN = 0.25f;
+static const float RAIN_STREAK_START_FADE_END = 0.2f;
+
+// しぶきは中心の小さな点と広がる輪を重ね、寿命に応じて消す。
+static const float RAIN_SPLASH_INITIAL_RADIUS = 0.15f;
+static const float RAIN_SPLASH_RING_WIDTH = 0.11f;
+static const float RAIN_SPLASH_RING_FADE_EXPONENT = 1.5f;
+static const float RAIN_SPLASH_RING_GAIN = 0.8f;
+static const float RAIN_SPLASH_BURST_WIDTH = 0.03f;
+static const float RAIN_SPLASH_BURST_FADE_END = 0.3f;
+static const float RAIN_SPLASH_BURST_GAIN = 1.6f;
+static const float RAIN_SPLASH_OUTER_FADE_START = 0.9f;
+
+// 透明に近い雨を描画せず、空の散乱光を抑える。
+static const float RAIN_MIN_ALPHA = 0.002f;
+static const float RAIN_AMBIENT_LIGHT_GAIN = 0.35f;
+
+// 雨粒の懐中電灯への反応は中心と外周で異なる。
+static const float RAIN_FLASHLIGHT_BEAM_GAIN = 0.45f;
+static const float RAIN_FLASHLIGHT_SPILL_GAIN = 0.25f;
+
+// 背後の照明で雨粒が浮かぶよう、前方散乱の量を調整する。
+static const float RAIN_POINT_LIGHT_BASE_SCATTER = 0.12f;
+static const float RAIN_POINT_LIGHT_FORWARD_SCATTER = 0.55f;
+
+// 雨粒としぶきで明るさを分け、遠方の雨を霧の中へなじませる。
+static const float RAIN_STREAK_LIGHT_GAIN = 0.6f;
+static const float RAIN_SPLASH_LIGHT_GAIN = 0.35f;
+static const float RAIN_DISTANCE_FOG_GAIN = 0.9f;
+
 float4 main(RAIN_PS_IN input) : SV_TARGET
 {
     if (DebugViewMode >= 1)
@@ -30,24 +61,24 @@ float4 main(RAIN_PS_IN input) : SV_TARGET
     if (input.kind < 0.5f)
     {
         const float across = 1.0f - abs(input.uv.x);
-        shape = across * across * lerp(0.25f, 1.0f, input.uv.y) * smoothstep(0.0f, 0.2f, input.uv.y);
+        shape = across * across * lerp(RAIN_STREAK_HEAD_MIN_GAIN, 1.0f, input.uv.y) * smoothstep(0.0f, RAIN_STREAK_START_FADE_END, input.uv.y);
     }
     else
     {
         const float radius = length(input.uv);
-        const float ringRadius = lerp(0.15f, 1.0f, sqrt(input.life));
-        const float ringOffset = (radius - ringRadius) / 0.11f;
-        const float ring = exp(-ringOffset * ringOffset) * pow(1.0f - input.life, 1.5f) * 0.8f;
-        const float burst = exp(-radius * radius / 0.03f) * (1.0f - smoothstep(0.0f, 0.3f, input.life)) * 1.6f;
-        shape = (ring + burst) * (1.0f - smoothstep(0.9f, 1.0f, radius));
+        const float ringRadius = lerp(RAIN_SPLASH_INITIAL_RADIUS, 1.0f, sqrt(input.life));
+        const float ringOffset = (radius - ringRadius) / RAIN_SPLASH_RING_WIDTH;
+        const float ring = exp(-ringOffset * ringOffset) * pow(1.0f - input.life, RAIN_SPLASH_RING_FADE_EXPONENT) * RAIN_SPLASH_RING_GAIN;
+        const float burst = exp(-radius * radius / RAIN_SPLASH_BURST_WIDTH) * (1.0f - smoothstep(0.0f, RAIN_SPLASH_BURST_FADE_END, input.life)) * RAIN_SPLASH_BURST_GAIN;
+        shape = (ring + burst) * (1.0f - smoothstep(RAIN_SPLASH_OUTER_FADE_START, 1.0f, radius));
     }
     const float alpha = input.alpha * shape;
-    clip(alpha - 0.002f);
+    clip(alpha - RAIN_MIN_ALPHA);
 
     const float distanceFromCamera = length(input.viewPos);
     const float3 pixelDirection = input.viewPos / max(distanceFromCamera, 0.001f);
     // 空の暗い光（雨粒は空の光をわずかに映す）
-    float3 lighting = Light.Ambient.rgb * 0.35f;
+    float3 lighting = Light.Ambient.rgb * RAIN_AMBIENT_LIGHT_GAIN;
     // 懐中電灯：光の円錐の中の雨粒だけが白く光る。木の陰になった雨粒は光らない（影の地図）
     if (Light.Enable && Light.FlashlightEnabled)
     {
@@ -57,7 +88,7 @@ float4 main(RAIN_PS_IN input) : SV_TARGET
         const float spill = GetFlashlightSpillProfile(pixelDirection);
         const float shadow = beam > 0.001f ? GetFlashlightShadow(input.shadowPos) : 1.0f;
         lighting += Light.Diffuse.rgb * GetFlashlightTint(pixelDirection) * Light.Intensity * rangeFade * rangeFade *
-            (beam * shadow * 0.45f + spill * 0.25f);
+            (beam * shadow * RAIN_FLASHLIGHT_BEAM_GAIN + spill * RAIN_FLASHLIGHT_SPILL_GAIN);
     }
     // 街灯・玄関の灯り・窓の明かり：近くの雨粒ほど明るく光り、灯りのまわりに雨が浮かぶ
     [loop]
@@ -75,11 +106,11 @@ float4 main(RAIN_PS_IN input) : SV_TARGET
         const float3 toLightView = normalize(lightView - input.viewPos);
         const float forward = saturate(dot(toLightView, pixelDirection));
         lighting += pointLight.ColorIntensity.rgb * pointLight.ColorIntensity.a * attenuation * attenuation * attenuation *
-            (0.12f + 0.55f * forward * forward);
+            (RAIN_POINT_LIGHT_BASE_SCATTER + RAIN_POINT_LIGHT_FORWARD_SCATTER * forward * forward);
     }
-    float3 color = lighting * (input.kind < 0.5f ? 0.6f : 0.35f);
+    float3 color = lighting * (input.kind < 0.5f ? RAIN_STREAK_LIGHT_GAIN : RAIN_SPLASH_LIGHT_GAIN);
     // 遠くの雨は霧に隠れる（加算なので、霧の分だけ薄くしている）
     const float fog = saturate(GetHorrorDistanceFog(distanceFromCamera, LoopDepth));
-    color *= 1.0f - fog * 0.9f;
+    color *= 1.0f - fog * RAIN_DISTANCE_FOG_GAIN;
     return float4(color, alpha);
 }

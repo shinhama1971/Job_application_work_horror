@@ -22,6 +22,8 @@ namespace
     constexpr float ResultLensDirtStrength = 0.08f;
     constexpr float ResultBloomPeak = 0.72f;
     constexpr float ResultBloomSeconds = 0.90f;
+    // クリア直後の押し間違いで結果画面を飛ばさないようにする。
+    constexpr float ResultInputDelaySeconds = 0.85f;
 }
 
 ResultScene::ResultScene()
@@ -70,7 +72,7 @@ void ResultScene::Update()
 {
     const float deltaTime = Application::GetDeltaTime();
     m_ResultTimer += deltaTime;
-    if (m_ResultTimer < 0.85f)
+    if (m_ResultTimer < ResultInputDelaySeconds)
     {
         return;
     }

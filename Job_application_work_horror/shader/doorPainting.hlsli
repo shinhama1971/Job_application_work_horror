@@ -18,6 +18,10 @@ struct DoorPaint
 };
 
 // 角を丸めた四角（中心center、半分の大きさhalfSize、角の丸みcorner）までの距離（内側が負）
+// 数字の中心を札に合わせ、同じ大きさで「204」を描く。
+static const float DOOR_NUMBER_PLATE_Y = 7.0f;
+static const float DOOR_NUMBER_DIGIT_SCALE = 0.62f;
+
 float DoorRoundedBox(float2 p, float2 center, float2 halfSize, float corner)
 {
     const float2 q = abs(p - center) - halfSize + corner;
@@ -64,6 +68,45 @@ float DoorDigit(float2 local, uint digit)
 
 // 扉のUV（u は見る人から見て右から左へ増える。v は上から下）と、取っ手の側（params.x：-1 = 見て左、+1 = 見て右）から、
 // その点の色と凹凸を求めている
+// 木目は縦に伸ばし、密度の違う筋と節を重ねる。
+#define DOOR_GRAIN_COARSE_X 2.6f
+#define DOOR_GRAIN_COARSE_Y 0.18f
+#define DOOR_GRAIN_COARSE_WEIGHT 0.6f
+#define DOOR_GRAIN_FINE_X 9.0f
+#define DOOR_GRAIN_FINE_SEED 7.0f
+#define DOOR_GRAIN_FINE_WEIGHT 0.4f
+#define DOOR_KNOT_START 0.82f
+#define DOOR_KNOT_FULL 0.95f
+#define DOOR_KNOT_NOISE_SCALE 0.35f
+#define DOOR_KNOT_NOISE_SEED 31.0f
+
+// 塗装の色と木目を残す量。床に近い部分は汚れで暗くする。
+#define DOOR_PAINT_COLOR float3(0.30f, 0.16f, 0.10f)
+#define DOOR_PAINT_BASE_GAIN 0.85f
+#define DOOR_PAINT_GRAIN_GAIN 0.25f
+#define DOOR_BOTTOM_PAINT_GAIN 0.70f
+#define DOOR_BOTTOM_DAMAGE_START_Y (-20.0f)
+#define DOOR_BOTTOM_DAMAGE_END_Y (-8.0f)
+
+// 塗装の剥がれは大小のノイズで決め、縁は暗くし、露出した木地は明るくする。
+#define DOOR_PEEL_COARSE_SCALE float2(0.45f, 0.30f)
+#define DOOR_PEEL_COARSE_SEED 11.0f
+#define DOOR_PEEL_COARSE_WEIGHT 0.7f
+#define DOOR_PEEL_FINE_SCALE 1.8f
+#define DOOR_PEEL_FINE_SEED 4.0f
+#define DOOR_PEEL_FINE_WEIGHT 0.3f
+#define DOOR_PEEL_START 0.66f
+#define DOOR_PEEL_FULL 0.68f
+#define DOOR_PEEL_PIXEL_FILTER 0.05f
+#define DOOR_PEEL_EDGE_START 0.60f
+#define DOOR_EXPOSED_WOOD_COLOR float3(0.42f, 0.33f, 0.22f)
+#define DOOR_EXPOSED_WOOD_BASE 0.8f
+#define DOOR_EXPOSED_WOOD_GRAIN_GAIN 0.35f
+#define DOOR_PEEL_EDGE_DARKENING 0.45f
+#define DOOR_KNOT_COLOR_GAIN 0.55f
+#define DOOR_KNOT_BLEND 0.6f
+#define DOOR_PEEL_DEPTH 0.15f
+
 DoorPaint GetDoorPainting(float2 uv, float4 params)
 {
     // 扉の単位（幅22・高さ40、中心が0、上が+、見る人から見て右が+）
@@ -73,13 +116,13 @@ DoorPaint GetDoorPainting(float2 uv, float4 params)
 
     // 木目：縦に流れる筋と、ところどころの節
     const float grain =
-        FastValueNoise(float2(p.x * 2.6f, p.y * 0.18f)) * 0.6f +
-        FastValueNoise(float2(p.x * 9.0f, p.y * 0.5f) + 7.0f) * 0.4f;
-    const float knot = smoothstep(0.82f, 0.95f, FastValueNoise(p * 0.35f + 31.0f));
+        FastValueNoise(float2(p.x * DOOR_GRAIN_COARSE_X, p.y * DOOR_GRAIN_COARSE_Y)) * DOOR_GRAIN_COARSE_WEIGHT +
+        FastValueNoise(float2(p.x * DOOR_GRAIN_FINE_X, p.y * 0.5f) + DOOR_GRAIN_FINE_SEED) * DOOR_GRAIN_FINE_WEIGHT;
+    const float knot = smoothstep(DOOR_KNOT_START, DOOR_KNOT_FULL, FastValueNoise(p * DOOR_KNOT_NOISE_SCALE + DOOR_KNOT_NOISE_SEED));
 
     // 塗装：くすんだ茶色のペンキ。木目がうっすら透け、下の方ほど汚れて暗い
-    float3 paint = float3(0.30f, 0.16f, 0.10f) * (0.85f + grain * 0.25f);
-    paint *= lerp(0.70f, 1.0f, smoothstep(-20.0f, -8.0f, p.y));
+    float3 paint = DOOR_PAINT_COLOR * (DOOR_PAINT_BASE_GAIN + grain * DOOR_PAINT_GRAIN_GAIN);
+    paint *= lerp(DOOR_BOTTOM_PAINT_GAIN, 1.0f, smoothstep(DOOR_BOTTOM_DAMAGE_START_Y, DOOR_BOTTOM_DAMAGE_END_Y, p.y));
 
     // 6枚の羽目板（2列3段）：枠より一段へこみ、縁に斜めの面がある
     float relief = 0.0f;
@@ -106,24 +149,24 @@ DoorPaint GetDoorPainting(float2 uv, float4 params)
 
     // 剥げた塗装：ノイズのしきい値より上の所が剥げ、下の白っぽい木地が見えている。縁は塗装が浮いて暗い
     const float peelNoise =
-        FastValueNoise(p * float2(0.45f, 0.30f) + 11.0f) * 0.7f +
-        FastValueNoise(p * 1.8f - 4.0f) * 0.3f;
-    const float peel = smoothstep(0.66f, 0.68f + footprint * 0.05f, peelNoise);
-    const float peelEdge = smoothstep(0.60f, 0.66f, peelNoise) * (1.0f - peel);
-    const float3 bareWood = float3(0.42f, 0.33f, 0.22f) * (0.8f + grain * 0.35f);
+        FastValueNoise(p * DOOR_PEEL_COARSE_SCALE + DOOR_PEEL_COARSE_SEED) * DOOR_PEEL_COARSE_WEIGHT +
+        FastValueNoise(p * DOOR_PEEL_FINE_SCALE - DOOR_PEEL_FINE_SEED) * DOOR_PEEL_FINE_WEIGHT;
+    const float peel = smoothstep(DOOR_PEEL_START, DOOR_PEEL_FULL + footprint * DOOR_PEEL_PIXEL_FILTER, peelNoise);
+    const float peelEdge = smoothstep(DOOR_PEEL_EDGE_START, DOOR_PEEL_START, peelNoise) * (1.0f - peel);
+    const float3 bareWood = DOOR_EXPOSED_WOOD_COLOR * (DOOR_EXPOSED_WOOD_BASE + grain * DOOR_EXPOSED_WOOD_GRAIN_GAIN);
     float3 color = lerp(paint, bareWood, peel);
-    color *= 1.0f - peelEdge * 0.45f;
-    color = lerp(color, color * 0.55f, knot * 0.6f);
-    relief -= peel * 0.15f;
+    color *= 1.0f - peelEdge * DOOR_PEEL_EDGE_DARKENING;
+    color = lerp(color, color * DOOR_KNOT_COLOR_GAIN, knot * DOOR_KNOT_BLEND);
+    relief -= peel * DOOR_PEEL_DEPTH;
 
     // 部屋番号の札（くすんだ真鍮）と、黒い数字「204」
-    const float plate = smoothstep(0.05f + footprint, 0.0f, DoorRoundedBox(p, float2(0.0f, 7.0f), float2(2.3f, 1.25f), 0.3f));
+    const float plate = smoothstep(0.05f + footprint, 0.0f, DoorRoundedBox(p, float2(0.0f, DOOR_NUMBER_PLATE_Y), float2(2.3f, 1.25f), 0.3f));
     color = lerp(color, float3(0.30f, 0.22f, 0.10f) * (0.75f + grain * 0.2f), plate);
     relief += plate * 0.3f;
     float digits = 10.0f;
-    digits = min(digits, DoorDigit((p - float2(-1.25f, 7.0f)) * float2(1.0f, 1.0f) / 0.62f, 2u));
-    digits = min(digits, DoorDigit((p - float2(0.0f, 7.0f)) / 0.62f, 0u));
-    digits = min(digits, DoorDigit((p - float2(1.25f, 7.0f)) / 0.62f, 4u));
+    digits = min(digits, DoorDigit((p - float2(-1.25f, DOOR_NUMBER_PLATE_Y)) * float2(1.0f, 1.0f) / DOOR_NUMBER_DIGIT_SCALE, 2u));
+    digits = min(digits, DoorDigit((p - float2(0.0f, DOOR_NUMBER_PLATE_Y)) / DOOR_NUMBER_DIGIT_SCALE, 0u));
+    digits = min(digits, DoorDigit((p - float2(1.25f, DOOR_NUMBER_PLATE_Y)) / DOOR_NUMBER_DIGIT_SCALE, 4u));
     const float digitInk = (1.0f - smoothstep(0.10f, 0.10f + footprint * 2.0f, digits)) * plate;
     color = lerp(color, float3(0.03f, 0.025f, 0.02f), digitInk);
 

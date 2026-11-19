@@ -6,11 +6,15 @@
 #ifndef FAST_NOISE_INCLUDED
 #define FAST_NOISE_INCLUDED
 
+// 水たまりの形の照合に使う GroundWaterEffects.cpp の NoiseHashScale・NoiseHashShift と同じ値。
+static const float FAST_HASH_COORDINATE_SCALE = 0.1031f;
+static const float FAST_HASH_DOT_OFFSET = 33.33f;
+
 // 2次元の座標から、0〜1の疑似乱数を作っている
 float FastHash21(float2 value)
 {
-    float3 p3 = frac(float3(value.xyx) * 0.1031f);
-    p3 += dot(p3, p3.yzx + 33.33f);
+    float3 p3 = frac(float3(value.xyx) * FAST_HASH_COORDINATE_SCALE);
+    p3 += dot(p3, p3.yzx + FAST_HASH_DOT_OFFSET);
     return frac((p3.x + p3.y) * p3.z);
 }
 

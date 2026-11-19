@@ -73,19 +73,20 @@ namespace
 	constexpr float LeakDropFirstWait = 0.3f;
 	constexpr float LeakDropWaitStep = 0.9f;
 
-	// --- fastNoise.hlsli・wetFloorPS.hlsl と同じ乱数の式の係数（変えるとシェーダーの水たまりの形とずれる）
+	// fastNoise.hlsli の FAST_HASH_COORDINATE_SCALE・FAST_HASH_DOT_OFFSET と同じ値。岸の形を CPU 判定と描画で揃える。
 	constexpr float NoiseHashScale = 0.1031f;
 	constexpr float NoiseHashShift = 33.33f;
+	// wetFloorPS.hlsl の WATER_HASH21_FREQUENCY / WATER_HASH21_AMPLITUDE と同じ係数で、水滴用の乱数を作る。
 	constexpr float Hash21FrequencyX = 127.1f;
 	constexpr float Hash21FrequencyY = 311.7f;
 	constexpr float HashAmplitude = 43758.5453f;
-	// 2つの乱数を作るときの、1つ目と2つ目のずらし
+	// wetFloorPS.hlsl の WATER_HASH22_OFFSET_A / WATER_HASH22_OFFSET_B と同じずらしで、2つの乱数を作る。
 	const Vector2 Hash22OffsetA(17.3f, 41.7f);
 	const Vector2 Hash22OffsetB(93.1f, 11.8f);
 	// マスに水たまりがあるかを決める乱数のずらし、水滴の種のずらし
 	const Vector2 PuddlePresenceOffset(53.4f, 27.9f);
 	const Vector2 DropSeedOffset(9.7f, 71.3f);
-	// 水たまりの岸のゆがみ（wetFloorPS.hlsl と同じ）：ノイズの細かさとずらし、ゆがみの大きさ、
+	// 水たまりの岸のゆがみ（puddleMask.hlsli の PUDDLE_SHORE_* と同じ）：ノイズの細かさとずらし、ゆがみの大きさ、
 	// 角度に沿った2つの波（数・種の倍率・大きさ）
 	constexpr float ShoreNoiseScale = 0.052f;
 	constexpr float ShoreNoiseCellScale = 1.73f;

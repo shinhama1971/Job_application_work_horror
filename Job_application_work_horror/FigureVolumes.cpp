@@ -21,10 +21,17 @@ namespace
     constexpr UINT FigureSlot = 13;
     constexpr UINT SamplerSlot = 2;
 
+    // tools/maya/build_figure_volumes.py が書き出す識別子・形式番号と、float16 の格納単位。
+    constexpr char VolumeMagic[] = "SDFV";
+    constexpr std::uint32_t VolumeFileVersion = 1;
+    constexpr std::uint32_t DistanceOnlyChannels = 1;
+    constexpr std::uint32_t DistanceAndPartChannels = 4;
+    constexpr std::uint32_t VolumeValueBytes = 2;
+
     // ファイルの先頭（tools/maya/build_figure_volumes.py の struct.pack と同じ並び）
     struct VolumeHeader
     {
-        char Magic[4];
+        char Magic[sizeof(VolumeMagic) - 1];
         std::uint32_t Version;
         std::uint32_t CountX;
         std::uint32_t CountY;
@@ -50,8 +57,9 @@ namespace Effect
         std::memcpy(&header, bytes.data(), sizeof(header));
         const std::size_t valueCount =
             static_cast<std::size_t>(header.CountX) * header.CountY * header.CountZ * header.Channels;
-        if (std::memcmp(header.Magic, "SDFV", 4) != 0 || header.Version != 1 ||
-            (header.Channels != 1 && header.Channels != 4) || bytes.size() != sizeof(header) + valueCount * 2)
+        if (std::memcmp(header.Magic, VolumeMagic, sizeof(header.Magic)) != 0 || header.Version != VolumeFileVersion ||
+            (header.Channels != DistanceOnlyChannels && header.Channels != DistanceAndPartChannels) ||
+            bytes.size() != sizeof(header) + valueCount * VolumeValueBytes)
         {
             utility::ReportFatalError("距離場のファイルの形が違います。\n" + path);
         }
@@ -61,14 +69,14 @@ namespace Effect
         description.Height = header.CountY;
         description.Depth = header.CountZ;
         description.MipLevels = 1;
-        description.Format = header.Channels == 4 ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R16_FLOAT;
+        description.Format = header.Channels == DistanceAndPartChannels ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R16_FLOAT;
         description.Usage = D3D11_USAGE_IMMUTABLE;
         description.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 
         // 値は x が一番内側、次に y、最後に z の並び（1つの値は float16 の2バイト）
         D3D11_SUBRESOURCE_DATA data{};
         data.pSysMem = bytes.data() + sizeof(header);
-        data.SysMemPitch = header.CountX * header.Channels * 2;
+        data.SysMemPitch = header.CountX * header.Channels * VolumeValueBytes;
         data.SysMemSlicePitch = data.SysMemPitch * header.CountY;
 
         Volume volume;

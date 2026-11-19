@@ -145,6 +145,39 @@ float TraceMirrorFigure(float3 origin, float3 direction, out float depth)
     return coverage * saturate(MirrorFigure.w);
 }
 
+// 銀のくすみと剥がれで、きれいな鏡よりも反射を暗くする。
+static const float3 MIRROR_SILVER_TINT = float3(0.80f, 0.84f, 0.80f);
+static const float3 MIRROR_DESILVER_TINT = float3(0.030f, 0.026f, 0.022f);
+static const float MIRROR_DESILVER_BLEND = 0.88f;
+
+// 懐中電灯の中心の鋭い反射と周囲の広いにじみをそれぞれ調整する。
+static const float MIRROR_GLARE_HOTSPOT_EXPONENT = 2500.0f;
+static const float MIRROR_GLARE_HOTSPOT_GAIN = 0.55f;
+static const float MIRROR_GLARE_HALO_EXPONENT = 90.0f;
+static const float MIRROR_GLARE_HALO_GAIN = 0.05f;
+
+// 鏡の外周から銀が剥がれる幅と、内側に点々と残る剥がれの出やすさ。
+static const float MIRROR_DESILVER_EDGE_WIDTH = 0.15f;
+static const float MIRROR_DESILVER_EDGE_JITTER = 0.09f;
+static const float MIRROR_DESILVER_SPOT_START = 0.80f;
+static const float MIRROR_DESILVER_SPOT_FULL = 0.90f;
+static const float MIRROR_DESILVER_SPOT_WEIGHT = 0.65f;
+
+// 埃で鏡の映りが白くかすむ量。元の像の明るさを落として散乱色を足す。
+static const float MIRROR_DUST_REFLECTION_SCALE = 0.72f;
+static const float3 MIRROR_DUST_TINT = float3(0.010f, 0.011f, 0.010f);
+static const float MIRROR_DUST_BLEND = 0.35f;
+
+// 古い鏡のうねりで映りがわずかに歪むよう、2方向のノイズから法線をずらす。
+#define MIRROR_WOBBLE_NOISE_SCALE float2(3.0f, 4.0f)
+#define MIRROR_WOBBLE_NOISE_SEED_X 5.1f
+#define MIRROR_WOBBLE_NOISE_SEED_Y 2.7f
+#define MIRROR_WOBBLE_AMPLITUDE 0.006f
+
+// 反射の始点を鏡の表面から浮かせ、曇ったガラスの粗さで像をなじませる。
+#define MIRROR_RAY_SURFACE_OFFSET 0.1f
+#define MIRROR_RAY_ROUGHNESS 0.12f
+
 float4 main(MIRROR_PS_IN input) : SV_Target
 {
     const float2 face = saturate(input.tex);
@@ -153,17 +186,17 @@ float4 main(MIRROR_PS_IN input) : SV_Target
     const float3 tangent = normalize(cross(float3(0.0f, 1.0f, 0.0f), surfaceNormal) + float3(1e-4f, 0.0f, 0.0f));
     const float3 bitangent = cross(surfaceNormal, tangent);
     const float2 wobble = float2(
-        FastValueNoise(face * float2(3.0f, 4.0f) + 5.1f),
-        FastValueNoise(face * float2(3.0f, 4.0f) - 2.7f)) - 0.5f;
-    const float3 mirrorNormal = normalize(surfaceNormal + (tangent * wobble.x + bitangent * wobble.y) * 0.006f);
+        FastValueNoise(face * MIRROR_WOBBLE_NOISE_SCALE + MIRROR_WOBBLE_NOISE_SEED_X),
+        FastValueNoise(face * MIRROR_WOBBLE_NOISE_SCALE - MIRROR_WOBBLE_NOISE_SEED_Y)) - 0.5f;
+    const float3 mirrorNormal = normalize(surfaceNormal + (tangent * wobble.x + bitangent * wobble.y) * MIRROR_WOBBLE_AMPLITUDE);
 
     // 目から鏡の点への光線を鏡で反射させ、部屋の形・小物の箱（画面の外も映る）と、画面に映っている物（SSR）をたどっている
     const float3 eye = GetMistEyePosition();
     const float3 direction = reflect(normalize(input.worldPos - eye), mirrorNormal);
-    const float3 origin = input.worldPos + surfaceNormal * 0.1f;
+    const float3 origin = input.worldPos + surfaceNormal * MIRROR_RAY_SURFACE_OFFSET;
     float roomDistance;
     float nearVertical;
-    float3 color = TraceRoomReflection(origin, direction, 0.12f, roomDistance, nearVertical);
+    float3 color = TraceRoomReflection(origin, direction, MIRROR_RAY_ROUGHNESS, roomDistance, nearVertical);
     [branch]
     if (ReflectionParams.y > 0.5f)
     {
@@ -198,7 +231,7 @@ float4 main(MIRROR_PS_IN input) : SV_Target
     }
 
     // くすんだ銀：少し緑がかった古いガラスの色で、映りを2割ほど暗くしている
-    color *= float3(0.80f, 0.84f, 0.80f);
+    color *= MIRROR_SILVER_TINT;
 
     // 縁から銀が剥げた黒いしみ（縁に近いほど多く、ノイズで不規則に広がる）と、面の途中の小さな剥げ
     const float2 edge = min(face, 1.0f - face);
@@ -206,14 +239,14 @@ float4 main(MIRROR_PS_IN input) : SV_Target
     const float blotch =
         FastValueNoise(face * float2(7.0f, 11.0f) + 13.0f) * 0.6f +
         FastValueNoise(face * 23.0f - 4.0f) * 0.4f;
-    const float edgeLoss = smoothstep(0.15f, 0.0f, edgeDistance - blotch * 0.09f);
-    const float spotLoss = smoothstep(0.80f, 0.90f, FastValueNoise(face * float2(5.0f, 7.0f) + 31.0f)) * 0.65f;
+    const float edgeLoss = smoothstep(MIRROR_DESILVER_EDGE_WIDTH, 0.0f, edgeDistance - blotch * MIRROR_DESILVER_EDGE_JITTER);
+    const float spotLoss = smoothstep(MIRROR_DESILVER_SPOT_START, MIRROR_DESILVER_SPOT_FULL, FastValueNoise(face * float2(5.0f, 7.0f) + 31.0f)) * MIRROR_DESILVER_SPOT_WEIGHT;
     const float desilver = saturate(edgeLoss + spotLoss);
-    color = lerp(color, float3(0.030f, 0.026f, 0.022f), desilver * 0.88f);
+    color = lerp(color, MIRROR_DESILVER_TINT, desilver * MIRROR_DESILVER_BLEND);
 
     // 埃のくもり：映りを少し白っぽく、薄くしている
     const float haze = FastValueNoise(face * float2(2.0f, 3.0f) + 7.0f);
-    color = lerp(color, color * 0.72f + float3(0.010f, 0.011f, 0.010f), haze * 0.35f);
+    color = lerp(color, color * MIRROR_DUST_REFLECTION_SCALE + MIRROR_DUST_TINT, haze * MIRROR_DUST_BLEND);
 
     // 懐中電灯を正面から当てると、跳ね返った光が目に戻ってきて、鏡の一点がまぶしく光る（懐中電灯は目の位置にある）
     if (Light.Enable && Light.FlashlightEnabled)
@@ -222,7 +255,7 @@ float4 main(MIRROR_PS_IN input) : SV_Target
         const float3 bounced = reflect(toPixel, normalize(input.viewNormal));
         const float towardEye = saturate(dot(bounced, -toPixel));
         const float beam = GetFlashlightBeamProfile(toPixel);
-        const float glare = (pow(towardEye, 2500.0f) * 0.55f + pow(towardEye, 90.0f) * 0.05f) * beam;
+        const float glare = (pow(towardEye, MIRROR_GLARE_HOTSPOT_EXPONENT) * MIRROR_GLARE_HOTSPOT_GAIN + pow(towardEye, MIRROR_GLARE_HALO_EXPONENT) * MIRROR_GLARE_HALO_GAIN) * beam;
         // くもった所は、光を広くにじませている
         color += Light.Diffuse.rgb * Light.Intensity * glare * (1.0f - desilver) * (1.0f + haze * 0.5f);
     }

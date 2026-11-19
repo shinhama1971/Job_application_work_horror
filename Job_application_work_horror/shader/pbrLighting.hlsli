@@ -32,6 +32,15 @@ struct PbrSurface
 
 // マテリアルの粗さを返している。0（指定なし）のときは、これまでの光沢の強さ（Phongの指数）から換算している。
 // 建物の壁と天井は、打ちっぱなしのコンクリートとして粗くしている。
+// 従来の光沢指数から変換した粗さの範囲。風化した面は粗い側に寄せる。
+#define PBR_LEGACY_MIN_ROUGHNESS 0.45f
+#define PBR_LEGACY_MAX_ROUGHNESS 0.95f
+#define PBR_WEATHERED_MIN_ROUGHNESS 0.86f
+
+// 濡れた面の粗さを水膜の値に近づけ、元の材質の違いを残す。
+#define PBR_WET_SURFACE_ROUGHNESS 0.16f
+#define PBR_WET_SURFACE_ROUGHNESS_BLEND 0.75f
+
 float GetMaterialRoughness()
 {
     if (Material.Roughness > 0.0f)
@@ -40,8 +49,8 @@ float GetMaterialRoughness()
     }
     // Blinn-Phongの指数 n とGGXの粗さの対応：α ≒ sqrt(2 / (n + 2))、見た目の粗さ = sqrt(α)
     const float alpha = sqrt(2.0f / (max(Material.Shiness, 1.0f) + 2.0f));
-    const float converted = clamp(sqrt(alpha), 0.45f, 0.95f);
-    return Material.WeatheringSurface ? max(converted, 0.86f) : converted;
+    const float converted = clamp(sqrt(alpha), PBR_LEGACY_MIN_ROUGHNESS, PBR_LEGACY_MAX_ROUGHNESS);
+    return Material.WeatheringSurface ? max(converted, PBR_WEATHERED_MIN_ROUGHNESS) : converted;
 }
 
 // 色・金属らしさ・粗さ・濡れ具合から、PBRの材質を作っている。
@@ -50,7 +59,7 @@ PbrSurface MakePbrSurface(float3 baseColor, float metallic, float roughness, flo
 {
     PbrSurface surface;
     surface.metallic = saturate(metallic);
-    surface.roughness = clamp(lerp(roughness, 0.16f, saturate(wetness) * 0.75f), PBR_MIN_ROUGHNESS, 1.0f);
+    surface.roughness = clamp(lerp(roughness, PBR_WET_SURFACE_ROUGHNESS, saturate(wetness) * PBR_WET_SURFACE_ROUGHNESS_BLEND), PBR_MIN_ROUGHNESS, 1.0f);
     surface.alpha = surface.roughness * surface.roughness;
     surface.diffuseColor = baseColor * (1.0f - surface.metallic);
     surface.f0 = lerp(PBR_DIELECTRIC_F0.xxx, baseColor, surface.metallic);
@@ -65,16 +74,22 @@ float DistributionGGX(float nDotH, float alpha)
     return alphaSquared / (PBR_PI * denominator * denominator);
 }
 
+// 浅い角度の可視項が発散しないよう、分母の下限を置く。
+static const float PBR_VISIBILITY_DENOMINATOR_MIN = 1e-4f;
+
+// 正面の反射率 F0 から斜めの全反射へ近づく Schlick 近似の指数。
+static const float PBR_SCHLICK_EXPONENT = 5.0f;
+
 // 高さを考えたSmithの遮蔽を、GGX用に近似した可視の項（G / (4 n・l n・v) をまとめた形。Hammon 2017）
 float VisibilitySmithGGX(float nDotV, float nDotL, float alpha)
 {
-    return 0.5f / max(lerp(2.0f * nDotL * nDotV, nDotL + nDotV, alpha), 1e-4f);
+    return 0.5f / max(lerp(2.0f * nDotL * nDotV, nDotL + nDotV, alpha), PBR_VISIBILITY_DENOMINATOR_MIN);
 }
 
 // Schlickのフレネル：浅い角度で見るほど、どんな物も鏡のように光を返す
 float3 FresnelSchlick(float3 f0, float vDotH)
 {
-    const float weight = pow(1.0f - saturate(vDotH), 5.0f);
+    const float weight = pow(1.0f - saturate(vDotH), PBR_SCHLICK_EXPONENT);
     return f0 + (1.0f - f0) * weight;
 }
 

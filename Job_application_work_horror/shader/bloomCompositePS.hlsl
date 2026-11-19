@@ -14,15 +14,47 @@ struct PS_IN
 // 画面効果の値（FullScreenQuad.cppのTimeBufferと同じ並び。ここではブルームの強さ・縦横比・レンズの汚れを使っている）
 #include "postProcessBuffer.hlsli"
 
+// レンズの汚れを作る三つの波の向き・細かさと、重ねたときの濃さ。
+static const float2 LENS_DIRT_FINE_FREQUENCY = float2(23.17f, 17.83f);
+static const float2 LENS_DIRT_CROSS_FREQUENCY = float2(-37.11f, 13.57f);
+static const float2 LENS_DIRT_BROAD_FREQUENCY = float2(7.31f, -9.17f);
+static const float LENS_DIRT_FINE_PHASE = 1.73f;
+static const float LENS_DIRT_CROSS_MODULATION = 2.35f;
+static const float LENS_DIRT_BROAD_MODULATION = 1.15f;
+static const float LENS_DIRT_FINE_WEIGHT = 0.24f;
+static const float LENS_DIRT_CROSS_WEIGHT = 0.31f;
+static const float LENS_DIRT_BROAD_WEIGHT = 0.45f;
+
+// 細い段から左右対称に光を拾い、近い試料を遠い試料より強く混ぜる。
+static const float STREAK_NEAR_OFFSET_TEXELS = 7.0f;
+static const float STREAK_FAR_OFFSET_TEXELS = 20.0f;
+static const float STREAK_NEAR_WEIGHT = 0.34f;
+static const float STREAK_FAR_WEIGHT = 0.16f;
+
+// ブルームと光の筋の明るさの比較には、同じリニア RGB の輝度係数を使う。
+static const float3 BLOOM_LUMINANCE_WEIGHTS = float3(0.2126f, 0.7152f, 0.0722f);
+
+// 広がった光を抑え、明るくまとまった光源やイベント時に横の筋を出す。
+static const float STREAK_DIFFUSE_SUPPRESSION = 0.72f;
+static const float STREAK_COMPACT_GAIN = 4.2f;
+static const float STREAK_COMPACT_BIAS = 0.20f;
+static const float STREAK_BRIGHTNESS_START = 0.045f;
+static const float STREAK_BRIGHTNESS_END = 0.32f;
+static const float STREAK_EVENT_BLOOM_THRESHOLD = 0.48f;
+static const float STREAK_EVENT_RESPONSE = 0.85f;
+static const float STREAK_BASE_STRENGTH = 0.055f;
+static const float STREAK_EVENT_STRENGTH = 0.075f;
+static const float3 STREAK_TINT = float3(0.84f, 0.91f, 1.0f);
+
 // レンズの汚れのむらを、sinを重ねた模様で作っている（0〜1）
 float LensDirtWave(float2 uv)
 {
-    const float first = sin(dot(uv, float2(23.17f, 17.83f)) + 1.73f);
+    const float first = sin(dot(uv, LENS_DIRT_FINE_FREQUENCY) + LENS_DIRT_FINE_PHASE);
     const float second = sin(
-        dot(uv, float2(-37.11f, 13.57f)) + first * 2.35f);
+        dot(uv, LENS_DIRT_CROSS_FREQUENCY) + first * LENS_DIRT_CROSS_MODULATION);
     const float broad = sin(
-        dot(uv, float2(7.31f, -9.17f)) + second * 1.15f);
-    return saturate(first * 0.24f + second * 0.31f + broad * 0.45f + 0.50f);
+        dot(uv, LENS_DIRT_BROAD_FREQUENCY) + second * LENS_DIRT_BROAD_MODULATION);
+    return saturate(first * LENS_DIRT_FINE_WEIGHT + second * LENS_DIRT_CROSS_WEIGHT + broad * LENS_DIRT_BROAD_WEIGHT + 0.50f);
 }
 
 // ぼかしたブルームの画像の段（t0 = 縦横1/4、t1 = 1/8、t2 = 1/16、t3 = 1/32）とサンプラー（s0）
@@ -53,6 +85,19 @@ float3 SampleBloomLevel(Texture2D levelTexture, float2 uv)
     return levelTexture.SampleLevel(bloomSampler, clamp(uv, margin, 1.0f - margin), 0.0f).rgb;
 }
 
+// 画面の外側ほど汚れを浮かせ、模様は一定の濃さを超えた領域だけ現れる。
+static const float LENS_DIRT_EDGE_START = 0.08f;
+static const float LENS_DIRT_EDGE_FULL = 0.72f;
+static const float LENS_DIRT_MASK_START = 0.54f;
+static const float LENS_DIRT_MASK_FULL = 0.84f;
+static const float LENS_DIRT_EDGE_MASK_GAIN = 0.12f;
+
+// 明るい光源の周囲でだけ暖色の汚れを出し、暗い画面を覆わないようにする。
+static const float LENS_DIRT_MIN_LUMINANCE = 0.025f;
+static const float LENS_DIRT_FULL_LUMINANCE = 0.30f;
+static const float3 LENS_DIRT_GLOW_TINT = float3(1.00f, 0.88f, 0.70f);
+static const float LENS_DIRT_GLOW_SCALE = 0.12f;
+
 float4 main(PS_IN input) : SV_TARGET
 {
     uint bloomWidth;
@@ -73,51 +118,51 @@ float4 main(PS_IN input) : SV_TARGET
     // 広い間隔で読み取り、テクスチャを足さずに、蛍光灯の横長の形を強調している。
     float3 streak = 0.0f;
     streak += bloomTexture.SampleLevel(
-        bloomSampler, saturate(uv + float2(texelSize.x * 7.0f, 0.0f)), 0.0f).rgb * 0.34f;
+        bloomSampler, saturate(uv + float2(texelSize.x * STREAK_NEAR_OFFSET_TEXELS, 0.0f)), 0.0f).rgb * STREAK_NEAR_WEIGHT;
     streak += bloomTexture.SampleLevel(
-        bloomSampler, saturate(uv - float2(texelSize.x * 7.0f, 0.0f)), 0.0f).rgb * 0.34f;
+        bloomSampler, saturate(uv - float2(texelSize.x * STREAK_NEAR_OFFSET_TEXELS, 0.0f)), 0.0f).rgb * STREAK_NEAR_WEIGHT;
     streak += bloomTexture.SampleLevel(
-        bloomSampler, saturate(uv + float2(texelSize.x * 20.0f, 0.0f)), 0.0f).rgb * 0.16f;
+        bloomSampler, saturate(uv + float2(texelSize.x * STREAK_FAR_OFFSET_TEXELS, 0.0f)), 0.0f).rgb * STREAK_FAR_WEIGHT;
     streak += bloomTexture.SampleLevel(
-        bloomSampler, saturate(uv - float2(texelSize.x * 20.0f, 0.0f)), 0.0f).rgb * 0.16f;
+        bloomSampler, saturate(uv - float2(texelSize.x * STREAK_FAR_OFFSET_TEXELS, 0.0f)), 0.0f).rgb * STREAK_FAR_WEIGHT;
 
     // 筋は、明るくまとまった光（ブルームより筋が強い所）だけに出している
     const float streakLuminance = dot(
         streak,
-        float3(0.2126f, 0.7152f, 0.0722f));
+        BLOOM_LUMINANCE_WEIGHTS);
     const float bloomLuminanceForShape = dot(
         sharpBloom,
-        float3(0.2126f, 0.7152f, 0.0722f));
+        BLOOM_LUMINANCE_WEIGHTS);
     const float compactHighlight = saturate(
-        (streakLuminance - bloomLuminanceForShape * 0.72f) * 4.2f + 0.20f);
+        (streakLuminance - bloomLuminanceForShape * STREAK_DIFFUSE_SUPPRESSION) * STREAK_COMPACT_GAIN + STREAK_COMPACT_BIAS);
     const float brightStreak = smoothstep(
-        0.045f,
-        0.32f,
+        STREAK_BRIGHTNESS_START,
+        STREAK_BRIGHTNESS_END,
         streakLuminance);
     // イベントでブルームを強めたときは、筋も強くしている
     const float eventBoost = saturate(
-        (bloomIntensity - 0.48f) * 0.85f);
+        (bloomIntensity - STREAK_EVENT_BLOOM_THRESHOLD) * STREAK_EVENT_RESPONSE);
     const float streakStrength =
-        (0.055f + eventBoost * 0.075f) * brightStreak * compactHighlight;
+        (STREAK_BASE_STRENGTH + eventBoost * STREAK_EVENT_STRENGTH) * brightStreak * compactHighlight;
     const float3 streakColor =
-        streak * float3(0.84f, 0.91f, 1.0f) * streakStrength;
+        streak * STREAK_TINT * streakStrength;
 
     // レンズの汚れは、ブルームがある場所だけに表示している。
     // いつも張り付いた汚れを避けながら、明るい照明にレンズらしい反応を加えている。
     const float2 centered = (uv - 0.5f) * float2(screenAspect, 1.0f);
-    const float edgeWeight = smoothstep(0.08f, 0.72f, length(centered));
+    const float edgeWeight = smoothstep(LENS_DIRT_EDGE_START, LENS_DIRT_EDGE_FULL, length(centered));
     const float dirtWave = LensDirtWave(uv);
     const float dirtMask = smoothstep(
-        0.54f,
-        0.84f,
-        dirtWave + edgeWeight * 0.12f);
+        LENS_DIRT_MASK_START,
+        LENS_DIRT_MASK_FULL,
+        dirtWave + edgeWeight * LENS_DIRT_EDGE_MASK_GAIN);
     const float bloomLuminance = dot(
         bloom,
-        float3(0.2126f, 0.7152f, 0.0722f));
-    const float visibleDirt = dirtMask * smoothstep(0.025f, 0.30f, bloomLuminance)
+        BLOOM_LUMINANCE_WEIGHTS);
+    const float visibleDirt = dirtMask * smoothstep(LENS_DIRT_MIN_LUMINANCE, LENS_DIRT_FULL_LUMINANCE, bloomLuminance)
         * saturate(lensDirtStrength);
-    const float3 dirtGlow = bloom * float3(1.00f, 0.88f, 0.70f)
-        * visibleDirt * 0.12f;
+    const float3 dirtGlow = bloom * LENS_DIRT_GLOW_TINT
+        * visibleDirt * LENS_DIRT_GLOW_SCALE;
 
     // ブルーム＋光の筋＋レンズの汚れの光を返している（加算合成で画面に足される）
     return float4(

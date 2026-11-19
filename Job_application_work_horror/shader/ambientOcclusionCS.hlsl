@@ -88,10 +88,20 @@ float3 ViewPositionAt(int2 pixel)
 }
 
 // 0〜1の乱数（4x4の模様にして、隣り合う画素で標本の向きを変えている）
+// 4×4画素で標本の回転を変え、縞が目立たないようにする。
+static const int OCCLUSION_ROTATION_TILE_MASK = 3;
+static const int OCCLUSION_ROTATION_TILE_WIDTH = 4;
+static const float OCCLUSION_ROTATION_COUNT = 16.0f;
+static const float OCCLUSION_ROTATION_FULL_TURN = 6.2831853f;
+
+// 除算の下限と、遠方で効果を薄め始める距離の割合。
+static const float OCCLUSION_RANGE_MIN_DEPTH_DELTA = 0.001f;
+static const float OCCLUSION_DISTANCE_FADE_START_FRACTION = 0.6f;
+
 float InterleavedAngle(int2 pixel)
 {
-    const int2 cell = pixel & 3;
-    return (float(cell.x * 4 + cell.y) + 0.5f) / 16.0f * 6.2831853f;
+    const int2 cell = pixel & OCCLUSION_ROTATION_TILE_MASK;
+    return (float(cell.x * OCCLUSION_ROTATION_TILE_WIDTH + cell.y) + 0.5f) / OCCLUSION_ROTATION_COUNT * OCCLUSION_ROTATION_FULL_TURN;
 }
 
 // 視点の空間の点を、描く範囲の画素の位置へ投影している（カメラの後ろなら false）
@@ -182,7 +192,11 @@ float ComputeContactShadow(float3 center, float3 normal, int2 outputPixel)
     return 1.0f;
 }
 
-[numthreads(8, 8, 1)]
+// AmbientOcclusion.cpp の OcclusionDownsampleFactor / OcclusionThreadGroupSize と揃える。
+#define OCCLUSION_DOWNSAMPLE_FACTOR 2
+#define OCCLUSION_THREAD_GROUP_SIZE 8
+
+[numthreads(OCCLUSION_THREAD_GROUP_SIZE, OCCLUSION_THREAD_GROUP_SIZE, 1)]
 void main(uint3 id : SV_DispatchThreadID)
 {
     // 半分の解像度の1画素が、描く範囲の2x2画素の左上を受け持っている
@@ -191,7 +205,7 @@ void main(uint3 id : SV_DispatchThreadID)
     {
         return;
     }
-    const int2 pixel = min(outputPixel * 2, int2(ViewportSize) - 1);
+    const int2 pixel = min(outputPixel * OCCLUSION_DOWNSAMPLE_FACTOR, int2(ViewportSize) - 1);
     const float depth = SceneDepth.Load(int3(pixel + int2(ViewportOffset), 0));
     const float3 center = ViewPositionAt(pixel);
     // 何も描いていない所と、遠くて霧に沈む所は、遮る物なしにしている
@@ -237,11 +251,11 @@ void main(uint3 id : SV_DispatchThreadID)
         }
         const float sceneZ = ViewPositionAt(samplePixel).z;
         // 標本の点より手前に物があれば遮られている。ただし、半径より大きく手前の物（離れた前景）は数えない
-        const float rangeCheck = smoothstep(0.0f, 1.0f, Radius / max(abs(center.z - sceneZ), 0.001f));
+        const float rangeCheck = smoothstep(0.0f, 1.0f, Radius / max(abs(center.z - sceneZ), OCCLUSION_RANGE_MIN_DEPTH_DELTA));
         occlusion += (sceneZ < samplePosition.z - Bias ? 1.0f : 0.0f) * rangeCheck;
     }
 
-    const float distanceFade = 1.0f - smoothstep(MaxDistance * 0.6f, MaxDistance, center.z);
+    const float distanceFade = 1.0f - smoothstep(MaxDistance * OCCLUSION_DISTANCE_FADE_START_FRACTION, MaxDistance, center.z);
     OcclusionOutput[outputPixel] = float2(
         saturate(1.0f - occlusion / 12.0f * Intensity * distanceFade),
         ComputeContactShadow(center, normal, outputPixel));

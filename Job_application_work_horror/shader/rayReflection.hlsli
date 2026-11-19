@@ -47,6 +47,17 @@ static const float SSR_SINGLE_SAMPLE_BLUR_LIMIT = 0.35f;
 // SSR：反射の光線をビュー空間で少しずつ（だんだん大きな歩幅で）進め、画面の深度より奥へ入った所を「ぶつかった」とし、
 // 当たった面を前のフレームのカメラへ投影し直して、同じ位置の色を読む。前の画面で隠れていた面は使わない。
 // 返り値の xyz は色、w はぶつかった度合い（画面の端と、遠くまで進んだ所では0へ近づけている）。
+// 最初の標本はわずかに離し、視点に近すぎる射影では交差を判定しない。
+#define SSR_INITIAL_RAY_DISTANCE 1.5f
+#define SSR_MIN_PROJECTION_W 0.001f
+
+// 面から離れすぎた交差や、ほとんど見えない映り込みを捨てる。
+#define SSR_MIN_THICKNESS_CONFIDENCE 0.001f
+#define SSR_MIN_VISIBLE_WEIGHT 0.001f
+
+// 壁や小物と交差するとき、光線の始点のすぐそばを除く。
+#define ROOM_REFLECTION_MIN_INTERSECTION_DISTANCE 0.05f
+
 // stepCount は進める回数、stepGrowth は1回ごとに歩幅を広げる割合（レイ反射では、遠くは部屋の形で補うので少なくしている）。
 // blurPerDistance は、映る物が反射する面から離れているほどぼかす強さ（前のフレームの画面の縮小画像の段。0ならぼかさない）。
 // 本物の水面は、水面に近い物（柱の根元）はくっきり、離れた物ほどぼやけて映るので、それに合わせている（2面の壁の鏡は0）
@@ -71,7 +82,7 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
     const float depthScale = CausticProjection[2][2];
     const float depthOffset = CausticProjection[3][2];
     const float forwardSign = CausticProjection[2][3];
-    float distance = 1.5f;
+    float distance = SSR_INITIAL_RAY_DISTANCE;
     float previousDistance = 0.0f;
     // 出発点そのものは反射面。最初の試料を基準にし、自分自身を交差と判定しない。
     float previousBehind = 1.0f;
@@ -81,7 +92,7 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
         const float3 rayPosition = viewPosition + rayDirection * distance;
         const float4 clip = mul(float4(rayPosition, 1.0f), CausticProjection);
         // 鏡のようにカメラの方へ戻る光線は、すぐにカメラの後ろへ出るので、ここで終わる
-        if (clip.w <= 0.001f)
+        if (clip.w <= SSR_MIN_PROJECTION_W)
         {
             break;
         }
@@ -115,7 +126,7 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
                 const float middle = (nearDistance + farDistance) * 0.5f;
                 const float3 middlePosition = viewPosition + rayDirection * middle;
                 const float4 middleClip = mul(float4(middlePosition, 1.0f), CausticProjection);
-                const float2 middleNdc = middleClip.xy / max(middleClip.w, 0.001f);
+                const float2 middleNdc = middleClip.xy / max(middleClip.w, SSR_MIN_PROJECTION_W);
                 const float2 middleUv = float2(middleNdc.x * 0.5f + 0.5f, -middleNdc.y * 0.5f + 0.5f);
                 const int2 middlePixel = clamp(int2(middleUv * dimensions), int2(0, 0), int2(width, height) - 1);
                 const float middleDepth = g_SsrDepth.Load(int3(middlePixel, 0));
@@ -137,7 +148,7 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
             const float thickness = SSR_MIN_HIT_THICKNESS + farDistance * SSR_HIT_THICKNESS_PER_DISTANCE;
             const float residual = abs((viewPosition.z + rayDirection.z * farDistance - hitViewZ) * forwardSign);
             const float thicknessConfidence = 1.0f - smoothstep(thickness * 0.5f, thickness, residual);
-            if (thicknessConfidence <= 0.001f)
+            if (thicknessConfidence <= SSR_MIN_THICKNESS_CONFIDENCE)
             {
                 distance *= stepGrowth;
                 continue;
@@ -157,7 +168,7 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
                 continue;
             }
             const float4 previousClip = mul(float4(hitWorld, 1.0f), PreviousReflectionViewProjection);
-            if (previousClip.w <= 0.001f)
+            if (previousClip.w <= SSR_MIN_PROJECTION_W)
             {
                 return 0.0f;
             }
@@ -180,7 +191,7 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
             const float fade = smoothstep(0.0f, SSR_EDGE_FADE_UV, min(edge.x, edge.y)) * depthConfidence * thicknessConfidence *
                 smoothstep(0.0f, SSR_HIT_HEIGHT_FADE_WIDTH, heightAboveMinimum) *
                 (1.0f - smoothstep(SSR_STEP_FADE_START_RATIO, 1.0f, float(step) / float(stepCount)));
-            if (fade <= 0.001f)
+            if (fade <= SSR_MIN_VISIBLE_WEIGHT)
             {
                 return 0.0f;
             }
@@ -212,6 +223,10 @@ float4 TraceScreenSpaceReflection(float3 worldPosition, float3 worldNormal, int 
 }
 
 // 部屋の形の、壁・天井・床の色（照らす前の色）と、光線を追う一番遠い距離
+// 部屋を囲う壁がある場所ではキューブマップを弱く混ぜ、室内の反射が外の色に寄りすぎないようにする。
+static const float ROOM_ENVIRONMENT_WEIGHT_ENCLOSED = 0.28f;
+static const float ROOM_ENVIRONMENT_WEIGHT_OPEN = 0.62f;
+
 static const float3 RoomReflectionWallAlbedo = float3(0.20f, 0.20f, 0.18f);
 static const float3 RoomReflectionCeilingAlbedo = float3(0.13f, 0.13f, 0.12f);
 static const float3 RoomReflectionFloorAlbedo = float3(0.11f, 0.105f, 0.10f);
@@ -251,7 +266,7 @@ float IntersectRoom(float3 origin, float3 direction, out float3 hitNormal, out f
         const float2 leave = max(slabNear, slabFar);
         const float enter = max(entry.x, entry.y);
         const float exit = min(leave.x, leave.y);
-        if (enter > 0.05f && enter <= exit && enter < nearest)
+        if (enter > ROOM_REFLECTION_MIN_INTERSECTION_DISTANCE && enter <= exit && enter < nearest)
         {
             nearest = enter;
             hitNormal = entry.x > entry.y
@@ -290,7 +305,7 @@ float IntersectRoom(float3 origin, float3 direction, out float3 hitNormal, out f
         const float3 leave = max(slabNear, slabFar);
         const float enter = max(max(entry.x, entry.y), entry.z);
         const float exit = min(min(leave.x, leave.y), leave.z);
-        if (enter > 0.05f && enter <= exit && enter < nearest)
+        if (enter > ROOM_REFLECTION_MIN_INTERSECTION_DISTANCE && enter <= exit && enter < nearest)
         {
             nearest = enter;
             hitNormal = entry.x >= entry.y && entry.x >= entry.z ? float3(-sign(inverseDirection.x), 0.0f, 0.0f)
@@ -319,6 +334,25 @@ float IntersectRoom(float3 origin, float3 direction, out float3 hitNormal, out f
 // 環境マップが撮れていないとき（TraceRoomReflection で useEnvironment を使わないとき）に、この模様で見た目を補っている。
 // 壁は打ちっぱなしのコンクリートのパネル（横60・縦17。litTexturePS の GetWallAgeing と同じ大きさ）の継ぎ目と色むら、
 // 天井は天井板の格子（30四方）と染みを、当たった位置から計算している。小物の箱には掛けない
+// 反射の中に描く壁と床では、パネルの大きさを変えて継ぎ目を残す。
+#define ROOM_REFLECTION_WALL_PANEL_SIZE float2(60.0f, 17.0f)
+#define ROOM_REFLECTION_HORIZONTAL_PANEL_SIZE float2(30.0f, 30.0f)
+#define ROOM_REFLECTION_PANEL_SEAM_CORE 0.2f
+#define ROOM_REFLECTION_PANEL_SEAM_EDGE 0.9f
+
+// 材質の色が一様にならないよう、床版の差、広い染み、細かいざらつきを重ねる。
+#define ROOM_REFLECTION_PANEL_TINT_SEED 71.0f
+#define ROOM_REFLECTION_PANEL_BLOTCH_SCALE 0.045f
+#define ROOM_REFLECTION_PANEL_BLOTCH_SEED 17.0f
+#define ROOM_REFLECTION_PANEL_FINE_SCALE 0.40f
+#define ROOM_REFLECTION_PANEL_FINE_SEED 5.0f
+#define ROOM_REFLECTION_PANEL_BASE_TINT 0.80f
+#define ROOM_REFLECTION_PANEL_TINT_RANGE 0.18f
+#define ROOM_REFLECTION_PANEL_NOISE_BASE 0.72f
+#define ROOM_REFLECTION_PANEL_BLOTCH_WEIGHT 0.42f
+#define ROOM_REFLECTION_PANEL_FINE_WEIGHT 0.10f
+#define ROOM_REFLECTION_PANEL_SEAM_DARKENING 0.50f
+
 float GetRoomReflectionDetail(float3 hitPosition, float3 hitNormal)
 {
     const bool wall = abs(hitNormal.y) < 0.5f;
@@ -326,21 +360,50 @@ float GetRoomReflectionDetail(float3 hitPosition, float3 hitNormal)
     const float2 uv = wall
         ? float2(dot(hitPosition.xz, float2(-hitNormal.z, hitNormal.x)), hitPosition.y - OcclusionFloorY)
         : hitPosition.xz;
-    const float2 panelSize = wall ? float2(60.0f, 17.0f) : float2(30.0f, 30.0f);
+    const float2 panelSize = wall ? ROOM_REFLECTION_WALL_PANEL_SIZE : ROOM_REFLECTION_HORIZONTAL_PANEL_SIZE;
     const float2 panelUV = uv / panelSize;
     const float2 edgeDistance = (0.5f - abs(frac(panelUV) - 0.5f)) * panelSize;
-    const float seam = 1.0f - smoothstep(0.2f, 0.9f, min(edgeDistance.x, edgeDistance.y));
+    const float seam = 1.0f - smoothstep(ROOM_REFLECTION_PANEL_SEAM_CORE, ROOM_REFLECTION_PANEL_SEAM_EDGE, min(edgeDistance.x, edgeDistance.y));
     // パネルごとの明るさの違い・大きな染み・細かいざらつき
-    const float panelShade = FastHash21(floor(panelUV) + 71.0f);
-    const float blotch = FastValueNoise(uv * 0.045f + 17.0f);
-    const float fine = FastValueNoise(uv * 0.40f + 5.0f);
-    return (0.80f + panelShade * 0.18f) * (0.72f + blotch * 0.42f + fine * 0.10f) * (1.0f - seam * 0.50f);
+    const float panelShade = FastHash21(floor(panelUV) + ROOM_REFLECTION_PANEL_TINT_SEED);
+    const float blotch = FastValueNoise(uv * ROOM_REFLECTION_PANEL_BLOTCH_SCALE + ROOM_REFLECTION_PANEL_BLOTCH_SEED);
+    const float fine = FastValueNoise(uv * ROOM_REFLECTION_PANEL_FINE_SCALE + ROOM_REFLECTION_PANEL_FINE_SEED);
+    return (ROOM_REFLECTION_PANEL_BASE_TINT + panelShade * ROOM_REFLECTION_PANEL_TINT_RANGE) * (ROOM_REFLECTION_PANEL_NOISE_BASE + blotch * ROOM_REFLECTION_PANEL_BLOTCH_WEIGHT + fine * ROOM_REFLECTION_PANEL_FINE_WEIGHT) * (1.0f - seam * ROOM_REFLECTION_PANEL_SEAM_DARKENING);
 }
 
 // 部屋の形に光線を飛ばし、当たった天井・床・壁の色と、途中で光線がそばを通った照明の光を返している。
 // roughness は面の荒さ（0〜1）で、荒いほど照明の映り込みをにじませている。
 // hitDistance は当たった面までの距離（どこにも当たらなければ RoomReflectionMaxDistance）で、鏡に映る人影の前後を決めるのに使っている。
 // useEnvironment なら、当たった面の色を、環境マップ（本物の景色）から読んでいる（水たまり。鏡は自分の後ろを映すので使わない）
+// 反射の中で近い壁や扉の下側を残し、遠い壁や上部を天井の色へなじませる。
+#define ROOM_REFLECTION_NEAR_WALL_START 30.0f
+#define ROOM_REFLECTION_NEAR_WALL_END 85.0f
+#define ROOM_REFLECTION_WALL_HEIGHT_FADE_START 0.62f
+#define ROOM_REFLECTION_WALL_HEIGHT_FADE_END 0.95f
+
+// 映る光源の芯とにじみの広さを、粗い面ほど広げる。
+#define ROOM_REFLECTION_LIGHT_RADIUS 6.0f
+#define ROOM_REFLECTION_LIGHT_ROUGHNESS_SPREAD 1.5f
+#define ROOM_REFLECTION_LIGHT_REACH_MULTIPLIER 12.0f
+
+// 光線の当たり位置の近くにある照明だけを映り込みとして調べる。
+#define ROOM_REFLECTION_LIGHT_HIT_MARGIN 4.0f
+
+// 光源の強い芯と弱いにじみを重ねて反射像に加える。
+#define ROOM_REFLECTION_GLOW_CORE_WEIGHT 0.85f
+#define ROOM_REFLECTION_GLOW_HALO_RADIUS 3.0f
+#define ROOM_REFLECTION_GLOW_HALO_WEIGHT 0.03f
+
+// 反射の面は斜めに照らされた場合も、薄い光が残るようにする。
+#define ROOM_REFLECTION_LIGHT_GRAZING_RESPONSE 0.20f
+#define ROOM_REFLECTION_LIGHT_LAMBERT_WEIGHT 0.80f
+
+// 水面で跳ねた懐中電灯の光は、壁へ届く前に弱める。
+#define ROOM_REFLECTION_FLASHLIGHT_BOUNCE_WEIGHT 0.42f
+
+// 遠い照明が霧の中で強く光りすぎないようにする。
+#define ROOM_REFLECTION_GLOW_FOG_FADE 0.6f
+
 float3 TraceRoomReflection(float3 origin, float3 direction, float roughness,
     out float hitDistance, out float nearVertical, bool useEnvironment = false)
 {
@@ -354,8 +417,8 @@ float3 TraceRoomReflection(float3 origin, float3 direction, float roughness,
     // 近くの壁や扉の下側は水面でも輪郭が読めるようにする。壁の上部と遠い壁は天井の反射へなじませる。
     const float roomHeight = max(OcclusionCeilingY - OcclusionFloorY, 1.0f);
     const float relativeHeight = (hitPosition.y - OcclusionFloorY) / roomHeight;
-    nearVertical = (1.0f - abs(hitNormal.y)) * (1.0f - smoothstep(30.0f, 85.0f, hitDistance)) *
-        (1.0f - smoothstep(0.62f, 0.95f, relativeHeight));
+    nearVertical = (1.0f - abs(hitNormal.y)) * (1.0f - smoothstep(ROOM_REFLECTION_NEAR_WALL_START, ROOM_REFLECTION_NEAR_WALL_END, hitDistance)) *
+        (1.0f - smoothstep(ROOM_REFLECTION_WALL_HEIGHT_FADE_START, ROOM_REFLECTION_WALL_HEIGHT_FADE_END, relativeHeight));
     // 建物の壁・天井・床に当たったときだけ、コンクリートや天井板の模様を付けている（小物の箱は小物の色のまま）
     const bool roomSurface = all(albedo == RoomReflectionWallAlbedo) ||
         all(albedo == RoomReflectionCeilingAlbedo) || all(albedo == RoomReflectionFloorAlbedo);
@@ -373,9 +436,9 @@ float3 TraceRoomReflection(float3 origin, float3 direction, float roughness,
 
     float3 lighting = GetHemisphereAmbient(hitNormal);
     float3 glow = 0.0f;
-    const float glowRadius = 6.0f * (1.0f + roughness * 1.5f);
+    const float glowRadius = ROOM_REFLECTION_LIGHT_RADIUS * (1.0f + roughness * ROOM_REFLECTION_LIGHT_ROUGHNESS_SPREAD);
     // 器具の光を調べる、光線からの距離の上限（にじみの裾がほぼ0になる所）の二乗
-    const float glowReach2 = (glowRadius * 12.0f) * (glowRadius * 12.0f);
+    const float glowReach2 = (glowRadius * ROOM_REFLECTION_LIGHT_REACH_MULTIPLIER) * (glowRadius * ROOM_REFLECTION_LIGHT_REACH_MULTIPLIER);
     [loop]
     for (uint i = 0; i < PointLightCount; ++i)
     {
@@ -384,7 +447,7 @@ float3 TraceRoomReflection(float3 origin, float3 direction, float roughness,
         const float3 toLight = pointLight.PositionRange.xyz - origin;
         const float along = dot(toLight, direction);
         const float miss2 = dot(toLight, toLight) - along * along;
-        const bool nearRay = along > 0.0f && along < hitDistance + 4.0f && miss2 < glowReach2;
+        const bool nearRay = along > 0.0f && along < hitDistance + ROOM_REFLECTION_LIGHT_HIT_MARGIN && miss2 < glowReach2;
         const float3 offset = pointLight.PositionRange.xyz - hitPosition;
         const float lightDistance2 = dot(offset, offset);
         const float range = max(pointLight.PositionRange.w, 0.001f);
@@ -397,8 +460,8 @@ float3 TraceRoomReflection(float3 origin, float3 direction, float roughness,
             if (nearRay)
             {
                 const float miss = sqrt(max(miss2, 0.0f));
-                glow += lightColor * (exp(-miss2 / (glowRadius * glowRadius)) * 0.85f +
-                    exp(-miss / (glowRadius * 3.0f)) * 0.03f);
+                glow += lightColor * (exp(-miss2 / (glowRadius * glowRadius)) * ROOM_REFLECTION_GLOW_CORE_WEIGHT +
+                    exp(-miss / (glowRadius * ROOM_REFLECTION_GLOW_HALO_RADIUS)) * ROOM_REFLECTION_GLOW_HALO_WEIGHT);
             }
             // 当たった面を、この光源で照らしている（床の点光源と同じ減衰）
             if (lightsHit)
@@ -407,7 +470,7 @@ float3 TraceRoomReflection(float3 origin, float3 direction, float roughness,
                 float attenuation = saturate(1.0f - lightDistance / range);
                 attenuation *= attenuation;
                 const float lambert = saturate(dot(hitNormal, offset / max(lightDistance, 0.001f)));
-                lighting += lightColor * attenuation * (0.20f + lambert * 0.80f);
+                lighting += lightColor * attenuation * (ROOM_REFLECTION_LIGHT_GRAZING_RESPONSE + lambert * ROOM_REFLECTION_LIGHT_LAMBERT_WEIGHT);
             }
         }
     }
@@ -437,7 +500,7 @@ float3 TraceRoomReflection(float3 origin, float3 direction, float roughness,
                 const float bounceFade = 1.0f - bounceDistance * bounceDistance;
                 lighting += Light.Diffuse.rgb * GetFlashlightTint(waterDirection) * Light.Intensity *
                     GetFlashlightBeamProfile(waterDirection) * bounceFade * bounceFade *
-                    saturate(dot(hitNormal, -direction)) * nearVertical * 0.42f;
+                    saturate(dot(hitNormal, -direction)) * nearVertical * ROOM_REFLECTION_FLASHLIGHT_BOUNCE_WEIGHT;
             }
         }
         color = albedo * lighting;
@@ -446,7 +509,7 @@ float3 TraceRoomReflection(float3 origin, float3 direction, float roughness,
     const float3 fogColor = GetHorrorFogColor(Light.Ambient.rgb, LoopDepth);
     const float fog = hit ? GetHorrorDistanceFog(hitDistance, LoopDepth) : 1.0f;
     const float3 roomColor = ApplyFilmicHorrorGrade(
-        lerp(color, fogColor, fog) + glow * (1.0f - fog * 0.6f), LoopDepth);
+        lerp(color, fogColor, fog) + glow * (1.0f - fog * ROOM_REFLECTION_GLOW_FOG_FADE), LoopDepth);
 
     // 画面の外の物を、環境マップ（カメラの位置から撮った本物の景色）で補っている。
     // 反射の向きのまま読むと、撮った位置（目）と水面の位置が違うので、近くの物ほど映る位置がずれる。
@@ -469,7 +532,7 @@ float3 TraceRoomReflection(float3 origin, float3 direction, float roughness,
         const float3 environment = g_RayEnvironmentProbe.SampleLevel(g_SamplerState,
             float3(probeDirection.x, probeDirection.y, -probeDirection.z), mipLevel).rgb;
         // 面が順番に更新されても映り込みの輪郭が跳ねないよう、室内では部屋の形と今の照明を主体にする。
-        const float environmentWeight = OcclusionBoxCount > 0 ? 0.28f : 0.62f;
+        const float environmentWeight = OcclusionBoxCount > 0 ? ROOM_ENVIRONMENT_WEIGHT_ENCLOSED : ROOM_ENVIRONMENT_WEIGHT_OPEN;
         return lerp(roomColor, environment + glow * 0.25f, environmentWeight);
     }
 

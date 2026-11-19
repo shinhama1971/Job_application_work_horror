@@ -132,6 +132,10 @@ StructuredBuffer<uint> g_PointLightWallMasks : register(t19);
 
 // タイルの大きさと、1タイルに入れる光源の上限（TiledLighting.hと同じ値）
 #include "tiledLightingConfig.hlsli"
+
+// 天井照明の下向きの配光が広がる範囲。壁・床・手元モデルの境界を揃える。
+static const float FIXTURE_BEAM_DOT_START = 0.04f;
+static const float FIXTURE_BEAM_DOT_END = 0.72f;
 static const uint LIGHT_TILE_SIZE = SIGNAL_LOST_LIGHT_TILE_SIZE;
 static const uint MAX_LIGHTS_PER_TILE = SIGNAL_LOST_MAX_LIGHTS_PER_TILE;
 

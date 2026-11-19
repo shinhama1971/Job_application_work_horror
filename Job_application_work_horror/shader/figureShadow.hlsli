@@ -41,15 +41,26 @@ float SegmentSegmentDistance(float3 p1, float3 q1, float3 p2, float3 q2, out flo
     return length(p1 + direction1 * s - (p2 + direction2 * t));
 }
 
+// カプセルの縁を少しぼかし、受け面のすぐそばで自分の面を遮らないようにする。
+#define FIGURE_SHADOW_DEFAULT_SOFTNESS 0.045f
+#define FIGURE_SHADOW_BASE_PENUMBRA 0.5f
+#define FIGURE_SHADOW_RECEIVER_FADE_END 0.03f
+
+// 影の適用しきい値、カプセルを調べる球の中心の高さと半径、影の最大の濃さ。
+#define UNSEEN_SHADOW_MIN_STRENGTH 0.001f
+#define UNSEEN_SHADOW_BOUND_CENTER_HEIGHT 19.0f
+#define UNSEEN_SHADOW_BOUND_RADIUS 27.0f
+#define UNSEEN_SHADOW_OPACITY 0.97f
+
 // カプセル（芯の線分 a-b、半径 radius）が、画素から光源への線分をどれだけ遮るか（0〜1）を返している。
 // 遮る所から画素までの距離に合わせて縁をぼかし、近い所ほどくっきり、遠い所ほどぼんやりした影にしている（softness はぼけの広がり方）
-float GetCapsuleOcclusion(float3 pixel, float3 light, float3 a, float3 b, float radius, float softness = 0.045f)
+float GetCapsuleOcclusion(float3 pixel, float3 light, float3 a, float3 b, float radius, float softness = FIGURE_SHADOW_DEFAULT_SOFTNESS)
 {
     float along;
     const float distance = SegmentSegmentDistance(pixel, light, a, b, along);
-    const float penumbra = 0.5f + along * length(light - pixel) * softness;
+    const float penumbra = FIGURE_SHADOW_BASE_PENUMBRA + along * length(light - pixel) * softness;
     // 画素のすぐそば（自分の足もとの面）では遮らないようにしている
-    return smoothstep(radius + penumbra, radius - penumbra * 0.5f, distance) * smoothstep(0.0f, 0.03f, along);
+    return smoothstep(radius + penumbra, radius - penumbra * 0.5f, distance) * smoothstep(0.0f, FIGURE_SHADOW_RECEIVER_FADE_END, along);
 }
 
 // 見えない影の人影が、lightPosition から worldPosition へ届く光をどれだけ通すか（0〜1）を返している。
@@ -59,23 +70,23 @@ float GetUnseenFigureShadow(float3 worldPosition, float3 lightPosition)
     // 光の筋の Compute Shader では光源のループの中で何度も呼ぶため、途中で返さず、戻り値を1か所にまとめている
     float visibility = 1.0f;
     [branch]
-    if (UnseenFigure.w > 0.001f)
+    if (UnseenFigure.w > UNSEEN_SHADOW_MIN_STRENGTH)
     {
         const float3 foot = UnseenFigure.xyz;
         // 人影を囲む球（中心は胸の高さ、半径27）に、画素から光源への線分が届かない組み合わせは、点と線分の距離だけで先に飛ばしている
         // （ほとんどの画素と光源はここで終わるため、重いカプセルの計算をしない）
-        const float3 center = foot + float3(0.0f, 19.0f, 0.0f);
+        const float3 center = foot + float3(0.0f, UNSEEN_SHADOW_BOUND_CENTER_HEIGHT, 0.0f);
         const float3 toLight = lightPosition - worldPosition;
         const float along = saturate(dot(center - worldPosition, toLight) / max(dot(toLight, toLight), 1e-4f));
         const float3 closest = worldPosition + toLight * along - center;
         [branch]
-        if (dot(closest, closest) <= 27.0f * 27.0f)
+        if (dot(closest, closest) <= UNSEEN_SHADOW_BOUND_RADIUS * UNSEEN_SHADOW_BOUND_RADIUS)
         {
             const float body = GetCapsuleOcclusion(worldPosition, lightPosition,
                 foot + float3(0.0f, 4.0f, 0.0f), foot + float3(0.0f, 29.0f, 0.0f), 5.4f);
             const float head = GetCapsuleOcclusion(worldPosition, lightPosition,
                 foot + float3(0.0f, 35.5f, 0.0f), foot + float3(0.0f, 36.5f, 0.0f), 3.8f);
-            visibility = 1.0f - max(body, head) * 0.97f * saturate(UnseenFigure.w);
+            visibility = 1.0f - max(body, head) * UNSEEN_SHADOW_OPACITY * saturate(UnseenFigure.w);
         }
     }
     return visibility;
@@ -127,7 +138,7 @@ float GetPlayerBodyShadow(float3 worldPosition, float3 lightPosition)
 float GetUnseenFigureFlashlightShadow(float3 worldPosition)
 {
     [branch]
-    if (UnseenFigure.w <= 0.001f)
+    if (UnseenFigure.w <= UNSEEN_SHADOW_MIN_STRENGTH)
     {
         return 1.0f;
     }

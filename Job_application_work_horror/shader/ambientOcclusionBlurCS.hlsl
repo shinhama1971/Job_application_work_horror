@@ -23,16 +23,28 @@ Texture2D<float> SceneDepth : register(t0);
 Texture2D<float2> RawOcclusion : register(t1);
 RWTexture2D<float2> OcclusionOutput : register(u0);
 
+// AmbientOcclusion.cpp の OcclusionDownsampleFactor / OcclusionThreadGroupSize と揃える。
+#define OCCLUSION_DOWNSAMPLE_FACTOR 2
+#define OCCLUSION_THREAD_GROUP_SIZE 8
+
 // 半分の解像度の画素に対応する所の深さ（0〜1）を、カメラからの前向きの距離へ戻している
 float LinearDepthAt(int2 occlusionPixel)
 {
-    const int2 pixel = min(occlusionPixel * 2, int2(ViewportSize) - 1);
+    const int2 pixel = min(occlusionPixel * OCCLUSION_DOWNSAMPLE_FACTOR, int2(ViewportSize) - 1);
     const float depth = SceneDepth.Load(int3(pixel + int2(ViewportOffset), 0));
     const float4 position = mul(float4(0.0f, 0.0f, depth, 1.0f), InverseProjection);
     return position.z / position.w;
 }
 
-[numthreads(8, 8, 1)]
+// 奥行きが異なる面を混ぜず、重みの合計で割る際の下限を保つ。
+static const float OCCLUSION_BLUR_DEPTH_DISCONTINUITY_WEIGHT = 0.8f;
+static const float OCCLUSION_BLUR_MIN_WEIGHT_SUM = 0.0001f;
+
+// 中心の前後を読む4×4の窓。開始と終了を縦横で揃える。
+static const int OCCLUSION_BLUR_WINDOW_BEGIN = -2;
+static const int OCCLUSION_BLUR_WINDOW_END = 2;
+
+[numthreads(OCCLUSION_THREAD_GROUP_SIZE, OCCLUSION_THREAD_GROUP_SIZE, 1)]
 void main(uint3 id : SV_DispatchThreadID)
 {
     const int2 pixel = int2(id.xy);
@@ -44,18 +56,18 @@ void main(uint3 id : SV_DispatchThreadID)
     float2 total = 0.0f;
     float weightSum = 0.0f;
     [unroll]
-    for (int y = -2; y < 2; ++y)
+    for (int y = OCCLUSION_BLUR_WINDOW_BEGIN; y < OCCLUSION_BLUR_WINDOW_END; ++y)
     {
         [unroll]
-        for (int x = -2; x < 2; ++x)
+        for (int x = OCCLUSION_BLUR_WINDOW_BEGIN; x < OCCLUSION_BLUR_WINDOW_END; ++x)
         {
             const int2 samplePixel = clamp(pixel + int2(x, y), int2(0, 0), int2(OcclusionSize) - 1);
             // 深さが離れている画素（物の向こう側）は、ほとんど混ぜない
             const float depthDifference = abs(LinearDepthAt(samplePixel) - centerDepth);
-            const float weight = 1.0f / (1.0f + depthDifference * 0.8f);
+            const float weight = 1.0f / (1.0f + depthDifference * OCCLUSION_BLUR_DEPTH_DISCONTINUITY_WEIGHT);
             total += RawOcclusion.Load(int3(samplePixel, 0)) * weight;
             weightSum += weight;
         }
     }
-    OcclusionOutput[pixel] = total / max(weightSum, 0.0001f);
+    OcclusionOutput[pixel] = total / max(weightSum, OCCLUSION_BLUR_MIN_WEIGHT_SUM);
 }

@@ -40,6 +40,8 @@ private:
     static constexpr float ResponseReferenceFps = 60.0f;
     // これより遅い速さは止まったとみなして0にする
     static constexpr float StopSpeedEpsilon = 0.001f;
+    // ごく小さい入力は移動の指示に扱わず、スティックの微小な揺れを吸収する。
+    static constexpr float MoveInputLengthSquaredThreshold = 0.0001f;
     // 頭を揺らし始める速さと、動いているとみなす速さの2乗
     static constexpr float HeadBobMinSpeed = 0.025f;
     static constexpr float MovingSpeedSquared = 0.0025f;
@@ -98,7 +100,7 @@ public:
         float deltaTime)
     {
         const float moveLengthSquared = moveDirection.LengthSquared();
-        const bool isMoving = moveLengthSquared > 0.0001f;
+        const bool isMoving = moveLengthSquared > MoveInputLengthSquaredThreshold;
 
         // スタミナ切れの後は、25%まで回復するまで走れないようにしている
         if (m_SprintExhausted && m_Stamina >= MaxStamina * ExhaustedSprintResumeRate)
@@ -197,7 +199,7 @@ public:
         }
         else
         {
-            const float returnDecay = std::pow(BobReturnPerFrame, deltaTime * 60.0f);
+            const float returnDecay = std::pow(BobReturnPerFrame, deltaTime * ResponseReferenceFps);
             m_HeadBobOffset *= returnDecay;
             m_HeadBobSideOffset *= returnDecay;
         }

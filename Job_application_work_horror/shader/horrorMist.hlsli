@@ -21,6 +21,19 @@
 // 部屋全体に漂う薄い霧の濃さ（サイレントヒルのように、懐中電灯を向けた先が白くかすみ、遠くまで見通せない）
 #define MIST_AIR_DENSITY 0.0024f
 
+// 2面の周回が深いときは霧を濃くし、非常灯の色を散乱に足す。
+static const float MIST_LOOP_DENSITY_GAIN = 0.85f;
+static const float3 MIST_UNLIT_TINT = float3(0.012f, 0.015f, 0.015f);
+static const float MIST_AMBIENT_LIGHT_BLEND = 0.035f;
+static const float MIST_SURROUNDING_LIGHT_BLEND = 0.10f;
+static const float3 MIST_DEEP_LOOP_TINT = float3(1.25f, 0.55f, 0.50f);
+static const float3 MIST_DEEP_LOOP_RED_LIFT = float3(0.010f, 0.0f, 0.0f);
+
+// 懐中電灯が届くほど霧で散乱する光を強め、光の円の外側の弱い成分も加える。
+static const float MIST_FLASHLIGHT_SPILL_SCALE = 0.8f;
+static const float MIST_FLASHLIGHT_BASE_SCATTER = 0.06f;
+static const float MIST_FLASHLIGHT_REACH_SCATTER = 0.15f;
+
 // プレイヤーの目の位置（ビュー行列から求めている。ビュー = 回転R と 移動t で、目の位置 = -t・Rの転置）
 float3 GetMistEyePosition()
 {
@@ -29,12 +42,31 @@ float3 GetMistEyePosition()
 
 // 霧を重ねた色を返している。viewPosition はビュー空間の位置（懐中電灯の円錐の向きを求めるのに使う）。
 // surroundingLight はその面が受けている光（天井の電球や非常灯）で、霧がその光を受けて色づく（電球のまわりが暖かくかすむ）
+// カメラ直近は霧を省き、高さがほぼ一定の視線は積分の極限値を使う。
+#define MIST_MIN_VIEW_DISTANCE 0.5f
+#define MIST_INTEGRAL_HEIGHT_EPSILON 0.001f
+
+// 霧のかたまりと細い筋のノイズを、異なる密度・流速で重ねる。
+#define MIST_SAMPLE_VIEW_FRACTION 0.65f
+#define MIST_FLOW_X 1.10f
+#define MIST_FLOW_Z 0.45f
+#define MIST_BROAD_NOISE_SCALE 0.022f
+#define MIST_BROAD_FLOW_SCALE 0.020f
+#define MIST_WISP_NOISE_X 0.060f
+#define MIST_WISP_NOISE_Z 0.030f
+#define MIST_WISP_FLOW_X 0.045f
+#define MIST_WISP_FLOW_Z 0.040f
+#define MIST_WISP_SEED 7.0f
+#define MIST_NOISE_BASE_DENSITY 0.35f
+#define MIST_BROAD_NOISE_WEIGHT 0.95f
+#define MIST_WISP_NOISE_WEIGHT 0.55f
+
 float3 ApplyHorrorMist(float3 color, float3 worldPosition, float3 viewPosition, float3 surroundingLight)
 {
     const float3 eye = GetMistEyePosition();
     const float3 toPixel = worldPosition - eye;
     const float distance = length(toPixel);
-    if (distance < 0.5f)
+    if (distance < MIST_MIN_VIEW_DISTANCE)
     {
         return color;
     }
@@ -43,7 +75,7 @@ float3 ApplyHorrorMist(float3 color, float3 worldPosition, float3 viewPosition, 
     const float heightEye = (eye.y - SCENE_BASE_FLOOR_Y) / MIST_HEIGHT_SCALE;
     const float heightPixel = (worldPosition.y - SCENE_BASE_FLOOR_Y) / MIST_HEIGHT_SCALE;
     const float heightChange = heightEye - heightPixel;
-    const float layer = abs(heightChange) > 0.001f
+    const float layer = abs(heightChange) > MIST_INTEGRAL_HEIGHT_EPSILON
         ? (exp(-heightPixel) - exp(-heightEye)) / heightChange
         : exp(-heightPixel);
     float amount = MIST_DENSITY * distance * layer;
@@ -51,21 +83,21 @@ float3 ApplyHorrorMist(float3 color, float3 worldPosition, float3 viewPosition, 
     amount += MIST_AIR_DENSITY * distance;
 
     // 霧の濃淡：視線の先の床の近くを、ゆっくり流れる2層のノイズで、筋やかたまりにしている
-    const float2 mistPoint = lerp(eye.xz, worldPosition.xz, 0.65f);
-    const float2 flow = float2(CausticTime * 1.10f, CausticTime * 0.45f);
-    const float broad = FastValueNoise(mistPoint * 0.022f + flow * 0.020f);
-    const float wisps = FastValueNoise(float2(mistPoint.x * 0.060f - flow.x * 0.045f, mistPoint.y * 0.030f + flow.y * 0.040f) + 7.0f);
-    amount *= 0.35f + broad * 0.95f + wisps * 0.55f;
+    const float2 mistPoint = lerp(eye.xz, worldPosition.xz, MIST_SAMPLE_VIEW_FRACTION);
+    const float2 flow = float2(CausticTime * MIST_FLOW_X, CausticTime * MIST_FLOW_Z);
+    const float broad = FastValueNoise(mistPoint * MIST_BROAD_NOISE_SCALE + flow * MIST_BROAD_FLOW_SCALE);
+    const float wisps = FastValueNoise(float2(mistPoint.x * MIST_WISP_NOISE_X - flow.x * MIST_WISP_FLOW_X, mistPoint.y * MIST_WISP_NOISE_Z + flow.y * MIST_WISP_FLOW_Z) + MIST_WISP_SEED);
+    amount *= MIST_NOISE_BASE_DENSITY + broad * MIST_BROAD_NOISE_WEIGHT + wisps * MIST_WISP_NOISE_WEIGHT;
     // 2面の周回が進むほど、霧を濃くしている（LoopDepth。common.hlsl の b7）
-    amount *= 1.0f + saturate(LoopDepth) * 0.85f;
+    amount *= 1.0f + saturate(LoopDepth) * MIST_LOOP_DENSITY_GAIN;
     const float mist = saturate(1.0f - exp(-amount));
 
     // 霧の色：懐中電灯の外は闇に近い暗い灰緑。円錐の中は、懐中電灯の光を散らして白く浮かぶ（遠いほど光が届かない）
-    float3 mistColor = float3(0.012f, 0.015f, 0.015f) + Light.Ambient.rgb * 0.035f;
+    float3 mistColor = MIST_UNLIT_TINT + Light.Ambient.rgb * MIST_AMBIENT_LIGHT_BLEND;
     // 電球や非常灯の光を受けた霧は、その光の色でかすむ（P.T. の廊下の電球のまわりの暖かいもや）
-    mistColor += surroundingLight * 0.10f;
+    mistColor += surroundingLight * MIST_SURROUNDING_LIGHT_BLEND;
     // 周回が深いほど、霧そのものも赤黒く濁らせている
-    mistColor = lerp(mistColor, mistColor * float3(1.25f, 0.55f, 0.50f) + float3(0.010f, 0.0f, 0.0f), saturate(LoopDepth));
+    mistColor = lerp(mistColor, mistColor * MIST_DEEP_LOOP_TINT + MIST_DEEP_LOOP_RED_LIFT, saturate(LoopDepth));
     if (Light.Enable && Light.FlashlightEnabled)
     {
         const float3 pixelDirection = viewPosition / max(length(viewPosition), 0.001f);
@@ -73,7 +105,7 @@ float3 ApplyHorrorMist(float3 color, float3 worldPosition, float3 viewPosition, 
         const float reach = saturate(1.0f - distance / max(Light.Range, 1.0f));
         // 中心の光に加えて、翼の光（GetFlashlightSpillProfile）でも霧がうっすら光り、光の円のまわりがぼんやり明るくかすむ
         const float spill = GetFlashlightSpillProfile(pixelDirection);
-        mistColor += Light.Diffuse.rgb * GetFlashlightTint(pixelDirection) * Light.Intensity * (beam + spill * 0.8f) * (0.06f + reach * 0.15f);
+        mistColor += Light.Diffuse.rgb * GetFlashlightTint(pixelDirection) * Light.Intensity * (beam + spill * MIST_FLASHLIGHT_SPILL_SCALE) * (MIST_FLASHLIGHT_BASE_SCATTER + reach * MIST_FLASHLIGHT_REACH_SCATTER);
     }
     return lerp(color, mistColor, mist);
 }
