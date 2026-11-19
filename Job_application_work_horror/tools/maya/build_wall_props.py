@@ -43,30 +43,37 @@ def build_shelf(name, length, depth, seed):
         for k in range(4):
             y0 = levels[k]
             box('Main', (0.25, 11.6, 0.25), (x, y0 + 5.25, 0.0), rotate=(math.degrees(math.atan2(depth - 1.0, 10.5)) * (1 if k % 2 else -1), 0.0, 0.0))
+    # 棚の中身を選ぶ累積確率と、両端に残す余白。
+    empty_limit = 0.18
+    binder_limit = 0.55
+    box_limit = 0.85
+    binder_tilt_chance = 0.3
+    contents_end_margin = 1.6
+    contents_stop_margin = 2.0
     # 棚の中身（ファイル・段ボール箱・紙の束）。ところどころ空けている
     for k in range(4):
         floor = levels[k] + 0.25
-        x = -half_length + 1.6
-        while x < half_length - 2.0:
+        x = -half_length + contents_end_margin
+        while x < half_length - contents_stop_margin:
             kind = random.random()
-            if kind < 0.18:
+            if kind < empty_limit:
                 x += random.uniform(3.0, 9.0)
                 continue
-            if kind < 0.55:
+            if kind < binder_limit:
                 # 背表紙を並べたファイル（少し傾く）
                 count = random.randint(3, 8)
                 for _ in range(count):
                     width = random.uniform(1.0, 1.8)
-                    if x + width > half_length - 1.6:
+                    if x + width > half_length - contents_end_margin:
                         break
                     height = random.uniform(6.5, 8.8)
-                    tilt = random.uniform(-6.0, 6.0) if random.random() < 0.3 else 0.0
+                    tilt = random.uniform(-6.0, 6.0) if random.random() < binder_tilt_chance else 0.0
                     box('Binder', (width, height, depth * 0.72), (x + width * 0.5, floor + height * 0.5, 0.0),
                         rotate=(0.0, 0.0, tilt), bevel=0.08)
                     x += width + 0.05
-            elif kind < 0.85:
+            elif kind < box_limit:
                 width = random.uniform(6.0, 10.0)
-                if x + width > half_length - 1.6:
+                if x + width > half_length - contents_end_margin:
                     break
                 height = random.uniform(5.0, 7.0)
                 box('Box', (width, height, depth * 0.8), (x + width * 0.5, floor + height * 0.5, 0.0),
@@ -74,7 +81,7 @@ def build_shelf(name, length, depth, seed):
                 x += width + random.uniform(0.3, 1.5)
             else:
                 width = random.uniform(5.0, 8.0)
-                if x + width > half_length - 1.6:
+                if x + width > half_length - contents_end_margin:
                     break
                 height = random.uniform(1.0, 3.5)
                 box('Paper', (width, height, depth * 0.7), (x + width * 0.5, floor + height * 0.5, 0.0),

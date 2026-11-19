@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "ForestLightningFigure.h"
+#include "ShadowFigureGeometry.h"
 #include "Application.h"
 #include "Camera.h"
 #include "PropModel.h"
@@ -15,9 +16,7 @@ namespace
 {
     // 人影の大きさ（ShadowMan と同じ）：モデルを読み込むときに割る大きさ（モデルの実際の大きさのまま読むための基準）と、
     // 実際に描く大きさの倍率（背が約31 → 約54、幅1.45倍）
-    const Vector3 FigureModelScale(8.0f, 16.0f, 8.0f);
-    const Vector3 FigureEnlarge(1.45f, 1.75f, 1.45f);
-    const Vector3 FigureSize = FigureModelScale * FigureEnlarge;
+    const Vector3 FigureSize = ShadowFigureGeometry::ModelScale * ShadowFigureGeometry::DisplayScale;
     // 体の色（ほとんど黒）。光の当たり方はシェーダーで決めるので、マテリアルの色は使わない
     const Color FigureBodyColor(0.025f, 0.03f, 0.027f, 1.0f);
     const Color FigureDiffuse(0.70f, 0.74f, 0.70f, 1.0f);
@@ -32,7 +31,7 @@ void ForestLightningFigure::Init()
 {
     PropModel::Append("assets/model/props/shadow_man.fbx",
         { { "Body", FigureBodyColor } },
-        FigureModelScale, m_Vertices, m_Indices);
+        ShadowFigureGeometry::ModelScale, m_Vertices, m_Indices);
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
     m_Shader.CreateRequired(

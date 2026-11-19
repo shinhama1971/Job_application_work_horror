@@ -4,6 +4,7 @@
 // ============================================================================
 
 #pragma once
+#include "shader/renderingConfig.hlsli"
 
 #include <algorithm>
 #include <array>
@@ -20,12 +21,12 @@ namespace Effect
     enum class ToneMapMode : unsigned int
     {
         // ACES（映画の色の規格の曲線の近似。Narkowicz 2015）。明るい所を白く飛ばさず、なだらかに丸める
-        Aces = 0,
+        Aces = SIGNAL_LOST_TONE_MAP_ACES,
         // HDRにする前に近い曲線（ACESを28%だけ混ぜて、1で切る）。見比べる用
-        Legacy = 1,
+        Legacy = SIGNAL_LOST_TONE_MAP_LEGACY,
         // 曲線を掛けず1で切るだけ。デバッグ表示（法線・光源のタイル・SSAOなど）の色を、そのまま見せるときに使う
-        Passthrough = 2,
-        Reinhard = 3,
+        Passthrough = SIGNAL_LOST_TONE_MAP_PASSTHROUGH,
+        Reinhard = SIGNAL_LOST_TONE_MAP_REINHARD,
     };
 
     // 描き終えた画面を取り込み、ブルームを作り、露出やノイズなどの画面効果を重ねている。演出からは一時的な効果を起こせる。

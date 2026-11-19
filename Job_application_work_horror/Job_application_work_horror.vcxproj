@@ -374,6 +374,8 @@
     <ClInclude Include="Object.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="PlayerMovement.h" />
+    <ClInclude Include="ShadowFigureGeometry.h" />
+    <ClInclude Include="Stage1CeilingGeometry.h" />
     <ClInclude Include="CubeMapGeometry.h" />
     <ClInclude Include="ReflectionProbe.h" />
     <ClInclude Include="ScreenSpaceReflection.h" />
@@ -512,6 +514,7 @@
     <ClInclude Include="shader\toneMapping.hlsli" />
     <ClInclude Include="shader\horrorMist.hlsli" />
     <ClInclude Include="shader\tiledLightingConfig.hlsli" />
+    <ClInclude Include="shader\renderingConfig.hlsli" />
     <ClInclude Include="shader\computeDispatchConfig.hlsli" />
     <ClInclude Include="shader\postProcessBuffer.hlsli" />
     <ClInclude Include="shader\lightShaftSegment.hlsli" />

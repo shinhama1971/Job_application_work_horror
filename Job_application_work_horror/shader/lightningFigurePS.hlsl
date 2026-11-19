@@ -9,6 +9,7 @@
 
 #include "common.hlsl"
 #include "horrorGrade.hlsli"
+#include "fastNoise.hlsli"
 
 // ForestLightningFigure.h の LightningFigureBuffer と同じ並び（b7 を一時的に借りている）
 cbuffer LightningFigureBuffer : register(b7)
@@ -22,8 +23,6 @@ cbuffer LightningFigureBuffer : register(b7)
 };
 
 // 疑似乱数の係数（Dave Hoskins の hash13。決まった値）
-#define FIGURE_HASH_SCALE 0.1031f
-#define FIGURE_HASH_OFFSET 33.33f
 // 崩れる模様：マスの細かさ、動く模様（マスのずらし・切り替わる速さ）、2つの模様の重み、崩れる縁の幅
 #define FIGURE_CELL_SCALE 0.42f
 #define FIGURE_MOVING_CELL_SCALE 1.73f
@@ -46,19 +45,12 @@ cbuffer LightningFigureBuffer : register(b7)
 #define FIGURE_MIN_DIVISOR 0.001f
 
 // 3次元の値から0〜1の疑似乱数を作っている
-float FigureHash31(float3 value)
-{
-    value = frac(value * FIGURE_HASH_SCALE);
-    value += dot(value, value.yzx + FIGURE_HASH_OFFSET);
-    return frac((value.x + value.y) * value.z);
-}
-
 float4 main(in PS_IN input) : SV_Target
 {
     // ワールドのマス目に固定したノイズで、見え方より大きい画素を捨てている（見え方が下がるほど穴が増える）
     const float3 cell = floor(input.worldPos * FIGURE_CELL_SCALE);
-    const float noise = FigureHash31(cell) * FIGURE_COARSE_WEIGHT +
-        FigureHash31(cell * FIGURE_MOVING_CELL_SCALE + floor(FigureTime * FIGURE_MOVING_RATE)) * FIGURE_MOVING_WEIGHT;
+    const float noise = FastHash31(cell) * FIGURE_COARSE_WEIGHT +
+        FastHash31(cell * FIGURE_MOVING_CELL_SCALE + floor(FigureTime * FIGURE_MOVING_RATE)) * FIGURE_MOVING_WEIGHT;
     const float signedEdge = FigureVisibility - noise;
     clip(signedEdge);
     const float edge = 1.0f - smoothstep(0.0f, FIGURE_EDGE_WIDTH, signedEdge);

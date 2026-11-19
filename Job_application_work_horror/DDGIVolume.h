@@ -13,6 +13,7 @@
 // ============================================================================
 
 #pragma once
+#include "shader/renderingConfig.hlsli"
 
 #include <array>
 #include <cstdint>
@@ -33,9 +34,9 @@ namespace Effect
     {
     public:
         // 1つのプローブから飛ばす光線の数（ddgiCommon.hlsli の DDGI_MAX_RAYS と同じ）と、八面体マップの大きさ（中の画素の数）
-        static constexpr uint32_t RaysPerProbe = 64;
-        static constexpr uint32_t IrradianceTexels = 8;
-        static constexpr uint32_t DistanceTexels = 16;
+        static constexpr uint32_t RaysPerProbe = SIGNAL_LOST_DDGI_MAX_RAYS;
+        static constexpr uint32_t IrradianceTexels = SIGNAL_LOST_DDGI_IRRADIANCE_TEXELS;
+        static constexpr uint32_t DistanceTexels = SIGNAL_LOST_DDGI_DISTANCE_TEXELS;
 
         // width・height は描く範囲の一番大きい大きさ（間接光の画像は、その縦横半分で作る）
         void Init(int width, int height);

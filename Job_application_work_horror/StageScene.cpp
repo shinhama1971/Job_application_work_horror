@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "StageScene.h"
+#include "Stage1CeilingGeometry.h"
 #include "MathUtility.h"
 #include "Application.h"
 #include "Game.h"
@@ -38,7 +39,7 @@ namespace
     constexpr int DebugHauntedDoorPhase = 3;
     constexpr float RoomOcclusionFloorY = -100.0f;
     // 天井の下面（stage1_props.txt の天井の板 PropCeiling* の下の端。11月19日に -48.5 から 12 上げた）
-    constexpr float RoomOcclusionCeilingY = -36.5f;
+    constexpr float RoomOcclusionCeilingY = Stage1CeilingGeometry::UndersideY;
     constexpr float RoomOcclusionStrength = 0.55f;
 
     // --- 1面の進行の値

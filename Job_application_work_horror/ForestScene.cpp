@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "ForestScene.h"
+#include "ShadowFigureGeometry.h"
 #include "EventFeedback.h"
 #include "ForestGrass.h"
 #include "ForestLightningFigure.h"
@@ -66,7 +67,6 @@ namespace
     // 木などから離す距離（埋まらないように）と、視線を遮る木とみなす太さのゆとり、遮る物とみなす高さ（胸より高い物）
     constexpr float FigureClearance = 5.0f;
     constexpr float FigureSightMargin = 2.0f;
-    constexpr float FigureChestHeight = 30.0f;
     // 稲光の強さ（0〜1）から人影の見え方にする倍率（光の後半で崩れ始めるように、1より大きくしている）
     constexpr float FigureVisibilityGain = 1.8f;
     // 人影を見せている間の恐怖の画面効果の強さ（1回目・2回目）
@@ -385,12 +385,12 @@ void ForestScene::ShowLightningFigure(int strikeIndex)
 
     // 研究所の方へ進んだ所から、横にずらした場所を順に試し、木に埋まらず、木の陰にもならない所を選んでいる
     Vector3 chosen = Vector3::Zero;
-    bool found = false;
-    for (float sideTry : FigureSideTries)
+    for (std::size_t index = 0; index < std::size(FigureSideTries); ++index)
     {
+        const float sideTry = FigureSideTries[index];
         const Vector2 spot = Vector2(player.x, player.z) + toDoor * along + side * (FigureSideOffset[strikeIndex] * sideTry);
         const Vector3 candidate(spot.x, m_GroundY, spot.y);
-        if (!found)
+        if (index == 0)
         {
             // どこも塞がっていたときは、最初に試した場所を使う
             chosen = candidate;
@@ -398,7 +398,6 @@ void ForestScene::ShowLightningFigure(int strikeIndex)
         if (!IsFigureSpotBlocked(candidate))
         {
             chosen = candidate;
-            found = true;
             break;
         }
     }
@@ -432,7 +431,7 @@ bool ForestScene::IsFigureSpotBlocked(const Vector3& spot) const
         const Vector3 position = wall->GetPosition();
         const Vector3 half = wall->GetScale() * 0.5f;
         // 低い物（岩・倒木・茂み）は人影を隠さないので、胸より高い物だけを調べている
-        if (position.y + std::fabs(half.y) < m_GroundY + FigureChestHeight)
+        if (position.y + std::fabs(half.y) < m_GroundY + ShadowFigureGeometry::ChestHeight)
         {
             continue;
         }

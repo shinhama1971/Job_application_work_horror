@@ -9,6 +9,7 @@
 // ============================================================================
 
 #include "toneMapping.hlsli"
+#include "renderingConfig.hlsli"
 
 // 頂点シェーダー（unlitTextureVS）から受け取る値
 struct PS_IN
@@ -28,9 +29,9 @@ cbuffer ToneMapBuffer : register(b0)
 // HDRで描いた画面（t0）
 Texture2D hdrScene : register(t0);
 
-static const uint TONE_MAP_MODE_LEGACY = 1;
-static const uint TONE_MAP_MODE_PASSTHROUGH = 2;
-static const uint TONE_MAP_MODE_REINHARD = 3;
+static const uint TONE_MAP_MODE_LEGACY = SIGNAL_LOST_TONE_MAP_LEGACY;
+static const uint TONE_MAP_MODE_PASSTHROUGH = SIGNAL_LOST_TONE_MAP_PASSTHROUGH;
+static const uint TONE_MAP_MODE_REINHARD = SIGNAL_LOST_TONE_MAP_REINHARD;
 
 // HDRにする前の曲線：ACES を混ぜていた割合
 static const float LEGACY_ACES_BLEND = 0.28f;

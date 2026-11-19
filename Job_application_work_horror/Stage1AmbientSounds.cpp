@@ -5,6 +5,7 @@
 // ============================================================================
 
 #include "Stage1AmbientSounds.h"
+#include "Stage1CeilingGeometry.h"
 #include "MathUtility.h"
 
 #include "StageSurveillanceCameras.h"
@@ -25,7 +26,7 @@ namespace
     constexpr float StageMaxX = 205.0f;
     constexpr float StageMinZ = -170.0f;
     constexpr float StageMaxZ = 330.0f;
-    constexpr float CeilingVoidY = -32.0f;  // 天井板（y=-35付近）のすぐ上
+    constexpr float CeilingVoidY = Stage1CeilingGeometry::VoidY;
     constexpr float Pi = MathUtility::Pi;
 
     // 見ていない方向（背後・横）から鳴らすと、振り向いても何もいない怖さが出る。

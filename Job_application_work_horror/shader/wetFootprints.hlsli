@@ -5,6 +5,7 @@
 // ============================================================================
 #ifndef WET_FOOTPRINTS_INCLUDED
 #define WET_FOOTPRINTS_INCLUDED
+#include "renderingConfig.hlsli"
 
 // ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
 #include "fastNoise.hlsli"
@@ -55,7 +56,7 @@ float FootprintEllipse(float2 position, float2 center, float2 radius)
 #define BARE_ARCH_CENTER float2(0.25f, -0.35f)
 #define BARE_ARCH_RADIUS float2(0.30f, 0.75f)
 // 足跡の並び（置き方・状態の2つ）と、裸足かを見るしきい値
-#define FOOTPRINT_STRIDE 2
+#define FOOTPRINT_STRIDE SIGNAL_LOST_FOOTPRINT_STRIDE
 #define FOOTPRINT_BARE_THRESHOLD 0.5f
 
 // 足跡1つの形（0〜1）。localは足の向きに合わせた座標（x = 右、y = つま先の方向。単位はワールド）。

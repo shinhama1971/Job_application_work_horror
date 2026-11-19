@@ -13,6 +13,7 @@ struct PS_IN
 
 // 画面効果の値（FullScreenQuad.cppのTimeBufferと同じ並び）
 #include "postProcessBuffer.hlsli"
+#include "renderingConfig.hlsli"
 #include "fastNoise.hlsli"
 
 // 描いた画面（t0）とサンプラー（s0）
@@ -282,7 +283,7 @@ static const float CRT_FILM_WARM_GAIN = 1.35f;
 
 // --- 影のまわりの空間のゆがみ（presenceWarp。PostProcess::SetPresenceWarps）
 // 数（postProcessBuffer.hlsli の presenceWarp と同じ）
-#define PRESENCE_WARP_COUNT 2
+#define PRESENCE_WARP_COUNT SIGNAL_LOST_PRESENCE_WARP_COUNT
 // ゆらぎの模様：細かさ（半径を1とした長さあたり）、流れる速さ、2つのノイズを互いにずらす量
 #define PRESENCE_WARP_NOISE_SCALE 3.2f
 #define PRESENCE_WARP_FLOW_SPEED 0.45f

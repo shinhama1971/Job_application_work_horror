@@ -25,6 +25,7 @@ $previousLowPassed = 0.0
 $highPassed = 0.0
 
 # 「ザザッ」という荒いはじける音（パチパチ）を、ランダムな時刻に入れている
+$crackleChancePerSample = 0.0009
 $crackleTimer = 0
 $crackleAmplitude = 0.0
 
@@ -42,7 +43,7 @@ for ($i = 0; $i -lt $sampleCount; $i++) {
     $value *= $wobble
 
     # パチパチ：まれに短く大きな雑音の粒を足している
-    if ($crackleTimer -le 0 -and $random.NextDouble() -lt 0.0009) {
+    if ($crackleTimer -le 0 -and $random.NextDouble() -lt $crackleChancePerSample) {
         $crackleTimer = [int]($sampleRate * (0.004 + $random.NextDouble() * 0.020))
         $crackleAmplitude = 0.6 + $random.NextDouble() * 0.9
     }

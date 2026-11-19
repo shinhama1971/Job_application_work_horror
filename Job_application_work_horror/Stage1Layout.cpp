@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "Stage1Layout.h"
+#include "Stage1CeilingGeometry.h"
 
 #include "SceneLayoutBuilder.h"
 
@@ -50,8 +51,8 @@ namespace
     constexpr float StageDoorHeight = 50.0f;
     constexpr float StageDoorThickness = 4.0f;
     // 部屋の壁の中心の高さと高さ（床 y=-99 から天井の下 y=-37 まで。stage1_props.txt の壁と同じ）
-    constexpr float StageRoomWallCenterY = -68.0f;
-    constexpr float StageRoomWallHeight = 62.0f;
+    constexpr float StageRoomWallCenterY = Stage1CeilingGeometry::WallCenterY;
+    constexpr float StageRoomWallHeight = Stage1CeilingGeometry::WallHeight;
     // 扉の上をふさぐ壁（扉の上の端から天井まで。天井を上げたので、高さ50の扉の上が空いている）：厚み（壁と同じ）、扉の幅から左右へはみ出す長さ
     constexpr float DoorLintelThickness = 4.0f;
     constexpr float DoorLintelOverlap = 2.0f;
@@ -709,15 +710,13 @@ namespace
             PropLayoutFile::MoveTo(object, candidates[pick(m_FuseRandom)]);
         }
 
-        // Wallを、色と当たり判定の有無を指定した小物として作る（進行のコードが色や表示を変える物だけに使っている。
-        // それ以外の小物は、小物のファイルから読んでいる）
         // 扉の上の端から天井までをふさぐ壁を作っている（扉の向きに合わせて、幅を x か z に向ける）
         void CreateDoorLintel(const Door& door, const char* name)
         {
             const Vector3 position = door.GetPosition();
             const Vector3 scale = door.GetScale();
             const float doorTop = position.y + scale.y * 0.5f;
-            const float wallTop = StageRoomWallCenterY + StageRoomWallHeight * 0.5f;
+            const float wallTop = Stage1CeilingGeometry::WallTopY;
             const float height = wallTop - doorTop;
             if (height <= 0.0f)
             {
@@ -733,6 +732,8 @@ namespace
             lintel->SetCollisionEnabled(false);
         }
 
+        // Wallを、色と当たり判定の有無を指定した小物として作る（進行のコードが色や表示を変える物だけに使っている。
+        // それ以外の小物は、小物のファイルから読んでいる）
         Wall* CreateStageProp(const char* name, const Vector3& position, const Vector3& scale,
             const Color& diffuse, const Color& emission, float shininess, bool collisionEnabled)
         {

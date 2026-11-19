@@ -5,17 +5,23 @@
 // ほかの部品（樹皮・岩・壁の汚れなど）もこの部品を読み込むので、二重に読まれないよう、1回だけ読む印を付けている
 #ifndef FAST_NOISE_INCLUDED
 #define FAST_NOISE_INCLUDED
+#include "renderingConfig.hlsli"
 
 // 水たまりの形の照合に使う GroundWaterEffects.cpp の NoiseHashScale・NoiseHashShift と同じ値。
-static const float FAST_HASH_COORDINATE_SCALE = 0.1031f;
-static const float FAST_HASH_DOT_OFFSET = 33.33f;
+static const float FAST_HASH_COORDINATE_SCALE = SIGNAL_LOST_FAST_HASH_SCALE;
+static const float FAST_HASH_DOT_OFFSET = SIGNAL_LOST_FAST_HASH_OFFSET;
 
-// 2次元の座標から、0〜1の疑似乱数を作っている
-float FastHash21(float2 value)
+// 森の人影と水たまりのノイズで同じハッシュを使う。
+float FastHash31(float3 value)
 {
-    float3 p3 = frac(float3(value.xyx) * FAST_HASH_COORDINATE_SCALE);
+    float3 p3 = frac(value * FAST_HASH_COORDINATE_SCALE);
     p3 += dot(p3, p3.yzx + FAST_HASH_DOT_OFFSET);
     return frac((p3.x + p3.y) * p3.z);
+}
+
+float FastHash21(float2 value)
+{
+    return FastHash31(value.xyx);
 }
 
 // 格子の4隅の乱数を、なめらかに補間した値のノイズ（0〜1）

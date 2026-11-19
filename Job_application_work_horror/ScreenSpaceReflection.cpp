@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "ScreenSpaceReflection.h"
+#include "shader/renderingConfig.hlsli"
 
 #include "Renderer.h"
 #include "utility.h"
@@ -15,7 +16,7 @@ namespace
     constexpr UINT DepthSlot = 8;
     constexpr UINT PreviousDepthSlot = 17;
     // rayReflection.hlsli の SSR_HISTORY_MAX_BLUR_LOD に対応する LOD 0〜3。
-    constexpr UINT HistoryMipLevels = 4;
+    constexpr UINT HistoryMipLevels = SIGNAL_LOST_SSR_HISTORY_MIP_LEVELS;
 }
 
 namespace Effect

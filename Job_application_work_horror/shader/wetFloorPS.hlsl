@@ -3,6 +3,7 @@
 // ============================================================================
 
 #include "common.hlsl"
+#include "renderingConfig.hlsli"
 
 // 床のテクスチャ（t0）とサンプラー（s0）
 Texture2D g_Texture : register(t0);
@@ -15,7 +16,7 @@ TextureCube g_ReflectionProbe : register(t7);
 
 // Ground.cppのWetFloorBufferと同じ並び（b10）。経過時間、波紋の強さ、反射の強さ、水面の細かさ
 // 濡れた足跡の最大数（WetFootprints::MaxCount と同じ）
-#define FOOTPRINT_COUNT 32
+#define FOOTPRINT_COUNT SIGNAL_LOST_FOOTPRINT_COUNT
 // 天井の雨漏りの最大数（WaterEffectSystem::MaxLeakCount と同じ）
 #define LEAK_COUNT 8
 cbuffer WetFloorBuffer : register(b10)
@@ -30,7 +31,7 @@ cbuffer WetFloorBuffer : register(b10)
     float4 FloodRect;
     // 濡れた足跡（WetFootprints::Fill）。x = 数。1つにつき2つ（xy = 位置、z = sin(向き)、w = cos(向き)/ x = 濡れ具合、y = 左右、z = 裸足か）
     float4 FootprintInfo;
-    float4 Footprints[FOOTPRINT_COUNT * 2];
+    float4 Footprints[FOOTPRINT_COUNT * SIGNAL_LOST_FOOTPRINT_STRIDE];
     // x = 雨漏りの数、y = 反射の距離による簡略化。Leaks は xy = 中心のx・z、z = 半径。
     float4 LeakInfo;
     float4 Leaks[LEAK_COUNT];
@@ -1000,13 +1001,13 @@ float4 main(in LIT_PS_IN input) : SV_Target
     float puddleFigure = 0.0f;
     float nearVertical = 0.0f;
     [branch]
-    if (reflectionMode != 0 && puddle > WATER_EPSILON)
+    if (reflectionMode != SIGNAL_LOST_REFLECTION_OFF && puddle > WATER_EPSILON)
     {
-        if (reflectionMode == 1)
+        if (reflectionMode == SIGNAL_LOST_REFLECTION_CUBE_MAP)
         {
             alternateReflection = float4(SampleProbeReflection(input.worldPos, reflectionNormal), 1.0f);
         }
-        else if (reflectionMode == 2)
+        else if (reflectionMode == SIGNAL_LOST_REFLECTION_SCREEN_SPACE)
         {
             if (ReflectionParams.y > FLOOR_FLAG_THRESHOLD)
             {

@@ -9,6 +9,7 @@
 // ============================================================================
 
 #pragma once
+#include "shader/renderingConfig.hlsli"
 
 #include <SimpleMath.h>
 
@@ -20,7 +21,8 @@ class WetFootprints final
 {
 public:
     // シェーダーへ渡す足跡の最大数（wetFloorPS の FOOTPRINT_COUNT と同じ）
-    static constexpr int MaxCount = 32;
+    static constexpr int MaxCount = SIGNAL_LOST_FOOTPRINT_COUNT;
+    static constexpr int VectorsPerPrint = SIGNAL_LOST_FOOTPRINT_STRIDE;
     // 足跡の向きを決められるとみなす、進んだ向きの長さの2乗
     static constexpr float MinimumDirectionLengthSquared = 0.01f;
     // 足跡1つ分（位置・向き・左右・裸足か・濡れ具合）
@@ -142,9 +144,9 @@ public:
             {
                 continue;
             }
-            out[count * 2] = DirectX::SimpleMath::Vector4(
+            out[count * VectorsPerPrint] = DirectX::SimpleMath::Vector4(
                 print.Position.x, print.Position.y, std::sin(print.Yaw), std::cos(print.Yaw));
-            out[count * 2 + 1] = DirectX::SimpleMath::Vector4(
+            out[count * VectorsPerPrint + 1] = DirectX::SimpleMath::Vector4(
                 print.Wetness, print.Side, print.Bare ? 1.0f : 0.0f, 0.0f);
             ++count;
         }

@@ -142,7 +142,7 @@ private:
     // ヒューズを拾った瞬間の演出：経過秒（-1 なら起きていない）、何本目か（0 から）、鳴らした足音の数、消した照明、足音を鳴らす所
     float m_FuseScareTimer = -1.0f;
     int m_FuseScareLevel = 0;
-    int m_FuseScareStepsPlayed = 0;
+    std::size_t m_FuseScareStepsPlayed = 0;
     std::vector<class CeilingLight*> m_FuseScareLights;
     DirectX::SimpleMath::Vector3 m_FuseScareBehind = DirectX::SimpleMath::Vector3::Zero;
     float m_CeilingStalkerWait = 0.0f;

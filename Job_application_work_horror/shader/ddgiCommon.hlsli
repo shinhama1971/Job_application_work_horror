@@ -12,6 +12,7 @@
 // ============================================================================
 #ifndef DDGI_COMMON_INCLUDED
 #define DDGI_COMMON_INCLUDED
+#include "renderingConfig.hlsli"
 
 // 1つのセルを囲み、三線形補間に使うプローブの数。
 #define DDGI_CELL_CORNER_COUNT 8
@@ -50,12 +51,12 @@ cbuffer DDGIBuffer : register(b0)
 
 // 放射照度の画像（1プローブ = 8x8画素 + まわり1画素の縁）と、距離の画像（16x16画素 + 縁。x = 平均、y = 2乗の平均）。
 // スレッドの数（numthreads）にも使うので、#define にしている（DDGIVolume.h と同じ値）
-#define DDGI_IRRADIANCE_TEXELS 8
-#define DDGI_DISTANCE_TEXELS 16
-static const uint DDGI_BORDER = 1;
+#define DDGI_IRRADIANCE_TEXELS SIGNAL_LOST_DDGI_IRRADIANCE_TEXELS
+#define DDGI_DISTANCE_TEXELS SIGNAL_LOST_DDGI_DISTANCE_TEXELS
+static const uint DDGI_BORDER = SIGNAL_LOST_DDGI_BORDER;
 
 // 光線の数の上限（光線を書く画像の幅。DDGIVolume.h の RaysPerProbe と同じ）
-#define DDGI_MAX_RAYS 64
+#define DDGI_MAX_RAYS SIGNAL_LOST_DDGI_MAX_RAYS
 static const float DDGI_PI = 3.14159265f;
 // 黄金比（球の上にほぼ均等に向きを並べるフィボナッチ格子に使う）
 static const float DDGI_GOLDEN_RATIO = 1.61803399f;

@@ -32,7 +32,6 @@ public:
     void Show(const DirectX::SimpleMath::Vector3& footPosition, float facing);
     // 人影を消している
     void Hide() { m_Visible = false; }
-    bool IsShown() const { return m_Visible; }
     // 毎フレームの見え方（0〜1。下がるとノイズで崩れる）と、背にした稲光の位置・色・強さ（0〜1）
     void SetLightning(float visibility, const DirectX::SimpleMath::Vector3& lightningPosition,
         const DirectX::SimpleMath::Vector3& lightningColor, float backlight);

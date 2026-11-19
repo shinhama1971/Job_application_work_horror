@@ -105,7 +105,6 @@ namespace
     constexpr float FlashlightOnClickPitch = 1.08f;
     constexpr float FlashlightOffClickPitch = 0.94f;
     // 電池の残りが少なくなったときの知らせ（20%を切った・10%を切った＝一番強い知らせの段階）
-    constexpr int BatteryCriticalWarning = 2;
     constexpr float BatteryLowPulseStrength = 0.12f;
     constexpr float BatteryLowPulseSeconds = 0.22f;
     constexpr int BatteryLowRumbleFrames = 4;
@@ -466,10 +465,10 @@ FlashlightSystem::FrameState Player::UpdateFlashlightPower(float deltaTime)
         }
     }
 
-    const int warningLevel = m_Flashlight.UpdateBattery(deltaTime);
-    if (warningLevel > 0)
+    const auto warningLevel = m_Flashlight.UpdateBattery(deltaTime);
+    if (warningLevel != FlashlightSystem::BatteryWarning::None)
     {
-        const bool critical = warningLevel == BatteryCriticalWarning;
+        const bool critical = warningLevel == FlashlightSystem::BatteryWarning::Critical;
         Core::Game::GetInstance()->GetPostProcess()->TriggerHorrorPulse(
             critical ? BatteryCriticalPulseStrength : BatteryLowPulseStrength,
             critical ? BatteryCriticalPulseSeconds : BatteryLowPulseSeconds);

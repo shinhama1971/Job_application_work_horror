@@ -4,6 +4,7 @@
 // ============================================================================
 
 #pragma once
+#include "shader/renderingConfig.hlsli"
 
 #include "Material.h"
 #include "Shader.h"
@@ -81,14 +82,14 @@ public:
     // マス目の一辺、水たまりを置くマスの乱数のしきい値（これ以上なら置く）、中心をマスの中でずらす幅、
     // 楕円の半径（横・縦。基本の値＋乱数で足す幅。マスの一辺を1とした値）、岸の線（楕円の距離）と、岸のゆがみの最大の振れ幅
     // shader/puddleMask.hlsli の PUDDLE_GRID_CELL_SIZE・PUDDLE_CENTER_JITTER・PUDDLE_AXIS_*・PUDDLE_SHORE_RADIUS と揃える。
-    static constexpr float PuddleCellSize = 82.0f;
+    static constexpr float PuddleCellSize = SIGNAL_LOST_PUDDLE_GRID_CELL_SIZE;
     static constexpr float PuddleChance = 0.62f;
-    static constexpr float PuddleCenterJitter = 0.22f;
-    static constexpr float PuddleAxisX = 0.72f;
-    static constexpr float PuddleAxisXRange = 0.25f;
-    static constexpr float PuddleAxisZ = 0.43f;
-    static constexpr float PuddleAxisZRange = 0.20f;
-    static constexpr float PuddleShoreRadius = 0.37f;
+    static constexpr float PuddleCenterJitter = SIGNAL_LOST_PUDDLE_CENTER_JITTER;
+    static constexpr float PuddleAxisX = SIGNAL_LOST_PUDDLE_AXIS_X;
+    static constexpr float PuddleAxisXRange = SIGNAL_LOST_PUDDLE_AXIS_X_RANGE;
+    static constexpr float PuddleAxisZ = SIGNAL_LOST_PUDDLE_AXIS_Z;
+    static constexpr float PuddleAxisZRange = SIGNAL_LOST_PUDDLE_AXIS_Z_RANGE;
+    static constexpr float PuddleShoreRadius = SIGNAL_LOST_PUDDLE_SHORE_RADIUS;
     static constexpr float PuddleShoreWarpMax = 0.177f;
     // 水面のメッシュで覆う楕円の大きさ（岸が必ず収まる0.62に、多角形が楕円の内側に入る分の4%を足している）
     static constexpr float PuddleCoverRadius = 0.62f * 1.04f;

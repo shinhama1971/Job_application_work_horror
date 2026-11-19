@@ -641,6 +641,12 @@
     <ClInclude Include="PostProcess.h">
       <Filter>ヘッダー ファイル\Rendering\Effects</Filter>
     </ClInclude>
+    <ClInclude Include="ShadowFigureGeometry.h">
+      <Filter>ヘッダー ファイル\Rendering\Effects</Filter>
+    </ClInclude>
+    <ClInclude Include="Stage1CeilingGeometry.h">
+      <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
+    </ClInclude>
     <ClInclude Include="CubeMapGeometry.h">
       <Filter>ヘッダー ファイル\Rendering\Effects</Filter>
     </ClInclude>
@@ -978,6 +984,9 @@
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
     <ClInclude Include="shader\horrorMist.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\renderingConfig.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
     <ClInclude Include="shader\computeDispatchConfig.hlsli">

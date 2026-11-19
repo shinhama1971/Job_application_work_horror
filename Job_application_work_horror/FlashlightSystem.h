@@ -12,6 +12,8 @@
 class FlashlightSystem final
 {
 public:
+    enum class BatteryWarning { None, Low, Critical };
+
     // 1フレーム分の懐中電灯の状態（Playerがこれを見て光を作っている）
     struct FrameState
     {
@@ -76,7 +78,7 @@ private:
     float m_BatteryNoticeTimer = 0.0f;
     float m_PowerBlend = 1.0f;
     // 電池が少ない警告をどこまで出したか（0=なし、1=20%以下、2=10%以下）、ちらつきの経過時間、前フレームで暗くなっていたか
-    int m_LowBatteryWarningLevel = 0;
+    BatteryWarning m_LowBatteryWarningLevel = BatteryWarning::None;
     float m_FlickerTime = 0.0f;
     bool m_WasVoltageDrop = false;
     // 出来事で起こすちらつきの残り秒数と、始まってからの秒数
@@ -95,7 +97,7 @@ public:
     void InitializeRuntimeNotifications()
     {
         m_BatteryNoticeTimer = 0.0f;
-        m_LowBatteryWarningLevel = 0;
+        m_LowBatteryWarningLevel = BatteryWarning::None;
         m_PowerBlend = m_IsOn ? 1.0f : 0.0f;
         m_FlickerTime = 0.0f;
         m_WasVoltageDrop = false;
@@ -122,7 +124,7 @@ public:
     }
 
     // 点けている間は電池を減らし、空になったら消している。戻り値は、このフレームで新しく達した警告の段階（0は通知なし）。
-    int UpdateBattery(float deltaTime)
+    BatteryWarning UpdateBattery(float deltaTime)
     {
         if (m_IsOn)
         {
@@ -134,9 +136,9 @@ public:
             }
         }
 
-        const int warningLevel = m_Battery <= CriticalBatteryLevel
-            ? 2
-            : (m_Battery <= LowBatteryLevel ? 1 : 0);
+        const BatteryWarning warningLevel = m_Battery <= CriticalBatteryLevel
+            ? BatteryWarning::Critical
+            : (m_Battery <= LowBatteryLevel ? BatteryWarning::Low : BatteryWarning::None);
         if (warningLevel > m_LowBatteryWarningLevel)
         {
             m_LowBatteryWarningLevel = warningLevel;
@@ -145,9 +147,9 @@ public:
         // 電池が25%より多くなったら、警告をもう一度出せるようにしている
         if (m_Battery > WarningResetLevel)
         {
-            m_LowBatteryWarningLevel = 0;
+            m_LowBatteryWarningLevel = BatteryWarning::None;
         }
-        return 0;
+        return BatteryWarning::None;
     }
 
     // 電池の状態から、このフレームの光の強さと、電圧が下がったときのちらつきを計算している。
@@ -233,7 +235,7 @@ public:
             m_Battery = MaxBattery;
         }
         m_BatteryNoticeTimer = BatteryNoticeSeconds;
-        m_LowBatteryWarningLevel = m_Battery <= LowBatteryLevel ? 1 : 0;
+        m_LowBatteryWarningLevel = m_Battery <= LowBatteryLevel ? BatteryWarning::Low : BatteryWarning::None;
     }
 
     // 点いているか、電池の残り、通知の残り秒数を返している

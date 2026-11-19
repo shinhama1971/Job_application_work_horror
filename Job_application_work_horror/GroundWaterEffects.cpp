@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "Ground.h"
+#include "shader/renderingConfig.hlsli"
 #include "MathUtility.h"
 
 #include "Game.h"
@@ -76,8 +77,8 @@ namespace
 	constexpr float LeakDropWaitStep = 0.9f;
 
 	// fastNoise.hlsli の FAST_HASH_COORDINATE_SCALE・FAST_HASH_DOT_OFFSET と同じ値。岸の形を CPU 判定と描画で揃える。
-	constexpr float NoiseHashScale = 0.1031f;
-	constexpr float NoiseHashShift = 33.33f;
+	constexpr float NoiseHashScale = SIGNAL_LOST_FAST_HASH_SCALE;
+	constexpr float NoiseHashShift = SIGNAL_LOST_FAST_HASH_OFFSET;
 	// wetFloorPS.hlsl の WATER_HASH21_FREQUENCY / WATER_HASH21_AMPLITUDE と同じ係数で、水滴用の乱数を作る。
 	constexpr float Hash21FrequencyX = 127.1f;
 	constexpr float Hash21FrequencyY = 311.7f;
@@ -90,15 +91,15 @@ namespace
 	const Vector2 DropSeedOffset(9.7f, 71.3f);
 	// 水たまりの岸のゆがみ（puddleMask.hlsli の PUDDLE_SHORE_* と同じ）：ノイズの細かさとずらし、ゆがみの大きさ、
 	// 角度に沿った2つの波（数・種の倍率・大きさ）
-	constexpr float ShoreNoiseScale = 0.052f;
-	constexpr float ShoreNoiseCellScale = 1.73f;
-	constexpr float ShoreNoiseWarp = 0.22f;
-	constexpr float ShoreWaveCountA = 5.0f;
-	constexpr float ShoreWaveSeedA = 9.0f;
-	constexpr float ShoreWaveAmountA = 0.045f;
-	constexpr float ShoreWaveCountB = 9.0f;
-	constexpr float ShoreWaveSeedB = 13.0f;
-	constexpr float ShoreWaveAmountB = 0.022f;
+	constexpr float ShoreNoiseScale = SIGNAL_LOST_PUDDLE_SHORE_NOISE_SCALE;
+	constexpr float ShoreNoiseCellScale = SIGNAL_LOST_PUDDLE_SHORE_NOISE_CELL_SCALE;
+	constexpr float ShoreNoiseWarp = SIGNAL_LOST_PUDDLE_SHORE_NOISE_WARP;
+	constexpr float ShoreWaveCountA = SIGNAL_LOST_PUDDLE_SHORE_WAVE_A_COUNT;
+	constexpr float ShoreWaveSeedA = SIGNAL_LOST_PUDDLE_SHORE_WAVE_A_SEED;
+	constexpr float ShoreWaveAmountA = SIGNAL_LOST_PUDDLE_SHORE_WAVE_A_AMOUNT;
+	constexpr float ShoreWaveCountB = SIGNAL_LOST_PUDDLE_SHORE_WAVE_B_COUNT;
+	constexpr float ShoreWaveSeedB = SIGNAL_LOST_PUDDLE_SHORE_WAVE_B_SEED;
+	constexpr float ShoreWaveAmountB = SIGNAL_LOST_PUDDLE_SHORE_WAVE_B_AMOUNT;
 	// 雨漏りの水たまりの岸（wetFloorPS.hlsl と同じ）：調べる範囲（半径の倍率）、ノイズの細かさとゆがみ、水たまりとみなす境
 	constexpr float LeakShoreSearchScale = 1.075f;
 	constexpr float LeakShoreNoiseScale = 0.35f;

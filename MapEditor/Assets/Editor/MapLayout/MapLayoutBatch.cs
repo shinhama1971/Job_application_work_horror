@@ -193,7 +193,7 @@ namespace MapLayout.Editor
             for (var index = 0; index < lines.Length; ++index)
             {
                 var tokens = Regex.Matches(lines[index].Split('#')[0], @"\S+").Cast<Match>().Select(match => match.Value).ToArray();
-                if (tokens.Length < 2 || (tokens[MapLayoutColumn.Command] != "prop" && tokens[MapLayoutColumn.Command] != "place"))
+                if (tokens.Length <= MapLayoutColumn.Name || (tokens[MapLayoutColumn.Command] != "prop" && tokens[MapLayoutColumn.Command] != "place"))
                 {
                     continue;
                 }

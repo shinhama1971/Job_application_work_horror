@@ -20,6 +20,7 @@
 #include "Wall.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 using namespace DirectX::SimpleMath;
@@ -30,8 +31,7 @@ namespace
     constexpr float MinDripInterval = 1.4f;
     constexpr float MaxDripInterval = 3.8f;
     // 背後で水の中を歩く音を鳴らすまでの、西棟の中にいた秒数（1回目・2回目）。
-    constexpr float FirstWadingSeconds = 9.0f;
-    constexpr float SecondWadingSeconds = 26.0f;
+    constexpr std::array WadingEventTimes{ 9.0f, 26.0f };
     // 西棟の入口の扉の位置（鍵で開く扉。ヒューズを取ると勝手に閉まる）。
     const Vector3 EntranceDoorPosition(-220.0f, -74.0f, -20.0f);
     // 奥のポンプ室の排水口の位置。水はここへ向かって引いていく。
@@ -385,8 +385,8 @@ void Stage1WestWing::Update(const Player& player, float deltaTime,
     }
 
     // 背後で何かが水の中を歩く音（2回まで）。振り返っても何もいない。
-    const float wadingSeconds = m_WadingEventsPlayed == 0 ? FirstWadingSeconds : SecondWadingSeconds;
-    if (m_WadingEventsPlayed < 2 && m_InsideSeconds >= wadingSeconds && m_Step != Step::Done)
+    if (m_WadingEventsPlayed < static_cast<int>(WadingEventTimes.size()) &&
+        m_InsideSeconds >= WadingEventTimes[m_WadingEventsPlayed] && m_Step != Step::Done)
     {
         ++m_WadingEventsPlayed;
         ScheduleWading(position, listenerForward);

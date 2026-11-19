@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "StageScene.h"
+#include "ShadowFigureGeometry.h"
 #include "MathUtility.h"
 #include "Application.h"
 #include "Game.h"
@@ -118,7 +119,6 @@ namespace
     constexpr float FlashlightLitEndMargin = 4.0f;
 
     // --- 書類保管室の照らすと止まる影：照らされたかを調べる胸の高さ、音を鳴らす高さ、知らせの秒数、電池を奪っても残す量
-    constexpr float ArchiveStalkerChestHeight = 17.0f;
     constexpr float ArchiveStalkerKnockHeight = 20.0f;
     constexpr float ArchiveStalkerStepHeight = 4.0f;
     constexpr float ArchiveStalkerFirstNoticeSeconds = 4.5f;
@@ -267,15 +267,25 @@ namespace
     constexpr FlickerSpec CeilingStalkerRestoreFlicker{ 0.55f, 0.80f };
 
     // --- ヒューズを拾った瞬間の演出（1本目・2本目・3本目の順。本数が多いほど強い）
-    constexpr int FuseScareLevels = 3;
-    // この距離の中の天井の照明を消す範囲と、消えている秒数、懐中電灯をちらつかせる秒数
-    constexpr float FuseScareBlackoutRadius[FuseScareLevels] = { 90.0f, 120.0f, 160.0f };
-    constexpr float FuseScareBlackoutSeconds[FuseScareLevels] = { 1.2f, 1.8f, 2.4f };
-    constexpr float FuseScareSputterSeconds[FuseScareLevels] = { 0.9f, 1.4f, 1.9f };
-    // すぐ後ろで鳴らす足音の数と、それぞれを鳴らす時刻（拾ってからの秒数）
-    constexpr int FuseScareStepCount[FuseScareLevels] = { 0, 1, 2 };
-    constexpr int FuseScareMaxSteps = 2;
-    constexpr float FuseScareStepTimes[FuseScareMaxSteps] = { 0.65f, 1.05f };
+    struct FuseScareSetting
+    {
+        float Radius;
+        float BlackoutSeconds;
+        float SputterSeconds;
+        std::size_t StepCount;
+    };
+    constexpr FuseScareSetting FuseScares[] =
+    {
+        { 90.0f, 1.2f, 0.9f, 0 },
+        { 120.0f, 1.8f, 1.4f, 1 },
+        { 160.0f, 2.4f, 1.9f, 2 },
+    };
+    constexpr float FuseScareStepTimes[] = { 0.65f, 1.05f };
+    static_assert(std::size(FuseScares) == Core::GameState::RequiredFuseCount);
+    static_assert(std::ranges::all_of(FuseScares, [](const FuseScareSetting& setting)
+    {
+        return setting.StepCount <= std::size(FuseScareStepTimes);
+    }));
     // 足音を鳴らす所（拾った瞬間に向いていた方の、真後ろのこの距離。床の高さ）と、重い足音の高さ・音量
     constexpr float FuseScareBehindDistance = 5.0f;
     constexpr float FuseScareStepPitch = 0.62f;
@@ -292,7 +302,6 @@ namespace
     constexpr float PresenceWarpRange = 140.0f;
     constexpr float PresenceWarpNearDistance = 18.0f;
     // ゆがみの中心にする高さ（影の胸。ShadowMan の視線の判定と同じ）と、ゆがむ範囲の体のまわりの半径（ワールドの長さ）
-    constexpr float PresenceWarpChestHeight = 30.0f;
     constexpr float PresenceWarpWorldRadius = 28.0f;
     // 画面の上でのゆがむ範囲の半径の下限と上限（縦の高さを1とした長さ）
     constexpr float PresenceWarpMinScreenRadius = 0.08f;
@@ -899,7 +908,7 @@ void StageScene::UpdateScareLightSequence()
     }
 }
 
-// ヒューズを拾った後の影：2本目なら中央のホール、3本目なら細い廊下に出している（見つめると消える）
+// ヒューズ取得直後に周囲を暗くして、懐中電灯と背後の足音で注意を引く。
 void StageScene::StartFuseScare(int fuseCount)
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -910,13 +919,13 @@ void StageScene::StartFuseScare(int fuseCount)
     }
     // 前の演出が終わっていなければ、照明を戻してからやり直している
     EndFuseScare();
-    m_FuseScareLevel = (std::min)(fuseCount, FuseScareLevels) - 1;
+    m_FuseScareLevel = (std::min)(fuseCount, Core::GameState::RequiredFuseCount) - 1;
     m_FuseScareTimer = 0.0f;
     m_FuseScareStepsPlayed = 0;
 
     // 近くの天井の照明を一斉に消している（停電のように。暖かい色の電球の安全地帯は消さない）
     const Vector3 position = player->GetPosition();
-    const float radius = FuseScareBlackoutRadius[m_FuseScareLevel];
+    const float radius = FuseScares[m_FuseScareLevel].Radius;
     for (CeilingLight* light : m_Objects.ceilingLights)
     {
         if (light == nullptr || light->IsForcedOff())
@@ -934,7 +943,7 @@ void StageScene::StartFuseScare(int fuseCount)
         }
     }
     // 懐中電灯もちらつかせている（消えるたびに、電圧が下がったときと同じ脈打ちと振動が出る）
-    player->SputterFlashlight(FuseScareSputterSeconds[m_FuseScareLevel]);
+    player->SputterFlashlight(FuseScares[m_FuseScareLevel].SputterSeconds);
 
     // 足音は、拾った瞬間に向いていた方の真後ろで鳴らす（振り向いても、そこには何もいない）
     Vector3 forward = game->GetCamera()->GetForward();
@@ -955,15 +964,15 @@ void StageScene::UpdateFuseScare(float deltaTime)
     }
     Core::Game* game = Core::Game::GetInstance();
     m_FuseScareTimer += deltaTime;
-    const int stepCount = FuseScareStepCount[m_FuseScareLevel];
-    if (m_FuseScareStepsPlayed < stepCount && m_FuseScareTimer >= FuseScareStepTimes[m_FuseScareStepsPlayed])
+    const auto& scare = FuseScares[m_FuseScareLevel];
+    if (m_FuseScareStepsPlayed < scare.StepCount && m_FuseScareTimer >= FuseScareStepTimes[m_FuseScareStepsPlayed])
     {
         game->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, m_FuseScareBehind, FuseScareStepPitch, FuseScareStepVolume);
         EventFeedback::HorrorPulse(*game->GetPostProcess(), FuseScareStepPulse);
         EventFeedback::Rumble(FuseScareStepRumble);
         ++m_FuseScareStepsPlayed;
     }
-    if (m_FuseScareTimer >= FuseScareBlackoutSeconds[m_FuseScareLevel])
+    if (m_FuseScareTimer >= scare.BlackoutSeconds)
     {
         EndFuseScare();
     }
@@ -1451,7 +1460,7 @@ void StageScene::UpdatePresenceWarp(const Player& player)
             continue;
         }
         // 影の胸の位置と、そこから体の半径だけ横へずらした位置を画面へ写し、画面の上での位置と大きさにしている
-        const Vector3 chest = shadow->GetPosition() + Vector3(0.0f, PresenceWarpChestHeight, 0.0f);
+        const Vector3 chest = shadow->GetPosition() + Vector3(0.0f, ShadowFigureGeometry::ChestHeight, 0.0f);
         Vector2 center;
         Vector2 side;
         if (!toScreen(chest, center) || !toScreen(chest + cameraRight * PresenceWarpWorldRadius, side) ||
@@ -1583,9 +1592,9 @@ bool StageScene::UpdateArchiveStalker(Player& player, float deltaTime)
     input.PlayerPosition = player.GetPosition();
     // 電力が戻った後と、隠し部屋に閉じ込められている間は出さない
     input.Enabled = !game->IsPowerRestored() && !m_HiddenRoom.IsTrapped();
-    // 照らされているかは、影の胸のあたり（足元から17）で判定している（ShadowManの「見られたか」と同じ高さ）
+    // 視線判定と同じ胸の位置を使い、影の見た目に合わせる。
     input.Lit = m_ArchiveStalker.IsActive() &&
-        IsLitByFlashlight(player, shadow->GetPosition() + Vector3(0.0f, ArchiveStalkerChestHeight, 0.0f));
+        IsLitByFlashlight(player, shadow->GetPosition() + Vector3(0.0f, ShadowFigureGeometry::ChestHeight, 0.0f));
     input.DeltaTime = deltaTime;
 
     // 影は棚・壁・閉じた扉を通り抜けず、押し戻されて沿うように回り込む

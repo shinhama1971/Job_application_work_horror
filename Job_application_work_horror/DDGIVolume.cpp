@@ -168,8 +168,8 @@ namespace Effect
         // 画像：光線の結果は「光線の番号 x プローブの番号」、八面体マップは横にプローブの x と y の段、縦に z を並べる
         const uint32_t probeCount = GetProbeCount();
         const uint32_t tilesAcross = m_ProbeCounts[0] * m_ProbeCounts[1];
-        const uint32_t irradianceTile = IrradianceTexels + 2;
-        const uint32_t distanceTile = DistanceTexels + 2;
+        const uint32_t irradianceTile = IrradianceTexels + 2 * SIGNAL_LOST_DDGI_BORDER;
+        const uint32_t distanceTile = DistanceTexels + 2 * SIGNAL_LOST_DDGI_BORDER;
         bool created = m_RayResults.Create(RaysPerProbe, probeCount, DXGI_FORMAT_R16G16B16A16_FLOAT);
         for (int index = 0; index < 2 && created; ++index)
         {

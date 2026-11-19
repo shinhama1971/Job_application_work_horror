@@ -4,6 +4,7 @@
 // ============================================================================
 
 #pragma once
+#include "shader/renderingConfig.hlsli"
 
 #include <cstddef>
 #include <wrl/client.h>
@@ -22,7 +23,7 @@ namespace Graphics
         // ブルームの段の数（縦横1/4・1/8・1/16・1/32。bloomCompositePS.hlsl の t0〜t3）
         static constexpr unsigned int BloomLevelCount = 4;
         // 影のまわりの空間のゆがみの数（shader/postProcessBuffer.hlsli の presenceWarp と同じ）
-        static constexpr unsigned int PresenceWarpCount = 2;
+        static constexpr unsigned int PresenceWarpCount = SIGNAL_LOST_PRESENCE_WARP_COUNT;
 
     private:
         // 画面効果のシェーダーへ渡す値（定数バッファb0）。16バイト単位にそろえるため、最後に詰め物を入れている
@@ -61,8 +62,9 @@ namespace Graphics
             DirectX::SimpleMath::Vector4 echo;
         };
 
-        static_assert(sizeof(TimeBuffer) == 128);
+        static_assert(sizeof(TimeBuffer) == offsetof(TimeBuffer, echo) + sizeof(DirectX::SimpleMath::Vector4));
         static_assert(offsetof(TimeBuffer, presenceWarps) == 80);
+        static_assert(offsetof(TimeBuffer, echo) == offsetof(TimeBuffer, presenceWarps) + PresenceWarpCount * sizeof(DirectX::SimpleMath::Vector4));
         static_assert(offsetof(TimeBuffer, exposure) == 32);
         static_assert(offsetof(TimeBuffer, fearVision) == 64);
 

@@ -34,7 +34,7 @@ class Ground :public Object
 		DirectX::SimpleMath::Vector4 FloodRect;
 		// 濡れた足跡（WetFootprints::Fill）。x = 数、と、1つにつき2つの値（位置と向き、濡れ具合・左右・裸足か）
 		DirectX::SimpleMath::Vector4 FootprintInfo;
-		DirectX::SimpleMath::Vector4 Footprints[WetFootprints::MaxCount * 2];
+		DirectX::SimpleMath::Vector4 Footprints[WetFootprints::MaxCount * WetFootprints::VectorsPerPrint];
 		// 天井の雨漏りの真下の水たまり。x = 数、と、1つにつき xy = 中心のx・z、z = 半径
 		DirectX::SimpleMath::Vector4 LeakInfo;
 		DirectX::SimpleMath::Vector4 Leaks[WaterEffectSystem::MaxLeakCount];

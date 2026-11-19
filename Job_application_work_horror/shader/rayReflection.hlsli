@@ -12,6 +12,7 @@
 // ============================================================================
 #ifndef RAY_REFLECTION_INCLUDED
 #define RAY_REFLECTION_INCLUDED
+#include "renderingConfig.hlsli"
 
 // ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
 #include "fastNoise.hlsli"
@@ -40,7 +41,7 @@ static const float SSR_HISTORY_FADE_START_RATIO = 0.45f;
 static const float SSR_HIT_HEIGHT_FADE_WIDTH = 1.5f;
 static const float SSR_STEP_FADE_START_RATIO = 0.65f;
 // スクリーン履歴の段数は ScreenSpaceReflection.cpp の HistoryMipLevels と合わせる。
-static const float SSR_HISTORY_MAX_BLUR_LOD = 3.0f;
+static const float SSR_HISTORY_MAX_BLUR_LOD = float(SIGNAL_LOST_SSR_HISTORY_MIP_LEVELS - 1);
 // ぼかしが小さい場合は、4方向のサンプリングを省いて元の画像を読む。
 static const float SSR_SINGLE_SAMPLE_BLUR_LIMIT = 0.35f;
 // SSR の既定の進める回数と歩幅の広げ方、ぶつかった高さを調べない既定の値（とても低い）

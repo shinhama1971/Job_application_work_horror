@@ -6,6 +6,7 @@
 // ============================================================================
 #ifndef PUDDLE_MASK_INCLUDED
 #define PUDDLE_MASK_INCLUDED
+#include "renderingConfig.hlsli"
 
 // ノイズの関数（FastValueNoise・FastHash21）。読み込む側の順番に頼らず、この部品だけでも読めるようにしている
 #include "fastNoise.hlsli"
@@ -23,33 +24,33 @@ cbuffer PuddleCellBuffer : register(b13)
 }
 
 // WaterEffectSystem::PuddleCellSize と同じワールド単位。CPU と水面の区画を揃える。
-static const float PUDDLE_GRID_CELL_SIZE = 82.0f;
+static const float PUDDLE_GRID_CELL_SIZE = SIGNAL_LOST_PUDDLE_GRID_CELL_SIZE;
 
 // 中心のずれと楕円の大きさ。WaterEffectSystem の PuddleCenterJitter・PuddleAxisX/Z・PuddleAxisX/ZRange と揃える。
-static const float PUDDLE_CENTER_JITTER = 0.22f;
+static const float PUDDLE_CENTER_JITTER = SIGNAL_LOST_PUDDLE_CENTER_JITTER;
 static const float PUDDLE_FULL_TURN = 6.2831853f;
-static const float PUDDLE_AXIS_X = 0.72f;
-static const float PUDDLE_AXIS_X_RANGE = 0.25f;
-static const float PUDDLE_AXIS_Z = 0.43f;
-static const float PUDDLE_AXIS_Z_RANGE = 0.20f;
+static const float PUDDLE_AXIS_X = SIGNAL_LOST_PUDDLE_AXIS_X;
+static const float PUDDLE_AXIS_X_RANGE = SIGNAL_LOST_PUDDLE_AXIS_X_RANGE;
+static const float PUDDLE_AXIS_Z = SIGNAL_LOST_PUDDLE_AXIS_Z;
+static const float PUDDLE_AXIS_Z_RANGE = SIGNAL_LOST_PUDDLE_AXIS_Z_RANGE;
 
 // 岸のうねりとノイズ。GroundWaterEffects.cpp の ShoreWave*・ShoreNoise* と同じ値で、濡れ判定と輪郭を揃える。
-static const float PUDDLE_SHORE_WAVE_A_COUNT = 5.0f;
-static const float PUDDLE_SHORE_WAVE_B_COUNT = 9.0f;
-static const float PUDDLE_SHORE_WAVE_A_SEED = 9.0f;
-static const float PUDDLE_SHORE_WAVE_B_SEED = 13.0f;
-static const float PUDDLE_SHORE_WAVE_A_AMOUNT = 0.045f;
-static const float PUDDLE_SHORE_WAVE_B_AMOUNT = 0.022f;
-static const float PUDDLE_SHORE_NOISE_SCALE = 0.052f;
-static const float PUDDLE_SHORE_NOISE_CELL_SCALE = 1.73f;
-static const float PUDDLE_SHORE_NOISE_WARP = 0.22f;
+static const float PUDDLE_SHORE_WAVE_A_COUNT = SIGNAL_LOST_PUDDLE_SHORE_WAVE_A_COUNT;
+static const float PUDDLE_SHORE_WAVE_B_COUNT = SIGNAL_LOST_PUDDLE_SHORE_WAVE_B_COUNT;
+static const float PUDDLE_SHORE_WAVE_A_SEED = SIGNAL_LOST_PUDDLE_SHORE_WAVE_A_SEED;
+static const float PUDDLE_SHORE_WAVE_B_SEED = SIGNAL_LOST_PUDDLE_SHORE_WAVE_B_SEED;
+static const float PUDDLE_SHORE_WAVE_A_AMOUNT = SIGNAL_LOST_PUDDLE_SHORE_WAVE_A_AMOUNT;
+static const float PUDDLE_SHORE_WAVE_B_AMOUNT = SIGNAL_LOST_PUDDLE_SHORE_WAVE_B_AMOUNT;
+static const float PUDDLE_SHORE_NOISE_SCALE = SIGNAL_LOST_PUDDLE_SHORE_NOISE_SCALE;
+static const float PUDDLE_SHORE_NOISE_CELL_SCALE = SIGNAL_LOST_PUDDLE_SHORE_NOISE_CELL_SCALE;
+static const float PUDDLE_SHORE_NOISE_WARP = SIGNAL_LOST_PUDDLE_SHORE_NOISE_WARP;
 
 // 水面の端を滑らかにし、境界の中心に細い岸の線を出す。岸の半径は WaterEffectSystem::PuddleShoreRadius と同じ値。
 static const float PUDDLE_EDGE_INNER = 0.34f;
 static const float PUDDLE_EDGE_OUTER = 0.40f;
 static const float PUDDLE_SHORE_LINE_INNER = 0.012f;
 static const float PUDDLE_SHORE_LINE_OUTER = 0.070f;
-static const float PUDDLE_SHORE_RADIUS = 0.37f;
+static const float PUDDLE_SHORE_RADIUS = SIGNAL_LOST_PUDDLE_SHORE_RADIUS;
 
 // 放射状に広がる波と斜めに横切る波を重ね、単調な同心円を減らす。
 static const float PUDDLE_RADIAL_WAVE_FREQUENCY = 48.0f;
