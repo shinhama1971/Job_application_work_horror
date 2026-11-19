@@ -488,7 +488,9 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 
 `ForestScene::Update` が毎フレーム `ForestEvents::Update` にプレイヤーの足元を渡しています。`ForestEvents` は配置ファイルから作った小物（`PropLayoutFile::SpawnedProps`）を名前で探し、街灯（`PathLampBulb`・`PathLampBulb_1`）・研究所の2階の窓（`LabWindow2F4`）・玄関の灯り（`LabPorchLight`）の明るさを `Wall::SetEmissionScale` で変えています。倍率は `Wall::UploadMaterial` で光る色に、`Wall::CollectPointLights` で点光源の強さに掛けるので、面の光り方と周りの照らし方が一緒に変わります（値が変わったときだけマテリアルを送り直します）。ちらつきは時間だけから決まる式（不安定な時間の中だけ、1秒に14回、途切れるかを乱数で決める）なので、自動撮影では毎回同じ結果になります。窓が消えた瞬間の恐怖の強さを返し、`ForestScene` が `PostProcess::SetFearVision` へ渡しています。
 
-森の稲光は `ForestScene` で、研究所の手前から建物の方向を向いたときに一度だけ始めます。建物の斜め上から約0.46秒間だけ、`ForestLightning` が既存のタイルベースライティングへ青白い点光源を追加します。画面全体の露出は変えず、玄関からの暗転中と計測モードでは光を出しません。
+森の稲光は `ForestScene` で、研究所の手前から建物の方向を向いたときに始めます（2回まで。2回目は1回目が消えてから5.5秒の後に、玄関まで30の所まで近づいていても起きます）。建物の斜め上から約0.46秒間だけ、`ForestLightning` が既存のタイルベースライティングへ青白い点光源を追加します。画面全体の露出は変えず、玄関からの暗転中と計測モードでは光を出しません。
+
+稲光が光るたびに、`ForestLightningFigure` が木の間に黒い人影を立たせます。人影の形は1面の人影（`ShadowMan`）と同じモデルです。描くのは `shader/lightningFigurePS.hlsl` で、体はほとんど黒のまま、視線に対して横を向いた面（輪郭）を稲光の色で光らせます（稲光の方を向いた輪郭ほど強くします）。稲光の強さを1.8倍した値を見え方にし、それが1を下回るとワールドに固定したマス目のノイズで穴が増えて崩れます（崩れる縁も稲光の色）。定数バッファは `ShadowMan` と同じく b7 を描く間だけ借りて、描いた後に戻すため、このシェーダーは b7 の周回の深さを読まず、霧は周回0として計算します。立たせる場所は、プレイヤーから玄関までの距離に掛けた割合（1回目は0.55、2回目は0.30）だけ進んだ所から、横へずらした候補を順に試して選びます。`ForestScene::IsFigureSpotBlocked` で、胸より高い配置物（木・建物）に埋まるものと、目から人影への線分がその近くを通る（木の陰になる）ものを外します。人影を出している間は、稲光の強さに合わせて恐怖の画面効果（`PostProcess::SetFearVision`）を出します。
 
 草むらを通る「見えない何か」は、`ForestEvents` が足元の位置と強さを決め、`ForestScene` が `ForestGrass::SetUnseenWalker` で草へ渡しています。`grassCS.hlsl` は、プレイヤーと同じように目標の葉先をずらすほか、踏まれた倒れ具合を `GrassState.Tip.w`、倒れる向きを `GrassState.Velocity.w`（どちらも使っていなかった値）に覚え、毎秒0.2ずつ戻しています。バッファの大きさは変えずに、通った跡を残せます。
 

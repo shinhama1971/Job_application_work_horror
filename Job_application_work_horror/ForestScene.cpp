@@ -4,7 +4,9 @@
 // ============================================================================
 
 #include "ForestScene.h"
+#include "EventFeedback.h"
 #include "ForestGrass.h"
+#include "ForestLightningFigure.h"
 #include "ForestRain.h"
 #include "LabEntrance.h"
 #include "Wall.h"
@@ -47,6 +49,33 @@ namespace
     // 稲光の光り方：立ち上がる時間と、全体で光っている時間（立ち上がりだけ鋭く、後半は滑らかに消す）
     constexpr float LightningRiseSeconds = 0.05f;
     constexpr float LightningFlashSeconds = 0.46f;
+
+    // --- 稲光の一瞬だけ浮かぶ人影
+    // 稲光は2回。1回目は遠くの木の間に、2回目は、1回目が消えてからこの秒数の後に、もっと近くに人影が立つ
+    constexpr int LightningStrikeCount = 2;
+    constexpr float SecondStrikeDelaySeconds = 5.5f;
+    // 2回目が起きる、研究所までの距離の下限（1回目より玄関に近くても起きるようにしている）
+    constexpr float SecondStrikeMinDistance = 30.0f;
+    // 人影を立たせる所：プレイヤーから研究所までの距離に掛ける割合と、その距離の最小・最大、小道からの横のずれ（1回目・2回目）
+    constexpr float FigureAlongFraction[LightningStrikeCount] = { 0.55f, 0.30f };
+    constexpr float FigureMinAlong[LightningStrikeCount] = { 50.0f, 24.0f };
+    constexpr float FigureMaxAlong[LightningStrikeCount] = { 120.0f, 55.0f };
+    constexpr float FigureSideOffset[LightningStrikeCount] = { 20.0f, 9.0f };
+    // 横のずれを試す順番（ずれに掛ける割合。木に埋まるか木の陰になるなら次を試す）
+    constexpr float FigureSideTries[] = { 1.0f, -1.0f, 0.5f, -0.5f, 0.0f };
+    // 木などから離す距離（埋まらないように）と、視線を遮る木とみなす太さのゆとり、遮る物とみなす高さ（胸より高い物）
+    constexpr float FigureClearance = 5.0f;
+    constexpr float FigureSightMargin = 2.0f;
+    constexpr float FigureChestHeight = 17.0f;
+    // 稲光の強さ（0〜1）から人影の見え方にする倍率（光の後半で崩れ始めるように、1より大きくしている）
+    constexpr float FigureVisibilityGain = 1.8f;
+    // 人影を見せている間の恐怖の画面効果の強さ（1回目・2回目）
+    constexpr float FigureFear[LightningStrikeCount] = { 0.35f, 0.70f };
+    // 2回目の人影が近くに立ったときの、低い衝撃音（高さ・音量）と振動
+    constexpr EventFeedback::SoundSpec SecondFigureSound{ 0.60f, 0.55f };
+    constexpr EventFeedback::RumbleSpec SecondFigureRumble{ 10, 0.25f };
+    // 向きを計算しないほど短いとみなす長さの2乗
+    constexpr float MinimumLengthSquared = 0.0001f;
 
     // 夜の森の画面の見え方：少し暗めにし、ノイズと周辺減光を強めて、照明の下の光の筋をやや控えめに出している
     constexpr float ForestExposure = 0.92f;
@@ -195,6 +224,7 @@ ForestScene::ForestScene()
     SceneLayoutBuilder builder(*game, m_ObjectNames);
     World world = BuildWorld(builder, layout);
     m_Player = world.PlayerObject;
+    m_GroundY = world.GroundObject->GetPosition().y;
     m_Grass = world.Grass;
     m_LayoutProps = std::move(world.Props);
 
@@ -212,6 +242,7 @@ ForestScene::ForestScene()
     m_Lightning = builder.Create<ForestLightning>("ForestLightning");
     // 上空の斜め手前から、正面と屋根の輪郭を一緒に照らす。
     m_Lightning->SetPosition(doorPosition + LightningOffset);
+    m_LightningFigure = builder.Create<ForestLightningFigure>("ForestLightningFigure");
 
     // 配置を読み直したときに置き直す物（地面と草の範囲）
     Ground* ground = world.GroundObject;
@@ -274,40 +305,153 @@ void ForestScene::ReloadPropLayout()
 void ForestScene::UpdateLightning(float deltaTime, const Vector3& forward)
 {
     constexpr float flashSeconds = LightningFlashSeconds;
+    m_LightningFear = 0.0f;
     if (!RainEnabled || m_EnterTimer >= 0.0f || Tools::CaptureMode::IsBenchmark())
     {
         m_Lightning->SetStrength(0.0f);
-        return;
-    }
-    if (m_LightningTime >= flashSeconds)
-    {
+        m_LightningFigure->Hide();
         return;
     }
     if (m_LightningTime < 0.0f)
     {
+        // 光っていない間：決まった回数まで、次に光れる時間になるのを待つ
+        if (m_LightningStrikes >= LightningStrikeCount)
+        {
+            return;
+        }
+        m_LightningCooldown = (std::max)(0.0f, m_LightningCooldown - deltaTime);
+        if (m_LightningCooldown > 0.0f)
+        {
+            return;
+        }
         const Vector3 offset = m_Entrance->GetInteractionPosition() - m_Player->GetPosition();
         const Vector2 towardLab(offset.x, offset.z);
         const float distanceSquared = towardLab.LengthSquared();
         const Vector2 look(forward.x, forward.z);
-        // 小道から研究所を向いたときに一度だけ発生する。足元や背後を見ている間は待つ。
-        if (offset.z <= 0.0f || distanceSquared < LightningMinDistance * LightningMinDistance ||
+        const float minDistance = m_LightningStrikes == 0 ? LightningMinDistance : SecondStrikeMinDistance;
+        // 小道から研究所を向いたときに起きる。足元や背後を見ている間は待つ。
+        if (offset.z <= 0.0f || distanceSquared < minDistance * minDistance ||
             distanceSquared > LightningMaxDistance * LightningMaxDistance ||
             look.Dot(towardLab) < LightningFacing * std::sqrt(distanceSquared))
         {
             return;
         }
         m_LightningTime = 0.0f;
+        ShowLightningFigure(m_LightningStrikes);
+        ++m_LightningStrikes;
     }
     else
     {
         m_LightningTime = (std::min)(m_LightningTime + deltaTime, flashSeconds);
     }
 
-    // 立ち上がりだけ鋭く、後半は滑らかに消す。連続点滅はさせない。
+    // 立ち上がりだけ鋭く、後半は滑らかに消す。1回の光の中では点滅させない。
     constexpr float riseSeconds = LightningRiseSeconds;
     const float rise = (std::min)(1.0f, m_LightningTime / riseSeconds);
     const float tail = (std::min)(1.0f, (flashSeconds - m_LightningTime) / (flashSeconds - riseSeconds));
-    m_Lightning->SetStrength(LightningStrength * rise * tail * tail);
+    const float flash = rise * tail * tail;
+    m_Lightning->SetStrength(LightningStrength * flash);
+
+    // 人影は、稲光が明るい間だけ逆光で浮かび、光が弱まると崩れて消える
+    m_LightningFigure->SetLightning((std::min)(1.0f, flash * FigureVisibilityGain),
+        m_Lightning->GetPosition(), LightningColor, flash);
+    const int shownStrike = (std::max)(0, m_LightningStrikes - 1);
+    m_LightningFear = FigureFear[shownStrike] * flash;
+
+    if (m_LightningTime >= flashSeconds)
+    {
+        // 光り終わった：人影を消し、次の稲光まで待つ
+        m_LightningTime = -1.0f;
+        m_LightningCooldown = SecondStrikeDelaySeconds;
+        m_Lightning->SetStrength(0.0f);
+        m_LightningFigure->Hide();
+    }
+}
+
+void ForestScene::ShowLightningFigure(int strikeIndex)
+{
+    const Vector3 player = m_Player->GetPosition();
+    const Vector3 door = m_Entrance->GetInteractionPosition();
+    Vector2 toDoor(door.x - player.x, door.z - player.z);
+    const float distance = toDoor.Length();
+    if (distance * distance < MinimumLengthSquared)
+    {
+        return;
+    }
+    toDoor /= distance;
+    const Vector2 side(toDoor.y, -toDoor.x);
+    const float along = std::clamp(distance * FigureAlongFraction[strikeIndex],
+        FigureMinAlong[strikeIndex], FigureMaxAlong[strikeIndex]);
+
+    // 研究所の方へ進んだ所から、横にずらした場所を順に試し、木に埋まらず、木の陰にもならない所を選んでいる
+    Vector3 chosen = Vector3::Zero;
+    bool found = false;
+    for (float sideTry : FigureSideTries)
+    {
+        const Vector2 spot = Vector2(player.x, player.z) + toDoor * along + side * (FigureSideOffset[strikeIndex] * sideTry);
+        const Vector3 candidate(spot.x, m_GroundY, spot.y);
+        if (!found)
+        {
+            // どこも塞がっていたときは、最初に試した場所を使う
+            chosen = candidate;
+        }
+        if (!IsFigureSpotBlocked(candidate))
+        {
+            chosen = candidate;
+            found = true;
+            break;
+        }
+    }
+
+    const Vector3 toPlayer = player - chosen;
+    const float facing = std::atan2(toPlayer.x, toPlayer.z);
+    m_LightningFigure->Show(chosen, facing);
+
+    // 2回目は近くに立つので、低い衝撃音と振動で気づかせている（1回目は音を出さず、見えたかどうか分からないくらいにしている）
+    if (strikeIndex > 0)
+    {
+        Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_SCARE, chosen,
+            SecondFigureSound.Pitch, SecondFigureSound.Volume);
+        EventFeedback::Rumble(SecondFigureRumble);
+    }
+}
+
+bool ForestScene::IsFigureSpotBlocked(const Vector3& spot) const
+{
+    const Vector2 eye(m_Player->GetPosition().x, m_Player->GetPosition().z);
+    const Vector2 target(spot.x, spot.z);
+    const Vector2 sight = target - eye;
+    const float sightLengthSquared = (std::max)(sight.LengthSquared(), MinimumLengthSquared);
+    for (const auto& [name, wall] : m_LayoutProps)
+    {
+        (void)name;
+        if (wall == nullptr || !wall->IsCollisionEnabled())
+        {
+            continue;
+        }
+        const Vector3 position = wall->GetPosition();
+        const Vector3 half = wall->GetScale() * 0.5f;
+        // 低い物（岩・倒木・茂み）は人影を隠さないので、胸より高い物だけを調べている
+        if (position.y + std::fabs(half.y) < m_GroundY + FigureChestHeight)
+        {
+            continue;
+        }
+        // 上から見た太さを、回した向きを気にしない円とみなしている
+        const float radius = (std::max)(std::fabs(half.x), std::fabs(half.z));
+        const Vector2 center(position.x, position.z);
+        if ((center - target).LengthSquared() < (radius + FigureClearance) * (radius + FigureClearance))
+        {
+            return true;
+        }
+        // 目から人影への線分に、一番近い点までの距離
+        const float t = std::clamp((center - eye).Dot(sight) / sightLengthSquared, 0.0f, 1.0f);
+        const Vector2 closest = eye + sight * t;
+        if ((center - closest).LengthSquared() < (radius + FigureSightMargin) * (radius + FigureSightMargin))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 void ForestScene::Update()
@@ -320,7 +464,8 @@ void ForestScene::Update()
         return;
     }
     // 街灯のちらつき・後ろの街灯が消える・研究所の窓の明かりが消える・草むらを何かが通る（ForestEvents）
-    const float fear = m_Events.Update(deltaTime, m_Player->GetPosition(), m_LayoutProps);
+    // 稲光の人影の恐怖（前のフレームの値）と、強い方を使っている
+    const float fear = (std::max)(m_Events.Update(deltaTime, m_Player->GetPosition(), m_LayoutProps), m_LightningFear);
     game->GetPostProcess()->SetFearVision(fear, fear > m_LastFear + FearSpikeThreshold);
     m_LastFear = fear;
     // 草むらを通る「見えない何か」の足元の草を、草の Compute Shader で押し倒している

@@ -321,6 +321,9 @@
     <ClCompile Include="ForestScene.cpp">
       <Filter>ソース ファイル\Scene\Forest</Filter>
     </ClCompile>
+    <ClCompile Include="ForestLightningFigure.cpp">
+      <Filter>ソース ファイル\Scene\Forest</Filter>
+    </ClCompile>
     <ClCompile Include="LabEntrance.cpp">
       <Filter>ソース ファイル\Scene\Forest</Filter>
     </ClCompile>
@@ -684,6 +687,9 @@
       <Filter>ヘッダー ファイル\Scene\Forest</Filter>
     </ClInclude>
     <ClInclude Include="ForestScene.h">
+      <Filter>ヘッダー ファイル\Scene\Forest</Filter>
+    </ClInclude>
+    <ClInclude Include="ForestLightningFigure.h">
       <Filter>ヘッダー ファイル\Scene\Forest</Filter>
     </ClInclude>
     <ClInclude Include="LabEntrance.h">
@@ -1115,6 +1121,9 @@
       <Filter>リソース ファイル\Shader\Pixel</Filter>
     </FxCompile>
     <FxCompile Include="shader\shadowDissolvePS.hlsl">
+      <Filter>リソース ファイル\Shader\Pixel</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\lightningFigurePS.hlsl">
       <Filter>リソース ファイル\Shader\Pixel</Filter>
     </FxCompile>
     <FxCompile Include="shader\signalPanelPS.hlsl">

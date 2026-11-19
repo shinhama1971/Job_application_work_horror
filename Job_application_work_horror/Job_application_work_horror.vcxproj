@@ -298,6 +298,7 @@
     <ClCompile Include="Stage2Scene.cpp" />
     <ClCompile Include="Stage3Scene.cpp" />
     <ClCompile Include="ForestScene.cpp" />
+    <ClCompile Include="ForestLightningFigure.cpp" />
     <ClCompile Include="ForestGrass.cpp" />
     <ClCompile Include="SkyBackdrop.cpp" />
     <ClCompile Include="ForestEvents.cpp" />
@@ -445,6 +446,7 @@
     <ClInclude Include="Stage2Scene.h" />
     <ClInclude Include="Stage3Scene.h" />
     <ClInclude Include="ForestScene.h" />
+    <ClInclude Include="ForestLightningFigure.h" />
     <ClInclude Include="ForestGrass.h" />
     <ClInclude Include="SkyBackdrop.h" />
     <ClInclude Include="ForestEvents.h" />
@@ -548,6 +550,9 @@
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\shadowDissolvePS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\lightningFigurePS.hlsl">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\bloomBlurHorizontalCS.hlsl">

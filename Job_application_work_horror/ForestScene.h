@@ -25,6 +25,7 @@ class Ground;
 class SceneLayoutBuilder;
 class LabEntrance;
 class ForestLightning;
+class ForestLightningFigure;
 
 class ForestScene final : public Scene
 {
@@ -68,6 +69,10 @@ private:
     // 配置のファイルを読み直し、木・岩・研究所などと、地面・開始位置以外の置き場所を置き直している（Debug版の F5 と、ファイルが書き換わったとき）
     void ReloadPropLayout();
     void UpdateLightning(float deltaTime, const DirectX::SimpleMath::Vector3& forward);
+    // 稲光が光り始めたときに、木の間の人影を出している（strikeIndex は何回目の稲光か。0 から）
+    void ShowLightningFigure(int strikeIndex);
+    // その位置に人影を立たせると、木などに埋まるか、プレイヤーから見て木の陰になるか
+    bool IsFigureSpotBlocked(const DirectX::SimpleMath::Vector3& spot) const;
 
     // 作ったObjectの名前（終わるときに、この一覧で破棄する）、配置ファイルから作った物、置き場所の置き直し方、ファイルの見張り
     std::vector<std::string> m_ObjectNames;
@@ -85,7 +90,14 @@ private:
     InteractionSystem m_InteractionSystem;
     LabEntrance* m_Entrance = nullptr;
     ForestLightning* m_Lightning = nullptr;
+    // 稲光：今の光の経過秒（-1 なら光っていない）、これまでに光った回数、次に光れるまでの秒数
     float m_LightningTime = -1.0f;
+    int m_LightningStrikes = 0;
+    float m_LightningCooldown = 0.0f;
+    // 稲光の一瞬だけ木の間に浮かぶ人影と、その人影で出す恐怖の画面効果の強さ（0〜1）、地面の高さ
+    ForestLightningFigure* m_LightningFigure = nullptr;
+    float m_LightningFear = 0.0f;
+    float m_GroundY = 0.0f;
     float m_EnterTimer = -1.0f;
     bool m_SceneChangeRequested = false;
     static constexpr float EnterFadeSeconds = 1.4f;
