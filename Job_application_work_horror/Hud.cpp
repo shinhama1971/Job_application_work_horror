@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "Hud.h"
+#include "HudText.h"
 #include "StoryText.h"
 
 #include <algorithm>
@@ -22,6 +23,7 @@
 #include "Renderer.h"
 
 using namespace DirectX::SimpleMath;
+using HudText::CountDisplayedCharacters;
 
 namespace
 {
@@ -160,19 +162,6 @@ namespace
     constexpr float KeyGlyphStrokeRatio = 0.18f;
     constexpr float KeyGlyphEMiddleWidthRatio = 0.82f;
 
-    // UTF-8の文字列で、画面に出る文字の数を数えている（2バイト目以降のバイトは数えない）
-    size_t CountDisplayedCharacters(std::string_view text)
-    {
-        size_t count = 0;
-        for (unsigned char byte : text)
-        {
-            if (!StoryText::IsUtf8ContinuationByte(byte))
-            {
-                ++count;
-            }
-        }
-        return count;
-    }
 }
 
 // キャンバスの拡大率：描画解像度の高さ÷864

@@ -1,5 +1,17 @@
 # 作業の引き継ぎ（2026年11月9日）
 
+## 長いファイルの分割（11月20日、Claude Code）
+
+- 1000行を超えていたファイルを、役割ごとに分けた。中身は移しただけで、処理は変えていない（元の行が新しいファイルのどこかに全部あるかを、スクリプトで確かめた）。
+  - `StageSceneEvents.cpp`（1881行）→ `StageSceneEvents.cpp`（進行）・`StageSceneLoop.cpp`（ループ廊下）・`StageSceneScares.cpp`（驚かせる演出）と、値の `Stage1EventSettings.h`
+  - `Stage2SceneHorror.cpp`（1806行）→ `Stage2SceneHorror.cpp`（恐怖の進行）・`Stage2SceneAnomalies.cpp`（異変）と、値の `Stage2HorrorSettings.h`
+  - `HudScreens.cpp`（1782行）→ `HudTitle.cpp`・`HudMenus.cpp`・`HudScreens.cpp` と、共通の `HudText.h`（`Hud.cpp` にあった `CountDisplayedCharacters` の重複もここへまとめた）
+  - `CaptureMode.cpp`（1638行）→ 道順のデータを `CaptureTours.cpp`・`CaptureTours.h` へ（`CaptureMode.cpp` は1360行）
+  - `litTexturePS.hlsl`（1210行）→ `wallSurface.hlsli` を分け、631行。`wetFloorPS.hlsl`（1123行）→ `floorAgeing.hlsli`・`puddleReflection.hlsli`・`waterDrips.hlsli` を分け、787行
+- 前のコミットで足した `breathingWallVS.hlsl` を、プロジェクトのファイル一覧に入れ忘れていたので足した（ビルドの後のシェーダーのコンパイルは、フォルダの中を全部見るので動いていた）。
+- 確かめたこと：Release・Debug（x64）とも警告0。シェーダー55個のバイトコードが、分ける前のコミットと全部同じ。自動撮影が最後まで動くこと。
+- 残っている長い所：`litTexturePS.hlsl` と `wetFloorPS.hlsl` の `main` は、それぞれ約430行・約500行（画素ごとの計算を順に書いているため、今回は分けていない）。
+
 ## 1面の呼吸する壁（11月20日、Claude Code）
 
 - ループ廊下を1周した後、東の区間の南の壁（配置ファイルの `LoopWall3` の +z の面）が、4.6秒ごとに息をするように膨らむ。膨らむ量は1周目4・2周目5.5・3周目以降7（急に動き出さないよう、1秒に1ずつ近づける）。

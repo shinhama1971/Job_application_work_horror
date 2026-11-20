@@ -246,6 +246,8 @@
     <ClCompile Include="WaterRippleSimulation.cpp" />
     <ClCompile Include="Hud.cpp" />
     <ClCompile Include="HudScreens.cpp" />
+    <ClCompile Include="HudTitle.cpp" />
+    <ClCompile Include="HudMenus.cpp" />
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="InteractionSystem.cpp" />
     <ClCompile Include="Item.cpp" />
@@ -288,6 +290,7 @@
     <ClCompile Include="KeyItem.cpp" />
     <ClCompile Include="Locker.cpp" />
     <ClCompile Include="CaptureMode.cpp" />
+    <ClCompile Include="CaptureTours.cpp" />
     <ClCompile Include="VideoWriter.cpp" />
     <ClCompile Include="PropLayoutFile.cpp" />
     <ClCompile Include="LayoutExtras.cpp" />
@@ -296,6 +299,8 @@
     <ClCompile Include="HangingBulb.cpp" />
     <ClCompile Include="TechDemo.cpp" />
     <ClCompile Include="StageSceneEvents.cpp" />
+    <ClCompile Include="StageSceneLoop.cpp" />
+    <ClCompile Include="StageSceneScares.cpp" />
     <ClCompile Include="StageSceneDraw.cpp" />
     <ClCompile Include="Stage2Scene.cpp" />
     <ClCompile Include="Stage3Scene.cpp" />
@@ -315,6 +320,7 @@
     <ClCompile Include="Stage2Objective.cpp" />
     <ClCompile Include="Stage2ScenePuzzles.cpp" />
     <ClCompile Include="Stage2SceneHorror.cpp" />
+    <ClCompile Include="Stage2SceneAnomalies.cpp" />
     <ClCompile Include="Stage2SceneDraw.cpp" />
     <ClCompile Include="StaticMesh.cpp" />
     <ClCompile Include="ModelCache.cpp" />
@@ -360,6 +366,7 @@
     <ClInclude Include="WaterEffectSystem.h" />
     <ClInclude Include="WaterRippleSimulation.h" />
     <ClInclude Include="Hud.h" />
+    <ClInclude Include="HudText.h" />
     <ClInclude Include="IndexBuffer.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="Interactable.h" />
@@ -420,6 +427,7 @@
     <ClInclude Include="PointShadowMap.h" />
     <ClInclude Include="Sound.h" />
     <ClInclude Include="StageScene.h" />
+    <ClInclude Include="Stage1EventSettings.h" />
     <ClInclude Include="Stage1Layout.h" />
     <ClInclude Include="Stage1LightNumber.h" />
     <ClInclude Include="Stage1Objective.h" />
@@ -440,6 +448,7 @@
     <ClInclude Include="KeyItem.h" />
     <ClInclude Include="Locker.h" />
     <ClInclude Include="CaptureMode.h" />
+    <ClInclude Include="CaptureTours.h" />
     <ClInclude Include="VideoWriter.h" />
     <ClInclude Include="TechDemo.h" />
     <ClInclude Include="KeypadLock.h" />
@@ -477,6 +486,7 @@
     <ClInclude Include="MathUtility.h" />
     <ClInclude Include="BehindPresence.h" />
     <ClInclude Include="Stage2SceneConstants.h" />
+    <ClInclude Include="Stage2HorrorSettings.h" />
     <ClInclude Include="QuietRecovery.h" />
     <ClInclude Include="StaticMesh.h" />
     <ClInclude Include="stb_image.h" />
@@ -505,6 +515,10 @@
     <ClInclude Include="shader\ddgiUpdate.hlsli" />
     <ClInclude Include="shader\roomOcclusion.hlsli" />
     <ClInclude Include="shader\waterCaustics.hlsli" />
+    <ClInclude Include="shader\wallSurface.hlsli" />
+    <ClInclude Include="shader\floorAgeing.hlsli" />
+    <ClInclude Include="shader\puddleReflection.hlsli" />
+    <ClInclude Include="shader\waterDrips.hlsli" />
     <ClInclude Include="shader\waterCausticsLayout.hlsli" />
     <ClInclude Include="shader\puddleMask.hlsli" />
     <ClInclude Include="shader\horrorMarks.hlsli" />
@@ -718,6 +732,7 @@
   <ItemGroup>
     <None Include="shader\grassCS.hlsl" />
     <None Include="shader\grassVS.hlsl" />
+    <None Include="shader\breathingWallVS.hlsl" />
     <None Include="shader\grassPS.hlsl" />
     <None Include="shader\skyBackdropVS.hlsl" />
     <None Include="shader\skyBackdropPS.hlsl" />

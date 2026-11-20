@@ -322,7 +322,7 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 | 影 | GPU | `ShadowMap`（1024x1024、手元の位置から作る。`FlashlightRig.h`）、`flashlightShadow.hlsli`（PCSS：遮る物の探索8か所と比較9か所） | 深度の描画と比較は画素ごとの処理 |
 | 壁・床・天井の古さ、凹凸、部屋の角の暗がり | GPU（PS） | `GetWallAgeing`、`GetFloorAgeing`、`surfaceDetail.hlsli`、`roomOcclusion.hlsli` | 画像素材を読まずにワールド座標から計算する（メモリ帯域の代わりに計算量を使う） |
 | 壁のホラーらしい跡（血の手形・引っかき傷・血の垂れ跡） | GPU（PS） | `horrorMarks.hlsli`（`litTexturePS` の壁の古さから呼ぶ） | 壁に沿ったマス目ごとの乱数で置き場所と種類を決め、距離関数で形を作る。画像素材を読まない |
-| 水たまりの反射 | GPU（PS） | `wetFloorPS.hlsl` の `TraceRayReflection`、`rayReflection.hlsli`（部屋の形・小物・扉へのレイ反射に、前後の深度が一致するSSRの色を混ぜる。扉は本描画と同じ開閉角度の箱を使い、近くの壁と扉は斜めからも輪郭が読めるようにする） | 反転したカメラで景色を描き直さず、床の画素ごとに反射の光線を飛ばす |
+| 水たまりの反射 | GPU（PS） | `puddleReflection.hlsli`（`wetFloorPS.hlsl` から読む）の `TraceRayReflection`、`rayReflection.hlsli`（部屋の形・小物・扉へのレイ反射に、前後の深度が一致するSSRの色を混ぜる。扉は本描画と同じ開閉角度の箱を使い、近くの壁と扉は斜めからも輪郭が読めるようにする） | 反転したカメラで景色を描き直さず、床の画素ごとに反射の光線を飛ばす |
 | 水たまりのメッシュと LOD | CPU・GPU（PS） | `Ground::BuildPuddleSurfaces`（マス目の表から、岸が必ず収まる楕円の多角形を作る）、`Ground::BuildDynamicSurfaces`（雨漏りと浸水した範囲。毎フレーム）、`Ground::DrawWaterSurfaces`、`wetFloorPS.hlsl` の `WaterSurfaceLevel`（b10） | 床の本体は乾いた床（水たまりの計算なし）として描き、メッシュを床の0.05上に描き重ねる。深度プリパスにもメッシュを描くので、下の床の画素は捨てられる。画面の外か（`Camera::IsSphereVisible`）と描画グループはメッシュごとに CPU で決める。反射は画素までの距離を使い、SSRの寄与を160〜230で弱め（11月14日に105〜155から広げた）、部屋の形による反射を300〜380で霧の色へ移す |
 | 壁の鏡（2面） | GPU（PS） | `mirrorPS.hlsl`（`rayReflection.hlsli` を床と共通で使う）、`GameRendering.cpp`（カメラに近い小物の箱16個を b12 で渡す） | 鏡の画素ごとに反射の光線を飛ばす。床と違い下向きの光線が多いため、床の高さとの交差も見ている |
 | 鏡に映る自分の姿・鏡の異変の人影（2面） | CPU・GPU（PS） | `MirrorSelf`（1秒60回の姿勢の記録から遅らせた姿勢と手足の振りを b12 で渡す）、`MirrorAnomaly`、`mirrorPS.hlsl`、`FigureVolumes`（焼いた距離場の3Dテクスチャ t6・t13・s2）、`shader/figureVolume.hlsli`（体も人影も距離場のスフィアトレーシング。体は関節のまわりに回した空間で読んで手足を振る） | 一人称で体がなく、異変の人影も物として置かないため、鏡のシェーダーの中だけに形を出している |
@@ -458,6 +458,12 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
   `ResetForNextLoop` → `ConfigureClockForLoop` → `PlayLoopStartFeedback` → `UpdateCycleMarks` → 周回ごとの `Apply*LoopChanges`、
   `Hud::Draw` は目的・記録の数・照準・ヒューズ・ゲージ・操作の表示・電池の知らせの7つ、`PropLayoutFile::Load` は1行の命令ごとの `Parse*Line`）。
   切り出すときは処理の順番と乱数を引く回数を変えず、見た目と遊びが前と同じになるようにしています。
+- 1つのファイルも、役割ごとに分けています（目安は800行）。
+  - 1面の演出：`StageSceneEvents.cpp`（進行：電力・出口・物音・壁の文字・危険度・無線）、`StageSceneLoop.cpp`（ループ廊下・伸びる廊下・呼吸する壁）、`StageSceneScares.cpp`（驚かせる演出）。値は `Stage1EventSettings.h` にまとめ、3つのファイルで共有しています。
+  - 2面の演出：`Stage2SceneHorror.cpp`（最後の追跡・捕まったとき・背後の気配・心拍）と `Stage2SceneAnomalies.cpp`（異変）。値は `Stage2HorrorSettings.h`。
+  - HUD の画面：`HudTitle.cpp`（タイトル・導入）、`HudMenus.cpp`（リザルト・暗証番号・ポーズ）、`HudScreens.cpp`（プレイ中に重ねる画面）。共通の文字の計算と、導入と無線で同じ「電波が乱れた文字」の値は `HudText.h`。
+  - 自動撮影：道順のデータは `CaptureTours.cpp`（型と段取りの時刻は `CaptureTours.h`）、道順をたどって撮る処理は `CaptureMode.cpp`。
+  - シェーダー：`litTexturePS.hlsl` の壁と天井の表面（汚れ・古さ・凹凸・水の筋）は `wallSurface.hlsli`、`wetFloorPS.hlsl` の床の古さ・水たまりの反射・水滴の輪は `floorAgeing.hlsli`・`puddleReflection.hlsli`・`waterDrips.hlsli`。元の場所で読み込んでいるので、コンパイル結果は分ける前と同じです。
 
 ## 検証
 

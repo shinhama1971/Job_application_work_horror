@@ -372,6 +372,12 @@
     <ClCompile Include="StageSceneEvents.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
+    <ClCompile Include="StageSceneLoop.cpp">
+      <Filter>ソース ファイル\Scene\Stage1</Filter>
+    </ClCompile>
+    <ClCompile Include="StageSceneScares.cpp">
+      <Filter>ソース ファイル\Scene\Stage1</Filter>
+    </ClCompile>
     <ClCompile Include="StageSurveillanceController.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
@@ -391,6 +397,9 @@
       <Filter>ソース ファイル\Scene\Stage2</Filter>
     </ClCompile>
     <ClCompile Include="Stage2SceneHorror.cpp">
+      <Filter>ソース ファイル\Scene\Stage2</Filter>
+    </ClCompile>
+    <ClCompile Include="Stage2SceneAnomalies.cpp">
       <Filter>ソース ファイル\Scene\Stage2</Filter>
     </ClCompile>
     <ClCompile Include="Stage2ScenePuzzles.cpp">
@@ -423,6 +432,9 @@
     <ClCompile Include="CaptureMode.cpp">
       <Filter>ソース ファイル\Tools</Filter>
     </ClCompile>
+    <ClCompile Include="CaptureTours.cpp">
+      <Filter>ソース ファイル\Tools</Filter>
+    </ClCompile>
     <ClCompile Include="DebugUI.cpp">
       <Filter>ソース ファイル\Tools</Filter>
     </ClCompile>
@@ -439,6 +451,12 @@
       <Filter>ソース ファイル\Ui</Filter>
     </ClCompile>
     <ClCompile Include="HudScreens.cpp">
+      <Filter>ソース ファイル\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="HudTitle.cpp">
+      <Filter>ソース ファイル\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="HudMenus.cpp">
       <Filter>ソース ファイル\Ui</Filter>
     </ClCompile>
     <ClCompile Include="ScreenDustOverlay.cpp">
@@ -776,6 +794,9 @@
     <ClInclude Include="StageScene.h">
       <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
     </ClInclude>
+    <ClInclude Include="Stage1EventSettings.h">
+      <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
+    </ClInclude>
     <ClInclude Include="StageSurveillanceCameras.h">
       <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
     </ClInclude>
@@ -860,6 +881,9 @@
     <ClInclude Include="Stage2SceneConstants.h">
       <Filter>ヘッダー ファイル\Scene\Stage2</Filter>
     </ClInclude>
+    <ClInclude Include="Stage2HorrorSettings.h">
+      <Filter>ヘッダー ファイル\Scene\Stage2</Filter>
+    </ClInclude>
     <ClInclude Include="TensionPulse.h">
       <Filter>ヘッダー ファイル\Scene\Stage2</Filter>
     </ClInclude>
@@ -908,6 +932,9 @@
     <ClInclude Include="CaptureMode.h">
       <Filter>ヘッダー ファイル\Tools</Filter>
     </ClInclude>
+    <ClInclude Include="CaptureTours.h">
+      <Filter>ヘッダー ファイル\Tools</Filter>
+    </ClInclude>
     <ClInclude Include="DebugUI.h">
       <Filter>ヘッダー ファイル\Tools</Filter>
     </ClInclude>
@@ -921,6 +948,9 @@
       <Filter>ヘッダー ファイル\Tools</Filter>
     </ClInclude>
     <ClInclude Include="Hud.h">
+      <Filter>ヘッダー ファイル\Ui</Filter>
+    </ClInclude>
+    <ClInclude Include="HudText.h">
       <Filter>ヘッダー ファイル\Ui</Filter>
     </ClInclude>
     <ClInclude Include="ScreenDustOverlay.h">
@@ -1053,6 +1083,18 @@
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
     <ClInclude Include="shader\waterCaustics.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\wallSurface.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\floorAgeing.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\puddleReflection.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\waterDrips.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
     <ClInclude Include="shader\waterCausticsLayout.hlsli">
@@ -1213,6 +1255,9 @@
       <Filter>リソース ファイル\Shader\Pixel</Filter>
     </None>
     <None Include="shader\grassVS.hlsl">
+      <Filter>リソース ファイル\Shader\Vertex</Filter>
+    </None>
+    <None Include="shader\breathingWallVS.hlsl">
       <Filter>リソース ファイル\Shader\Vertex</Filter>
     </None>
     <None Include="shader\rainVS.hlsl">
