@@ -470,11 +470,6 @@ namespace
         // 進む道筋に沿って、懐中電灯で浮かぶ手がかりと消灯時の異変を置く。
         void BuildWallWritings()
         {
-            m_Objects.facilityMap = CreateWriting(
-                "Stage1FacilityMap", "assets/texture/stage1_facility_map.png",
-                "assets/texture/stage1_facility_map_loop.png");
-            m_Objects.facilityMap->SetPrintedSurface();
-            m_Objects.facilityMap->SetInkColor(Color(1.0f, 1.0f, 1.0f, 1.0f));
             m_Objects.writings[Stage1WallWritings::Warning] = CreateWriting(
                 "Stage1WritingWarning", "assets/texture/writing_warning.png", "");
             m_Objects.writings[Stage1WallWritings::Three] = CreateWriting(

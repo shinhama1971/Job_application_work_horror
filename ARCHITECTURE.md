@@ -109,9 +109,9 @@ DDGI と半解像度の光の筋は Game が単一所有し、型の定義は Ga
 
 `StageScene::UpdateRouteLights` が進行とプレイヤーの位置に合わせて天井灯を1灯選びます。`CeilingLight::UpdateRouteFlicker` は不ぞろいな間隔で2回の明るい点灯を作り、ときどき長い明滅を挟みます。発光パネルと周囲の点光源は同じ明るさを使うため、停電中は床や壁に落ちる赤い光でも方向が分かります。
 
-#### 施設案内図
+#### 壁に貼った印刷物
 
-配電盤の横に、`stage1_props.txt` の `place Stage1FacilityMap` で印刷された案内図を置きます。`FlashlightWriting` の板と2枚の画像の切り替えを使い、印刷物は深度プリパスで裏の壁を隠します。`printedSurfacePS.hlsl` は共通の照明・影・霧を使い、紙面のつや消し材質を拡散反射で描きます。暗がりの計算には配置時の壁からの距離を渡します。壁のシェーダーでは、穴やひび、カビ、水の筋や傷が現れる範囲で細部を計算します。`AdvanceCorridorLoop` が最初の周回で扉の消えた画像に切り替えます。画像は `tools/generate-facility-map.ps1` から作り直せます。
+暗証番号の部屋の保管箱の掲示は、`FlashlightWriting` の板を印刷物（`SetPrintedSurface`）にして描きます。印刷物は深度プリパスで裏の壁を隠します。`printedSurfacePS.hlsl` は共通の照明・影・霧を使い、紙面のつや消し材質を拡散反射で描きます。暗がりの計算には配置時の壁からの距離を渡します。壁のシェーダーでは、穴やひび、カビ、水の筋や傷が現れる範囲で細部を計算します。（配電盤の横の施設案内図は11月21日に外しました。画像と作るスクリプトは `docs/retired-code/facility-map/` にあります。）
 
 #### 録音と無線
 

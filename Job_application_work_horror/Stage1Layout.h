@@ -128,8 +128,7 @@ struct StageObjects
     Stage1WallWritings::Writings writings{};
     // 消灯時の異変は、リザルトの既読集計から外す。
     FlashlightWriting* darkCorridorWriting = nullptr;
-    // 配電盤の横の施設案内図。廊下を一周すると図の中の扉だけが消える。
-    FlashlightWriting* facilityMap = nullptr;
+
     // 突き当たりのドアを通って開始地点へ戻るたびに、開始地点の部屋に1つずつ浮かぶ文字（1周目・2周目・3周目）
     std::array<FlashlightWriting*, LapWritingCount> lapWritings{};
     // 暗証番号の扉・入力盤・番号の手がかり（任意で探索）

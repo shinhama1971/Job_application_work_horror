@@ -300,7 +300,7 @@ place ExtraLight_SouthWestHallWest  -345 -38.5 -210 size 22 2 10
 place ExtraLight_StairLanding        304 -6 255 size 22 2 10
 place Door                           0 -74 40
 place FuseBox                        -35.1 -73.4 35
-place Stage1FacilityMap              -69 -68 38 yaw 180 size 37 25 1
+
 place ExitPowerPanel                 151.99 -66.93 272.31
 place Stage1EmergencyCharger         -217.5 -90 -103.5 yaw 90
 place Stage1EvidenceTerminal         216.8 -79.5 -42 yaw -90

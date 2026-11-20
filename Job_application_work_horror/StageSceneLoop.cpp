@@ -153,11 +153,6 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     const int openingPhase = (std::min)(m_CorridorLoopCount, MaxCorridorLoopPhase);
     ++m_CorridorLoopCount;
 
-    if (m_CorridorLoopCount == 1 && m_Objects.facilityMap != nullptr)
-    {
-        m_Objects.facilityMap->ShowAlternate();
-    }
-
     // 最後のドアに対する立ち位置と向きを、そのまま奥のドアの裏側へ写している。
     // 最後のドアを通る向き（+x）が奥のドアを通る向き（+z）になるよう、水平に90度回している（(x, z) → (-z, x)）。
     // 同じフレームの後半でPlayerがカメラを更新するため、移った瞬間も1フレームもずれない。

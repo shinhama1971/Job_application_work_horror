@@ -1,5 +1,12 @@
 # 作業の引き継ぎ（2026年11月9日）
 
+## 1面の施設案内図を外した（11月21日、Claude Code）
+
+- 作者の希望で、配電盤の横の施設案内図（`Stage1FacilityMap`）を外した。作る処理（`Stage1Layout.cpp`）、持っていた変数（`Stage1Layout.h` の `facilityMap`）、1周目に扉の消えた図へ替える処理（`StageSceneLoop.cpp`）、配置ファイルの place 行を消した。
+- 画像2枚（`stage1_facility_map.png`・`stage1_facility_map_loop.png`）と作るスクリプト（`generate-facility-map.ps1`）は、`docs/retired-code/facility-map/` へ移した（`git mv`）。
+- 印刷物の描き方（`SetPrintedSurface`・`printedSurfacePS.hlsl`）は、暗証番号の部屋の保管箱の掲示が使っているので残した。
+- 確かめたこと：Release・Debug（x64）とも警告0。自動撮影が最後まで動き、中央ホールの配電盤のまわりに図がないこと。
+
 ## 1面の呼吸する壁を中央ホールと建物全体へ（11月21日、Claude Code）
 
 - 懐中電灯で照らしても止まらないようにした（作者の希望）。ライトの円錐で膨らみを弱める計算を、シェーダー（`breathingWallShape.hlsli`・`breathingWallDeform.hlsli`）と当たり判定（`WallBreathing.cpp`）の両方から外した。息の音も、照らしている間に止めない。
