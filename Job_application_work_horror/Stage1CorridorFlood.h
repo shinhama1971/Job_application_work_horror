@@ -61,6 +61,8 @@ public:
     bool IsActive() const { return m_State != State::Idle && m_State != State::Finished; }
     // 追いつかれた後の暗転の濃さ（0〜1）
     float GetBlackout() const;
+    // 追いつかれた後の、画面の下から上がってくる水面の高さ（0〜1。PostProcess::SetSubmerge へ渡す）
+    float GetSubmerge() const;
 
 private:
     enum class State

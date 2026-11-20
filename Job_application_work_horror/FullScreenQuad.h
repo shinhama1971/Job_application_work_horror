@@ -60,9 +60,12 @@ namespace Graphics
             DirectX::SimpleMath::Vector4 presenceWarps[PresenceWarpCount];
             // 残像（x = 強さ、yz = ずらす量、w = 乱数の種）
             DirectX::SimpleMath::Vector4 echo;
+            // 水に呑まれる視界（x = 水面の高さ 0〜1。0で画面の下、1で画面の全部が水の中。yzw は使っていない）
+            DirectX::SimpleMath::Vector4 submerge;
         };
 
-        static_assert(sizeof(TimeBuffer) == offsetof(TimeBuffer, echo) + sizeof(DirectX::SimpleMath::Vector4));
+        static_assert(sizeof(TimeBuffer) == offsetof(TimeBuffer, submerge) + sizeof(DirectX::SimpleMath::Vector4));
+        static_assert(offsetof(TimeBuffer, submerge) == offsetof(TimeBuffer, echo) + sizeof(DirectX::SimpleMath::Vector4));
         static_assert(offsetof(TimeBuffer, presenceWarps) == 80);
         static_assert(offsetof(TimeBuffer, echo) == offsetof(TimeBuffer, presenceWarps) + PresenceWarpCount * sizeof(DirectX::SimpleMath::Vector4));
         static_assert(offsetof(TimeBuffer, exposure) == 32);
@@ -129,7 +132,8 @@ namespace Graphics
             float lensDropAge = 0.0f,
             const DirectX::SimpleMath::Vector4* presenceWarps = nullptr,
             ID3D11ShaderResourceView* echoSRV = nullptr,
-            const DirectX::SimpleMath::Vector4& echo = DirectX::SimpleMath::Vector4::Zero);
+            const DirectX::SimpleMath::Vector4& echo = DirectX::SimpleMath::Vector4::Zero,
+            float submergeLevel = 0.0f);
 
         // HDRの画面（hdrSceneSRV）を、選んだ曲線（Effect::ToneMapMode の番号）で今の描画先へ描いている（上書き）
         void DrawToneMap(ID3D11ShaderResourceView* hdrSceneSRV, unsigned int mode);

@@ -140,6 +140,8 @@ namespace Effect
         m_EchoStrength = 0.0f;
         m_TargetEchoStrength = 0.0f;
         m_EchoHold = 0.0f;
+        m_SubmergeLevel = 0.0f;
+        m_SubmergeHold = 0.0f;
         m_EchoCaptureTimer = 0.0f;
         m_EchoValid = false;
         m_EchoCopyRequested = false;
@@ -319,6 +321,12 @@ namespace Effect
         }
         m_FearVision += (m_TargetFearVision - m_FearVision) * response(FearVisionResponse);
         m_FearBeat = (std::max)(0.0f, m_FearBeat - deltaTime * FearBeatDecayPerSecond);
+        // 水に呑まれる視界：Scene から渡されなくなったら、すぐに消す
+        m_SubmergeHold -= deltaTime;
+        if (m_SubmergeHold <= 0.0f)
+        {
+            m_SubmergeLevel = 0.0f;
+        }
         // 残像：Scene から渡されなくなったら0へ戻す。出ている間は、少し前の画面をときどき写し取り、そのたびにずらす向きを変える
         m_EchoHold -= deltaTime;
         if (m_EchoHold <= 0.0f)
@@ -708,7 +716,8 @@ namespace Effect
             m_EchoValid ? m_EchoTexture.GetSRV() : nullptr,
             DirectX::SimpleMath::Vector4(
                 Tools::CaptureMode::IsActive() ? 0.0f : (std::clamp)(m_EchoStrength * effectScale, 0.0f, 1.0f),
-                m_EchoOffset.x, m_EchoOffset.y, m_EchoSeed));
+                m_EchoOffset.x, m_EchoOffset.y, m_EchoSeed),
+            m_SubmergeLevel);
 
         // 最後に、HDRの画面を曲線で0〜1へ移して、バックバッファへ描いている（自動撮影・計測では --tonemap で曲線を選べる）
         const auto toneMapOverride = Tools::CaptureMode::GetToneMapOverride();

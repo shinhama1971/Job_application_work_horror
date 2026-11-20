@@ -566,6 +566,12 @@ void StageScene::UpdateCorridorFlood(Player& player, float deltaTime)
         }
     }
 
+    // 追いつかれたら、画面の下から赤い水面が上がってきて、視界が水に呑まれる
+    if (const float submerge = m_CorridorFlood.GetSubmerge(); submerge > 0.0f)
+    {
+        game->GetPostProcess()->SetSubmerge(submerge);
+    }
+
     // 床の浸水範囲は、西棟の水を抜いた後は使っていないので、水がある間だけこの演出が使っている
     Ground* ground = m_Objects.ground;
     if (ground == nullptr)

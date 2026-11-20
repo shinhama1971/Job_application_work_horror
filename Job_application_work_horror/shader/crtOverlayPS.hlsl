@@ -313,6 +313,49 @@ static const float CRT_FILM_WARM_GAIN = 1.35f;
 #define ECHO_BAND_COUNT 90.0f
 #define ECHO_BAND_VARIATION 0.45f
 
+// --- 水に呑まれる視界（submerge。1面のループ廊下の赤い水に追いつかれたとき）
+// 水面の線：高さ 0〜1 で上がりきったときに、波の分だけ画面の上を越える余り、大きな波と細かい波（横の細かさ・速さ・高さ）、線のぼかし
+#define SUBMERGE_OVERSHOOT 0.12f
+#define SUBMERGE_WAVE_FREQUENCY 7.0f
+#define SUBMERGE_WAVE_SPEED 2.6f
+#define SUBMERGE_WAVE_HEIGHT 0.035f
+#define SUBMERGE_RIPPLE_FREQUENCY 23.0f
+#define SUBMERGE_RIPPLE_SPEED 5.5f
+#define SUBMERGE_RIPPLE_HEIGHT 0.010f
+#define SUBMERGE_LINE_SOFTNESS 0.006f
+// 水の中の景色のゆらぎ（細かさ・速さ・ずらす量）
+#define SUBMERGE_REFRACT_FREQUENCY 18.0f
+#define SUBMERGE_REFRACT_SPEED 3.1f
+#define SUBMERGE_REFRACT_STRENGTH 0.012f
+// 水の中の色：景色の明るさに掛ける赤、深い所の暗い赤、線から下へこの割合で深くなる、深さで暗くする割合、景色の色を残す割合
+#define SUBMERGE_BLOOD_TINT float3(0.85f, 0.10f, 0.07f)
+#define SUBMERGE_DEEP_COLOR float3(0.10f, 0.004f, 0.003f)
+#define SUBMERGE_DEPTH_GAIN 2.2f
+#define SUBMERGE_DEPTH_DARKEN 0.85f
+#define SUBMERGE_SCENE_KEEP 0.15f
+// 水の中の濃さと、水面の線の明るい縁（明るさ・鋭さ・色）
+#define SUBMERGE_ALPHA 0.94f
+#define SUBMERGE_LINE_GLOW 0.55f
+#define SUBMERGE_LINE_SHARPNESS 160.0f
+#define SUBMERGE_LINE_COLOR float3(0.95f, 0.35f, 0.28f)
+// 上っていく泡：画面の高さあたりのマスの数、上る速さ（画面の高さ/秒）、出るマスの割合、横のずれ、大きさ（最小＋乱数の幅）、輪の内側、明るさ、種
+#define SUBMERGE_BUBBLE_CELLS 14.0f
+#define SUBMERGE_BUBBLE_RISE 0.55f
+#define SUBMERGE_BUBBLE_CHANCE 0.84f
+#define SUBMERGE_BUBBLE_JITTER 0.30f
+#define SUBMERGE_BUBBLE_RADIUS_MIN 0.06f
+#define SUBMERGE_BUBBLE_RADIUS_RANGE 0.16f
+#define SUBMERGE_BUBBLE_INNER 0.72f
+#define SUBMERGE_BUBBLE_BRIGHTNESS 0.28f
+#define SUBMERGE_BUBBLE_SEED 31.7f
+// 泡の列ごとの違い：上る速さ（最低＋乱数の幅）と、列ごとの縦のずらし、横に揺れる速さと幅
+// （横のずれの半分＋揺れ＋一番大きな半径が、マスの半分 0.5 を超えないようにしている。超えると泡がマスの境で切れる）
+#define SUBMERGE_BUBBLE_SPEED_MIN 0.55f
+#define SUBMERGE_BUBBLE_SPEED_RANGE 0.9f
+#define SUBMERGE_BUBBLE_COLUMN_OFFSET 17.0f
+#define SUBMERGE_BUBBLE_SWAY_SPEED 3.3f
+#define SUBMERGE_BUBBLE_SWAY 0.10f
+
 float4 main(PS_IN input) : SV_TARGET
 {
     // コマ落ち：影が近くラジオの雑音が強いとき、一瞬だけ映像が止まる。止まった画面は縦に少しずれ、
@@ -665,6 +708,57 @@ float4 main(PS_IN input) : SV_TARGET
         const float fearAlpha = saturate(fearEdge * fear * (CRT_FEAR_ALPHA_BASE + pulse * CRT_FEAR_ALPHA_PULSE));
         const float layeredAlpha = fearAlpha + alpha * (1.0f - fearAlpha);
         overlayColor = (fearColor * fearAlpha + overlayColor * alpha * (1.0f - fearAlpha)) /
+            max(layeredAlpha, CRT_MIN_DIVISOR);
+        alpha = layeredAlpha;
+    }
+
+    // 水に呑まれる：画面の下から、波打つ水面の線が上がってくる。線より下は、景色がゆらいで赤く濁り、泡が上っていく。
+    // 線の上は今までの層のまま。水が上がりきると、画面の全部が水の中になる（この後、Scene が暗転させる）
+    [branch]
+    if (submerge.x > CRT_EFFECT_EPSILON)
+    {
+        const float wave =
+            sin(input.uv.x * SUBMERGE_WAVE_FREQUENCY + time * SUBMERGE_WAVE_SPEED) * SUBMERGE_WAVE_HEIGHT +
+            sin(input.uv.x * SUBMERGE_RIPPLE_FREQUENCY - time * SUBMERGE_RIPPLE_SPEED) * SUBMERGE_RIPPLE_HEIGHT;
+        // uv の y は画面の下ほど大きい。高さ0で線は画面の下の外、1で上の外
+        const float waterline = 1.0f - submerge.x * (1.0f + SUBMERGE_OVERSHOOT) + wave;
+        const float under = smoothstep(waterline - SUBMERGE_LINE_SOFTNESS, waterline + SUBMERGE_LINE_SOFTNESS, input.uv.y);
+
+        // 水の中の景色：縦横に揺らいだ所を読み、明るさだけを赤く染め、線から深いほど暗い赤へ沈めている
+        const float2 refraction = float2(
+            sin(input.uv.y * SUBMERGE_REFRACT_FREQUENCY + time * SUBMERGE_REFRACT_SPEED),
+            cos(input.uv.x * SUBMERGE_REFRACT_FREQUENCY - time * SUBMERGE_REFRACT_SPEED)) * SUBMERGE_REFRACT_STRENGTH;
+        const float3 underScene = SceneTexture.SampleLevel(LinearSampler, saturate(input.uv + refraction), 0.0f).rgb;
+        const float underLuminance = dot(underScene, CRT_LUMINANCE_WEIGHTS);
+        const float depth = saturate((input.uv.y - waterline) * SUBMERGE_DEPTH_GAIN);
+        float3 submergeColor = lerp(underLuminance.xxx * SUBMERGE_BLOOD_TINT, underScene, SUBMERGE_SCENE_KEEP);
+        submergeColor = lerp(submergeColor, SUBMERGE_DEEP_COLOR, depth * SUBMERGE_DEPTH_DARKEN);
+
+        // 上っていく泡：画面を縦の列とマスに分け、一部のマスにだけ、輪の形の泡を置いて上へ流している。
+        // 列ごとに上る速さと縦の位置をずらし、横に揺らして、泡が行と列にそろって見えないようにしている
+        const float bubbleColumn = floor(input.uv.x * screenAspect * SUBMERGE_BUBBLE_CELLS);
+        const float columnRandom = FastHash21(float2(bubbleColumn, SUBMERGE_BUBBLE_SEED));
+        const float columnRise = time * SUBMERGE_BUBBLE_RISE *
+            (SUBMERGE_BUBBLE_SPEED_MIN + columnRandom * SUBMERGE_BUBBLE_SPEED_RANGE) + columnRandom * SUBMERGE_BUBBLE_COLUMN_OFFSET;
+        const float2 bubbleSpace = float2(input.uv.x * screenAspect * SUBMERGE_BUBBLE_CELLS,
+            (input.uv.y + columnRise) * SUBMERGE_BUBBLE_CELLS);
+        const float2 bubbleCell = floor(bubbleSpace);
+        const float bubbleRandom = FastHash21(bubbleCell + SUBMERGE_BUBBLE_SEED);
+        const float2 bubbleCenter = float2((bubbleRandom - 0.5f) * SUBMERGE_BUBBLE_JITTER +
+            sin(time * SUBMERGE_BUBBLE_SWAY_SPEED + bubbleCell.y + bubbleRandom * SUBMERGE_BUBBLE_COLUMN_OFFSET) * SUBMERGE_BUBBLE_SWAY, 0.0f);
+        const float bubbleRadius = SUBMERGE_BUBBLE_RADIUS_MIN + bubbleRandom * SUBMERGE_BUBBLE_RADIUS_RANGE;
+        const float bubbleDistance = length(frac(bubbleSpace) - 0.5f - bubbleCenter);
+        const float bubbleRing = smoothstep(bubbleRadius, bubbleRadius * SUBMERGE_BUBBLE_INNER, bubbleDistance) *
+            smoothstep(bubbleRadius * SUBMERGE_BUBBLE_INNER * SUBMERGE_BUBBLE_INNER, bubbleRadius * SUBMERGE_BUBBLE_INNER, bubbleDistance);
+        const float bubble = bubbleRing * step(SUBMERGE_BUBBLE_CHANCE, FastHash21(bubbleCell)) * under;
+        submergeColor += bubble * SUBMERGE_BUBBLE_BRIGHTNESS * SUBMERGE_LINE_COLOR;
+
+        // 水面の線のすぐそばを、明るく光らせている（水面を下から・横から見た光の縁）
+        const float lineGlow = exp(-abs(input.uv.y - waterline) * SUBMERGE_LINE_SHARPNESS) * SUBMERGE_LINE_GLOW;
+        const float submergeAlpha = saturate(under * SUBMERGE_ALPHA + lineGlow);
+        submergeColor = lerp(submergeColor, SUBMERGE_LINE_COLOR, saturate(lineGlow / max(submergeAlpha, CRT_MIN_DIVISOR)));
+        const float layeredAlpha = submergeAlpha + alpha * (1.0f - submergeAlpha);
+        overlayColor = (submergeColor * submergeAlpha + overlayColor * alpha * (1.0f - submergeAlpha)) /
             max(layeredAlpha, CRT_MIN_DIVISOR);
         alpha = layeredAlpha;
     }

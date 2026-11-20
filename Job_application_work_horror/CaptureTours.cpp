@@ -117,6 +117,8 @@ namespace Tools::CaptureTours
         { 156.0f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05v_1面_廊下の照明が消える", false },
         { 158.0f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05w_1面_奥から押し寄せる赤い水", false },
         { 159.3f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05x_1面_目の前まで来た赤い水", false },
+        { 160.0f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05y_1面_赤い水に呑まれる視界", false },
+        { 160.35f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05z_1面_水の中に沈んだ視界", false },
         { 162.5f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, nullptr, false },
     };
 

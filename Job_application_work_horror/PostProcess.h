@@ -119,6 +119,9 @@ namespace Effect
         float m_EchoStrength = 0.0f;
         float m_TargetEchoStrength = 0.0f;
         float m_EchoHold = 0.0f;
+        // 水に呑まれる視界の水面の高さと、渡されなくなってから0へ戻すまでの残り秒数
+        float m_SubmergeLevel = 0.0f;
+        float m_SubmergeHold = 0.0f;
         float m_EchoCaptureTimer = 0.0f;
         bool m_EchoValid = false;
         bool m_EchoCopyRequested = false;
@@ -336,6 +339,14 @@ namespace Effect
         {
             m_TargetEchoStrength = (std::clamp)(strength, 0.0f, 1.0f);
             m_EchoHold = FearVisionHoldSeconds;
+        }
+
+        // 水に呑まれる視界の水面の高さ（0〜1。0で画面の下、1で画面の全部が水の中）を設定している。
+        // Scene が毎フレーム渡し、渡されなくなったら0へ戻す（演出の強さの設定では弱めない。捕まったことを伝える表示のため）
+        void SetSubmerge(float level)
+        {
+            m_SubmergeLevel = (std::clamp)(level, 0.0f, 1.0f);
+            m_SubmergeHold = FearVisionHoldSeconds;
         }
 
         // 影のまわりの空間のゆがみを設定している（xy = 画面の位置 0〜1、z = 半径（縦の高さを1とした長さ）、w = 強さ 0〜1）

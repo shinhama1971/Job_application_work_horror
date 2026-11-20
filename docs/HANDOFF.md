@@ -1,5 +1,13 @@
 # 作業の引き継ぎ（2026年11月9日）
 
+## 赤い水に呑まれる視界（11月21日、Claude Code）
+
+- ループ廊下の赤い水に追いつかれたとき、ただ暗くなるだけだったのを、画面の下から波打つ赤い水面が上がって視界が水に呑まれる表示にした。
+- 流れ：追いつかれてから0.8秒で水面が上がりきる（`Stage1CorridorFlood::GetSubmerge`）→ 1.2秒までに真っ暗（`GetBlackout`）→ 開始地点へ戻して明るくする。
+- 画面効果：b0（`TimeBuffer`）の最後に `float4 submerge` を足した（`FullScreenQuad.h` の static_assert・`postProcessBuffer.hlsli`・`FullScreenQuad::Draw` の引数の3か所）。`crtOverlayPS.hlsl` の水に呑まれる層：2つの波の水面の線、線より下の揺らいだ景色を赤く染めて深いほど暗くする、列ごとに速さの違う泡、線の光る縁。値は `crtOverlayPS.hlsl` の `SUBMERGE_*`。
+- 確かめたこと：Release・Debug（x64）とも警告0。b0 を読むほかの3つ（`bloomCompositePS`・`exposurePS`・`volumetricFlashlightPS`）は、逆アセンブルで命令が同じ（バッファが大きくなった分だけ違う）。撮影 `05y`（水面が上がってくる）・`05z`（水の中に沈んだ）を足し、泡が行と列にそろって見えないよう直した。
+- 作者に確かめてもらうこと：実際に追いつかれたときの速さ（0.8秒）と、泡の量。
+
 ## 1面のループ廊下に押し寄せる赤い水（11月21日、Claude Code）
 
 - 8番出口・P.T. などを調べて選んだ案のうち、作者が選んだ「廊下の奥から水が押し寄せる」を作った。抜いた西棟の水が廊下へ戻ってくる、という流れにしている。

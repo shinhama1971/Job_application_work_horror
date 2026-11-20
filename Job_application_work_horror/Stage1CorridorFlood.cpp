@@ -32,6 +32,8 @@ namespace
     // 追いつかれた後の暗転の秒数（この半分の所でプレイヤーを開始地点へ戻している）
     constexpr float CaughtBlackoutSeconds = 2.4f;
     constexpr float RestartPoint = 0.5f;
+    // 追いつかれてから、画面の下から水面が上がりきるまでの秒数（この後、真っ暗になっていく）
+    constexpr float SubmergeRiseSeconds = 0.8f;
     // 水の赤さが濃くなる・薄くなる速さ（1秒あたり）
     constexpr float RednessRiseRate = 1.2f;
     constexpr float RednessFallRate = 0.4f;
@@ -165,9 +167,21 @@ float Stage1CorridorFlood::GetBlackout() const
     {
         return 0.0f;
     }
-    // 前半で真っ暗にし、後半で明るく戻している
+    // 水面が上がりきってから開始地点へ戻すまでに真っ暗にし、戻した後で明るくしている
     const float half = CaughtBlackoutSeconds * RestartPoint;
-    return m_StateTimer < half
-        ? m_StateTimer / half
-        : 1.0f - (m_StateTimer - half) / (CaughtBlackoutSeconds - half);
+    if (m_StateTimer < half)
+    {
+        return std::clamp((m_StateTimer - SubmergeRiseSeconds) / (half - SubmergeRiseSeconds), 0.0f, 1.0f);
+    }
+    return 1.0f - (m_StateTimer - half) / (CaughtBlackoutSeconds - half);
+}
+
+float Stage1CorridorFlood::GetSubmerge() const
+{
+    // 追いつかれてから開始地点へ戻すまでの間だけ、画面の下から水面を上げている（戻した後は、もう水の中ではない）
+    if (m_State != State::CaughtBlackout || m_StateTimer >= CaughtBlackoutSeconds * RestartPoint)
+    {
+        return 0.0f;
+    }
+    return std::clamp(m_StateTimer / SubmergeRiseSeconds, 0.0f, 1.0f);
 }
