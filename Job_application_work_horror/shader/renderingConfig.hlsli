@@ -67,6 +67,9 @@
 #define SIGNAL_LOST_MAX_REFLECTION_PROPS 16
 #define SIGNAL_LOST_REFLECTION_PROP_STRIDE 3
 
+// 呼吸する壁の、1回の呼吸（吸って吐く）の秒数。breathingWallVS.hlsl の膨らみと、StageScene の息の音で同じ値を使う。
+#define SIGNAL_LOST_BREATHING_WALL_CYCLE_SECONDS 4.6f
+
 // 人影を描く間だけ、通常はデバッグ表示に使う枠を借りる。
 #define SIGNAL_LOST_DEBUG_VIEW_BUFFER_SLOT 7
 #define SIGNAL_LOST_CBUFFER_REGISTER_IMPL(slot) b ## slot

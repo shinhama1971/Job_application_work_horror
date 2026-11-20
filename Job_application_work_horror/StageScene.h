@@ -89,6 +89,10 @@ private:
     void UpdateCeilingStalker(const class Player& player, float deltaTime);
     // ループ廊下で振り返ると、廊下が伸びて見える（Stage1CorridorStretch の倍率をカメラへ渡している）
     void UpdateCorridorStretch(const class Player& player, float deltaTime);
+    // ループ廊下の東の区間の南の壁（LoopWall3）を、呼吸する壁にしている（配置を読み直したら、もう一度探す）
+    void SetupBreathingWall();
+    // 呼吸する壁：周回が進むほど大きく膨らみ、息を吐くたびに壁の中から息の音がする
+    void UpdateBreathingWall(const class Player& player, float deltaTime);
     // 姿の見えない物音を更新し、鳴らしている
     void UpdateAmbientSounds();
     // 懐中電灯で照らすと浮かぶ壁の文字。書き換わった文字を読んだら物音の演出を起こしている。
@@ -152,6 +156,11 @@ private:
     // 天井裏の足音の演出、電力が戻ってからの秒数（演出を始めてよい時間になったかを見る）、このフレームの合図
     Stage1CeilingStalker m_CeilingStalker;
     Stage1CorridorStretch m_CorridorStretch;
+    // 呼吸する壁と、呼吸の時間（秒）・今の膨らむ量・前のフレームの呼吸の何回目か（息の音を1回ずつ鳴らすため）
+    class Wall* m_BreathingWall = nullptr;
+    float m_BreathingWallTime = 0.0f;
+    float m_BreathingWallAmplitude = 0.0f;
+    int m_BreathingWallCycle = 0;
     // ヒューズを拾った瞬間の演出：経過秒（-1 なら起きていない）、何本目か（0 から）、鳴らした足音の数、消した照明、足音を鳴らす所
     float m_FuseScareTimer = -1.0f;
     int m_FuseScareLevel = 0;

@@ -383,6 +383,10 @@ void Wall::Draw(Camera* cam)
     m_Shader.SetGPU();
     m_VertexBuffer.SetGPU();
     m_IndexBuffer.SetGPU();
+    if (m_Breathing)
+    {
+        BindBreathing(*cam);
+    }
 
     // モデルの光らない部位（枠・笠・台）を、光る色を付けないマテリアルで先に描いている
     if (m_GlowIndexStart > 0)
@@ -432,6 +436,10 @@ void Wall::DrawDepthPrepass(Camera* cam)
     context->PSSetShader(nullptr, nullptr, 0);
     m_VertexBuffer.SetGPU();
     m_IndexBuffer.SetGPU();
+    if (m_Breathing)
+    {
+        BindBreathing(*cam);
+    }
     context->DrawIndexed(static_cast<UINT>(m_Indices.size()), 0, 0);
 }
 
@@ -744,6 +752,97 @@ void Wall::RebuildVisualModel()
     }
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
+}
+
+void Wall::EnableBreathing(bool positiveZFace, int columns, int rows, float edgeWidth)
+{
+    columns = (std::max)(columns, 1);
+    rows = (std::max)(rows, 1);
+    const float faceSign = positiveZFace ? 1.0f : -1.0f;
+
+    // 箱の6面（各4頂点・12インデックス）のうち、動かす面だけを格子に置き換えている
+    constexpr std::size_t VerticesPerFace = 4;
+    constexpr std::size_t IndicesPerFace = 12;
+    std::vector<VERTEX_3D> vertices;
+    std::vector<unsigned int> indices;
+    const std::size_t faceCount = m_BoxVertices.size() / VerticesPerFace;
+    for (std::size_t face = 0; face < faceCount; ++face)
+    {
+        const VERTEX_3D& first = m_BoxVertices[face * VerticesPerFace];
+        const unsigned int base = static_cast<unsigned int>(vertices.size());
+        if (first.normal.z * faceSign <= 0.5f)
+        {
+            // ほかの面はそのまま写している（インデックスは新しい並びの番号に直す）
+            const unsigned int oldBase = static_cast<unsigned int>(face * VerticesPerFace);
+            vertices.insert(vertices.end(),
+                m_BoxVertices.begin() + face * VerticesPerFace, m_BoxVertices.begin() + (face + 1) * VerticesPerFace);
+            for (std::size_t index = face * IndicesPerFace; index < (face + 1) * IndicesPerFace; ++index)
+            {
+                indices.push_back(m_BoxIndices[index] - oldBase + base);
+            }
+            continue;
+        }
+        // 格子の頂点。UV は箱の同じ面と同じ向きにしている（+z の面は x とともに増え、-z の面は x とともに減る）
+        for (int column = 0; column <= columns; ++column)
+        {
+            for (int row = 0; row <= rows; ++row)
+            {
+                const float x = -0.5f + static_cast<float>(column) / static_cast<float>(columns);
+                const float y = -0.5f + static_cast<float>(row) / static_cast<float>(rows);
+                VERTEX_3D vertex = first;
+                vertex.position = Vector3(x, y, 0.5f * faceSign);
+                vertex.uv = Vector2(positiveZFace ? x + 0.5f : 0.5f - x, 0.5f - y);
+                vertices.push_back(vertex);
+            }
+        }
+        // 1マスを2つの三角形にし、箱と同じく表と裏の両方の順番を持たせている
+        const auto at = [base, rows](int column, int row)
+        {
+            return base + static_cast<unsigned int>(column * (rows + 1) + row);
+        };
+        for (int column = 0; column < columns; ++column)
+        {
+            for (int row = 0; row < rows; ++row)
+            {
+                const unsigned int a = at(column, row);
+                const unsigned int b = at(column, row + 1);
+                const unsigned int c = at(column + 1, row);
+                const unsigned int d = at(column + 1, row + 1);
+                const unsigned int cell[] = { a, b, c, c, b, d, c, b, a, d, b, c };
+                indices.insert(indices.end(), std::begin(cell), std::end(cell));
+            }
+        }
+    }
+
+    m_Vertices = std::move(vertices);
+    m_Indices = std::move(indices);
+    m_VertexBuffer.Create(m_Vertices);
+    m_IndexBuffer.Create(m_Indices);
+    m_Shader.CreateRequired("shader/breathingWallVS.hlsl", "shader/litTexturePS.hlsl");
+
+    D3D11_BUFFER_DESC desc{};
+    desc.Usage = D3D11_USAGE_DEFAULT;
+    desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    desc.ByteWidth = sizeof(BREATHING_WALL_BUFFER);
+    if (FAILED(Renderer::GetDevice()->CreateBuffer(&desc, nullptr, m_BreathBuffer.ReleaseAndGetAddressOf())))
+    {
+        Utility::ReportFatalError("呼吸する壁の定数バッファの作成に失敗しました。");
+    }
+    m_BreathFaceSign = faceSign;
+    m_BreathEdgeWidth = edgeWidth;
+    m_Breathing = true;
+}
+
+void Wall::BindBreathing(const Camera& camera)
+{
+    BREATHING_WALL_BUFFER buffer{};
+    buffer.Params = Vector4(m_BreathTime, m_BreathAmplitude, m_BreathFaceSign, m_BreathEdgeWidth);
+    const Vector3 origin = camera.GetPosition();
+    buffer.FlashlightOrigin = Vector4(origin.x, origin.y, origin.z, 1.0f);
+    ID3D11DeviceContext* context = Renderer::GetDeviceContext();
+    context->UpdateSubresource(m_BreathBuffer.Get(), 0, nullptr, &buffer, 0, 0);
+    ID3D11Buffer* breathBuffer = m_BreathBuffer.Get();
+    context->VSSetConstantBuffers(SIGNAL_LOST_OBJECT_DRAW_BUFFER_SLOT, 1, &breathBuffer);
 }
 
 // PBRの表面の仕上げ（金属らしさと粗さ）を、マテリアルの値として変えている

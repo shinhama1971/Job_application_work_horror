@@ -259,6 +259,28 @@ namespace
     constexpr PulseSpec CorridorStretchPulse{ 0.16f, 0.6f };
     constexpr RumbleSpec CorridorStretchRumble{ 10, 0.08f };
 
+    // --- 呼吸する壁（ループ廊下の東の区間の南の壁）
+    // 配置ファイルの壁の名前と、膨らませる面（+z の面＝北の廊下側）、格子の細かさ、縁から動かさない幅
+    constexpr const char* BreathingWallName = "LoopWall3";
+    constexpr bool BreathingWallPositiveZFace = true;
+    constexpr int BreathingWallColumns = 72;
+    constexpr int BreathingWallRows = 24;
+    constexpr float BreathingWallEdgeWidth = 14.0f;
+    // 一番大きく膨らむ量（1周目・2周目・3周目以降。0周目は動かない）と、その量へ近づく速さ（1秒あたり）
+    constexpr float BreathingWallFirstLoopAmplitude = 4.0f;
+    constexpr float BreathingWallSecondLoopAmplitude = 5.5f;
+    constexpr float BreathingWallLaterLoopAmplitude = 7.0f;
+    constexpr float BreathingWallAmplitudeRate = 1.0f;
+    // 息の音：壁のこの範囲（x）と高さで、プレイヤーに一番近い所から鳴らす。この距離より遠いと鳴らさない
+    constexpr float BreathingWallSoundMinX = 50.0f;
+    constexpr float BreathingWallSoundMaxX = 190.0f;
+    constexpr float BreathingWallSoundY = -70.0f;
+    constexpr float BreathingWallSoundZ = 238.0f;
+    constexpr float BreathingWallSoundDistance = 90.0f;
+    // 懐中電灯を壁へ向けているとみなす向き（視線と、音の所への向きの内積がこれより大きい）。照らしている間は息をしない
+    constexpr float BreathingWallLitFacing = 0.9f;
+    constexpr EventFeedback::SoundSpec BreathingWallSound{ 0.55f, 0.75f };
+
     // --- 天井裏の足音が、照明を消しながら迫ってくる（Stage1CeilingStalker）
     // 電力が戻ってから、この秒数が過ぎた後に起きる（照明が全部点き、落ち着いた頃）
     constexpr float CeilingStalkerDelaySeconds = 25.0f;
@@ -1302,6 +1324,64 @@ void StageScene::UpdateCorridorStretch(const Player& player, float deltaTime)
         EventFeedback::Rumble(CorridorStretchRumble);
     }
     camera->SetWorldStretchZ(m_CorridorStretch.GetStretchZ());
+}
+
+void StageScene::SetupBreathingWall()
+{
+    m_BreathingWall = nullptr;
+    for (const auto& [name, wall] : m_Objects.layoutProps)
+    {
+        if (name == BreathingWallName && wall != nullptr)
+        {
+            wall->EnableBreathing(BreathingWallPositiveZFace, BreathingWallColumns, BreathingWallRows, BreathingWallEdgeWidth);
+            m_BreathingWall = wall;
+            break;
+        }
+    }
+}
+
+void StageScene::UpdateBreathingWall(const Player& player, float deltaTime)
+{
+    if (m_BreathingWall == nullptr)
+    {
+        return;
+    }
+    // 1周するまでは普通の壁。周回が進むほど大きく膨らむ（急に動き出さないよう、少しずつ近づけている）
+    const float target =
+        m_CorridorLoopCount <= 0 ? 0.0f
+        : m_CorridorLoopCount == 1 ? BreathingWallFirstLoopAmplitude
+        : m_CorridorLoopCount == 2 ? BreathingWallSecondLoopAmplitude
+        : BreathingWallLaterLoopAmplitude;
+    const float step = BreathingWallAmplitudeRate * deltaTime;
+    m_BreathingWallAmplitude = std::clamp(target, m_BreathingWallAmplitude - step, m_BreathingWallAmplitude + step);
+    m_BreathingWallTime += deltaTime;
+    m_BreathingWall->SetBreathing(m_BreathingWallTime, m_BreathingWallAmplitude);
+
+    // 息を吐き始める所（呼吸の1回の始まり）ごとに、壁の中から息の音を1回鳴らしている
+    const int cycle = static_cast<int>(m_BreathingWallTime / SIGNAL_LOST_BREATHING_WALL_CYCLE_SECONDS);
+    const bool newCycle = cycle != m_BreathingWallCycle;
+    m_BreathingWallCycle = cycle;
+    if (!newCycle || m_BreathingWallAmplitude <= 0.0f || !IsAmbientSoundAllowed())
+    {
+        return;
+    }
+    Core::Game* game = Core::Game::GetInstance();
+    const Vector3 playerPosition = player.GetPosition();
+    const Vector3 soundPosition(
+        std::clamp(playerPosition.x, BreathingWallSoundMinX, BreathingWallSoundMaxX),
+        BreathingWallSoundY, BreathingWallSoundZ);
+    Vector3 toSound = soundPosition - game->GetCamera()->GetPosition();
+    const float distance = toSound.Length();
+    if (distance > BreathingWallSoundDistance)
+    {
+        return;
+    }
+    toSound /= (std::max)(distance, 0.001f);
+    const bool lit = player.IsFlashlightOn() && game->GetCamera()->GetForward().Dot(toSound) > BreathingWallLitFacing;
+    if (!lit)
+    {
+        game->PlayAudioCueAt(SOUND_CUE_BREATH, soundPosition, BreathingWallSound.Pitch, BreathingWallSound.Volume);
+    }
 }
 
 void StageScene::UpdateCeilingStalker(const Player& player, float deltaTime)

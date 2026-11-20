@@ -175,6 +175,13 @@ namespace
         { 125.6f, Vector3(0.0f, FloorY, 200.0f), Pi, -0.02f, L"05p_1面_振り返ったループ廊下", false },
         { 131.0f, Vector3(0.0f, FloorY, 200.0f), Pi, -0.02f, L"05q_1面_見つめている間に伸びた廊下", false },
         { 131.5f, Vector3(0.0f, FloorY, 200.0f), Pi, -0.02f, nullptr, false },
+        // 1周した後のループ廊下の東の区間。南の壁（LoopWall3）が、息をするように膨らんでは戻る。
+        // 壁に沿って奥を見た画面と、壁を正面から照らした画面（光の当たった所だけ平らに止まる）を、膨らみ切った時刻に写している
+        { 131.55f, Vector3(178.0f, FloorY, 264.0f), YawToward(178.0f, 264.0f, 60.0f, 241.0f), -0.06f, nullptr, false },
+        { 135.7f, Vector3(178.0f, FloorY, 264.0f), YawToward(178.0f, 264.0f, 60.0f, 241.0f), -0.06f, L"05r_1面_息をする壁", false },
+        { 136.5f, Vector3(120.0f, FloorY, 262.0f), Pi, -0.12f, nullptr, false },
+        { 140.3f, Vector3(120.0f, FloorY, 262.0f), Pi, -0.12f, L"05s_1面_照らした所だけ止まる壁", false },
+        { 140.8f, Vector3(120.0f, FloorY, 262.0f), Pi, -0.12f, nullptr, false },
     };
 
     // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉 → 鏡（普段・鏡の異変で人影が映る・振り返ると誰もいない）

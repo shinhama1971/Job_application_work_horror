@@ -15,6 +15,8 @@
 
 #include <cmath>
 #include <string>
+#include <d3d11.h>
+#include <wrl/client.h>
 
 class Camera;
 
@@ -80,6 +82,23 @@ private:
     // 本描画・影・深度プリパスで共通のワールド行列（同じ計算にし、深度プリパスと本描画の深度を一致させている）
     DirectX::SimpleMath::Matrix MakeWorldMatrix() const;
 
+    // 呼吸する壁（EnableBreathing）。breathingWallVS.hlsl の b9 と同じ並び
+    struct BREATHING_WALL_BUFFER
+    {
+        // x = 時間（秒）、y = 一番大きく膨らむ量、z = 動かす面の向き（+1 か -1）、w = 縁を固定する幅
+        DirectX::SimpleMath::Vector4 Params;
+        // xyz = 懐中電灯の光が出る所（カメラの位置）
+        DirectX::SimpleMath::Vector4 FlashlightOrigin;
+    };
+    bool m_Breathing = false;
+    float m_BreathFaceSign = -1.0f;
+    float m_BreathEdgeWidth = 0.0f;
+    float m_BreathTime = 0.0f;
+    float m_BreathAmplitude = 0.0f;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> m_BreathBuffer;
+    // 呼吸の値をGPUへ送り、頂点シェーダーの b9 に入れている（本描画と深度プリパスで同じ形にするため、両方で呼んでいる）
+    void BindBreathing(const Camera& camera);
+
 public:
     // 箱を作る／何もしない／描く／影を描く／解放する
     void Init() override;
@@ -120,6 +139,17 @@ public:
 
     // PBRの表面の仕上げ（金属らしさ0〜1、粗さ0.045〜1。粗さ0は光沢の強さから換算する）を決めている
     void SetSurfaceFinish(float metallic, float roughness);
+
+    // 呼吸する壁にしている：箱の +z（positiveZFace）か -z の面を columns×rows の細かい格子に分け、
+    // 頂点シェーダー（breathingWallVS.hlsl）で膨らませる。縁から edgeWidth の所までは動かさない（隣の壁とつながったまま）。
+    // 見た目だけが動き、当たり判定と影は箱のまま
+    void EnableBreathing(bool positiveZFace, int columns, int rows, float edgeWidth);
+    // 呼吸の時間（秒）と、一番大きく膨らむ量（0なら動かない）を決めている
+    void SetBreathing(float time, float amplitude)
+    {
+        m_BreathTime = time;
+        m_BreathAmplitude = amplitude;
+    }
 
     // 建物の壁として、壁の古さ（パネルの継ぎ目・ひび・水の跡・カビ）を描くかどうかを決めている。
     // 古さの濃さは面ごとに Renderer::SetWallWeathering で決めている。小物（棚・配管・標識）には使っていない。

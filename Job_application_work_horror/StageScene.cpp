@@ -246,6 +246,10 @@ void StageScene::Init()
     m_KeypadDoor.Init(m_Objects.keypad);
     m_HiddenRoom.Init(m_Objects.hiddenRoom);
     m_WestWing.Init(m_Objects.westWing);
+    m_BreathingWallTime = 0.0f;
+    m_BreathingWallAmplitude = 0.0f;
+    m_BreathingWallCycle = 0;
+    SetupBreathingWall();
     m_CeilingScare.Reset();
     Renderer::SetPuddleFigure(Vector3::Zero, 0.0f);
     m_SafeLights.Init(m_Objects.safeZones);
@@ -311,6 +315,7 @@ bool StageScene::ReloadPropLayout()
     }
     // 読み直しで増えた壁も、影の視線と移動を遮る。
     m_StalkerWalls = game.GetObjects<Wall>();
+    SetupBreathingWall();
     // 扉・照明・電池など place 行で置いた物も置き直し、部屋の形（room の壁）を部屋の角の暗がりへ渡し直している。
     // プレイヤーの位置と、プレイごとに選ぶヒューズ・鍵の場所（spot）は、遊んでいる途中の状態なので変えない
     const int placed = PropLayoutFile::ReapplyPlacements(layout, m_Objects.placementBindings);
@@ -733,6 +738,7 @@ void StageScene::UpdateStageEvents(Player& player, float deltaTime)
     UpdateFootprintFollower(player);
     UpdateCeilingStalker(player, deltaTime);
     UpdateCorridorStretch(player, deltaTime);
+    UpdateBreathingWall(player, deltaTime);
     // 隠し部屋の影も、書類保管室の影と同じく、棚・壁・閉じた扉を通り抜けずに回り込む
     m_HiddenRoom.Update(player, deltaTime, m_KeypadDoor.IsSolved(),
         [this](Vector3& position, float radius)
