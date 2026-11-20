@@ -212,6 +212,15 @@ void Camera::GetMainMatrices(Matrix& view, Matrix& projection) const
 {
     const Vector3 up(0.0f, 1.0f, 0.0f);
     view = DirectX::XMMatrixLookAtLH(m_Position, m_Position + GetForward(), up);
+    // 見え方の引き伸ばし：カメラの位置を中心に、世界を z 方向へ伸ばしてから視点の行列をかけている
+    if (m_WorldStretchZ != 1.0f)
+    {
+        const Matrix stretch =
+            Matrix::CreateTranslation(-m_Position) *
+            Matrix::CreateScale(1.0f, 1.0f, m_WorldStretchZ) *
+            Matrix::CreateTranslation(m_Position);
+        view = stretch * view;
+    }
 
     constexpr float fieldOfView = DirectX::XMConvertToRadians(60.0f);
     constexpr float nearPlane = 1.0f;
@@ -263,8 +272,11 @@ bool Camera::IsSphereVisible(
     // 描画側の射影行列（縦60度、far 1000）に合わせた軽量な視錐台判定。
     // 正確な6平面の判定より余白を広く取り、細長い壁なども見えているのに消えることがないよう、見える側に寄せている。
     radius = (std::max)(radius, 1.0f);
+    // 見え方を z 方向へ伸ばしている間は、伸ばした後の位置と大きさで判定している
+    Vector3 offset = center - m_Position;
+    offset.z *= m_WorldStretchZ;
+    radius *= m_WorldStretchZ;
     // 描く距離（1000）より遠ければ見えない
-    const Vector3 offset = center - m_Position;
     const float distanceSquared =
         offset.x * offset.x + offset.y * offset.y + offset.z * offset.z;
     const float farDistance = MainCameraFarPlane + radius;

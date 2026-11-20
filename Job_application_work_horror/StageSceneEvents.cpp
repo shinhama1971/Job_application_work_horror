@@ -250,6 +250,15 @@ namespace
     // 暖かい灯りの下にいる度合いが、これ以上なら物音を鳴らさない
     constexpr float SafeLightQuietCalm = 0.5f;
 
+    // --- 振り返ると廊下が伸びて見える（Stage1CorridorStretch）
+    // 伸び始めたときの音（扉のきしみを低く遅くして、建物がきしむ音にしている）は、南のドアの方から鳴らしている。
+    // 鳴らす所は、プレイヤーからこの距離だけ南
+    constexpr float CorridorStretchSoundDistance = 60.0f;
+    constexpr EventFeedback::SoundSpec CorridorStretchSound{ 0.38f, 0.9f };
+    // 伸び始めの小さな画面の脈打ちと振動
+    constexpr PulseSpec CorridorStretchPulse{ 0.16f, 0.6f };
+    constexpr RumbleSpec CorridorStretchRumble{ 10, 0.08f };
+
     // --- 天井裏の足音が、照明を消しながら迫ってくる（Stage1CeilingStalker）
     // 電力が戻ってから、この秒数が過ぎた後に起きる（照明が全部点き、落ち着いた頃）
     constexpr float CeilingStalkerDelaySeconds = 25.0f;
@@ -636,6 +645,8 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     m_LoopCooldown = CorridorLoopCooldownSeconds;
     m_ProgressHintTimer = 0.0f;
     m_LoopNoticeTimer = CorridorLoopNoticeSeconds;
+    // 周回が進むほど、振り返った廊下が大きく伸びる
+    m_CorridorStretch.SetLoopCount(m_CorridorLoopCount);
 
     const int loopPhase = m_CorridorLoopCount < MaxCorridorLoopPhase
         ? m_CorridorLoopCount
@@ -1276,6 +1287,21 @@ bool StageScene::IsAmbientSoundAllowed() const
         !powerRestoring &&
         m_SafeLights.GetCalm() < SafeLightQuietCalm &&
         (exit == nullptr || !exit->IsEscaping());
+}
+
+void StageScene::UpdateCorridorStretch(const Player& player, float deltaTime)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    Camera* camera = game->GetCamera();
+    const Vector3 position = player.GetPosition();
+    if (m_CorridorStretch.Update(deltaTime, position, camera->GetForward(), IsAmbientSoundAllowed()))
+    {
+        game->PlayAudioCueAt(SOUND_CUE_DOOR, position - Vector3(0.0f, 0.0f, CorridorStretchSoundDistance),
+            CorridorStretchSound.Pitch, CorridorStretchSound.Volume);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), CorridorStretchPulse);
+        EventFeedback::Rumble(CorridorStretchRumble);
+    }
+    camera->SetWorldStretchZ(m_CorridorStretch.GetStretchZ());
 }
 
 void StageScene::UpdateCeilingStalker(const Player& player, float deltaTime)

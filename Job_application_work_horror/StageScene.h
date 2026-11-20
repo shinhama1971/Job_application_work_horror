@@ -16,6 +16,7 @@
 #include "Stage1Objective.h"
 #include "Stage1AmbientSounds.h"
 #include "Stage1CeilingStalker.h"
+#include "Stage1CorridorStretch.h"
 #include "TensionPulse.h"
 #include "Stage1LightStalker.h"
 #include "RadioStatic.h"
@@ -86,6 +87,8 @@ private:
     bool IsAmbientSoundAllowed() const;
     // 電力が戻った後に一度だけ、天井裏の足音が照明を消しながら迫ってくる演出を進めている
     void UpdateCeilingStalker(const class Player& player, float deltaTime);
+    // ループ廊下で振り返ると、廊下が伸びて見える（Stage1CorridorStretch の倍率をカメラへ渡している）
+    void UpdateCorridorStretch(const class Player& player, float deltaTime);
     // 姿の見えない物音を更新し、鳴らしている
     void UpdateAmbientSounds();
     // 懐中電灯で照らすと浮かぶ壁の文字。書き換わった文字を読んだら物音の演出を起こしている。
@@ -148,6 +151,7 @@ private:
     Stage1AmbientSounds m_AmbientSounds;
     // 天井裏の足音の演出、電力が戻ってからの秒数（演出を始めてよい時間になったかを見る）、このフレームの合図
     Stage1CeilingStalker m_CeilingStalker;
+    Stage1CorridorStretch m_CorridorStretch;
     // ヒューズを拾った瞬間の演出：経過秒（-1 なら起きていない）、何本目か（0 から）、鳴らした足音の数、消した照明、足音を鳴らす所
     float m_FuseScareTimer = -1.0f;
     int m_FuseScareLevel = 0;

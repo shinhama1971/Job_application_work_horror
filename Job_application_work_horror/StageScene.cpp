@@ -230,6 +230,8 @@ void StageScene::Init()
     m_ExitOmenSequence.Reset();
     m_AmbientSounds.Reset();
     m_CeilingStalker.Reset();
+    m_CorridorStretch.Reset();
+    game->GetCamera()->SetWorldStretchZ(1.0f);
     m_FuseScareTimer = -1.0f;
     m_FuseScareStepsPlayed = 0;
     m_FuseScareLights.clear();
@@ -730,6 +732,7 @@ void StageScene::UpdateStageEvents(Player& player, float deltaTime)
     UpdateWallWritings(player);
     UpdateFootprintFollower(player);
     UpdateCeilingStalker(player, deltaTime);
+    UpdateCorridorStretch(player, deltaTime);
     // 隠し部屋の影も、書類保管室の影と同じく、棚・壁・閉じた扉を通り抜けずに回り込む
     m_HiddenRoom.Update(player, deltaTime, m_KeypadDoor.IsSolved(),
         [this](Vector3& position, float radius)
@@ -932,6 +935,8 @@ void StageScene::Uninit()
     Renderer::SetWallWeathering(0.0f);
     Renderer::SetRoomOcclusion(nullptr, 0, 0.0f, 0.0f, 0.0f);
     Renderer::SetPuddleFigure(Vector3::Zero, 0.0f);
+    // ループ廊下の伸びた見え方を元に戻している（カメラはシーンをまたいで使い続けるため）
+    Core::Game::GetInstance()->GetCamera()->SetWorldStretchZ(1.0f);
     Effect::PostProcess* postProcess = Core::Game::GetInstance()->GetPostProcess();
     postProcess->SetAtmosphere(Effect::PostProcess::DefaultNoiseAmount, Effect::PostProcess::DefaultVignetteStrength);
     postProcess->SetExposure(Effect::PostProcess::DefaultExposure);

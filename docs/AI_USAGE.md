@@ -473,3 +473,5 @@ Codex（OpenAI）が、Compute Shaderのバインド先、画面合成の定数�
 Codex（OpenAI）が、2面の信号盤の件数を判定・配置・表示で共通化し、色表の要素数を検査するようにしました。
 
 Claude Code（Anthropic）が、提出前のソースの見直しとして、Codex の未コミットの作業（1面の消灯時の異変・保管箱の掲示・2面の信号盤の件数）をビルドとシェーダーのバイトコードの比較で確かめ、試作中の3面をタイトルの選択肢から外し、ファイル名と関数名の書き方をそろえました（`input`・`sound`・`utility` → `Input`・`Sound`・`Utility`、綴りの誤りだった `AssimpPerse` → `AssimpParse`、`utf8_to_wide_winapi` → `Utf8ToWide`）。また、150行を超えていた14の関数（`SelectStage1Objective`・`PropLayoutFile::Load`・`ForestGrass::PlantBlades`・`PropLayoutEditor::Draw`・`Hud::Draw`・`Hud::DrawTitle`・`Stage2Scene` の `AdvanceLoop`・`UpdateNoiseThreat`・`UpdateSignalPuzzle`・`Draw`・`StageScene` の `Draw`・`AdvanceCorridorLoop`・`CeilingLight::Update`・`ShadowMan::Update`）を、処理の順番を変えずに同じクラスの小さな関数へ切り出しました。どこで切るかと関数の名前は Claude Code が決め、作者は「長い関数を分ける」ことを選びました。
+
+Claude Code（Anthropic）が、作者が選んだ「振り向くと廊下が伸びている」演出を作りました。壁を動かす案から、見え方だけを z 方向へ引き伸ばすビュー行列（`Camera::SetWorldStretchZ`）に変えたのは Claude Code の判断です（自動撮影でも同じ見え方を写せ、当たり判定や光の計算を変えずに済むため）。伸びる量・速さは、作者が遊んで確かめる前提の仮の値です。

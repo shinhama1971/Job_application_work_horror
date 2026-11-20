@@ -42,6 +42,9 @@ private:
     float m_CameraDirection = 0.0f;
     float m_CameraPitch = 0.0f;
 
+    // 見え方だけを、カメラの位置を中心に z 方向（南北）へ引き伸ばす倍率（1で元のまま）。
+    // 1面のループ廊下で、振り返った廊下が伸びて見える演出に使っている。当たり判定と光の計算は元の位置のまま
+    float m_WorldStretchZ = 1.0f;
 
 public:
     void Init();
@@ -73,6 +76,18 @@ public:
         const DirectX::SimpleMath::Matrix& view,
         const DirectX::SimpleMath::Matrix& projection);
     void ClearOverrideMatrices();
+
+    // 見え方だけを z 方向へ引き伸ばす倍率を決めている（1で元のまま。1より小さい値は1にしている）。
+    // シーンが毎フレーム決め直し、シーンを切り替えたら1に戻している。
+    void SetWorldStretchZ(float scale)
+    {
+        m_WorldStretchZ = scale < 1.0f ? 1.0f : scale;
+    }
+
+    float GetWorldStretchZ() const
+    {
+        return m_WorldStretchZ;
+    }
 
     // カメラの位置を設定・取得している（Playerが目の高さに合わせて毎フレーム設定している）
     void SetPosition(DirectX::SimpleMath::Vector3 pos)

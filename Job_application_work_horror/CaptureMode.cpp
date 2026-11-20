@@ -170,6 +170,11 @@ namespace
         { 123.8f, Vector3(0.0f, FloorY, -140.0f), YawToward(0.0f, -140.0f, 34.0f, -178.0f), -0.05f, nullptr, false },
         { 124.4f, Vector3(0.0f, FloorY, -140.0f), YawToward(0.0f, -140.0f, 34.0f, -178.0f), -0.05f, L"05o_1面_振り返ると閉じたドアと浮かんだ文字", false },
         { 125.0f, Vector3(0.0f, FloorY, -140.0f), YawToward(0.0f, -140.0f, 34.0f, -178.0f), -0.05f, nullptr, false },
+        // 1周した後、南北の廊下の奥で来た方（南のドア）を振り返る。振り返った直後と、見つめ続けて廊下が伸びた後を写している
+        { 125.05f, Vector3(0.0f, FloorY, 200.0f), Pi, -0.02f, nullptr, false },
+        { 125.6f, Vector3(0.0f, FloorY, 200.0f), Pi, -0.02f, L"05p_1面_振り返ったループ廊下", false },
+        { 131.0f, Vector3(0.0f, FloorY, 200.0f), Pi, -0.02f, L"05q_1面_見つめている間に伸びた廊下", false },
+        { 131.5f, Vector3(0.0f, FloorY, 200.0f), Pi, -0.02f, nullptr, false },
     };
 
     // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉 → 鏡（普段・鏡の異変で人影が映る・振り返ると誰もいない）
