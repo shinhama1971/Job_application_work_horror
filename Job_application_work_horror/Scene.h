@@ -43,7 +43,9 @@ enum class SceneDebugAction
     // 1面：西棟の水面にだけ映る天井の人影を、すぐに出している（手で試すときと、自動撮影で写すときに使っている）
     ShowCeilingReflection,
     // 撮影用：通常プレイでは呼ばず、4周目の開始部屋を再現する。
-    ShowHauntedStartDoor
+    ShowHauntedStartDoor,
+    // 撮影用：通常プレイでは呼ばず、3周目で3本目のヒューズを拾った後（建物全体が呼吸している）にする。
+    ShowBreathingBuilding
 };
 
 // シーンの基底クラス。Gameが今のシーンを1つだけunique_ptrで持ち、毎フレーム更新・描画している。

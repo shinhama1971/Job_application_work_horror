@@ -103,8 +103,14 @@ namespace Tools::CaptureTours
         { 131.55f, Vector3(178.0f, FloorY, 264.0f), YawToward(178.0f, 264.0f, 60.0f, 241.0f), -0.06f, nullptr, false },
         { 135.7f, Vector3(178.0f, FloorY, 264.0f), YawToward(178.0f, 264.0f, 60.0f, 241.0f), -0.06f, L"05r_1面_息をする壁", false },
         { 136.5f, Vector3(120.0f, FloorY, 262.0f), Pi, -0.12f, nullptr, false },
-        { 140.3f, Vector3(120.0f, FloorY, 262.0f), Pi, -0.12f, L"05s_1面_照らした所だけ止まる壁", false },
+        { 140.3f, Vector3(120.0f, FloorY, 262.0f), Pi, -0.12f, L"05s_1面_照らしても止まらない壁", false },
         { 140.8f, Vector3(120.0f, FloorY, 262.0f), Pi, -0.12f, nullptr, false },
+        // 3周目で3本目のヒューズを拾った後（BreathingBuildingRequestTime）。中央ホールに戻ると、部屋を囲む壁と外周の壁が
+        // 面全体で息をしている。膨らむ量は少しずつ大きくなるので、しばらく待ってから写している
+        { 141.05f, Vector3(-60.0f, FloorY, -40.0f), YawToward(-60.0f, -40.0f, -200.0f, 40.0f), -0.04f, nullptr, false },
+        { 152.0f, Vector3(-60.0f, FloorY, -40.0f), YawToward(-60.0f, -40.0f, -200.0f, 40.0f), -0.04f, L"05t_1面_ヒューズ3本の後に息をする中央ホール", false },
+        { 154.3f, Vector3(-60.0f, FloorY, -40.0f), YawToward(-60.0f, -40.0f, -200.0f, 40.0f), -0.04f, L"05u_1面_息を吐いた中央ホール", false },
+        { 154.8f, Vector3(-60.0f, FloorY, -40.0f), YawToward(-60.0f, -40.0f, -200.0f, 40.0f), -0.04f, nullptr, false },
     };
 
     // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉 → 鏡（普段・鏡の異変で人影が映る・振り返ると誰もいない）

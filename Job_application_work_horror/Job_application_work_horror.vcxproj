@@ -338,6 +338,7 @@
     <ClCompile Include="TitleScene.cpp" />
     <ClCompile Include="Utility.cpp" />
     <ClCompile Include="Wall.cpp" />
+    <ClCompile Include="WallBreathing.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -447,6 +448,7 @@
     <ClInclude Include="Stage1SafeLights.h" />
     <ClInclude Include="Stage1CeilingStalker.h" />
     <ClInclude Include="Stage1CorridorStretch.h" />
+    <ClInclude Include="Stage1BreathingGroup.h" />
     <ClInclude Include="Stage1WestWing.h" />
     <ClInclude Include="CeilingReflectionScare.h" />
     <ClInclude Include="KeyItem.h" />
@@ -539,6 +541,8 @@
     <ClInclude Include="shader\horrorMist.hlsli" />
     <ClInclude Include="shader\tiledLightingConfig.hlsli" />
     <ClInclude Include="shader\renderingConfig.hlsli" />
+    <ClInclude Include="shader\breathingWallShape.hlsli" />
+    <ClInclude Include="shader\breathingWallDeform.hlsli" />
     <ClInclude Include="shader\computeDispatchConfig.hlsli" />
     <ClInclude Include="shader\postProcessBuffer.hlsli" />
     <ClInclude Include="shader\lightShaftSegment.hlsli" />
@@ -738,6 +742,7 @@
     <None Include="shader\grassCS.hlsl" />
     <None Include="shader\grassVS.hlsl" />
     <None Include="shader\breathingWallVS.hlsl" />
+    <None Include="shader\breathingWallPS.hlsl" />
     <None Include="shader\grassPS.hlsl" />
     <None Include="shader\skyBackdropVS.hlsl" />
     <None Include="shader\skyBackdropPS.hlsl" />

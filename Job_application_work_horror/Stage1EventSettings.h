@@ -9,6 +9,7 @@
 #include "MathUtility.h"
 #include "ShadowFigureGeometry.h"
 #include "Stage1FuseProgress.h"
+#include "Stage1BreathingGroup.h"
 #include "Stage1LightNumber.h"
 
 #include <SimpleMath.h>
@@ -239,26 +240,59 @@ namespace Stage1EventSettings
     constexpr PulseSpec CorridorStretchPulse{ 0.16f, 0.6f };
     constexpr RumbleSpec CorridorStretchRumble{ 10, 0.08f };
 
-    // --- 呼吸する壁（ループ廊下の東の区間の南の壁）
-    // 配置ファイルの壁の名前と、膨らませる面（+z の面＝北の廊下側）、格子の細かさ、縁から動かさない幅
-    constexpr const char* BreathingWallName = "LoopWall3";
-    constexpr bool BreathingWallPositiveZFace = true;
-    constexpr int BreathingWallColumns = 72;
+    // --- 呼吸する壁（配置ファイルの壁の名前、膨らませる面の向き、組）
+    // 廊下：南北と東西の区間で廊下を向く8枚（1周した後から）
+    // 中央ホール：配電盤のある部屋を囲む4枚（3周目から）
+    // 建物の外周：中央ホールと廊下を外から囲む長い壁（3本目のヒューズを拾った後から。戻ってくると建物全体が息をしている）
+    struct BreathingWallFace
+    {
+        const char* Name;
+        DirectX::SimpleMath::Vector3 Normal;
+        Stage1BreathingGroup Group;
+    };
+    constexpr BreathingWallFace BreathingWallFaces[] =
+    {
+        { "Wall11", { 1.0f, 0.0f, 0.0f }, Stage1BreathingGroup::Corridor },
+        { "Wall12", { 1.0f, 0.0f, 0.0f }, Stage1BreathingGroup::Corridor },
+        { "Wall13", { -1.0f, 0.0f, 0.0f }, Stage1BreathingGroup::Corridor },
+        { "Wall13North", { -1.0f, 0.0f, 0.0f }, Stage1BreathingGroup::Corridor },
+        { "LoopWall1", { 1.0f, 0.0f, 0.0f }, Stage1BreathingGroup::Corridor },
+        { "LoopWall2", { -1.0f, 0.0f, 0.0f }, Stage1BreathingGroup::Corridor },
+        { "LoopWall3", { 0.0f, 0.0f, 1.0f }, Stage1BreathingGroup::Corridor },
+        { "LoopWall4", { 0.0f, 0.0f, -1.0f }, Stage1BreathingGroup::Corridor },
+        { "Wall5", { 0.0f, 0.0f, -1.0f }, Stage1BreathingGroup::Hall },
+        { "Wall6", { 0.0f, 0.0f, -1.0f }, Stage1BreathingGroup::Hall },
+        { "Wall7", { 0.0f, 0.0f, 1.0f }, Stage1BreathingGroup::Hall },
+        { "Wall8", { 0.0f, 0.0f, 1.0f }, Stage1BreathingGroup::Hall },
+        { "Wall1", { 0.0f, 0.0f, -1.0f }, Stage1BreathingGroup::Building },
+        { "Wall2", { -1.0f, 0.0f, 0.0f }, Stage1BreathingGroup::Building },
+        { "Wall4", { 1.0f, 0.0f, 0.0f }, Stage1BreathingGroup::Building },
+        { "Wall4North", { 1.0f, 0.0f, 0.0f }, Stage1BreathingGroup::Building },
+    };
+    // 短い壁の格子数を減らしつつ、長い壁も細かく膨らむようにする。
+    constexpr float BreathingWallColumnWidth = 3.0f;
     constexpr int BreathingWallRows = 24;
     constexpr float BreathingWallEdgeWidth = 14.0f;
-    // 一番大きく膨らむ量（1周目・2周目・3周目以降。0周目は動かない）と、その量へ近づく速さ（1秒あたり）
+    // 変位が届く壁の近くにある物だけを取り付ける。取り付け点は、動く面の中へ少し入れて採る。
+    constexpr float BreathingFixtureAttachReach = 11.0f;
+    constexpr float BreathingFixtureBackTolerance = 3.25f;
+    constexpr float BreathingFixtureAnchorInset = 7.0f;
+    constexpr float BreathingFixtureInsetLimit = 0.25f;
+    // 廊下を2回抜けて開始地点へ戻ると、3周目に入る。
+    constexpr int BreathingWallWholeFaceCompletedLoops = 2;
+    // 廊下：1周目完了から膨らみ始め、周回が進むごとに大きくする。
     constexpr float BreathingWallFirstLoopAmplitude = 4.0f;
     constexpr float BreathingWallSecondLoopAmplitude = 5.5f;
     constexpr float BreathingWallLaterLoopAmplitude = 7.0f;
+    // 中央ホール：3周目から膨らむ量
+    constexpr float BreathingHallAmplitude = 5.5f;
+    // 建物の外周：3本目のヒューズを拾った後から膨らむ量（廊下・中央ホールも、この量まで大きくする）
+    constexpr float BreathingBuildingAmplitude = 7.0f;
+    // 膨らむ量が目標へ近づく速さ（1秒あたり。急に動き出さないように）
     constexpr float BreathingWallAmplitudeRate = 1.0f;
-    // 息の音：壁のこの範囲（x）と高さで、プレイヤーに一番近い所から鳴らす。この距離より遠いと鳴らさない
-    constexpr float BreathingWallSoundMinX = 50.0f;
-    constexpr float BreathingWallSoundMaxX = 190.0f;
-    constexpr float BreathingWallSoundY = -70.0f;
-    constexpr float BreathingWallSoundZ = 238.0f;
+    // 壁の少し手前から息を鳴らして、音源が壁の中にならないようにする。
+    constexpr float BreathingWallSoundFaceOffset = 1.0f;
     constexpr float BreathingWallSoundDistance = 90.0f;
-    // 懐中電灯を壁へ向けているとみなす向き（視線と、音の所への向きの内積がこれより大きい）。照らしている間は息をしない
-    constexpr float BreathingWallLitFacing = 0.9f;
     constexpr EventFeedback::SoundSpec BreathingWallSound{ 0.55f, 0.75f };
 
     // --- 天井裏の足音が、照明を消しながら迫ってくる（Stage1CeilingStalker）

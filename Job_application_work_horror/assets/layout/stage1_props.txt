@@ -106,7 +106,7 @@ prop WestWingPumpRoomWallWest  -350 -68 180   60 62 4   concrete none 4 1 weathe
 prop WestWingPumpRoomWallEast  -250 -68 180   60 62 4   concrete none 4 1 weathering room
 prop SouthWestHallNorth        -300 -68 -180   160 62 4   concrete none 4 1 weathering room
 prop SouthWestHallWest         -380 -68 -256   4 62 152   concrete none 4 1 weathering room
-prop SouthWestHallSouth        -250 -68 -332   264 62 4   concrete none 4 1 weathering room
+prop SouthWestHallSouth        -251 -68 -332   264 62 4   concrete none 4 1 weathering room
 prop SouthWestHallEast         -120 -68 -256   4 62 152   concrete none 4 1 weathering room
 # 西棟と南西の広間の柱（建物の一部として古さを描く。部屋の角の暗がりは32枚までなので含めない）
 prop WestWingColumn1           -330 -68 10   10 62 10   concrete none 4 1 weathering
@@ -118,7 +118,7 @@ prop WestWingColumn6           -270 -68 130   10 62 10   concrete none 4 1 weath
 prop SouthWestHallColumn1      -290 -68 -225   10 62 10   concrete none 4 1 weathering
 prop SouthWestHallColumn2      -210 -68 -225   10 62 10   concrete none 4 1 weathering
 prop SouthWestHallColumn3      -290 -68 -285   10 62 10   concrete none 4 1 weathering
-prop SouthWestHallColumn4      -210 -68 -285   10 62 10   concrete none 4 1 weathering
+prop SouthWestHallColumn4      -206.9 -68 -285   10 62 10   concrete none 4 1 weathering
 
 # --- 天井（床から53の高さに施設全体を覆う板。影は落とさず、天井板・外れた板の穴・雨漏りの染みを描く）
 prop PropCeilingMain           0     -35   80     436 3 516   ceilingPanel none 4 0 noshadow weathering
@@ -231,7 +231,8 @@ prop DoorLampArchive         -42.5 -64  104     1 4 10   doorLampBody doorLamp 2
 prop DoorLampArchive_1         -42.5 -64  136.3     1 4 10   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
 prop DoorLampKeypad           42.5 -64  86.2      1 4 10   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
 prop DoorLampWestWing       -217.5 -59.1 -44.2      1 4 10   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
-prop DoorLampPumpRoom       -276   -64  177.5   10 4 1   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
+prop DoorLampPumpRoom       -271.91   -64  177.5   10 4 1   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
+prop DoorLampPumpRoom_1       -328.8   -64  177.5   10 4 1   doorLampBody doorLamp 24 0 noshadow glow 62 2.1 model warning_lamp
 prop DoorLampLoopCorner      194   -64  237.5   10 4 1   doorLampBody doorLamp 24 0 noshadow glow 55 1.9 model warning_lamp
 # --- 西棟の南西の角：棚・机・木箱の一角
 prop PropWestWingShelf1    -368 -77   -78   10 44 30   shelfColor none 10 1 model shelf_short

@@ -17,6 +17,7 @@
 #include "Stage1AmbientSounds.h"
 #include "Stage1CeilingStalker.h"
 #include "Stage1CorridorStretch.h"
+#include "Stage1BreathingGroup.h"
 #include "TensionPulse.h"
 #include "Stage1LightStalker.h"
 #include "RadioStatic.h"
@@ -89,10 +90,11 @@ private:
     void UpdateCeilingStalker(const class Player& player, float deltaTime);
     // ループ廊下で振り返ると、廊下が伸びて見える（Stage1CorridorStretch の倍率をカメラへ渡している）
     void UpdateCorridorStretch(const class Player& player, float deltaTime);
-    // ループ廊下の東の区間の南の壁（LoopWall3）を、呼吸する壁にしている（配置を読み直したら、もう一度探す）
+    // 呼吸する壁（Stage1EventSettings.h の BreathingWallFaces）を探して格子にし、壁と一緒に動く扉・照明・小物を記録している（配置を読み直したら、もう一度探す）
     void SetupBreathingWall();
-    // 呼吸する壁：周回が進むほど大きく膨らみ、息を吐くたびに壁の中から息の音がする
-    void UpdateBreathingWall(const class Player& player, float deltaTime);
+    void UpdateBreathingFixtures(bool restore = false);
+    // 呼吸する壁：組ごとに、周回とヒューズの数で膨らむ量を決め、息を吐くたびに一番近い壁の中から息の音を鳴らす
+    void UpdateBreathingWall(float deltaTime);
     // 姿の見えない物音を更新し、鳴らしている
     void UpdateAmbientSounds();
     // 懐中電灯で照らすと浮かぶ壁の文字。書き換わった文字を読んだら物音の演出を起こしている。
@@ -156,10 +158,27 @@ private:
     // 天井裏の足音の演出、電力が戻ってからの秒数（演出を始めてよい時間になったかを見る）、このフレームの合図
     Stage1CeilingStalker m_CeilingStalker;
     Stage1CorridorStretch m_CorridorStretch;
-    // 呼吸する壁と、呼吸の時間（秒）・今の膨らむ量・前のフレームの呼吸の何回目か（息の音を1回ずつ鳴らすため）
-    class Wall* m_BreathingWall = nullptr;
+    // 呼吸する壁（壁・膨らませる面の向き・組）と、呼吸の時間（秒）・組ごとの今の膨らむ量・前のフレームの呼吸の何回目か（息の音を1回ずつ鳴らすため）
+    struct BreathingWall
+    {
+        class Wall* Surface;
+        DirectX::SimpleMath::Vector3 Normal;
+        Stage1BreathingGroup Group;
+    };
+    std::vector<BreathingWall> m_BreathingWalls;
+    struct BreathingFixture
+    {
+        Object* Fixture;
+        Wall* Surface;
+        DirectX::SimpleMath::Vector3 BasePosition;
+        DirectX::SimpleMath::Vector3 Normal;
+        DirectX::SimpleMath::Vector2 Sample;
+    };
+    std::vector<BreathingFixture> m_BreathingFixtures;
     float m_BreathingWallTime = 0.0f;
-    float m_BreathingWallAmplitude = 0.0f;
+    std::array<float, Stage1BreathingGroupCount> m_BreathingGroupAmplitudes{};
+    // 組ごとの、今の膨らむ量の目標（周回とヒューズの数から決める）
+    float GetBreathingGroupTarget(Stage1BreathingGroup group) const;
     int m_BreathingWallCycle = 0;
     // ヒューズを拾った瞬間の演出：経過秒（-1 なら起きていない）、何本目か（0 から）、鳴らした足音の数、消した照明、足音を鳴らす所
     float m_FuseScareTimer = -1.0f;

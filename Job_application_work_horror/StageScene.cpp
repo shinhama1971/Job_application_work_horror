@@ -37,6 +37,8 @@ namespace
     // デバッグで「4周目以降のドア」を見せるときの周回の数（StageSceneEvents の StartDoorHauntedGapLoop と同じ）と、
     // ドアの開き方の段階（Door の一番最後の段階）
     constexpr int DebugHauntedDoorLoop = 4;
+    // 撮影で、建物全体が呼吸している状態にするときの周回（3周目）
+    constexpr int DebugBreathingBuildingLoop = 3;
     constexpr int DebugHauntedDoorPhase = 3;
     constexpr float RoomOcclusionFloorY = -100.0f;
     // 天井の下面（stage1_props.txt の天井の板 PropCeiling* の下の端。11月19日に -48.5 から 12 上げた）
@@ -247,7 +249,7 @@ void StageScene::Init()
     m_HiddenRoom.Init(m_Objects.hiddenRoom);
     m_WestWing.Init(m_Objects.westWing);
     m_BreathingWallTime = 0.0f;
-    m_BreathingWallAmplitude = 0.0f;
+    m_BreathingGroupAmplitudes.fill(0.0f);
     m_BreathingWallCycle = 0;
     SetupBreathingWall();
     m_CeilingScare.Reset();
@@ -307,6 +309,8 @@ bool StageScene::ReloadPropLayout()
         return false;
     }
     Core::Game& game = *Core::Game::GetInstance();
+    // 読み直す前に元の位置へ戻し、呼吸の変位を新しい基準位置に混ぜない。
+    UpdateBreathingFixtures(true);
     SceneLayoutBuilder builder(game, m_Objects.objectNames);
     if (!PropLayoutFile::Reload(builder, layout, m_Objects.layoutProps, m_LayoutNotice))
     {
@@ -315,10 +319,10 @@ bool StageScene::ReloadPropLayout()
     }
     // 読み直しで増えた壁も、影の視線と移動を遮る。
     m_StalkerWalls = game.GetObjects<Wall>();
-    SetupBreathingWall();
     // 扉・照明・電池など place 行で置いた物も置き直し、部屋の形（room の壁）を部屋の角の暗がりへ渡し直している。
     // プレイヤーの位置と、プレイごとに選ぶヒューズ・鍵の場所（spot）は、遊んでいる途中の状態なので変えない
     const int placed = PropLayoutFile::ReapplyPlacements(layout, m_Objects.placementBindings);
+    SetupBreathingWall();
     m_Objects.wallFootprints = PropLayoutFile::CollectRoomFootprints(layout);
     Renderer::SetRoomOcclusion(
         m_Objects.wallFootprints.data(),
@@ -530,6 +534,16 @@ void StageScene::RequestDebugAction(SceneDebugAction action)
         m_Objects.startDoor->SetLocked(true);
         return;
     }
+    if (action == SceneDebugAction::ShowBreathingBuilding)
+    {
+        m_CorridorLoopCount = (std::max)(m_CorridorLoopCount, DebugBreathingBuildingLoop);
+        Core::Game* game = Core::Game::GetInstance();
+        while (game->GetItemCount() < Core::GameState::RequiredFuseCount)
+        {
+            game->AddItemCount();
+        }
+        return;
+    }
     Door* endDoor = m_Objects.exitDoor;
     Player* player = m_Objects.player;
     if (action == SceneDebugAction::OpenStage1EndDoor &&
@@ -738,7 +752,7 @@ void StageScene::UpdateStageEvents(Player& player, float deltaTime)
     UpdateFootprintFollower(player);
     UpdateCeilingStalker(player, deltaTime);
     UpdateCorridorStretch(player, deltaTime);
-    UpdateBreathingWall(player, deltaTime);
+    UpdateBreathingWall(deltaTime);
     // 隠し部屋の影も、書類保管室の影と同じく、棚・壁・閉じた扉を通り抜けずに回り込む
     m_HiddenRoom.Update(player, deltaTime, m_KeypadDoor.IsSolved(),
         [this](Vector3& position, float radius)

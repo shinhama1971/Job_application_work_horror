@@ -108,6 +108,10 @@ struct LIT_PS_IN
     float3 worldPos : TEXCOORD4;
     float3 worldNormal : TEXCOORD5;
     float4 shadowPos : TEXCOORD6;
+#if defined(BREATHING_WALL_SURFACE)
+    float3 restPosition : TEXCOORD7;
+    float3 restNormal : TEXCOORD8;
+#endif
 };
 
 
@@ -334,8 +338,13 @@ float4 main(in LIT_PS_IN input) : SV_Target
 
         // 壁の古さ（建物の壁と天井だけ）。0のときは前と同じ見た目になる。
         const float weathering = Material.WeatheringSurface ? WallWeathering : 0.0f;
+#if defined(BREATHING_WALL_SURFACE)
+        // 手形や継ぎ目は、膨らむ前の壁の面で場所を決める。光や影には変形後の位置と法線を使う。
+        const WallAgeing ageing = GetWallAgeing(input.restPosition, input.restNormal, weathering);
+#else
         const WallAgeing ageing = GetWallAgeing(
             input.worldPos, input.worldNormal, weathering);
+#endif
         color.rgb *= ageing.tint;
         color.rgb *= 1.0f - ageing.cavity * AGEING_CAVITY_DARKEN;
         wetness = saturate(grime + ageing.damp * AGEING_DAMP_WETNESS);
@@ -474,6 +483,10 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 貼り付けた壁までの距離は配置時に分かるので、画素ごとに壁の一覧を走査しない。
     const float roomOcclusion = screenOcclusion * (OcclusionBoxCount > 0
         ? ComputeRoomOcclusion(input.worldPos, detailWorldNormal, Material.Ambuent.x) : 1.0f);
+#elif defined(BREATHING_WALL_SURFACE)
+    // 膨らんだ所は自分の壁の箱から離れるので、そのままでは「すぐ近くの別の壁（角）」と取り違えて強く暗くなる
+    // （膨らみの形に沿った、格子状のギザギザの暗がりになっていた）。部屋の角の暗がりは、膨らむ前の面で求める
+    const float roomOcclusion = GetRoomOcclusion(input.restPosition, input.restNormal) * screenOcclusion;
 #else
     const float roomOcclusion = GetRoomOcclusion(input.worldPos, normalize(input.worldNormal)) * screenOcclusion;
 #endif

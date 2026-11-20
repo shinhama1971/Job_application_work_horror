@@ -1,0 +1,15 @@
+// 呼吸する壁を変形したまま影に描くための関数（breathingWallDeform.hlsli から退避。11月20日、影は平らな面で描くことにしたため使わなくなった）
+float4 BreathShadowPosition(in VS_IN input)
+{
+    if (!BreathMovesFace(input.nrm.xyz))
+    {
+        return mul(input.pos, World);
+    }
+    const float3 tangentWorld = BreathTangent();
+    const float width = length(tangentWorld);
+    const float height = length(World[1].xyz);
+    const float3 normal = normalize(mul(input.nrm.xyz, (float3x3)World));
+    const float3 position = BreathWorldPosition(input.pos.xyz, normal,
+        tangentWorld / max(width, BreathMinDistance), width, height);
+    return float4(position, 1.0f);
+}

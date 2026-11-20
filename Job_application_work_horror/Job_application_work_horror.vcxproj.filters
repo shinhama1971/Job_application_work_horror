@@ -498,6 +498,9 @@
     <ClCompile Include="Wall.cpp">
       <Filter>ソース ファイル\World</Filter>
     </ClCompile>
+    <ClCompile Include="WallBreathing.cpp">
+      <Filter>ソース ファイル\World</Filter>
+    </ClCompile>
     <ClCompile Include="GroundWaterEffects.cpp">
       <Filter>ソース ファイル\World\Water</Filter>
     </ClCompile>
@@ -791,6 +794,9 @@
     <ClInclude Include="Stage1CorridorStretch.h">
       <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
     </ClInclude>
+    <ClInclude Include="Stage1BreathingGroup.h">
+      <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
+    </ClInclude>
     <ClInclude Include="Stage1Transmissions.h">
       <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
     </ClInclude>
@@ -1049,6 +1055,12 @@
     <ClInclude Include="shader\renderingConfig.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
+    <ClInclude Include="shader\breathingWallShape.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\breathingWallDeform.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
     <ClInclude Include="shader\computeDispatchConfig.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
@@ -1273,6 +1285,9 @@
       <Filter>リソース ファイル\Shader\Vertex</Filter>
     </None>
     <None Include="shader\breathingWallVS.hlsl">
+      <Filter>リソース ファイル\Shader\Vertex</Filter>
+    </None>
+    <None Include="shader\breathingWallPS.hlsl">
       <Filter>リソース ファイル\Shader\Vertex</Filter>
     </None>
     <None Include="shader\rainVS.hlsl">
