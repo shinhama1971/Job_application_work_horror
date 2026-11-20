@@ -426,6 +426,15 @@ namespace
         { 21.05f, Vector3(-292,FloorY,-79), Pi, -0.98f, nullptr, false },
         { 24.0f, Vector3(-292,FloorY,-79), Pi, -0.98f, L"feature_valve_close", false },
         { 25.0f, Vector3(-292,FloorY,-79), Pi, -0.98f, nullptr, false },
+        // 同じ位置・向きで通常表示の点灯と消灯を撮り、表示の切り替えを確認する。
+        { 25.10f, Vector3(0,FloorY,220), 0.0f, -0.42f, nullptr, false },
+        { 26.5f, Vector3(0,FloorY,220), 0.0f, -0.42f, L"feature_corridor_light_on", false },
+        { 29.8f, Vector3(0,FloorY,220), 0.0f, -0.42f, L"feature_corridor_light_off", false },
+        { 31.0f, Vector3(0,FloorY,220), 0.0f, -0.42f, L"feature_corridor_lit_again", false },
+        { 32.0f, Vector3(0,FloorY,220), 0.0f, -0.42f, nullptr, false },
+        { 32.10f, Vector3(187,FloorY,150), Pi * 0.5f, -0.36f, nullptr, false },
+        { 33.5f, Vector3(187,FloorY,150), Pi * 0.5f, -0.36f, L"feature_keypad_fuse_case_sign", false },
+        { 34.0f, Vector3(187,FloorY,150), Pi * 0.5f, -0.36f, nullptr, false },
     };
     const std::vector<Keyframe> FeatureStage2 = {
         { 0.0f, Vector3(-28,FloorY,-85), 0.15f, -0.40f, nullptr, false },
@@ -1117,6 +1126,8 @@ namespace Tools::CaptureMode
         constexpr float FeatureStage1FlashlightOnStart = 10.0f;
         constexpr float FeatureStage1FlashlightOnEnd = 13.0f;
         constexpr float FeatureStage1FullbrightEnd = 21.0f;
+        constexpr float FeatureCorridorLightOffStart = 27.0f;
+        constexpr float FeatureCorridorLightOffEnd = 30.1f;
         constexpr int FullbrightDebugView = ShaderDebugView::Fullbright;   // 照明・影・霧なしで全体を明るく
         constexpr int NormalDebugView = ShaderDebugView::Final;
         // 機能の撮影では、3面の観測の場面を足す分だけ、後半の操作の時刻を遅らせる
@@ -1382,7 +1393,8 @@ namespace Tools::CaptureMode
                 player.SetFlashlightOn(false);
             if (g_FeatureTour && scene == SceneName::Stage)
                 player.SetFlashlightOn((g_TourTime >= FeatureStage1FlashlightOnStart && g_TourTime < FeatureStage1FlashlightOnEnd) ||
-                    g_TourTime >= FeatureStage1FullbrightEnd);
+                    (g_TourTime >= FeatureStage1FullbrightEnd &&
+                        !(g_TourTime >= FeatureCorridorLightOffStart && g_TourTime < FeatureCorridorLightOffEnd)));
             // ドア検証の間は Fullbright で形を見せる。通常表示の資料画像には使わない。
             if (g_FeatureTour && g_ViewOverride < 0)
                 Renderer::SetDebugViewMode(scene == SceneName::Stage && g_TourTime < FeatureStage1FullbrightEnd

@@ -14,11 +14,12 @@
 #include "Renderer.h"
 #include "TechDemo.h"
 #include "Wall.h"
-#include "utility.h"
+#include "Utility.h"
 
 #include <algorithm>
 #include <cmath>
 #include <random>
+#include <utility>
 
 using namespace DirectX::SimpleMath;
 
@@ -215,6 +216,124 @@ namespace
     constexpr std::uint32_t NearLodLevel = 1;
     constexpr std::uint32_t MiddleLodLevel = 2;
     constexpr std::uint32_t FarLodLevel = 3;
+
+    // 葉を生やさない所：当たり判定があり、足元が地面の近くにある物（木の幹・岩・倒木・研究所の壁と屋根の下・門柱・街灯の柱）
+    std::vector<Footprint> CollectFootprints(float groundY)
+    {
+        std::vector<Footprint> footprints;
+        for (const Wall* wall : Core::Game::GetInstance()->GetObjects<Wall>())
+        {
+            if (wall->IsDestroy())
+            {
+                continue;
+            }
+            const Vector3 position = wall->GetPosition();
+            const Vector3 scale = wall->GetScale();
+            // 枯れた茂み（forest_brush）は当たり判定がないが、草に埋もれて見えなくなるので、枝の広がりの内側には生やさない
+            if (!wall->IsCollisionEnabled())
+            {
+                if (wall->GetVisualModel() == "forest_brush")
+                {
+                    const float yaw = wall->GetRotation().y;
+                    footprints.push_back(Footprint{ Vector2(position.x, position.z),
+                        Vector2(scale.x * BrushClearRate, scale.z * BrushClearRate), std::cos(yaw), std::sin(yaw) });
+                }
+                continue;
+            }
+            // 屋根の下（研究所の中）にも生やさないよう、低い所にある物は全部含めている
+            if (position.y - scale.y * 0.5f > groundY + FootprintMaxHeight)
+            {
+                continue;
+            }
+            const float yaw = wall->GetRotation().y;
+            // 木の幹は細いので、少し広めに空けている
+            const float margin = (std::min)(scale.x, scale.z) < ThinTrunkWidth ? ThinTrunkMargin : FootprintMargin;
+            footprints.push_back(Footprint{ Vector2(position.x, position.z),
+                Vector2(scale.x * 0.5f + margin, scale.z * 0.5f + margin), std::cos(yaw), std::sin(yaw) });
+        }
+        return footprints;
+    }
+
+    // 生やさない所を、上から見た格子（一辺 CellSize）に振り分けたもの。
+    // 葉の候補（数十万）ごとに全部の物（百数十）を調べると、Debug版の起動で数秒かかっていたため、
+    // 候補のいるマスに重なる物だけを調べるようにしている（結果は全部を調べたときと同じ）
+    class FootprintGrid
+    {
+    public:
+        static constexpr float CellSize = 40.0f;
+
+        FootprintGrid(std::vector<Footprint> footprints, float minX, float minZ, float halfX, float halfZ)
+            : m_Footprints(std::move(footprints)), m_MinX(minX), m_MinZ(minZ)
+        {
+            m_Columns = (std::max)(1, static_cast<int>(std::ceil(halfX * 2.0f / CellSize)));
+            m_Rows = (std::max)(1, static_cast<int>(std::ceil(halfZ * 2.0f / CellSize)));
+            m_Cells.resize(static_cast<std::size_t>(m_Columns * m_Rows));
+            for (std::size_t index = 0; index < m_Footprints.size(); ++index)
+            {
+                const Footprint& footprint = m_Footprints[index];
+                // 回っている箱も含むよう、箱の対角線の半分を半径にしている
+                const float radius = footprint.HalfSize.Length();
+                const int column0 = ColumnOf(footprint.Center.x - radius, true);
+                const int column1 = ColumnOf(footprint.Center.x + radius, true);
+                const int row0 = RowOf(footprint.Center.y - radius, true);
+                const int row1 = RowOf(footprint.Center.y + radius, true);
+                for (int row = row0; row <= row1; ++row)
+                {
+                    for (int column = column0; column <= column1; ++column)
+                    {
+                        m_Cells[static_cast<std::size_t>(row * m_Columns + column)].push_back(static_cast<std::uint32_t>(index));
+                    }
+                }
+            }
+        }
+
+        // 上から見た (x, z) が、どれかの生やさない所の中にある
+        bool IsBlocked(float x, float z) const
+        {
+            const std::size_t cell = static_cast<std::size_t>(RowOf(z, false) * m_Columns + ColumnOf(x, false));
+            for (const std::uint32_t index : m_Cells[cell])
+            {
+                if (IsInsideFootprint(m_Footprints[index], x, z))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+    private:
+        // マスの番号（箱を振り分けるときは floor、葉の候補を調べるときは切り捨てで、元の計算と同じにしている）
+        int ColumnOf(float x, bool useFloor) const
+        {
+            const float cell = (x - m_MinX) / CellSize;
+            return std::clamp(static_cast<int>(useFloor ? std::floor(cell) : cell), 0, m_Columns - 1);
+        }
+        int RowOf(float z, bool useFloor) const
+        {
+            const float cell = (z - m_MinZ) / CellSize;
+            return std::clamp(static_cast<int>(useFloor ? std::floor(cell) : cell), 0, m_Rows - 1);
+        }
+
+        std::vector<Footprint> m_Footprints;
+        std::vector<std::vector<std::uint32_t>> m_Cells;
+        float m_MinX;
+        float m_MinZ;
+        int m_Columns = 1;
+        int m_Rows = 1;
+    };
+
+    // 水たまりの位置は、地面（Ground）が作られたときに決まっている（床のシェーダーと同じ式）
+    const Ground* FindGround()
+    {
+        for (const Ground* candidate : Core::Game::GetInstance()->GetObjects<Ground>())
+        {
+            if (!candidate->IsDestroy())
+            {
+                return candidate;
+            }
+        }
+        return nullptr;
+    }
 }
 
 void ForestGrass::Init()
@@ -226,7 +345,7 @@ void ForestGrass::Init()
     m_Shader.CreateRequired("shader/grassVS.hlsl", "shader/grassPS.hlsl", true);
     if (!m_SimulationShader.Create("shader/grassCS.hlsl"))
     {
-        utility::ReportFatalError("草の Compute Shader の作成に失敗しました。");
+        Utility::ReportFatalError("草の Compute Shader の作成に失敗しました。");
     }
 
     ID3D11Device* device = Renderer::GetDevice();
@@ -236,12 +355,12 @@ void ForestGrass::Init()
     paramsDesc.ByteWidth = sizeof(SimulationParams);
     if (FAILED(device->CreateBuffer(&paramsDesc, nullptr, m_SimulationParams.ReleaseAndGetAddressOf())))
     {
-        utility::ReportFatalError("草の定数バッファの作成に失敗しました。");
+        Utility::ReportFatalError("草の定数バッファの作成に失敗しました。");
     }
     paramsDesc.ByteWidth = sizeof(DrawParams);
     if (FAILED(device->CreateBuffer(&paramsDesc, nullptr, m_DrawParams.ReleaseAndGetAddressOf())))
     {
-        utility::ReportFatalError("草の定数バッファの作成に失敗しました。");
+        Utility::ReportFatalError("草の定数バッファの作成に失敗しました。");
     }
 
     // 葉は薄い1枚の帯なので、表と裏の両方を描いている（ほかの物は裏の面を描かない設定のまま）
@@ -251,7 +370,7 @@ void ForestGrass::Init()
     rasterizerDesc.DepthClipEnable = TRUE;
     if (FAILED(device->CreateRasterizerState(&rasterizerDesc, m_TwoSidedRasterizer.ReleaseAndGetAddressOf())))
     {
-        utility::ReportFatalError("草のラスタライザーの設定の作成に失敗しました。");
+        Utility::ReportFatalError("草のラスタライザーの設定の作成に失敗しました。");
     }
 
     // 最初の大きさは、置き場所（place ForestGrass）で上書きされる
@@ -279,74 +398,8 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
     density = (std::min)(density, static_cast<float>(MaxBlades) * CandidateHeadroom / area);
     const float spacing = 1.0f / std::sqrt(density);
 
-    // 葉を生やさない所：当たり判定があり、足元が地面の近くにある物（木の幹・岩・倒木・研究所の壁と屋根の下・門柱・街灯の柱）
-    std::vector<Footprint> footprints;
-    for (const Wall* wall : Core::Game::GetInstance()->GetObjects<Wall>())
-    {
-        if (wall->IsDestroy())
-        {
-            continue;
-        }
-        const Vector3 position = wall->GetPosition();
-        const Vector3 scale = wall->GetScale();
-        // 枯れた茂み（forest_brush）は当たり判定がないが、草に埋もれて見えなくなるので、枝の広がりの内側には生やさない
-        if (!wall->IsCollisionEnabled())
-        {
-            if (wall->GetVisualModel() == "forest_brush")
-            {
-                const float yaw = wall->GetRotation().y;
-                footprints.push_back(Footprint{ Vector2(position.x, position.z),
-                    Vector2(scale.x * BrushClearRate, scale.z * BrushClearRate), std::cos(yaw), std::sin(yaw) });
-            }
-            continue;
-        }
-        // 屋根の下（研究所の中）にも生やさないよう、低い所にある物は全部含めている
-        if (position.y - scale.y * 0.5f > groundY + FootprintMaxHeight)
-        {
-            continue;
-        }
-        const float yaw = wall->GetRotation().y;
-        // 木の幹は細いので、少し広めに空けている
-        const float margin = (std::min)(scale.x, scale.z) < ThinTrunkWidth ? ThinTrunkMargin : FootprintMargin;
-        footprints.push_back(Footprint{ Vector2(position.x, position.z),
-            Vector2(scale.x * 0.5f + margin, scale.z * 0.5f + margin), std::cos(yaw), std::sin(yaw) });
-    }
-
-    // 生やさない所を、上から見た格子（一辺 FootprintCellSize）に振り分けている。
-    // 葉の候補（数十万）ごとに全部の物（百数十）を調べると、Debug版の起動で数秒かかっていたため、
-    // 候補のいるマスに重なる物だけを調べるようにしている（結果は全部を調べたときと同じ）
-    constexpr float FootprintCellSize = 40.0f;
-    const int footprintColumns = (std::max)(1, static_cast<int>(std::ceil(halfX * 2.0f / FootprintCellSize)));
-    const int footprintRows = (std::max)(1, static_cast<int>(std::ceil(halfZ * 2.0f / FootprintCellSize)));
-    std::vector<std::vector<std::uint32_t>> footprintCells(static_cast<std::size_t>(footprintColumns * footprintRows));
-    for (std::size_t index = 0; index < footprints.size(); ++index)
-    {
-        const Footprint& footprint = footprints[index];
-        // 回っている箱も含むよう、箱の対角線の半分を半径にしている
-        const float radius = footprint.HalfSize.Length();
-        const int column0 = std::clamp(static_cast<int>(std::floor((footprint.Center.x - radius - minX) / FootprintCellSize)), 0, footprintColumns - 1);
-        const int column1 = std::clamp(static_cast<int>(std::floor((footprint.Center.x + radius - minX) / FootprintCellSize)), 0, footprintColumns - 1);
-        const int row0 = std::clamp(static_cast<int>(std::floor((footprint.Center.y - radius - minZ) / FootprintCellSize)), 0, footprintRows - 1);
-        const int row1 = std::clamp(static_cast<int>(std::floor((footprint.Center.y + radius - minZ) / FootprintCellSize)), 0, footprintRows - 1);
-        for (int row = row0; row <= row1; ++row)
-        {
-            for (int column = column0; column <= column1; ++column)
-            {
-                footprintCells[static_cast<std::size_t>(row * footprintColumns + column)].push_back(static_cast<std::uint32_t>(index));
-            }
-        }
-    }
-
-    // 水たまりの位置は、地面（Ground）が作られたときに決まっている（床のシェーダーと同じ式）
-    const Ground* ground = nullptr;
-    for (const Ground* candidate : Core::Game::GetInstance()->GetObjects<Ground>())
-    {
-        if (!candidate->IsDestroy())
-        {
-            ground = candidate;
-            break;
-        }
-    }
+    const FootprintGrid footprints(CollectFootprints(groundY), minX, minZ, halfX, halfZ);
+    const Ground* ground = FindGround();
 
     // プレイ時も撮影時も、草を毎回同じ場所に置く。
     constexpr unsigned int ForestGrassPlacementSeed = 20261106u;
@@ -376,18 +429,7 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
             {
                 continue;
             }
-            bool blocked = false;
-            const int footprintColumn = std::clamp(static_cast<int>((x - minX) / FootprintCellSize), 0, footprintColumns - 1);
-            const int footprintRow = std::clamp(static_cast<int>((z - minZ) / FootprintCellSize), 0, footprintRows - 1);
-            for (const std::uint32_t index : footprintCells[static_cast<std::size_t>(footprintRow * footprintColumns + footprintColumn)])
-            {
-                if (IsInsideFootprint(footprints[index], x, z))
-                {
-                    blocked = true;
-                    break;
-                }
-            }
-            if (blocked)
+            if (footprints.IsBlocked(x, z))
             {
                 continue;
             }
@@ -417,7 +459,19 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
         }
     }
 
-    // 区画ごとに並べ替えている。区画の中の順番はばらばらなので、先頭から何割かを描けば区画全体が均一に薄くなる
+    // 区画の中の順番をばらばらにしている（先頭から何割かを描けば区画全体が均一に薄くなる）
+    std::shuffle(blades.begin(), blades.end(), random);
+    // 上限を超えたら、ばらばらに並べた後ろを捨てている（範囲の一部だけが抜けないように）
+    if (blades.size() > MaxBlades)
+    {
+        blades.resize(MaxBlades);
+    }
+    BuildChunks(blades, minX, minZ, halfX, halfZ, groundY);
+    ResetBladeStates(blades, states);
+}
+
+void ForestGrass::BuildChunks(std::vector<Blade>& blades, float minX, float minZ, float halfX, float halfZ, float groundY)
+{
     const int chunksX = (std::max)(1, static_cast<int>(std::ceil(halfX * 2.0f / ChunkSize)));
     const int chunksZ = (std::max)(1, static_cast<int>(std::ceil(halfZ * 2.0f / ChunkSize)));
     auto chunkOf = [&](const Blade& blade)
@@ -426,12 +480,6 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
         const int cz = std::clamp(static_cast<int>((blade.Root.z - minZ) / ChunkSize), 0, chunksZ - 1);
         return cz * chunksX + cx;
     };
-    std::shuffle(blades.begin(), blades.end(), random);
-    // 上限を超えたら、ばらばらに並べた後ろを捨てている（範囲の一部だけが抜けないように）
-    if (blades.size() > MaxBlades)
-    {
-        blades.resize(MaxBlades);
-    }
     // 区画の番号ごとに数えてから置き直す並べ替え（数え上げソート）。同じ区画の中の順番は保たれるので、
     // std::stable_sort と同じ並びになる。比べながら並べ替えるより速く、Debug版の起動で1秒以上かかっていたのを短くした
     {
@@ -476,7 +524,10 @@ void ForestGrass::PlantBlades(std::vector<Blade>& blades, std::vector<BladeState
         entry.Radius = std::sqrt(ChunkSize * ChunkSize * 0.5f + tallest * tallest * 0.25f) + tallest;
         m_Chunks.push_back(entry);
     }
+}
 
+void ForestGrass::ResetBladeStates(const std::vector<Blade>& blades, std::vector<BladeState>& states)
+{
     // 最初の葉先：何もないときの傾きのまま（ばねが落ち着いた形）
     states.resize(blades.size());
     for (std::size_t i = 0; i < blades.size(); ++i)
@@ -523,7 +574,7 @@ void ForestGrass::CreateBuffers(const std::vector<Blade>& blades, const std::vec
         FAILED(device->CreateShaderResourceView(m_StateBuffer.Get(), nullptr, m_StateView.ReleaseAndGetAddressOf())) ||
         FAILED(device->CreateUnorderedAccessView(m_StateBuffer.Get(), nullptr, m_StateAccess.ReleaseAndGetAddressOf())))
     {
-        utility::ReportFatalError("草のバッファの作成に失敗しました。");
+        Utility::ReportFatalError("草のバッファの作成に失敗しました。");
     }
 }
 

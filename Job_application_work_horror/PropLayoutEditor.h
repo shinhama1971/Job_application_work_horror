@@ -52,6 +52,14 @@ private:
         const DirectX::SimpleMath::Vector3& direction);
     // 明滅させていた小物の色を元に戻している
     void RestoreHighlight(PropLayoutFile::SpawnedProps& props);
+    // Draw の中身（Debug版だけ）：クリックで選ぶ・保存と読み直しのボタン・小物の一覧・選んだ小物の値・複製・削除・選んだ小物の明滅
+    void PickFromMouse(const Camera& camera);
+    Action DrawFileControls(PropLayoutFile::SpawnedProps& props, const Camera& camera);
+    void DrawPropList();
+    void DrawSelectedProp(SceneLayoutBuilder& builder, PropLayoutFile::SpawnedProps& props, const Camera& camera);
+    void DuplicateSelected(SceneLayoutBuilder& builder, PropLayoutFile::SpawnedProps& props, const PropDescription& original);
+    void DeleteSelected(PropLayoutFile::SpawnedProps& props, Wall& wall);
+    void UpdateHighlight(PropLayoutFile::SpawnedProps& props);
 
     std::string m_Path;
     PropLayout m_Layout;

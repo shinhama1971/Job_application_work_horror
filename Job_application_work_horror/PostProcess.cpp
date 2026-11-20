@@ -8,7 +8,7 @@
 #include "GpuTimer.h"
 #include "Renderer.h"
 #include "Application.h"
-#include "utility.h"
+#include "Utility.h"
 #include "CaptureMode.h"
 #include "shader/computeDispatchConfig.hlsli"
 
@@ -247,7 +247,7 @@ namespace Effect
                     m_AutoExposureParams.ReleaseAndGetAddressOf()));
             if (!created)
             {
-                utility::ReportFatalError("自動露出のバッファの作成に失敗しました。");
+                Utility::ReportFatalError("自動露出のバッファの作成に失敗しました。");
             }
         }
         m_ResetAutoExposure = true;

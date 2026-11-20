@@ -8,8 +8,8 @@
 #include	<unordered_map>
 #include	<cassert>
 #include	"Texture.h"
-#include	"AssimpPerse.h"
-#include	"utility.h"
+#include	"AssimpParse.h"
+#include	"Utility.h"
 
 // Assimp側のCRT構成（静的CRT）と一致させ、Release版がデバッグランタイムに依存しないようにしている。
 #if defined(_DEBUG)
@@ -18,7 +18,7 @@
 #pragma comment(lib, "assimp-vc143-mt.lib")
 #endif
 
-namespace AssimpPerse
+namespace AssimpParse
 {
 	// g_*は1回の読み込みだけに使う作業領域で、GetModelDataの先頭で毎回空にしている。
 	// Textureだけはunique_ptrなので、GetTexturesで呼び出し元へ所有権を移している（移した後は空になる）。
@@ -160,7 +160,7 @@ namespace AssimpPerse
 			}
 
 			// マテリアル情報を保存している（最初のディフューズテクスチャの名前も一緒に記録している）
-			AssimpPerse::MATERIAL mtrl{};
+			AssimpParse::MATERIAL mtrl{};
 			mtrl.mtrlname = mtrlname;
 			mtrl.Ambient = ambient;
 			mtrl.Diffuse = diffuse;
@@ -203,7 +203,7 @@ namespace AssimpPerse
         // assertはReleaseで消えるため、読み込めないときはファイル名と理由を表示して終了している。
 		if (pScene == nullptr)
 		{
-            utility::ReportFatalError(
+            Utility::ReportFatalError(
                 "モデルを読み込めませんでした。\n" + filename + "\n" +
                 importer.GetErrorString());
 		}

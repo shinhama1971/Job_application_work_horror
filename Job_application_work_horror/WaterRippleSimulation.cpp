@@ -8,7 +8,7 @@
 #include "shader/computeDispatchConfig.hlsli"
 
 #include "Renderer.h"
-#include "utility.h"
+#include "Utility.h"
 
 #include <algorithm>
 #include <cmath>
@@ -61,7 +61,7 @@ void WaterRippleSimulation::Init(int resolution, float worldSize)
 
     if (!m_Shader.Create("shader/waterRippleCS.hlsl"))
     {
-        utility::ReportFatalError("水たまりの波のシェーダーの作成に失敗しました。");
+        Utility::ReportFatalError("水たまりの波のシェーダーの作成に失敗しました。");
     }
 
     D3D11_BUFFER_DESC paramsDesc{};
@@ -71,7 +71,7 @@ void WaterRippleSimulation::Init(int resolution, float worldSize)
     if (FAILED(Renderer::GetDevice()->CreateBuffer(
         &paramsDesc, nullptr, m_ParamsBuffer.ReleaseAndGetAddressOf())))
     {
-        utility::ReportFatalError("水たまりの波の定数バッファの作成に失敗しました。");
+        Utility::ReportFatalError("水たまりの波の定数バッファの作成に失敗しました。");
     }
 
     m_HasOrigin = false;

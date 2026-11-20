@@ -9,7 +9,7 @@
 #include	<limits>
 #include	<wrl/client.h>
 #include	"Renderer.h"
-#include	"utility.h"
+#include	"Utility.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -33,7 +33,7 @@ public:
 		// ByteWidthはUINT。件数を変換する前にバイト数が表現できるか確認する。
 		if (vertices.empty() || vertices.size() > (std::numeric_limits<UINT>::max)() / sizeof(T))
 		{
-			utility::ReportFatalError("頂点バッファの容量が不正です。");
+			Utility::ReportFatalError("頂点バッファの容量が不正です。");
 		}
 
 		// 頂点バッファを作っている
@@ -46,7 +46,7 @@ public:
 		// assertはReleaseで消えるため、作れなかったときははっきり知らせて終了している。
 		if (!created)
 		{
-			utility::ReportFatalError("頂点バッファを作成できませんでした。");
+			Utility::ReportFatalError("頂点バッファを作成できませんでした。");
 		}
 		m_VertexCapacity = vertices.size();
 	}

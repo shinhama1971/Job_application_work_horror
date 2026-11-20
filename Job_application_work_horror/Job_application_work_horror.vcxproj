@@ -206,7 +206,7 @@
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
     <ClCompile Include="Application.cpp" />
-    <ClCompile Include="AssimpPerse.cpp" />
+    <ClCompile Include="AssimpParse.cpp" />
     <ClCompile Include="BatteryItem.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CeilingLight.cpp" />
@@ -246,7 +246,7 @@
     <ClCompile Include="WaterRippleSimulation.cpp" />
     <ClCompile Include="Hud.cpp" />
     <ClCompile Include="HudScreens.cpp" />
-    <ClCompile Include="input.cpp" />
+    <ClCompile Include="Input.cpp" />
     <ClCompile Include="InteractionSystem.cpp" />
     <ClCompile Include="Item.cpp" />
     <ClCompile Include="main.cpp" />
@@ -271,7 +271,7 @@
     <ClCompile Include="DDGIVolume.cpp" />
     <ClCompile Include="LightShafts.cpp" />
     <ClCompile Include="PointShadowMap.cpp" />
-    <ClCompile Include="sound.cpp" />
+    <ClCompile Include="Sound.cpp" />
     <ClCompile Include="StageScene.cpp" />
     <ClCompile Include="Stage1Layout.cpp" />
     <ClCompile Include="Stage1Objective.cpp" />
@@ -325,12 +325,12 @@
     <ClCompile Include="FigureVolumes.cpp" />
     <ClCompile Include="FirstPersonHands.cpp" />
     <ClCompile Include="TitleScene.cpp" />
-    <ClCompile Include="utility.cpp" />
+    <ClCompile Include="Utility.cpp" />
     <ClCompile Include="Wall.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
-    <ClInclude Include="AssimpPerse.h" />
+    <ClInclude Include="AssimpParse.h" />
     <ClInclude Include="BatteryItem.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="DebugUI.h" />
@@ -360,7 +360,7 @@
     <ClInclude Include="WaterRippleSimulation.h" />
     <ClInclude Include="Hud.h" />
     <ClInclude Include="IndexBuffer.h" />
-    <ClInclude Include="input.h" />
+    <ClInclude Include="Input.h" />
     <ClInclude Include="Interactable.h" />
     <ClInclude Include="InteractionSystem.h" />
     <ClInclude Include="Item.h" />
@@ -417,7 +417,7 @@
     <ClInclude Include="DDGIVolume.h" />
     <ClInclude Include="GIUpdateSettings.h" />
     <ClInclude Include="PointShadowMap.h" />
-    <ClInclude Include="sound.h" />
+    <ClInclude Include="Sound.h" />
     <ClInclude Include="StageScene.h" />
     <ClInclude Include="Stage1Layout.h" />
     <ClInclude Include="Stage1LightNumber.h" />
@@ -486,7 +486,7 @@
     <ClInclude Include="FirstPersonHands.h" />
     <ClInclude Include="TitleStageChoices.h" />
     <ClInclude Include="TitleScene.h" />
-    <ClInclude Include="utility.h" />
+    <ClInclude Include="Utility.h" />
     <ClInclude Include="VertexBuffer.h" />
     <ClInclude Include="Wall.h" />
     <ClInclude Include="shader\fastNoise.hlsli" />

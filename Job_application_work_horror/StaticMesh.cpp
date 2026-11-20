@@ -5,8 +5,8 @@
 // ============================================================================
 
 #include	"StaticMesh.h"
-#include	"AssimpPerse.h"
-#include	"utility.h"
+#include	"AssimpParse.h"
+#include	"Utility.h"
 
 #include <algorithm>
 #include <cfloat>
@@ -143,20 +143,20 @@ void StaticMesh::Load(std::string filename, std::string texturedirectory)
 // Assimpで読み込んだ結果を、ゲームで使う形（VERTEX_3D・SUBSET・MATERIAL）に変換している
 bool StaticMesh::LoadWithAssimp(const std::string& filename, const std::string& texturedirectory)
 {
-	std::vector<AssimpPerse::SUBSET> subsets{};					// サブセットの情報
-	std::vector<std::vector<AssimpPerse::VERTEX>> vertices{};	// 頂点データ（メッシュ単位）
+	std::vector<AssimpParse::SUBSET> subsets{};					// サブセットの情報
+	std::vector<std::vector<AssimpParse::VERTEX>> vertices{};	// 頂点データ（メッシュ単位）
 	std::vector<std::vector<unsigned int>> indices{};			// インデックスデータ（メッシュ単位）
-	std::vector<AssimpPerse::MATERIAL> materials{};				// マテリアル
+	std::vector<AssimpParse::MATERIAL> materials{};				// マテリアル
 
 	// Assimpを使ってモデルのデータを読み込んでいる
-	AssimpPerse::GetModelData(filename, texturedirectory);
+	AssimpParse::GetModelData(filename, texturedirectory);
 
-	subsets = AssimpPerse::GetSubsets();		// サブセットの情報を取得している
-	vertices = AssimpPerse::GetVertices();		// 頂点データ（メッシュ単位）
-	indices = AssimpPerse::GetIndices();		// インデックスデータ（メッシュ単位）
-	materials = AssimpPerse::GetMaterials();	// マテリアルの情報を取得している
+	subsets = AssimpParse::GetSubsets();		// サブセットの情報を取得している
+	vertices = AssimpParse::GetVertices();		// 頂点データ（メッシュ単位）
+	indices = AssimpParse::GetIndices();		// インデックスデータ（メッシュ単位）
+	materials = AssimpParse::GetMaterials();	// マテリアルの情報を取得している
 
-	m_textures = AssimpPerse::GetTextures();	// テクスチャを受け取っている（所有権もここへ移る）
+	m_textures = AssimpParse::GetTextures();	// テクスチャを受け取っている（所有権もここへ移る）
 
 	// 頂点データを作っている
 	for (const auto& mv : vertices)
@@ -225,7 +225,7 @@ bool StaticMesh::LoadWithAssimp(const std::string& filename, const std::string& 
 	}
 
 	// 変換済みの形式は、テクスチャをファイル名から読み直すので、名前の無いテクスチャ（埋め込み・パスを取れなかった物）があれば保存しない
-	if (AssimpPerse::HasEmbeddedTextures())
+	if (AssimpParse::HasEmbeddedTextures())
 	{
 		return false;
 	}
@@ -398,7 +398,7 @@ void StaticMesh::SaveConverted(const std::string& filename) const
 	{
 		return;
 	}
-	const auto result = utility::WriteFileAtomically(path, [&](std::ofstream& stream)
+	const auto result = Utility::WriteFileAtomically(path, [&](std::ofstream& stream)
 	{
 		stream.write(ConvertedMagic, sizeof(ConvertedMagic));
 		WriteValue(stream, ConvertedVersion);
@@ -424,7 +424,7 @@ void StaticMesh::SaveConverted(const std::string& filename) const
 			WriteString(stream, index < m_texturenames.size() ? m_texturenames[index] : std::string());
 		}
 	});
-	if (result != utility::AtomicWriteResult::Success)
+	if (result != Utility::AtomicWriteResult::Success)
 	{
 		OutputDebugStringW((L"モデルキャッシュを保存できません: " + path.wstring() + L"\n").c_str());
 	}

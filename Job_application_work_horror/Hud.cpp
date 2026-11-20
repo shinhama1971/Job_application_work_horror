@@ -282,9 +282,19 @@ void Hud::Draw(
             ? ReticleLayout::TargetColor
             : HudPalette::Text);
 
-    const float screenWidth = GetCanvasWidth();
-    const float screenHeight = GetCanvasHeight();
+    DrawObjective(objectiveText);
+    DrawEvidenceCount();
+    DrawReticle(hasInteractionTarget, reticleColor);
+    DrawFuseSlots(fuseCount);
+    DrawGauges(player);
+    DrawInteractionPrompt(interactionPrompt, interactionLocked);
+    DrawBatteryNotice(player);
 
+    Flush();
+}
+
+void Hud::DrawObjective(std::string_view objectiveText)
+{
     // 左上：今の目的。逃げる・電力が戻ったなどの安全な目的は緑、それ以外は黄色で出している
     if (!objectiveText.empty())
     {
@@ -305,6 +315,11 @@ void Hud::Draw(
         AddRectangle(LeftMargin, TopMargin, ObjectiveLayout::AccentWidth, ObjectiveLayout::PanelHeight, objectiveColor);
         AddText(ObjectiveLayout::TextX, ObjectiveLayout::TextY, objectiveText, ObjectiveLayout::TextPixelSize, objectiveColor);
     }
+}
+
+void Hud::DrawEvidenceCount()
+{
+    const float screenWidth = GetCanvasWidth();
 
     // 任意で探せる情報（記録の数）は、必ず進める目的より控えめに表示し、両方を同時に分かるようにしている。
     // リザルト画面で数える探索の要素も、クリアする前から分かる表示にしている。
@@ -329,6 +344,12 @@ void Hud::Draw(
         AddText(evidenceX, TopRightNoticeLayout::EvidenceTextY + m_TopRightOffset,
             evidenceText, TopRightNoticeLayout::TextPixelSize, evidenceColor);
     }
+}
+
+void Hud::DrawReticle(bool hasInteractionTarget, const Color& reticleColor)
+{
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
 
     // 視線の位置だけを伝える、小さな十字の照準を画面の中央に描いている。
     const float reticleExtent = hasInteractionTarget ? ReticleLayout::TargetExtent : ReticleLayout::IdleExtent;
@@ -341,6 +362,11 @@ void Hud::Draw(
     AddRectangle(centerX + gap, centerY - stroke * 0.5f, armLength, stroke, reticleColor);
     AddRectangle(centerX - stroke * 0.5f, centerY - reticleExtent, stroke, armLength, reticleColor);
     AddRectangle(centerX - stroke * 0.5f, centerY + gap, stroke, armLength, reticleColor);
+}
+
+void Hud::DrawFuseSlots(int fuseCount)
+{
+    const float screenHeight = GetCanvasHeight();
 
     // 負の個数を「ヒューズの表示なし」として扱い、ヒューズのない面でも電池のHUDを共用している。
     if (fuseCount >= 0)
@@ -358,6 +384,11 @@ void Hud::Draw(
             );
         }
     }
+}
+
+void Hud::DrawGauges(const Player& player)
+{
+    const float screenHeight = GetCanvasHeight();
 
     // 懐中電灯の電池の枠と残りのゲージを描いている（50%以下で黄色、20%以下で赤）。
     const float batteryRate = std::clamp(
@@ -410,6 +441,12 @@ void Hud::Draw(
                 GaugeLayout::FillWidth * staminaRate, GaugeLayout::StaminaFillHeight, staminaColor);
         }
     }
+}
+
+void Hud::DrawInteractionPrompt(std::string_view interactionPrompt, bool interactionLocked)
+{
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
 
     // 押すキーと、実行される操作の名前を一緒に表示している。
     // ボタン名だけでは、拾う・開ける・脱出するのどれが起きるか分からなかったためである。
@@ -443,6 +480,11 @@ void Hud::Draw(
         AddText(panelX + InteractionPromptLayout::TextX, panelY + InteractionPromptLayout::TextY,
             interactionPrompt, InteractionPromptLayout::TextPixelSize, promptColor);
     }
+}
+
+void Hud::DrawBatteryNotice(const Player& player)
+{
+    const float screenWidth = GetCanvasWidth();
 
     // 右上：電池を拾った直後は「回復した」、20%以下なら「残量が少ない」と出している
     std::string_view batteryNotice;
@@ -467,8 +509,6 @@ void Hud::Draw(
         AddText(noticeX, BatteryNoticeLayout::TextY + m_TopRightOffset,
             batteryNotice, TopRightNoticeLayout::TextPixelSize, batteryNoticeColor);
     }
-
-    Flush();
 }
 
 

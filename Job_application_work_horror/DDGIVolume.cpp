@@ -9,7 +9,7 @@
 
 #include "CaptureMode.h"
 #include "Renderer.h"
-#include "utility.h"
+#include "Utility.h"
 
 #include <algorithm>
 #include <cmath>
@@ -108,7 +108,7 @@ namespace Effect
             m_ApplyShader.Create("shader/ddgiApplyCS.hlsl");
         if (!created)
         {
-            utility::ReportFatalError("間接光（DDGI）の準備に失敗しました。");
+            Utility::ReportFatalError("間接光（DDGI）の準備に失敗しました。");
         }
         m_HasGrid = false;
         m_RoomVersion = 0;

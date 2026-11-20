@@ -216,6 +216,8 @@ for ($digit = 1; $digit -le 9; ++$digit)
 $writings += @(
     # 暗証番号の扉の先の部屋
     @{ Name = 'writing_watched'; Text = 'ずっと みていた'; Seed = 2201 },
+    # ループ廊下の突き当たり。ライトを消すと、照らして読む警告の下に現れる。
+    @{ Name = 'writing_dark_corridor'; Text = 'そのまま きいて'; Seed = 2202 },
     # 1面のループで、突き当たりのドアを通って開始地点へ戻るたびに、開始地点の部屋に1つずつ現れる文字（StageScene）
     @{ Name = 'writing_lap1'; Text = 'おかえり'; Seed = 2301 },
     @{ Name = 'writing_lap2'; Text = 'なんど あけても ここ'; Seed = 2302 },
@@ -229,4 +231,33 @@ foreach ($writing in $writings)
     $height = if ($writing.Height) { $writing.Height } else { 256 }
     [WallWritingGenerator]::Generate($writing.Text, $path, $writing.Seed, $width, $height)
     Write-Host "生成: $path"
+}
+
+# 空箱の真上に貼る点検表示。壁の汚れと紛れないように、印刷物は背景の紙も描く。
+$signPath = Join-Path $outputDirectory 'stage1_keypad_fuse_case_sign.png'
+$sign = New-Object System.Drawing.Bitmap 680, 280
+$graphics = [System.Drawing.Graphics]::FromImage($sign)
+$headerFont = New-Object System.Drawing.Font 'Yu Gothic', 34, ([System.Drawing.FontStyle]::Bold)
+$bodyFont = New-Object System.Drawing.Font 'Yu Gothic', 25, ([System.Drawing.FontStyle]::Bold)
+$ink = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(36, 38, 34))
+$rule = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(126, 57, 35))
+try
+{
+    $graphics.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
+    $graphics.Clear([System.Drawing.Color]::FromArgb(202, 198, 172))
+    $graphics.DrawString('予備ヒューズ 保管箱', $headerFont, $ink, 25, 20)
+    $graphics.FillRectangle($rule, 28, 92, 624, 6)
+    $graphics.DrawString('空の場合は後で確認', $bodyFont, $ink, 28, 124)
+    $graphics.DrawString('ヒューズ２本回収・廊下２周後', $bodyFont, $ink, 28, 190)
+    $sign.Save($signPath, [System.Drawing.Imaging.ImageFormat]::Png)
+    Write-Host "生成: $signPath"
+}
+finally
+{
+    $rule.Dispose()
+    $ink.Dispose()
+    $bodyFont.Dispose()
+    $headerFont.Dispose()
+    $graphics.Dispose()
+    $sign.Dispose()
 }

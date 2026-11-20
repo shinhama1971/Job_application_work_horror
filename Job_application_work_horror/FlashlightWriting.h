@@ -34,6 +34,9 @@ public:
     // 板を、周囲の照明や懐中電灯で照らせる印刷物として描く。
     void SetPrintedSurface();
 
+    // 光を消したときに浮かぶ文字にする。通常の照射判定を反転する。
+    void SetDarknessReveal() { m_DarknessReveal = true; }
+
     // 文字の画像を読み込んでいる。alternatePathを指定すると、ShowAlternateで書き換えられるようになる。
     void SetTextures(const std::string& primaryPath, const std::string& alternatePath = "");
 
@@ -58,7 +61,7 @@ public:
     // 濃さを、ゆっくり変えずにすぐ決めている（最初は隠しておく文字に使っている）
     void SetPresenceImmediately(float presence) { m_Presence = presence; m_TargetPresence = presence; }
 
-    // 懐中電灯の中心付近で、さえぎる物なく照らして読める状態かどうかを返している。
+    // 光の条件を満たし、さえぎる物なく視線の中心付近で読めるかを返す。
     bool IsBeingRead(
         const DirectX::SimpleMath::Vector3& cameraPosition,
         const DirectX::SimpleMath::Vector3& cameraForward,
@@ -87,6 +90,7 @@ private:
     bool m_HasAlternate = false;
     bool m_ShowingAlternate = false;
     bool m_PrintedSurface = false;
+    bool m_DarknessReveal = false;
 
     // 文字が向いている方向、インクの色、今の濃さと目標の濃さ、経過時間（シェーダーで、文字が現れる境目をゆっくり揺らすのに使っている）
     DirectX::SimpleMath::Vector3 m_Normal = DirectX::SimpleMath::Vector3(0.0f, 0.0f, -1.0f);

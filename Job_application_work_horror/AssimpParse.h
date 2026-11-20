@@ -19,7 +19,7 @@
 #pragma pop_macro("max")
 #pragma pop_macro("min")
 
-namespace AssimpPerse
+namespace AssimpParse
 {
 	// Assimpから読んだ1頂点分のデータ（どのメッシュ・マテリアルに属するかも持っている）
 	struct VERTEX {

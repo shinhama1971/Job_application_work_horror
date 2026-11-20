@@ -77,6 +77,11 @@ private:
     bool ReloadPropLayout();
     // 目的表示の文章を選ぶために、今の状態を集めている（StageSceneDraw.cpp）。
     Stage1ObjectiveInput MakeObjectiveInput() const;
+    // Draw の中身：配置エディタ（Debug版だけ）・ポーズメニュー・目的地の矢印が指す所・始まりと捕まったときと階段の暗転
+    void DrawLayoutEditor(Camera* camera);
+    void DrawPauseMenu();
+    DirectX::SimpleMath::Vector3 SelectGuideTarget(int fuseCount, bool exitPowerActivated);
+    void DrawScreenFades();
     // 姿の見えない物音を鳴らしてよいか（台本の演出や監視映像と重ならないか）を判断している。
     bool IsAmbientSoundAllowed() const;
     // 電力が戻った後に一度だけ、天井裏の足音が照明を消しながら迫ってくる演出を進めている
@@ -85,6 +90,7 @@ private:
     void UpdateAmbientSounds();
     // 懐中電灯で照らすと浮かぶ壁の文字。書き換わった文字を読んだら物音の演出を起こしている。
     void UpdateWallWritings(class Player& player);
+    void UpdateDarkCorridorWriting(const class Player& player);
     // ボイスレコーダーを調べたら録音の字幕を流し、1面の途中で届く無線（嘘の指示）を進めている
     void UpdateTransmissions(const class Player& player, float deltaTime, bool archiveStalkerLit);
     // 誰かの濡れた足跡：西棟の水から初めて乾いた床へ出ると、同じ水から裸足の足跡が一歩ずつ後をついて来る（1回だけ）
@@ -115,6 +121,9 @@ private:
     void UpdateEntranceThresholdEvent(class Player& player);
     void UpdateStorageScare(class Player& player);
     void AdvanceCorridorLoop(class Player& player);
+    // AdvanceCorridorLoop の中身：壁の文字と周回の印・周回ごとの廊下の変化
+    void UpdateCorridorLoopMarks(int loopPhase);
+    void ApplyCorridorLoopChanges(int loopPhase);
     // 突き当たりの最後のドアが開いていて、プレイヤーがその向こう側へ出たか
     bool IsThroughEndDoor(const DirectX::SimpleMath::Vector3& position) const;
 
@@ -205,6 +214,9 @@ private:
     float m_EvidenceNoticeTimer = 0.0f;
     float m_LoopCooldown = 0.0f;
     float m_LoopNoticeTimer = 0.0f;
+    // 暗い廊下の文字は、目を止めて読んだときだけ一度反応する。
+    float m_DarkWritingReadTime = 0.0f;
+    bool m_DarkWritingTriggered = false;
     // 暗証番号の部屋のヒューズ：空の箱の知らせを出す残り秒数、箱に近づいている間か（近づいた瞬間だけ知らせる）、
     // 3本目の段階になったときに、先に開けていた部屋の箱へヒューズが戻ったか、前のフレームで3本目の段階だったか
     float m_EmptyFuseCaseNoticeTimer = 0.0f;

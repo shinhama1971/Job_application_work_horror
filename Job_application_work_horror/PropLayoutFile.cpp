@@ -7,7 +7,7 @@
 
 #include "SceneLayoutBuilder.h"
 #include "Wall.h"
-#include "utility.h"
+#include "Utility.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -69,6 +69,220 @@ namespace
 
 namespace PropLayoutFile
 {
+    namespace
+    {
+        // 1行を読むときの間違いの文章（空なら読めた）
+        using ParseError = std::string;
+
+        // 名前で探し、あれば値を置き換え、なければ後ろに足している（色と仕上げの表で使う）
+        template<class Entries, class Value>
+        void SetNamedEntry(Entries& entries, const std::string& name, const Value& value)
+        {
+            const auto existing = std::find_if(entries.begin(), entries.end(),
+                [&name](const auto& entry) { return entry.first == name; });
+            if (existing != entries.end())
+            {
+                existing->second = value;
+            }
+            else
+            {
+                entries.emplace_back(name, value);
+            }
+        }
+
+        // color 名前 r g b [metal 粗さ [金属らしさ]] [rough 粗さ]
+        ParseError ParseColorLine(std::istringstream& line, PropLayout& layout)
+        {
+            std::string name;
+            float r = 0.0f, g = 0.0f, b = 0.0f;
+            if (!(line >> name >> r >> g >> b))
+            {
+                return "color の後に 名前 r g b が必要";
+            }
+            SetNamedEntry(layout.Colors, name, Color(r, g, b, 1.0f));
+
+            // 色の後ろに付けるPBRの仕上げ（metal 粗さ ／ rough 粗さ）
+            std::string option;
+            while (line >> option)
+            {
+                float roughness = 0.0f;
+                if ((option != "metal" && option != "rough") || !(line >> roughness))
+                {
+                    return "color の後ろには metal 粗さ [金属らしさ] か rough 粗さ を書く: " + option;
+                }
+                // metal の後ろには、金属らしさ（0〜1。汚れや酸化の膜がある金属ほど低い）を続けて書ける。省くと1
+                float metallic = option == "metal" ? 1.0f : 0.0f;
+                if (option == "metal")
+                {
+                    const std::streampos beforeAmount = line.tellg();
+                    if (!(line >> metallic))
+                    {
+                        line.clear();
+                        line.seekg(beforeAmount);
+                        metallic = 1.0f;
+                    }
+                }
+                PropSurfaceFinish finish;
+                finish.Metallic = std::clamp(metallic, 0.0f, 1.0f);
+                finish.Roughness = std::clamp(roughness, MinimumRoughness, 1.0f);
+                SetNamedEntry(layout.Finishes, name, finish);
+            }
+            return {};
+        }
+
+        // spot 組の名前 x y z（同じ組の名前を何行も書くと、候補が増える）
+        ParseError ParseSpotLine(std::istringstream& line, PropLayout& layout)
+        {
+            std::string group;
+            DirectX::SimpleMath::Vector3 position;
+            if (!(line >> group >> position.x >> position.y >> position.z))
+            {
+                return "spot の後に 組の名前 x y z が必要";
+            }
+            auto existing = std::find_if(layout.Spots.begin(), layout.Spots.end(),
+                [&group](const auto& spots) { return spots.first == group; });
+            if (existing == layout.Spots.end())
+            {
+                layout.Spots.emplace_back(group, std::vector<DirectX::SimpleMath::Vector3>{});
+                existing = layout.Spots.end() - 1;
+            }
+            existing->second.push_back(position);
+            return {};
+        }
+
+        // place 名前 x y z [yaw 度] [size 幅 高さ 奥行き]
+        ParseError ParsePlaceLine(std::istringstream& line, PropLayout& layout, int lineNumber)
+        {
+            PropPlacement placement;
+            if (!(line >> placement.Name >> placement.Position.x >> placement.Position.y >> placement.Position.z))
+            {
+                return "place の値が足りない（名前 位置3つ）";
+            }
+            std::string option;
+            while (line >> option)
+            {
+                if (option == "yaw")
+                {
+                    float degrees = 0.0f;
+                    if (!(line >> degrees))
+                    {
+                        return "yaw の後に向き（度）が必要";
+                    }
+                    placement.Yaw = DirectX::XMConvertToRadians(degrees);
+                    placement.HasYaw = true;
+                }
+                else if (option == "size")
+                {
+                    if (!(line >> placement.Size.x >> placement.Size.y >> placement.Size.z))
+                    {
+                        return "size の後に 幅 高さ 奥行き が必要";
+                    }
+                    placement.HasSize = true;
+                }
+                else
+                {
+                    return "place の知らない指定: " + option;
+                }
+            }
+            for (const PropPlacement& existing : layout.Placements)
+            {
+                if (existing.Name == placement.Name)
+                {
+                    return "同じ名前の place が2回ある: " + placement.Name;
+                }
+            }
+            placement.Line = lineNumber;
+            layout.Placements.push_back(placement);
+            return {};
+        }
+
+        // prop の後ろに付ける指定（影なし・壁の古さ・部屋の形・外壁・光る範囲・見た目のモデル）
+        ParseError ParsePropOptions(std::istringstream& line, PropDescription& prop)
+        {
+            std::string option;
+            while (line >> option)
+            {
+                if (option == "noshadow")
+                {
+                    prop.CastsShadow = false;
+                }
+                else if (option == "weathering")
+                {
+                    prop.Weathering = true;
+                }
+                else if (option == "room")
+                {
+                    prop.Room = true;
+                }
+                else if (option == "facade")
+                {
+                    // 研究所の外壁の材質（facadePS。型枠の跡・Pコンの穴・雨だれ・根元の苔）で描く箱
+                    prop.Facade = true;
+                }
+                else if (option == "glow")
+                {
+                    if (!(line >> prop.GlowRange >> prop.GlowStrength))
+                    {
+                        return "glow の後に 範囲 強さ が必要";
+                    }
+                }
+                else if (option == "model")
+                {
+                    if (!(line >> prop.Model) || !Wall::IsKnownVisualModel(prop.Model))
+                    {
+                        return "model の後に、Wall.cpp の一覧にあるモデルの名前が必要: " + prop.Model;
+                    }
+                }
+                else
+                {
+                    return "知らない指定: " + option;
+                }
+            }
+            return {};
+        }
+
+        // prop 名前 x y z 幅 高さ 奥行き 色 光る色 光沢 当たり判定 [指定...]
+        ParseError ParsePropLine(std::istringstream& line, PropLayout& layout, int lineNumber)
+        {
+            PropDescription prop;
+            std::string diffuseName, emissionName;
+            int collision = 0;
+            if (!(line >> prop.Name >>
+                prop.Position.x >> prop.Position.y >> prop.Position.z >>
+                prop.Scale.x >> prop.Scale.y >> prop.Scale.z >>
+                diffuseName >> emissionName >> prop.Shininess >> collision))
+            {
+                return "prop の値が足りない（名前 位置3つ 大きさ3つ 色 光る色 光沢 当たり判定）";
+            }
+            const Color* diffuse = FindColor(layout, diffuseName);
+            const Color* emission = FindColor(layout, emissionName);
+            if (diffuse == nullptr || emission == nullptr)
+            {
+                return "color で決めていない色の名前: " + (diffuse == nullptr ? diffuseName : emissionName);
+            }
+            prop.Diffuse = *diffuse;
+            prop.Emission = *emission;
+            prop.Finish = FindFinish(layout, diffuseName);
+            prop.DiffuseName = diffuseName;
+            prop.EmissionName = emissionName;
+            prop.Collision = collision != 0;
+            prop.Line = lineNumber;
+            if (ParseError error = ParsePropOptions(line, prop); !error.empty())
+            {
+                return error;
+            }
+            for (const PropDescription& existing : layout.Props)
+            {
+                if (existing.Name == prop.Name)
+                {
+                    return "同じ名前が2回ある: " + prop.Name;
+                }
+            }
+            layout.Props.push_back(prop);
+            return {};
+        }
+    }
+
     PropLayout Load(const std::string& path)
     {
         PropLayout layout;
@@ -108,202 +322,15 @@ namespace PropLayoutFile
                 continue;
             }
 
-            if (command == "color")
+            ParseError error;
+            if (command == "color") error = ParseColorLine(line, layout);
+            else if (command == "spot") error = ParseSpotLine(line, layout);
+            else if (command == "place") error = ParsePlaceLine(line, layout, lineNumber);
+            else if (command == "prop") error = ParsePropLine(line, layout, lineNumber);
+            else error = "知らない行: " + command;
+            if (!error.empty())
             {
-                std::string name;
-                float r = 0.0f, g = 0.0f, b = 0.0f;
-                if (!(line >> name >> r >> g >> b))
-                {
-                    return fail(lineNumber, "color の後に 名前 r g b が必要");
-                }
-                const auto existing = std::find_if(layout.Colors.begin(), layout.Colors.end(),
-                    [&name](const auto& color) { return color.first == name; });
-                if (existing != layout.Colors.end())
-                {
-                    existing->second = Color(r, g, b, 1.0f);
-                }
-                else
-                {
-                    layout.Colors.emplace_back(name, Color(r, g, b, 1.0f));
-                }
-
-                // 色の後ろに付けるPBRの仕上げ（metal 粗さ ／ rough 粗さ）
-                std::string option;
-                while (line >> option)
-                {
-                    float roughness = 0.0f;
-                    if ((option != "metal" && option != "rough") || !(line >> roughness))
-                    {
-                        return fail(lineNumber, "color の後ろには metal 粗さ [金属らしさ] か rough 粗さ を書く: " + option);
-                    }
-                    // metal の後ろには、金属らしさ（0〜1。汚れや酸化の膜がある金属ほど低い）を続けて書ける。省くと1
-                    float metallic = option == "metal" ? 1.0f : 0.0f;
-                    if (option == "metal")
-                    {
-                        const std::streampos beforeAmount = line.tellg();
-                        if (!(line >> metallic))
-                        {
-                            line.clear();
-                            line.seekg(beforeAmount);
-                            metallic = 1.0f;
-                        }
-                    }
-                    PropSurfaceFinish finish;
-                    finish.Metallic = std::clamp(metallic, 0.0f, 1.0f);
-                    finish.Roughness = std::clamp(roughness, MinimumRoughness, 1.0f);
-                    const auto existingFinish = std::find_if(layout.Finishes.begin(), layout.Finishes.end(),
-                        [&name](const auto& entry) { return entry.first == name; });
-                    if (existingFinish != layout.Finishes.end())
-                    {
-                        existingFinish->second = finish;
-                    }
-                    else
-                    {
-                        layout.Finishes.emplace_back(name, finish);
-                    }
-                }
-            }
-            else if (command == "spot")
-            {
-                // spot 組の名前 x y z（同じ組の名前を何行も書くと、候補が増える）
-                std::string group;
-                DirectX::SimpleMath::Vector3 position;
-                if (!(line >> group >> position.x >> position.y >> position.z))
-                {
-                    return fail(lineNumber, "spot の後に 組の名前 x y z が必要");
-                }
-                auto existing = std::find_if(layout.Spots.begin(), layout.Spots.end(),
-                    [&group](const auto& spots) { return spots.first == group; });
-                if (existing == layout.Spots.end())
-                {
-                    layout.Spots.emplace_back(group, std::vector<DirectX::SimpleMath::Vector3>{});
-                    existing = layout.Spots.end() - 1;
-                }
-                existing->second.push_back(position);
-            }
-            else if (command == "place")
-            {
-                // place 名前 x y z [yaw 度] [size 幅 高さ 奥行き]
-                PropPlacement placement;
-                if (!(line >> placement.Name >> placement.Position.x >> placement.Position.y >> placement.Position.z))
-                {
-                    return fail(lineNumber, "place の値が足りない（名前 位置3つ）");
-                }
-                std::string option;
-                while (line >> option)
-                {
-                    if (option == "yaw")
-                    {
-                        float degrees = 0.0f;
-                        if (!(line >> degrees))
-                        {
-                            return fail(lineNumber, "yaw の後に向き（度）が必要");
-                        }
-                        placement.Yaw = DirectX::XMConvertToRadians(degrees);
-                        placement.HasYaw = true;
-                    }
-                    else if (option == "size")
-                    {
-                        if (!(line >> placement.Size.x >> placement.Size.y >> placement.Size.z))
-                        {
-                            return fail(lineNumber, "size の後に 幅 高さ 奥行き が必要");
-                        }
-                        placement.HasSize = true;
-                    }
-                    else
-                    {
-                        return fail(lineNumber, "place の知らない指定: " + option);
-                    }
-                }
-                for (const PropPlacement& existing : layout.Placements)
-                {
-                    if (existing.Name == placement.Name)
-                    {
-                        return fail(lineNumber, "同じ名前の place が2回ある: " + placement.Name);
-                    }
-                }
-                placement.Line = lineNumber;
-                layout.Placements.push_back(placement);
-            }
-            else if (command == "prop")
-            {
-                PropDescription prop;
-                std::string diffuseName, emissionName;
-                int collision = 0;
-                if (!(line >> prop.Name >>
-                    prop.Position.x >> prop.Position.y >> prop.Position.z >>
-                    prop.Scale.x >> prop.Scale.y >> prop.Scale.z >>
-                    diffuseName >> emissionName >> prop.Shininess >> collision))
-                {
-                    return fail(lineNumber, "prop の値が足りない（名前 位置3つ 大きさ3つ 色 光る色 光沢 当たり判定）");
-                }
-                const Color* diffuse = FindColor(layout, diffuseName);
-                const Color* emission = FindColor(layout, emissionName);
-                if (diffuse == nullptr || emission == nullptr)
-                {
-                    return fail(lineNumber, "color で決めていない色の名前: " +
-                        (diffuse == nullptr ? diffuseName : emissionName));
-                }
-                prop.Diffuse = *diffuse;
-                prop.Emission = *emission;
-                prop.Finish = FindFinish(layout, diffuseName);
-                prop.DiffuseName = diffuseName;
-                prop.EmissionName = emissionName;
-                prop.Collision = collision != 0;
-                prop.Line = lineNumber;
-
-                // 後ろに付ける指定（影なし・壁の古さ・光る範囲・見た目のモデル）
-                std::string option;
-                while (line >> option)
-                {
-                    if (option == "noshadow")
-                    {
-                        prop.CastsShadow = false;
-                    }
-                    else if (option == "weathering")
-                    {
-                        prop.Weathering = true;
-                    }
-                    else if (option == "room")
-                    {
-                        prop.Room = true;
-                    }
-                    else if (option == "facade")
-                    {
-                        // 研究所の外壁の材質（facadePS。型枠の跡・Pコンの穴・雨だれ・根元の苔）で描く箱
-                        prop.Facade = true;
-                    }
-                    else if (option == "glow")
-                    {
-                        if (!(line >> prop.GlowRange >> prop.GlowStrength))
-                        {
-                            return fail(lineNumber, "glow の後に 範囲 強さ が必要");
-                        }
-                    }
-                    else if (option == "model")
-                    {
-                        if (!(line >> prop.Model) || !Wall::IsKnownVisualModel(prop.Model))
-                        {
-                            return fail(lineNumber, "model の後に、Wall.cpp の一覧にあるモデルの名前が必要: " + prop.Model);
-                        }
-                    }
-                    else
-                    {
-                        return fail(lineNumber, "知らない指定: " + option);
-                    }
-                }
-                for (const PropDescription& existing : layout.Props)
-                {
-                    if (existing.Name == prop.Name)
-                    {
-                        return fail(lineNumber, "同じ名前が2回ある: " + prop.Name);
-                    }
-                }
-                layout.Props.push_back(prop);
-            }
-            else
-            {
-                return fail(lineNumber, "知らない行: " + command);
+                return fail(lineNumber, error);
             }
         }
         if (file.bad() || !file.eof())
@@ -336,7 +363,7 @@ namespace PropLayoutFile
             [&name](const PropPlacement& placement) { return placement.Name == name; });
         if (found == layout.Placements.end())
         {
-            utility::ReportFatalError("配置のファイルに place " + name + " がありません。");
+            Utility::ReportFatalError("配置のファイルに place " + name + " がありません。");
         }
         return *found;
     }
@@ -347,7 +374,7 @@ namespace PropLayoutFile
             [&group](const auto& spots) { return spots.first == group; });
         if (found == layout.Spots.end() || found->second.empty())
         {
-            utility::ReportFatalError("配置のファイルに spot " + group + " がありません。");
+            Utility::ReportFatalError("配置のファイルに spot " + group + " がありません。");
         }
         return found->second;
     }
@@ -601,8 +628,8 @@ namespace PropLayoutFile
             }
         }
 
-        using utility::AtomicWriteResult;
-        const auto result = utility::WriteTextAtomically(path, output.str(), [&]
+        using Utility::AtomicWriteResult;
+        const auto result = Utility::WriteTextAtomically(path, output.str(), [&]
         {
             const PropLayout latest = Load(path);
             return latest.IsValid() && latest.SourceLines == current.SourceLines;

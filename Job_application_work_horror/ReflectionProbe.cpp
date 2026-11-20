@@ -8,7 +8,7 @@
 
 #include "Camera.h"
 #include "Renderer.h"
-#include "utility.h"
+#include "Utility.h"
 
 using namespace DirectX::SimpleMath;
 
@@ -97,7 +97,7 @@ namespace Effect
             SUCCEEDED(device->CreateDepthStencilView(m_DepthTexture.Get(), nullptr, m_DepthView.ReleaseAndGetAddressOf()));
         if (!created)
         {
-            utility::ReportFatalError("反射のキューブマップの作成に失敗しました。");
+            Utility::ReportFatalError("反射のキューブマップの作成に失敗しました。");
         }
         m_NextFace = 0;
         m_FacesDrawn = 0;

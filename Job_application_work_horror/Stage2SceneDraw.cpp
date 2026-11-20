@@ -61,7 +61,6 @@ void Stage2Scene::Draw(Camera* camera)
     }
 
     ExitTrigger* exit = m_Objects.exit;
-    Door* finalDoor = m_Objects.door;
     FuseBox* confirmationPanel =
         m_Objects.confirmationPanel;
     const bool confirmationPending =
@@ -84,19 +83,7 @@ void Stage2Scene::Draw(Camera* camera)
     // ロッカーの中では、扉のすき間以外を暗くしている（目的表示はその上に重ねて読めるようにしている）。
     if (player->IsHiding())
     {
-        float hidingDanger = 0.0f;
-        ShadowMan* stalker = m_Objects.noiseShadow;
-        if (stalker != nullptr && stalker->IsActive())
-        {
-            Vector3 toStalker = stalker->GetPosition() - player->GetPosition();
-            toStalker.y = 0.0f;
-            // 足音の影が近いほど、すき間の縁を赤くしている（この距離から、この幅で遠ざかるほど弱く）
-            constexpr float HidingDangerNearDistance = 20.0f;
-            constexpr float HidingDangerRange = 80.0f;
-            hidingDanger = MathUtility::Proximity(toStalker.Length(), HidingDangerNearDistance, HidingDangerRange);
-        }
-        m_Hud.DrawHidingView(m_VisualTimer, hidingDanger,
-            m_BreathHold.GetBreath(), m_BreathHold.IsHolding(), m_BreathHold.GetExposure());
+        DrawHidingView(*player);
     }
     // 普段のHUD（2面はヒューズがないので-1を渡している）
     m_Hud.Draw(*player, -1, m_InteractionSystem.GetPrompt(),
@@ -104,71 +91,125 @@ void Stage2Scene::Draw(Camera* camera)
     const float threatRate = ComputeThreatRate(*player, true);
     if (showStatusPanel)
     {
-        m_Hud.DrawStage2Status(
-            m_LoopCount, threatRate, m_FinalDoorReady,
-            m_SignalPuzzle.GetStep(),
-            m_LoopCount >= Stage2FinalLoopCount && !m_SignalPuzzle.IsComplete());
-        // 危険度があるとき・息を潜めている間だけ、その進み具合を出している
-        if (m_LoopCount < Stage2FinalLoopCount && !m_ObservedScareSequence.IsActive() &&
-            !m_FinalSequence.IsPursuitActive() &&
-            !m_FinalSequence.IsSequenceActive() &&
-            m_LoopTransitionTimer < 0.0f &&
-            (m_NoiseThreatSystem.GetThreat() > QuietRecoveryThreat ||
-                m_QuietRecovery.progress > 0.0f ||
-                m_QuietRecovery.successNotice > 0.0f || m_QuietRecovery.cooldown > 0.0f))
-        {
-            m_Hud.DrawQuietRecovery(
-                m_QuietRecovery.progress / QuietRecovery::RequiredSeconds,
-                m_QuietRecovery.cooldown, m_QuietRecovery.successNotice > 0.0f,
-                m_QuietRecovery.tooClose);
-        }
+        DrawStatusPanel(threatRate);
     }
     // 目的地の方向：普段は奥の扉、異変を探す間はその場所、確認のスイッチや信号盤の段階ではその位置
     if (m_VisualTimer >= Hud::ChapterCardSeconds &&
         !m_CaughtSequence.IsActive() &&
         (exit == nullptr || !exit->IsEscaping()))
     {
-        Vector3 guideTarget = finalDoor != nullptr
-            ? finalDoor->GetPosition()
-            : FallbackDoorTarget;
-        const Stage2Anomaly requiredAnomaly = m_AnomalyPlan.GetRequired(m_LoopCount);
-        if (requiredAnomaly != Stage2Anomaly::None && !IsRequiredAnomalyFound())
-        {
-            // 探すべき異変の場所を指している（偽の扉・時計・肖像画・最後に現れた血の手形・鏡・ノックの出どころ）。
-            guideTarget =
-                requiredAnomaly == Stage2Anomaly::FalseDoor ? FalseDoorTarget :
-                requiredAnomaly == Stage2Anomaly::Clock ? ClockTarget :
-                requiredAnomaly == Stage2Anomaly::Portrait ? PortraitTarget :
-                requiredAnomaly == Stage2Anomaly::Handprint ? m_HandprintAnomaly.GetLatestPosition() :
-                requiredAnomaly == Stage2Anomaly::Mirror
-                    ? Vector3(MirrorAnomaly::SurfaceX, MirrorAnomaly::CenterY, MirrorAnomaly::CenterZ) :
-                requiredAnomaly == Stage2Anomaly::Puddle
-                    ? Vector3(PuddleReflectionAnomaly::PuddleCenterX, PuddleReflectionAnomaly::FloorY,
-                        PuddleReflectionAnomaly::PuddleCenterZ) :
-                GetKnockListenPoint();
-        }
-        else if (confirmationPending)
-        {
-            guideTarget = ConfirmationPanelTarget;
-        }
-        else if (m_LoopCount >= Stage2FinalLoopCount && !m_SignalPuzzle.IsComplete())
-        {
-            if (m_SignalPuzzle.GetStep() == 0)
-            {
-                guideTarget = BlueSignalTarget;
-            }
-            else if (m_SignalPuzzle.GetStep() == 1)
-            {
-                guideTarget = AmberSignalTarget;
-            }
-            else
-            {
-                guideTarget = RedSignalTarget;
-            }
-        }
         m_Hud.DrawObjectiveGuide(
-            *camera, player->GetPosition(), guideTarget);
+            *camera, player->GetPosition(), SelectGuideTarget(confirmationPending));
     }
+    DrawIntroAndLoopCards();
+    DrawScreenFades();
+
+    // ポーズ中はポーズメニューを重ねている（2階として表示）
+    if (game->IsPaused())
+    {
+        m_Hud.DrawPause(
+            game->GetBrightnessLevel(),
+            game->GetEffectLevel(),
+            game->GetLookSensitivityLevel(),
+            game->GetVolumeLevel(),
+            game->IsGuideEnabled(),
+            game->GetResolutionLevel(),
+            game->GetPauseSettingIndex(),
+            2,
+            game->GetRunTimeSeconds(),
+            game->GetCaughtCount());
+    }
+}
+
+// ロッカーの中の見え方（足音の影が近いほど、すき間の縁を赤くしている）
+void Stage2Scene::DrawHidingView(const Player& player)
+{
+    float hidingDanger = 0.0f;
+    ShadowMan* stalker = m_Objects.noiseShadow;
+    if (stalker != nullptr && stalker->IsActive())
+    {
+        Vector3 toStalker = stalker->GetPosition() - player.GetPosition();
+        toStalker.y = 0.0f;
+        // 足音の影が近いほど、すき間の縁を赤くしている（この距離から、この幅で遠ざかるほど弱く）
+        constexpr float HidingDangerNearDistance = 20.0f;
+        constexpr float HidingDangerRange = 80.0f;
+        hidingDanger = MathUtility::Proximity(toStalker.Length(), HidingDangerNearDistance, HidingDangerRange);
+    }
+    m_Hud.DrawHidingView(m_VisualTimer, hidingDanger,
+        m_BreathHold.GetBreath(), m_BreathHold.IsHolding(), m_BreathHold.GetExposure());
+}
+
+// 右上の状態パネル（周回・危険度・信号盤の段階）と、息を潜めて振り切る進み具合
+void Stage2Scene::DrawStatusPanel(float threatRate)
+{
+    m_Hud.DrawStage2Status(
+        m_LoopCount, threatRate, m_FinalDoorReady,
+        m_SignalPuzzle.GetStep(),
+        m_LoopCount >= Stage2FinalLoopCount && !m_SignalPuzzle.IsComplete());
+    // 危険度があるとき・息を潜めている間だけ、その進み具合を出している
+    if (m_LoopCount < Stage2FinalLoopCount && !m_ObservedScareSequence.IsActive() &&
+        !m_FinalSequence.IsPursuitActive() &&
+        !m_FinalSequence.IsSequenceActive() &&
+        m_LoopTransitionTimer < 0.0f &&
+        (m_NoiseThreatSystem.GetThreat() > QuietRecoveryThreat ||
+            m_QuietRecovery.progress > 0.0f ||
+            m_QuietRecovery.successNotice > 0.0f || m_QuietRecovery.cooldown > 0.0f))
+    {
+        m_Hud.DrawQuietRecovery(
+            m_QuietRecovery.progress / QuietRecovery::RequiredSeconds,
+            m_QuietRecovery.cooldown, m_QuietRecovery.successNotice > 0.0f,
+            m_QuietRecovery.tooClose);
+    }
+}
+
+// 目的地の方向の矢印が指す所を選んでいる
+Vector3 Stage2Scene::SelectGuideTarget(bool confirmationPending) const
+{
+    Door* finalDoor = m_Objects.door;
+    Vector3 guideTarget = finalDoor != nullptr
+        ? finalDoor->GetPosition()
+        : FallbackDoorTarget;
+    const Stage2Anomaly requiredAnomaly = m_AnomalyPlan.GetRequired(m_LoopCount);
+    if (requiredAnomaly != Stage2Anomaly::None && !IsRequiredAnomalyFound())
+    {
+        // 探すべき異変の場所を指している（偽の扉・時計・肖像画・最後に現れた血の手形・鏡・ノックの出どころ）。
+        guideTarget =
+            requiredAnomaly == Stage2Anomaly::FalseDoor ? FalseDoorTarget :
+            requiredAnomaly == Stage2Anomaly::Clock ? ClockTarget :
+            requiredAnomaly == Stage2Anomaly::Portrait ? PortraitTarget :
+            requiredAnomaly == Stage2Anomaly::Handprint ? m_HandprintAnomaly.GetLatestPosition() :
+            requiredAnomaly == Stage2Anomaly::Mirror
+                ? Vector3(MirrorAnomaly::SurfaceX, MirrorAnomaly::CenterY, MirrorAnomaly::CenterZ) :
+            requiredAnomaly == Stage2Anomaly::Puddle
+                ? Vector3(PuddleReflectionAnomaly::PuddleCenterX, PuddleReflectionAnomaly::FloorY,
+                    PuddleReflectionAnomaly::PuddleCenterZ) :
+            GetKnockListenPoint();
+    }
+    else if (confirmationPending)
+    {
+        guideTarget = ConfirmationPanelTarget;
+    }
+    else if (m_LoopCount >= Stage2FinalLoopCount && !m_SignalPuzzle.IsComplete())
+    {
+        if (m_SignalPuzzle.GetStep() == 0)
+        {
+            guideTarget = BlueSignalTarget;
+        }
+        else if (m_SignalPuzzle.GetStep() == 1)
+        {
+            guideTarget = AmberSignalTarget;
+        }
+        else
+        {
+            guideTarget = RedSignalTarget;
+        }
+    }
+    return guideTarget;
+}
+
+// 始まりの暗転・章のカード・周回のカード・周回が変わった瞬間のまばたき
+void Stage2Scene::DrawIntroAndLoopCards()
+{
     // 始まりの0.65秒は、黒からだんだん明るくしている
     if (m_VisualTimer < Hud::IntroFadeSeconds)
     {
@@ -213,7 +254,12 @@ void Stage2Scene::Draw(Camera* camera)
             (std::clamp)(m_LoopBlinkTimer / Stage2LoopBlinkSeconds, 0.0f, 1.0f);
         m_Hud.DrawBlink(blinkRate * blinkRate * LoopBlinkDarkness);
     }
+}
 
+// 捕まったときと、脱出の演出の後半で、画面を暗くしている
+void Stage2Scene::DrawScreenFades()
+{
+    ExitTrigger* exit = m_Objects.exit;
     // 捕まったときは画面を暗くしている
     if (m_CaughtSequence.IsActive())
     {
@@ -230,22 +276,6 @@ void Stage2Scene::Draw(Camera* camera)
         const float smoothFade =
             MathUtility::SmoothCurve(fadeRate);
         m_Hud.DrawBlink(smoothFade * EscapeDarkness);
-    }
-
-    // ポーズ中はポーズメニューを重ねている（2階として表示）
-    if (game->IsPaused())
-    {
-        m_Hud.DrawPause(
-            game->GetBrightnessLevel(),
-            game->GetEffectLevel(),
-            game->GetLookSensitivityLevel(),
-            game->GetVolumeLevel(),
-            game->IsGuideEnabled(),
-            game->GetResolutionLevel(),
-            game->GetPauseSettingIndex(),
-            2,
-            game->GetRunTimeSeconds(),
-            game->GetCaughtCount());
     }
 }
 

@@ -6,7 +6,7 @@
 #include "PauseMenu.h"
 
 #include "GameSettings.h"
-#include "input.h"
+#include "Input.h"
 
 #include <algorithm>
 

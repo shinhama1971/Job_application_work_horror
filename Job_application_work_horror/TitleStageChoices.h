@@ -18,7 +18,7 @@ namespace TitleStageChoices
         { SceneName::Forest, "1面  森から研究所へ", "雨の森を歩いて研究所に入る  クリアの記録が残る" },
         { SceneName::Stage2, "2面  ループする廊下", "2面から遊ぶ  クリアしても記録には残らない" },
         { SceneName::Intro, "1面  森を飛ばして始める", "受信記録を見て、研究所の中から始める" },
-        { SceneName::Stage3, "3面  通信室（試作）", "試作中の3面から遊ぶ  クリアしても記録には残らない" },
+        // 試作中の3面は、提出版ではタイトルから選べないようにしている（開発用の --stage3 で始められる）
     };
     inline constexpr int Count = static_cast<int>(std::size(Entries));
 }

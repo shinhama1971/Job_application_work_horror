@@ -6,6 +6,7 @@
 #include "Hud.h"
 #include "TitleStageChoices.h"
 #include "StoryText.h"
+#include "Stage2SceneConstants.h"
 
 #include <algorithm>
 #include <array>
@@ -196,8 +197,6 @@ void Hud::DrawTitle(
     using namespace TitleLayout;
     m_Vertices.clear();
 
-    const float screenWidth = GetCanvasWidth();
-    const float screenHeight = GetCanvasHeight();
     // 「開始」の文字と、選んでいる面の縁を、ゆっくり明滅させている
     const float pulse = std::sin(time * PromptPulseRate) * 0.5f + 0.5f;
     const Color promptColor(
@@ -206,16 +205,22 @@ void Hud::DrawTitle(
         PromptBaseColor.B() + pulse * PromptPulseRange.B(),
         PromptBaseColor.A() + pulse * PromptPulseRange.A());
     noise = (std::clamp)(noise, 0.0f, 1.0f);
-    // 0〜1の乱数（同じ値からは同じ結果）。ノイズのずれ方を、時間の刻みごとに変えるのに使っている
-    const auto hash = [](float value)
-    {
-        const float s = std::sin(value * HashFrequency) * HashAmplitude;
-        return s - std::floor(s);
-    };
-    const auto textWidth = [](std::string_view text, float pixelSize)
-    {
-        return static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * GlyphAdvance;
-    };
+
+    DrawTitleBackground();
+    DrawTitleLogo(time, noise);
+    const float afterStages = DrawTitleStageMenu(selectedStage, promptColor);
+    DrawTitleFooter(afterStages, promptColor, hasClearRecord, bestClearTimeSeconds, bestCaughtCount);
+    DrawTitleStatus(time, noise);
+
+    Flush();
+}
+
+// 左側の暗い帯・画面全体の薄い走査線・左端の緑の線
+void Hud::DrawTitleBackground()
+{
+    using namespace TitleLayout;
+    const float screenWidth = GetCanvasWidth();
+    const float screenHeight = GetCanvasHeight();
 
     // 左側の暗い帯：左端はほぼ黒、右へ行くほど透明にして、後ろの森が右側に見えるようにしている
     AddRectangle(0.0f, 0.0f, BandWidth - FadeWidth, screenHeight, BandColor);
@@ -232,8 +237,23 @@ void Hud::DrawTitle(
     }
     // 左端の緑の線
     AddRectangle(SideLineX, SideLineMargin, SideLineWidth, screenHeight - SideLineMargin * 2.0f, SideLineColor);
+}
 
-    // --- 題名：通常は静かに表示し、ノイズのときに文字を横へずらし、色をにじませ、横の帯を抜いている
+// 題名：通常は静かに表示し、ノイズのときに文字を横へずらし、色をにじませ、横の帯を抜いている
+void Hud::DrawTitleLogo(float time, float noise)
+{
+    using namespace TitleLayout;
+    // 0〜1の乱数（同じ値からは同じ結果）。ノイズのずれ方を、時間の刻みごとに変えるのに使っている
+    const auto hash = [](float value)
+    {
+        const float s = std::sin(value * HashFrequency) * HashAmplitude;
+        return s - std::floor(s);
+    };
+    const auto textWidth = [](std::string_view text, float pixelSize)
+    {
+        return static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * GlyphAdvance;
+    };
+
     constexpr std::string_view title = "通信途絶";
     const float titleHeight = TitlePixelSize * GlyphRows;
     const float noiseStep = std::floor(time * NoiseStepsPerSecond);
@@ -268,8 +288,13 @@ void Hud::DrawTitle(
     // 英語の題名と、ひとことの説明
     AddText(Left + Indent, TitleY + titleHeight + SubtitleGap, "SIGNAL LOST", SubtitlePixelSize, SubtitleColor);
     AddText(Left + Indent, TitleY + titleHeight + TaglineGap, "終わらない廊下から脱出する", TaglinePixelSize, TextColor);
+}
 
-    // --- 始める面の選択：縦に4つ並べ、選んでいる面の枠を明るくし、その下に説明を出している（試作中の3面は一番下）
+// 始める面の選択：縦に並べ（TitleStageChoices の数だけ）、選んでいる面の枠を明るくし、その下に説明を出している。
+// 並びの下の端の高さを返している（その下に操作と記録を並べる）
+float Hud::DrawTitleStageMenu(int selectedStage, const Color& promptColor)
+{
+    using namespace TitleLayout;
     const int stage = (std::clamp)(selectedStage, 0, StageCount - 1);
     for (int index = 0; index < StageCount; ++index)
     {
@@ -293,8 +318,16 @@ void Hud::DrawTitle(
     }
     const float afterStages = StageTop + StageCount * (StageBoxHeight + StageBoxGap);
     AddText(Left + Indent, afterStages + NoteGap, TitleStageChoices::Entries[stage].Description, NotePixelSize, TextColor);
+    return afterStages;
+}
 
-    // 開始と終了の操作
+// 開始と終了の操作・クリアの記録・左下の操作の説明
+void Hud::DrawTitleFooter(float afterStages, const Color& promptColor,
+    bool hasClearRecord, float bestClearTimeSeconds, int bestCaughtCount)
+{
+    using namespace TitleLayout;
+    const float screenHeight = GetCanvasHeight();
+
     const bool controller = Input::IsControllerConnected();
     const std::string_view prompt = controller ? "Aでゲーム開始" : "ENTERでゲーム開始";
     AddText(Left + Indent, afterStages + PromptGap, prompt, PromptPixelSize, promptColor);
@@ -323,8 +356,14 @@ void Hud::DrawTitle(
         AddText(Left + Indent, screenHeight - ControlsBottom + static_cast<float>(line) * ControlsLineSpacing,
             controls[line], NotePixelSize, FaintColor);
     }
+}
 
-    // 右上：監視映像のような受信表示（「受信中」と、明滅する印と、時間）。ノイズのときは「信号なし」にしている
+// 右上：監視映像のような受信表示（「受信中」と、明滅する印と、時間）。ノイズのときは「信号なし」にしている
+void Hud::DrawTitleStatus(float time, float noise)
+{
+    using namespace TitleLayout;
+    const float screenWidth = GetCanvasWidth();
+
     const bool lost = noise > LostNoiseLevel;
     const std::string_view status = lost ? "信号なし" : "受信中...";
     const int clock = static_cast<int>(time);
@@ -342,8 +381,6 @@ void Hud::DrawTitle(
     AddText(statusX + StatusTextOffset, StatusTextY, status, StatusTextPixelSize, lost ? LostTextColor : TextColor);
     AddText(statusX + StatusTextOffset, ChannelY, "CH-03", HelpPixelSize, FaintColor);
     AddText(statusX + ClockOffset, ChannelY, timeText, HelpPixelSize, FaintColor);
-
-    Flush();
 }
 
 namespace
@@ -921,6 +958,7 @@ namespace Stage2StatusLayout
         Color(0.96f, 0.68f, 0.14f, 0.96f),
         Color(0.94f, 0.18f, 0.10f, 0.96f)
     };
+    static_assert(std::size(SignalColors) == Stage2SignalTerminalCount);
     // 次に押す信号盤の色の暗さ（色に掛ける割合）と、そのときの不透明度
     constexpr float NextSignalDim = 0.58f;
     constexpr float NextSignalAlpha = 0.96f;
@@ -929,8 +967,7 @@ namespace Stage2StatusLayout
     constexpr float TextIndent = 14.0f;
     constexpr float TextTop = 8.0f;
     constexpr float TextPixelSize = 1.8f;
-    // 3つの区画：数、幅とすき間、上からの位置、高さ
-    constexpr int SegmentCount = 3;
+    // 区画の幅とすき間、上からの位置、高さ
     constexpr float SegmentWidth = 52.0f;
     constexpr float SegmentGap = 7.0f;
     constexpr float SegmentY = 35.0f;
@@ -971,16 +1008,17 @@ void Hud::DrawStage2Status(
         TextPixelSize, active);
 
     // 3つの区画：周回の数、信号盤の段階なら終えた色まで点け、次に押す色は暗くして示している
-    const int safeCompletedLoops = (std::clamp)(completedLoops, 0, SegmentCount);
-    for (int index = 0; index < SegmentCount; ++index)
+    const int segmentCount = signalActive ? Stage2SignalTerminalCount : Stage2FinalLoopCount;
+    const int safeCompletedLoops = (std::clamp)(completedLoops, 0, Stage2FinalLoopCount);
+    for (int index = 0; index < segmentCount; ++index)
     {
         const bool segmentComplete = signalActive
-            ? index < (std::clamp)(signalStep, 0, SegmentCount)
+            ? index < (std::clamp)(signalStep, 0, Stage2SignalTerminalCount)
             : index < safeCompletedLoops;
         Color segmentColor = segmentComplete
             ? (signalActive ? SignalColors[index] : active)
             : InactiveColor;
-        if (signalActive && index == (std::clamp)(signalStep, 0, SegmentCount - 1))
+        if (signalActive && index == (std::clamp)(signalStep, 0, Stage2SignalTerminalCount - 1))
         {
             segmentColor = Color(
                 SignalColors[index].x * NextSignalDim,

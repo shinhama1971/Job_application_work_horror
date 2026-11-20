@@ -3,7 +3,7 @@
 // 主な技術: std::filesystem、UTF-8・UTF-16・Shift-JISの変換、Known Folder（%LOCALAPPDATA%）の取得
 // ============================================================================
 
-#include	"utility.h"
+#include	"Utility.h"
 
 #include	<cstdlib>
 #include	<filesystem>
@@ -13,9 +13,9 @@
 #include	<Windows.h>
 #include	<ShlObj.h>
 
-namespace utility {
+namespace Utility {
 	// UTF-8をワイド文字（UTF-16）にしている
-	std::wstring utf8_to_wide_winapi(std::string const& src)
+	std::wstring Utf8ToWide(std::string const& src)
 	{
 		auto const dest_size = ::MultiByteToWideChar(
 			CP_UTF8,			 // 元の文字列はUTF-8
@@ -140,7 +140,7 @@ namespace utility {
         std::wstring message;
         try
         {
-            message = utf8_to_wide_winapi(utf8Message);
+            message = Utf8ToWide(utf8Message);
         }
         catch (...)
         {

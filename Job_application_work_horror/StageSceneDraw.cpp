@@ -58,51 +58,13 @@ void StageScene::Draw(Camera* camera)
         return;
     }
 
-#if defined(ENABLE_IMGUI)
-    // Debug版だけ：デバッグ画面（F1）の配置エディタで小物を選んで動かし、Save で配置のファイルへ書き戻している。
-    // 書き戻したら読み直して、ファイルの行番号を新しくしている。
-    if (camera != nullptr)
-    {
-        SceneLayoutBuilder builder(*game, m_Objects.objectNames);
-        switch (m_PropLayoutEditor.Draw(builder, m_Objects.layoutProps, *camera))
-        {
-        case PropLayoutEditor::Action::Saved:
-            if (ReloadPropLayout())
-            {
-                m_LayoutNotice = "配置のファイルに書き戻した";
-            }
-            break;
-        case PropLayoutEditor::Action::SaveFailed:
-            m_LayoutNotice = m_PropLayoutEditor.GetError();
-            m_LayoutNoticeTimer = PropLayoutFile::LayoutErrorNoticeSeconds;
-            break;
-        case PropLayoutEditor::Action::ReloadFile:
-            ReloadPropLayout();
-            break;
-        case PropLayoutEditor::Action::None:
-            break;
-        }
-    }
-#endif
+    DrawLayoutEditor(camera);
 
     // 監視映像を見ている間は、映像の画面（とポーズ）だけを描いている
     if (m_Surveillance.IsViewing())
     {
         m_Surveillance.DrawFeed(m_Hud);
-        if (game->IsPaused())
-        {
-            m_Hud.DrawPause(
-                game->GetBrightnessLevel(),
-                game->GetEffectLevel(),
-                game->GetLookSensitivityLevel(),
-                game->GetVolumeLevel(),
-                game->IsGuideEnabled(),
-                game->GetResolutionLevel(),
-                game->GetPauseSettingIndex(),
-                1,
-                game->GetRunTimeSeconds(),
-                game->GetCaughtCount());
-        }
+        DrawPauseMenu();
         return;
     }
 
@@ -132,57 +94,127 @@ void StageScene::Draw(Camera* camera)
         m_StageVisualTimer >= Hud::ChapterCardSeconds &&
         (exitTrigger == nullptr || !exitTrigger->IsEscaping()))
     {
-        const Vector3 endDoorTarget(Stage1EndDoorX, EndDoorTargetY, Stage1EndDoorZ);
-        Vector3 guideTarget = endDoorTarget;
-        if (m_HiddenRoom.IsTrapped() && m_Objects.hiddenRoom.key != nullptr)
-        {
-            // 隠し部屋に閉じ込められている間は、鍵の場所を指している。
-            guideTarget = m_Objects.hiddenRoom.key->GetPosition();
-        }
-        // 電力が戻った後は、出口の送電盤、次に最後のドアを指している
-        else if (game->IsPowerRestored() && !exitPowerActivated)
-        {
-            guideTarget = ExitPowerPanelTarget;
-        }
-        else if (game->IsPowerRestored())
-        {
-            guideTarget = endDoorTarget;
-        }
-        // ヒューズの位置はプレイごとに変わるため、配置したObjectから読んでいる。
-        else if (fuseCount <= 0 && m_Objects.firstFuse != nullptr)
-        {
-            guideTarget = m_Objects.firstFuse->GetPosition();
-        }
-        else if (fuseCount == 1 && m_CorridorLoopCount >= 1 && m_Objects.secondFuse != nullptr)
-        {
-            guideTarget = m_Objects.secondFuse->GetPosition();
-        }
-        else if (fuseCount == Stage1FuseProgress::BeforeLastFuse &&
-            m_CorridorLoopCount >= Stage1FuseProgress::LoopsToUnlockLastFuse)
-        {
-            // 3本目：西棟の鍵をまだ拾っていなくて、暗証番号の扉が開いていれば、その部屋の奥のヒューズを指している
-            if (m_WestWing.GetStep() == Stage1WestWing::Step::FindKey && m_KeypadDoor.IsSolved() &&
-                m_Objects.keypadRoomFuse != nullptr && m_Objects.keypadRoomFuse->IsActive())
-            {
-                guideTarget = m_Objects.keypadRoomFuse->GetPosition();
-            }
-            else
-            {
-                // 3本目は西棟の奥。鍵 → 西側の扉 → 一番近い排水バルブ → ヒューズの順に指している。
-                guideTarget = m_WestWing.GetGuideTarget();
-            }
-        }
-        // ヒューズが3本そろったら、配電盤を指している
-        else if (fuseCount >= RequiredFuseCount)
-        {
-            guideTarget = FuseBoxTarget;
-        }
         m_Hud.DrawObjectiveGuide(
             *camera,
             player->GetPosition(),
-            guideTarget);
+            SelectGuideTarget(fuseCount, exitPowerActivated));
     }
 
+    DrawScreenFades();
+    // 暗証番号の入力画面を開いていれば描いている
+    m_KeypadDoor.Draw(m_Hud);
+
+    DrawPauseMenu();
+}
+
+// Debug版だけ：デバッグ画面（F1）の配置エディタで小物を選んで動かし、Save で配置のファイルへ書き戻している。
+// 書き戻したら読み直して、ファイルの行番号を新しくしている。
+void StageScene::DrawLayoutEditor(Camera* camera)
+{
+#if defined(ENABLE_IMGUI)
+    Core::Game* game = Core::Game::GetInstance();
+    if (camera != nullptr)
+    {
+        SceneLayoutBuilder builder(*game, m_Objects.objectNames);
+        switch (m_PropLayoutEditor.Draw(builder, m_Objects.layoutProps, *camera))
+        {
+        case PropLayoutEditor::Action::Saved:
+            if (ReloadPropLayout())
+            {
+                m_LayoutNotice = "配置のファイルに書き戻した";
+            }
+            break;
+        case PropLayoutEditor::Action::SaveFailed:
+            m_LayoutNotice = m_PropLayoutEditor.GetError();
+            m_LayoutNoticeTimer = PropLayoutFile::LayoutErrorNoticeSeconds;
+            break;
+        case PropLayoutEditor::Action::ReloadFile:
+            ReloadPropLayout();
+            break;
+        case PropLayoutEditor::Action::None:
+            break;
+        }
+    }
+#else
+    (void)camera;
+#endif
+}
+
+// ポーズ中はポーズメニューを重ねている（1階として表示）
+void StageScene::DrawPauseMenu()
+{
+    Core::Game* game = Core::Game::GetInstance();
+    if (game->IsPaused())
+    {
+        m_Hud.DrawPause(
+            game->GetBrightnessLevel(),
+            game->GetEffectLevel(),
+            game->GetLookSensitivityLevel(),
+            game->GetVolumeLevel(),
+            game->IsGuideEnabled(),
+            game->GetResolutionLevel(),
+            game->GetPauseSettingIndex(),
+            1,
+            game->GetRunTimeSeconds(),
+            game->GetCaughtCount());
+    }
+}
+
+// 目的地の方向：進み具合に合わせて次に行く場所を選んでいる（普段はループ廊下の突き当たりの最後のドア）
+Vector3 StageScene::SelectGuideTarget(int fuseCount, bool exitPowerActivated)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    const Vector3 endDoorTarget(Stage1EndDoorX, EndDoorTargetY, Stage1EndDoorZ);
+    Vector3 guideTarget = endDoorTarget;
+    if (m_HiddenRoom.IsTrapped() && m_Objects.hiddenRoom.key != nullptr)
+    {
+        // 隠し部屋に閉じ込められている間は、鍵の場所を指している。
+        guideTarget = m_Objects.hiddenRoom.key->GetPosition();
+    }
+    // 電力が戻った後は、出口の送電盤、次に最後のドアを指している
+    else if (game->IsPowerRestored() && !exitPowerActivated)
+    {
+        guideTarget = ExitPowerPanelTarget;
+    }
+    else if (game->IsPowerRestored())
+    {
+        guideTarget = endDoorTarget;
+    }
+    // ヒューズの位置はプレイごとに変わるため、配置したObjectから読んでいる。
+    else if (fuseCount <= 0 && m_Objects.firstFuse != nullptr)
+    {
+        guideTarget = m_Objects.firstFuse->GetPosition();
+    }
+    else if (fuseCount == 1 && m_CorridorLoopCount >= 1 && m_Objects.secondFuse != nullptr)
+    {
+        guideTarget = m_Objects.secondFuse->GetPosition();
+    }
+    else if (fuseCount == Stage1FuseProgress::BeforeLastFuse &&
+        m_CorridorLoopCount >= Stage1FuseProgress::LoopsToUnlockLastFuse)
+    {
+        // 3本目：西棟の鍵をまだ拾っていなくて、暗証番号の扉が開いていれば、その部屋の奥のヒューズを指している
+        if (m_WestWing.GetStep() == Stage1WestWing::Step::FindKey && m_KeypadDoor.IsSolved() &&
+            m_Objects.keypadRoomFuse != nullptr && m_Objects.keypadRoomFuse->IsActive())
+        {
+            guideTarget = m_Objects.keypadRoomFuse->GetPosition();
+        }
+        else
+        {
+            // 3本目は西棟の奥。鍵 → 西側の扉 → 一番近い排水バルブ → ヒューズの順に指している。
+            guideTarget = m_WestWing.GetGuideTarget();
+        }
+    }
+    // ヒューズが3本そろったら、配電盤を指している
+    else if (fuseCount >= RequiredFuseCount)
+    {
+        guideTarget = FuseBoxTarget;
+    }
+    return guideTarget;
+}
+
+// 始まりの暗転と章のカード、捕まったときと階段を上るときの暗転
+void StageScene::DrawScreenFades()
+{
     // 始まりの0.65秒は黒からだんだん明るくし、4.2秒までは章のカードを出している
     if (m_StageVisualTimer < Hud::IntroFadeSeconds)
     {
@@ -207,24 +239,6 @@ void StageScene::Draw(Camera* camera)
         const float fadeRate = (std::clamp)((m_Objects.exitTrigger->GetEscapeProgress() - StairClimbFadeStartProgress) /
             StairClimbFadeProgressSpan, 0.0f, 1.0f);
         m_Hud.DrawBlink(MathUtility::SmoothCurve(fadeRate), 1.0f);
-    }
-    // 暗証番号の入力画面を開いていれば描いている
-    m_KeypadDoor.Draw(m_Hud);
-
-    // ポーズ中はポーズメニューを重ねている（1階として表示）
-    if (game->IsPaused())
-    {
-        m_Hud.DrawPause(
-            game->GetBrightnessLevel(),
-            game->GetEffectLevel(),
-            game->GetLookSensitivityLevel(),
-            game->GetVolumeLevel(),
-            game->IsGuideEnabled(),
-            game->GetResolutionLevel(),
-            game->GetPauseSettingIndex(),
-            1,
-            game->GetRunTimeSeconds(),
-            game->GetCaughtCount());
     }
 }
 

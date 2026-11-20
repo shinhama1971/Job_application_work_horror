@@ -180,10 +180,25 @@ PropLayoutEditor::Action PropLayoutEditor::Draw(
         SetLayout(PropLayoutFile::Load(m_Path));
     }
 
-    Action action = Action::None;
-    const ImGuiIO& io = ImGui::GetIO();
+    PickFromMouse(camera);
 
-    // 窓の外（景色）をクリックしたら、カーソルの位置から奥へ伸ばした光線で小物を選んでいる
+    const ImGuiIO& io = ImGui::GetIO();
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - WindowRightMargin, WindowTop), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(WindowWidth, WindowHeight), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Prop Layout Editor");
+    const Action action = DrawFileControls(props, camera);
+    DrawPropList();
+    DrawSelectedProp(builder, props, camera);
+    ImGui::End();
+
+    UpdateHighlight(props);
+    return action;
+}
+
+// 窓の外（景色）をクリックしたら、カーソルの位置から奥へ伸ばした光線で小物を選んでいる
+void PropLayoutEditor::PickFromMouse(const Camera& camera)
+{
+    const ImGuiIO& io = ImGui::GetIO();
     if (!io.WantCaptureMouse && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
         io.DisplaySize.x > 0.0f && io.DisplaySize.y > 0.0f)
     {
@@ -199,10 +214,12 @@ PropLayoutEditor::Action PropLayoutEditor::Draw(
         direction.Normalize();
         PickAlongRay(nearPoint, direction);
     }
+}
 
-    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - WindowRightMargin, WindowTop), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(WindowWidth, WindowHeight), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Prop Layout Editor");
+// ファイルの名前と、保存・読み直し・視線の先で選ぶボタン
+PropLayoutEditor::Action PropLayoutEditor::DrawFileControls(PropLayoutFile::SpawnedProps& props, const Camera& camera)
+{
+    Action action = Action::None;
     ImGui::TextUnformatted(m_Path.c_str());
     if (m_Dirty)
     {
@@ -241,8 +258,12 @@ PropLayoutEditor::Action PropLayoutEditor::Draw(
     {
         ImGui::TextUnformatted(m_Status.c_str());
     }
+    return action;
+}
 
-    // 小物の一覧（名前の一部で絞り込める）
+// 小物の一覧（名前の一部で絞り込める）
+void PropLayoutEditor::DrawPropList()
+{
     ImGui::InputText("Filter", m_Filter, sizeof(m_Filter));
     if (ImGui::BeginListBox("##props", ImVec2(-1.0f, PropListHeight)))
     {
@@ -264,120 +285,134 @@ PropLayoutEditor::Action PropLayoutEditor::Draw(
         }
         ImGui::EndListBox();
     }
+}
 
-    // 選んだ小物の値（変えたらすぐWallへ当てはめている）
+// 選んだ小物の値（変えたらすぐWallへ当てはめている）
+void PropLayoutEditor::DrawSelectedProp(SceneLayoutBuilder& builder, PropLayoutFile::SpawnedProps& props, const Camera& camera)
+{
     PropDescription* description = FindDescription(m_Selected);
     Wall* wall = description != nullptr ? FindWall(props, description->Name) : nullptr;
-    if (description != nullptr && wall != nullptr)
-    {
-        ImGui::SeparatorText(description->Name.c_str());
-        bool changed = false;
-        changed |= ImGui::DragFloat3("Position", &description->Position.x, PositionDragSpeed);
-        changed |= ImGui::DragFloat3("Size", &description->Scale.x, SizeDragSpeed, MinimumSize, MaximumSize);
-
-        // 色は color で付けた名前から選ぶ（ファイルに名前で書き戻すため）
-        const auto colorCombo = [this, &changed](const char* label, std::string& name, Color& color)
-        {
-            if (ImGui::BeginCombo(label, name.c_str()))
-            {
-                for (const auto& [colorName, value] : m_Layout.Colors)
-                {
-                    if (ImGui::Selectable(colorName.c_str(), colorName == name))
-                    {
-                        name = colorName;
-                        color = value;
-                        changed = true;
-                    }
-                }
-                ImGui::EndCombo();
-            }
-        };
-        colorCombo("Color", description->DiffuseName, description->Diffuse);
-        // PBRの仕上げは色の名前で決まるので、色を選び直したら合わせている
-        description->Finish = PropLayoutFile::FindFinish(m_Layout, description->DiffuseName);
-        colorCombo("Emission", description->EmissionName, description->Emission);
-        changed |= ImGui::DragFloat("Shininess", &description->Shininess, ShininessDragSpeed, 0.0f, MaximumShininess);
-        changed |= ImGui::Checkbox("Collision", &description->Collision);
-        ImGui::SameLine();
-        changed |= ImGui::Checkbox("Shadow", &description->CastsShadow);
-        ImGui::SameLine();
-        changed |= ImGui::Checkbox("Weathering", &description->Weathering);
-        changed |= ImGui::DragFloat("Glow range", &description->GlowRange, GlowRangeDragSpeed, 0.0f, MaximumGlowRange);
-        changed |= ImGui::DragFloat("Glow strength", &description->GlowStrength, GlowStrengthDragSpeed, 0.0f, MaximumGlowStrength);
-
-        if (ImGui::Button("Snap to floor"))
-        {
-            description->Position.y = FloorY + std::abs(description->Scale.y) * 0.5f;
-            changed = true;
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Bring in front"))
-        {
-            // 目の前（水平に40）へ持ってくる。高さはそのまま
-            Vector3 forward = camera.GetForward();
-            forward.y = 0.0f;
-            forward.Normalize();
-            description->Position.x = camera.GetPosition().x + forward.x * NewPropDistance;
-            description->Position.z = camera.GetPosition().z + forward.z * NewPropDistance;
-            changed = true;
-        }
-        if (changed)
-        {
-            PropLayoutFile::Apply(*wall, *description);
-            m_Dirty = true;
-        }
-
-        ImGui::SameLine();
-        if (ImGui::Button("Duplicate"))
-        {
-            // 名前の後ろに番号を付けて複製し、少し横へずらしている。ファイルでは元の行の後ろに足される
-            PropDescription copy = *description;
-            int number = 2;
-            do
-            {
-                copy.Name = description->Name + "_" + std::to_string(number++);
-            } while (FindDescription(copy.Name) != nullptr ||
-                (builder.HasNamedObject(copy.Name) && FindWall(props, copy.Name) == nullptr));
-            copy.Position.x += std::abs(copy.Scale.x) + DuplicateGap;
-            // 前に消した同じ名前の小物があれば、それを使い直している
-            Wall* copyWall = FindWall(props, copy.Name);
-            if (copyWall == nullptr)
-            {
-                copyWall = builder.Create<Wall>(copy.Name);
-                props.emplace_back(copy.Name, copyWall);
-            }
-            PropLayoutFile::Apply(*copyWall, copy);
-            RestoreHighlight(props);
-            const auto source = std::find_if(m_Layout.Props.begin(), m_Layout.Props.end(),
-                [this](const PropDescription& prop) { return prop.Name == m_Selected; });
-            m_Selected = copy.Name;
-            m_Layout.Props.insert(source + 1, copy);
-            m_Dirty = true;
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Delete"))
-        {
-            RestoreHighlight(props);
-            wall->SetVisible(false);
-            m_Layout.Props.erase(std::remove_if(m_Layout.Props.begin(), m_Layout.Props.end(),
-                [this](const PropDescription& prop) { return prop.Name == m_Selected; }), m_Layout.Props.end());
-            m_Selected.clear();
-            m_Dirty = true;
-        }
-    }
-    else
+    if (description == nullptr || wall == nullptr)
     {
         ImGui::TextDisabled("No prop selected.");
+        return;
     }
-    ImGui::End();
+    ImGui::SeparatorText(description->Name.c_str());
+    bool changed = false;
+    changed |= ImGui::DragFloat3("Position", &description->Position.x, PositionDragSpeed);
+    changed |= ImGui::DragFloat3("Size", &description->Scale.x, SizeDragSpeed, MinimumSize, MaximumSize);
 
-    // 選んだ小物を黄色く明滅させている（選び直したら、前の小物の色を戻す）
+    // 色は color で付けた名前から選ぶ（ファイルに名前で書き戻すため）
+    const auto colorCombo = [this, &changed](const char* label, std::string& name, Color& color)
+    {
+        if (ImGui::BeginCombo(label, name.c_str()))
+        {
+            for (const auto& [colorName, value] : m_Layout.Colors)
+            {
+                if (ImGui::Selectable(colorName.c_str(), colorName == name))
+                {
+                    name = colorName;
+                    color = value;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+    };
+    colorCombo("Color", description->DiffuseName, description->Diffuse);
+    // PBRの仕上げは色の名前で決まるので、色を選び直したら合わせている
+    description->Finish = PropLayoutFile::FindFinish(m_Layout, description->DiffuseName);
+    colorCombo("Emission", description->EmissionName, description->Emission);
+    changed |= ImGui::DragFloat("Shininess", &description->Shininess, ShininessDragSpeed, 0.0f, MaximumShininess);
+    changed |= ImGui::Checkbox("Collision", &description->Collision);
+    ImGui::SameLine();
+    changed |= ImGui::Checkbox("Shadow", &description->CastsShadow);
+    ImGui::SameLine();
+    changed |= ImGui::Checkbox("Weathering", &description->Weathering);
+    changed |= ImGui::DragFloat("Glow range", &description->GlowRange, GlowRangeDragSpeed, 0.0f, MaximumGlowRange);
+    changed |= ImGui::DragFloat("Glow strength", &description->GlowStrength, GlowStrengthDragSpeed, 0.0f, MaximumGlowStrength);
+
+    if (ImGui::Button("Snap to floor"))
+    {
+        description->Position.y = FloorY + std::abs(description->Scale.y) * 0.5f;
+        changed = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Bring in front"))
+    {
+        // 目の前（水平に40）へ持ってくる。高さはそのまま
+        Vector3 forward = camera.GetForward();
+        forward.y = 0.0f;
+        forward.Normalize();
+        description->Position.x = camera.GetPosition().x + forward.x * NewPropDistance;
+        description->Position.z = camera.GetPosition().z + forward.z * NewPropDistance;
+        changed = true;
+    }
+    if (changed)
+    {
+        PropLayoutFile::Apply(*wall, *description);
+        m_Dirty = true;
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Duplicate"))
+    {
+        DuplicateSelected(builder, props, *description);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Delete"))
+    {
+        DeleteSelected(props, *wall);
+    }
+}
+
+// 名前の後ろに番号を付けて複製し、少し横へずらしている。ファイルでは元の行の後ろに足される
+void PropLayoutEditor::DuplicateSelected(SceneLayoutBuilder& builder, PropLayoutFile::SpawnedProps& props, const PropDescription& original)
+{
+    PropDescription copy = original;
+    int number = 2;
+    do
+    {
+        copy.Name = original.Name + "_" + std::to_string(number++);
+    } while (FindDescription(copy.Name) != nullptr ||
+        (builder.HasNamedObject(copy.Name) && FindWall(props, copy.Name) == nullptr));
+    copy.Position.x += std::abs(copy.Scale.x) + DuplicateGap;
+    // 前に消した同じ名前の小物があれば、それを使い直している
+    Wall* copyWall = FindWall(props, copy.Name);
+    if (copyWall == nullptr)
+    {
+        copyWall = builder.Create<Wall>(copy.Name);
+        props.emplace_back(copy.Name, copyWall);
+    }
+    PropLayoutFile::Apply(*copyWall, copy);
+    RestoreHighlight(props);
+    const auto source = std::find_if(m_Layout.Props.begin(), m_Layout.Props.end(),
+        [this](const PropDescription& prop) { return prop.Name == m_Selected; });
+    m_Selected = copy.Name;
+    m_Layout.Props.insert(source + 1, copy);
+    m_Dirty = true;
+}
+
+// 選んだ小物を隠し、配置から外している
+void PropLayoutEditor::DeleteSelected(PropLayoutFile::SpawnedProps& props, Wall& wall)
+{
+    RestoreHighlight(props);
+    wall.SetVisible(false);
+    m_Layout.Props.erase(std::remove_if(m_Layout.Props.begin(), m_Layout.Props.end(),
+        [this](const PropDescription& prop) { return prop.Name == m_Selected; }), m_Layout.Props.end());
+    m_Selected.clear();
+    m_Dirty = true;
+}
+
+// 選んだ小物を黄色く明滅させている（選び直したら、前の小物の色を戻す）
+void PropLayoutEditor::UpdateHighlight(PropLayoutFile::SpawnedProps& props)
+{
     if (m_Highlighted != m_Selected)
     {
         RestoreHighlight(props);
     }
-    description = FindDescription(m_Selected);
-    wall = description != nullptr ? FindWall(props, m_Selected) : nullptr;
+    const PropDescription* description = FindDescription(m_Selected);
+    Wall* wall = description != nullptr ? FindWall(props, m_Selected) : nullptr;
     if (description != nullptr && wall != nullptr)
     {
         const float pulse = 0.5f + 0.5f * std::sin(static_cast<float>(ImGui::GetTime()) * HighlightPulseRate);
@@ -386,7 +421,6 @@ PropLayoutEditor::Action PropLayoutEditor::Draw(
             description->Shininess);
         m_Highlighted = m_Selected;
     }
-    return action;
 }
 
 #else

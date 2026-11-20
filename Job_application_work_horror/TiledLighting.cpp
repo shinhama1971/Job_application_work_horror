@@ -12,7 +12,7 @@
 #include "Application.h"
 #include "Camera.h"
 #include "DebugUI.h"
-#include "utility.h"
+#include "Utility.h"
 
 #include <algorithm>
 #include <cmath>
@@ -173,7 +173,7 @@ namespace Effect
                 m_ShadingParamsBuffer.ReleaseAndGetAddressOf());
         if (!created)
         {
-            utility::ReportFatalError("タイルベースライティングの初期化に失敗しました。");
+            Utility::ReportFatalError("タイルベースライティングの初期化に失敗しました。");
         }
 
         SetLights({});

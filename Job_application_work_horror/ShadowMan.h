@@ -66,6 +66,11 @@ private:
     float m_ChaseStepDistance = 0.0f;
     bool m_ChaseStepLeft = false;
 
+    // Update の中身：外から位置を決めている影がプレイヤーの方を向く・追いかけて足音を鳴らす・見られて崩れる反応
+    void FaceTowardPlayer();
+    void ChasePlayer(const class Player& player, float deltaTime);
+    void UpdateGazeReaction(const class Player& player, float deltaTime);
+
 public:
     void Init() override;
     void Update() override;

@@ -25,7 +25,7 @@
 #include "HangingBulb.h"
 #include "LayoutExtras.h"
 #include "PropLayoutFile.h"
-#include "utility.h"
+#include "Utility.h"
 
 #include <SimpleMath.h>
 #include <array>
@@ -574,7 +574,7 @@ namespace Stage2Layout
         const PropLayout propLayout = PropLayoutFile::Load(PropLayoutPath);
         if (!propLayout.IsValid())
         {
-            utility::ReportFatalError("2面の配置を読めませんでした（" + std::to_string(propLayout.ErrorLine) +
+            Utility::ReportFatalError("2面の配置を読めませんでした（" + std::to_string(propLayout.ErrorLine) +
                 "行目）: " + propLayout.Error);
         }
 

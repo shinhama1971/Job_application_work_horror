@@ -134,7 +134,9 @@ void FlashlightWriting::Draw(Camera* cam)
 
     MATERIAL material{};
     material.Diffuse = Color(m_InkColor.R(), m_InkColor.G(), m_InkColor.B(), m_Presence);
-    material.Emission = Color(m_PrintedSurface ? 0.0f : m_Time, 0.0f, 0.0f, 0.0f);
+    // Emission.y は、半透明の文字を消灯時に見せるかをシェーダーへ渡す印。
+    material.Emission = Color(m_PrintedSurface ? 0.0f : m_Time,
+        !m_PrintedSurface && m_DarknessReveal ? 1.0f : 0.0f, 0.0f, 0.0f);
     material.Roughness = WritingRoughness;
     // 印刷物は貼り付けた壁までの距離を使って暗がりを付ける。
     material.Ambient.x = m_PrintedSurface ? SurfaceOffset : 0.0f;
@@ -188,13 +190,14 @@ void FlashlightWriting::BindGeometry(Camera* cam)
     m_IndexBuffer.SetGPU();
 }
 
-// 読める条件：ライトが点いている・文字が十分濃い・距離が近い・視線の中心付近にある・正面に近い方向から見ている
+// 読める条件は配光の種類、文字の濃さ、距離、視線、正面への向き、壁や扉での遮蔽で決まる。
 bool FlashlightWriting::IsBeingRead(
     const Vector3& cameraPosition,
     const Vector3& cameraForward,
     bool flashlightOn) const
 {
-    if (!flashlightOn || m_Presence < ReadablePresence)
+    const bool lightConditionMet = m_DarknessReveal ? !flashlightOn : flashlightOn;
+    if (!lightConditionMet || m_Presence < ReadablePresence)
     {
         return false;
     }

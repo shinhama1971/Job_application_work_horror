@@ -7,7 +7,8 @@
 // マテリアル（b4）の使い方
 //   Diffuse.rgb : 文字の色
 // 文字の濃さ（0〜1。書き換わった直後に0から戻して、じわりと現している）
-// 経過時間（秒）。現れる境目をゆっくり揺らしている
+//   Emission.x : 境目をゆっくり揺らすための経過時間（秒）
+//   Emission.y : 消灯時に浮かぶ文字（1）か、照らすと浮かぶ文字（0）か
 // 画像（t0）は、透明度だけを文字の形として使っている。
 // ============================================================================
 
@@ -67,6 +68,10 @@ static const float NominalFlashlightIntensity = 1.5f;
 #define REVEAL_MIN_DIVISOR 0.001f
 #define REVEAL_MIN_BEAM 0.001f
 
+// 離れて見ると壁の染みに見え、近づくと読める距離。発光色はブルームを強く出さない値に抑える。
+static const float DarkWritingFadeStart = 90.0f;
+static const float DarkWritingFadeEnd = 150.0f;
+
 float4 main(in LIT_PS_IN input) : SV_Target
 {
     // 文字の形の外は描かない
@@ -80,6 +85,17 @@ float4 main(in LIT_PS_IN input) : SV_Target
     {
         clip(presence - WRITING_DEBUG_MIN_PRESENCE);
         return float4(Material.Diffuse.rgb * WRITING_DEBUG_BRIGHTNESS, saturate(shape * presence));
+    }
+    if (Material.Emission.y > 0.0f)
+    {
+        if (Light.FlashlightEnabled)
+        {
+            discard;
+        }
+        const float distanceFade = 1.0f - smoothstep(DarkWritingFadeStart, DarkWritingFadeEnd, distanceFromCamera);
+        const float alpha = saturate(shape * presence * distanceFade);
+        clip(alpha - WRITING_MIN_VISIBLE_ALPHA);
+        return float4(Material.Diffuse.rgb, alpha);
     }
     if (!Light.Enable || !Light.FlashlightEnabled ||
         presence <= REVEAL_MIN_PRESENCE || distanceFromCamera <= REVEAL_MIN_DIVISOR)

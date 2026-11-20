@@ -8,7 +8,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "utility.h"
+#include "Utility.h"
 
 namespace Core
 {
@@ -21,7 +21,7 @@ namespace Core
     // 値を1項目ずつ検証する。壊れた値や古い形式で欠けている項目は、現在値を使う。
     void GameSettings::Load()
     {
-        std::ifstream settingsFile(utility::ResolveSaveFileForRead(SettingsFileName));
+        std::ifstream settingsFile(Utility::ResolveSaveFileForRead(SettingsFileName));
         const auto loadLevel = [&settingsFile](int& current, int maximum)
         {
             std::string token;
@@ -53,6 +53,6 @@ namespace Core
             << m_VolumeLevel << ' '
             << m_GuideLevel << ' '
             << m_ResolutionLevel << "\r\n";
-        return utility::WriteSaveFile(SettingsFileName, text.str());
+        return Utility::WriteSaveFile(SettingsFileName, text.str());
     }
 }

@@ -415,13 +415,7 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         m_FinalSequence.IsPursuitActive())
     {
         m_QuietRecovery.Reset();
-        m_NoiseThreatSystem.SetThreat((std::max)(0.0f,
-            m_NoiseThreatSystem.GetThreat() - deltaTime * FinalThreatDecayPerSecond));
-        ShadowMan* noiseShadow = m_Objects.noiseShadow;
-        if (noiseShadow != nullptr)
-        {
-            noiseShadow->SetActive(false);
-        }
+        FadeOutNoiseThreat(deltaTime);
         return;
     }
 
@@ -430,13 +424,7 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         m_LoopCount >= Stage2FinalLoopCount && !m_SignalPuzzle.IsComplete();
     if (m_LoopCount >= Stage2FinalLoopCount && !signalStealthActive)
     {
-        m_NoiseThreatSystem.SetThreat((std::max)(0.0f,
-            m_NoiseThreatSystem.GetThreat() - deltaTime * FinalThreatDecayPerSecond));
-        ShadowMan* noiseShadow = m_Objects.noiseShadow;
-        if (noiseShadow != nullptr)
-        {
-            noiseShadow->SetActive(false);
-        }
+        FadeOutNoiseThreat(deltaTime);
         return;
     }
 
@@ -445,6 +433,35 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         return;
     }
 
+    AddFootstepThreat(player, deltaTime, signalStealthActive);
+    if (UpdateNoiseStalkerProximity(player))
+    {
+        return;
+    }
+    UpdateQuietRecovery(player, deltaTime);
+    TrySpawnNoiseStalker(player);
+    if (ResetSignalPuzzleOnNoise(signalStealthActive))
+    {
+        return;
+    }
+    TriggerThreatWarning(player);
+}
+
+// 危険度を少しずつ下げ、足音の影を消している（最後の演出の間と、信号盤を直し終えた後）
+void Stage2Scene::FadeOutNoiseThreat(float deltaTime)
+{
+    m_NoiseThreatSystem.SetThreat((std::max)(0.0f,
+        m_NoiseThreatSystem.GetThreat() - deltaTime * FinalThreatDecayPerSecond));
+    ShadowMan* noiseShadow = m_Objects.noiseShadow;
+    if (noiseShadow != nullptr)
+    {
+        noiseShadow->SetActive(false);
+    }
+}
+
+// 足音の大きさ（水たまり・走る・歩く）で危険度を上げ下げしている
+void Stage2Scene::AddFootstepThreat(const Player& player, float deltaTime, bool signalStealthActive)
+{
     // 足音の大きさ（水たまりや走った音）で危険度を上げ、強い水音なら知らせを出している
     const float surfacePulse = player.GetSurfaceNoisePulse();
     if (surfacePulse > 0.0f)
@@ -464,8 +481,11 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         : -deltaTime * (signalStealthActive ? WalkThreatDecaySignal : WalkThreatDecayNormal);
     m_NoiseThreatSystem.SetThreat((std::clamp)(
         m_NoiseThreatSystem.GetThreat() + change, 0.0f, 1.0f));
+}
 
-    Core::Game* game = Core::Game::GetInstance();
+// 足音の影が近いほど危険度を上げている。捕まったら true を返す
+bool Stage2Scene::UpdateNoiseStalkerProximity(Player& player)
+{
     // 足音の影が出ていれば、近いほど危険度を上げ、15.5まで近づかれたら捕まっている
     ShadowMan* noiseShadow =
         m_Objects.noiseShadow;
@@ -482,12 +502,18 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         {
             StartCaughtSequence(
                 player, CaughtSequence::Reason::NoiseStalker);
-            return;
+            return true;
         }
     }
+    return false;
+}
 
-    // 初めの3周では、距離を取って消灯・静止すると、足音の影を振り切れる。
-    // 信号盤パズルと最後の追跡は、それぞれの対処のしかたのままにしている。
+// 初めの3周では、距離を取って消灯・静止すると、足音の影を振り切れる。
+// 信号盤パズルと最後の追跡は、それぞれの対処のしかたのままにしている。
+void Stage2Scene::UpdateQuietRecovery(const Player& player, float deltaTime)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    ShadowMan* noiseShadow = m_Objects.noiseShadow;
     bool nearbyThreat = false;
     if (noiseShadow != nullptr && noiseShadow->IsActive())
     {
@@ -515,7 +541,13 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         EventFeedback::BloomPulse(*game->GetPostProcess(), QuietRecoveryBloom);
         EventFeedback::Rumble(QuietRecoveryRumble);
     }
+}
 
+// 危険度が上がったら、背後に足音の影を出して追わせている
+void Stage2Scene::TrySpawnNoiseStalker(const Player& player)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    ShadowMan* noiseShadow = m_Objects.noiseShadow;
     // 危険度が0.74以上になったら、背後68に足音の影を出し、追わせている（ライトで照らせば追い払える）
     const bool canSpawnNoiseStalker =
         m_NoiseThreatSystem.GetThreat() >= NoiseStalkerSpawnThreat &&
@@ -559,24 +591,34 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
         EventFeedback::HorrorPulse(*game->GetPostProcess(), NoiseStalkerSpawnPulse);
         EventFeedback::Rumble(NoiseStalkerSpawnRumble);
     }
+}
 
-    // 信号盤パズルの間に危険度が最大になったら、パズルを最初からやり直させている
-    if (signalStealthActive && m_NoiseThreatSystem.GetThreat() >= SignalResetThreat)
+// 信号盤パズルの間に危険度が最大になったら、パズルを最初からやり直させている。やり直したら true を返す
+bool Stage2Scene::ResetSignalPuzzleOnNoise(bool signalStealthActive)
+{
+    if (!signalStealthActive || m_NoiseThreatSystem.GetThreat() < SignalResetThreat)
     {
-        ResetSignalPuzzle();
-        RegisterPuzzleMistake(PuzzleFeedback::SignalNoiseReset);
-        m_PuzzleFeedback.Set(PuzzleFeedback::SignalNoiseReset, SignalResetFeedbackSeconds);
-        m_Notices.signal = Stage2LongNoticeSeconds;
-        m_NoiseThreatSystem.SetWarningTimer(SignalResetWarningSeconds);
-        m_NoiseThreatSystem.SetThreat(SignalResetThreatAfter);
-        m_NoiseThreatSystem.SetEventCooldown(SignalResetEventCooldown);
-
-        EventFeedback::HorrorPulse(*game->GetPostProcess(), SignalResetPulse);
-        EventFeedback::BloomPulse(*game->GetPostProcess(), SignalResetBloom);
-        EventFeedback::Rumble(SignalResetRumble);
-        return;
+        return false;
     }
-    // 危険度が警告の高さ以上になると、近くの照明を明滅させて警告している
+    Core::Game* game = Core::Game::GetInstance();
+    ResetSignalPuzzle();
+    RegisterPuzzleMistake(PuzzleFeedback::SignalNoiseReset);
+    m_PuzzleFeedback.Set(PuzzleFeedback::SignalNoiseReset, SignalResetFeedbackSeconds);
+    m_Notices.signal = Stage2LongNoticeSeconds;
+    m_NoiseThreatSystem.SetWarningTimer(SignalResetWarningSeconds);
+    m_NoiseThreatSystem.SetThreat(SignalResetThreatAfter);
+    m_NoiseThreatSystem.SetEventCooldown(SignalResetEventCooldown);
+
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), SignalResetPulse);
+    EventFeedback::BloomPulse(*game->GetPostProcess(), SignalResetBloom);
+    EventFeedback::Rumble(SignalResetRumble);
+    return true;
+}
+
+// 危険度が警告の高さ以上になると、近くの照明を明滅させて警告している
+void Stage2Scene::TriggerThreatWarning(const Player& player)
+{
+    Core::Game* game = Core::Game::GetInstance();
     if (m_NoiseThreatSystem.GetThreat() < ThreatWarningLevel ||
         m_NoiseThreatSystem.GetEventCooldown() > 0.0f)
     {
@@ -613,8 +655,30 @@ void Stage2Scene::UpdateNoiseThreat(Player& player, float deltaTime)
 void Stage2Scene::AdvanceLoop(Player& player)
 {
     m_QuietRecovery.Reset();
-    Core::Game* game = Core::Game::GetInstance();
     ++m_LoopCount;
+    ResetForNextLoop(player);
+    ConfigureClockForLoop();
+    PlayLoopStartFeedback();
+    UpdateCycleMarks();
+
+    // 周回ごとに廊下を変えている
+    if (m_LoopCount == 1)
+    {
+        ApplyFirstLoopChanges();
+    }
+    else if (m_LoopCount == Stage2SecondLoop)
+    {
+        ApplySecondLoopChanges();
+    }
+    else
+    {
+        ApplyFinalLoopChanges();
+    }
+}
+
+// 周回の進み具合・異変・脅威・扉・照明を、新しい周回の始めの状態に戻している
+void Stage2Scene::ResetForNextLoop(Player& player)
+{
     m_LoopCooldown = LoopCooldownSeconds;
     m_ProgressHintTimer = 0.0f;
     m_GuidancePulseCooldown = GuidancePulseCooldownSeconds;
@@ -682,9 +746,12 @@ void Stage2Scene::AdvanceLoop(Player& player)
             light->SetForcedOff(false);
         }
     }
+}
 
-    ConfigureClockForLoop();
-
+// 周回が切り替わった瞬間の画面と振動の演出（周回を重ねるほど強い）
+void Stage2Scene::PlayLoopStartFeedback()
+{
+    Core::Game* game = Core::Game::GetInstance();
     const float loop = static_cast<float>(m_LoopCount);
     game->GetPostProcess()->TriggerHorrorPulse(
         LoopStartPulseBase.Strength + loop * LoopStartPulseStep.Strength,
@@ -693,8 +760,11 @@ void Stage2Scene::AdvanceLoop(Player& player)
         LoopStartBloomBase + loop * LoopStartBloomStep,
         LoopStartBloomSeconds);
     Input::SetVibration(LoopStartRumbleBaseFrames + m_LoopCount * LoopStartRumbleFramesPerLoop, LoopStartRumbleStrength);
+}
 
-    // 周回の数だけ、入口の右の壁に傷の印を出している
+// 周回の数だけ、入口の右の壁に傷の印を出している
+void Stage2Scene::UpdateCycleMarks()
+{
     for (int markIndex = 0; markIndex < Stage2Objects::CycleMarkCount; ++markIndex)
     {
         Wall* cycleMark = m_Objects.cycleMarks[static_cast<std::size_t>(markIndex)];
@@ -723,95 +793,98 @@ void Stage2Scene::AdvanceLoop(Player& player)
                 CycleMarkShininess);
         }
     }
+}
 
+// 1周目：中央の照明を故障させ、傷を3本出し、電池と周回の印を出している
+void Stage2Scene::ApplyFirstLoopChanges()
+{
     Wall* loopMark = m_Objects.loopMark;
-    Wall* portrait = m_Objects.portrait;
     CeilingLight* light2 = m_Objects.Light(Stage2Light::Light2);
-    CeilingLight* light3 = m_Objects.Light(Stage2Light::Light3);
+    // 偽の扉は、偽の扉を見つける周回（Stage2AnomalyPlanが決める）だけ出している。
+    SetFalseDoorState(
+        m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::FalseDoor), false);
+    CeilingLight* failingLight =
+        m_Objects.Light(Stage2Light::Light2);
+    if (failingLight != nullptr)
+    {
+        failingLight->SetFaulted(true);
+    }
+    RevealScratchPieces(0, Loop1ScratchEnd, Loop1ScratchEmission);
+    BatteryItem* battery = m_Objects.battery;
+    if (battery != nullptr)
+    {
+        battery->SetActive(true);
+    }
+    if (loopMark != nullptr)
+    {
+        if (!loopMark->IsVisible())
+        {
+            loopMark->DissolveIn(MarkDissolveSeconds);
+        }
+        loopMark->SetAppearance(LoopMarkDiffuse, LoopMarkEmission, LoopMarkShininess);
+    }
+    if (light2 != nullptr)
+    {
+        light2->SetEmergencyLight(true, Light2Loop1EmergencyOffset);
+    }
+}
 
-    // 1周目：中央の照明を故障させ、傷を3本出し、電池と周回の印を出している
-    if (m_LoopCount == 1)
+// 2周目：入口と奥の照明も故障させ、傷を9本にし、肖像画を赤く変え、見つめると照明の演出が起きる影を出している
+void Stage2Scene::ApplySecondLoopChanges()
+{
+    Wall* portrait = m_Objects.portrait;
+    CeilingLight* light3 = m_Objects.Light(Stage2Light::Light3);
+    SetFalseDoorState(
+        m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::FalseDoor), false);
+    CeilingLight* entranceLight =
+        m_Objects.Light(Stage2Light::Light1);
+    CeilingLight* farLight =
+        m_Objects.Light(Stage2Light::Light3);
+    if (entranceLight != nullptr)
     {
-        // 偽の扉は、偽の扉を見つける周回（Stage2AnomalyPlanが決める）だけ出している。
-        SetFalseDoorState(
-            m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::FalseDoor), false);
-        CeilingLight* failingLight =
-            m_Objects.Light(Stage2Light::Light2);
-        if (failingLight != nullptr)
-        {
-            failingLight->SetFaulted(true);
-        }
-        RevealScratchPieces(0, Loop1ScratchEnd, Loop1ScratchEmission);
-        BatteryItem* battery = m_Objects.battery;
-        if (battery != nullptr)
-        {
-            battery->SetActive(true);
-        }
-        if (loopMark != nullptr)
-        {
-            if (!loopMark->IsVisible())
+        entranceLight->SetFaulted(true);
+    }
+    if (farLight != nullptr)
+    {
+        farLight->SetFaulted(true);
+    }
+    RevealScratchPieces(Loop1ScratchEnd, Loop2ScratchEnd, Loop2ScratchEmission);
+    if (portrait != nullptr)
+    {
+        portrait->SetAppearance(PortraitLoop2Diffuse, PortraitLoop2Emission, PortraitLoop2Shininess);
+    }
+    if (light3 != nullptr)
+    {
+        light3->SetEmergencyLight(true, Light3Loop2EmergencyOffset);
+    }
+    ShadowMan* shadow = m_Objects.shadow;
+    if (shadow != nullptr)
+    {
+        shadow->SetActive(true);
+        shadow->EnableGazeScare(Loop2ShadowGazeSeconds);
+        shadow->SetOnObserved(
+            [this]()
             {
-                loopMark->DissolveIn(MarkDissolveSeconds);
-            }
-            loopMark->SetAppearance(LoopMarkDiffuse, LoopMarkEmission, LoopMarkShininess);
-        }
-        if (light2 != nullptr)
-        {
-            light2->SetEmergencyLight(true, Light2Loop1EmergencyOffset);
-        }
+                StartObservedScare();
+            });
     }
-    // 2周目：入口と奥の照明も故障させ、傷を9本にし、肖像画を赤く変え、見つめると照明の演出が起きる影を出している
-    else if (m_LoopCount == Stage2SecondLoop)
+}
+
+// 最後の周：偽の扉を消し、残りの傷を出し、信号盤を直すまで最後の停電と追跡を止めている
+void Stage2Scene::ApplyFinalLoopChanges()
+{
+    Core::Game* game = Core::Game::GetInstance();
+    SetFalseDoorState(false, false);
+    RevealScratchPieces(Loop2ScratchEnd, Stage2ScratchCount, FinalLoopScratchEmission);
+    // 最後の周では、3つの信号盤を直す必要がある。
+    // 廊下を探して、表示された色の順番どおりに操作した後だけ、最後の停電と追跡を始めている。
+    m_FinalSequenceArmed = false;
+    CeilingLight* doorLight = m_Objects.Light(Stage2Light::DoorLight);
+    if (doorLight != nullptr)
     {
-        SetFalseDoorState(
-            m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::FalseDoor), false);
-        CeilingLight* entranceLight =
-            m_Objects.Light(Stage2Light::Light1);
-        CeilingLight* farLight =
-            m_Objects.Light(Stage2Light::Light3);
-        if (entranceLight != nullptr)
-        {
-            entranceLight->SetFaulted(true);
-        }
-        if (farLight != nullptr)
-        {
-            farLight->SetFaulted(true);
-        }
-        RevealScratchPieces(Loop1ScratchEnd, Loop2ScratchEnd, Loop2ScratchEmission);
-        if (portrait != nullptr)
-        {
-            portrait->SetAppearance(PortraitLoop2Diffuse, PortraitLoop2Emission, PortraitLoop2Shininess);
-        }
-        if (light3 != nullptr)
-        {
-            light3->SetEmergencyLight(true, Light3Loop2EmergencyOffset);
-        }
-        ShadowMan* shadow = m_Objects.shadow;
-        if (shadow != nullptr)
-        {
-            shadow->SetActive(true);
-            shadow->EnableGazeScare(Loop2ShadowGazeSeconds);
-            shadow->SetOnObserved(
-                [this]()
-                {
-                    StartObservedScare();
-                });
-        }
+        EventFeedback::Flicker(*doorLight, FinalLoopDoorFlicker);
     }
-    else
-    {
-        SetFalseDoorState(false, false);
-        RevealScratchPieces(Loop2ScratchEnd, Stage2ScratchCount, FinalLoopScratchEmission);
-        // 最後の周では、3つの信号盤を直す必要がある。
-        // 廊下を探して、表示された色の順番どおりに操作した後だけ、最後の停電と追跡を始めている。
-        m_FinalSequenceArmed = false;
-        CeilingLight* doorLight = m_Objects.Light(Stage2Light::DoorLight);
-        if (doorLight != nullptr)
-        {
-            EventFeedback::Flicker(*doorLight, FinalLoopDoorFlicker);
-        }
-        EventFeedback::HorrorPulse(*game->GetPostProcess(), FinalLoopPulse);
-    }
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), FinalLoopPulse);
 }
 
 // 周回に合わせて時計の針を決めている（3周目以降は文字盤を赤黒くしている）
@@ -973,10 +1046,6 @@ void Stage2Scene::ResetSignalPuzzle()
 // 信号盤パズル：押された信号盤を順番どおりか判定し、目印の光り方を更新している
 void Stage2Scene::UpdateSignalPuzzle()
 {
-    Core::Game* game = Core::Game::GetInstance();
-    const auto& baseDiffuse = Stage2SignalDiffuse;
-    const auto& baseEmission = Stage2SignalEmission;
-
     const bool puzzleActive =
         m_LoopCount >= Stage2FinalLoopCount && !m_SignalPuzzle.IsComplete();
     for (int signalIndex = 0; signalIndex < Stage2SignalTerminalCount; ++signalIndex)
@@ -990,137 +1059,175 @@ void Stage2Scene::UpdateSignalPuzzle()
 
     if (puzzleActive)
     {
-        for (int signalIndex = 0; signalIndex < Stage2SignalTerminalCount; ++signalIndex)
+        AcceptActivatedSignal();
+    }
+    UpdateSignalMarkers(puzzleActive);
+}
+
+// 操作された信号盤を1つだけ受け付け、順番が合っているかで反応を変えている
+void Stage2Scene::AcceptActivatedSignal()
+{
+    for (int signalIndex = 0; signalIndex < Stage2SignalTerminalCount; ++signalIndex)
+    {
+        FuseBox* terminal = m_Objects.signalTerminals[static_cast<std::size_t>(signalIndex)];
+        if (terminal == nullptr || !terminal->IsActivated() ||
+            m_SignalPuzzle.IsAccepted(signalIndex))
         {
-            FuseBox* terminal = m_Objects.signalTerminals[static_cast<std::size_t>(signalIndex)];
-            if (terminal == nullptr || !terminal->IsActivated() ||
-                m_SignalPuzzle.IsAccepted(signalIndex))
-            {
-                continue;
-            }
+            continue;
+        }
 
-            const SignalPuzzle::AcceptResult acceptResult =
-                m_SignalPuzzle.Accept(signalIndex);
-            // 順番が違えば、間違いを数えて危険度を大きく上げている
-            if (acceptResult == SignalPuzzle::AcceptResult::WrongOrder)
-            {
-                if (m_LoopCount >= Stage2FinalLoopCount)
-                {
-                    m_FinalSequenceArmed = false;
-                }
-                RegisterPuzzleMistake(PuzzleFeedback::SignalWrongOrder);
-                m_Notices.signal = Stage2NoticeSeconds;
-                m_NoiseThreatSystem.SetThreat(WrongOrderThreat);
-                EventFeedback::HorrorPulse(*game->GetPostProcess(), WrongOrderPulse);
-                EventFeedback::Rumble(WrongOrderRumble);
-                break;
-            }
+        const SignalPuzzle::AcceptResult acceptResult =
+            m_SignalPuzzle.Accept(signalIndex);
+        if (acceptResult == SignalPuzzle::AcceptResult::WrongOrder)
+        {
+            OnSignalWrongOrder();
+        }
+        else
+        {
+            OnSignalAccepted(signalIndex, acceptResult == SignalPuzzle::AcceptResult::Completed);
+        }
+        break;
+    }
+}
 
-            // 順番どおりなら、危険度を少し上げて、対応する照明を明滅させている
-            m_PuzzleFeedback.SetType(PuzzleFeedback::NoFeedback);
-            const float retryAssist = static_cast<float>((std::min)(
-                m_PuzzleFeedback.GetMistakeCount(), Stage2SignalStalkerMaxAssist));
-            m_NoiseThreatSystem.SetThreat((std::min)(
-                1.0f,
-                m_NoiseThreatSystem.GetThreat() + CorrectThreatRise -
-                    retryAssist * CorrectThreatAssistRelief));
-            m_Notices.signal = Stage2ShortNoticeSeconds;
-            m_ProgressHintTimer = 0.0f;
-            EventFeedback::BloomPulse(*game->GetPostProcess(), CorrectBloom);
-            Input::SetVibration(
-                CorrectRumbleBase.Frames + m_SignalPuzzle.GetStep() * CorrectRumbleFramesPerStep,
-                CorrectRumbleBase.Strength);
+// 順番が違えば、間違いを数えて危険度を大きく上げている
+void Stage2Scene::OnSignalWrongOrder()
+{
+    Core::Game* game = Core::Game::GetInstance();
+    if (m_LoopCount >= Stage2FinalLoopCount)
+    {
+        m_FinalSequenceArmed = false;
+    }
+    RegisterPuzzleMistake(PuzzleFeedback::SignalWrongOrder);
+    m_Notices.signal = Stage2NoticeSeconds;
+    m_NoiseThreatSystem.SetThreat(WrongOrderThreat);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), WrongOrderPulse);
+    EventFeedback::Rumble(WrongOrderRumble);
+}
 
-            CeilingLight* responseLight = m_Objects.Light(
-                signalIndex == 0 ? Stage2Light::Light3 :
-                signalIndex == 1 ? Stage2Light::Light2 : Stage2Light::Light1);
-            if (responseLight != nullptr)
-            {
-                EventFeedback::Flicker(*responseLight, CorrectFlicker);
-            }
-            ApplySignalLightingState();
+// 順番どおりなら、危険度を少し上げて、対応する照明を明滅させている
+void Stage2Scene::OnSignalAccepted(int signalIndex, bool completed)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    m_PuzzleFeedback.SetType(PuzzleFeedback::NoFeedback);
+    const float retryAssist = static_cast<float>((std::min)(
+        m_PuzzleFeedback.GetMistakeCount(), Stage2SignalStalkerMaxAssist));
+    m_NoiseThreatSystem.SetThreat((std::min)(
+        1.0f,
+        m_NoiseThreatSystem.GetThreat() + CorrectThreatRise -
+            retryAssist * CorrectThreatAssistRelief));
+    m_Notices.signal = Stage2ShortNoticeSeconds;
+    m_ProgressHintTimer = 0.0f;
+    EventFeedback::BloomPulse(*game->GetPostProcess(), CorrectBloom);
+    Input::SetVibration(
+        CorrectRumbleBase.Frames + m_SignalPuzzle.GetStep() * CorrectRumbleFramesPerStep,
+        CorrectRumbleBase.Strength);
 
-            // 3つそろったら、最後の停電の準備をして、影を消している
-            if (acceptResult == SignalPuzzle::AcceptResult::Completed)
-            {
-                m_FinalSequenceArmed = true;
-                m_Notices.loop = Stage2ImportantNoticeSeconds;
-                ApplySignalLightingState();
-                game->RegisterAnomalyHandled();
-                ShadowMan* signalShadow =
-                    m_Objects.shadow;
-                if (signalShadow != nullptr)
-                {
-                    signalShadow->SetActive(false);
-                }
-                for (FuseBox* completedTerminal : m_Objects.signalTerminals)
-                {
-                    if (completedTerminal != nullptr)
-                    {
-                        completedTerminal->SetManualInteractionAllowed(false);
-                    }
-                }
-                EventFeedback::BloomPulse(*game->GetPostProcess(), CompletedBloom);
-                EventFeedback::HorrorPulse(*game->GetPostProcess(), CompletedPulse);
-            }
-            else
-            {
-                // 途中なら、背後に影を出して追わせている（間違えた回数が多いほど遠くに出し、遅くしている）
-                Player* player = m_Objects.player;
-                ShadowMan* signalShadow =
-                    m_Objects.shadow;
-                if (player != nullptr && signalShadow != nullptr)
-                {
-                    const Vector3 playerPosition = player->GetPosition();
-                    Vector3 backward = -player->GetForward();
-                    backward.y = 0.0f;
-                    if (backward.LengthSquared() < MinimumDirectionLength)
-                    {
-                        backward = Vector3(0.0f, 0.0f, -1.0f);
-                    }
-                    backward.Normalize();
-                    const float assistLevel = static_cast<float>((std::min)(
-                        m_PuzzleFeedback.GetMistakeCount(), Stage2SignalStalkerMaxAssist));
-                    const float spawnDistance =
-                        SignalStalkerBaseDistance - m_SignalPuzzle.GetStep() * SignalStalkerDistancePerStep +
-                            assistLevel * SignalStalkerDistancePerAssist;
-                    signalShadow->SetPosition(
-                        playerPosition.x + backward.x * spawnDistance,
-                        Stage2FootY,
-                        playerPosition.z + backward.z * spawnDistance);
-                    signalShadow->SetActive(false);
-                    signalShadow->SetActive(true);
-                    signalShadow->EnableChase(
-                        SignalStalkerBaseSpeed + static_cast<float>(
-                            m_SignalPuzzle.GetStep()) * SignalStalkerSpeedPerStep -
-                            assistLevel * SignalStalkerSlowdownPerAssist,
-                        SignalStalkerStopDistance);
-                    signalShadow->EnableGazeScare(SignalStalkerGazeScareSeconds);
-                    signalShadow->SetOnObserved(
-                        [this]()
-                        {
-                            Core::Game* currentGame =
-                                Core::Game::GetInstance();
-                            ShadowMan* currentShadow =
-                                m_Objects.shadow;
-                            if (currentShadow != nullptr)
-                            {
-                                currentShadow->SetActive(false);
-                            }
-                            m_NoiseThreatSystem.SetThreat((std::max)(SignalStalkerSeenMinThreat,
-                                m_NoiseThreatSystem.GetThreat() - SignalStalkerSeenThreatDrop));
-                            m_PuzzleFeedback.Set(PuzzleFeedback::SignalStalkerRepelled, SignalStalkerSeenFeedbackSeconds);
-                            m_Notices.signal = Stage2ShortNoticeSeconds;
-                            EventFeedback::BloomPulse(*currentGame->GetPostProcess(), SignalStalkerSeenBloom);
-                            EventFeedback::Rumble(SignalStalkerSeenRumble);
-                        });
-                }
-            }
-            break;
+    CeilingLight* responseLight = m_Objects.Light(
+        signalIndex == 0 ? Stage2Light::Light3 :
+        signalIndex == 1 ? Stage2Light::Light2 : Stage2Light::Light1);
+    if (responseLight != nullptr)
+    {
+        EventFeedback::Flicker(*responseLight, CorrectFlicker);
+    }
+    ApplySignalLightingState();
+
+    // 3つそろったら、最後の停電の準備をして、影を消している。途中なら、背後に影を出して追わせている
+    if (completed)
+    {
+        CompleteSignalPuzzle();
+    }
+    else
+    {
+        SpawnSignalStalker();
+    }
+}
+
+// 3つそろったときの処理：最後の停電の準備をして、影を消し、信号盤を操作できなくしている
+void Stage2Scene::CompleteSignalPuzzle()
+{
+    Core::Game* game = Core::Game::GetInstance();
+    m_FinalSequenceArmed = true;
+    m_Notices.loop = Stage2ImportantNoticeSeconds;
+    ApplySignalLightingState();
+    game->RegisterAnomalyHandled();
+    ShadowMan* signalShadow =
+        m_Objects.shadow;
+    if (signalShadow != nullptr)
+    {
+        signalShadow->SetActive(false);
+    }
+    for (FuseBox* completedTerminal : m_Objects.signalTerminals)
+    {
+        if (completedTerminal != nullptr)
+        {
+            completedTerminal->SetManualInteractionAllowed(false);
         }
     }
+    EventFeedback::BloomPulse(*game->GetPostProcess(), CompletedBloom);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), CompletedPulse);
+}
 
-    // 目印：受け付けた信号盤は緑に、次に押す信号盤は明るく脈打たせている
+// 途中なら、背後に影を出して追わせている（間違えた回数が多いほど遠くに出し、遅くしている）
+void Stage2Scene::SpawnSignalStalker()
+{
+    Player* player = m_Objects.player;
+    ShadowMan* signalShadow =
+        m_Objects.shadow;
+    if (player == nullptr || signalShadow == nullptr)
+    {
+        return;
+    }
+    const Vector3 playerPosition = player->GetPosition();
+    Vector3 backward = -player->GetForward();
+    backward.y = 0.0f;
+    if (backward.LengthSquared() < MinimumDirectionLength)
+    {
+        backward = Vector3(0.0f, 0.0f, -1.0f);
+    }
+    backward.Normalize();
+    const float assistLevel = static_cast<float>((std::min)(
+        m_PuzzleFeedback.GetMistakeCount(), Stage2SignalStalkerMaxAssist));
+    const float spawnDistance =
+        SignalStalkerBaseDistance - m_SignalPuzzle.GetStep() * SignalStalkerDistancePerStep +
+            assistLevel * SignalStalkerDistancePerAssist;
+    signalShadow->SetPosition(
+        playerPosition.x + backward.x * spawnDistance,
+        Stage2FootY,
+        playerPosition.z + backward.z * spawnDistance);
+    signalShadow->SetActive(false);
+    signalShadow->SetActive(true);
+    signalShadow->EnableChase(
+        SignalStalkerBaseSpeed + static_cast<float>(
+            m_SignalPuzzle.GetStep()) * SignalStalkerSpeedPerStep -
+            assistLevel * SignalStalkerSlowdownPerAssist,
+        SignalStalkerStopDistance);
+    signalShadow->EnableGazeScare(SignalStalkerGazeScareSeconds);
+    signalShadow->SetOnObserved(
+        [this]()
+        {
+            Core::Game* currentGame =
+                Core::Game::GetInstance();
+            ShadowMan* currentShadow =
+                m_Objects.shadow;
+            if (currentShadow != nullptr)
+            {
+                currentShadow->SetActive(false);
+            }
+            m_NoiseThreatSystem.SetThreat((std::max)(SignalStalkerSeenMinThreat,
+                m_NoiseThreatSystem.GetThreat() - SignalStalkerSeenThreatDrop));
+            m_PuzzleFeedback.Set(PuzzleFeedback::SignalStalkerRepelled, SignalStalkerSeenFeedbackSeconds);
+            m_Notices.signal = Stage2ShortNoticeSeconds;
+            EventFeedback::BloomPulse(*currentGame->GetPostProcess(), SignalStalkerSeenBloom);
+            EventFeedback::Rumble(SignalStalkerSeenRumble);
+        });
+}
+
+// 目印：受け付けた信号盤は緑に、次に押す信号盤は明るく脈打たせている
+void Stage2Scene::UpdateSignalMarkers(bool puzzleActive)
+{
+    const auto& baseDiffuse = Stage2SignalDiffuse;
+    const auto& baseEmission = Stage2SignalEmission;
     const float pulse = std::sin(m_VisualTimer * MarkerPulseSpeed) * 0.5f + 0.5f;
     for (int signalIndex = 0; signalIndex < Stage2SignalTerminalCount; ++signalIndex)
     {

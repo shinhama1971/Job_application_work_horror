@@ -62,6 +62,11 @@ private:
 
     // 進む先の1灯のちかちか（切れかけの電球）を、目標の明るさに掛けている
     void UpdateRouteFlicker(float& targetBrightness);
+    // Update の中身：電力が戻った後の明るさ・停電中の非常灯・故障した蛍光灯の消え方・イベント用の明滅
+    float ComputePoweredBrightness() const;
+    float ComputeEmergencyBrightness() const;
+    float ApplyFaultDropout(float targetBrightness) const;
+    float ApplyEventFlicker(float targetBrightness, float deltaTime);
 
 public:
     // 通路の標準の器具の大きさ（モデルはこの大きさを1にした空間で作っている。配置ファイルに size が無い行もこの大きさ）

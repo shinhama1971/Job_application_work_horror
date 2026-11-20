@@ -249,7 +249,7 @@ Stage3Scene::Stage3Scene()
     const PropLayout layout = PropLayoutFile::Load("assets/layout/stage3_props.txt");
     if (!layout.IsValid())
     {
-        utility::ReportFatalError("3面の配置を読めませんでした（" + std::to_string(layout.ErrorLine) +
+        Utility::ReportFatalError("3面の配置を読めませんでした（" + std::to_string(layout.ErrorLine) +
             "行目）: " + layout.Error);
     }
 

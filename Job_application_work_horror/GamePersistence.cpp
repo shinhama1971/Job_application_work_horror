@@ -12,7 +12,7 @@
 #include <limits>
 #include <sstream>
 
-#include "utility.h"
+#include "Utility.h"
 
 namespace Core
 {
@@ -49,7 +49,7 @@ namespace Core
     void Game::LoadBestRecord()
     {
         std::ifstream recordFile(
-            utility::ResolveSaveFileForRead(BestRecordFileName));
+            Utility::ResolveSaveFileForRead(BestRecordFileName));
         float clearTime = 0.0f;
         int caughtCount = 0;
         if (!(recordFile >> clearTime >> caughtCount) || !IsValidBestRecord(clearTime, caughtCount))
@@ -74,7 +74,7 @@ namespace Core
         std::ostringstream text;
         text << std::setprecision(std::numeric_limits<float>::max_digits10)
             << clearTime << ' ' << caughtCount << "\r\n";
-        return utility::WriteSaveFile(BestRecordFileName, text.str());
+        return Utility::WriteSaveFile(BestRecordFileName, text.str());
     }
 
 }

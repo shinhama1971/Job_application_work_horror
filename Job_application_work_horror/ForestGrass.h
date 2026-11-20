@@ -86,6 +86,10 @@ private:
 
     // 範囲の中に葉を植え、区画ごとに並べ替えている（区画の中の順番はばらばらにし、先頭から何割かを描けば全体が薄くなるようにしている）
     void PlantBlades(std::vector<Blade>& blades, std::vector<BladeState>& states);
+    // 葉を区画ごとに並べ直し、区画の一覧（先頭・数・中心・半径）を作っている
+    void BuildChunks(std::vector<Blade>& blades, float minX, float minZ, float halfX, float halfZ, float groundY);
+    // 最初の葉先を、何もないときの傾きのまま（ばねが落ち着いた形）にしている
+    static void ResetBladeStates(const std::vector<Blade>& blades, std::vector<BladeState>& states);
     // GPU のバッファを作り直している
     void CreateBuffers(const std::vector<Blade>& blades, const std::vector<BladeState>& states);
     void ReleaseBuffers();

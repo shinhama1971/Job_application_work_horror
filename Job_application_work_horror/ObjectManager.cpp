@@ -4,7 +4,7 @@
 // ============================================================================
 
 #include "ObjectManager.h"
-#include "utility.h"
+#include "Utility.h"
 
 #include <algorithm>
 
@@ -15,7 +15,7 @@ namespace Core
         const auto existing = m_NamedObjects.find(name);
         if (existing != m_NamedObjects.end() && !existing->second->IsDestroy())
         {
-            utility::ReportFatalError("同じ名前の Object を登録できない: " + name);
+            Utility::ReportFatalError("同じ名前の Object を登録できない: " + name);
         }
     }
 

@@ -209,6 +209,8 @@ void StageScene::Init()
     m_EvidenceNoticeTimer = 0.0f;
     m_LoopCooldown = 0.0f;
     m_LoopNoticeTimer = 0.0f;
+    m_DarkWritingReadTime = 0.0f;
+    m_DarkWritingTriggered = false;
     m_EmptyFuseCaseNoticeTimer = 0.0f;
     m_NearEmptyFuseCase = false;
     m_KeypadFuseReturned = false;
@@ -335,7 +337,7 @@ bool StageScene::IsThirdFuseStage() const
 // 暗証番号の部屋のヒューズは、3本目を探す段階になるまで出さない（先に取れると、2本目の左の倉庫の進行と食い違うため）。
 // 寄り道で先に暗証番号の扉を開けていれば、3本目はその部屋へ取りに行くだけになる（探索のごほうび）。
 // 先に開けた人が空の部屋で迷わないよう、ヒューズの置き場所には空の箱（配置ファイルの PropKeypadFuseCase）を置き、
-// 近づくと「箱は空だ」と知らせる。3本目の段階になった瞬間に、箱に物を置く音を部屋の方から鳴らし、
+// 壁の掲示で箱を調べ直す条件を伝え、近づくと「箱は空だ」と知らせる。3本目の段階になった瞬間に、箱に物を置く音を部屋の方から鳴らし、
 // 進む先の照明と目的の表示で、空だった箱に何かが戻ったことを伝えている（ループ廊下を2周した合図にもなる）。
 // どちらか一方を取ったら、もう一方は消して、4本目として拾えないようにしている。
 void StageScene::UpdateThirdFuseRoutes()

@@ -10,7 +10,7 @@
 #include "ShadowMap.h"
 #include "Renderer.h"
 #include "PropModel.h"
-#include "utility.h"
+#include "Utility.h"
 
 #include <algorithm>
 #include <array>
@@ -650,7 +650,7 @@ void Wall::SetVisualModel(const std::string& name)
 {
     if (!name.empty() && FindVisualModel(name) == nullptr)
     {
-        utility::ReportFatalError("Wall に知らないモデルの名前が指定されました: " + name);
+        Utility::ReportFatalError("Wall に知らないモデルの名前が指定されました: " + name);
     }
     m_VisualModel = name;
     // 外の森の岩は岩の材質（rockPS。色むら・ひび・苔・鉱物の粒・地面際の湿り）、枯れ木・倒木・茂みは樹皮の材質

@@ -7,7 +7,7 @@
 #include "AmbientOcclusion.h"
 
 #include "Renderer.h"
-#include "utility.h"
+#include "Utility.h"
 #include "shader/computeDispatchConfig.hlsli"
 
 #include <algorithm>
@@ -69,7 +69,7 @@ namespace Effect
             m_BlurShader.Create("shader/ambientOcclusionBlurCS.hlsl");
         if (!created)
         {
-            utility::ReportFatalError("画面空間の環境遮蔽（SSAO）の準備に失敗しました。");
+            Utility::ReportFatalError("画面空間の環境遮蔽（SSAO）の準備に失敗しました。");
         }
     }
 

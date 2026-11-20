@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // ファイルの役割: 1面の施設（壁・照明・ヒューズ・端末・扉・演出用の人影）を作って配置している。
 // 主な技術: 配置のデータを進行から分ける設計、作るときにポインタを受け取る仕組み、名前の一覧の一元管理
 // ============================================================================
@@ -30,9 +30,10 @@
 #include "StoryText.h"
 #include "VoiceRecorder.h"
 #include "Wall.h"
-#include "utility.h"
+#include "Utility.h"
 
 #include <SimpleMath.h>
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <iterator>
@@ -466,7 +467,7 @@ namespace
             m_Objects.startDoorSign = startDoorSign;
         }
 
-        // 懐中電灯で照らしたときだけ浮かぶ壁の文字。進む道筋に沿って、目的の手がかりと不安を置いている。
+        // 進む道筋に沿って、懐中電灯で浮かぶ手がかりと消灯時の異変を置く。
         void BuildWallWritings()
         {
             m_Objects.facilityMap = CreateWriting(
@@ -485,6 +486,17 @@ namespace
             m_Objects.writings[Stage1WallWritings::Turn] = CreateWriting(
                 "Stage1WritingTurn", "assets/texture/writing_turn.png",
                 "assets/texture/writing_turned.png");
+
+            // 点灯時の警告とは別の高さに置き、同じ壁で視線を大きく動かさずに変化を見つけられるようにする。
+            constexpr Color DarkCorridorInk(0.29f, 0.40f, 0.36f, 1.0f);
+            m_Objects.darkCorridorWriting = CreateWriting(
+                "Stage1DarkCorridorWriting", "assets/texture/writing_dark_corridor.png", "", false);
+            if (auto* writing = m_Objects.darkCorridorWriting)
+            {
+                writing->SetDarknessReveal();
+                writing->SetInkColor(DarkCorridorInk);
+                writing->SetPresenceImmediately(0.0f);
+            }
 
             // ループの周回ごとに、開始地点の部屋に1つずつ浮かぶ文字。最初は隠しておき、StageScene が周回に合わせて浮かばせている。
             // 1周目は奥のドアの右、2周目は東の壁、3周目は西の壁（戻ってくるたびに、部屋の中の文字が増えていく）
@@ -533,6 +545,14 @@ namespace
             BatteryItem* hiddenBattery = m_Builder.Create<BatteryItem>("Stage1KeypadRoomBattery");
             Place(*hiddenBattery, "Stage1KeypadRoomBattery");
             CreateWriting("Stage1KeypadRoomWriting", "assets/texture/writing_watched.png", "");
+
+            // HUDを切っていても、先に開けた部屋の空箱が進行不良に見えないようにする。
+            if (auto* fuseCaseSign = CreateWriting(
+                "Stage1KeypadFuseCaseSign", "assets/texture/stage1_keypad_fuse_case_sign.png", "", false))
+            {
+                fuseCaseSign->SetPrintedSurface();
+                fuseCaseSign->SetInkColor(Color(1.0f, 1.0f, 1.0f, 1.0f));
+            }
 
             // 鍵は閉じ込めた瞬間に、部屋の隅の候補からランダムな位置へ置いている。
             KeyItem* hiddenRoomKey = m_Builder.Create<KeyItem>("Stage1HiddenRoomKey");
@@ -771,8 +791,15 @@ namespace
 
         // 懐中電灯で照らしたときだけ浮かぶ壁の文字を作っている。
         // 位置は壁の表面、向き（yaw）は壁から通路側へ向かう法線、幅と高さは size の1つ目と2つ目（配置のファイルの place 行）。画像は横長(4:1)。
-        FlashlightWriting* CreateWriting(const char* name, const char* texture, const char* alternateTexture)
+        FlashlightWriting* CreateWriting(const char* name, const char* texture, const char* alternateTexture,
+            bool required = true)
         {
+            // 旧版のUnityの配置を書き出しても、今回追加した飾りがないだけでステージを開始できる。
+            if (!required && std::ranges::none_of(m_Layout.Placements,
+                [name](const PropPlacement& entry) { return entry.Name == name; }))
+            {
+                return nullptr;
+            }
             const PropPlacement& placement = At(name);
             FlashlightWriting* writing = m_Builder.Create<FlashlightWriting>(name);
             writing->SetTextures(texture, alternateTexture);
@@ -836,7 +863,7 @@ namespace Stage1Layout
         const PropLayout propLayout = PropLayoutFile::Load(PropLayoutPath);
         if (!propLayout.IsValid())
         {
-            utility::ReportFatalError("1面の配置を読めませんでした（" + std::to_string(propLayout.ErrorLine) +
+            Utility::ReportFatalError("1面の配置を読めませんでした（" + std::to_string(propLayout.ErrorLine) +
                 "行目）: " + propLayout.Error);
         }
 

@@ -4,7 +4,7 @@
 // ============================================================================
 
 #include "RenderTexture.h"
-#include "utility.h"
+#include "Utility.h"
 
 namespace Graphics
 {
@@ -81,7 +81,7 @@ namespace Graphics
     {
         if (!Init(width, height, format, enableUnorderedAccess))
         {
-            utility::ReportFatalError(std::string("描画テクスチャを作成できません: ") + purpose);
+            Utility::ReportFatalError(std::string("描画テクスチャを作成できません: ") + purpose);
         }
     }
 

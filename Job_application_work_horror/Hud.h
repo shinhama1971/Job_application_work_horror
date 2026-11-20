@@ -187,6 +187,24 @@ private:
     static float GetCanvasWidth();
     static float GetCanvasHeight();
 
+    // タイトル画面の部品（DrawTitle から順に呼んでいる）：背景の帯と走査線・題名・面の選択（下の端の高さを返す）・操作と記録・右上の受信表示
+    void DrawTitleBackground();
+    void DrawTitleLogo(float time, float noise);
+    float DrawTitleStageMenu(int selectedStage, const DirectX::SimpleMath::Color& promptColor);
+    void DrawTitleFooter(float afterStages, const DirectX::SimpleMath::Color& promptColor,
+        bool hasClearRecord, float bestClearTimeSeconds, int bestCaughtCount);
+    void DrawTitleStatus(float time, float noise);
+
+    // プレイ中の HUD の部品（Draw から順に呼んでいる）：左上の目的、右上の記録の数、中央の照準、左下のヒューズとゲージ、
+    // 下の操作の表示、右上の電池の知らせ
+    void DrawObjective(std::string_view objectiveText);
+    void DrawEvidenceCount();
+    void DrawReticle(bool hasInteractionTarget, const DirectX::SimpleMath::Color& reticleColor);
+    void DrawFuseSlots(int fuseCount);
+    void DrawGauges(const Player& player);
+    void DrawInteractionPrompt(std::string_view interactionPrompt, bool interactionLocked);
+    void DrawBatteryNotice(const Player& player);
+
     // 色付きの四角形を1つためている（キャンバス座標）
     void AddRectangle(float x, float y, float width, float height, const DirectX::SimpleMath::Color& color);
     // 操作ボタンの印として、「E」と「A」の形を四角形で組み立てている

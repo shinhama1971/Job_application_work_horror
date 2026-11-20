@@ -3,7 +3,7 @@
 // 主な技術: XAudio2、X3DAudio（立体音響）、ローパスフィルター、RIFF/WAVEの解析、Source Voice、RAII
 // ============================================================================
 
-#include "sound.h"
+#include "Sound.h"
 #include "MathUtility.h"
 
 #include <algorithm>

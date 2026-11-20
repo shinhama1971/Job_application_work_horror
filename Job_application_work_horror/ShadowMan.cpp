@@ -9,7 +9,7 @@
 #include "Application.h"
 #include "ShadowMan.h"
 #include "Player.h"
-#include "input.h"
+#include "Input.h"
 #include "PropModel.h"
 
 #include <algorithm>
@@ -117,18 +117,7 @@ void ShadowMan::Update()
     // 位置を外から決めている影は、時間切れ・追う動き・見られて崩れる反応をせず、プレイヤーの方を向くだけにしている
     if (m_ExternallyControlled)
     {
-        if (m_Player == nullptr)
-        {
-            m_Player = Core::Game::GetInstance()->GetObj<Player>("Player");
-        }
-        if (m_Player != nullptr)
-        {
-            const Vector3 toPlayer = m_Player->GetPosition() - m_Position;
-            if (toPlayer.x * toPlayer.x + toPlayer.z * toPlayer.z > MinimumLengthSquared)
-            {
-                m_Rotation.y = std::atan2(toPlayer.x, toPlayer.z);
-            }
-        }
+        FaceTowardPlayer();
         return;
     }
 
@@ -158,105 +147,136 @@ void ShadowMan::Update()
         return;
     }
 
-    Vector3 toPlayer = player->GetPosition() - m_Position;
     // 追ってくる設定なら、水平方向にプレイヤーへ近づいている（止まる距離より近づかない）
     if (m_ChaseEnabled)
     {
-        Vector3 horizontalDirection(toPlayer.x, 0.0f, toPlayer.z);
-        const float horizontalDistance = horizontalDirection.Length();
-        if (horizontalDistance > m_ChaseStopDistance &&
-            horizontalDistance > MinimumDistance)
-        {
-            horizontalDirection /= horizontalDistance;
-            const float travel = (std::min)(
-                m_ChaseSpeed * deltaTime,
-                horizontalDistance - m_ChaseStopDistance);
-            m_Position += horizontalDirection * travel;
-            toPlayer = player->GetPosition() - m_Position;
-
-            // 一定の歩幅ごとに、この人影の足元から足音を鳴らしている。
-            // 立体音響で、見えていなくても背後のどこから近づいてくるかが分かる。
-            constexpr float ChaseStrideLength = 22.0f;
-            m_ChaseStepDistance += travel;
-            if (m_ChaseStepDistance >= ChaseStrideLength)
-            {
-                m_ChaseStepDistance -= ChaseStrideLength;
-                m_ChaseStepLeft = !m_ChaseStepLeft;
-                // プレイヤーより低く重い足音にし、左右の足で少しだけ音の高さを変えている。
-                game->PlayAudioCueAt(
-                    SOUND_CUE_FOOTSTEP,
-                    m_Position + Vector3(0.0f, FootstepHeight, 0.0f),
-                    m_ChaseStepLeft ? FootstepPitchLeft : FootstepPitchRight,
-                    FootstepVolume);
-            }
-        }
+        ChasePlayer(*player, deltaTime);
     }
+    const Vector3 toPlayer = player->GetPosition() - m_Position;
     // いつもプレイヤーの方を向いている
     if (toPlayer.LengthSquared() > MinimumLengthSquared)
     {
         m_Rotation.y = std::atan2(toPlayer.x, toPlayer.z);
     }
 
-	// 見られたか：ライトを点けていて、220より近く、視線の中心（内積0.955超）に影の胸のあたりがあるとき
-	const Vector3 shadowCenter = m_Position + Vector3(0.0f, ShadowFigureGeometry::ChestHeight, 0.0f);
-	Vector3 cameraToShadow = shadowCenter - game->GetCamera()->GetPosition();
-	const float distanceToShadow = cameraToShadow.Length();
-	if (distanceToShadow > MinimumDistance)
-	{
-		cameraToShadow /= distanceToShadow;
-	}
+    UpdateGazeReaction(*player, deltaTime);
+}
 
-	const float gazeAlignment =
-		game->GetCamera()->GetForward().Dot(cameraToShadow);
-	const bool illuminatedByGaze =
-		m_Age > GazeIgnoreSeconds &&
-		player->IsFlashlightOn() &&
-		distanceToShadow < GazeDistance &&
-		gazeAlignment > GazeFacing;
+// 位置を外から決めている影は、プレイヤーの方を向くだけにしている
+void ShadowMan::FaceTowardPlayer()
+{
+    if (m_Player == nullptr)
+    {
+        m_Player = Core::Game::GetInstance()->GetObj<Player>("Player");
+    }
+    if (m_Player != nullptr)
+    {
+        const Vector3 toPlayer = m_Player->GetPosition() - m_Position;
+        if (toPlayer.x * toPlayer.x + toPlayer.z * toPlayer.z > MinimumLengthSquared)
+        {
+            m_Rotation.y = std::atan2(toPlayer.x, toPlayer.z);
+        }
+    }
+}
 
-	// 見られている間は崩れていき、表示時間も早く減っている。最初に見られた瞬間に画面と振動で驚かせている
-	if (illuminatedByGaze)
-	{
-		m_ObservedAmount += ObservedRate * deltaTime;
-		m_LifeTime -= ObservedLifeDrain * deltaTime;
+// 水平方向にプレイヤーへ近づき、一定の歩幅ごとに足音を鳴らしている
+void ShadowMan::ChasePlayer(const Player& player, float deltaTime)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    const Vector3 toPlayer = player.GetPosition() - m_Position;
+    Vector3 horizontalDirection(toPlayer.x, 0.0f, toPlayer.z);
+    const float horizontalDistance = horizontalDirection.Length();
+    if (horizontalDistance > m_ChaseStopDistance &&
+        horizontalDistance > MinimumDistance)
+    {
+        horizontalDirection /= horizontalDistance;
+        const float travel = (std::min)(
+            m_ChaseSpeed * deltaTime,
+            horizontalDistance - m_ChaseStopDistance);
+        m_Position += horizontalDirection * travel;
 
-		if (!m_ReactedToGaze)
-		{
-			m_ReactedToGaze = true;
-			// 視線で驚かせる演出が有効なら、通常の発見時より画面の衝撃を強く長くする。
-			constexpr float GazeScarePulseStrength = 0.62f;
-			constexpr float ObservedFadePulseStrength = 0.20f;
-			constexpr float GazeScarePulseSeconds = 0.48f;
-			constexpr float ObservedFadePulseSeconds = 0.28f;
-			const float pulseStrength = m_GazeScareEnabled ? GazeScarePulseStrength : ObservedFadePulseStrength;
-			const float pulseDuration = m_GazeScareEnabled ? GazeScarePulseSeconds : ObservedFadePulseSeconds;
-			game->GetPostProcess()->TriggerHorrorPulse(
-				pulseStrength,
-				pulseDuration);
+        // 一定の歩幅ごとに、この人影の足元から足音を鳴らしている。
+        // 立体音響で、見えていなくても背後のどこから近づいてくるかが分かる。
+        constexpr float ChaseStrideLength = 22.0f;
+        m_ChaseStepDistance += travel;
+        if (m_ChaseStepDistance >= ChaseStrideLength)
+        {
+            m_ChaseStepDistance -= ChaseStrideLength;
+            m_ChaseStepLeft = !m_ChaseStepLeft;
+            // プレイヤーより低く重い足音にし、左右の足で少しだけ音の高さを変えている。
+            game->PlayAudioCueAt(
+                SOUND_CUE_FOOTSTEP,
+                m_Position + Vector3(0.0f, FootstepHeight, 0.0f),
+                m_ChaseStepLeft ? FootstepPitchLeft : FootstepPitchRight,
+                FootstepVolume);
+        }
+    }
+}
 
-			if (m_GazeScareEnabled)
-			{
-				Input::SetVibration(GazeScareRumbleFrames, GazeScareRumbleStrength);
-			}
+// 懐中電灯で見られている間は崩れていき、目を離すと少しずつ戻る
+void ShadowMan::UpdateGazeReaction(const Player& player, float deltaTime)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    // 見られたか：ライトを点けていて、220より近く、視線の中心（内積0.955超）に影の胸のあたりがあるとき
+    const Vector3 shadowCenter = m_Position + Vector3(0.0f, ShadowFigureGeometry::ChestHeight, 0.0f);
+    Vector3 cameraToShadow = shadowCenter - game->GetCamera()->GetPosition();
+    const float distanceToShadow = cameraToShadow.Length();
+    if (distanceToShadow > MinimumDistance)
+    {
+        cameraToShadow /= distanceToShadow;
+    }
 
-			if (m_OnObserved)
-			{
-				m_OnObserved();
-			}
-		}
-	}
-	// 目を離すと、崩れ具合が少しずつ戻る
-	else
-	{
-		m_ObservedAmount -= ObservedRecoverRate * deltaTime;
-	}
+    const float gazeAlignment =
+        game->GetCamera()->GetForward().Dot(cameraToShadow);
+    const bool illuminatedByGaze =
+        m_Age > GazeIgnoreSeconds &&
+        player.IsFlashlightOn() &&
+        distanceToShadow < GazeDistance &&
+        gazeAlignment > GazeFacing;
 
-	m_ObservedAmount = (std::clamp)(m_ObservedAmount, 0.0f, 1.0f);
-	// ほとんど崩れたら、0.4秒以内に消している
-	if (m_ObservedAmount > VanishObservedAmount)
-	{
-		m_LifeTime = (std::min)(m_LifeTime, VanishSeconds);
-	}
+    // 見られている間は崩れていき、表示時間も早く減っている。最初に見られた瞬間に画面と振動で驚かせている
+    if (illuminatedByGaze)
+    {
+        m_ObservedAmount += ObservedRate * deltaTime;
+        m_LifeTime -= ObservedLifeDrain * deltaTime;
+
+        if (!m_ReactedToGaze)
+        {
+            m_ReactedToGaze = true;
+            // 視線で驚かせる演出が有効なら、通常の発見時より画面の衝撃を強く長くする。
+            constexpr float GazeScarePulseStrength = 0.62f;
+            constexpr float ObservedFadePulseStrength = 0.20f;
+            constexpr float GazeScarePulseSeconds = 0.48f;
+            constexpr float ObservedFadePulseSeconds = 0.28f;
+            const float pulseStrength = m_GazeScareEnabled ? GazeScarePulseStrength : ObservedFadePulseStrength;
+            const float pulseDuration = m_GazeScareEnabled ? GazeScarePulseSeconds : ObservedFadePulseSeconds;
+            game->GetPostProcess()->TriggerHorrorPulse(
+                pulseStrength,
+                pulseDuration);
+
+            if (m_GazeScareEnabled)
+            {
+                Input::SetVibration(GazeScareRumbleFrames, GazeScareRumbleStrength);
+            }
+
+            if (m_OnObserved)
+            {
+                m_OnObserved();
+            }
+        }
+    }
+    // 目を離すと、崩れ具合が少しずつ戻る
+    else
+    {
+        m_ObservedAmount -= ObservedRecoverRate * deltaTime;
+    }
+
+    m_ObservedAmount = (std::clamp)(m_ObservedAmount, 0.0f, 1.0f);
+    // ほとんど崩れたら、0.4秒以内に消している
+    if (m_ObservedAmount > VanishObservedAmount)
+    {
+        m_LifeTime = (std::min)(m_LifeTime, VanishSeconds);
+    }
 }
 
 // 現れる・消える・見られて崩れる度合いを合わせて、崩れて消える表現で描いている

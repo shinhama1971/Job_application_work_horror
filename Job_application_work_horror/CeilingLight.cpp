@@ -303,63 +303,11 @@ void CeilingLight::Update()
     float targetBrightness = 0.0f;
     if (powerRestored)
     {
-        // 照明を順番に点け、各蛍光灯が完全に点く直前に短く明滅させている。
-        // 一斉に点くのを避け、古い設備が復旧するときの不安定さを出している。
-        const float startupDelay =
-            std::fmod(std::fabs(m_FlickerOffset), StartupStaggerSteps) * StartupStaggerSeconds;
-        const float startupTime = m_PowerOnTimer - startupDelay;
-
-        if (startupTime >= 0.0f && startupTime < StartupSeconds)
-        {
-            // 1/24秒ごとに、点いているか消えているかを決まった並びで切り替えている（点き始めの蛍光灯の明滅）
-            const int pulse = static_cast<int>(startupTime * StartupPulsesPerSecond);
-            const bool tubeIsOn =
-                (pulse == StartupFirstOnPulse) || (pulse == StartupSecondOnPulse) || (pulse == StartupThirdOnPulse) ||
-                (pulse >= StartupSteadyPulse && (pulse % FlickerPulseCycle) != FlickerOffPulseInCycle);
-            const float warmup =
-                StartupWarmupBrightness + (startupTime / StartupSeconds) * StartupWarmupRise;
-            targetBrightness = tubeIsOn ? warmup : StartupOffBrightness;
-        }
-        else if (startupTime >= StartupSeconds)
-        {
-            // 器具ごとに安定器の個体差を持たせ、まれに起きる電圧の低下を再現している。
-            // 一定すぎる光を避け、古い施設らしさを出している。
-            const float fixtureWear = std::fmod(
-                std::fabs(m_FlickerOffset) * WearScale + WearOffset,
-                1.0f);
-            // 電源のうなりによる小さな明るさの揺れ（器具ごとに周期を変えている）
-            const float electricalHum =
-                std::sin((m_Time + m_FlickerOffset) *
-                    (HumRate + fixtureWear * HumWearRate)) * HumDepth;
-            const float highFrequencyBuzz =
-                std::sin((m_Time * BuzzRate) + m_FlickerOffset * BuzzOffsetScale) * BuzzDepth;
-            // 器具ごとの周期で、まれに短く暗くなる（電圧の低下）
-            const float dipCycle = DipCycleSeconds + fixtureWear * DipCycleWearRange;
-            const float dipPhase = std::fmod(
-                m_Time + std::fabs(m_FlickerOffset) * DipPhaseOffsetScale,
-                dipCycle);
-            const bool rareVoltageDip =
-                dipPhase < DipSeconds + fixtureWear * DipWearSeconds;
-            const float voltage = rareVoltageDip
-                ? DipBrightness + fixtureWear * DipWearBrightness
-                : 1.0f;
-            targetBrightness =
-                (1.0f + electricalHum + highFrequencyBuzz) * voltage;
-        }
+        targetBrightness = ComputePoweredBrightness();
     }
     else if (m_IsEmergencyLight)
-    // 停電中の非常灯：赤く暗い光が不安定に揺れ、4.3秒ごとに一瞬消えている
     {
-        const float flickerTime = m_Time + m_FlickerOffset;
-        const float unstable =
-            std::sin(flickerTime * EmergencyWobbleRateA) *
-            std::sin(flickerTime * EmergencyWobbleRateB);
-        const bool shortBlackout =
-            std::fmod(flickerTime, EmergencyBlackoutCycle) < EmergencyBlackoutSeconds;
-        // 懐中電灯を消すとほとんど闇なので、赤い光だまりが見えるよう、前より明るくしている
-        targetBrightness = shortBlackout
-            ? EmergencyBlackoutBrightness
-            : EmergencyBaseBrightness + (unstable + 1.0f) * EmergencyWobbleDepth;
+        targetBrightness = ComputeEmergencyBrightness();
     }
 
     // 進む先の候補の照明。停電中も非常回路の弱い光を残し、候補どうしは同じ明るさ・同じ色にしている。
@@ -388,37 +336,13 @@ void CeilingLight::Update()
     // この自然な揺らぎの後からイベント用の明滅を重ね、怖い演出を確実に見せている。
     if (m_IsFaulted && powerRestored)
     {
-        const float faultTime = m_Time + std::fabs(m_FlickerOffset) * FaultTimeOffsetScale;
-        const float faultCycle = FaultCycleSeconds +
-            std::fmod(std::fabs(m_FlickerOffset) * FaultCycleOffsetScale, FaultCycleRange);
-        const float faultPhase = std::fmod(faultTime, faultCycle);
-        const float ballastNoise =
-            std::sin(faultTime * BallastNoiseRateA) * std::sin(faultTime * BallastNoiseRateB);
-        const bool longDropout = faultPhase < FaultLongDropoutSeconds;
-        const bool unstableDropout =
-            faultPhase < FaultUnstableSeconds && ballastNoise < FaultUnstableThreshold;
-        targetBrightness = (longDropout || unstableDropout)
-            ? FaultOffBrightness
-            : targetBrightness * FaultDimRate;
+        targetBrightness = ApplyFaultDropout(targetBrightness);
     }
 
     // イベント用の明滅（影が出たときなど）。決まった並びで点滅させ、点いている間は普段より明るくしている
     if (m_EventFlickerTimer > 0.0f)
     {
-        m_EventFlickerTimer = (std::max)(
-            0.0f,
-            m_EventFlickerTimer - deltaTime);
-        const float elapsed =
-            m_EventFlickerDuration - m_EventFlickerTimer;
-        const int pulse = static_cast<int>(elapsed * EventPulsesPerSecond);
-        const bool tubeOn =
-            (pulse == EventFirstOnPulse) || (pulse == EventSecondOnPulse) ||
-            (pulse >= EventSteadyPulse && (pulse % FlickerPulseCycle) != FlickerOffPulseInCycle);
-        const float flareBrightness =
-            EventFlareBrightness + m_EventFlickerStrength * EventFlareRange;
-        targetBrightness = tubeOn
-            ? (std::max)(targetBrightness, flareBrightness)
-            : EventOffBrightness;
+        targetBrightness = ApplyEventFlicker(targetBrightness, deltaTime);
     }
 
     // 演出で強制的に消しているときは、何があっても真っ暗にしている
@@ -442,6 +366,105 @@ void CeilingLight::Update()
         1.0f - response, deltaTime * ResponseReferenceFps);
     m_Brightness +=
         (targetBrightness - m_Brightness) * deltaResponse;
+}
+
+// 電力が戻った後の明るさ
+float CeilingLight::ComputePoweredBrightness() const
+{
+    // 照明を順番に点け、各蛍光灯が完全に点く直前に短く明滅させている。
+    // 一斉に点くのを避け、古い設備が復旧するときの不安定さを出している。
+    const float startupDelay =
+        std::fmod(std::fabs(m_FlickerOffset), StartupStaggerSteps) * StartupStaggerSeconds;
+    const float startupTime = m_PowerOnTimer - startupDelay;
+
+    if (startupTime >= 0.0f && startupTime < StartupSeconds)
+    {
+        // 1/24秒ごとに、点いているか消えているかを決まった並びで切り替えている（点き始めの蛍光灯の明滅）
+        const int pulse = static_cast<int>(startupTime * StartupPulsesPerSecond);
+        const bool tubeIsOn =
+            (pulse == StartupFirstOnPulse) || (pulse == StartupSecondOnPulse) || (pulse == StartupThirdOnPulse) ||
+            (pulse >= StartupSteadyPulse && (pulse % FlickerPulseCycle) != FlickerOffPulseInCycle);
+        const float warmup =
+            StartupWarmupBrightness + (startupTime / StartupSeconds) * StartupWarmupRise;
+        return tubeIsOn ? warmup : StartupOffBrightness;
+    }
+    if (startupTime >= StartupSeconds)
+    {
+        // 器具ごとに安定器の個体差を持たせ、まれに起きる電圧の低下を再現している。
+        // 一定すぎる光を避け、古い施設らしさを出している。
+        const float fixtureWear = std::fmod(
+            std::fabs(m_FlickerOffset) * WearScale + WearOffset,
+            1.0f);
+        // 電源のうなりによる小さな明るさの揺れ（器具ごとに周期を変えている）
+        const float electricalHum =
+            std::sin((m_Time + m_FlickerOffset) *
+                (HumRate + fixtureWear * HumWearRate)) * HumDepth;
+        const float highFrequencyBuzz =
+            std::sin((m_Time * BuzzRate) + m_FlickerOffset * BuzzOffsetScale) * BuzzDepth;
+        // 器具ごとの周期で、まれに短く暗くなる（電圧の低下）
+        const float dipCycle = DipCycleSeconds + fixtureWear * DipCycleWearRange;
+        const float dipPhase = std::fmod(
+            m_Time + std::fabs(m_FlickerOffset) * DipPhaseOffsetScale,
+            dipCycle);
+        const bool rareVoltageDip =
+            dipPhase < DipSeconds + fixtureWear * DipWearSeconds;
+        const float voltage = rareVoltageDip
+            ? DipBrightness + fixtureWear * DipWearBrightness
+            : 1.0f;
+        return (1.0f + electricalHum + highFrequencyBuzz) * voltage;
+    }
+    return 0.0f;
+}
+
+// 停電中の非常灯：赤く暗い光が不安定に揺れ、4.3秒ごとに一瞬消えている
+float CeilingLight::ComputeEmergencyBrightness() const
+{
+    const float flickerTime = m_Time + m_FlickerOffset;
+    const float unstable =
+        std::sin(flickerTime * EmergencyWobbleRateA) *
+        std::sin(flickerTime * EmergencyWobbleRateB);
+    const bool shortBlackout =
+        std::fmod(flickerTime, EmergencyBlackoutCycle) < EmergencyBlackoutSeconds;
+    // 懐中電灯を消すとほとんど闇なので、赤い光だまりが見えるよう、前より明るくしている
+    return shortBlackout
+        ? EmergencyBlackoutBrightness
+        : EmergencyBaseBrightness + (unstable + 1.0f) * EmergencyWobbleDepth;
+}
+
+// 故障した蛍光灯の、不規則に消える揺らぎ
+float CeilingLight::ApplyFaultDropout(float targetBrightness) const
+{
+    const float faultTime = m_Time + std::fabs(m_FlickerOffset) * FaultTimeOffsetScale;
+    const float faultCycle = FaultCycleSeconds +
+        std::fmod(std::fabs(m_FlickerOffset) * FaultCycleOffsetScale, FaultCycleRange);
+    const float faultPhase = std::fmod(faultTime, faultCycle);
+    const float ballastNoise =
+        std::sin(faultTime * BallastNoiseRateA) * std::sin(faultTime * BallastNoiseRateB);
+    const bool longDropout = faultPhase < FaultLongDropoutSeconds;
+    const bool unstableDropout =
+        faultPhase < FaultUnstableSeconds && ballastNoise < FaultUnstableThreshold;
+    return (longDropout || unstableDropout)
+        ? FaultOffBrightness
+        : targetBrightness * FaultDimRate;
+}
+
+// イベント用の明滅（決まった並びで点滅させ、点いている間は普段より明るくしている）
+float CeilingLight::ApplyEventFlicker(float targetBrightness, float deltaTime)
+{
+    m_EventFlickerTimer = (std::max)(
+        0.0f,
+        m_EventFlickerTimer - deltaTime);
+    const float elapsed =
+        m_EventFlickerDuration - m_EventFlickerTimer;
+    const int pulse = static_cast<int>(elapsed * EventPulsesPerSecond);
+    const bool tubeOn =
+        (pulse == EventFirstOnPulse) || (pulse == EventSecondOnPulse) ||
+        (pulse >= EventSteadyPulse && (pulse % FlickerPulseCycle) != FlickerOffPulseInCycle);
+    const float flareBrightness =
+        EventFlareBrightness + m_EventFlickerStrength * EventFlareRange;
+    return tubeOn
+        ? (std::max)(targetBrightness, flareBrightness)
+        : EventOffBrightness;
 }
 
 // 本体を描き、続けて発光パネルを明るさに応じた色で光らせて描いている

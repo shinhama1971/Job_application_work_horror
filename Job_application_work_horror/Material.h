@@ -12,7 +12,7 @@
 #include	"Renderer.h"
 #include	"Shader.h"
 #include	"Texture.h"
-#include "utility.h"
+#include "Utility.h"
 
 class Shader;
 class Texture;
@@ -71,7 +71,7 @@ public:
 	void CreateRequired(MATERIAL mtrl) {
 		if (!Create(mtrl))
 		{
-			utility::ReportFatalError("マテリアルの定数バッファを作成できません。");
+			Utility::ReportFatalError("マテリアルの定数バッファを作成できません。");
 		}
 	}
 

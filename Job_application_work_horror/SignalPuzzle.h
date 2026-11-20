@@ -25,7 +25,7 @@ public:
 
 private:
     // 各信号盤を受け付けたか、次に操作すべき番号、解けたか
-    std::array<bool, SignalCount> m_Accepted{ false, false, false };
+    std::array<bool, SignalCount> m_Accepted{};
     int m_Step = 0;
     bool m_Complete = false;
 

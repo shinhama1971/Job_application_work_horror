@@ -34,6 +34,10 @@
 
 作者が3つの追加内容と作業の優先順位を指定しました。今回の作業はコミット・pushせず、作者の差分確認を待つ運用です。
 
+### Codexが担当した1面の追加（2026年11月20日）
+
+- ループ廊下の消灯時の文字と足音・画面演出、暗証番号の部屋の保管箱の掲示を実装。`StageScene*`、`Stage1Layout.*`、`FlashlightWriting.*`、`flashlightRevealPS.hlsl`、配置ファイルとテクスチャ生成スクリプトを変更。
+
 ### ゲームの機能
 
 | 機能 | 主なファイル | AIの関与 | 作者の関与【作者が記入・確認する欄】 |
@@ -265,7 +269,7 @@
 
 - Codexが、次の変更を作った。
   - 効果音：位置付きの音の16枠が埋まったときは、再生を始めたのが一番古い枠を使う。シーンを切り替えるときは、前のシーンの効果音と環境音をすべて止めてから新しい音を始める（`Sound::StopAll`）。
-  - 保存：設定とベスト記録を、隣の一時ファイルへ書き終えてから差し替える（`utility::WriteTextAtomically`）。ベスト記録は1面から通してクリアしたプレイだけで更新し、自動撮影・計測では更新しない。
+  - 保存：設定とベスト記録を、隣の一時ファイルへ書き終えてから差し替える（`Utility::WriteTextAtomically`）。ベスト記録は1面から通してクリアしたプレイだけで更新し、自動撮影・計測では更新しない。
   - 配置ファイル：ゲームの中の配置エディターに保存していない編集がある間は、自動の読み直しを待つ。保存は、編集を始めたときから外で書き換えられていないかを確かめてから、一時ファイル経由で差し替える。読み直しで別の Object と名前が重なったら、配置を変えずに行番号と名前を出す。
   - Unity のマップエディター：候補地点（`spot`）を、行番号ではなく読み込んだときの行の中身で照らし合わせる。
   - 入力とウィンドウ：別のウィンドウへ切り替えたときにコントローラーの振動を止め、戻った直後のキーとマウスの動きを拾わないようにした。使っていなかったウィンドウの大きさの変更（`Renderer::ResizeWindow`）を外し、Alt+Enter での切り替えを止めた。
@@ -283,7 +287,7 @@
 | 監視カメラ巡回の処理を `StageScene` から分離 | `StageSurveillanceController.*` | 修正 |
 | Sceneの毎フレームの名前検索をやめ、初期化時に取得したポインタを使う | `StageScene*.cpp`, `Stage2Scene*.cpp` | 修正 |
 | 警告レベルを /W4 に上げて警告を0にする、コードの細かな作法の整理 | 複数 | 修正 |
-| セーブデータの保存先を `%LOCALAPPDATA%\SignalLost` に変更 | `GamePersistence.cpp`, `GameSettings.cpp`, `utility.cpp` | 修正 |
+| セーブデータの保存先を `%LOCALAPPDATA%\SignalLost` に変更 | `GamePersistence.cpp`, `GameSettings.cpp`, `Utility.cpp` | 修正 |
 | 2面のやり直し時の進行値の扱いの修正 | `GameState.h`, `Game.cpp` | 修正 |
 | ソースコード全体のコメントの見直し（誤った説明の修正・不足の追加） | 複数 | 修正 |
 | 未使用のコード・素材の削除、`TestPipe` を `PipeProp` に改名 | 複数 | 修正 |
@@ -465,3 +469,7 @@ Codex（OpenAI）が、撮影・計測中に表示しない残像のテクスチ
 Codex（OpenAI）が、日次撮影の失敗判定と実行ごとの保存先、配布ZIPの完成名へ切り替える条件を修正しました。ゲームの起動プロセスを模擬し、PowerShell 5.1で成功・失敗時のファイル出力を確認しました。
 
 Codex（OpenAI）が、Compute Shaderのバインド先、画面合成の定数バッファ、自動露出の添字、照明演出の段階名、制作ツールのWAVヘッダーを整理し、数値定義の確認メモに集約しました。
+
+Codex（OpenAI）が、2面の信号盤の件数を判定・配置・表示で共通化し、色表の要素数を検査するようにしました。
+
+Claude Code（Anthropic）が、提出前のソースの見直しとして、Codex の未コミットの作業（1面の消灯時の異変・保管箱の掲示・2面の信号盤の件数）をビルドとシェーダーのバイトコードの比較で確かめ、試作中の3面をタイトルの選択肢から外し、ファイル名と関数名の書き方をそろえました（`input`・`sound`・`utility` → `Input`・`Sound`・`Utility`、綴りの誤りだった `AssimpPerse` → `AssimpParse`、`utf8_to_wide_winapi` → `Utf8ToWide`）。また、150行を超えていた14の関数（`SelectStage1Objective`・`PropLayoutFile::Load`・`ForestGrass::PlantBlades`・`PropLayoutEditor::Draw`・`Hud::Draw`・`Hud::DrawTitle`・`Stage2Scene` の `AdvanceLoop`・`UpdateNoiseThreat`・`UpdateSignalPuzzle`・`Draw`・`StageScene` の `Draw`・`AdvanceCorridorLoop`・`CeilingLight::Update`・`ShadowMan::Update`）を、処理の順番を変えずに同じクラスの小さな関数へ切り出しました。どこで切るかと関数の名前は Claude Code が決め、作者は「長い関数を分ける」ことを選びました。

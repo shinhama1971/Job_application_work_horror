@@ -1,6 +1,6 @@
 #include "LightShafts.h"
 #include "Renderer.h"
-#include "utility.h"
+#include "Utility.h"
 #include "shader/computeDispatchConfig.hlsli"
 
 #include <algorithm>
@@ -86,7 +86,7 @@ namespace Effect
             !Renderer::CreateConstantBuffer(sizeof(ShaftParameters), m_Parameters.ReleaseAndGetAddressOf()) ||
             !m_Shader.Create("shader/lightShaftsCS.hlsl"))
         {
-            utility::ReportFatalError("光の筋の初期化に失敗しました");
+            Utility::ReportFatalError("光の筋の初期化に失敗しました");
         }
     }
 

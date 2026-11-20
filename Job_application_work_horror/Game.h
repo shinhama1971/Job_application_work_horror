@@ -19,8 +19,8 @@
 #include "GameSettings.h"
 #include "PauseMenu.h"
 #include "ObjectManager.h"
-#include "sound.h"
-#include "utility.h"
+#include "Sound.h"
+#include "Utility.h"
 // ゲームのシーン（タイトル・1面・2面・リザルト）
 enum class SceneName
 {

@@ -95,6 +95,13 @@ private:
     void Init();
     void Uninit();
     void AdvanceLoop(Player& player);
+    // AdvanceLoop の中身：新しい周回の始めの状態に戻す・切り替わりの演出・壁の周回の印・1周目／2周目／最後の周の変化
+    void ResetForNextLoop(Player& player);
+    void PlayLoopStartFeedback();
+    void UpdateCycleMarks();
+    void ApplyFirstLoopChanges();
+    void ApplySecondLoopChanges();
+    void ApplyFinalLoopChanges();
     // 影を見てしまったときの照明の演出を始める／進める
     void StartObservedScare();
     void UpdateObservedScare(float deltaTime);
@@ -132,6 +139,12 @@ private:
     // ノックの異変を更新している／耳を澄ませる位置を返している
     void UpdateKnockingAnomaly(const Player& player, float deltaTime);
     DirectX::SimpleMath::Vector3 GetKnockListenPoint() const;
+    // Draw の中身：ロッカーの中の見え方・右上の状態パネル・目的地の矢印が指す所・始まりと周回のカード・画面の暗転
+    void DrawHidingView(const Player& player);
+    void DrawStatusPanel(float threatRate);
+    DirectX::SimpleMath::Vector3 SelectGuideTarget(bool confirmationPending) const;
+    void DrawIntroAndLoopCards();
+    void DrawScreenFades();
     // 偽の扉の異変を更新している／偽の扉の表示と位置を切り替えている
     void UpdateFalseDoorAnomaly(const Player& player);
     void SetFalseDoorState(bool visible, bool rightSide);
@@ -143,8 +156,24 @@ private:
     void RegisterPuzzleMistake(int type);
     // 足音の危険度と、足音を追う影を更新している
     void UpdateNoiseThreat(Player& player, float deltaTime);
+    // UpdateNoiseThreat の中身：危険度を下げて影を消す・足音で上げ下げ・影が近いと上げる（捕まると true）・
+    // 静かにして振り切る・背後に影を出す・信号盤のやり直し（やり直すと true）・照明の明滅の警告
+    void FadeOutNoiseThreat(float deltaTime);
+    void AddFootstepThreat(const Player& player, float deltaTime, bool signalStealthActive);
+    bool UpdateNoiseStalkerProximity(Player& player);
+    void UpdateQuietRecovery(const Player& player, float deltaTime);
+    void TrySpawnNoiseStalker(const Player& player);
+    bool ResetSignalPuzzleOnNoise(bool signalStealthActive);
+    void TriggerThreatWarning(const Player& player);
     // 信号盤パズル・信号盤の段階で背後から来る影・信号盤の照明の状態・パズルのやり直し
     void UpdateSignalPuzzle();
+    // UpdateSignalPuzzle の中身：操作された信号盤の受け付け・順番違い・順番どおり・3つそろった・背後の影・目印の色
+    void AcceptActivatedSignal();
+    void OnSignalWrongOrder();
+    void OnSignalAccepted(int signalIndex, bool completed);
+    void CompleteSignalPuzzle();
+    void SpawnSignalStalker();
+    void UpdateSignalMarkers(bool puzzleActive);
     void UpdateSignalStalker();
     void ApplySignalLightingState();
     void ResetSignalPuzzle();

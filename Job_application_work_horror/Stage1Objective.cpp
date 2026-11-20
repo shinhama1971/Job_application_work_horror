@@ -7,6 +7,8 @@
 #include "Stage1FuseProgress.h"
 #include "Stage1WestWing.h"
 
+#include <optional>
+
 namespace
 {
     // 3本目のヒューズを探す段階（西棟）の文章。目的・ヒント（35秒・18秒）の3種類がある。
@@ -71,247 +73,275 @@ namespace
     constexpr float LightHintSeconds = 18.0f;
 }
 
-std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
+namespace
 {
-    // まず、ヒューズの数とループ廊下の回数から、普段の目的を決めている
-    std::string objectiveText;
-    if (in.fuseCount <= 0)
+    // 普段の目的：ヒューズの数とループ廊下の回数から決めている
+    std::string SelectBaseObjective(const Stage1ObjectiveInput& in)
     {
-        objectiveText = "開始地点の近くでヒューズを探す";
+        if (in.fuseCount <= 0)
+        {
+            return "開始地点の近くでヒューズを探す";
+        }
+        if (in.fuseCount == 1)
+        {
+            return in.corridorLoopCount < 1
+                ? "廊下の突き当たりのドアを開けて進む"
+                : "左側の部屋でヒューズを探す";
+        }
+        if (in.fuseCount == Stage1FuseProgress::BeforeLastFuse)
+        {
+            return in.corridorLoopCount < Stage1FuseProgress::LoopsToUnlockLastFuse
+                ? "もう一度、廊下の突き当たりのドアを開ける"
+                : SelectThirdFuseText(in, ObjectiveText);
+        }
+        return "左の部屋にある配電盤を調べる";
     }
-    else if (in.fuseCount == 1)
+
+    // 監視カメラの現地確認の間の文章（残り時間と、光で消した割合は毎フレーム変わるため、ここで組み立てている）
+    std::string SelectPatrolText(const Stage1ObjectiveInput& in)
     {
-        objectiveText = in.corridorLoopCount < 1
-            ? "廊下の突き当たりのドアを開けて進む"
-            : "左側の部屋でヒューズを探す";
-    }
-    else if (in.fuseCount == Stage1FuseProgress::BeforeLastFuse)
-    {
-        objectiveText = in.corridorLoopCount < Stage1FuseProgress::LoopsToUnlockLastFuse
-            ? "もう一度、廊下の突き当たりのドアを開ける"
-            : SelectThirdFuseText(in, ObjectiveText);
-    }
-    else
-    {
-        objectiveText = "左の部屋にある配電盤を調べる";
-    }
-    // ここから下は、上に書いたものほど優先して、普段の目的を上書きしている
-    if (!in.layoutNotice.empty())
-    {
-        // Debug版で小物の配置のファイルを読み直したときの結果（読めなかった行も伝える）
-        objectiveText = std::string(in.layoutNotice);
-    }
-    else if (in.escaping)
-    {
-        objectiveText = "ドアの先へ移動中";
-    }
-    else if (!in.hiddenRoomText.empty())
-    {
-        // 隠し部屋に閉じ込められている間は、その場の状況だけを伝えている。
-        objectiveText = std::string(in.hiddenRoomText);
-    }
-    else if (!in.archiveStalkerText.empty())
-    {
-        // 照らすと止まる影が現れた・触れられたときの知らせは、短い間だけ普段の目的より優先している。
-        objectiveText = std::string(in.archiveStalkerText);
-    }
-    else if (!in.westWingText.empty())
-    {
-        // 西棟のバルブを回している間の進み具合と、水が引いたなどの知らせ。
-        objectiveText = std::string(in.westWingText);
-    }
-    else if (in.emptyFuseCaseNotice)
-    {
-        // 3本目の段階より前に暗証番号の部屋を開けた人に、ここにはまだヒューズがないことを伝えている。
-        objectiveText = "ヒューズの箱は空だ。誰かが持ち去ったらしい";
-    }
-    else if (!in.safeLightText.empty())
-    {
-        // 光の安全地帯に初めて入ったときの知らせ。
-        objectiveText = std::string(in.safeLightText);
-    }
-    else if (in.patrolDispatched)
-    {
-        // 現地確認の間の残り時間と、光で消した割合は毎フレーム変わるため、ここで文章を組み立てている。
         const std::string cameraLabel(in.patrolCameraLabel);
         const std::string anomalyLabel(in.patrolAnomalyLabel);
         if (!in.flashlightOn)
         {
-            objectiveText = cameraLabel +
+            return cameraLabel +
                 " へ向かい " + anomalyLabel + "をライトで照らす  残り " +
                 std::to_string(in.patrolRemainingSeconds) + "秒";
         }
-        else if (in.patrolConfirmPercent > 0)
+        if (in.patrolConfirmPercent > 0)
         {
-            objectiveText = "異常を光で除去中  " +
+            return "異常を光で除去中  " +
                 std::to_string(in.patrolConfirmPercent) + "%";
         }
-        else
-        {
-            objectiveText = cameraLabel +
-                " の" + anomalyLabel + "をライトで探す  残り " +
-                std::to_string(in.patrolRemainingSeconds) + "秒";
-        }
+        return cameraLabel +
+            " の" + anomalyLabel + "をライトで探す  残り " +
+            std::to_string(in.patrolRemainingSeconds) + "秒";
     }
-    else if (in.patrolNotice)
+
+    // 一番優先する、その場の状況の文章（配置の読み直し・脱出中・閉じ込め・照らすと止まる影・西棟・空の箱・安全地帯・監視カメラ）
+    std::optional<std::string> SelectSituationText(const Stage1ObjectiveInput& in)
     {
-        objectiveText = in.patrolNoticeText;
+        if (!in.layoutNotice.empty())
+        {
+            // Debug版で小物の配置のファイルを読み直したときの結果（読めなかった行も伝える）
+            return std::string(in.layoutNotice);
+        }
+        if (in.escaping)
+        {
+            return std::string("ドアの先へ移動中");
+        }
+        if (!in.hiddenRoomText.empty())
+        {
+            // 隠し部屋に閉じ込められている間は、その場の状況だけを伝えている。
+            return std::string(in.hiddenRoomText);
+        }
+        if (!in.archiveStalkerText.empty())
+        {
+            // 照らすと止まる影が現れた・触れられたときの知らせは、短い間だけ普段の目的より優先している。
+            return std::string(in.archiveStalkerText);
+        }
+        if (!in.westWingText.empty())
+        {
+            // 西棟のバルブを回している間の進み具合と、水が引いたなどの知らせ。
+            return std::string(in.westWingText);
+        }
+        if (in.emptyFuseCaseNotice)
+        {
+            // 3本目の段階より前に暗証番号の部屋を開けた人に、ここにはまだヒューズがないことを伝えている。
+            return std::string("ヒューズの箱は空だ。誰かが持ち去ったらしい");
+        }
+        if (!in.safeLightText.empty())
+        {
+            // 光の安全地帯に初めて入ったときの知らせ。
+            return std::string(in.safeLightText);
+        }
+        if (in.patrolDispatched)
+        {
+            return SelectPatrolText(in);
+        }
+        if (in.patrolNotice)
+        {
+            return std::string(in.patrolNoticeText);
+        }
+        return std::nullopt;
     }
+
     // 一時的な知らせ（充電・監視カメラ・倉庫の物音・ヒューズを拾った・影が消えた）
-    else if (in.chargerNotice)
+    std::optional<std::string> SelectNoticeText(const Stage1ObjectiveInput& in)
     {
-        objectiveText = in.fuseWatcherState == FuseWatcherState::Watching
-            ? "充電音で影が現れた ライトを向ける"
-            : "バッテリーを充電した";
+        if (in.chargerNotice)
+        {
+            return std::string(in.fuseWatcherState == FuseWatcherState::Watching
+                ? "充電音で影が現れた ライトを向ける"
+                : "バッテリーを充電した");
+        }
+        if (in.evidenceNotice)
+        {
+            return std::string("監視カメラの巡回を終えた");
+        }
+        if (in.storageScareNotice)
+        {
+            return std::string(in.storageScarePhase == StorageScarePhase::NoiseHeard
+                ? "背後で金属音がした"
+                : (in.storageScarePhase == StorageScarePhase::ShadowShown
+                    ? "背後に気配がある"
+                    : "影は光の中へ消えた"));
+        }
+        if (in.fuseNotice)
+        {
+            if (in.fuseWatcherState == FuseWatcherState::Watching) return std::string("影に懐中電灯を向ける");
+            if (in.fuseCount == 1) return std::string("ヒューズを1本入手");
+            if (in.fuseCount == Stage1FuseProgress::BeforeLastFuse) return std::string("ヒューズを2本入手");
+            return std::string("ヒューズを3本入手");
+        }
+        if (in.fuseWatcherNotice)
+        {
+            return std::string(in.fuseWatcherState == FuseWatcherState::Watching
+                ? "影を正面から懐中電灯で照らす"
+                : "影が光の中へ消えた");
+        }
+        return std::nullopt;
     }
-    else if (in.evidenceNotice)
-    {
-        objectiveText = "監視カメラの巡回を終えた";
-    }
-    else if (in.storageScareNotice)
-    {
-        objectiveText = in.storageScarePhase == StorageScarePhase::NoiseHeard
-            ? "背後で金属音がした"
-            : (in.storageScarePhase == StorageScarePhase::ShadowShown
-                ? "背後に気配がある"
-                : "影は光の中へ消えた");
-    }
-    else if (in.fuseNotice)
-    {
-        if (in.fuseWatcherState == FuseWatcherState::Watching)
-            objectiveText = "影に懐中電灯を向ける";
-        else if (in.fuseCount == 1) objectiveText = "ヒューズを1本入手";
-        else if (in.fuseCount == Stage1FuseProgress::BeforeLastFuse) objectiveText = "ヒューズを2本入手";
-        else objectiveText = "ヒューズを3本入手";
-    }
-    else if (in.fuseWatcherNotice)
-    {
-        objectiveText = in.fuseWatcherState == FuseWatcherState::Watching
-            ? "影を正面から懐中電灯で照らす"
-            : "影が光の中へ消えた";
-    }
+
     // 演出の最中の文章（出口の前兆・電力が戻った瞬間・送電中・照明の演出・ループ廊下）
-    else if (in.exitOmenSeconds > 0.0f)
+    std::optional<std::string> SelectEventText(const Stage1ObjectiveInput& in)
     {
-        objectiveText = in.exitOmenSeconds > ExitOmenFirstLineSeconds
-            ? "何かが待っている"
-            : "立ち止まらず進む";
+        if (in.exitOmenSeconds > 0.0f)
+        {
+            return std::string(in.exitOmenSeconds > ExitOmenFirstLineSeconds
+                ? "何かが待っている"
+                : "立ち止まらず進む");
+        }
+        if (in.powerRestored &&
+            in.powerRestoreActive &&
+            in.powerRestoreSeconds < PowerRestoreNoticeSeconds)
+        {
+            return std::string(in.powerRestoreSeconds < PowerRestoreFirstLineSeconds
+                ? "電力が復旧した"
+                : "出口側の非常送電盤へ向かう");
+        }
+        if (in.exitPowerActivated && !in.exitPowerReady)
+        {
+            return std::string("非常電源を送電中");
+        }
+        if (in.scareLightNoticeSeconds > 0.0f)
+        {
+            return std::string(in.scareLightNoticeSeconds > ScareLightFirstLineSeconds
+                ? "何かに見られている"
+                : "点灯した照明をたどる");
+        }
+        if (in.loopNotice)
+        {
+            if (in.corridorLoopCount == 1)
+            {
+                return std::string("廊下の様子が変わった");
+            }
+            if (in.corridorLoopCount == Stage1FuseProgress::LoopsToUnlockLastFuse)
+            {
+                return std::string("そのまま歩き続ける");
+            }
+            return std::string("後ろを振り返らない");
+        }
+        return std::nullopt;
     }
-    else if (in.powerRestored &&
-        in.powerRestoreActive &&
-        in.powerRestoreSeconds < PowerRestoreNoticeSeconds)
+
+    // 進めないときのヒントの文章（進み具合ごと）。強いヒント（35秒）と軽いヒント（18秒）で、同じ並びの文章を使い分けている
+    struct IdleHintTexts
     {
-        objectiveText = in.powerRestoreSeconds < PowerRestoreFirstLineSeconds
-            ? "電力が復旧した"
-            : "出口側の非常送電盤へ向かう";
-    }
-    else if (in.exitPowerActivated && !in.exitPowerReady)
+        const char* GoToExitPanel;
+        const char* GoToExitDoor;
+        const char* FindFirstFuse;
+        const char* OpenCorridorDoor;
+        const char* FindSecondFuse;
+        const char* OpenCorridorDoorAgain;
+        TextVariant ThirdFuseVariant;
+        const char* ReturnToFuseBox;
+    };
+
+    constexpr IdleHintTexts StrongHints
     {
-        objectiveText = "非常電源を送電中";
-    }
-    else if (in.scareLightNoticeSeconds > 0.0f)
+        "ヒント 右奥の赤い送電盤を調べる",
+        "ヒント 廊下の突き当たりの緑色の出口へ",
+        "ヒント 最初の壁付近を探す",
+        "ヒント 中央のドアから廊下の奥のドアへ",
+        "ヒント 左奥の部屋を探す",
+        "ヒント もう一度廊下の奥のドアを開ける",
+        LongIdleHint,
+        "ヒント 左の部屋の配電盤を調べる",
+    };
+
+    constexpr IdleHintTexts LightHints
     {
-        objectiveText = in.scareLightNoticeSeconds > ScareLightFirstLineSeconds
-            ? "何かに見られている"
-            : "点灯した照明をたどる";
-    }
-    else if (in.loopNotice)
+        "ヒント 出口手前の送電盤へ向かう",
+        "ヒント 緑色の出口灯をたどる",
+        "ヒント 開始地点の周囲を探す",
+        "ヒント 中央のドアが進行ルート",
+        "ヒント 左側の部屋を確認する",
+        "ヒント 長い廊下の奥のドアをもう一度",
+        ShortIdleHint,
+        "ヒント 配電盤へ戻る",
+    };
+
+    std::string SelectIdleHint(const Stage1ObjectiveInput& in, const IdleHintTexts& texts)
     {
-        if (in.corridorLoopCount == 1)
+        if (in.powerRestored && !in.exitPowerActivated) return texts.GoToExitPanel;
+        if (in.powerRestored) return texts.GoToExitDoor;
+        if (in.fuseCount <= 0) return texts.FindFirstFuse;
+        if (in.fuseCount == 1 && in.corridorLoopCount < 1) return texts.OpenCorridorDoor;
+        if (in.fuseCount == 1) return texts.FindSecondFuse;
+        if (in.fuseCount == Stage1FuseProgress::BeforeLastFuse &&
+            in.corridorLoopCount < Stage1FuseProgress::LoopsToUnlockLastFuse)
         {
-            objectiveText = "廊下の様子が変わった";
+            return texts.OpenCorridorDoorAgain;
         }
-        else if (in.corridorLoopCount == Stage1FuseProgress::LoopsToUnlockLastFuse)
-        {
-            objectiveText = "そのまま歩き続ける";
-        }
-        else
-        {
-            objectiveText = "後ろを振り返らない";
-        }
+        if (in.fuseCount == Stage1FuseProgress::BeforeLastFuse) return SelectThirdFuseText(in, texts.ThirdFuseVariant);
+        return texts.ReturnToFuseBox;
     }
-    // 35秒止まっていたら、場所がはっきり分かるヒントを出している
-    else if (in.progressHintSeconds >= StrongHintSeconds)
-    {
-        if (in.powerRestored && !in.exitPowerActivated)
-        {
-            objectiveText = "ヒント 右奥の赤い送電盤を調べる";
-        }
-        else if (in.powerRestored)
-        {
-            objectiveText = "ヒント 廊下の突き当たりの緑色の出口へ";
-        }
-        else if (in.fuseCount <= 0)
-        {
-            objectiveText = "ヒント 最初の壁付近を探す";
-        }
-        else if (in.fuseCount == 1 && in.corridorLoopCount < 1)
-        {
-            objectiveText = "ヒント 中央のドアから廊下の奥のドアへ";
-        }
-        else if (in.fuseCount == 1)
-        {
-            objectiveText = "ヒント 左奥の部屋を探す";
-        }
-        else if (in.fuseCount == Stage1FuseProgress::BeforeLastFuse && in.corridorLoopCount < Stage1FuseProgress::LoopsToUnlockLastFuse)
-        {
-            objectiveText = "ヒント もう一度廊下の奥のドアを開ける";
-        }
-        else if (in.fuseCount == Stage1FuseProgress::BeforeLastFuse)
-        {
-            objectiveText = SelectThirdFuseText(in, LongIdleHint);
-        }
-        else
-        {
-            objectiveText = "ヒント 左の部屋の配電盤を調べる";
-        }
-    }
-    // 18秒止まっていたら、方向を示す軽いヒントを出している
-    else if (in.progressHintSeconds >= LightHintSeconds)
-    {
-        if (in.powerRestored && !in.exitPowerActivated)
-        {
-            objectiveText = "ヒント 出口手前の送電盤へ向かう";
-        }
-        else if (in.powerRestored)
-        {
-            objectiveText = "ヒント 緑色の出口灯をたどる";
-        }
-        else if (in.fuseCount <= 0)
-        {
-            objectiveText = "ヒント 開始地点の周囲を探す";
-        }
-        else if (in.fuseCount == 1 && in.corridorLoopCount < 1)
-        {
-            objectiveText = "ヒント 中央のドアが進行ルート";
-        }
-        else if (in.fuseCount == 1)
-        {
-            objectiveText = "ヒント 左側の部屋を確認する";
-        }
-        else if (in.fuseCount == Stage1FuseProgress::BeforeLastFuse && in.corridorLoopCount < Stage1FuseProgress::LoopsToUnlockLastFuse)
-        {
-            objectiveText = "ヒント 長い廊下の奥のドアをもう一度";
-        }
-        else if (in.fuseCount == Stage1FuseProgress::BeforeLastFuse)
-        {
-            objectiveText = SelectThirdFuseText(in, ShortIdleHint);
-        }
-        else
-        {
-            objectiveText = "ヒント 配電盤へ戻る";
-        }
-    }
+
     // 電力が戻った後の普段の目的
-    else if (in.powerRestored && !in.exitPowerActivated)
+    std::optional<std::string> SelectPoweredObjective(const Stage1ObjectiveInput& in)
     {
-        objectiveText = "出口手前の非常送電盤を操作する";
+        if (in.powerRestored && !in.exitPowerActivated)
+        {
+            return std::string("出口手前の非常送電盤を操作する");
+        }
+        if (in.powerRestored)
+        {
+            return std::string(in.exitDoorOpen
+                ? "開いた出口ドアを通り抜ける"
+                : "廊下の突き当たりのドアを開ける");
+        }
+        return std::nullopt;
     }
-    else if (in.powerRestored)
+}
+
+// 上に書いたものほど優先して、1つの文章を選んでいる：その場の状況 → 一時的な知らせ → 演出の最中 →
+// 35秒・18秒止まっていたときのヒント → 電力が戻った後の目的 → 普段の目的
+std::string SelectStage1Objective(const Stage1ObjectiveInput& in)
+{
+    if (std::optional<std::string> text = SelectSituationText(in))
     {
-        objectiveText = in.exitDoorOpen
-            ? "開いた出口ドアを通り抜ける"
-            : "廊下の突き当たりのドアを開ける";
+        return *text;
     }
-    return objectiveText;
+    if (std::optional<std::string> text = SelectNoticeText(in))
+    {
+        return *text;
+    }
+    if (std::optional<std::string> text = SelectEventText(in))
+    {
+        return *text;
+    }
+    if (in.progressHintSeconds >= StrongHintSeconds)
+    {
+        return SelectIdleHint(in, StrongHints);
+    }
+    if (in.progressHintSeconds >= LightHintSeconds)
+    {
+        return SelectIdleHint(in, LightHints);
+    }
+    if (std::optional<std::string> text = SelectPoweredObjective(in))
+    {
+        return *text;
+    }
+    return SelectBaseObjective(in);
 }

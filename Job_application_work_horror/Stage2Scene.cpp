@@ -97,7 +97,6 @@ namespace
     constexpr float StartExposure = 0.95f;
     constexpr float ExitLensDistortionStrength = Effect::PostProcess::StartupLensDistortionStrength;
     // 信号の乱れ：信号盤の数、足音の影が近いときに乱れ始める危険度と強まり方と上限、信号盤パズルの間の乱れ
-    constexpr int SignalTerminalTotal = 3;
     constexpr float StalkerInterferenceStartThreat = 0.52f;
     constexpr float StalkerInterferencePerThreat = 0.72f;
     constexpr float StalkerInterferenceMax = 0.30f;
@@ -817,7 +816,7 @@ void Stage2Scene::UpdateCorridorAtmosphere(Player& player, float deltaTime)
     const bool signalRestorationActive =
         m_LoopCount >= Stage2FinalLoopCount && !m_SignalPuzzle.IsComplete();
     const float unresolvedSignalRate =
-        1.0f - static_cast<float>(m_SignalPuzzle.GetStep()) / static_cast<float>(SignalTerminalTotal);
+        1.0f - static_cast<float>(m_SignalPuzzle.GetStep()) / static_cast<float>(Stage2SignalTerminalCount);
     ShadowMan* activeNoiseShadow = m_Objects.noiseShadow;
     const float stalkerInterference =
         activeNoiseShadow != nullptr && activeNoiseShadow->IsActive()

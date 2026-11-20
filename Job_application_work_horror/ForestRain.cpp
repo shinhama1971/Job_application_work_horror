@@ -9,7 +9,7 @@
 #include "Game.h"
 #include "Renderer.h"
 #include "Wall.h"
-#include "utility.h"
+#include "Utility.h"
 
 #include <algorithm>
 #include <cmath>
@@ -85,7 +85,7 @@ void ForestRain::Init()
     paramsDesc.ByteWidth = sizeof(RainDrawParams);
     if (FAILED(device->CreateBuffer(&paramsDesc, nullptr, m_DrawParams.ReleaseAndGetAddressOf())))
     {
-        utility::ReportFatalError("雨の定数バッファの作成に失敗しました。");
+        Utility::ReportFatalError("雨の定数バッファの作成に失敗しました。");
     }
     // 雨粒の四角形は、カメラの向きによって表と裏が入れ替わるので、両面を描いている
     D3D11_RASTERIZER_DESC rasterizerDesc{};
@@ -94,7 +94,7 @@ void ForestRain::Init()
     rasterizerDesc.DepthClipEnable = TRUE;
     if (FAILED(device->CreateRasterizerState(&rasterizerDesc, m_TwoSidedRasterizer.ReleaseAndGetAddressOf())))
     {
-        utility::ReportFatalError("雨のラスタライザーの設定の作成に失敗しました。");
+        Utility::ReportFatalError("雨のラスタライザーの設定の作成に失敗しました。");
     }
     m_Time = 0.0f;
     m_ShelterTimer = 0.0f;

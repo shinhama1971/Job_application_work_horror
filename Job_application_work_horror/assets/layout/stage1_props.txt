@@ -346,6 +346,8 @@ place Stage1WritingWarning           -62 -71 -178 yaw 0 size 56 14 0
 place Stage1WritingThree             -150 -70 -72 yaw 180 size 64 16 0
 place Stage1WritingPower             -128 -69 38 yaw 180 size 64 16 0
 place Stage1WritingTurn              0 -70 273 yaw 180 size 60 15 0
+place Stage1DarkCorridorWriting      0 -83 273 yaw 180 size 42 10.5 0
+place Stage1KeypadFuseCaseSign     218 -63 150 yaw -90 size 34 14 0
 place Stage1WritingLap1              54 -71 -178 yaw 0 size 44 11 0
 place Stage1WritingLap2              88 -70 -140 yaw -90 size 64 16 0
 place Stage1WritingLap3              -88 -70 -140 yaw 90 size 60 15 0

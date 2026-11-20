@@ -10,7 +10,7 @@
 #include "Game.h"
 #include "Player.h"
 #include "TechDemo.h"
-#include "utility.h"
+#include "Utility.h"
 #include "Wall.h"
 #include "MathUtility.h"
 #include <algorithm>
@@ -209,7 +209,7 @@ void Ground::Init()
     constexpr const char* fieldTexturePath = "assets/texture/field.jpg";
     if (!m_Texture.Load(fieldTexturePath))
     {
-        utility::ReportFatalError(
+        Utility::ReportFatalError(
             std::string("テクスチャを読み込めませんでした。\n") + fieldTexturePath);
     }
 

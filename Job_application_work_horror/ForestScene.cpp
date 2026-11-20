@@ -21,7 +21,7 @@
 #include "PostProcess.h"
 #include "Renderer.h"
 #include "SceneLayoutBuilder.h"
-#include "utility.h"
+#include "Utility.h"
 
 #include <Windows.h>
 #include <shellapi.h>
@@ -179,7 +179,7 @@ PropLayout ForestScene::LoadLayout()
     PropLayout layout = PropLayoutFile::Load(PropLayoutPath);
     if (!layout.IsValid())
     {
-        utility::ReportFatalError("森の配置を読めませんでした（" + std::to_string(layout.ErrorLine) + "行目）: " + layout.Error);
+        Utility::ReportFatalError("森の配置を読めませんでした（" + std::to_string(layout.ErrorLine) + "行目）: " + layout.Error);
     }
     return layout;
 }

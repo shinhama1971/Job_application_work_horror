@@ -7,7 +7,7 @@
 #include "PointShadowMap.h"
 
 #include "Renderer.h"
-#include "utility.h"
+#include "Utility.h"
 
 using namespace DirectX::SimpleMath;
 

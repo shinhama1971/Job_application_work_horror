@@ -158,7 +158,7 @@ void TitleScene::Update()
         Input::GetButtonTrigger(XINPUT_START))
     {
         // 1面は、雨の森を歩いて研究所に入ってから始める（森で研究棟からの無線を聞き、玄関で目的の画面を見る）。
-        // 3つ目は、森を飛ばして、導入（受信記録と目的の画面）から1面を始める。4つ目（一番下）は、試作中の3面から始める
+        // 3つ目は、森を飛ばして、導入（受信記録と目的の画面）から1面を始める
         Core::Game::GetInstance()->RequestSceneChange(TitleStageChoices::Entries[s_SelectedStage].Scene);
     }
 }

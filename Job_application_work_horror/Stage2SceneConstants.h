@@ -5,7 +5,10 @@
 // ============================================================================
 
 #pragma once
+#include "SignalPuzzle.h"
+
 #include <SimpleMath.h>
+#include <iterator>
 
 inline constexpr const char* Stage2ScratchNames[] =
 {
@@ -58,19 +61,21 @@ inline constexpr float Stage2FinalSequenceStartZ = -8.0f;
 inline constexpr float Stage2LoopTransitionSeconds = 4.2f;
 // 信号盤（青・黄・赤）の上の目印の色（普段の色と光る色）。配置（Stage2Layout）と、パズルの進み具合で光らせる処理（Stage2Scene）で使う
 // 青・黄・赤の信号盤で、端末と目印および色表の要素数をそろえる。
-inline constexpr int Stage2SignalTerminalCount = 3;
-inline const DirectX::SimpleMath::Color Stage2SignalDiffuse[Stage2SignalTerminalCount] =
+inline constexpr int Stage2SignalTerminalCount = SignalPuzzle::SignalCount;
+inline const DirectX::SimpleMath::Color Stage2SignalDiffuse[] =
 {
     DirectX::SimpleMath::Color(0.015f, 0.055f, 0.13f, 1.0f),
     DirectX::SimpleMath::Color(0.13f, 0.075f, 0.012f, 1.0f),
     DirectX::SimpleMath::Color(0.13f, 0.018f, 0.012f, 1.0f)
 };
-inline const DirectX::SimpleMath::Color Stage2SignalEmission[Stage2SignalTerminalCount] =
+inline const DirectX::SimpleMath::Color Stage2SignalEmission[] =
 {
     DirectX::SimpleMath::Color(0.015f, 0.18f, 0.48f, 1.0f),
     DirectX::SimpleMath::Color(0.40f, 0.17f, 0.008f, 1.0f),
     DirectX::SimpleMath::Color(0.42f, 0.018f, 0.008f, 1.0f)
 };
+static_assert(std::size(Stage2SignalDiffuse) == Stage2SignalTerminalCount);
+static_assert(std::size(Stage2SignalEmission) == Stage2SignalTerminalCount);
 // 周回が変わった瞬間のまばたきの秒数
 inline constexpr float Stage2LoopBlinkSeconds = 0.28f;
 // 進めないまま、この秒数がたつと、探すべき異変の近くの照明を揺らして知らせる。その間隔

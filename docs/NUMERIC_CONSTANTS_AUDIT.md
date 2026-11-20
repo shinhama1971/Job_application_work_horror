@@ -268,3 +268,8 @@ C++とHLSLが [renderingConfig.hlsli](../Job_application_work_horror/shader/rend
 - 照明演出4系統について、約1/60秒・0.1秒・0.9秒の時間刻みで、変更前後のイベントと完了状態を比較し一致。
 - WAV 7本が前後一致。奇数長のチャンクを含むWAVも読み込み、壊れたRIFF識別子はエラーとして扱った。
 - ゲーム画面とUnityエディター上の操作は未確認。
+
+
+### 再確認で見つかった1件
+
+2面の信号盤の件数が判定、配置、信号の乱れ、HUDで重複していた。SignalPuzzle::SignalCount を使い、色表と件数の一致をコンパイル時に検査する。HUDで周回を表示するときは Stage2FinalLoopCount を参照する。現行の信号盤数・周回数はともに3で、表示区画数と進行率は変更前と一致。Release・Debug x64は警告0・エラー0。実プレイは未確認。

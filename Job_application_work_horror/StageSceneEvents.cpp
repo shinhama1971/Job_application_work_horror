@@ -321,6 +321,10 @@ namespace
 
     // 書き換わった壁の文字を読んだとき
     constexpr PulseSpec ChangedWritingPulse{ 0.22f, 0.36f };
+    // 最初の通過では普通の廊下を覚え、次に通ったときだけ暗がりの変化を発見できる。
+    constexpr int DarkWritingFirstCompletedLoop = 1;
+    constexpr float DarkWritingReadSeconds = 0.45f;
+    constexpr PulseSpec DarkWritingPulse{ 0.13f, 0.65f };
     constexpr RumbleSpec ChangedWritingRumble{ 5, 0.16f };
 
     // 書類保管室の影：現れたときの棚の奥の音、近づく足音、触れられたとき
@@ -637,6 +641,29 @@ void StageScene::AdvanceCorridorLoop(Player& player)
         ? m_CorridorLoopCount
         : MaxCorridorLoopPhase;
 
+    UpdateCorridorLoopMarks(loopPhase);
+
+    // 開始地点へ戻すときに、廊下の扉も閉じた状態に戻している。同じ境目をもう一度開けさせることで、
+    // 各周回が意図された繰り返しとして感じられるようにしている。
+    Door* loopDoor = m_Objects.loopDoor;
+    if (loopDoor != nullptr)
+    {
+        loopDoor->ResetClosed(loopPhase);
+    }
+    // 最後のドアは閉じた状態に戻し、周回に合わせた開き方に変えている（次の周回でもう一度開けさせる）
+    Door* endDoor = m_Objects.exitDoor;
+    if (endDoor != nullptr)
+    {
+        endDoor->ResetClosed(loopPhase);
+    }
+
+    ApplyCorridorLoopChanges(loopPhase);
+}
+
+// 開始地点の部屋の壁の文字と、周回の数だけの壁の赤い印を出し、周回が進むほど強い演出をしている
+void StageScene::UpdateCorridorLoopMarks(int loopPhase)
+{
+    Core::Game* game = Core::Game::GetInstance();
     // 開始地点の部屋に、この周回の壁の文字をじわりと浮かばせている（戻ってくるたびに、部屋の文字が1つずつ増えていく）
     if (m_CorridorLoopCount >= 1 && m_CorridorLoopCount <= static_cast<int>(m_Objects.lapWritings.size()))
     {
@@ -669,21 +696,12 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     EventFeedback::Rumble(RumbleSpec{
         CorridorLoopRumbleBase.Frames + loopPhase * CorridorLoopRumbleStep.Frames,
         CorridorLoopRumbleBase.Strength + loopPhase * CorridorLoopRumbleStep.Strength });
+}
 
-    // 開始地点へ戻すときに、廊下の扉も閉じた状態に戻している。同じ境目をもう一度開けさせることで、
-    // 各周回が意図された繰り返しとして感じられるようにしている。
-    Door* loopDoor = m_Objects.loopDoor;
-    if (loopDoor != nullptr)
-    {
-        loopDoor->ResetClosed(loopPhase);
-    }
-    // 最後のドアは閉じた状態に戻し、周回に合わせた開き方に変えている（次の周回でもう一度開けさせる）
-    Door* endDoor = m_Objects.exitDoor;
-    if (endDoor != nullptr)
-    {
-        endDoor->ResetClosed(loopPhase);
-    }
-
+// 周回ごとに廊下を変えている（1周目：2本目のヒューズ、2周目：西棟と影、3周目以降：照明の配置と背後の人影）
+void StageScene::ApplyCorridorLoopChanges(int loopPhase)
+{
+    Core::Game* game = Core::Game::GetInstance();
     CeilingLight* entranceLight =
         m_Objects.CeilingLightAt(Stage1LightNumber::StartRoom);
     CeilingLight* middleLight =
@@ -1365,6 +1383,7 @@ void StageScene::UpdateWallWritings(Player& player)
         game->IsPowerRestored());
     // 読んだ数は、リザルト画面の「壁の文字」に出している。
     game->SetWallWritingsRead(m_WallWritings.GetReadCount());
+    UpdateDarkCorridorWriting(player);
     if (!changedWritingRead)
     {
         return;
@@ -1374,6 +1393,42 @@ void StageScene::UpdateWallWritings(Player& player)
         game->IsPowerRestored(), camera->GetPosition(), camera->GetForward());
     EventFeedback::HorrorPulse(*game->GetPostProcess(), ChangedWritingPulse);
     EventFeedback::Rumble(ChangedWritingRumble);
+}
+
+// 光を消して文字を探す間に、何かが背後へ近づく。進行に必要な手がかりには数えない。
+void StageScene::UpdateDarkCorridorWriting(const Player& player)
+{
+    FlashlightWriting* writing = m_Objects.darkCorridorWriting;
+    if (writing == nullptr)
+    {
+        return;
+    }
+    Core::Game* game = Core::Game::GetInstance();
+    const bool flashlightOn = player.IsFlashlightOn();
+    if (flashlightOn || m_CorridorLoopCount < DarkWritingFirstCompletedLoop || game->IsPowerRestored())
+    {
+        // 電池のちらつきでも読める状態になるのを避け、点灯したらその場で文字を消す。
+        writing->SetPresenceImmediately(0.0f);
+        m_DarkWritingReadTime = 0.0f;
+        return;
+    }
+
+    writing->SetTargetPresence(1.0f);
+    const Camera* camera = game->GetCamera();
+    if (m_DarkWritingTriggered || !IsAmbientSoundAllowed() ||
+        !writing->IsBeingRead(camera->GetPosition(), camera->GetForward(), flashlightOn))
+    {
+        m_DarkWritingReadTime = 0.0f;
+        return;
+    }
+
+    m_DarkWritingReadTime += Application::GetDeltaTime();
+    if (m_DarkWritingReadTime >= DarkWritingReadSeconds)
+    {
+        m_DarkWritingTriggered = true;
+        m_AmbientSounds.StartCeilingStepsNow(false, camera->GetPosition(), camera->GetForward());
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), DarkWritingPulse);
+    }
 }
 
 // 今の危険度（0〜1）を求めている

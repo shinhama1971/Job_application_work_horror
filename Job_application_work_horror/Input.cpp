@@ -4,7 +4,7 @@
 // マウスの視点操作はCameraがカーソルの位置から直接読んでいる
 // ============================================================================
 
-#include "input.h"
+#include "Input.h"
 #include "Application.h"
 
 #include <algorithm>

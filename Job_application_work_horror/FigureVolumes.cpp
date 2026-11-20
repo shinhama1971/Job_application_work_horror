@@ -6,7 +6,7 @@
 #include "FigureVolumes.h"
 
 #include "Renderer.h"
-#include "utility.h"
+#include "Utility.h"
 
 #include <cstdint>
 #include <cstring>
@@ -52,7 +52,7 @@ namespace Effect
         VolumeHeader header{};
         if (bytes.size() < sizeof(header))
         {
-            utility::ReportFatalError("距離場のファイルを読めませんでした。\n" + path);
+            Utility::ReportFatalError("距離場のファイルを読めませんでした。\n" + path);
         }
         std::memcpy(&header, bytes.data(), sizeof(header));
         const std::size_t valueCount =
@@ -61,7 +61,7 @@ namespace Effect
             (header.Channels != DistanceOnlyChannels && header.Channels != DistanceAndPartChannels) ||
             bytes.size() != sizeof(header) + valueCount * VolumeValueBytes)
         {
-            utility::ReportFatalError("距離場のファイルの形が違います。\n" + path);
+            Utility::ReportFatalError("距離場のファイルの形が違います。\n" + path);
         }
 
         D3D11_TEXTURE3D_DESC description{};
@@ -84,7 +84,7 @@ namespace Effect
         if (FAILED(device->CreateTexture3D(&description, &data, volume.Texture.GetAddressOf())) ||
             FAILED(device->CreateShaderResourceView(volume.Texture.Get(), nullptr, volume.View.GetAddressOf())))
         {
-            utility::ReportFatalError("距離場の3Dテクスチャを作れませんでした。\n" + path);
+            Utility::ReportFatalError("距離場の3Dテクスチャを作れませんでした。\n" + path);
         }
         return volume;
     }
@@ -103,7 +103,7 @@ namespace Effect
         sampler.MaxLOD = D3D11_FLOAT32_MAX;
         if (FAILED(Renderer::GetDevice()->CreateSamplerState(&sampler, m_Sampler.ReleaseAndGetAddressOf())))
         {
-            utility::ReportFatalError("距離場のサンプラーを作成できません。");
+            Utility::ReportFatalError("距離場のサンプラーを作成できません。");
         }
     }
 

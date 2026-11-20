@@ -141,13 +141,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AssimpPerse.cpp">
+    <ClCompile Include="AssimpParse.cpp">
       <Filter>ソース ファイル\Asset</Filter>
     </ClCompile>
     <ClCompile Include="Texture.cpp">
       <Filter>ソース ファイル\Asset</Filter>
     </ClCompile>
-    <ClCompile Include="sound.cpp">
+    <ClCompile Include="Sound.cpp">
       <Filter>ソース ファイル\Audio</Filter>
     </ClCompile>
     <ClCompile Include="Camera.cpp">
@@ -168,7 +168,7 @@
     <ClCompile Include="GameSettings.cpp">
       <Filter>ソース ファイル\Core</Filter>
     </ClCompile>
-    <ClCompile Include="input.cpp">
+    <ClCompile Include="Input.cpp">
       <Filter>ソース ファイル\Core</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
@@ -186,7 +186,7 @@
     <ClCompile Include="Scene.cpp">
       <Filter>ソース ファイル\Core</Filter>
     </ClCompile>
-    <ClCompile Include="utility.cpp">
+    <ClCompile Include="Utility.cpp">
       <Filter>ソース ファイル\Core</Filter>
     </ClCompile>
     <ClCompile Include="BatteryItem.cpp">
@@ -473,7 +473,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="AssimpPerse.h">
+    <ClInclude Include="AssimpParse.h">
       <Filter>ヘッダー ファイル\Asset</Filter>
     </ClInclude>
     <ClInclude Include="Material.h">
@@ -488,7 +488,7 @@
     <ClInclude Include="RadioStatic.h">
       <Filter>ヘッダー ファイル\Audio</Filter>
     </ClInclude>
-    <ClInclude Include="sound.h">
+    <ClInclude Include="Sound.h">
       <Filter>ヘッダー ファイル\Audio</Filter>
     </ClInclude>
     <ClInclude Include="Camera.h">
@@ -506,7 +506,7 @@
     <ClInclude Include="GameState.h">
       <Filter>ヘッダー ファイル\Core</Filter>
     </ClInclude>
-    <ClInclude Include="input.h">
+    <ClInclude Include="Input.h">
       <Filter>ヘッダー ファイル\Core</Filter>
     </ClInclude>
     <ClInclude Include="main.h">
@@ -524,7 +524,7 @@
     <ClInclude Include="Scene.h">
       <Filter>ヘッダー ファイル\Core</Filter>
     </ClInclude>
-    <ClInclude Include="utility.h">
+    <ClInclude Include="Utility.h">
       <Filter>ヘッダー ファイル\Core</Filter>
     </ClInclude>
     <ClInclude Include="BatteryItem.h">

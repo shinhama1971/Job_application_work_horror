@@ -7,7 +7,7 @@
 #include "shader/renderingConfig.hlsli"
 
 #include "Renderer.h"
-#include "utility.h"
+#include "Utility.h"
 
 namespace
 {
@@ -44,7 +44,7 @@ namespace Effect
             FAILED(device->CreateShaderResourceView(m_PreviousDepthCopy.Get(), &viewDesc,
                 m_PreviousDepthView.ReleaseAndGetAddressOf())))
         {
-            utility::ReportFatalError("SSRの深度のテクスチャの作成に失敗しました。");
+            Utility::ReportFatalError("SSRの深度のテクスチャの作成に失敗しました。");
         }
     }
 

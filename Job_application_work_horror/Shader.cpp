@@ -7,7 +7,7 @@
 #include	"Renderer.h"
 
 #include <unordered_map>
-#include "utility.h"
+#include "Utility.h"
 
 namespace
 {
@@ -92,7 +92,7 @@ void Shader::CreateRequired(const char* vs, const char* ps, bool procedural)
 {
 	if (!Create(vs, ps, procedural))
 	{
-		utility::ReportFatalError(std::string("描画シェーダーを作成できません: ") + vs + " / " + ps);
+		Utility::ReportFatalError(std::string("描画シェーダーを作成できません: ") + vs + " / " + ps);
 	}
 }
 

@@ -10,7 +10,7 @@
 #include	<string>
 #include	<string_view>
 
-namespace utility
+namespace Utility
 {
     // セーブデータの保存先（%LOCALAPPDATA%\SignalLost）を返している。
     // 起動したときの作業フォルダに左右されず、書き込み権限のある場所に保存するためである。
@@ -40,7 +40,7 @@ namespace utility
     bool WriteSaveFile(std::string const& fileName, std::string_view text);
 
 	// 文字コードの変換（UTF-8→UTF-16）
-	std::wstring utf8_to_wide_winapi(std::string const& src);
+	std::wstring Utf8ToWide(std::string const& src);
 
     // 続けられない初期化の失敗をダイアログで知らせ、プロセスを終えている。
     // assertはReleaseで消えるため、素材のファイルが無いときなどはこちらで扱っている。

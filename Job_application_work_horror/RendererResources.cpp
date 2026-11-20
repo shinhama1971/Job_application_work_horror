@@ -5,7 +5,7 @@
 
 #include "Renderer.h"
 #include "Application.h"
-#include "utility.h"
+#include "Utility.h"
 
 #include <algorithm>
 #include <execution>
@@ -215,8 +215,8 @@ namespace
 		// 途中まで書いたCSOを別プロセスが読まないよう、閉じて確認したファイルだけを公開する。
 		auto csoPath = sourcePath;
 		csoPath.replace_extension(".cso");
-		if (utility::WriteTextAtomically(csoPath, {reinterpret_cast<const char*>(shaderObject.data()), shaderObject.size()})
-			!= utility::AtomicWriteResult::Success)
+		if (Utility::WriteTextAtomically(csoPath, {reinterpret_cast<const char*>(shaderObject.data()), shaderObject.size()})
+			!= Utility::AtomicWriteResult::Success)
 		{
 			if (requireCacheWrite)
 			{
@@ -487,7 +487,7 @@ void Renderer::CreateRequiredConstantBuffer(unsigned int bytesize, ID3D11Buffer*
 {
 	if (!CreateConstantBuffer(bytesize, buffer))
 	{
-		utility::ReportFatalError(std::string("定数バッファを作成できません: ") + purpose);
+		Utility::ReportFatalError(std::string("定数バッファを作成できません: ") + purpose);
 	}
 }
 

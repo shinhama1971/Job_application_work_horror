@@ -8,7 +8,7 @@
 #include	<vector>
 #include	<wrl/client.h>
 #include	"Renderer.h"
-#include	"utility.h"
+#include	"Utility.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -37,7 +37,7 @@ public:
 		// assertはReleaseで消えるため、作れなかったときははっきり知らせて終了している。
 		if (!created)
 		{
-			utility::ReportFatalError("インデックスバッファを作成できませんでした。");
+			Utility::ReportFatalError("インデックスバッファを作成できませんでした。");
 		}
 	}
 
