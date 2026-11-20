@@ -405,6 +405,12 @@
     <ClCompile Include="Stage2ScenePuzzles.cpp">
       <Filter>ソース ファイル\Scene\Stage2</Filter>
     </ClCompile>
+    <ClCompile Include="Stage2SceneThreat.cpp">
+      <Filter>ソース ファイル\Scene\Stage2</Filter>
+    </ClCompile>
+    <ClCompile Include="Stage2SceneLoop.cpp">
+      <Filter>ソース ファイル\Scene\Stage2</Filter>
+    </ClCompile>
     <ClCompile Include="Stage3Scene.cpp">
       <Filter>ソース ファイル\Scene\Stage3</Filter>
     </ClCompile>
@@ -432,6 +438,9 @@
     <ClCompile Include="CaptureMode.cpp">
       <Filter>ソース ファイル\Tools</Filter>
     </ClCompile>
+    <ClCompile Include="CaptureBenchmark.cpp">
+      <Filter>ソース ファイル\Tools</Filter>
+    </ClCompile>
     <ClCompile Include="CaptureTours.cpp">
       <Filter>ソース ファイル\Tools</Filter>
     </ClCompile>
@@ -448,6 +457,9 @@
       <Filter>ソース ファイル\Tools</Filter>
     </ClCompile>
     <ClCompile Include="Hud.cpp">
+      <Filter>ソース ファイル\Ui</Filter>
+    </ClCompile>
+    <ClCompile Include="HudGlyphs.cpp">
       <Filter>ソース ファイル\Ui</Filter>
     </ClCompile>
     <ClCompile Include="HudScreens.cpp">
@@ -933,6 +945,9 @@
       <Filter>ヘッダー ファイル\Tools</Filter>
     </ClInclude>
     <ClInclude Include="CaptureTours.h">
+      <Filter>ヘッダー ファイル\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="CaptureBenchmark.h">
       <Filter>ヘッダー ファイル\Tools</Filter>
     </ClInclude>
     <ClInclude Include="DebugUI.h">

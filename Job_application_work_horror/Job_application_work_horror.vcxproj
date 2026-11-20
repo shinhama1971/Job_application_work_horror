@@ -245,6 +245,7 @@
     <ClCompile Include="GroundWaterEffects.cpp" />
     <ClCompile Include="WaterRippleSimulation.cpp" />
     <ClCompile Include="Hud.cpp" />
+    <ClCompile Include="HudGlyphs.cpp" />
     <ClCompile Include="HudScreens.cpp" />
     <ClCompile Include="HudTitle.cpp" />
     <ClCompile Include="HudMenus.cpp" />
@@ -290,6 +291,7 @@
     <ClCompile Include="KeyItem.cpp" />
     <ClCompile Include="Locker.cpp" />
     <ClCompile Include="CaptureMode.cpp" />
+    <ClCompile Include="CaptureBenchmark.cpp" />
     <ClCompile Include="CaptureTours.cpp" />
     <ClCompile Include="VideoWriter.cpp" />
     <ClCompile Include="PropLayoutFile.cpp" />
@@ -319,6 +321,8 @@
     <ClCompile Include="Stage2Layout.cpp" />
     <ClCompile Include="Stage2Objective.cpp" />
     <ClCompile Include="Stage2ScenePuzzles.cpp" />
+    <ClCompile Include="Stage2SceneThreat.cpp" />
+    <ClCompile Include="Stage2SceneLoop.cpp" />
     <ClCompile Include="Stage2SceneHorror.cpp" />
     <ClCompile Include="Stage2SceneAnomalies.cpp" />
     <ClCompile Include="Stage2SceneDraw.cpp" />
@@ -449,6 +453,7 @@
     <ClInclude Include="Locker.h" />
     <ClInclude Include="CaptureMode.h" />
     <ClInclude Include="CaptureTours.h" />
+    <ClInclude Include="CaptureBenchmark.h" />
     <ClInclude Include="VideoWriter.h" />
     <ClInclude Include="TechDemo.h" />
     <ClInclude Include="KeypadLock.h" />

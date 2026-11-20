@@ -461,8 +461,9 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 - 1つのファイルも、役割ごとに分けています（目安は800行）。
   - 1面の演出：`StageSceneEvents.cpp`（進行：電力・出口・物音・壁の文字・危険度・無線）、`StageSceneLoop.cpp`（ループ廊下・伸びる廊下・呼吸する壁）、`StageSceneScares.cpp`（驚かせる演出）。値は `Stage1EventSettings.h` にまとめ、3つのファイルで共有しています。
   - 2面の演出：`Stage2SceneHorror.cpp`（最後の追跡・捕まったとき・背後の気配・心拍）と `Stage2SceneAnomalies.cpp`（異変）。値は `Stage2HorrorSettings.h`。
-  - HUD の画面：`HudTitle.cpp`（タイトル・導入）、`HudMenus.cpp`（リザルト・暗証番号・ポーズ）、`HudScreens.cpp`（プレイ中に重ねる画面）。共通の文字の計算と、導入と無線で同じ「電波が乱れた文字」の値は `HudText.h`。
-  - 自動撮影：道順のデータは `CaptureTours.cpp`（型と段取りの時刻は `CaptureTours.h`）、道順をたどって撮る処理は `CaptureMode.cpp`。
+  - HUD の画面：`HudTitle.cpp`（タイトル・導入）、`HudMenus.cpp`（リザルト・暗証番号・ポーズ）、`HudScreens.cpp`（プレイ中に重ねる画面）。文字描画は `HudGlyphs.cpp`。共通の文字の計算と、導入と無線で同じ「電波が乱れた文字」の値は `HudText.h`。
+  - 自動撮影：道順のデータは `CaptureTours.cpp`（型と段取りの時刻は `CaptureTours.h`）、道順をたどって撮る処理は `CaptureMode.cpp`。地点ごとの計測と集計は `CaptureBenchmark.cpp`。
+  - 2面の処理：周回と時計・偽の扉は `Stage2SceneLoop.cpp`、足音で迫る影とロッカーは `Stage2SceneThreat.cpp`、信号盤は `Stage2ScenePuzzles.cpp`。
   - シェーダー：`litTexturePS.hlsl` の壁と天井の表面（汚れ・古さ・凹凸・水の筋）は `wallSurface.hlsli`、`wetFloorPS.hlsl` の床の古さ・水たまりの反射・水滴の輪は `floorAgeing.hlsli`・`puddleReflection.hlsli`・`waterDrips.hlsli`。元の場所で読み込んでいるので、コンパイル結果は分ける前と同じです。
 
 ## 検証

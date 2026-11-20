@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // ファイルの役割: 2面の壁の引っかき傷（文字の形を作る小片）の名前と数、ノックの音の出どころ、出口の先の階段の寸法を定義している。
 // 主な技術: constexpr、配列の要素数の自動計算
 // 傷の数は、配置（Stage2Layout）と、傷を少しずつ見せる進行（Stage2Scene）の両方で使っている。
@@ -106,3 +106,6 @@ inline constexpr float Stage2StairStartZ = 150.0f;
 inline constexpr float Stage2StairStepRun = 7.0f;
 inline constexpr float Stage2StairStepRise = 4.0f;
 inline constexpr int Stage2StairStepCount = 10;
+
+// 時計と信号盤の影で、方向を求められるかを判定する下限。
+inline constexpr float Stage2MinimumDirectionLength = 0.001f;

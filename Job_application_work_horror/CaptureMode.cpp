@@ -5,6 +5,7 @@
 // ============================================================================
 
 #include "CaptureMode.h"
+#include "CaptureBenchmark.h"
 #include "CaptureTours.h"
 #include "CapturePixelFormat.h"
 #include "MathUtility.h"
@@ -16,11 +17,8 @@
 #include "Game.h"
 #include "GameSettings.h"
 #include "TechDemo.h"
-#include "GpuTimer.h"
 #include "Ground.h"
 #include "FuseBox.h"
-#include "ForestGrass.h"
-#include "ForestScene.h"
 #include "Door.h"
 #include "Locker.h"
 #include "Player.h"
@@ -40,14 +38,10 @@
 
 #include <algorithm>
 #include <array>
-#include <chrono>
 #include <cmath>
-#include <dxgi.h>
 #include <filesystem>
 #include <fstream>
-#include <iomanip>
 #include <random>
-#include <sstream>
 #include <vector>
 
 #pragma comment(lib, "windowscodecs.lib")
@@ -59,108 +53,9 @@ namespace
 {
     using namespace Tools::CaptureTours;
 
-    // 計測の表：1%遅いフレーム（99パーセンタイル）、ミリ秒から FPS への換算、プレイ動画のフレームレート
-    constexpr double SlowFramePercentile = 0.99;
-    constexpr double MillisecondsPerSecond = 1000.0;
     // 画面写真の BGRA の1画素のバイト数と、不透明な透明度
     using CapturePixelFormat::BytesPerPixel;
     // BGRAでは、末尾のバイトが透明度。
-
-    // 1面: 開始地点 → 中央ホール → 左の倉庫 → 暗証番号の扉 → ループ廊下 → 西棟（浸水した機械室） → 書類保管室 → 南西の広間 → 光の安全地帯 → 足音の波紋 → 壁の血の手形
-    const std::vector<Keyframe> Stage1Tour =
-    {
-        { 0.0f, Vector3(0.0f, FloorY, -120.0f), Pi, -0.12f, nullptr, false },
-        { 4.5f, Vector3(0.0f, FloorY, -128.0f), YawToward(0.0f, -128.0f, -42.0f, -178.0f), -0.12f, L"01_1面_開始地点_照らすと浮かぶ壁の文字", false },
-        { 8.0f, Vector3(0.0f, FloorY, -90.0f), 0.0f, 0.0f, nullptr, false },
-        { 13.0f, Vector3(0.0f, FloorY, -10.0f), YawToward(0.0f, -10.0f, -180.0f, 35.0f), 0.0f, nullptr, false },
-        { 15.5f, Vector3(-10.0f, FloorY, 0.0f), YawToward(-10.0f, 0.0f, -180.0f, 35.0f), -0.05f, L"02_1面_中央ホールと配電盤", false },
-        { 17.5f, Vector3(-10.0f, FloorY, 0.0f), YawToward(-10.0f, 0.0f, -180.0f, 35.0f) + 0.6f, 0.95f, L"02b_1面_中央ホールの天井", false },
-        { 19.5f, Vector3(-60.0f, FloorY, -88.0f), YawToward(-60.0f, -88.0f, -150.0f, -140.0f), 0.0f, nullptr, false },
-        { 24.0f, Vector3(-150.0f, FloorY, -110.0f), 0.0f, -0.26f, L"03_1面_左の倉庫の壁の文字", false },
-        { 28.0f, Vector3(-60.0f, FloorY, -30.0f), YawToward(-60.0f, -30.0f, 0.0f, 40.0f), 0.0f, nullptr, false },
-        // 中央ホールで懐中電灯を消した画面（天井の照明の光だまりの外は、ほとんど闇）
-        { 29.0f, Vector3(-45.0f, FloorY, -5.0f), YawToward(-45.0f, -5.0f, 120.0f, -20.0f), 0.08f, L"02c_1面_懐中電灯を消した中央ホール", false },
-        { 32.0f, Vector3(0.0f, FloorY, 70.0f), 0.0f, 0.0f, nullptr, false },
-        { 36.5f, Vector3(12.0f, FloorY, 112.0f), Pi * 0.5f, -0.05f, L"04_1面_暗証番号の扉", false },
-        { 41.0f, Vector3(0.0f, FloorY, 185.0f), 0.0f, 0.0f, nullptr, false },
-        { 46.5f, Vector3(0.0f, FloorY, 240.0f), 0.0f, -0.10f, L"05_1面_ループ廊下の突き当たり", false },
-        { 50.05f, Vector3(0.0f, FloorY, 245.0f), 0.0f, -0.10f, nullptr, false },
-        // 西棟（浸水した機械室）。入口の内側へ場面を切り替え、柱の並ぶ広間と排水バルブを写し、仕切りの切れ目から奥のポンプ室へ進んでいる。
-        // 切り替えの前後を同じ時刻にして、補間で書類保管室を通り、入室の無線が先に流れるのを防いでいる。
-        { 50.05f, Vector3(-232.0f, FloorY, -20.0f), YawToward(-232.0f, -20.0f, -330.0f, 140.0f), -0.16f, nullptr, false },
-        { 52.5f, Vector3(-233.0f, FloorY, -21.0f), YawToward(-233.0f, -21.0f, -330.0f, 140.0f), -0.16f, L"05b_1面_西棟の柱の並ぶ浸水した広間", false },
-        { 55.0f, Vector3(-292.0f, FloorY, -66.0f), Pi, -0.62f, nullptr, false },
-        { 57.0f, Vector3(-292.0f, FloorY, -67.0f), Pi, -0.62f, L"05b2_1面_西棟の排水バルブ", false },
-        { 58.5f, Vector3(-295.0f, FloorY, -70.0f), 0.0f, -0.08f, nullptr, false },
-        // 水の中を奥へ進みながら足元の水面をのぞくと、水面にだけ、少し先の天井に逆さまに張り付いた人影が映る。見上げると何もいない
-        { 59.6f, Vector3(-298.0f, FloorY, 20.0f), 0.0f, -0.08f, nullptr, false },
-        { 60.2f, Vector3(-298.0f, FloorY, 20.0f), 0.0f, -1.00f, nullptr, false },
-        { 61.4f, Vector3(-298.0f, FloorY, 20.0f), 0.0f, -1.00f, L"05b3_1面_西棟の水面に映る天井の人影", false },
-        { 61.9f, Vector3(-298.0f, FloorY, 20.0f), 0.0f, 0.35f, nullptr, false },
-        { 62.6f, Vector3(-298.0f, FloorY, 20.0f), 0.0f, 0.35f, L"05b4_1面_見上げると何もいない", false },
-        { 64.0f, Vector3(-300.0f, FloorY, 150.0f), 0.0f, -0.08f, nullptr, false },
-        { 67.0f, Vector3(-300.0f, FloorY, 195.0f), YawToward(-300.0f, 195.0f, -345.0f, 235.0f), -0.12f, nullptr, false },
-        { 72.5f, Vector3(-262.0f, FloorY, 196.0f), YawToward(-262.0f, 196.0f, -320.0f, 240.0f), -0.30f, nullptr, false },
-        { 75.0f, Vector3(-262.0f, FloorY, 197.0f), YawToward(-262.0f, 197.0f, -320.0f, 240.0f), -0.30f, L"05c_1面_西棟のポンプ室と排水口", false },
-        { 77.0f, Vector3(-262.0f, FloorY, 197.0f), YawToward(-262.0f, 197.0f, -320.0f, 240.0f), -0.30f, nullptr, false },
-        // 書類保管室（棚が並ぶ迷路）。棚の間から奥を向き、懐中電灯の影（手元から作る影と、距離で柔らかくなる縁）を写している。
-        { 77.05f, Vector3(-60.0f, FloorY, 115.0f), YawToward(-60.0f, 115.0f, -200.0f, 118.0f), -0.12f, nullptr, false },
-        { 79.5f, Vector3(-62.0f, FloorY, 115.0f), YawToward(-62.0f, 115.0f, -200.0f, 118.0f), -0.12f, L"05d_1面_書類保管室の棚と影", false },
-        // 入ってから4秒で「照らすと止まる影」が部屋の奥に現れ、光の外を回り込んで近づき、ライトの中に入ると止まる。
-        { 81.0f, Vector3(-62.0f, FloorY, 115.0f), YawToward(-62.0f, 115.0f, -200.0f, 118.0f), -0.12f, nullptr, false },
-        { 84.0f, Vector3(-62.0f, FloorY, 115.0f), YawToward(-62.0f, 115.0f, -200.0f, 118.0f), -0.12f, L"05e_1面_書類保管室の照らすと止まる影", false },
-        { 87.0f, Vector3(-62.0f, FloorY, 115.0f), YawToward(-62.0f, 115.0f, -200.0f, 118.0f), -0.12f, L"05f_1面_照らされて止まった影", false },
-        { 88.5f, Vector3(-62.0f, FloorY, 115.0f), YawToward(-62.0f, 115.0f, -200.0f, 118.0f), -0.12f, nullptr, false },
-        // 南西の広間（左の倉庫の南の入口から入る部屋）。入口から柱の並ぶ広間を見渡し、奥の棚と机の一角へ進む。
-        { 88.55f, Vector3(-160.0f, FloorY, -150.0f), Pi, -0.10f, nullptr, false },
-        { 90.5f, Vector3(-160.0f, FloorY, -196.0f), YawToward(-160.0f, -196.0f, -300.0f, -270.0f), -0.14f, nullptr, false },
-        { 92.5f, Vector3(-160.0f, FloorY, -196.0f), YawToward(-160.0f, -196.0f, -300.0f, -270.0f), -0.14f, L"05g_1面_南西の広間", false },
-        { 95.5f, Vector3(-280.0f, FloorY, -262.0f), YawToward(-280.0f, -262.0f, -350.0f, -290.0f), -0.20f, nullptr, false },
-        { 97.0f, Vector3(-280.0f, FloorY, -262.0f), YawToward(-280.0f, -262.0f, -350.0f, -290.0f), -0.20f, L"05h_1面_南西の広間の棚と机", false },
-        { 98.0f, Vector3(-280.0f, FloorY, -262.0f), YawToward(-280.0f, -262.0f, -350.0f, -290.0f), -0.20f, nullptr, false },
-        // 光の安全地帯（中央ホールの西の裸電球）。少し離れた暗がりから暖かい灯りを見て、灯りの下まで歩き、落ち着いた画面を写している。
-        { 98.05f, Vector3(-150.0f, FloorY, -30.0f), YawToward(-150.0f, -30.0f, -198.0f, 12.0f), 0.02f, nullptr, false },
-        { 100.5f, Vector3(-151.0f, FloorY, -29.0f), YawToward(-151.0f, -29.0f, -198.0f, 12.0f), 0.02f, L"05i_1面_光の安全地帯の裸電球", false },
-        { 103.5f, Vector3(-204.0f, FloorY, 18.0f), YawToward(-204.0f, 18.0f, -150.0f, -40.0f), -0.18f, nullptr, false },
-        { 106.0f, Vector3(-204.0f, FloorY, 17.0f), YawToward(-204.0f, 17.0f, -150.0f, -40.0f), -0.18f, L"05j_1面_光の安全地帯の灯りの下", false },
-        { 107.0f, Vector3(-204.0f, FloorY, 17.0f), YawToward(-204.0f, 17.0f, -150.0f, -40.0f), -0.18f, nullptr, false },
-        // 足音の波紋（西棟の浸水した広間を歩いて振り返る）。歩いた跡から波が広がって重なり、懐中電灯の光の中で輪が光る。
-        { 107.05f, Vector3(-300.0f, FloorY, -88.0f), 0.0f, -0.32f, nullptr, false },
-        { 111.0f, Vector3(-300.0f, FloorY, -40.0f), 0.0f, -0.32f, nullptr, false },
-        { 112.0f, Vector3(-300.0f, FloorY, -39.0f), Pi, -0.45f, nullptr, false },
-        { 112.6f, Vector3(-300.0f, FloorY, -39.0f), Pi, -0.45f, L"05k_1面_足音の波紋と波打つ反射", false },
-        { 113.5f, Vector3(-300.0f, FloorY, -39.0f), Pi, -0.45f, nullptr, false },
-        // 壁のホラーらしい跡（右の倉庫の東の壁の血の手形と、下へ引きずった跡）。懐中電灯で照らすと赤黒く浮かぶ。
-        { 113.55f, Vector3(168.0f, FloorY, -136.0f), YawToward(168.0f, -136.0f, 218.0f, -121.6f), -0.30f, nullptr, false },
-        { 116.0f, Vector3(170.0f, FloorY, -135.0f), YawToward(170.0f, -135.0f, 218.0f, -121.6f), -0.30f, L"05l_1面_右の倉庫の壁の血の手形", false },
-        { 117.0f, Vector3(170.0f, FloorY, -135.0f), YawToward(170.0f, -135.0f, 218.0f, -121.6f), -0.30f, nullptr, false },
-        // ループ廊下の突き当たりの最後のドア。開けた瞬間（Stage1EndDoorOpenTime）に開始地点の奥のドアの裏側へ移り、
-        // 開いていくドアの向こうに開始地点が見える（P.T.のように、ドアの先が最初の場所へそのまま続いている）。
-        // 部屋へ入ってドアに背を向けると、後ろでドアが閉まり、振り返ると閉じたドアだけが残っている。
-        // 戻ってきた部屋の壁には、1周目の文字「おかえり」がじわりと浮かんでいる。
-        { 117.05f, Vector3(171.0f, FloorY, 255.0f), Pi * 0.5f, 0.02f, nullptr, false },
-        { 118.5f, Vector3(171.0f, FloorY, 255.0f), Pi * 0.5f, 0.02f, L"05m_1面_ループ廊下の突き当たりのドア", false },
-        { 119.0f, Vector3(171.0f, FloorY, 255.0f), Pi * 0.5f, 0.02f, nullptr, false },
-        { 119.05f, Vector3(0.0f, FloorY, -205.0f), 0.0f, 0.02f, nullptr, false },
-        { 119.8f, Vector3(0.0f, FloorY, -205.0f), 0.0f, 0.02f, L"05n_1面_ドアの先は開始地点", false },
-        { 121.5f, Vector3(0.0f, FloorY, -172.0f), 0.0f, 0.0f, nullptr, false },
-        { 122.8f, Vector3(0.0f, FloorY, -140.0f), 0.0f, 0.0f, nullptr, false },
-        { 123.8f, Vector3(0.0f, FloorY, -140.0f), YawToward(0.0f, -140.0f, 34.0f, -178.0f), -0.05f, nullptr, false },
-        { 124.4f, Vector3(0.0f, FloorY, -140.0f), YawToward(0.0f, -140.0f, 34.0f, -178.0f), -0.05f, L"05o_1面_振り返ると閉じたドアと浮かんだ文字", false },
-        { 125.0f, Vector3(0.0f, FloorY, -140.0f), YawToward(0.0f, -140.0f, 34.0f, -178.0f), -0.05f, nullptr, false },
-        // 1周した後、南北の廊下の奥で来た方（南のドア）を振り返る。振り返った直後と、見つめ続けて廊下が伸びた後を写している
-        { 125.05f, Vector3(0.0f, FloorY, 200.0f), Pi, -0.02f, nullptr, false },
-        { 125.6f, Vector3(0.0f, FloorY, 200.0f), Pi, -0.02f, L"05p_1面_振り返ったループ廊下", false },
-        { 131.0f, Vector3(0.0f, FloorY, 200.0f), Pi, -0.02f, L"05q_1面_見つめている間に伸びた廊下", false },
-        { 131.5f, Vector3(0.0f, FloorY, 200.0f), Pi, -0.02f, nullptr, false },
-        // 1周した後のループ廊下の東の区間。南の壁（LoopWall3）が、息をするように膨らんでは戻る。
-        // 壁に沿って奥を見た画面と、壁を正面から照らした画面（光の当たった所だけ平らに止まる）を、膨らみ切った時刻に写している
-        { 131.55f, Vector3(178.0f, FloorY, 264.0f), YawToward(178.0f, 264.0f, 60.0f, 241.0f), -0.06f, nullptr, false },
-        { 135.7f, Vector3(178.0f, FloorY, 264.0f), YawToward(178.0f, 264.0f, 60.0f, 241.0f), -0.06f, L"05r_1面_息をする壁", false },
-        { 136.5f, Vector3(120.0f, FloorY, 262.0f), Pi, -0.12f, nullptr, false },
-        { 140.3f, Vector3(120.0f, FloorY, 262.0f), Pi, -0.12f, L"05s_1面_照らした所だけ止まる壁", false },
-        { 140.8f, Vector3(120.0f, FloorY, 262.0f), Pi, -0.12f, nullptr, false },
-    };
 
     // 角度の補間。差を-π〜πに直してから補間し、遠回りの方向へ回らないようにしている
     float LerpAngle(float from, float to, float t)
@@ -221,6 +116,9 @@ namespace
     // ------------------------------------------------------------------------
     // 撮影モードが有効か、保存先のフォルダ、動画、動画を開こうとしたか、画面の読み戻し用テクスチャ
     bool g_Active = false;
+    bool g_Benchmark = false;
+    bool g_BenchmarkVsync = false;
+    bool g_BenchmarkFigures = false;
     bool g_CaptureFailed = false;
     std::filesystem::path g_OutputDirectory;
     VideoWriter g_Video;
@@ -259,10 +157,6 @@ namespace
     int g_QuitCountdown = -1;
     // 計測を終えてから終了するまでのフレーム数
     constexpr int BenchmarkQuitDelayFrames = 3;
-    // 計測の表の列の幅（値・差）
-    constexpr int BenchmarkValueWidth = 9;
-    constexpr int BenchmarkDiffWidth = 8;
-
     // 撮影の経過を capture_log.txt に残している（うまく撮れなかったときの確認用）。
     void Log(const std::string& message)
     {
@@ -338,346 +232,6 @@ namespace
             return result;
         }
         return tour.back();
-    }
-
-    // ------------------------------------------------------------------------
-    // 処理の重さの計測（--benchmark）
-    // 1面の決まった地点ごとに「ライトOFF → ライトON」の順で同じ景色を測り、差を比べている。
-    // ------------------------------------------------------------------------
-    // 計測する地点（名前・立つ位置・向き）
-    struct BenchmarkSpot
-    {
-        const char* Name;
-        Vector3 Position;
-        float Yaw;
-        float Pitch;
-        SceneName Scene = SceneName::Stage;
-    };
-
-    const std::vector<BenchmarkSpot> StageBenchmarkSpots =
-    {
-        { "開始地点（壁の文字の前）", Vector3(0.0f, FloorY, -128.0f), Pi, -0.12f },
-        { "開始地点から廊下の奥", Vector3(0.0f, FloorY, -110.0f), 0.0f, 0.0f },
-        { "中央ホール", Vector3(-10.0f, FloorY, 0.0f), YawToward(-10.0f, 0.0f, -180.0f, 35.0f), -0.05f },
-        { "左の倉庫", Vector3(-150.0f, FloorY, -110.0f), 0.0f, -0.26f },
-        { "暗証番号の扉", Vector3(12.0f, FloorY, 112.0f), Pi * 0.5f, -0.05f },
-        { "ループ廊下", Vector3(0.0f, FloorY, 185.0f), 0.0f, 0.0f },
-        // 床一面が水に浸かった西棟。水面の反射（レイ反射）が画面の広い範囲に出る場所。
-        { "西棟（浸水した広間）", Vector3(-233.0f, FloorY, -21.0f), YawToward(-233.0f, -21.0f, -330.0f, 140.0f), -0.16f },
-        { "2面（裸電球の下）", Vector3(12.0f, FloorY, -25.0f), 0.0f, 0.04f, SceneName::Stage2 },
-        { "2面（廊下の奥）", Vector3(-12.0f, FloorY, 60.0f), Pi, -0.10f, SceneName::Stage2 },
-        // 左の壁の古い鏡を正面から見る所。鏡は、鏡で反射した光線をシェーダーの中で飛ばして映している（自分の体も映る）
-        { "2面（壁の鏡の前）", Vector3(0.0f, FloorY, 37.0f), -Pi * 0.5f, -0.06f, SceneName::Stage2 },
-    };
-
-    // --forest のときは森の同じ地点を測る。草なしとの比較でも、位置と向きは変えない。
-    const std::vector<BenchmarkSpot>& GetBenchmarkSpots()
-    {
-        static const bool forest = ForestScene::IsRequestedByCommandLine();
-        static const std::vector<BenchmarkSpot> forestSpots =
-        {
-            { "森（開始地点の小道）", Vector3(0.0f, FloorY, -398.0f), 0.0f, -0.20f, SceneName::Forest },
-            { "森（街灯の横の草むら）", Vector3(-6.0f, FloorY, -98.0f), -0.65f, -0.32f, SceneName::Forest },
-            { "森（研究所の手前）", Vector3(0.0f, FloorY, 125.0f), 0.0f, -0.15f, SceneName::Forest },
-        };
-        return forest ? forestSpots : StageBenchmarkSpots;
-    }
-
-    // 各段階のフレーム数。切り替えた直後はGPU時間の結果が数フレーム遅れて届くため、最初の45フレームは捨てている。
-    constexpr int BenchmarkWarmupFrames = 45;
-    constexpr int BenchmarkMeasureFrames = 180;
-    // 同じ地点を機能OFFとONの2通りで測る。
-    constexpr int BenchmarkPhaseCount = 2;
-    // --figures のとき：水たまりの人影を正面のこの距離に、見えない影を正面のこの距離の少し右に置く（足もとは床の高さ）
-    constexpr float BenchmarkPuddleFigureAhead = 26.0f;
-    constexpr float BenchmarkUnseenFigureAhead = 34.0f;
-    constexpr float BenchmarkUnseenFigureRight = 8.0f;
-    constexpr float BenchmarkFigureFloorY = -100.0f;
-
-    // 1つの条件（地点×ライトの状態）で集めた値。
-    struct BenchmarkSamples
-    {
-        std::vector<double> FrameMs;    // 前のフレームからの実際の経過時間
-        std::vector<double> CpuMs;      // FrameMsからPresentの待ち時間を引いたもの（CPU側で使った時間の目安）
-        // 描画の段階ごとのGPU時間の合計と、取れた回数（平均を出すのに使っている）
-        std::array<double, static_cast<size_t>(GpuPass::Count)> GpuSum{};
-        std::array<int, static_cast<size_t>(GpuPass::Count)> GpuCount{};
-    };
-
-    // 1つの地点の、ライトOFFとライトONの結果
-    struct BenchmarkResult
-    {
-        const BenchmarkSpot* Spot;
-        BenchmarkSamples Off;
-        BenchmarkSamples On;
-    };
-
-    // 計測モードか、今の地点の番号、地点の中での経過フレーム、結果
-    bool g_Benchmark = false;
-    size_t g_BenchmarkSpot = 0;
-    int g_BenchmarkFrame = 0;           // 地点の中での経過フレーム
-    std::vector<BenchmarkResult> g_BenchmarkResults;
-    // 前のフレームの時刻、直前のPresentにかかった時間、GPUの名前
-    std::chrono::steady_clock::time_point g_LastFrameTime;
-    bool g_HasLastFrameTime = false;
-    double g_LastPresentMs = 0.0;
-    // 計測モードで垂直同期を待つか（--vsync）
-    bool g_BenchmarkVsync = false;
-    // 計測モードで、水たまりの人影と見えない影を、どの地点でもカメラの前に置いて測るか（--figures）
-    bool g_BenchmarkFigures = false;
-    std::string g_AdapterName;
-
-    // 平均値を求めている
-    double Average(const std::vector<double>& values)
-    {
-        if (values.empty())
-        {
-            return 0.0;
-        }
-        double sum = 0.0;
-        for (double value : values)
-        {
-            sum += value;
-        }
-        return sum / static_cast<double>(values.size());
-    }
-
-    // 遅い方から(1 - ratio)の位置の値を求めている（0.99なら遅い方から1%）。かくつきの目安に使っている。
-    double Percentile(std::vector<double> values, double ratio)
-    {
-        if (values.empty())
-        {
-            return 0.0;
-        }
-        std::sort(values.begin(), values.end());
-        const size_t index = (std::min)(values.size() - 1,
-            static_cast<size_t>(ratio * static_cast<double>(values.size() - 1) + 0.5));
-        return values[index];
-    }
-
-    // 標準偏差を求めている（フレーム時間のばらつき。大きいほどFPSが上下して見える）
-    double StandardDeviation(const std::vector<double>& values)
-    {
-        if (values.size() < 2)
-        {
-            return 0.0;
-        }
-        const double average = Average(values);
-        double sum = 0.0;
-        for (double value : values)
-        {
-            sum += (value - average) * (value - average);
-        }
-        return std::sqrt(sum / static_cast<double>(values.size() - 1));
-    }
-
-    // ある描画段階のGPU時間の平均を求めている（一度も取れていなければ0）
-    double GpuAverage(const BenchmarkSamples& samples, GpuPass pass)
-    {
-        const size_t index = static_cast<size_t>(pass);
-        return samples.GpuCount[index] == 0
-            ? 0.0
-            : samples.GpuSum[index] / samples.GpuCount[index];
-    }
-
-    // GPUの名前を記録している（結果を見る人が、どの環境の数字か分かるように）。
-    void RecordAdapterName(ID3D11DeviceContext* context)
-    {
-        ComPtr<ID3D11Device> device;
-        context->GetDevice(&device);
-        ComPtr<IDXGIDevice> dxgiDevice;
-        ComPtr<IDXGIAdapter> adapter;
-        DXGI_ADAPTER_DESC description{};
-        if (FAILED(device.As(&dxgiDevice)) ||
-            FAILED(dxgiDevice->GetAdapter(&adapter)) ||
-            FAILED(adapter->GetDesc(&description)))
-        {
-            g_AdapterName = "不明";
-            return;
-        }
-        // GPUの名前はワイド文字なので、ファイルに書くためUTF-8へ変換している
-        const int size = WideCharToMultiByte(CP_UTF8, 0, description.Description, -1,
-            nullptr, 0, nullptr, nullptr);
-        std::string name(static_cast<size_t>((std::max)(size - 1, 0)), '\0');
-        WideCharToMultiByte(CP_UTF8, 0, description.Description, -1, name.data(), size,
-            nullptr, nullptr);
-        g_AdapterName = name;
-    }
-
-    // 全地点の結果を表にして benchmark_result.txt に書き出している
-    bool WriteBenchmarkResult()
-    {
-        Core::Game* game = Core::Game::GetInstance();
-        std::ostringstream text;
-        text << std::fixed << std::setprecision(2);
-        // 先頭に、画面の大きさ・描画解像度・エフェクト設定・GPUの名前を書いている
-        text << (ForestScene::IsRequestedByCommandLine() ? "処理の重さの計測結果（森・ライトOFFとONの比較）\n" : "処理の重さの計測結果（1・2面・ライトOFFとONの比較）\n");
-        text << "画面: " << Application::GetWindowWidth() << "x" << Application::GetWindowHeight()
-             << "  描画解像度: " << Application::GetWidth() << "x" << Application::GetHeight()
-             << "  垂直同期: " << (g_BenchmarkVsync ? "あり" : "なし")
-             << "  人影: " << (g_BenchmarkFigures ? "あり（水たまりの人影と見えない影をカメラの前に置く）" : "なし")
-             << "  エフェクト設定: " << (game->GetEffectLevel() + 1)
-             << "  GPU: " << g_AdapterName << "\n";
-        text << "各条件 " << BenchmarkMeasureFrames << " フレームの平均（ms）。"
-                "1%遅は遅い方から1%のフレーム時間で、かくつきの目安です。\n\n";
-
-        // GPU時間を表に出す描画段階と、その見出し
-        const std::pair<const char*, GpuPass> passes[] =
-        {
-            { "GPU合計", GpuPass::Total },
-            { "影", GpuPass::Shadow },
-            { "水面反射", GpuPass::Reflection },
-            { "本描画", GpuPass::MainScene },
-            { "ブルーム", GpuPass::Bloom },
-            { "画面効果", GpuPass::PostProcess },
-            { "水たまりの波", GpuPass::WaterRipples },
-            { "環境マップ", GpuPass::EnvironmentProbe },
-            { "電球の影", GpuPass::BulbShadow },
-            { "環境遮蔽", GpuPass::AmbientOcclusion },
-            { "間接光", GpuPass::GlobalIllumination },
-        };
-
-        for (const BenchmarkResult& result : g_BenchmarkResults)
-        {
-            text << "■ " << result.Spot->Name << "\n";
-            text << "  項目        ライトOFF   ライトON       差\n";
-            // 1行分（項目名・ライトOFF・ライトON・差）を書く関数。差には+-の符号を付けている
-            const auto row = [&text](const char* label, double off, double on)
-            {
-                text << "  " << label << "\t" << std::setw(BenchmarkValueWidth) << off << "   " << std::setw(BenchmarkValueWidth) << on
-                     << "   " << std::showpos << std::setw(BenchmarkDiffWidth) << (on - off) << std::noshowpos << "\n";
-            };
-            const double offFrame = Average(result.Off.FrameMs);
-            const double onFrame = Average(result.On.FrameMs);
-            row("フレーム", offFrame, onFrame);
-            row("1%遅", Percentile(result.Off.FrameMs, SlowFramePercentile), Percentile(result.On.FrameMs, SlowFramePercentile));
-            row("最大", Percentile(result.Off.FrameMs, 1.0), Percentile(result.On.FrameMs, 1.0));
-            row("ばらつき", StandardDeviation(result.Off.FrameMs), StandardDeviation(result.On.FrameMs));
-            row("CPU", Average(result.Off.CpuMs), Average(result.On.CpuMs));
-            for (const auto& [label, pass] : passes)
-            {
-                row(label, GpuAverage(result.Off, pass), GpuAverage(result.On, pass));
-            }
-            row("FPS換算", offFrame > 0.0 ? MillisecondsPerSecond / offFrame : 0.0,
-                onFrame > 0.0 ? MillisecondsPerSecond / onFrame : 0.0);
-            text << "\n";
-        }
-
-        std::ofstream file(g_OutputDirectory / L"benchmark_result.txt", std::ios::binary);
-        const std::string body = text.str();
-        // メモ帳で文字化けしないよう、UTF-8のバイト順マークだけを書き込む。
-        constexpr char Utf8Bom[] = "\xEF\xBB\xBF";
-        file.write(Utf8Bom, sizeof(Utf8Bom) - 1);
-        file.write(body.data(), static_cast<std::streamsize>(body.size()));
-        file.close();
-        return static_cast<bool>(file);
-    }
-
-    // 計測モードの1フレーム分。地点に立たせ、ライトを切り替えながら値を集めている。
-    void UpdateBenchmark(Core::Game* game)
-    {
-        // 前のフレームからの経過時間を測っている（最初の1回は0）
-        const auto now = std::chrono::steady_clock::now();
-        const double frameMs = g_HasLastFrameTime
-            ? std::chrono::duration<double, std::milli>(now - g_LastFrameTime).count()
-            : 0.0;
-        g_LastFrameTime = now;
-        g_HasLastFrameTime = true;
-
-        // タイトルからの切り替えが終わり、1面が始まるまでは何もしていない
-        const SceneName benchmarkScene = g_BenchmarkSpot < GetBenchmarkSpots().size()
-            ? GetBenchmarkSpots()[g_BenchmarkSpot].Scene : GetBenchmarkSpots().back().Scene;
-        if (game->GetCurrentSceneName() != benchmarkScene)
-        {
-            game->RequestSceneChange(benchmarkScene);
-            return;
-        }
-        Player* player = game->GetObj<Player>("Player");
-        Camera* camera = game->GetCamera();
-        if (player == nullptr || camera == nullptr)
-        {
-            return;
-        }
-
-        // 全地点を測り終えたら結果を書き出し、数フレーム後に終了している
-        if (g_BenchmarkSpot >= GetBenchmarkSpots().size())
-        {
-            if (!WriteBenchmarkResult())
-            {
-                Tools::CaptureMode::Abort("計測結果を書き出せません。");
-                return;
-            }
-            Log("benchmark finished");
-            g_Finished = true;
-            g_QuitCountdown = BenchmarkQuitDelayFrames;
-            return;
-        }
-        // 新しい地点に来たら、結果を入れる場所を用意している
-        if (g_BenchmarkResults.size() <= g_BenchmarkSpot)
-        {
-            g_BenchmarkResults.push_back({ &GetBenchmarkSpots()[g_BenchmarkSpot], {}, {} });
-            Log("benchmark spot " + std::to_string(g_BenchmarkSpot));
-        }
-
-        // 段階: [OFFの捨てる区間][OFFの計測][ONの捨てる区間][ONの計測]
-        const int phaseLength = BenchmarkWarmupFrames + BenchmarkMeasureFrames;
-        const bool lightOn = g_BenchmarkFrame >= phaseLength;
-        const int frameInPhase = g_BenchmarkFrame % phaseLength;
-        if (frameInPhase == BenchmarkWarmupFrames)
-        {
-            if (const ForestGrass* grass = game->GetObj<ForestGrass>("ForestGrass"))
-                Log("grass: planted=" + std::to_string(grass->GetBladeCount()) +
-                    " drawn=" + std::to_string(grass->GetDrawnBladeCount()) +
-                    " chunks=" + std::to_string(grass->GetDrawnChunkCount()));
-        }
-        // ここで測れるのは直前のフレームの値。条件を切り替えた直後のフレームは捨てる区間に入るようにしている。
-        if (frameInPhase >= BenchmarkWarmupFrames && frameMs > 0.0)
-        {
-            BenchmarkResult& result = g_BenchmarkResults[g_BenchmarkSpot];
-            BenchmarkSamples& samples = lightOn ? result.On : result.Off;
-            samples.FrameMs.push_back(frameMs);
-            samples.CpuMs.push_back((std::max)(frameMs - g_LastPresentMs, 0.0));
-            // 結果が届いている描画段階だけ、GPU時間を足している
-            if (GpuTimer* timer = game->GetGpuTimer())
-            {
-                for (size_t pass = 0; pass < static_cast<size_t>(GpuPass::Count); ++pass)
-                {
-                    const GpuTiming timing = timer->GetTiming(static_cast<GpuPass>(pass));
-                    if (timing.Status == GpuTimingStatus::Available)
-                    {
-                        samples.GpuSum[pass] += timing.Milliseconds;
-                        ++samples.GpuCount[pass];
-                    }
-                }
-            }
-        }
-
-        // 毎フレーム、地点の位置と向きに立たせ直し、ライトの状態を決めている
-        const BenchmarkSpot& spot = GetBenchmarkSpots()[g_BenchmarkSpot];
-        player->SetPosition(spot.Position);
-        player->SetFlashlightOn(lightOn);
-        player->RefillBattery();    // 電池切れの点滅で結果が揺れないよう、電池を満タンに保っている
-        camera->SetMouseLookEnabled(false);
-        camera->SetCameraDirection(spot.Yaw);
-        camera->SetCameraPitch(spot.Pitch);
-        // --figures のときは、水たまりの人影を正面26先に、見えない影を正面34先の少し右に置き、どちらも見え方1で描かせている
-        if (g_BenchmarkFigures)
-        {
-            const Vector3 forward(std::sin(spot.Yaw), 0.0f, std::cos(spot.Yaw));
-            const Vector3 right(forward.z, 0.0f, -forward.x);
-            Vector3 puddleFoot = spot.Position + forward * BenchmarkPuddleFigureAhead;
-            Vector3 unseenFoot = spot.Position + forward * BenchmarkUnseenFigureAhead + right * BenchmarkUnseenFigureRight;
-            puddleFoot.y = BenchmarkFigureFloorY;
-            unseenFoot.y = BenchmarkFigureFloorY;
-            Renderer::SetFigureOverride(true, puddleFoot, unseenFoot);
-        }
-
-        // OFFとONの両方を測り終えたら、次の地点へ進んでいる
-        if (++g_BenchmarkFrame >= phaseLength * BenchmarkPhaseCount)
-        {
-            g_BenchmarkFrame = 0;
-            ++g_BenchmarkSpot;
-        }
     }
 }
 
@@ -830,11 +384,6 @@ namespace Tools::CaptureMode
         return g_BenchmarkVsync;
     }
 
-    // Presentにかかった時間を記録している（CPU時間を求めるのに使っている）
-    void OnPresentTimed(double milliseconds)
-    {
-        g_LastPresentMs = milliseconds;
-    }
 
     namespace
     {
@@ -1168,7 +717,11 @@ namespace Tools::CaptureMode
         }
         if (g_Benchmark)
         {
-            UpdateBenchmark(game);
+            if (CaptureBenchmark::Update(game, g_OutputDirectory, g_BenchmarkVsync, g_BenchmarkFigures, Log))
+            {
+                g_Finished = true;
+                g_QuitCountdown = BenchmarkQuitDelayFrames;
+            }
             return;
         }
 
@@ -1210,24 +763,7 @@ namespace Tools::CaptureMode
         // 計測モードは、計測する区間では画面を保存していない（読み戻しの時間が計測に混ざらないように）。
         if (g_Benchmark)
         {
-            if (g_AdapterName.empty() && context != nullptr)
-            {
-                RecordAdapterName(context);
-            }
-            // 最初の地点のライトOFFと、各地点のライトONで1枚ずつ画面を保存している。描画解像度とHUDの見え方に加え、
-            // 描画の処理を変えたときに見た目が変わっていないかを、地点ごとに比べられるようにしている。
-            // どちらも捨てる区間の中なので、読み戻しの時間は計測に混ざらない。
-            const int phaseLength = BenchmarkWarmupFrames + BenchmarkMeasureFrames;
-            std::wstring screenName;
-            if (g_BenchmarkSpot == 0 && g_BenchmarkFrame == BenchmarkWarmupFrames / 2)
-            {
-                screenName = L"benchmark_screen.png";
-            }
-            else if (g_BenchmarkSpot < GetBenchmarkSpots().size() &&
-                g_BenchmarkFrame == phaseLength + BenchmarkWarmupFrames / 2)
-            {
-                screenName = L"benchmark_spot" + std::to_wstring(g_BenchmarkSpot) + L"_light_on.png";
-            }
+            const std::wstring screenName = CaptureBenchmark::GetScreenshotName(context);
             if (!screenName.empty())
             {
                 // 計測結果の数値は残すが、付属画像を保存できなければ終了コードを失敗にする。
