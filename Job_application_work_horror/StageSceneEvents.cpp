@@ -248,6 +248,7 @@ bool StageScene::IsAmbientSoundAllowed() const
         m_FuseWatcherState != FuseWatcherState::Watching &&
         m_ExitOmenSequence.GetTimer() <= 0.0f &&
         !m_CeilingStalker.IsActive() &&
+        !m_CorridorFlood.IsActive() &&
         !powerRestoring &&
         m_SafeLights.GetCalm() < SafeLightQuietCalm &&
         (exit == nullptr || !exit->IsEscaping());

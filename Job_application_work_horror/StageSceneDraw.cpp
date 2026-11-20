@@ -215,6 +215,11 @@ Vector3 StageScene::SelectGuideTarget(int fuseCount, bool exitPowerActivated)
 // 始まりの暗転と章のカード、捕まったときと階段を上るときの暗転
 void StageScene::DrawScreenFades()
 {
+    // ループ廊下の水に追いつかれたときは、真っ暗にしてから開始地点で明るくしている
+    if (const float floodBlackout = m_CorridorFlood.GetBlackout(); floodBlackout > 0.0f)
+    {
+        m_Hud.DrawBlink(floodBlackout, 1.0f);
+    }
     // 始まりの0.65秒は黒からだんだん明るくし、4.2秒までは章のカードを出している
     if (m_StageVisualTimer < Hud::IntroFadeSeconds)
     {

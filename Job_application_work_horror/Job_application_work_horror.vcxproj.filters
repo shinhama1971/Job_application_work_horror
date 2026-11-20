@@ -354,6 +354,9 @@
     <ClCompile Include="Stage1CorridorStretch.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
+    <ClCompile Include="Stage1CorridorFlood.cpp">
+      <Filter>ソース ファイル\Scene\Stage1</Filter>
+    </ClCompile>
     <ClCompile Include="Stage1Transmissions.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
@@ -792,6 +795,9 @@
       <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
     </ClInclude>
     <ClInclude Include="Stage1CorridorStretch.h">
+      <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
+    </ClInclude>
+    <ClInclude Include="Stage1CorridorFlood.h">
       <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
     </ClInclude>
     <ClInclude Include="Stage1BreathingGroup.h">

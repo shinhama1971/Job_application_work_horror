@@ -36,7 +36,7 @@ class Ground :public Object
 		// 濡れた足跡（WetFootprints::Fill）。x = 数、と、1つにつき2つの値（位置と向き、濡れ具合・左右・裸足か）
 		DirectX::SimpleMath::Vector4 FootprintInfo;
 		DirectX::SimpleMath::Vector4 Footprints[WetFootprints::MaxCount * WetFootprints::VectorsPerPrint];
-		// 天井の雨漏りの真下の水たまり。x = 数、と、1つにつき xy = 中心のx・z、z = 半径
+		// 天井の雨漏りの真下の水たまり。x = 数、y = 反射の簡略化、z = 浸水した水の赤さ。1つにつき xy = 中心のx・z、z = 半径
 		DirectX::SimpleMath::Vector4 LeakInfo;
 		DirectX::SimpleMath::Vector4 Leaks[WaterEffectSystem::MaxLeakCount];
 	};
@@ -125,6 +125,8 @@ class Ground :public Object
 		const std::vector<DirectX::SimpleMath::Vector2>& outline, float extraHeight = 0.0f) const;
 	// xy は対象の柱の x・z、z は水の手前の端、w は有効時の水面の持ち上げ量。
 	DirectX::SimpleMath::Vector4 m_DrainTrace = DirectX::SimpleMath::Vector4::Zero;
+	// 浸水した水の赤さ（0〜1。1面のループ廊下に押し寄せる水）
+	float m_FloodRedness = 0.0f;
 	void BuildPuddleSurfaces();
 	// 水たまりの置き方か、床の位置・大きさが変わっていたら、マス目の水たまりのメッシュを作り直している
 	void RebuildPuddleSurfacesIfChanged();
@@ -189,6 +191,8 @@ public:
 	{
 		m_WaterEffects.SetFloodRegion(minimum, maximum);
 	}
+	// 浸水した水の赤さ（0〜1）を決めている（1面のループ廊下に押し寄せる水。西棟の水は0のまま）
+	void SetFloodRedness(float redness) { m_FloodRedness = redness; }
 	// 西棟の浸水面の高さと、排水後に湿りが残る柱の位置を設定する。
 	void SetDrainTrace(const DirectX::SimpleMath::Vector2& column, float edgeZ, float progress);
 	// 一歩ごとに、濡れた足跡を残すかを決めている（水の中の一歩なら、その後の数歩に濡れた靴の跡を残す）。

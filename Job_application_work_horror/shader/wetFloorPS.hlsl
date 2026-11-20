@@ -32,7 +32,8 @@ cbuffer WetFloorBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_WET_F
     // 濡れた足跡（WetFootprints::Fill）。x = 数。1つにつき2つ（xy = 位置、z = sin(向き)、w = cos(向き)/ x = 濡れ具合、y = 左右、z = 裸足か）
     float4 FootprintInfo;
     float4 Footprints[FOOTPRINT_COUNT * SIGNAL_LOST_FOOTPRINT_STRIDE];
-    // x = 雨漏りの数、y = 反射の距離による簡略化。Leaks は xy = 中心のx・z、z = 半径。
+    // x = 雨漏りの数、y = 反射の距離による簡略化、z = 浸水した水の赤さ（0〜1。1面のループ廊下に押し寄せる水）。
+    // Leaks は xy = 中心のx・z、z = 半径。
     float4 LeakInfo;
     float4 Leaks[LEAK_COUNT];
 }
@@ -155,6 +156,11 @@ float3 SampleProbeReflection(float3 worldPosition, float3 worldNormal)
 #define FLOOD_WAVE_SCALE_Z (0.13f)
 #define FLOOD_WAVE_SPEED (0.5f)
 #define FLOOD_WAVE_STRENGTH (0.35f)
+// 押し寄せる赤い水：先頭の縁を崩すノイズの細かさ・流れる速さ・削る深さ（縁から内側へ）と、波を荒くする倍率
+#define FLOOD_FRONT_NOISE_SCALE (0.11f)
+#define FLOOD_FRONT_NOISE_SPEED (1.8f)
+#define FLOOD_FRONT_NOISE_DEPTH (9.0f)
+#define FLOOD_TURBULENT_WAVE_GAIN (3.0f)
 // 雨漏りの水たまり：調べる範囲に足すゆとり、縁のゆがみ（細かさ・強さ）、半径の下限、水たまりの縁（ぼかし始め）、
 // 岸の線（幅・位置・濃さ）、水滴の輪（間隔・速さ・強さ・遠くで弱める量）
 #define LEAK_REACH_MARGIN (3.0f)
@@ -203,6 +209,9 @@ float3 SampleProbeReflection(float3 worldPosition, float3 worldNormal)
 #define WET_LUMINANCE_LIFT (0.035f)
 #define WET_DEPTH_BLEND (0.38f)
 #define WET_PUDDLE_BLEND (0.84f)
+// 浸水した水を赤くするとき：水面の色（反射を含む）に掛ける色（緑と青を吸う）と、足す暗い赤
+#define FLOOD_BLOOD_FILTER float3(0.55f, 0.05f, 0.04f)
+#define FLOOD_BLOOD_TINT float3(0.020f, 0.001f, 0.001f)
 // 暗くする量：岸の線、水が引いた後の湿り、残った水
 #define SHORE_DARKEN (0.035f)
 #define DRAINED_DAMP_DARKEN (0.24f)
@@ -334,6 +343,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     float shore = 0.0f;
     float ripplePattern = 0.0f;
     float puddle = 0.0f;
+    // 床一面が水に浸かった範囲の濃さ（水を赤くするときに使う）
+    float floodAmount = 0.0f;
     [branch]
     if (waterLevel > WATER_LEVEL_DRY_FLOOR)
     {
@@ -346,12 +357,18 @@ float4 main(in LIT_PS_IN input) : SV_Target
         {
             const float2 fromMinimum = input.worldPos.xz - FloodRect.xy;
             const float2 toMaximum = FloodRect.zw - input.worldPos.xz;
+            // 押し寄せる赤い水（LeakInfo.z が0より大きい）は、縁を流れるノイズで崩し、波を荒くしている（西棟の水は元のまま）
+            const float turbulence = saturate(LeakInfo.z);
+            const float frontNoise = FastValueNoise(
+                input.worldPos.xz * FLOOD_FRONT_NOISE_SCALE + float2(0.0f, WetTime * FLOOD_FRONT_NOISE_SPEED));
             const float insideDistance = min(
-                min(fromMinimum.x, fromMinimum.y), min(toMaximum.x, toMaximum.y));
+                min(fromMinimum.x, fromMinimum.y), min(toMaximum.x, toMaximum.y)) -
+                frontNoise * FLOOD_FRONT_NOISE_DEPTH * turbulence;
             const float flood = smoothstep(FLOOD_EDGE_START, FLOOD_EDGE_FULL, insideDistance);
             ripplePattern += sin(input.worldPos.x * FLOOD_WAVE_SCALE_X + input.worldPos.z * FLOOD_WAVE_SCALE_Z + WetTime * FLOOD_WAVE_SPEED) *
-                FLOOD_WAVE_STRENGTH * flood * (1.0f - puddle);
+                FLOOD_WAVE_STRENGTH * flood * (1.0f - puddle) * (1.0f + turbulence * FLOOD_TURBULENT_WAVE_GAIN);
             puddle = max(puddle, flood);
+            floodAmount = flood;
         }
         // 天井の雨漏りの真下にできた小さな水たまり（少しずつ広がる。縁はノイズでゆがめ、落ちてくる水滴の輪が広がる）
         {
@@ -714,6 +731,9 @@ float4 main(in LIT_PS_IN input) : SV_Target
         reflectionStrength);
     // 真上から見ると反射は弱い（フレネル）ため、人影が映る所は床の色ごと沈め、水面の黒い人の形として見えるようにしている
     color.rgb *= 1.0f - puddleFigure * saturate(puddle * FIGURE_PUDDLE_GAIN) * FIGURE_PUDDLE_DARKEN;
+    // 1面のループ廊下に押し寄せる水は、映った景色ごと赤黒くしている（西棟の水は赤さ0なので、元のまま）
+    const float floodRedness = floodAmount * saturate(LeakInfo.z);
+    color.rgb = lerp(color.rgb, color.rgb * FLOOD_BLOOD_FILTER + FLOOD_BLOOD_TINT, floodRedness);
 
     // 高さの違う霧を重ね、近くの見やすさを保ちながら、遠くの輪郭を分けている。
     // 部屋全体を一様に白くせず、床の近くに霧を集めている。

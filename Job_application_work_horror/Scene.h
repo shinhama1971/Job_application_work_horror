@@ -45,7 +45,9 @@ enum class SceneDebugAction
     // 撮影用：通常プレイでは呼ばず、4周目の開始部屋を再現する。
     ShowHauntedStartDoor,
     // 撮影用：通常プレイでは呼ばず、3周目で3本目のヒューズを拾った後（建物全体が呼吸している）にする。
-    ShowBreathingBuilding
+    ShowBreathingBuilding,
+    // 撮影用：通常プレイでは呼ばず、1面のループ廊下に水が押し寄せる演出を、条件を見ずに始める。
+    StartCorridorFlood
 };
 
 // シーンの基底クラス。Gameが今のシーンを1つだけunique_ptrで持ち、毎フレーム更新・描画している。

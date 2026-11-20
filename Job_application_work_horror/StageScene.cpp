@@ -233,6 +233,10 @@ void StageScene::Init()
     m_AmbientSounds.Reset();
     m_CeilingStalker.Reset();
     m_CorridorStretch.Reset();
+    m_CorridorFlood.Reset();
+    m_CorridorFloodCues.clear();
+    m_CorridorFloodLights.clear();
+    m_CorridorFloodOwnsWater = false;
     game->GetCamera()->SetWorldStretchZ(1.0f);
     m_FuseScareTimer = -1.0f;
     m_FuseScareStepsPlayed = 0;
@@ -534,6 +538,11 @@ void StageScene::RequestDebugAction(SceneDebugAction action)
         m_Objects.startDoor->SetLocked(true);
         return;
     }
+    if (action == SceneDebugAction::StartCorridorFlood)
+    {
+        m_CorridorFlood.ForceStart();
+        return;
+    }
     if (action == SceneDebugAction::ShowBreathingBuilding)
     {
         m_CorridorLoopCount = (std::max)(m_CorridorLoopCount, DebugBreathingBuildingLoop);
@@ -753,6 +762,7 @@ void StageScene::UpdateStageEvents(Player& player, float deltaTime)
     UpdateCeilingStalker(player, deltaTime);
     UpdateCorridorStretch(player, deltaTime);
     UpdateBreathingWall(deltaTime);
+    UpdateCorridorFlood(player, deltaTime);
     // 隠し部屋の影も、書類保管室の影と同じく、棚・壁・閉じた扉を通り抜けずに回り込む
     m_HiddenRoom.Update(player, deltaTime, m_KeypadDoor.IsSolved(),
         [this](Vector3& position, float radius)

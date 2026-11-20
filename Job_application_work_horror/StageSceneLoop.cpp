@@ -506,6 +506,90 @@ void StageScene::UpdateBreathingFixtures(bool restore)
 }
 
 
+void StageScene::UpdateCorridorFlood(Player& player, float deltaTime)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    const bool drained = m_WestWing.GetStep() >= Stage1WestWing::Step::FindFuse;
+    m_CorridorFloodCues.clear();
+    m_CorridorFlood.Update(deltaTime, player.GetPosition(), drained, IsAmbientSoundAllowed(), m_CorridorFloodCues);
+    for (const Stage1CorridorFlood::Cue& cue : m_CorridorFloodCues)
+    {
+        switch (cue.Type)
+        {
+        case Stage1CorridorFlood::CueType::LightsOut:
+            // 廊下の照明を一斉に消している（すでに消えている照明は、戻すときにも触らない）
+            m_CorridorFloodLights.clear();
+            for (CeilingLight* light : game->GetObjects<CeilingLight>())
+            {
+                const Vector3 position = light->GetPosition();
+                if (light->IsForcedOff() ||
+                    position.x < Stage1CorridorFlood::CorridorMinX - CorridorFloodLightMargin ||
+                    position.x > Stage1CorridorFlood::CorridorMaxX + CorridorFloodLightMargin ||
+                    position.z < Stage1CorridorFlood::CorridorEntranceZ - CorridorFloodLightMargin ||
+                    position.z > Stage1CorridorFlood::CorridorEndZ + CorridorFloodLightMargin)
+                {
+                    continue;
+                }
+                light->SetForcedOff(true);
+                m_CorridorFloodLights.push_back(light);
+            }
+            game->PlayAudioCue(SOUND_CUE_POWER, CorridorFloodLightsOutSound.Pitch, CorridorFloodLightsOutSound.Volume);
+            EventFeedback::HorrorPulse(*game->GetPostProcess(), CorridorFloodLightsOutPulse);
+            EventFeedback::Rumble(CorridorFloodLightsOutRumble);
+            break;
+        case Stage1CorridorFlood::CueType::Rush:
+            game->PlayAudioCueAt(SOUND_CUE_DRAIN, cue.Position, CorridorFloodRushSound.Pitch, CorridorFloodRushSound.Volume);
+            EventFeedback::Rumble(CorridorFloodRushRumble);
+            break;
+        case Stage1CorridorFlood::CueType::Caught:
+            game->PlayAudioCueAt(SOUND_CUE_WATER_RUN, cue.Position,
+                CorridorFloodCaughtSplash.Pitch, CorridorFloodCaughtSplash.Volume);
+            game->PlayAudioCue(SOUND_CUE_SCARE, CorridorFloodCaughtScare.Pitch, CorridorFloodCaughtScare.Volume);
+            EventFeedback::HorrorPulse(*game->GetPostProcess(), CorridorFloodCaughtPulse);
+            EventFeedback::Rumble(CorridorFloodCaughtRumble);
+            break;
+        case Stage1CorridorFlood::CueType::Restart:
+        {
+            // その周回をやり直す：開始地点の部屋へ戻している（周回の数はそのまま）
+            const Vector3 position = player.GetPosition();
+            player.SetPosition(Vector3(CorridorFloodRestartX, position.y, CorridorFloodRestartZ));
+            game->GetCamera()->SetCameraDirection(CorridorFloodRestartYaw);
+            break;
+        }
+        case Stage1CorridorFlood::CueType::LightsOn:
+            for (CeilingLight* light : m_CorridorFloodLights)
+            {
+                light->SetForcedOff(false);
+            }
+            m_CorridorFloodLights.clear();
+            break;
+        }
+    }
+
+    // 床の浸水範囲は、西棟の水を抜いた後は使っていないので、水がある間だけこの演出が使っている
+    Ground* ground = m_Objects.ground;
+    if (ground == nullptr)
+    {
+        return;
+    }
+    if (m_CorridorFlood.HasWater())
+    {
+        ground->SetFloodRegion(
+            Vector2(Stage1CorridorFlood::CorridorMinX, m_CorridorFlood.GetFrontZ()),
+            Vector2(Stage1CorridorFlood::CorridorMaxX, Stage1CorridorFlood::CorridorEndZ));
+        m_CorridorFloodOwnsWater = true;
+    }
+    else if (m_CorridorFloodOwnsWater)
+    {
+        // 水が引き切ったら、広さ0の範囲にして水をなくしている
+        ground->SetFloodRegion(
+            Vector2(Stage1CorridorFlood::CorridorMinX, Stage1CorridorFlood::CorridorEndZ),
+            Vector2(Stage1CorridorFlood::CorridorMaxX, Stage1CorridorFlood::CorridorEndZ));
+        m_CorridorFloodOwnsWater = false;
+    }
+    ground->SetFloodRedness(m_CorridorFlood.GetRedness());
+}
+
 float StageScene::GetBreathingGroupTarget(Stage1BreathingGroup group) const
 {
     // 3本目のヒューズを拾った後は、建物全体（どの組も）が大きく息をしている

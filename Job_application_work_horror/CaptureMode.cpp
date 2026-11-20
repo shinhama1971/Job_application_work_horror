@@ -148,6 +148,7 @@ namespace
     bool g_PuddleAnomalyRequested = false;
     bool g_CeilingReflectionRequested = false;
     bool g_BreathingBuildingRequested = false;
+    bool g_CorridorFloodRequested = false;
     bool g_UnseenAnomalyRequested = false;
     // 2面の道順で、最後の停電を始めたか
     bool g_FinalSequenceRequested = false;
@@ -449,6 +450,7 @@ namespace Tools::CaptureMode
             g_PuddleAnomalyRequested = false;
             g_CeilingReflectionRequested = false;
             g_BreathingBuildingRequested = false;
+            g_CorridorFloodRequested = false;
             g_UnseenAnomalyRequested = false;
             g_FinalSequenceRequested = false;
             Log(std::string("start tour: ") + SceneLabel(scene));
@@ -526,6 +528,8 @@ namespace Tools::CaptureMode
                 { SceneName::Stage, Stage1EndDoorOpenTime, SceneDebugAction::OpenStage1EndDoor, &g_EndDoorOpenRequested, "open stage 1 end door" },
                 // 1面: 最後に、3周目・ヒューズ3本の状態にしている（中央ホールと外周の壁も息をする）
                 { SceneName::Stage, BreathingBuildingRequestTime, SceneDebugAction::ShowBreathingBuilding, &g_BreathingBuildingRequested, "show breathing building" },
+                // 1面: 最後に、ループ廊下へ赤い水が押し寄せる演出を始めている
+                { SceneName::Stage, CorridorFloodRequestTime, SceneDebugAction::StartCorridorFlood, &g_CorridorFloodRequested, "start corridor flood" },
                 // 2面: 鏡の前に立った後で、鏡の異変を出している（鏡の中にだけ、すぐ後ろの人影が映る）
                 { SceneName::Stage2, MirrorAnomalyRequestTime, SceneDebugAction::ShowMirrorAnomaly, &g_MirrorAnomalyRequested, "show mirror anomaly" },
                 // 2面: 濡れた足跡の場面の前に、2周目へ進めている

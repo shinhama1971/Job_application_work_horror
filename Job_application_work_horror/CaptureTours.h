@@ -55,6 +55,8 @@ namespace Tools::CaptureTours
     constexpr float Stage1EndDoorOpenTime = 119.0f;
     // 1面の最後に、この時刻に3周目・ヒューズ3本の状態にしている（建物全体が呼吸する様子を写すため）
     constexpr float BreathingBuildingRequestTime = 141.0f;
+    // 1面の最後に、この時刻にループ廊下へ赤い水が押し寄せる演出を始めている
+    constexpr float CorridorFloodRequestTime = 155.0f;
     // 濡れた足跡の場面の前に、2周目へ進めている（誰かの足跡は2周目から出る）
     constexpr float SecondLoopRequestTime = 50.5f;
     // 肖像画の場面の前に、肖像画の異変を出している

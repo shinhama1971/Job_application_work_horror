@@ -287,6 +287,7 @@
     <ClCompile Include="Stage1SafeLights.cpp" />
     <ClCompile Include="Stage1CeilingStalker.cpp" />
     <ClCompile Include="Stage1CorridorStretch.cpp" />
+    <ClCompile Include="Stage1CorridorFlood.cpp" />
     <ClCompile Include="Stage1WestWing.cpp" />
     <ClCompile Include="KeyItem.cpp" />
     <ClCompile Include="Locker.cpp" />
@@ -448,6 +449,7 @@
     <ClInclude Include="Stage1SafeLights.h" />
     <ClInclude Include="Stage1CeilingStalker.h" />
     <ClInclude Include="Stage1CorridorStretch.h" />
+    <ClInclude Include="Stage1CorridorFlood.h" />
     <ClInclude Include="Stage1BreathingGroup.h" />
     <ClInclude Include="Stage1WestWing.h" />
     <ClInclude Include="CeilingReflectionScare.h" />

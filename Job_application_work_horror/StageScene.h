@@ -17,6 +17,7 @@
 #include "Stage1AmbientSounds.h"
 #include "Stage1CeilingStalker.h"
 #include "Stage1CorridorStretch.h"
+#include "Stage1CorridorFlood.h"
 #include "Stage1BreathingGroup.h"
 #include "TensionPulse.h"
 #include "Stage1LightStalker.h"
@@ -95,6 +96,8 @@ private:
     void UpdateBreathingFixtures(bool restore = false);
     // 呼吸する壁：組ごとに、周回とヒューズの数で膨らむ量を決め、息を吐くたびに一番近い壁の中から息の音を鳴らす
     void UpdateBreathingWall(float deltaTime);
+    // 西棟の水を抜いた後、ループ廊下の奥から赤い水が押し寄せる（Stage1CorridorFlood の合図で照明・音・床の水・プレイヤーを動かす）
+    void UpdateCorridorFlood(class Player& player, float deltaTime);
     // 姿の見えない物音を更新し、鳴らしている
     void UpdateAmbientSounds();
     // 懐中電灯で照らすと浮かぶ壁の文字。書き換わった文字を読んだら物音の演出を起こしている。
@@ -188,6 +191,11 @@ private:
     DirectX::SimpleMath::Vector3 m_FuseScareBehind = DirectX::SimpleMath::Vector3::Zero;
     float m_CeilingStalkerWait = 0.0f;
     std::vector<Stage1CeilingStalker::Cue> m_CeilingStalkerCues;
+    // ループ廊下に押し寄せる水の演出、このフレームの合図、水で消した照明（戻すため）、床の浸水範囲をこの演出が使っているか
+    Stage1CorridorFlood m_CorridorFlood;
+    std::vector<Stage1CorridorFlood::Cue> m_CorridorFloodCues;
+    std::vector<class CeilingLight*> m_CorridorFloodLights;
+    bool m_CorridorFloodOwnsWater = false;
     // このフレームに鳴らす物音（使い回している）
     std::vector<AmbientSoundCue> m_AmbientCues;
     // 壁の文字を読んだか、いつ書き換えるかを管理している（文字のObjectはStage1Layoutが配置している）。

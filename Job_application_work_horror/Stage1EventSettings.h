@@ -295,6 +295,26 @@ namespace Stage1EventSettings
     constexpr float BreathingWallSoundDistance = 90.0f;
     constexpr EventFeedback::SoundSpec BreathingWallSound{ 0.55f, 0.75f };
 
+    // --- ループ廊下に押し寄せる赤い水（Stage1CorridorFlood）
+    // 照明が消えるときの音（電源が落ちる音を低く）・画面の脈打ち・振動
+    constexpr EventFeedback::SoundSpec CorridorFloodLightsOutSound{ 0.55f, 1.2f };
+    constexpr PulseSpec CorridorFloodLightsOutPulse{ 0.35f, 0.6f };
+    constexpr RumbleSpec CorridorFloodLightsOutRumble{ 12, 0.20f };
+    // 水が押し寄せる音（排水口の音を低く大きく。水の先頭から続けて鳴らす）と、そのたびの小さな振動
+    constexpr EventFeedback::SoundSpec CorridorFloodRushSound{ 0.62f, 1.6f };
+    constexpr RumbleSpec CorridorFloodRushRumble{ 8, 0.16f };
+    // 追いつかれたとき：大きな水しぶき（水の中を走る音を低く）と驚かせる音、強い画面の脈打ち、振動
+    constexpr EventFeedback::SoundSpec CorridorFloodCaughtSplash{ 0.50f, 1.8f };
+    constexpr EventFeedback::SoundSpec CorridorFloodCaughtScare{ 0.70f, 1.0f };
+    constexpr PulseSpec CorridorFloodCaughtPulse{ 0.95f, 0.9f };
+    constexpr RumbleSpec CorridorFloodCaughtRumble{ 24, 0.6f };
+    // 追いつかれた後に戻す所（開始地点の部屋の中、廊下の方＝北を向く）
+    constexpr float CorridorFloodRestartX = 0.0f;
+    constexpr float CorridorFloodRestartZ = -130.0f;
+    constexpr float CorridorFloodRestartYaw = 0.0f;
+    // 水で消す照明：廊下の範囲（Stage1CorridorFlood の浸水範囲）からこれだけ外まで（壁に付いた器具も含めるため）
+    constexpr float CorridorFloodLightMargin = 6.0f;
+
     // --- 天井裏の足音が、照明を消しながら迫ってくる（Stage1CeilingStalker）
     // 電力が戻ってから、この秒数が過ぎた後に起きる（照明が全部点き、落ち着いた頃）
     constexpr float CeilingStalkerDelaySeconds = 25.0f;

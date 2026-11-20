@@ -700,7 +700,8 @@ void Ground::Draw(Camera* cam)
 	}
 	constexpr auto puddleMeshMode = Tools::TechDemo::DefaultPuddleMeshMode;
 	wetFloor.LeakInfo = DirectX::SimpleMath::Vector4(
-		static_cast<float>(leakCount), puddleMeshMode == Tools::TechDemo::PuddleMeshMode::MeshLod ? 1.0f : 0.0f, 0.0f, 0.0f);
+		static_cast<float>(leakCount), puddleMeshMode == Tools::TechDemo::PuddleMeshMode::MeshLod ? 1.0f : 0.0f,
+		m_FloodRedness, 0.0f);
 	// 床の本体は乾いた床として描き、水たまりは後でそのメッシュに描き重ねる（DrawWaterSurfaces）。
 	// 比較用の描画設定で「床全体で計算」を選んでいるときは、前の方式（床の全部の画素で水たまりを計算し、メッシュは描かない）にしている
 	const bool drawsPuddleMeshes = puddleMeshMode != Tools::TechDemo::PuddleMeshMode::FullFloor;

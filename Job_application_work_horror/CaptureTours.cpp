@@ -111,6 +111,13 @@ namespace Tools::CaptureTours
         { 152.0f, Vector3(-60.0f, FloorY, -40.0f), YawToward(-60.0f, -40.0f, -200.0f, 40.0f), -0.04f, L"05t_1面_ヒューズ3本の後に息をする中央ホール", false },
         { 154.3f, Vector3(-60.0f, FloorY, -40.0f), YawToward(-60.0f, -40.0f, -200.0f, 40.0f), -0.04f, L"05u_1面_息を吐いた中央ホール", false },
         { 154.8f, Vector3(-60.0f, FloorY, -40.0f), YawToward(-60.0f, -40.0f, -200.0f, 40.0f), -0.04f, nullptr, false },
+        // ループ廊下に赤い水が押し寄せる（CorridorFloodRequestTime）。南北の廊下の中ほどから北の角を向き、
+        // 照明が消えた直後・奥から水が来る所・水が目の前まで来た所を写している（この後、追いつかれて暗転する）
+        { 155.05f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, nullptr, false },
+        { 156.0f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05v_1面_廊下の照明が消える", false },
+        { 158.0f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05w_1面_奥から押し寄せる赤い水", false },
+        { 159.3f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05x_1面_目の前まで来た赤い水", false },
+        { 162.5f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, nullptr, false },
     };
 
     // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉 → 鏡（普段・鏡の異変で人影が映る・振り返ると誰もいない）
