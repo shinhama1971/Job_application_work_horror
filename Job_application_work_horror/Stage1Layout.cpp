@@ -635,6 +635,7 @@ namespace
             m_Objects.fuseWatcher = CreateHiddenShadow("Stage1FuseWatcher");
             m_Objects.storageShadow = CreateHiddenShadow("Stage1StorageShadow");
             m_Objects.evidenceShadow = CreateHiddenShadow("Stage1EvidenceShadow");
+            m_Objects.timeStopFigure = CreateHiddenShadow("Stage1TimeStopFigure");
         }
 
         // 曲がり角の器具と、配置ファイルの ExtraLight_・ExtraBattery_ で始まる照明と電池、進み具合ごとの進む先の照明の並び

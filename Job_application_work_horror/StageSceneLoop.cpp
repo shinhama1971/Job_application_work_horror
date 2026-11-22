@@ -178,6 +178,12 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     m_LoopNoticeTimer = CorridorLoopNoticeSeconds;
     // 周回が進むほど、振り返った廊下が大きく伸びる
     m_CorridorStretch.SetLoopCount(m_CorridorLoopCount);
+    // 1周目から、右の倉庫（時間が止まった部屋）の天井から水が滴り、床に水たまりが広がっていく
+    // （時間が止まると、落ちる途中の水滴と、広がる波が宙で止まって見える）
+    if (m_CorridorLoopCount == 1 && m_Objects.ground != nullptr)
+    {
+        m_Objects.ground->AddLeak(TimeStopLeakCenter, TimeStopLeakRadius, TimeStopLeakGrowSeconds);
+    }
 
     const int loopPhase = m_CorridorLoopCount < MaxCorridorLoopPhase
         ? m_CorridorLoopCount
@@ -635,7 +641,8 @@ void StageScene::UpdateBreathingWall(float deltaTime)
         const float target = GetBreathingGroupTarget(static_cast<Stage1BreathingGroup>(index));
         amplitude = std::clamp(target, amplitude - step, amplitude + step);
     }
-    m_BreathingWallTime += deltaTime;
+    // 呼吸は世界の時計で進めている（時間が止まった部屋にいる間は、壁も息を止める）
+    m_BreathingWallTime += Application::GetWorldDeltaTime();
 
     // 3周目からは面全体が動く。廊下以外の組（中央ホール・外周）は、動き始めから面全体で息をする。
     // 懐中電灯で照らしても止めない（どこを照らしても、壁は息を続けている）

@@ -60,6 +60,18 @@ public:
         return m_DeltaTime;
     }
 
+    // 「世界の時計」の経過秒（GetDeltaTime に世界の時計の速さを掛けた値）。
+    // 1面の時間が止まった部屋で、止まって見せる物（床の水・水滴・天井灯のちらつき・吊るした電球・画面の粒と埃・呼吸する壁）だけが使っている。
+    // プレイヤーや人影は GetDeltaTime のまま動く
+    static float GetWorldDeltaTime() {
+        return m_DeltaTime * m_WorldTimeScale;
+    }
+
+    // 世界の時計の速さ（0〜1。0で止まる、1で普段どおり）を決めている。シーンが切り替わるときは1に戻す
+    static void SetWorldTimeScale(float scale) {
+        m_WorldTimeScale = scale < 0.0f ? 0.0f : (scale > 1.0f ? 1.0f : scale);
+    }
+
 private:
     static HINSTANCE   m_hInst;        // インスタンスハンドル
     static HWND        m_hWnd;         // ウィンドウハンドル
@@ -70,6 +82,7 @@ private:
     static int         m_LaunchResolutionLevel; // 起動時の描画解像度の設定段階
     static float       m_DpiScale;     // 画面の拡大率
     static float       m_DeltaTime;    // 前回の更新からの経過秒
+    static float       m_WorldTimeScale; // 世界の時計の速さ（GetWorldDeltaTime）
 
     // DPIを認識するプロセスとして宣言し、拡大率を記録している
     static void EnableDpiAwareness();

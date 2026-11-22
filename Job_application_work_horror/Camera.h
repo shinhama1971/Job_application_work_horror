@@ -45,6 +45,8 @@ private:
     // 見え方だけを、カメラの位置を中心に z 方向（南北）へ引き伸ばす倍率（1で元のまま）。
     // 1面のループ廊下で、振り返った廊下が伸びて見える演出に使っている。当たり判定と光の計算は元の位置のまま
     float m_WorldStretchZ = 1.0f;
+    // 視界の傾き（ラジアン。視線を軸に回す。0でまっすぐ）。1面の傾く部屋で使っている
+    float m_ViewRoll = 0.0f;
 
 public:
     void Init();
@@ -87,6 +89,12 @@ public:
     float GetWorldStretchZ() const
     {
         return m_WorldStretchZ;
+    }
+
+    // 視界の傾き（ラジアン。視線を軸に回す。0でまっすぐ）を決めている。シーンが毎フレーム決め直し、切り替えたら0に戻す
+    void SetViewRoll(float roll)
+    {
+        m_ViewRoll = roll;
     }
 
     // カメラの位置を設定・取得している（Playerが目の高さに合わせて毎フレーム設定している）

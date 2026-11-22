@@ -237,6 +237,11 @@ void StageScene::Init()
     m_CorridorFloodCues.clear();
     m_CorridorFloodLights.clear();
     m_CorridorFloodOwnsWater = false;
+    m_TimeStopRoom.Reset();
+    m_TimeStopCues.clear();
+    m_TiltRoom.Reset();
+    Application::SetWorldTimeScale(1.0f);
+    game->GetCamera()->SetViewRoll(0.0f);
     game->GetCamera()->SetWorldStretchZ(1.0f);
     m_FuseScareTimer = -1.0f;
     m_FuseScareStepsPlayed = 0;
@@ -763,6 +768,7 @@ void StageScene::UpdateStageEvents(Player& player, float deltaTime)
     UpdateCorridorStretch(player, deltaTime);
     UpdateBreathingWall(deltaTime);
     UpdateCorridorFlood(player, deltaTime);
+    UpdateStrangeRooms(player, deltaTime);
     // 隠し部屋の影も、書類保管室の影と同じく、棚・壁・閉じた扉を通り抜けずに回り込む
     m_HiddenRoom.Update(player, deltaTime, m_KeypadDoor.IsSolved(),
         [this](Vector3& position, float radius)
@@ -965,8 +971,10 @@ void StageScene::Uninit()
     Renderer::SetWallWeathering(0.0f);
     Renderer::SetRoomOcclusion(nullptr, 0, 0.0f, 0.0f, 0.0f);
     Renderer::SetPuddleFigure(Vector3::Zero, 0.0f);
-    // ループ廊下の伸びた見え方を元に戻している（カメラはシーンをまたいで使い続けるため）
+    // ループ廊下の伸びた見え方・傾く部屋の傾き・時間が止まった部屋の時計を元に戻している（シーンをまたいで使い続けるため）
     Core::Game::GetInstance()->GetCamera()->SetWorldStretchZ(1.0f);
+    Core::Game::GetInstance()->GetCamera()->SetViewRoll(0.0f);
+    Application::SetWorldTimeScale(1.0f);
     Effect::PostProcess* postProcess = Core::Game::GetInstance()->GetPostProcess();
     postProcess->SetAtmosphere(Effect::PostProcess::DefaultNoiseAmount, Effect::PostProcess::DefaultVignetteStrength);
     postProcess->SetExposure(Effect::PostProcess::DefaultExposure);

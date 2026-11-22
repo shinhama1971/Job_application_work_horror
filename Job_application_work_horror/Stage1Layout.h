@@ -84,6 +84,8 @@ struct StageObjects
     // 演出用の人影（ヒューズを拾った後に廊下に立つ影・左の倉庫の影・監視カメラの確認で現れる影・出口の前兆の影）
     ShadowMan* fuseWatcher = nullptr;
     ShadowMan* storageShadow = nullptr;
+    // 時間が止まった部屋（右の倉庫）で、止まった世界の中を近づいてくる人影
+    ShadowMan* timeStopFigure = nullptr;
     ShadowMan* evidenceShadow = nullptr;
     ShadowMan* exitOmen = nullptr;
     // 書類保管室の「照らすと止まる影」（位置はStage1LightStalkerが決めている）

@@ -539,7 +539,8 @@ void Ground::AddRainRipples(float deltaTime)
 //=======================================
 void Ground::Update()
 {
-	const float deltaTime = Application::GetDeltaTime();
+	// 水面・水滴・波紋は世界の時計で進めている（時間が止まった部屋では、落ちる水滴も波も止まる）
+	const float deltaTime = Application::GetWorldDeltaTime();
 	m_WetTime += deltaTime;
 	// 長く遊んでも浮動小数点の精度が落ちないよう、時間を戻している
 	if (m_WetTime > WetTimeWrapSeconds)

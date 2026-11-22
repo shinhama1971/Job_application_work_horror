@@ -120,6 +120,18 @@ namespace Tools::CaptureTours
         { 160.0f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05y_1面_赤い水に呑まれる視界", false },
         { 160.35f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05z_1面_水の中に沈んだ視界", false },
         { 162.5f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, nullptr, false },
+        // 時間が止まった部屋（右の倉庫）。入ると世界の時計がゆっくり止まり、天井から落ちる水滴と床の波が宙で止まる。
+        // 止まりきって少しすると、一番遠い隅に人影が現れ、止まった部屋の中を近づいてくる。
+        // 人影を正面から照らすと崩れて時間が戻るので、人影の写真は、視線を少し横（約20度）へずらして写している
+        { 162.55f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 150.0f, -128.0f), -0.40f, nullptr, false },
+        { 165.2f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 150.0f, -128.0f), -0.40f, L"05za_1面_時間が止まった部屋", false },
+        { 165.6f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 204.0f, -164.0f) + 0.35f, -0.10f, nullptr, false },
+        { 168.6f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 204.0f, -164.0f) + 0.35f, -0.10f, L"05zb_1面_止まった部屋で近づく人影", false },
+        { 169.0f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 204.0f, -164.0f) + 0.35f, -0.10f, nullptr, false },
+        // 傾く部屋（南西の広間）。入口から奥へ行くほど、視界がゆっくり傾いていく
+        { 169.05f, Vector3(-330.0f, FloorY, -228.0f), YawToward(-330.0f, -228.0f, -200.0f, -300.0f), -0.05f, nullptr, false },
+        { 172.8f, Vector3(-330.0f, FloorY, -228.0f), YawToward(-330.0f, -228.0f, -200.0f, -300.0f), -0.05f, L"05zc_1面_奥へ行くほど傾く広間", false },
+        { 173.3f, Vector3(-330.0f, FloorY, -228.0f), YawToward(-330.0f, -228.0f, -200.0f, -300.0f), -0.05f, nullptr, false },
     };
 
     // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉 → 鏡（普段・鏡の異変で人影が映る・振り返ると誰もいない）

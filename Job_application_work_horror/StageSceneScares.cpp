@@ -756,6 +756,82 @@ bool StageScene::UpdateArchiveStalker(Player& player, float deltaTime)
 // プレイヤーの足跡のすぐ横に並んで近づいてくる（姿は見えず、足跡と水音だけ。1回のプレイで1回だけ）。
 // 一番新しい足跡を懐中電灯で照らすとそこで止まり、照らさずにすぐ近くまで来させると、すぐ後ろで息づかいが聞こえる。
 // ----------------------------------------------------------------------------
+void StageScene::UpdateStrangeRooms(const Player& player, float deltaTime)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    const Vector3 position = player.GetPosition();
+    ShadowMan* figure = m_Objects.timeStopFigure;
+
+    m_TimeStopCues.clear();
+    // 人影を出してよいか：時間が止まっている間は、ほかの演出を止めている（IsAmbientSoundAllowed が false になる）ので、そのときは出してよいことにしている
+    m_TimeStopRoom.Update(deltaTime, position, m_CorridorLoopCount, IsAmbientSoundAllowed() || m_TimeStopRoom.IsActive(),
+        m_TimeStopCues);
+    for (const Stage1TimeStopRoom::Cue& cue : m_TimeStopCues)
+    {
+        switch (cue.Type)
+        {
+        case Stage1TimeStopRoom::CueType::Freeze:
+            game->PlayAudioCue(SOUND_CUE_POWER, TimeStopFreezeSound.Pitch, TimeStopFreezeSound.Volume);
+            EventFeedback::HorrorPulse(*game->GetPostProcess(), TimeStopFreezePulse);
+            break;
+        case Stage1TimeStopRoom::CueType::Resume:
+            game->PlayAudioCue(SOUND_CUE_POWER, TimeStopResumeSound.Pitch, TimeStopResumeSound.Volume);
+            EventFeedback::HorrorPulse(*game->GetPostProcess(), TimeStopResumePulse);
+            // 部屋を出たら、人影も止まった世界と一緒に消える
+            if (figure != nullptr)
+            {
+                figure->SetActive(false);
+            }
+            break;
+        case Stage1TimeStopRoom::CueType::SpawnFigure:
+            if (figure != nullptr)
+            {
+                figure->SetPosition(cue.Position.x, cue.Position.y, cue.Position.z);
+                figure->SetActive(true);
+                figure->EnableGazeScare(TimeStopFigureLifetime);
+                figure->EnableChase(TimeStopFigureSpeed, TimeStopFigureStopDistance);
+                // 照らして崩したら、止まっていた時間が一気に戻る
+                figure->SetOnObserved([this]()
+                {
+                    BreakTimeStop();
+                });
+            }
+            break;
+        }
+    }
+
+    // 人影に触れられたら、驚かせて、時間を一気に戻している
+    if (figure != nullptr && figure->IsActive())
+    {
+        const Vector3 toFigure = figure->GetPosition() - position;
+        if (Vector2(toFigure.x, toFigure.z).Length() <= TimeStopFigureCatchDistance)
+        {
+            figure->SetActive(false);
+            game->PlayAudioCue(SOUND_CUE_SCARE, TimeStopCaughtSound.Pitch, TimeStopCaughtSound.Volume);
+            EventFeedback::HorrorPulse(*game->GetPostProcess(), TimeStopCaughtPulse);
+            EventFeedback::Rumble(TimeStopCaughtRumble);
+            BreakTimeStop();
+        }
+    }
+    Application::SetWorldTimeScale(m_TimeStopRoom.GetWorldTimeScale());
+
+    // 傾く部屋：奥へ進むほど視界が傾き、暖かい灯りの下ではまっすぐに戻る
+    m_TiltRoom.Update(deltaTime, position, m_CorridorLoopCount, m_SafeLights.GetCalm());
+    game->GetCamera()->SetViewRoll(m_TiltRoom.GetRoll());
+}
+
+void StageScene::BreakTimeStop()
+{
+    if (!m_TimeStopRoom.IsActive())
+    {
+        return;
+    }
+    m_TimeStopRoom.BreakSpell();
+    Core::Game* game = Core::Game::GetInstance();
+    game->PlayAudioCue(SOUND_CUE_POWER, TimeStopResumeSound.Pitch, TimeStopResumeSound.Volume);
+    EventFeedback::HorrorPulse(*game->GetPostProcess(), TimeStopResumePulse);
+}
+
 void StageScene::UpdateFootprintFollower(Player& player)
 {
     Ground* ground = m_Objects.ground;

@@ -71,8 +71,9 @@ void ScreenDustOverlay::Update()
 {
     if (!m_IsActive) return;
 
+    // 埃の流れは世界の時計で進めている（時間が止まった部屋では、埃が宙に止まる）。表示する残り秒数は普段の経過秒で数える
     const float deltaTime = Application::GetDeltaTime();
-    m_Time += deltaTime;
+    m_Time += Application::GetWorldDeltaTime();
 
     if (m_Timer > 0.0f)
     {

@@ -210,8 +210,14 @@ void Camera::Uninit()
 // タイルベースのライトカリングも、同じ行列から各タイルの視錐台を作っている。
 void Camera::GetMainMatrices(Matrix& view, Matrix& projection) const
 {
-    const Vector3 up(0.0f, 1.0f, 0.0f);
-    view = DirectX::XMMatrixLookAtLH(m_Position, m_Position + GetForward(), up);
+    // 視界を傾けるときは、上の向きを視線を軸に回している（手元の懐中電灯も、この行列から置くので一緒に傾く）
+    const Vector3 forward = GetForward();
+    Vector3 up(0.0f, 1.0f, 0.0f);
+    if (m_ViewRoll != 0.0f)
+    {
+        up = Vector3::TransformNormal(up, Matrix::CreateFromAxisAngle(forward, m_ViewRoll));
+    }
+    view = DirectX::XMMatrixLookAtLH(m_Position, m_Position + forward, up);
     // 見え方の引き伸ばし：カメラの位置を中心に、世界を z 方向へ伸ばしてから視点の行列をかけている
     if (m_WorldStretchZ != 1.0f)
     {

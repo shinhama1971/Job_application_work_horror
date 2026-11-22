@@ -50,6 +50,7 @@ int        Application::m_LaunchResolutionLevel = 0;
 float      Application::m_DpiScale = 1.0f;
 // 前フレームからの経過秒。最初のフレームは60fps相当の値にしている。
 float      Application::m_DeltaTime = 1.0f / GameplayFramesPerSecond;
+float      Application::m_WorldTimeScale = 1.0f;
 
 //-----------------------------------------------------------------------------
 // コンストラクタ：Sleepやタイマーの精度を1ミリ秒に上げている

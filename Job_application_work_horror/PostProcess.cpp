@@ -293,7 +293,9 @@ namespace Effect
             return 1.0f - std::pow(
                 1.0f - responseAt60Fps, deltaTime * ResponseReferenceFps);
         };
-        m_Time += deltaTime;
+        // 画面の粒・光の中の埃・霧の流れが使う時間は、世界の時計で進めている（時間が止まった部屋では、粒も埃も止まる）。
+        // 強さを目標へ近づける処理は、普段の経過秒のまま
+        m_Time += Application::GetWorldDeltaTime();
 
         // 走ったときや電池の警告の強さをなめらかにし、画面効果が一瞬で切り替わらないようにしている。
         m_NoiseAmount +=

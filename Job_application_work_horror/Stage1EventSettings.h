@@ -295,6 +295,26 @@ namespace Stage1EventSettings
     constexpr float BreathingWallSoundDistance = 90.0f;
     constexpr EventFeedback::SoundSpec BreathingWallSound{ 0.55f, 0.75f };
 
+    // --- 時間が止まった部屋（右の倉庫。Stage1TimeStopRoom）
+    // 天井から滴る水の真下（x・z）、水たまりの一番大きな半径、広がりきるまでの秒数
+    const Vector2 TimeStopLeakCenter(150.0f, -128.0f);
+    constexpr float TimeStopLeakRadius = 14.0f;
+    constexpr float TimeStopLeakGrowSeconds = 40.0f;
+    // 時間が止まり始めたとき（電源が落ちるような低い音）と、戻ったとき（同じ音を高く）の音・画面の脈打ち
+    constexpr EventFeedback::SoundSpec TimeStopFreezeSound{ 0.32f, 0.9f };
+    constexpr EventFeedback::SoundSpec TimeStopResumeSound{ 1.35f, 0.8f };
+    constexpr PulseSpec TimeStopFreezePulse{ 0.22f, 1.2f };
+    constexpr PulseSpec TimeStopResumePulse{ 0.30f, 0.35f };
+    // 止まった世界を近づいてくる人影：歩く速さ（歩くより遅い）、止まる距離、消えるまでの秒数、触れられたとみなす距離
+    constexpr float TimeStopFigureSpeed = 13.0f;
+    constexpr float TimeStopFigureStopDistance = 9.0f;
+    constexpr float TimeStopFigureLifetime = 40.0f;
+    constexpr float TimeStopFigureCatchDistance = 11.0f;
+    // 触れられたとき：驚かせる音・強い画面の脈打ち・振動
+    constexpr EventFeedback::SoundSpec TimeStopCaughtSound{ 0.75f, 1.1f };
+    constexpr PulseSpec TimeStopCaughtPulse{ 0.8f, 0.7f };
+    constexpr RumbleSpec TimeStopCaughtRumble{ 16, 0.45f };
+
     // --- ループ廊下に押し寄せる赤い水（Stage1CorridorFlood）
     // 照明が消えるときの音（電源が落ちる音を低く）・画面の脈打ち・振動
     constexpr EventFeedback::SoundSpec CorridorFloodLightsOutSound{ 0.55f, 1.2f };

@@ -165,7 +165,8 @@ void HangingBulb::Kick(float strength)
 
 void HangingBulb::Update()
 {
-    const float deltaTime = (std::min)(Application::GetDeltaTime(), MaxDeltaTime);
+    // 揺れは世界の時計で進めている（時間が止まった部屋では、振れた途中の向きのまま止まる）
+    const float deltaTime = (std::min)(Application::GetWorldDeltaTime(), MaxDeltaTime);
     m_Time += deltaTime;
 
     // すきま風：ゆっくり向きの変わる小さな力。影が近いほど強くなる

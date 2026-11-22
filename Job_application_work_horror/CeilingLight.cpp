@@ -278,7 +278,8 @@ void CeilingLight::UpdateRouteFlicker(float& targetBrightness)
 // 目標の明るさを決めてから、実際の明るさを少しずつ近づけている（急に変わらないように）。
 void CeilingLight::Update()
 {
-    const float deltaTime = Application::GetDeltaTime();
+    // ちらつきは世界の時計で進めている（時間が止まった部屋では、ちらついた途中の明るさのまま止まる）
+    const float deltaTime = Application::GetWorldDeltaTime();
     m_Time += deltaTime;
 
     // 電力が復旧した瞬間から、点灯までの経過時間を数えている

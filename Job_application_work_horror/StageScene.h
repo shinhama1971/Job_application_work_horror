@@ -18,6 +18,7 @@
 #include "Stage1CeilingStalker.h"
 #include "Stage1CorridorStretch.h"
 #include "Stage1CorridorFlood.h"
+#include "Stage1StrangeRooms.h"
 #include "Stage1BreathingGroup.h"
 #include "TensionPulse.h"
 #include "Stage1LightStalker.h"
@@ -98,6 +99,10 @@ private:
     void UpdateBreathingWall(float deltaTime);
     // 西棟の水を抜いた後、ループ廊下の奥から赤い水が押し寄せる（Stage1CorridorFlood の合図で照明・音・床の水・プレイヤーを動かす）
     void UpdateCorridorFlood(class Player& player, float deltaTime);
+    // おかしな部屋：時間が止まった部屋（世界の時計・人影・音）と、傾く部屋（カメラの傾き）
+    void UpdateStrangeRooms(const class Player& player, float deltaTime);
+    // 時間が止まった部屋の人影に触れられたか、照らして崩したとき：時間を一気に戻している
+    void BreakTimeStop();
     // 姿の見えない物音を更新し、鳴らしている
     void UpdateAmbientSounds();
     // 懐中電灯で照らすと浮かぶ壁の文字。書き換わった文字を読んだら物音の演出を起こしている。
@@ -196,6 +201,10 @@ private:
     std::vector<Stage1CorridorFlood::Cue> m_CorridorFloodCues;
     std::vector<class CeilingLight*> m_CorridorFloodLights;
     bool m_CorridorFloodOwnsWater = false;
+    // おかしな部屋：時間が止まった部屋（右の倉庫）とその合図、傾く部屋（南西の広間）
+    Stage1TimeStopRoom m_TimeStopRoom;
+    std::vector<Stage1TimeStopRoom::Cue> m_TimeStopCues;
+    Stage1TiltRoom m_TiltRoom;
     // このフレームに鳴らす物音（使い回している）
     std::vector<AmbientSoundCue> m_AmbientCues;
     // 壁の文字を読んだか、いつ書き換えるかを管理している（文字のObjectはStage1Layoutが配置している）。
