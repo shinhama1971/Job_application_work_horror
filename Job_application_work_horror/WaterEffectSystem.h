@@ -20,6 +20,12 @@ class Camera;
 class WaterEffectSystem final
 {
 private:
+    // 更新と描画で同じ座標・寿命・個数を使う。
+    static constexpr float RippleSurfaceY = -99.96f;
+    static constexpr std::size_t MaxPuddleDrops = 24;
+    static constexpr float DropImpactSeconds = 0.55f;
+    static constexpr std::size_t MaxFootstepRipples = 8;
+
     // 天井から落ちる水滴1つ分（位置・落ちる速さ・次に落ちるまでの待ち時間・着水してからの残り時間・個体差・落ちている途中か）
     struct FallingDrop
     {

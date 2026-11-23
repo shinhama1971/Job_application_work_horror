@@ -86,6 +86,8 @@ struct StageObjects
     ShadowMan* storageShadow = nullptr;
     // 時間が止まった部屋（右の倉庫）で、止まった世界の中を近づいてくる人影
     ShadowMan* timeStopFigure = nullptr;
+    // 音で輪郭が浮かぶ真っ暗な部屋（開始地点の部屋）で、最後に聞いた音へ歩いていく人影
+    ShadowMan* echoFigure = nullptr;
     ShadowMan* evidenceShadow = nullptr;
     ShadowMan* exitOmen = nullptr;
     // 書類保管室の「照らすと止まる影」（位置はStage1LightStalkerが決めている）

@@ -74,6 +74,13 @@ namespace
     constexpr float TremorFrequency = 13.7f;
     constexpr float TremorAmount = 0.004f;
     constexpr float TremorRollScale = 1.5f;
+    // 怖さで手が震える：速さの違う2つの揺れ（回る速さ）と、2つ目の割合とずらし、一番大きな震え（ラジアン）、上下に掛ける割合
+    constexpr float FearTremorFrequencyA = 21.0f;
+    constexpr float FearTremorFrequencyB = 33.0f;
+    constexpr float FearTremorSecondShare = 0.6f;
+    constexpr float FearTremorPhase = 1.3f;
+    constexpr float FearTremorAmount = 0.010f;
+    constexpr float FearTremorPitchScale = 0.7f;
     // 光が一瞬暗くなったときに懐中電灯を振る動き（速さと大きさ）
     constexpr float JoltFrequency = 38.0f;
     constexpr float JoltAmount = 0.035f;
@@ -253,6 +260,7 @@ void FirstPersonHands::Update(const FrameInput& input)
     m_Jolt = input.VoltageDrop ? 1.0f : m_Jolt * std::exp(-deltaTime * JoltDecayRate);
     m_LensGlow = input.LensGlow;
     m_BatteryWeakness = input.BatteryWeakness;
+    m_Corruption = input.Corruption;
     m_Bounce = input.Bounce;
 
     // 位置のずれ（ビュー空間）
@@ -279,11 +287,15 @@ void FirstPersonHands::Update(const FrameInput& input)
         0.0f, 0.0f, 0.0f, 1.0f);
 
     // 電池が少ないと光が揺れ、光が一瞬暗くなると懐中電灯を振る（叩いて直そうとする動き）
-    const float tremor = std::sin(m_Time * TremorFrequency) * TremorAmount * input.BatteryStress;
+    // 怖いときは、速さの違う2つの揺れを重ねた細かい震えを足している（影が近いほど強い）
+    const float fearTremor = (std::sin(m_Time * FearTremorFrequencyA) +
+        std::sin(m_Time * FearTremorFrequencyB + FearTremorPhase) * FearTremorSecondShare) * FearTremorAmount * input.Fear;
+    const float tremor = std::sin(m_Time * TremorFrequency) * TremorAmount * input.BatteryStress + fearTremor;
     const float jolt = std::sin(m_Time * JoltFrequency) * JoltAmount * m_Jolt;
     const float yaw = m_LookSwayYaw.Value * YawLookSwayScale + YawSprint * m_Sprint + jolt * YawJoltScale + tremor;
     const float pitch = -m_LookSwayPitch.Value * PitchLookSwayScale + PitchSprint * m_Sprint - PitchNearSurface * m_NearSurface -
-        PitchClick * m_Click + PitchLowered * m_Lower + jolt + std::sin(m_Time * BreathFrequency + BreathTiltPhase) * BreathTilt;
+        PitchClick * m_Click + PitchLowered * m_Lower + jolt + std::sin(m_Time * BreathFrequency + BreathTiltPhase) * BreathTilt +
+        fearTremor * FearTremorPitchScale;
     const float roll = GripRoll + m_BobX.Value * RollBobScale + RollSprint * m_Sprint + tremor * TremorRollScale;
     m_ViewPose = Matrix::CreateFromYawPitchRoll(yaw, pitch, roll) * aim * Matrix::CreateTranslation(position);
 }
@@ -314,7 +326,7 @@ void FirstPersonHands::Draw(Camera& camera)
     Vector3 front = Vector3::TransformNormal(Vector3(0.0f, 0.0f, 1.0f), inverseView);
     front.Normalize();
     buffer.BounceDirection = Vector4(front.x, front.y, front.z, 0.0f);
-    buffer.State = Vector4(m_LensGlow, m_BatteryWeakness, SkinGrimeAmount, 0.0f);
+    buffer.State = Vector4(m_LensGlow, m_BatteryWeakness, SkinGrimeAmount, m_Corruption);
 
     ID3D11DeviceContext* context = Renderer::GetDeviceContext();
     context->UpdateSubresource(m_ViewModelBuffer.Get(), 0, nullptr, &buffer, 0, 0);

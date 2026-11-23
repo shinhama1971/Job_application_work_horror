@@ -250,6 +250,7 @@ bool StageScene::IsAmbientSoundAllowed() const
         !m_CeilingStalker.IsActive() &&
         !m_CorridorFlood.IsActive() &&
         !m_TimeStopRoom.IsActive() &&
+        !m_EchoRoom.IsDark() &&
         !powerRestoring &&
         m_SafeLights.GetCalm() < SafeLightQuietCalm &&
         (exit == nullptr || !exit->IsEscaping());
@@ -375,6 +376,22 @@ float StageScene::ComputeThreatRate(const Player& player) const
     }
     // 暖かい灯りの下（光の安全地帯）にいる間は、心拍と息が静まっていく
     return threatRate * (1.0f - m_SafeLights.GetCalm());
+}
+
+void StageScene::UpdateHands(Player& player, float deltaTime)
+{
+    const bool allFuses = Core::Game::GetInstance()->GetItemCount() >= Core::GameState::RequiredFuseCount;
+    const float target =
+        allFuses && m_CorridorLoopCount > 0 ? HandCorruptionAllFuses
+        : m_CorridorLoopCount <= 0 ? 0.0f
+        : m_CorridorLoopCount == 1 ? HandCorruptionFirstLoop
+        : m_CorridorLoopCount == 2 ? HandCorruptionSecondLoop
+        : HandCorruptionLaterLoop;
+    const float step = HandCorruptionRate * deltaTime;
+    m_HandCorruption = std::clamp(target, m_HandCorruption - step, m_HandCorruption + step);
+    player.SetHandCorruption(m_HandCorruption);
+    // 影が近いほど、手が細かく震える（心拍と同じ影の近さ）
+    player.SetHandFear(ComputeThreatRate(player));
 }
 
 void StageScene::UpdateTensionPulse(const Player& player, float deltaTime)

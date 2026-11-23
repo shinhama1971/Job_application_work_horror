@@ -18,6 +18,7 @@ SamplerState g_SamplerState : register(s0);
 #include "pbrLighting.hlsli"
 #include "waterCaustics.hlsli"
 #include "roomOcclusion.hlsli"
+#include "echoPulse.hlsli"
 #include "screenAmbientOcclusion.hlsli"
 #include "surfaceDetail.hlsli"
 #if defined(PORTRAIT_SURFACE)
@@ -639,6 +640,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
         return float4(0.0f, 0.0f, 0.0f, 1.0f);
     }
 
+    // 音で輪郭が浮かぶ部屋：広がる音の輪が通る所と、通り過ぎた後の輪郭を光らせている（輪がないときは何も足さない）
+    color.rgb += GetEchoReveal(input.worldPos, normalize(input.worldNormal));
     return color;
 }
 

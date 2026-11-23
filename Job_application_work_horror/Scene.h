@@ -47,7 +47,9 @@ enum class SceneDebugAction
     // 撮影用：通常プレイでは呼ばず、3周目で3本目のヒューズを拾った後（建物全体が呼吸している）にする。
     ShowBreathingBuilding,
     // 撮影用：通常プレイでは呼ばず、1面のループ廊下に水が押し寄せる演出を、条件を見ずに始める。
-    StartCorridorFlood
+    StartCorridorFlood,
+    // 撮影用：通常プレイでは呼ばず、開始地点の部屋を、音で輪郭が浮かぶ真っ暗な部屋にする（次に部屋の中にいるフレームで始まる）。
+    StartEchoRoom
 };
 
 // シーンの基底クラス。Gameが今のシーンを1つだけunique_ptrで持ち、毎フレーム更新・描画している。

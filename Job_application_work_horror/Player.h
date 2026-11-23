@@ -44,6 +44,11 @@ private:
     float m_FlashlightNearSurfaceBlend = 0.0f;
     // このフレームでスイッチを押したか（手の小さな押す動きに使っている）
     bool m_FlashlightToggledThisFrame = false;
+    // 懐中電灯が点かない間か（1面の音で輪郭が浮かぶ真っ暗な部屋）。スイッチを押しても音だけ鳴り、点かない
+    bool m_FlashlightBlocked = false;
+    // 手の変わり具合と怖さ（FirstPersonHands へ渡す。シーンが毎フレーム決めている）
+    float m_HandCorruption = 0.0f;
+    float m_HandFear = 0.0f;
     // 体の影の、歩く手足の振りの位相と大きさ（0〜1）
     float m_BodyWalkPhase = 0.0f;
     float m_BodyWalkAmount = 0.0f;
@@ -295,11 +300,25 @@ public:
     // 懐中電灯を点けた状態・消した状態にしている（自動撮影モードで使っている。音は鳴らさない）。
     void SetFlashlightOn(bool on)
     {
+        // 点かない間は、点けようとしても消えたまま
+        on = on && !m_FlashlightBlocked;
         if (m_Flashlight.IsOn() != on)
         {
             m_Flashlight.Toggle();
         }
     }
+    // 懐中電灯を点かなくしている（blocked の間は消え、スイッチを押しても点かない）。false に戻しても、自分で点けるまでは消えたまま
+    void SetFlashlightBlocked(bool blocked)
+    {
+        m_FlashlightBlocked = blocked;
+        if (blocked && m_Flashlight.IsOn())
+        {
+            m_Flashlight.Toggle();
+        }
+    }
+    // 手の変わり具合（0〜1。血管が浮き、指先が黒ずむ）と怖さ（0〜1。手が細かく震える）を決めている
+    void SetHandCorruption(float corruption) { m_HandCorruption = corruption; }
+    void SetHandFear(float fear) { m_HandFear = fear; }
     // 出来事（ヒューズを拾った瞬間など）で、懐中電灯を seconds 秒だけ激しくちらつかせている
     void SputterFlashlight(float seconds)
     {

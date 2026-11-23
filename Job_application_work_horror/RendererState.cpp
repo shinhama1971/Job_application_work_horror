@@ -93,10 +93,34 @@ void Renderer::SetRoomOcclusion(
 	buffer.FloorY = floorY;
 	buffer.CeilingY = ceilingY;
 	buffer.Strength = strength;
+	// 音の輪は、部屋の形を置き直しても今の値のまま残している
+	for (unsigned int i = 0; i < ROOM_OCCLUSION_BUFFER::MaxEchoPulses; ++i)
+	{
+		buffer.EchoPulses[i] = m_RoomOcclusion.EchoPulses[i];
+		buffer.EchoPulseStrength[i] = m_RoomOcclusion.EchoPulseStrength[i];
+	}
 	m_RoomOcclusion = buffer;
 	++m_RoomOcclusionVersion;
 	m_pDeviceContext->UpdateSubresource(
 		m_pRoomOcclusionBuffer.Get(), 0, NULL, &buffer, 0, 0);
+	m_pDeviceContext->PSSetConstantBuffers(
+		RoomOcclusionBufferSlot, 1, m_pRoomOcclusionBuffer.GetAddressOf());
+}
+
+void Renderer::SetEchoPulses(const Vector4* pulses, const float* strengths, unsigned int count)
+{
+	if (!m_pRoomOcclusionBuffer)
+	{
+		return;
+	}
+	for (unsigned int i = 0; i < ROOM_OCCLUSION_BUFFER::MaxEchoPulses; ++i)
+	{
+		const bool used = pulses != nullptr && strengths != nullptr && i < count;
+		m_RoomOcclusion.EchoPulses[i] = used ? pulses[i] : Vector4::Zero;
+		m_RoomOcclusion.EchoPulseStrength[i] = Vector4(used ? strengths[i] : 0.0f, 0.0f, 0.0f, 0.0f);
+	}
+	m_pDeviceContext->UpdateSubresource(
+		m_pRoomOcclusionBuffer.Get(), 0, NULL, &m_RoomOcclusion, 0, 0);
 	m_pDeviceContext->PSSetConstantBuffers(
 		RoomOcclusionBufferSlot, 1, m_pRoomOcclusionBuffer.GetAddressOf());
 }

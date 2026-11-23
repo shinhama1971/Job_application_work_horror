@@ -4,7 +4,8 @@
 //           頂点カラーの印（爪・血色）、指のすき間の環境遮蔽、浅い角度で光る薄い皮脂の鏡面反射、
 //           汚れ（指先と関節のすき間にたまる、廃墟を進むうちに付いた黒ずみ）
 // ・頂点カラー: r = 環境遮蔽、g = 爪、b = 血色（指先・関節・指の付け根）。build_flashlight_hand.py が作っている。
-// ・肌の色は Material.Diffuse、汚れの量は ViewModelState.z（FirstPersonHands）。
+// ・肌の色は Material.Diffuse、汚れの量は ViewModelState.z、手の変わり具合は ViewModelState.w（FirstPersonHands）。
+//   変わり具合が増えるほど、肌が青白くなり、手の甲に青黒い血管が浮き、指先と関節が黒ずむ（1面の周回とヒューズで増える）。
 // ============================================================================
 
 #include "common.hlsl"
@@ -36,6 +37,27 @@ SamplerState g_SamplerState : register(s0);
 #define SKIN_GRIME_START 0.35f
 #define SKIN_GRIME_FULL 0.75f
 #define SKIN_GRIME_TINT float3(0.42f, 0.38f, 0.34f)
+// 手の変わり具合：青白さ（色を抜く量と、寄せる冷たい色）、血管（細かさ・高さでのずらし・2本目の細かさの倍率と割合・
+// 線になる範囲（出始め・出きる）・色・濃さ）、黒ずみ（血色の印から出る範囲（出始め・出きる）・色・濃さ）
+#define SKIN_PALE_AMOUNT 0.45f
+#define SKIN_PALE_TINT float3(0.86f, 0.90f, 1.0f)
+// 血管は手の長さの向きに伸ばす（横は細かく、長さの向きは粗く）。出る所はまだらにしている（まだらの細かさ・出始め・出きる）
+#define SKIN_VEIN_SCALE_ACROSS 13.0f
+#define SKIN_VEIN_SCALE_ALONG 4.5f
+#define SKIN_VEIN_HEIGHT_SCALE 4.2f
+#define SKIN_VEIN_BRANCH_SCALE 2.1f
+#define SKIN_VEIN_BRANCH_SHARE 0.4f
+#define SKIN_VEIN_START 0.88f
+#define SKIN_VEIN_FULL 0.975f
+#define SKIN_VEIN_MASK_SCALE 2.6f
+#define SKIN_VEIN_MASK_START 0.35f
+#define SKIN_VEIN_MASK_FULL 0.7f
+#define SKIN_VEIN_COLOR float3(0.16f, 0.18f, 0.30f)
+#define SKIN_VEIN_STRENGTH 0.85f
+#define SKIN_NECROSIS_START 0.35f
+#define SKIN_NECROSIS_FULL 0.85f
+#define SKIN_NECROSIS_COLOR float3(0.10f, 0.06f, 0.08f)
+#define SKIN_NECROSIS_STRENGTH 0.9f
 // 粗さ（肌・汚れた肌・爪）
 #define SKIN_ROUGHNESS 0.52f
 #define SKIN_GRIME_ROUGHNESS 0.62f
@@ -75,6 +97,23 @@ float4 main(in VIEW_MODEL_PS_IN input) : SV_Target
     const float grime = ViewModelState.z * saturate((1.0f - occlusion) * SKIN_GRIME_CAVITY_GAIN + redness * SKIN_GRIME_REDNESS_GAIN) *
         smoothstep(SKIN_GRIME_START, SKIN_GRIME_FULL, grimeNoise);
     baseColor = lerp(baseColor, baseColor * SKIN_GRIME_TINT, grime);
+
+    // 手の変わり具合：青白くし、手の甲に血管を浮かせ、指先と関節を黒ずませている
+    const float corruption = saturate(ViewModelState.w);
+    const float paleLuminance = dot(baseColor, SKIN_LUMINANCE_WEIGHTS);
+    baseColor = lerp(baseColor, paleLuminance * SKIN_PALE_TINT, corruption * SKIN_PALE_AMOUNT);
+    // 血管：ノイズの「0.5 を横切る所」を細い線にし、細かさの違う2本を重ねて枝分かれに見せている（爪には出さない）
+    const float2 veinPosition = float2(input.localPos.x * SKIN_VEIN_SCALE_ACROSS, input.localPos.z * SKIN_VEIN_SCALE_ALONG) +
+        input.localPos.y * SKIN_VEIN_HEIGHT_SCALE;
+    const float veinMask = smoothstep(SKIN_VEIN_MASK_START, SKIN_VEIN_MASK_FULL, FastValueNoise(input.localPos.xz * SKIN_VEIN_MASK_SCALE));
+    const float veinMain = 1.0f - abs(FastValueNoise(veinPosition) * 2.0f - 1.0f);
+    const float veinBranch = 1.0f - abs(FastValueNoise(veinPosition * SKIN_VEIN_BRANCH_SCALE) * 2.0f - 1.0f);
+    const float vein = max(smoothstep(SKIN_VEIN_START, SKIN_VEIN_FULL, veinMain),
+        smoothstep(SKIN_VEIN_START, SKIN_VEIN_FULL, veinBranch) * SKIN_VEIN_BRANCH_SHARE) * veinMask * (1.0f - nail);
+    baseColor = lerp(baseColor, SKIN_VEIN_COLOR, vein * corruption * SKIN_VEIN_STRENGTH);
+    // 黒ずみ：血色の印（指先・関節・指の付け根）から広がる
+    const float necrosis = smoothstep(SKIN_NECROSIS_START, SKIN_NECROSIS_FULL, redness) * corruption;
+    baseColor = lerp(baseColor, SKIN_NECROSIS_COLOR, necrosis * SKIN_NECROSIS_STRENGTH);
 
     const float roughness = lerp(lerp(SKIN_ROUGHNESS, SKIN_GRIME_ROUGHNESS, grime), NAIL_ROUGHNESS, nail);
     const PbrSurface surface = MakePbrSurface(baseColor, 0.0f, roughness, 0.0f);

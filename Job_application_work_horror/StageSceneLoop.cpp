@@ -178,6 +178,8 @@ void StageScene::AdvanceCorridorLoop(Player& player)
     m_LoopNoticeTimer = CorridorLoopNoticeSeconds;
     // 周回が進むほど、振り返った廊下が大きく伸びる
     m_CorridorStretch.SetLoopCount(m_CorridorLoopCount);
+    // 2周目からは、戻った開始地点の部屋が、音で輪郭が浮かぶ真っ暗な部屋になる（一度だけ）
+    m_EchoRoom.ArmOnLoopArrival(m_CorridorLoopCount);
     // 1周目から、右の倉庫（時間が止まった部屋）の天井から水が滴り、床に水たまりが広がっていく
     // （時間が止まると、落ちる途中の水滴と、広がる波が宙で止まって見える）
     if (m_CorridorLoopCount == 1 && m_Objects.ground != nullptr)
@@ -512,12 +514,22 @@ void StageScene::UpdateBreathingFixtures(bool restore)
 }
 
 
+bool StageScene::IsCorridorFloodReady() const
+{
+    return m_WestWing.GetStep() >= Stage1WestWing::Step::FindFuse ||
+        Core::Game::GetInstance()->GetItemCount() >= Core::GameState::RequiredFuseCount;
+}
+
 void StageScene::UpdateCorridorFlood(Player& player, float deltaTime)
 {
     Core::Game* game = Core::Game::GetInstance();
-    const bool drained = m_WestWing.GetStep() >= Stage1WestWing::Step::FindFuse;
+    const ExitTrigger* exit = m_Objects.exitTrigger;
+    // 物音用の条件には、通過中にも残り続ける影や演出が含まれる。濁流は操作を妨げる場面だけ待たせる。
+    const bool canStart = player.CanControl() && !m_Surveillance.IsViewing() &&
+        !m_Surveillance.IsCaughtActive() && !m_HiddenRoom.IsTrapped() && !m_CeilingStalker.IsActive() &&
+        !m_TimeStopRoom.IsActive() && !m_EchoRoom.IsDark() && (exit == nullptr || !exit->IsEscaping());
     m_CorridorFloodCues.clear();
-    m_CorridorFlood.Update(deltaTime, player.GetPosition(), drained, IsAmbientSoundAllowed(), m_CorridorFloodCues);
+    m_CorridorFlood.Update(deltaTime, player.GetPosition(), IsCorridorFloodReady(), canStart, m_CorridorFloodCues);
     for (const Stage1CorridorFlood::Cue& cue : m_CorridorFloodCues)
     {
         switch (cue.Type)
@@ -578,7 +590,7 @@ void StageScene::UpdateCorridorFlood(Player& player, float deltaTime)
         game->GetPostProcess()->SetSubmerge(submerge);
     }
 
-    // 床の浸水範囲は、西棟の水を抜いた後は使っていないので、水がある間だけこの演出が使っている
+    // 床の浸水範囲を使い回す。暗証番号ルートで西棟を排水していない場合も、濁流後は元の水位に戻す。
     Ground* ground = m_Objects.ground;
     if (ground == nullptr)
     {
@@ -593,10 +605,7 @@ void StageScene::UpdateCorridorFlood(Player& player, float deltaTime)
     }
     else if (m_CorridorFloodOwnsWater)
     {
-        // 水が引き切ったら、広さ0の範囲にして水をなくしている
-        ground->SetFloodRegion(
-            Vector2(Stage1CorridorFlood::CorridorMinX, Stage1CorridorFlood::CorridorEndZ),
-            Vector2(Stage1CorridorFlood::CorridorMaxX, Stage1CorridorFlood::CorridorEndZ));
+        m_WestWing.ApplyFloodRegion();
         m_CorridorFloodOwnsWater = false;
     }
     ground->SetFloodRedness(m_CorridorFlood.GetRedness());

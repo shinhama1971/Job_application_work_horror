@@ -242,7 +242,9 @@
     <ClCompile Include="GameSettings.cpp" />
     <ClCompile Include="PauseMenu.cpp" />
     <ClCompile Include="Ground.cpp" />
+    <ClCompile Include="GroundRainRipples.cpp" />
     <ClCompile Include="GroundWaterEffects.cpp" />
+    <ClCompile Include="GroundWaterEffectDraw.cpp" />
     <ClCompile Include="WaterRippleSimulation.cpp" />
     <ClCompile Include="Hud.cpp" />
     <ClCompile Include="HudGlyphs.cpp" />
@@ -256,6 +258,7 @@
     <ClCompile Include="ObjectManager.cpp" />
     <ClCompile Include="Object.cpp" />
     <ClCompile Include="Player.cpp" />
+    <ClCompile Include="PlayerFlashlight.cpp" />
     <ClCompile Include="ReflectionProbe.cpp" />
     <ClCompile Include="ScreenSpaceReflection.cpp" />
     <ClCompile Include="PostProcess.cpp" />
@@ -276,7 +279,9 @@
     <ClCompile Include="PointShadowMap.cpp" />
     <ClCompile Include="Sound.cpp" />
     <ClCompile Include="StageScene.cpp" />
+    <ClCompile Include="StageSceneGuidance.cpp" />
     <ClCompile Include="Stage1Layout.cpp" />
+    <ClCompile Include="Stage1LayoutRooms.cpp" />
     <ClCompile Include="Stage1Objective.cpp" />
     <ClCompile Include="StageSurveillanceController.cpp" />
     <ClCompile Include="Stage1AmbientSounds.cpp" />
@@ -289,10 +294,12 @@
     <ClCompile Include="Stage1CorridorStretch.cpp" />
     <ClCompile Include="Stage1CorridorFlood.cpp" />
     <ClCompile Include="Stage1StrangeRooms.cpp" />
+    <ClCompile Include="Stage1EchoRoom.cpp" />
     <ClCompile Include="Stage1WestWing.cpp" />
     <ClCompile Include="KeyItem.cpp" />
     <ClCompile Include="Locker.cpp" />
     <ClCompile Include="CaptureMode.cpp" />
+    <ClCompile Include="CaptureImage.cpp" />
     <ClCompile Include="CaptureBenchmark.cpp" />
     <ClCompile Include="CaptureTours.cpp" />
     <ClCompile Include="VideoWriter.cpp" />
@@ -305,8 +312,10 @@
     <ClCompile Include="StageSceneEvents.cpp" />
     <ClCompile Include="StageSceneLoop.cpp" />
     <ClCompile Include="StageSceneScares.cpp" />
+    <ClCompile Include="StageSceneRoomScares.cpp" />
     <ClCompile Include="StageSceneDraw.cpp" />
     <ClCompile Include="Stage2Scene.cpp" />
+    <ClCompile Include="Stage2SceneAtmosphere.cpp" />
     <ClCompile Include="Stage3Scene.cpp" />
     <ClCompile Include="ForestScene.cpp" />
     <ClCompile Include="ForestLightningFigure.cpp" />
@@ -326,6 +335,7 @@
     <ClCompile Include="Stage2SceneThreat.cpp" />
     <ClCompile Include="Stage2SceneLoop.cpp" />
     <ClCompile Include="Stage2SceneHorror.cpp" />
+    <ClCompile Include="Stage2SceneFinalSequence.cpp" />
     <ClCompile Include="Stage2SceneAnomalies.cpp" />
     <ClCompile Include="Stage2SceneDraw.cpp" />
     <ClCompile Include="StaticMesh.cpp" />
@@ -340,6 +350,7 @@
     <ClCompile Include="TitleScene.cpp" />
     <ClCompile Include="Utility.cpp" />
     <ClCompile Include="Wall.cpp" />
+    <ClCompile Include="WallVisualModel.cpp" />
     <ClCompile Include="WallBreathing.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -436,6 +447,7 @@
     <ClInclude Include="StageScene.h" />
     <ClInclude Include="Stage1EventSettings.h" />
     <ClInclude Include="Stage1Layout.h" />
+    <ClInclude Include="Stage1LayoutBuilder.h" />
     <ClInclude Include="Stage1LightNumber.h" />
     <ClInclude Include="Stage1Objective.h" />
     <ClInclude Include="StageSurveillanceController.h" />
@@ -452,6 +464,7 @@
     <ClInclude Include="Stage1CorridorStretch.h" />
     <ClInclude Include="Stage1CorridorFlood.h" />
     <ClInclude Include="Stage1StrangeRooms.h" />
+    <ClInclude Include="Stage1EchoRoom.h" />
     <ClInclude Include="Stage1BreathingGroup.h" />
     <ClInclude Include="Stage1WestWing.h" />
     <ClInclude Include="CeilingReflectionScare.h" />
@@ -459,6 +472,7 @@
     <ClInclude Include="Locker.h" />
     <ClInclude Include="CaptureMode.h" />
     <ClInclude Include="CaptureTours.h" />
+    <ClInclude Include="CaptureImage.h" />
     <ClInclude Include="CaptureBenchmark.h" />
     <ClInclude Include="VideoWriter.h" />
     <ClInclude Include="TechDemo.h" />
@@ -528,8 +542,10 @@
     <ClInclude Include="shader\waterCaustics.hlsli" />
     <ClInclude Include="shader\wallSurface.hlsli" />
     <ClInclude Include="shader\floorAgeing.hlsli" />
+    <ClInclude Include="shader\wetFloorMaterialSettings.hlsli" />
     <ClInclude Include="shader\puddleReflection.hlsli" />
     <ClInclude Include="shader\waterDrips.hlsli" />
+    <ClInclude Include="shader\echoPulse.hlsli" />
     <ClInclude Include="shader\waterCausticsLayout.hlsli" />
     <ClInclude Include="shader\puddleMask.hlsli" />
     <ClInclude Include="shader\horrorMarks.hlsli" />

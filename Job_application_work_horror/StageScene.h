@@ -19,6 +19,7 @@
 #include "Stage1CorridorStretch.h"
 #include "Stage1CorridorFlood.h"
 #include "Stage1StrangeRooms.h"
+#include "Stage1EchoRoom.h"
 #include "Stage1BreathingGroup.h"
 #include "TensionPulse.h"
 #include "Stage1LightStalker.h"
@@ -98,11 +99,14 @@ private:
     // 呼吸する壁：組ごとに、周回とヒューズの数で膨らむ量を決め、息を吐くたびに一番近い壁の中から息の音を鳴らす
     void UpdateBreathingWall(float deltaTime);
     // 西棟の水を抜いた後、ループ廊下の奥から赤い水が押し寄せる（Stage1CorridorFlood の合図で照明・音・床の水・プレイヤーを動かす）
+    bool IsCorridorFloodReady() const;
     void UpdateCorridorFlood(class Player& player, float deltaTime);
     // おかしな部屋：時間が止まった部屋（世界の時計・人影・音）と、傾く部屋（カメラの傾き）
     void UpdateStrangeRooms(const class Player& player, float deltaTime);
     // 時間が止まった部屋の人影に触れられたか、照らして崩したとき：時間を一気に戻している
     void BreakTimeStop();
+    // 音で輪郭が浮かぶ真っ暗な部屋：照明・懐中電灯・人影・足音を動かし、音の輪を描画へ渡している
+    void UpdateEchoRoom(class Player& player, float deltaTime);
     // 姿の見えない物音を更新し、鳴らしている
     void UpdateAmbientSounds();
     // 懐中電灯で照らすと浮かぶ壁の文字。書き換わった文字を読んだら物音の演出を起こしている。
@@ -118,6 +122,8 @@ private:
     float ComputeThreatRate(const class Player& player) const;
     // 危険度に合わせて、自分の心拍音と呼吸音を鳴らしている。
     void UpdateTensionPulse(const class Player& player, float deltaTime);
+    // 自分の手：周回とヒューズの数で、手の変わり具合（血管・黒ずみ）を少しずつ進め、影の近さで手を震わせている
+    void UpdateHands(class Player& player, float deltaTime);
     // 出ている影のうち近いものの画面の位置・大きさ・近さを、画面効果（影のまわりの空間のゆがみ）へ渡している
     void UpdatePresenceWarp(const class Player& player);
     // 書類保管室の「照らすと止まる影」を進め、表示・足音・触れられたときの電池の減少を行っている。
@@ -205,6 +211,12 @@ private:
     Stage1TimeStopRoom m_TimeStopRoom;
     std::vector<Stage1TimeStopRoom::Cue> m_TimeStopCues;
     Stage1TiltRoom m_TiltRoom;
+    // 音で輪郭が浮かぶ真っ暗な部屋（開始地点の部屋）とその合図、暗くするために消した照明（戻すため）
+    Stage1EchoRoom m_EchoRoom;
+    std::vector<Stage1EchoRoom::Cue> m_EchoRoomCues;
+    std::vector<class CeilingLight*> m_EchoRoomLights;
+    // 自分の手の変わり具合（0〜1。少しずつ目標へ近づける）
+    float m_HandCorruption = 0.0f;
     // このフレームに鳴らす物音（使い回している）
     std::vector<AmbientSoundCue> m_AmbientCues;
     // 壁の文字を読んだか、いつ書き換えるかを管理している（文字のObjectはStage1Layoutが配置している）。

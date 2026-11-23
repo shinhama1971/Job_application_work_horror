@@ -52,6 +52,9 @@ public:
         bool Lowered = false;
         // 前の面で跳ね返って手を照らす光（色と強さ）
         DirectX::SimpleMath::Vector3 Bounce = DirectX::SimpleMath::Vector3::Zero;
+        // 手の変わり具合（0〜1。血管が浮き、指先が黒ずむ。1面の周回とヒューズで増える）と、怖さ（0〜1。手が細かく震える）
+        float Corruption = 0.0f;
+        float Fear = 0.0f;
     };
 
     void Init();
@@ -109,5 +112,6 @@ private:
     float m_NearSurface = 0.0f;
     float m_LensGlow = 0.0f;
     float m_BatteryWeakness = 0.0f;
+    float m_Corruption = 0.0f;   // 手の変わり具合（viewModelSkinPS の ViewModelState.w）
     DirectX::SimpleMath::Vector3 m_Bounce = DirectX::SimpleMath::Vector3::Zero;
 };

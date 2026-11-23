@@ -1,16 +1,60 @@
 // ============================================================================
-// ファイルの役割: 自動撮影の道順（キーフレーム）のデータ。時刻と時刻の間は、位置と向きを直線で補間する（CaptureMode.cpp）。
+// ファイルの役割: 自動撮影の道順（キーフレーム）のデータ。時刻と時刻の間は、位置と向きを直線で補間する。
 // Shot に名前があるキーフレームの時刻で、スクリーンショットを1枚保存する。
 // ============================================================================
 
 #include "CaptureTours.h"
 
+#include <algorithm>
 #include <iterator>
 
 using namespace DirectX::SimpleMath;
 
+namespace
+{
+    // 角度の補間。差を-π〜πに直してから補間し、遠回りの方向へ回らないようにしている
+    float LerpAngle(float from, float to, float t)
+    {
+        float delta = std::fmod(to - from, Tools::CaptureTours::Pi * 2.0f);
+        if (delta > Tools::CaptureTours::Pi) delta -= Tools::CaptureTours::Pi * 2.0f;
+        if (delta < -Tools::CaptureTours::Pi) delta += Tools::CaptureTours::Pi * 2.0f;
+        return from + delta * t;
+    }
+}
+
 namespace Tools::CaptureTours
 {
+    // 道順の中で、指定した時刻の位置と向きを、前後のキーフレームから補間して求めている
+    Keyframe Sample(const std::vector<Keyframe>& tour, float time)
+    {
+        // 最初のキーフレームより前は最初の位置、最後より後は最後の位置のままにしている
+        if (time <= tour.front().Time)
+        {
+            return tour.front();
+        }
+        for (size_t index = 1; index < tour.size(); ++index)
+        {
+            const Keyframe& next = tour[index];
+            if (time > next.Time)
+            {
+                continue;
+            }
+            const Keyframe& previous = tour[index - 1];
+            // 同時刻のキーフレームがあっても、補間率の分母をゼロにしない。
+            constexpr float MinimumKeyframeIntervalSeconds = 0.001f;
+            const float span = (std::max)(next.Time - previous.Time, MinimumKeyframeIntervalSeconds);
+            const float t = (time - previous.Time) / span;
+            Keyframe result = previous;
+            result.Position = Vector3::Lerp(previous.Position, next.Position, t);
+            result.Yaw = LerpAngle(previous.Yaw, next.Yaw, t);
+            result.Pitch = previous.Pitch + (next.Pitch - previous.Pitch) * t;
+            // 隠れる区間かどうかは補間せず、前のキーフレームの値を使っている
+            result.Hide = previous.Hide;
+            return result;
+        }
+        return tour.back();
+    }
+
     // 1面: 開始地点 → 中央ホール → 左の倉庫 → 暗証番号の扉 → ループ廊下 → 西棟（浸水した機械室） → 書類保管室 → 南西の広間 → 光の安全地帯 → 足音の波紋 → 壁の血の手形
     const std::vector<Keyframe> Stage1Tour =
     {
@@ -111,7 +155,7 @@ namespace Tools::CaptureTours
         { 152.0f, Vector3(-60.0f, FloorY, -40.0f), YawToward(-60.0f, -40.0f, -200.0f, 40.0f), -0.04f, L"05t_1面_ヒューズ3本の後に息をする中央ホール", false },
         { 154.3f, Vector3(-60.0f, FloorY, -40.0f), YawToward(-60.0f, -40.0f, -200.0f, 40.0f), -0.04f, L"05u_1面_息を吐いた中央ホール", false },
         { 154.8f, Vector3(-60.0f, FloorY, -40.0f), YawToward(-60.0f, -40.0f, -200.0f, 40.0f), -0.04f, nullptr, false },
-        // ループ廊下に赤い水が押し寄せる（CorridorFloodRequestTime）。南北の廊下の中ほどから北の角を向き、
+        // ヒューズ3本を持った状態でループ廊下に入ると、通常の条件で赤い水が押し寄せる。
         // 照明が消えた直後・奥から水が来る所・水が目の前まで来た所を写している（この後、追いつかれて暗転する）
         { 155.05f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, nullptr, false },
         { 156.0f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05v_1面_廊下の照明が消える", false },
@@ -128,10 +172,23 @@ namespace Tools::CaptureTours
         { 165.6f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 204.0f, -164.0f) + 0.35f, -0.10f, nullptr, false },
         { 168.6f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 204.0f, -164.0f) + 0.35f, -0.10f, L"05zb_1面_止まった部屋で近づく人影", false },
         { 169.0f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 204.0f, -164.0f) + 0.35f, -0.10f, nullptr, false },
+        // 次の場面へ飛ぶ間の補間が、開始地点の部屋（音で輪郭が浮かぶ部屋）を通らないよう、中央ホールを回っている
+        { 169.02f, Vector3(110.0f, FloorY, -40.0f), 0.0f, -0.05f, nullptr, false },
+        { 169.04f, Vector3(-330.0f, FloorY, -40.0f), 0.0f, -0.05f, nullptr, false },
         // 傾く部屋（南西の広間）。入口から奥へ行くほど、視界がゆっくり傾いていく
         { 169.05f, Vector3(-330.0f, FloorY, -228.0f), YawToward(-330.0f, -228.0f, -200.0f, -300.0f), -0.05f, nullptr, false },
         { 172.8f, Vector3(-330.0f, FloorY, -228.0f), YawToward(-330.0f, -228.0f, -200.0f, -300.0f), -0.05f, L"05zc_1面_奥へ行くほど傾く広間", false },
         { 173.3f, Vector3(-330.0f, FloorY, -228.0f), YawToward(-330.0f, -228.0f, -200.0f, -300.0f), -0.05f, nullptr, false },
+        // 音で輪郭が浮かぶ真っ暗な部屋（開始地点の部屋。2周した後に戻ると起きる）。照明も懐中電灯も消えた真っ暗な部屋を、
+        // 北へ歩くと一歩ごとに足元から音の輪が広がって部屋の形が浮かび、立ち止まると、奥の人影の足音の輪だけが見える
+        { 173.35f, Vector3(0.0f, FloorY, -166.0f), 0.0f, -0.12f, nullptr, false },
+        { 174.4f, Vector3(0.0f, FloorY, -166.0f), 0.0f, -0.12f, L"05zd_1面_真っ暗になった開始地点の部屋", false },
+        // 歩き出して最初の一歩の輪が、床の見える所（足元から30〜60）まで広がった瞬間を、少し下を向いて写している
+        { 174.5f, Vector3(0.0f, FloorY, -166.0f), 0.0f, -0.55f, nullptr, false },
+        { 175.75f, Vector3(0.0f, FloorY, -142.25f), 0.0f, -0.55f, L"05ze_1面_足音で浮かぶ部屋の輪郭", false },
+        { 176.5f, Vector3(0.0f, FloorY, -128.0f), 0.0f, -0.12f, nullptr, false },
+        { 178.6f, Vector3(0.0f, FloorY, -128.0f), 0.45f, -0.08f, L"05zf_1面_足音の輪だけで見える人影", false },
+        { 179.0f, Vector3(0.0f, FloorY, -128.0f), 0.45f, -0.08f, nullptr, false },
     };
 
     // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉 → 鏡（普段・鏡の異変で人影が映る・振り返ると誰もいない）

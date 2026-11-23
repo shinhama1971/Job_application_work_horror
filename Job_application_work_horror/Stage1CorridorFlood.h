@@ -3,7 +3,7 @@
 // 主な技術: 有限状態機械（待機 → 前触れ → 押し寄せる → 止まる／追いつかれた暗転 → 引いていく）、
 //           水の先頭の位置（床の浸水範囲として Ground へ渡す）、プレイヤーとの位置関係から決める結果
 //
-// ・西棟の排水を終えた後、南北の廊下へ入ると、廊下の照明が一斉に消え、奥から轟音が近づいてくる。
+// ・西棟の排水かヒューズ3本の回収を終えた後、南北の廊下の入口を抜けると濁流が迫る。
 // ・少し間を置いて、北の角から赤い水が南へ押し寄せてくる（歩くより速く、走るより遅い）。
 // ・南の入口（中央ホールへのドア）まで戻れば、水は入口で止まり、しばらくして引いていく。照明も戻る。
 // ・水に追いつかれると、画面が暗転し、開始地点の部屋からやり直しになる（周回の数はそのまま）。
@@ -45,12 +45,13 @@ public:
 
     // 面の始めに戻している（まだ起きていない状態）
     void Reset();
-    // 毎フレーム進めている。drained は西棟の排水が終わったか、allowed はほかの演出と重ならないか。
+    // ready は排水かヒューズ回収を終えたか、allowed はほかの大きな演出で操作が止まっていないか。
     // 起きた合図は cues に足している
-    void Update(float deltaTime, const DirectX::SimpleMath::Vector3& playerPosition, bool drained, bool allowed,
+    void Update(float deltaTime, const DirectX::SimpleMath::Vector3& playerPosition, bool ready, bool allowed,
         std::vector<Cue>& cues);
     // 撮影用：次の Update で、条件を見ずに前触れから始めている
     void ForceStart();
+    bool IsFinished() const { return m_State == State::Finished; }
 
     // 水があるか（前触れの間は、まだ水はない）と、水の先頭の z（ここから北の角までが水）
     bool HasWater() const;

@@ -19,6 +19,10 @@ cbuffer RoomOcclusionBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_
     float OcclusionFloorY;      // 床の高さ
     float OcclusionCeilingY;    // 天井の下面の高さ
     float OcclusionStrength;    // 角で一番暗くなる割合（0〜1）
+    // 音で輪郭が浮かぶ部屋の、広がる音の輪（xyz = 音が出た所、w = 今の半径）と、強さ（x = 0〜1。0なら使わない）。
+    // 部屋の形とは別に毎フレーム書き換える（Renderer::SetEchoPulses）。echoPulse.hlsli が読む
+    float4 EchoPulses[SIGNAL_LOST_MAX_ECHO_PULSES];
+    float4 EchoPulseStrength[SIGNAL_LOST_MAX_ECHO_PULSES];
 }
 
 // 壁がない場合の距離と、現在乗っている壁を数えないための余白。

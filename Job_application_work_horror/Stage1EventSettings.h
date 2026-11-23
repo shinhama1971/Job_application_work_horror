@@ -315,6 +315,29 @@ namespace Stage1EventSettings
     constexpr PulseSpec TimeStopCaughtPulse{ 0.8f, 0.7f };
     constexpr RumbleSpec TimeStopCaughtRumble{ 16, 0.45f };
 
+    // --- 自分の手が変わっていく（FirstPersonHands・viewModelSkinPS）
+    // 変わり具合の目標：1周目・2周目・3周目以降・3本目のヒューズを拾った後（0周目は0）
+    constexpr float HandCorruptionFirstLoop = 0.3f;
+    constexpr float HandCorruptionSecondLoop = 0.6f;
+    constexpr float HandCorruptionLaterLoop = 0.85f;
+    constexpr float HandCorruptionAllFuses = 1.0f;
+    // 目標へ近づく速さ（1秒あたり。気づかないくらいゆっくり進む）
+    constexpr float HandCorruptionRate = 0.05f;
+
+    // --- 音で輪郭が浮かぶ真っ暗な部屋（開始地点の部屋。Stage1EchoRoom）
+    // 暗くするときに消す照明：部屋の範囲からこれだけ外まで（壁に付いた器具も含めるため）
+    constexpr float EchoRoomLightMargin = 6.0f;
+    // 暗くなるとき：電源が落ちる低い音・懐中電灯がちらついて消えるまでの秒数・画面の脈打ち
+    constexpr EventFeedback::SoundSpec EchoRoomDarkenSound{ 0.40f, 1.1f };
+    constexpr float EchoRoomFlashlightSputterSeconds = 0.6f;
+    constexpr PulseSpec EchoRoomDarkenPulse{ 0.30f, 0.8f };
+    // 人影の足音（人より低く重く）
+    constexpr EventFeedback::SoundSpec EchoFigureStepSound{ 0.50f, 1.0f };
+    // 人影に触れられたとき：驚かせる音・強い画面の脈打ち・振動
+    constexpr EventFeedback::SoundSpec EchoRoomCaughtSound{ 0.72f, 1.1f };
+    constexpr PulseSpec EchoRoomCaughtPulse{ 0.85f, 0.7f };
+    constexpr RumbleSpec EchoRoomCaughtRumble{ 18, 0.5f };
+
     // --- ループ廊下に押し寄せる赤い水（Stage1CorridorFlood）
     // 照明が消えるときの音（電源が落ちる音を低く）・画面の脈打ち・振動
     constexpr EventFeedback::SoundSpec CorridorFloodLightsOutSound{ 0.55f, 1.2f };

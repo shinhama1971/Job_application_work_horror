@@ -219,6 +219,9 @@
     <ClCompile Include="Player.cpp">
       <Filter>ソース ファイル\Gameplay</Filter>
     </ClCompile>
+    <ClCompile Include="PlayerFlashlight.cpp">
+      <Filter>ソース ファイル\Gameplay</Filter>
+    </ClCompile>
     <ClCompile Include="ShadowMan.cpp">
       <Filter>ソース ファイル\Gameplay</Filter>
     </ClCompile>
@@ -342,6 +345,9 @@
     <ClCompile Include="Stage1Layout.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
+    <ClCompile Include="Stage1LayoutRooms.cpp">
+      <Filter>ソース ファイル\Scene\Stage1</Filter>
+    </ClCompile>
     <ClCompile Include="Stage1Objective.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
@@ -360,6 +366,9 @@
     <ClCompile Include="Stage1StrangeRooms.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
+    <ClCompile Include="Stage1EchoRoom.cpp">
+      <Filter>ソース ファイル\Scene\Stage1</Filter>
+    </ClCompile>
     <ClCompile Include="Stage1Transmissions.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
@@ -372,6 +381,9 @@
     <ClCompile Include="StageScene.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
+    <ClCompile Include="StageSceneGuidance.cpp">
+      <Filter>ソース ファイル\Scene\Stage1</Filter>
+    </ClCompile>
     <ClCompile Include="StageSceneDraw.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
@@ -382,6 +394,9 @@
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
     <ClCompile Include="StageSceneScares.cpp">
+      <Filter>ソース ファイル\Scene\Stage1</Filter>
+    </ClCompile>
+    <ClCompile Include="StageSceneRoomScares.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
     <ClCompile Include="StageSurveillanceController.cpp">
@@ -399,10 +414,16 @@
     <ClCompile Include="Stage2Scene.cpp">
       <Filter>ソース ファイル\Scene\Stage2</Filter>
     </ClCompile>
+    <ClCompile Include="Stage2SceneAtmosphere.cpp">
+      <Filter>ソース ファイル\Scene\Stage2</Filter>
+    </ClCompile>
     <ClCompile Include="Stage2SceneDraw.cpp">
       <Filter>ソース ファイル\Scene\Stage2</Filter>
     </ClCompile>
     <ClCompile Include="Stage2SceneHorror.cpp">
+      <Filter>ソース ファイル\Scene\Stage2</Filter>
+    </ClCompile>
+    <ClCompile Include="Stage2SceneFinalSequence.cpp">
       <Filter>ソース ファイル\Scene\Stage2</Filter>
     </ClCompile>
     <ClCompile Include="Stage2SceneAnomalies.cpp">
@@ -442,6 +463,9 @@
       <Filter>ソース ファイル\ThirdParty\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="CaptureMode.cpp">
+      <Filter>ソース ファイル\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="CaptureImage.cpp">
       <Filter>ソース ファイル\Tools</Filter>
     </ClCompile>
     <ClCompile Include="CaptureBenchmark.cpp">
@@ -492,6 +516,9 @@
     <ClCompile Include="Ground.cpp">
       <Filter>ソース ファイル\World</Filter>
     </ClCompile>
+    <ClCompile Include="GroundRainRipples.cpp">
+      <Filter>ソース ファイル\World</Filter>
+    </ClCompile>
     <ClCompile Include="HangingBulb.cpp">
       <Filter>ソース ファイル\World</Filter>
     </ClCompile>
@@ -504,10 +531,16 @@
     <ClCompile Include="Wall.cpp">
       <Filter>ソース ファイル\World</Filter>
     </ClCompile>
+    <ClCompile Include="WallVisualModel.cpp">
+      <Filter>ソース ファイル\World</Filter>
+    </ClCompile>
     <ClCompile Include="WallBreathing.cpp">
       <Filter>ソース ファイル\World</Filter>
     </ClCompile>
     <ClCompile Include="GroundWaterEffects.cpp">
+      <Filter>ソース ファイル\World\Water</Filter>
+    </ClCompile>
+    <ClCompile Include="GroundWaterEffectDraw.cpp">
       <Filter>ソース ファイル\World\Water</Filter>
     </ClCompile>
     <ClCompile Include="WaterRippleSimulation.cpp">
@@ -779,6 +812,9 @@
     <ClInclude Include="Stage1Layout.h">
       <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
     </ClInclude>
+    <ClInclude Include="Stage1LayoutBuilder.h">
+      <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
+    </ClInclude>
     <ClInclude Include="Stage1LightNumber.h">
       <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
     </ClInclude>
@@ -804,6 +840,9 @@
       <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
     </ClInclude>
     <ClInclude Include="Stage1StrangeRooms.h">
+      <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
+    </ClInclude>
+    <ClInclude Include="Stage1EchoRoom.h">
       <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
     </ClInclude>
     <ClInclude Include="Stage1BreathingGroup.h">
@@ -963,6 +1002,9 @@
       <Filter>ヘッダー ファイル\Tools</Filter>
     </ClInclude>
     <ClInclude Include="CaptureTours.h">
+      <Filter>ヘッダー ファイル\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="CaptureImage.h">
       <Filter>ヘッダー ファイル\Tools</Filter>
     </ClInclude>
     <ClInclude Include="CaptureBenchmark.h">
@@ -1130,10 +1172,16 @@
     <ClInclude Include="shader\floorAgeing.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
+    <ClInclude Include="shader\wetFloorMaterialSettings.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
     <ClInclude Include="shader\puddleReflection.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
     <ClInclude Include="shader\waterDrips.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\echoPulse.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
     <ClInclude Include="shader\waterCausticsLayout.hlsli">

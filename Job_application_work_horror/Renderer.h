@@ -127,9 +127,13 @@ struct ROOM_OCCLUSION_BUFFER
     float FloorY;
     float CeilingY;
     float Strength;
+    // 音で輪郭が浮かぶ部屋の音の輪（xyz = 音が出た所、w = 今の半径）と強さ（x）。SetEchoPulses で毎フレーム書き換える
+    static constexpr unsigned int MaxEchoPulses = SIGNAL_LOST_MAX_ECHO_PULSES;
+    DirectX::SimpleMath::Vector4 EchoPulses[MaxEchoPulses];
+    DirectX::SimpleMath::Vector4 EchoPulseStrength[MaxEchoPulses];
 };
 
-static_assert(sizeof(ROOM_OCCLUSION_BUFFER) == 16 * 33, "Room occlusion buffer must match HLSL layout");
+static_assert(sizeof(ROOM_OCCLUSION_BUFFER) == 16 * (33 + 2 * SIGNAL_LOST_MAX_ECHO_PULSES), "Room occlusion buffer must match HLSL layout");
 
 // 水面の光の揺らぎ（コースティクス）の定数バッファ（shader/waterCaustics.hlsliのWaterCausticsBuffer、b12と同じ並び）
 struct WATER_CAUSTICS_BUFFER
@@ -368,6 +372,10 @@ public:
 	static void SetRoomOcclusion(
 		const DirectX::SimpleMath::Vector4* boxes, unsigned int boxCount,
 		float floorY, float ceilingY, float strength);
+	// 音で輪郭が浮かぶ部屋の音の輪を、部屋の形と同じ b11 に書き換えている（xyz = 音が出た所、w = 半径。strengths は0〜1）。
+	// 部屋の形は変えないので、送り直した回数（DDGI が光線を当て直す合図）は増やさない。count 個より後ろは強さ0にする
+	static void SetEchoPulses(
+		const DirectX::SimpleMath::Vector4* pulses, const float* strengths, unsigned int count);
 	// 今の部屋の形（壁の長方形・床と天井の高さ）と、その定数バッファ（b11）、送り直した回数を返している（DDGI が光線を当てる形に使う）
 	static const ROOM_OCCLUSION_BUFFER& GetRoomOcclusion() { return m_RoomOcclusion; }
 	static ID3D11Buffer* GetRoomOcclusionBuffer() { return m_pRoomOcclusionBuffer.Get(); }

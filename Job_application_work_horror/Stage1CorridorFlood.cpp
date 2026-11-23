@@ -1,5 +1,5 @@
 // ============================================================================
-// ファイルの役割: 1面で、西棟の水を抜いた後に一度だけ起きる「抜いた水が、ループ廊下の奥から赤い濁流になって押し寄せる」演出の進行。
+// ファイルの役割: 1面で、排水かヒューズ3本の回収の後に一度だけ起きる濁流の進行。
 // （説明はStage1CorridorFlood.hを参照）
 // ============================================================================
 
@@ -13,7 +13,7 @@ using namespace DirectX::SimpleMath;
 namespace
 {
     // 始める範囲：南北の廊下の中で、南の入口からこの距離より奥まで入ったとき（入ってすぐでは、逃げる距離が短すぎる）
-    constexpr float TriggerMinZ = 110.0f;
+    constexpr float TriggerMinZ = 72.0f;
     constexpr float TriggerMaxZ = 230.0f;
     constexpr float TriggerHalfWidth = 40.0f;
     // 照明が消えてから水が押し寄せ始めるまでの秒数（轟音だけが近づいてくる間）
@@ -24,8 +24,6 @@ namespace
     constexpr float StopZ = Stage1CorridorFlood::CorridorEntranceZ + 2.0f;
     // 追いつかれたとみなす、水の先頭からの距離（先頭より北＝水の中にいる）
     constexpr float CatchMargin = 2.0f;
-    // 逃げ切ったとみなす所（南の入口を抜けて、中央ホールへ出た）
-    constexpr float EscapeZ = Stage1CorridorFlood::CorridorEntranceZ - 4.0f;
     // 水が止まってから引き始めるまでの秒数と、引いていく速さ（押し寄せるときより遅い）
     constexpr float HoldSeconds = 4.0f;
     constexpr float RecedeSpeed = 24.0f;
@@ -67,7 +65,7 @@ void Stage1CorridorFlood::StartWarning(std::vector<Cue>& cues)
     cues.push_back({ CueType::Rush, Vector3(0.0f, SoundY, CorridorEndZ) });
 }
 
-void Stage1CorridorFlood::Update(float deltaTime, const Vector3& playerPosition, bool drained, bool allowed,
+void Stage1CorridorFlood::Update(float deltaTime, const Vector3& playerPosition, bool ready, bool allowed,
     std::vector<Cue>& cues)
 {
     const bool inCorridor = std::fabs(playerPosition.x) <= TriggerHalfWidth &&
@@ -77,7 +75,7 @@ void Stage1CorridorFlood::Update(float deltaTime, const Vector3& playerPosition,
     switch (m_State)
     {
     case State::Idle:
-        if (m_ForceStart || (drained && allowed && inCorridor))
+        if (m_ForceStart || (ready && allowed && inCorridor))
         {
             StartWarning(cues);
         }
@@ -107,9 +105,9 @@ void Stage1CorridorFlood::Update(float deltaTime, const Vector3& playerPosition,
             m_StateTimer = 0.0f;
             cues.push_back({ CueType::Caught, Vector3(playerPosition.x, SoundY, playerPosition.z) });
         }
-        else if (playerPosition.z < EscapeZ || m_FrontZ <= StopZ)
+        else if (m_FrontZ <= StopZ)
         {
-            // 逃げ切ったか、水が入口まで来た（廊下の外にいる）ので、入口で止めている
+            // 先に逃げ切っていても、波が入口まで届くのをホールから見えるようにする。
             m_State = State::Holding;
             m_StateTimer = 0.0f;
         }

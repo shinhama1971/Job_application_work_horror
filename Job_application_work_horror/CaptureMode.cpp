@@ -7,7 +7,7 @@
 #include "CaptureMode.h"
 #include "CaptureBenchmark.h"
 #include "CaptureTours.h"
-#include "CapturePixelFormat.h"
+#include "CaptureImage.h"
 #include "MathUtility.h"
 #include "GIUpdateSettings.h"
 #include "PostProcess.h"
@@ -33,7 +33,6 @@
 #include <mfidl.h>
 #include <mfreadwrite.h>
 #include <shellapi.h>
-#include <wincodec.h>
 #include <wrl/client.h>
 
 #include <algorithm>
@@ -52,65 +51,6 @@ using namespace DirectX::SimpleMath;
 namespace
 {
     using namespace Tools::CaptureTours;
-
-    // 画面写真の BGRA の1画素のバイト数と、不透明な透明度
-    using CapturePixelFormat::BytesPerPixel;
-    // BGRAでは、末尾のバイトが透明度。
-
-    // 角度の補間。差を-π〜πに直してから補間し、遠回りの方向へ回らないようにしている
-    float LerpAngle(float from, float to, float t)
-    {
-        float delta = std::fmod(to - from, Pi * 2.0f);
-        if (delta > Pi) delta -= Pi * 2.0f;
-        if (delta < -Pi) delta += Pi * 2.0f;
-        return from + delta * t;
-    }
-
-    // RGBA（上の行から並ぶ）の画像をPNGで保存している。
-    bool SavePng(const std::wstring& path, const BYTE* rgba, UINT rowPitch, UINT width, UINT height)
-    {
-        // WICのファクトリーを作り、ファイルへ書き出すPNGのエンコーダーと1枚分のフレームを準備している
-        ComPtr<IWICImagingFactory> factory;
-        if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
-            IID_PPV_ARGS(&factory))))
-        {
-            return false;
-        }
-        ComPtr<IWICStream> stream;
-        ComPtr<IWICBitmapEncoder> encoder;
-        ComPtr<IWICBitmapFrameEncode> frame;
-        if (FAILED(factory->CreateStream(&stream)) ||
-            FAILED(stream->InitializeFromFilename(path.c_str(), GENERIC_WRITE)) ||
-            FAILED(factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, &encoder)) ||
-            FAILED(encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache)) ||
-            FAILED(encoder->CreateNewFrame(&frame, nullptr)) ||
-            FAILED(frame->Initialize(nullptr)) ||
-            FAILED(frame->SetSize(width, height)))
-        {
-            return false;
-        }
-        // PNGの書き出しはBGRAの並びを使っている（RGBAのまま渡すと赤と青が入れ替わるため、並べ替えてから渡している）。
-        WICPixelFormatGUID format = GUID_WICPixelFormat32bppBGRA;
-        if (FAILED(frame->SetPixelFormat(&format)) || !IsEqualGUID(format, GUID_WICPixelFormat32bppBGRA))
-        {
-            return false;
-        }
-        std::vector<BYTE> bgra(static_cast<size_t>(width) * height * BytesPerPixel);
-        for (UINT y = 0; y < height; ++y)
-        {
-            const BYTE* source = rgba + static_cast<size_t>(y) * rowPitch;
-            BYTE* destination = bgra.data() + static_cast<size_t>(y) * width * BytesPerPixel;
-            CapturePixelFormat::CopyRgbaToOpaqueBgra(source, destination, width);
-        }
-        if (FAILED(frame->WritePixels(height, width * BytesPerPixel, static_cast<UINT>(bgra.size()), bgra.data())) ||
-            FAILED(frame->Commit()) ||
-            FAILED(encoder->Commit()))
-        {
-            return false;
-        }
-        return true;
-    }
-
     // ------------------------------------------------------------------------
     // 撮影の状態（このファイルの中だけで使っている）
     // ------------------------------------------------------------------------
@@ -148,7 +88,7 @@ namespace
     bool g_PuddleAnomalyRequested = false;
     bool g_CeilingReflectionRequested = false;
     bool g_BreathingBuildingRequested = false;
-    bool g_CorridorFloodRequested = false;
+    bool g_EchoRoomRequested = false;
     bool g_UnseenAnomalyRequested = false;
     // 2面の道順で、最後の停電を始めたか
     bool g_FinalSequenceRequested = false;
@@ -205,36 +145,6 @@ namespace
         return nullptr;
     }
 
-    // 道順の中で、指定した時刻の位置と向きを、前後のキーフレームから補間して求めている
-    Keyframe Sample(const std::vector<Keyframe>& tour, float time)
-    {
-        // 最初のキーフレームより前は最初の位置、最後より後は最後の位置のままにしている
-        if (time <= tour.front().Time)
-        {
-            return tour.front();
-        }
-        for (size_t index = 1; index < tour.size(); ++index)
-        {
-            const Keyframe& next = tour[index];
-            if (time > next.Time)
-            {
-                continue;
-            }
-            const Keyframe& previous = tour[index - 1];
-            // 同時刻のキーフレームがあっても、補間率の分母をゼロにしない。
-            constexpr float MinimumKeyframeIntervalSeconds = 0.001f;
-            const float span = (std::max)(next.Time - previous.Time, MinimumKeyframeIntervalSeconds);
-            const float t = (time - previous.Time) / span;
-            Keyframe result = previous;
-            result.Position = Vector3::Lerp(previous.Position, next.Position, t);
-            result.Yaw = LerpAngle(previous.Yaw, next.Yaw, t);
-            result.Pitch = previous.Pitch + (next.Pitch - previous.Pitch) * t;
-            // 隠れる区間かどうかは補間せず、前のキーフレームの値を使っている
-            result.Hide = previous.Hide;
-            return result;
-        }
-        return tour.back();
-    }
 }
 
 namespace Tools::CaptureMode
@@ -386,7 +296,6 @@ namespace Tools::CaptureMode
         return g_BenchmarkVsync;
     }
 
-
     namespace
     {
         // --- 道順の撮影の進め方（UpdateBeforeObjects とその下の関数）
@@ -450,7 +359,7 @@ namespace Tools::CaptureMode
             g_PuddleAnomalyRequested = false;
             g_CeilingReflectionRequested = false;
             g_BreathingBuildingRequested = false;
-            g_CorridorFloodRequested = false;
+            g_EchoRoomRequested = false;
             g_UnseenAnomalyRequested = false;
             g_FinalSequenceRequested = false;
             Log(std::string("start tour: ") + SceneLabel(scene));
@@ -528,8 +437,8 @@ namespace Tools::CaptureMode
                 { SceneName::Stage, Stage1EndDoorOpenTime, SceneDebugAction::OpenStage1EndDoor, &g_EndDoorOpenRequested, "open stage 1 end door" },
                 // 1面: 最後に、3周目・ヒューズ3本の状態にしている（中央ホールと外周の壁も息をする）
                 { SceneName::Stage, BreathingBuildingRequestTime, SceneDebugAction::ShowBreathingBuilding, &g_BreathingBuildingRequested, "show breathing building" },
-                // 1面: 最後に、ループ廊下へ赤い水が押し寄せる演出を始めている
-                { SceneName::Stage, CorridorFloodRequestTime, SceneDebugAction::StartCorridorFlood, &g_CorridorFloodRequested, "start corridor flood" },
+                // 1面: 最後に、開始地点の部屋を、音で輪郭が浮かぶ真っ暗な部屋にしている
+                { SceneName::Stage, EchoRoomRequestTime, SceneDebugAction::StartEchoRoom, &g_EchoRoomRequested, "start echo room" },
                 // 2面: 鏡の前に立った後で、鏡の異変を出している（鏡の中にだけ、すぐ後ろの人影が映る）
                 { SceneName::Stage2, MirrorAnomalyRequestTime, SceneDebugAction::ShowMirrorAnomaly, &g_MirrorAnomalyRequested, "show mirror anomaly" },
                 // 2面: 濡れた足跡の場面の前に、2周目へ進めている
@@ -780,31 +689,7 @@ namespace Tools::CaptureMode
                     RecordCaptureFailure(("計測用画像の画面を取得できません: " + std::filesystem::path(screenName).string()).c_str());
                     return;
                 }
-                bool saved = false;
-                // CPUから読めるステージングテクスチャを作り、バックバッファをコピーして読み出している
-                D3D11_TEXTURE2D_DESC description{};
-                backBuffer->GetDesc(&description);
-                D3D11_TEXTURE2D_DESC stagingDescription = description;
-                stagingDescription.Usage = D3D11_USAGE_STAGING;
-                stagingDescription.BindFlags = 0;
-                stagingDescription.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-                stagingDescription.MiscFlags = 0;
-                ComPtr<ID3D11Device> device;
-                context->GetDevice(&device);
-                ComPtr<ID3D11Texture2D> staging;
-                D3D11_MAPPED_SUBRESOURCE mapped{};
-                if (SUCCEEDED(device->CreateTexture2D(&stagingDescription, nullptr, &staging)))
-                {
-                    context->CopyResource(staging.Get(), backBuffer);
-                    if (SUCCEEDED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped)))
-                    {
-                        saved = SavePng((g_OutputDirectory / screenName).wstring(),
-                            static_cast<const BYTE*>(mapped.pData), mapped.RowPitch,
-                            description.Width, description.Height);
-                        context->Unmap(staging.Get(), 0);
-                    }
-                }
-                if (!saved)
+                if (!CaptureImage::SaveBackBufferPng(context, backBuffer, (g_OutputDirectory / screenName).wstring()))
                 {
                     RecordCaptureFailure(("計測用画像を保存できません: " + std::filesystem::path(screenName).string()).c_str());
                 }
@@ -870,7 +755,7 @@ namespace Tools::CaptureMode
                 if (Door* door = Core::Game::GetInstance()->GetObj<Door>("Stage1StartDoor"))
                     Log("door angle = " + std::to_string(door->GetOpenAngle()));
             }
-            const bool saved = SavePng((g_OutputDirectory / (std::wstring(g_PendingShot) + L".png")).wstring(),
+            const bool saved = CaptureImage::SavePng((g_OutputDirectory / (std::wstring(g_PendingShot) + L".png")).wstring(),
                 pixels, mapped.RowPitch, description.Width, description.Height);
             if (!saved)
             {

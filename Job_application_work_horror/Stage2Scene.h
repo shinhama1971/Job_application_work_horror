@@ -87,6 +87,7 @@ private:
     void UpdateEvidence(Player& player);
     void UpdateConfirmationPanel(Door* corridorDoor);
     // 周回の進み具合・近くの照明の明るさ・危険度に合わせた画面効果と、扉のランプ
+    void InitializeCorridorAtmosphere();
     void UpdateCorridorAtmosphere(Player& player, float deltaTime);
     void UpdateDoorIndicator(Door* corridorDoor);
 

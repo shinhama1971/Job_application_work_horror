@@ -76,6 +76,9 @@ public:
         const Interactable* focused,
         std::vector<AmbientSoundCue>& cues);
 
+    // 廊下の濁流が終わった後などに、西棟の現在の水位を床へ反映する。
+    void ApplyFloodRegion();
+
     // 今の進み具合を返している
     Step GetStep() const { return m_Step; }
     // 回し終えたバルブの数
@@ -129,8 +132,6 @@ private:
         const Interactable* focused, std::vector<AmbientSoundCue>& cues);
     // 水の端を目標まで動かし、床の水に浸かった範囲を更新している。全部引いたらtrueを返している
     bool UpdateWaterLevel(float deltaTime, std::vector<AmbientSoundCue>& cues);
-    // 床の水に浸かった範囲を、今の水の端に合わせている
-    void ApplyFloodRegion();
     // 背後で水の中を歩く足音を予定している
     void ScheduleWading(const DirectX::SimpleMath::Vector3& listenerPosition,
         const DirectX::SimpleMath::Vector3& listenerForward);
