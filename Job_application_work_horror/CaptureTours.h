@@ -58,7 +58,7 @@ namespace Tools::CaptureTours
     // 1面の最後に、この時刻に3周目・ヒューズ3本の状態にしている（建物全体が呼吸する様子を写すため）
     constexpr float BreathingBuildingRequestTime = 141.0f;
     // 1面の最後に、この時刻に開始地点の部屋を、音で輪郭が浮かぶ真っ暗な部屋にしている（部屋へ飛んだ直後）
-    constexpr float EchoRoomRequestTime = 173.4f;
+    constexpr float EchoRoomRequestTime = 175.4f;
     // 濡れた足跡の場面の前に、2周目へ進めている（誰かの足跡は2周目から出る）
     constexpr float SecondLoopRequestTime = 50.5f;
     // 肖像画の場面の前に、肖像画の異変を出している

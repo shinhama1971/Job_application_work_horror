@@ -437,8 +437,9 @@ void StageScene::UpdateTransmissions(const Player& player, float deltaTime, bool
     input.PlayerPosition = player.GetPosition();
     input.FuseCount = game->GetItemCount();
     input.PowerRestored = game->IsPowerRestored();
-    // 閉じ込められている間・照明が次々に明滅する演出の間・監視映像を見ている間は、新しい無線を予約しない
-    input.RadioAllowed = !m_HiddenRoom.IsTrapped() && !m_ScareLightSequence.IsActive() && !m_Surveillance.IsViewing();
+    // 閉じ込められている間・照明が次々に明滅する演出の間・監視映像を見ている間・赤い濁流が押し寄せている間は、新しい無線を予約しない
+    input.RadioAllowed = !m_HiddenRoom.IsTrapped() && !m_ScareLightSequence.IsActive() && !m_Surveillance.IsViewing() &&
+        !m_CorridorFlood.IsActive();
     input.ArchiveStalkerLit = archiveStalkerLit;
     m_Transmissions.Update(input);
 }

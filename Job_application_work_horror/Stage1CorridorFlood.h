@@ -22,11 +22,13 @@
 class Stage1CorridorFlood final
 {
 public:
-    // StageScene へ渡す合図の種類：照明を消す・水の音を鳴らす・追いつかれた・プレイヤーを開始地点へ戻す・照明を戻す
+    // StageScene へ渡す合図の種類：照明を消す・水の音を鳴らす・天井から水滴が落ちる（前触れ）・追いつかれた・
+    // プレイヤーを開始地点へ戻す・照明を戻す
     enum class CueType
     {
         LightsOut,
         Rush,
+        Drip,
         Caught,
         Restart,
         LightsOn
@@ -35,8 +37,10 @@ public:
     struct Cue
     {
         CueType Type = CueType::LightsOut;
-        // 音を鳴らす所（Rush・Caught）
+        // 音を鳴らす所（Rush・Drip・Caught）。Drip は床の上の、水滴が落ちる所
         DirectX::SimpleMath::Vector3 Position;
+        // 強さ（0〜1）。前触れの轟音は、だんだん大きくなる
+        float Strength = 1.0f;
     };
 
     // 浸水する範囲（南北の廊下。x は両側の壁の内側、z は南の入口から北の角まで）
@@ -75,6 +79,8 @@ public:
     bool IsActive() const { return m_State != State::Idle && m_State != State::Finished; }
     // 追いつかれた後の暗転の濃さ（0〜1）
     float GetBlackout() const;
+    // 地鳴りの強さ（0〜1）。前触れの間にだんだん強まる（振動と視界の揺れに使う）
+    float GetTremor() const;
     // 追いつかれた後の、画面の下から上がってくる水面の高さ（0〜1。PostProcess::SetSubmerge へ渡す）
     float GetSubmerge() const;
 
@@ -92,6 +98,10 @@ private:
     };
 
     void StartWarning(std::vector<Cue>& cues);
+    // 前触れの間：だんだん大きくなる轟音と、だんだん増える水滴の合図
+    void UpdateWarning(float deltaTime, const DirectX::SimpleMath::Vector3& playerPosition, std::vector<Cue>& cues);
+    // 前触れがどこまで進んだか（0〜1。前触れの間だけ）
+    float GetWarningProgress() const;
     // Update の段階：水の音の合図／追いつかれた／流れ込み・押し寄せ・暗転の各状態／水の赤さ
     void PlayRushAt(float deltaTime, float x, float z, std::vector<Cue>& cues);
     void CatchPlayer(const DirectX::SimpleMath::Vector3& playerPosition, std::vector<Cue>& cues);
@@ -113,4 +123,7 @@ private:
     float m_RushSoundTimer = 0.0f;
     // 撮影から、条件を見ずに始めるよう頼まれたか
     bool m_ForceStart = false;
+    // 前触れの水滴：次に落とすまでの秒数と、落とした回数（落ちる場所の乱数の種）
+    float m_DripTimer = 0.0f;
+    int m_DripCount = 0;
 };

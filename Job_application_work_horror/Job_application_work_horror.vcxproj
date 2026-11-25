@@ -553,6 +553,8 @@
     <ClInclude Include="shader\wallSurface.hlsli" />
     <ClInclude Include="shader\floorAgeing.hlsli" />
     <ClInclude Include="shader\wetFloorMaterialSettings.hlsli" />
+    <ClInclude Include="shader\wetFloorStages.hlsli" />
+    <ClInclude Include="shader\litTextureStages.hlsli" />
     <ClInclude Include="shader\puddleReflection.hlsli" />
     <ClInclude Include="shader\waterDrips.hlsli" />
     <ClInclude Include="shader\corridorFloodWaveConfig.hlsli" />

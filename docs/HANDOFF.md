@@ -1,5 +1,17 @@
 # 作業の引き継ぎ（2026年11月9日）
 
+## 1面の濁流の前触れ・壁を這い上がる水・濡れた跡と、シェーダーの main の分割（11月26日、Claude Code）
+
+- 字幕：濁流が押し寄せている間は、新しい無線を予約せず（`StageSceneEvents.cpp` の `RadioAllowed`）、流れている字幕も描かない（`StageSceneDraw.cpp`）。
+- 前触れ：照明が消えてから波が見えるまでを1.6秒 → 3.6秒にした（`Stage1CorridorFlood.cpp` の `WarningSeconds`）。その間、右の通路の奥の轟音がだんだん大きくなり（`Cue::Strength`）、プレイヤーのまわりに天井から水滴が落ちる合図（`CueType::Drip`。音と床の水の小さな波）がだんだん増える。地鳴りの強さ（`GetTremor`）で、視界を細かく傾け、コントローラーを震わせる（値は `Stage1EventSettings.h` の `CorridorFloodTremor*`・`CorridorFloodDrip*`）。
+  - 自動撮影：前触れが2秒延びた分、1面の道順の157秒以降のキーフレームと `EchoRoomRequestTime` を2秒遅らせた。
+- 壁を這い上がる水：波の形（`corridorFloodWaveShape.hlsli`）で、壁に接している所（`GetWallContact`）は両端を下げず、波頭を最大1.7倍の高さまで這い上がらせる。
+- 壁の濡れた跡：b12 に `FloodWallStain`（届いた一番手前の z・高さ・赤さ・濃さ）を足し（`WATER_CAUSTICS_BUFFER` は1280バイト）、`litTexturePS` で南北の廊下と右の通路の壁に、波打った上端の赤黒い湿りと線を描く。水が引いた後、45秒で乾く（`StageScene::UpdateFloodWallStain`）。
+- 浸水した床の縁：先頭の縁だけを、細かいノイズと大きなうねりのノイズで崩し（壁際と奥の縁は壁まで水を届かせる）、右の通路の水との継ぎ目をなめらかな max でつないだ。赤い水の縁は幅4でぼかす（`wetFloorMaterialSettings.hlsli`）。
+- シェーダーの main の分割：`wetFloorPS`（530行 → 271行）の5つの段階を `wetFloorStages.hlsli`、`litTexturePS`（440行 → 325行）の3つの段階を `litTextureStages.hlsli` へ。コンパイル結果は、60本のうち51本が分ける前と同じ。残りの9本（床と、litTexturePS を読む壁・肖像画・時計・扉・岩・樹皮・外壁・呼吸する壁）はレジスタの番号付けだけが違い、命令の数は同じ（床は2つ減）。分ける前と後で撮影した72枚は、1枚に明るさで最大2段階の差がある以外は同じ。
+  - `[earlydepthstencil]`（印刷物の面）の直後に `#include` を置くと属性が main から外れるので、`#include` は属性の前に置いている。
+- Release・Debug（x64）は警告0。濁流の場面は自動撮影で確認した。前触れの音・振動・視界の揺れは、実際に遊んで確かめていない。
+
 ## 長い関数とファイルの分割（11月26日、Claude Code）
 
 - 120行を超えていた C++ の関数（3面を除く）を、段階ごとの関数に分けた。処理の中身と順番は変えていない。

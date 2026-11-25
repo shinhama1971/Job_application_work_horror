@@ -61,6 +61,8 @@ private:
     // Init の段階：進行と演出の状態をすべて最初に戻す／配置した Object を各仕組みに渡して準備する
     void ResetProgressState();
     void SetupStageSystems();
+    // 濁流が通った壁の濡れた跡を進め、シェーダーへ渡す
+    void UpdateFloodWallStain(float deltaTime);
     // 進む先の天井照明を1灯だけ、不規則にちかちかさせている
     void UpdateRouteLights();
     // 進行に合わせて、次に向かう場所の照明の組を選んでいる
@@ -218,6 +220,12 @@ private:
     std::vector<Stage1CorridorFlood::Cue> m_CorridorFloodCues;
     std::vector<class CeilingLight*> m_CorridorFloodLights;
     bool m_CorridorFloodOwnsWater = false;
+    // 濁流の地鳴りで、コントローラーを次に震わせるまでの秒数
+    float m_CorridorFloodRumbleTimer = 0.0f;
+    // 濁流が壁に残した濡れた跡：水が届いた一番手前の z、赤さ、濃さ（0〜1）
+    float m_FloodStainMinZ = 0.0f;
+    float m_FloodStainRedness = 0.0f;
+    float m_FloodStain = 0.0f;
     // おかしな部屋：時間が止まった部屋（右の倉庫）とその合図、傾く部屋（南西の広間）
     Stage1TimeStopRoom m_TimeStopRoom;
     std::vector<Stage1TimeStopRoom::Cue> m_TimeStopCues;

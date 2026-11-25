@@ -62,6 +62,8 @@ cbuffer WaterCausticsBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_
     float4 PreviousReflectionDepth;
     // xy = 排水跡を描く柱の x・z、z = 浸水範囲の手前の端、w = 水面の持ち上げ量（0なら無効）。
     float4 DrainTrace;
+    // 1面の濁流が壁に残した濡れた跡（x = 濁流が届いた一番手前の z、y = 床からの高さ、z = 赤さ、w = 濃さ。0なら描かない）
+    float4 FloodWallStain;
 #endif
 }
 

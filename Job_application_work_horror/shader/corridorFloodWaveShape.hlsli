@@ -33,6 +33,11 @@ static const float CrestSwellWarpSpeed = 0.7f;
 static const float CrestSwellWarpAmount = 1.3f;
 // 両端で波を低くし始める位置（幅の割合）。廊下の幅いっぱいに押し寄せ、壁のすぐ手前で床へ下げている
 static const float EdgeTaperStart = 0.86f;
+// 壁に当たった所で波頭が這い上がる量（両端で、波の高さにこの割合を足す）と、這い上がり始める位置（幅の割合）、
+// 右の通路から曲がり角へ入るときに、壁から離れていく距離
+static const float WallRideGain = 0.7f;
+static const float WallRideStart = 0.75f;
+static const float WallContactFade = 12.0f;
 static const float CrestFaceCompression = 0.32f;
 // 波頭の上の方を前へ倒す量。前の面が切り立ち、のしかかってくる形になる（格子の前後が入れ替わらない大きさにしている）
 static const float CrestLean = 1.4f;
@@ -72,6 +77,15 @@ float2 GetFlowPosition(float distance, float lateral)
     return float2(lerp(BendEndX, 0.0f, spread) + lateral * halfWidth, BendCenterZ - fromBend);
 }
 
+// その位置で、波の両端が壁に接しているか（0〜1）。右の通路と、曲がり終えて廊下いっぱいに広がった所では壁に当たり、
+// 曲がっている途中は岸が壁から離れているので、両端を床へ下げる
+float GetWallContact(float station)
+{
+    const float inlet = 1.0f - smoothstep(BendStart - WallContactFade, BendStart, station);
+    const float main = smoothstep(0.0f, MainWidthDistance, station - BendEnd);
+    return max(inlet, main);
+}
+
 float3 WavePosition(float2 uv, out float crest)
 {
     const float lateral = uv.x * 2.0f - 1.0f;
@@ -82,18 +96,25 @@ float3 WavePosition(float2 uv, out float crest)
     crest = smoothstep(0.0f, CrestStart, uv.y) * (1.0f - smoothstep(peak, CrestFall, uv.y));
     const float tail = smoothstep(TailStart, TailPeak, uv.y) * (1.0f - smoothstep(TailPeak, TailFade, uv.y));
     const float ridges = 0.5f + 0.5f * sin(uv.y * TailBands + lateral * lateral - time * TailRippleSpeed);
-    const float shore = 1.0f - smoothstep(EdgeTaperStart, 1.0f, abs(lateral));
-    const float swell = 1.0f - CrestSwellAmount * (0.5f + 0.5f * sin(lateral * CrestSwellFrequency + time * CrestSwellSpeed +
-        CrestSwellWarpAmount * sin(lateral * CrestSwellWarpFrequency - time * CrestSwellWarpSpeed)));
-    const float height = (WaveHeight * crest * swell + TailHeight * tail * ridges) * FloodShape.z * shore;
 
     const float depth = min(FloodShape.w, SIGNAL_LOST_FLOOD_WAVE_DEPTH);
     // 波頭を前に寄せながら、格子の前後の並びを保って折り返しを防ぐ。
     const float fromTail = 1.0f - uv.y;
     const float along = uv.y * depth * (1.0f - CrestFaceCompression * fromTail * fromTail) - CrestLean * crest * crest * FloodShape.z;
     const float station = FloodShape.w - along;
+
+    // 壁に当たっている所では、両端を下げずに、波頭が壁を這い上がるように高くしている
+    const float contact = GetWallContact(station);
+    const float openShore = 1.0f - smoothstep(EdgeTaperStart, 1.0f, abs(lateral));
+    const float shore = lerp(openShore, 1.0f, contact);
+    const float rideUp = 1.0f + WallRideGain * smoothstep(WallRideStart, 1.0f, abs(lateral)) * contact;
+    const float swell = 1.0f - CrestSwellAmount * (0.5f + 0.5f * sin(lateral * CrestSwellFrequency + time * CrestSwellSpeed +
+        CrestSwellWarpAmount * sin(lateral * CrestSwellWarpFrequency - time * CrestSwellWarpSpeed)));
+    const float height = (WaveHeight * crest * swell * rideUp + TailHeight * tail * ridges) * FloodShape.z * shore;
+
     const float2 xz = GetFlowPosition(station, lateral);
     return float3(xz.x, FloodShape.x - WaveFloorOverlap + height, xz.y);
 }
+
 
 #endif

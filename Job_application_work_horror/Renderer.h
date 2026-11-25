@@ -184,10 +184,13 @@ struct WATER_CAUSTICS_BUFFER
     DirectX::SimpleMath::Vector4 PreviousReflectionDepth;
     // xy = 排水跡を描く柱の x・z、z = 浸水範囲の手前の端、w = 水面の持ち上げ量（0なら無効）。
     DirectX::SimpleMath::Vector4 DrainTrace;
+    // 1面の濁流が壁に残した濡れた跡（x = 濁流が届いた一番手前の z、y = 濡れた跡の高さ（床から）、z = 赤さ（0〜1）、
+    // w = 跡の濃さ（0なら描かない）。南北の廊下と右の通路の壁だけに付く）
+    DirectX::SimpleMath::Vector4 FloodWallStain;
 };
 
 // 長さだけでなく、HLSLが共通して読み取る先頭部と、後半の配列・行列の位置も照合する。
-static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 1264);
+static_assert(sizeof(WATER_CAUSTICS_BUFFER) == 1280);
 static_assert(offsetof(WATER_CAUSTICS_BUFFER, MirrorSelf) ==
     offsetof(WATER_CAUSTICS_BUFFER, ReflectionProps) + sizeof(WATER_CAUSTICS_BUFFER::ReflectionProps));
 static_assert(offsetof(WATER_CAUSTICS_BUFFER, Ripple) == 96);
@@ -386,6 +389,8 @@ public:
 		const DirectX::SimpleMath::Vector4& drainTrace = DirectX::SimpleMath::Vector4::Zero);
 	// 水面の光の揺らぎで使う、プレイヤーの視点のビュー行列を設定している（毎フレーム、描画の最初に呼ぶ）
 	static void SetWaterCausticsView(const DirectX::SimpleMath::Matrix& view);
+	// 1面の濁流が壁に残した濡れた跡（x = 届いた一番手前の z、y = 床からの高さ、z = 赤さ、w = 濃さ。0なら描かない）
+	static void SetFloodWallStain(const DirectX::SimpleMath::Vector4& stain);
 	// 水たまりの波のシミュレーションの高さのテクスチャ（t9）と、その範囲・強さを、床と壁のシェーダーへ渡している。strengthが0なら使わない。
 	static void SetWaterRipples(ID3D11ShaderResourceView* heightTexture,
 		const DirectX::SimpleMath::Vector2& origin, float worldSize, float strength);

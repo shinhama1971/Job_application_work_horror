@@ -138,6 +138,11 @@ void StageScene::ResetProgressState()
     m_CorridorFloodCues.clear();
     m_CorridorFloodLights.clear();
     m_CorridorFloodOwnsWater = false;
+    m_CorridorFloodRumbleTimer = 0.0f;
+    m_FloodStainMinZ = Stage1CorridorFlood::CorridorEndZ;
+    m_FloodStainRedness = 0.0f;
+    m_FloodStain = 0.0f;
+    Renderer::SetFloodWallStain(Vector4::Zero);
     m_TimeStopRoom.Reset();
     m_TimeStopCues.clear();
     m_TiltRoom.Reset();
@@ -391,6 +396,7 @@ void StageScene::Uninit()
     Core::Game::GetInstance()->GetCamera()->SetViewRoll(0.0f);
     Application::SetWorldTimeScale(1.0f);
     Renderer::SetEchoPulses(nullptr, nullptr, 0);
+    Renderer::SetFloodWallStain(DirectX::SimpleMath::Vector4::Zero);
     Effect::PostProcess* postProcess = Core::Game::GetInstance()->GetPostProcess();
     postProcess->SetAtmosphere(Effect::PostProcess::DefaultNoiseAmount, Effect::PostProcess::DefaultVignetteStrength);
     postProcess->SetExposure(Effect::PostProcess::DefaultExposure);

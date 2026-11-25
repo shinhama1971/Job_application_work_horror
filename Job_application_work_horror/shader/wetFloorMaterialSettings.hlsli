@@ -30,6 +30,12 @@
 #define FLOOD_FRONT_NOISE_SCALE (0.11f)
 #define FLOOD_FRONT_NOISE_SPEED (1.8f)
 #define FLOOD_FRONT_NOISE_DEPTH (9.0f)
+// 赤い水の縁の大きなうねり（細かさ・流れる速さ・出入りの深さ）、2つの水面の継ぎ目をなめらかにつなぐ幅、赤い水の縁のぼかしの幅
+#define FLOOD_FRONT_BROAD_SCALE (0.035f)
+#define FLOOD_FRONT_BROAD_SPEED (0.6f)
+#define FLOOD_FRONT_BROAD_DEPTH (14.0f)
+#define FLOOD_JUNCTION_BLEND (10.0f)
+#define FLOOD_RED_EDGE_FULL (4.0f)
 #define FLOOD_TURBULENT_WAVE_GAIN (3.0f)
 // 雨漏りの水たまり：調べる範囲に足すゆとり、縁のゆがみ（細かさ・強さ）、半径の下限、水たまりの縁（ぼかし始め）、
 // 岸の線（幅・位置・濃さ）、水滴の輪（間隔・速さ・強さ・遠くで弱める量）

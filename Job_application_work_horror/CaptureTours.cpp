@@ -160,40 +160,40 @@ namespace Tools::CaptureTours
         { 155.05f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, nullptr, false },
         { 156.0f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05v_1面_廊下の照明が消える", false },
         // 角を曲がる前後は、廊下の西寄り（角が見える所）の同じ地点から見て、波が少しずつ向きを変えるのを写す。
-        { 157.35f, Vector3(-35.0f, FloorY, 185.0f), YawToward(-35.0f, 185.0f, 35.0f, 250.0f), -0.16f, L"05w_1面_右の通路から水が流れ込む", false },
-        { 157.60f, Vector3(-35.0f, FloorY, 185.0f), YawToward(-35.0f, 185.0f, 35.0f, 250.0f), -0.16f, L"05wa_1面_右から来た波が角を曲がる", false },
-        { 157.88f, Vector3(-35.0f, FloorY, 185.0f), YawToward(-35.0f, 185.0f, 35.0f, 250.0f), -0.16f, L"05waa_1面_波頭が南へ向く", false },
-        { 158.15f, Vector3(-35.0f, FloorY, 185.0f), YawToward(-35.0f, 185.0f, 35.0f, 250.0f), -0.16f, L"05wab_1面_向きを変えた波が迫る", false },
-        { 159.20f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05wb_1面_廊下を押し寄せる濁流", false },
-        { 160.25f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05x_1面_目の前まで来た赤い水", false },
-        { 161.05f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05y_1面_赤い水に呑まれる視界", false },
-        { 161.55f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05z_1面_水の中に沈んだ視界", false },
-        { 162.5f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, nullptr, false },
+        { 159.35f, Vector3(-35.0f, FloorY, 185.0f), YawToward(-35.0f, 185.0f, 35.0f, 250.0f), -0.16f, L"05w_1面_右の通路から水が流れ込む", false },
+        { 159.60f, Vector3(-35.0f, FloorY, 185.0f), YawToward(-35.0f, 185.0f, 35.0f, 250.0f), -0.16f, L"05wa_1面_右から来た波が角を曲がる", false },
+        { 159.88f, Vector3(-35.0f, FloorY, 185.0f), YawToward(-35.0f, 185.0f, 35.0f, 250.0f), -0.16f, L"05waa_1面_波頭が南へ向く", false },
+        { 160.15f, Vector3(-35.0f, FloorY, 185.0f), YawToward(-35.0f, 185.0f, 35.0f, 250.0f), -0.16f, L"05wab_1面_向きを変えた波が迫る", false },
+        { 161.20f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05wb_1面_廊下を押し寄せる濁流", false },
+        { 162.25f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05x_1面_目の前まで来た赤い水", false },
+        { 163.05f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05y_1面_赤い水に呑まれる視界", false },
+        { 163.55f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, L"05z_1面_水の中に沈んだ視界", false },
+        { 164.50f, Vector3(0.0f, FloorY, 150.0f), 0.0f, -0.16f, nullptr, false },
         // 時間が止まった部屋（右の倉庫）。入ると世界の時計がゆっくり止まり、天井から落ちる水滴と床の波が宙で止まる。
         // 止まりきって少しすると、一番遠い隅に人影が現れ、止まった部屋の中を近づいてくる。
         // 人影を正面から照らすと崩れて時間が戻るので、人影の写真は、視線を少し横（約20度）へずらして写している
-        { 162.55f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 150.0f, -128.0f), -0.40f, nullptr, false },
-        { 165.2f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 150.0f, -128.0f), -0.40f, L"05za_1面_時間が止まった部屋", false },
-        { 165.6f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 204.0f, -164.0f) + 0.35f, -0.10f, nullptr, false },
-        { 168.6f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 204.0f, -164.0f) + 0.35f, -0.10f, L"05zb_1面_止まった部屋で近づく人影", false },
-        { 169.0f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 204.0f, -164.0f) + 0.35f, -0.10f, nullptr, false },
+        { 164.55f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 150.0f, -128.0f), -0.40f, nullptr, false },
+        { 167.20f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 150.0f, -128.0f), -0.40f, L"05za_1面_時間が止まった部屋", false },
+        { 167.60f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 204.0f, -164.0f) + 0.35f, -0.10f, nullptr, false },
+        { 170.60f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 204.0f, -164.0f) + 0.35f, -0.10f, L"05zb_1面_止まった部屋で近づく人影", false },
+        { 171.00f, Vector3(110.0f, FloorY, -90.0f), YawToward(110.0f, -90.0f, 204.0f, -164.0f) + 0.35f, -0.10f, nullptr, false },
         // 次の場面へ飛ぶ間の補間が、開始地点の部屋（音で輪郭が浮かぶ部屋）を通らないよう、中央ホールを回っている
-        { 169.02f, Vector3(110.0f, FloorY, -40.0f), 0.0f, -0.05f, nullptr, false },
-        { 169.04f, Vector3(-330.0f, FloorY, -40.0f), 0.0f, -0.05f, nullptr, false },
+        { 171.02f, Vector3(110.0f, FloorY, -40.0f), 0.0f, -0.05f, nullptr, false },
+        { 171.04f, Vector3(-330.0f, FloorY, -40.0f), 0.0f, -0.05f, nullptr, false },
         // 傾く部屋（南西の広間）。入口から奥へ行くほど、視界がゆっくり傾いていく
-        { 169.05f, Vector3(-330.0f, FloorY, -228.0f), YawToward(-330.0f, -228.0f, -200.0f, -300.0f), -0.05f, nullptr, false },
-        { 172.8f, Vector3(-330.0f, FloorY, -228.0f), YawToward(-330.0f, -228.0f, -200.0f, -300.0f), -0.05f, L"05zc_1面_奥へ行くほど傾く広間", false },
-        { 173.3f, Vector3(-330.0f, FloorY, -228.0f), YawToward(-330.0f, -228.0f, -200.0f, -300.0f), -0.05f, nullptr, false },
+        { 171.05f, Vector3(-330.0f, FloorY, -228.0f), YawToward(-330.0f, -228.0f, -200.0f, -300.0f), -0.05f, nullptr, false },
+        { 174.80f, Vector3(-330.0f, FloorY, -228.0f), YawToward(-330.0f, -228.0f, -200.0f, -300.0f), -0.05f, L"05zc_1面_奥へ行くほど傾く広間", false },
+        { 175.30f, Vector3(-330.0f, FloorY, -228.0f), YawToward(-330.0f, -228.0f, -200.0f, -300.0f), -0.05f, nullptr, false },
         // 音で輪郭が浮かぶ真っ暗な部屋（開始地点の部屋。2周した後に戻ると起きる）。照明も懐中電灯も消えた真っ暗な部屋を、
         // 北へ歩くと一歩ごとに足元から音の輪が広がって部屋の形が浮かび、立ち止まると、奥の人影の足音の輪だけが見える
-        { 173.35f, Vector3(0.0f, FloorY, -166.0f), 0.0f, -0.12f, nullptr, false },
-        { 174.4f, Vector3(0.0f, FloorY, -166.0f), 0.0f, -0.12f, L"05zd_1面_真っ暗になった開始地点の部屋", false },
+        { 175.35f, Vector3(0.0f, FloorY, -166.0f), 0.0f, -0.12f, nullptr, false },
+        { 176.40f, Vector3(0.0f, FloorY, -166.0f), 0.0f, -0.12f, L"05zd_1面_真っ暗になった開始地点の部屋", false },
         // 歩き出して最初の一歩の輪が、床の見える所（足元から30〜60）まで広がった瞬間を、少し下を向いて写している
-        { 174.5f, Vector3(0.0f, FloorY, -166.0f), 0.0f, -0.55f, nullptr, false },
-        { 175.75f, Vector3(0.0f, FloorY, -142.25f), 0.0f, -0.55f, L"05ze_1面_足音で浮かぶ部屋の輪郭", false },
-        { 176.5f, Vector3(0.0f, FloorY, -128.0f), 0.0f, -0.12f, nullptr, false },
-        { 178.6f, Vector3(0.0f, FloorY, -128.0f), 0.45f, -0.08f, L"05zf_1面_足音の輪だけで見える人影", false },
-        { 179.0f, Vector3(0.0f, FloorY, -128.0f), 0.45f, -0.08f, nullptr, false },
+        { 176.50f, Vector3(0.0f, FloorY, -166.0f), 0.0f, -0.55f, nullptr, false },
+        { 177.75f, Vector3(0.0f, FloorY, -142.25f), 0.0f, -0.55f, L"05ze_1面_足音で浮かぶ部屋の輪郭", false },
+        { 178.50f, Vector3(0.0f, FloorY, -128.0f), 0.0f, -0.12f, nullptr, false },
+        { 180.60f, Vector3(0.0f, FloorY, -128.0f), 0.45f, -0.08f, L"05zf_1面_足音の輪だけで見える人影", false },
+        { 181.00f, Vector3(0.0f, FloorY, -128.0f), 0.45f, -0.08f, nullptr, false },
     };
 
     // 2面: ループ廊下 → 時計 → 肖像画 → ロッカー（中に隠れる）→ 奥の扉 → 鏡（普段・鏡の異変で人影が映る・振り返ると誰もいない）

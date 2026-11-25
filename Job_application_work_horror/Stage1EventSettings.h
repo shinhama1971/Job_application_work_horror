@@ -346,6 +346,23 @@ namespace Stage1EventSettings
     // 水が押し寄せる音（排水口の音を低く大きく。水の先頭から続けて鳴らす）と、そのたびの小さな振動
     constexpr EventFeedback::SoundSpec CorridorFloodRushSound{ 0.62f, 1.6f };
     constexpr RumbleSpec CorridorFloodRushRumble{ 8, 0.16f };
+    // 前触れの水滴：天井の高さから鳴らす水音（高さ・音量。前触れの終わりほど少し大きい）と、床の水に立てる小さな波（半径・強さ）
+    constexpr float CorridorFloodDripSoundY = -40.0f;
+    constexpr EventFeedback::SoundSpec CorridorFloodDripSound{ 1.05f, 0.45f };
+    constexpr float CorridorFloodDripVolumeGain = 0.35f;
+    constexpr float CorridorFloodDripRippleRadius = 0.8f;
+    constexpr float CorridorFloodDripRippleStrength = -0.6f;
+    // 地鳴り：視界の細かな揺れ（傾きの最大、2つの揺れの速さ）と、コントローラーの振動（間隔・長さ・強さの最大）
+    constexpr float CorridorFloodTremorRoll = 0.006f;
+    constexpr float CorridorFloodTremorRateA = 23.0f;
+    constexpr float CorridorFloodTremorRateB = 37.0f;
+    constexpr float CorridorFloodTremorRumbleInterval = 0.25f;
+    constexpr int CorridorFloodTremorRumbleFrames = 14;
+    constexpr float CorridorFloodTremorRumbleStrength = 0.30f;
+    // 濁流が壁に残す濡れた跡：上端の高さ（床から。波頭より少し上まで這い上がる）、水が来てから濃くなる速さ、乾いて消えるまでの秒数
+    constexpr float CorridorFloodStainHeight = 22.0f;
+    constexpr float CorridorFloodStainRiseRate = 3.0f;
+    constexpr float CorridorFloodStainDrySeconds = 45.0f;
     // 追いつかれたとき：大きな水しぶき（水の中を走る音を低く）と驚かせる音、強い画面の脈打ち、振動
     constexpr EventFeedback::SoundSpec CorridorFloodCaughtSplash{ 0.50f, 1.8f };
     constexpr float CorridorFloodImpactMoisture = 0.88f;

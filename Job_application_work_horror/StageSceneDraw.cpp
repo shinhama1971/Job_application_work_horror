@@ -84,10 +84,14 @@ void StageScene::Draw(Camera* camera)
         m_InteractionSystem.GetPrompt(),
         game->IsGuideEnabled() ? std::string_view(objectiveText) : std::string_view{});
 
-    // 録音と無線の字幕（目的表示なしの設定でも出す。物語の一部で、操作の説明ではないため）
-    Hud::RadioView radioView;
-    m_Transmissions.FillView(radioView);
-    m_Hud.DrawRadio(radioView);
+    // 録音と無線の字幕（目的表示なしの設定でも出す。物語の一部で、操作の説明ではないため）。
+    // 赤い濁流が押し寄せている間は、見せ場の波を字幕で隠さないよう出さない（水に呑まれて電波が途切れたように見せる）
+    if (!m_CorridorFlood.IsActive())
+    {
+        Hud::RadioView radioView;
+        m_Transmissions.FillView(radioView);
+        m_Hud.DrawRadio(radioView);
+    }
 
     // 目的地の方向：始まりの4.2秒の後、進み具合に合わせて次に行く場所を指している（普段はループ廊下の突き当たりの最後のドア）
     if (game->IsGuideEnabled() &&

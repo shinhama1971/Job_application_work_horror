@@ -503,3 +503,5 @@ Claude Code（Anthropic）が、作者が選んだ「音を立てたときだけ
 Claude Code（Anthropic）が、作者の「長い関数を分ける」という指示を受けて、ソースの点検で見つけた120行を超える8つの関数（`Sound::Init`・`Ground::Init`・`WaterEffectSystem::BuildPuddles`・`StageScene::SetupBreathingWall`・`Stage1CorridorFlood::Update`・`Stage1WestWing::Update`・`Stage2Scene::UpdateFinalPursuit`・`StaticMesh::LoadConverted`）を、処理の順番を変えずに段階ごとの関数へ分けました。どこで切るかと関数の名前は Claude Code が決めました。分ける前と後で無音の自動撮影（72枚）を画素で比べ、見た目が変わっていないことを確かめました。
 
 続けて Claude Code（Anthropic）が、作者の「残り時間かけてもいいから一気にファイル分割を」という指示を受けて、100行を超えていた残りの関数（3面を除く）を段階ごとの関数に分け、700行を超えていた9つのファイル（`Ground`・`StageScene`・`Stage2Scene`・`StageSceneLoop`・`HudScreens`・`Renderer`・`StageSurveillanceController`・`PostProcess` の .cpp と `crtOverlayPS.hlsl`）を役割ごとに分けました。移す関数と、一緒に移す定数（移した関数だけが使うもの）はスクリプトで調べ、両方のファイルで使う値はヘッダーへ出しました。分ける前と後で無音の自動撮影（1面→2面と森）を画素で比べ、シェーダーはバイトコードを比べて、見た目が変わっていないことを確かめました。
+
+Claude Code（Anthropic）が、作者が選んだ5つ（濁流の場面の字幕、濁流の前触れ、壁を這い上がる水と濡れた跡、浸水した床の縁、シェーダーの main の分割）を作りました。前触れの長さ・音・振動・視界の揺れの強さ、跡の色、縁のノイズの深さは Claude Code が決め、自動撮影の画像で調整しました。main の分割は、分ける前と後のコンパイル結果と命令の数、撮影した画像を比べて、見た目が変わっていないことを確かめました。

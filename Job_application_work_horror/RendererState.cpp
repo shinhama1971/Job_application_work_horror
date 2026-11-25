@@ -144,6 +144,12 @@ void Renderer::SetWaterCaustics(
 		WaterCausticsBufferSlot, 1, m_pWaterCausticsBuffer.GetAddressOf());
 }
 
+// 1面の濁流が壁に残した濡れた跡を覚えている（b12 へは、毎フレーム呼ばれる SetWaterCausticsView がまとめて送る）
+void Renderer::SetFloodWallStain(const Vector4& stain)
+{
+	m_WaterCaustics.FloodWallStain = stain;
+}
+
 // 水面の光の揺らぎで使うビュー行列を覚え、b12へ設定し直している。ビュー行列のb1は頂点シェーダーにしか設定していないため、
 // ピクセルシェーダーで使う分はこの定数バッファで渡している。
 void Renderer::SetWaterCausticsView(const Matrix& view)

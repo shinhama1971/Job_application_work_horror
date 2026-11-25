@@ -397,8 +397,19 @@ void StageScene::UpdateCorridorFlood(Player& player, float deltaTime)
             EventFeedback::Rumble(CorridorFloodLightsOutRumble);
             break;
         case Stage1CorridorFlood::CueType::Rush:
-            game->PlayAudioCueAt(SOUND_CUE_DRAIN, cue.Position, CorridorFloodRushSound.Pitch, CorridorFloodRushSound.Volume);
+            game->PlayAudioCueAt(SOUND_CUE_DRAIN, cue.Position, CorridorFloodRushSound.Pitch,
+                CorridorFloodRushSound.Volume * cue.Strength);
             EventFeedback::Rumble(CorridorFloodRushRumble);
+            break;
+        case Stage1CorridorFlood::CueType::Drip:
+            // 天井から水滴が落ちる：天井の高さから水音を鳴らし、床に水があれば小さな波を立てる
+            game->PlayAudioCueAt(SOUND_CUE_WATER_DROP,
+                Vector3(cue.Position.x, CorridorFloodDripSoundY, cue.Position.z), CorridorFloodDripSound.Pitch,
+                CorridorFloodDripSound.Volume * (1.0f + cue.Strength * CorridorFloodDripVolumeGain));
+            if (m_Objects.ground != nullptr)
+            {
+                m_Objects.ground->AddRippleImpulse(cue.Position, CorridorFloodDripRippleRadius, CorridorFloodDripRippleStrength);
+            }
             break;
         case Stage1CorridorFlood::CueType::Caught:
             game->GetPostProcess()->TriggerLensMoisture(CorridorFloodImpactMoisture, CorridorFloodImpactMoistureSeconds);
@@ -426,11 +437,27 @@ void StageScene::UpdateCorridorFlood(Player& player, float deltaTime)
         }
     }
 
+    // 地鳴り：水が近づくほど、視界が細かく揺れ、コントローラーが震える（傾く部屋の傾きに足している）
+    if (const float tremor = m_CorridorFlood.GetTremor(); tremor > 0.0f)
+    {
+        const float shake = std::sin(m_StageVisualTimer * CorridorFloodTremorRateA) +
+            std::sin(m_StageVisualTimer * CorridorFloodTremorRateB) * 0.5f;
+        game->GetCamera()->SetViewRoll(m_TiltRoom.GetRoll() + shake * CorridorFloodTremorRoll * tremor);
+        m_CorridorFloodRumbleTimer -= deltaTime;
+        if (m_CorridorFloodRumbleTimer <= 0.0f)
+        {
+            m_CorridorFloodRumbleTimer += CorridorFloodTremorRumbleInterval;
+            EventFeedback::Rumble({ CorridorFloodTremorRumbleFrames, CorridorFloodTremorRumbleStrength * tremor });
+        }
+    }
+
     // 追いつかれたら、画面の下から赤い水面が上がってきて、視界が水に呑まれる
     if (const float submerge = m_CorridorFlood.GetSubmerge(); submerge > 0.0f)
     {
         game->GetPostProcess()->SetSubmerge(submerge);
     }
+
+    UpdateFloodWallStain(deltaTime);
 
     // 床の浸水範囲を使い回す。暗証番号ルートで西棟を排水していない場合も、濁流後は元の水位に戻す。
     Ground* ground = m_Objects.ground;
@@ -459,3 +486,21 @@ void StageScene::UpdateCorridorFlood(Player& player, float deltaTime)
     ground->SetCorridorFloodFront(front.Distance, front.Strength);
 }
 
+
+// 濁流が通った壁の濡れた跡：水が届いた一番手前の z を覚え、水がある間は濃くし、水が引いた後はゆっくり乾かしている
+void StageScene::UpdateFloodWallStain(float deltaTime)
+{
+    const float frontZ = m_CorridorFlood.GetShallowFrontZ();
+    const bool water = frontZ < Stage1CorridorFlood::CorridorEndZ;
+    if (water)
+    {
+        m_FloodStainMinZ = (std::min)(m_FloodStainMinZ, frontZ);
+        m_FloodStainRedness = (std::max)(m_FloodStainRedness, m_CorridorFlood.GetRedness());
+        m_FloodStain = (std::min)(1.0f, m_FloodStain + deltaTime * CorridorFloodStainRiseRate);
+    }
+    else
+    {
+        m_FloodStain = (std::max)(0.0f, m_FloodStain - deltaTime / CorridorFloodStainDrySeconds);
+    }
+    Renderer::SetFloodWallStain(Vector4(m_FloodStainMinZ, CorridorFloodStainHeight, m_FloodStainRedness, m_FloodStain));
+}
