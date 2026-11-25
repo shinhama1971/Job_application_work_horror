@@ -8,6 +8,7 @@
 #include <wrl/client.h>
 
 #include "VertexBuffer.h"
+#include "CorridorFloodWave.h"
 #include "IndexBuffer.h"
 #include "Shader.h"
 #include "Texture.h"
@@ -33,10 +34,11 @@ class Ground :public Object
 		float WaterSurfaceLevel;
 		// 床一面が水に浸かった範囲（x・zの最小と最大）。範囲がないときは、最小が最大より大きい値にしている。
 		DirectX::SimpleMath::Vector4 FloodRect;
+		DirectX::SimpleMath::Vector4 FloodInletRect;
 		// 濡れた足跡（WetFootprints::Fill）。x = 数、と、1つにつき2つの値（位置と向き、濡れ具合・左右・裸足か）
 		DirectX::SimpleMath::Vector4 FootprintInfo;
 		DirectX::SimpleMath::Vector4 Footprints[WetFootprints::MaxCount * WetFootprints::VectorsPerPrint];
-		// 天井の雨漏りの真下の水たまり。x = 数、y = 反射の簡略化、z = 浸水した水の赤さ。1つにつき xy = 中心のx・z、z = 半径
+		// 天井の雨漏りの真下の水たまり。x = 数、y = 反射の簡略化、z = 主な浸水範囲の赤さ、w = 右の通路の水の赤さ。1つにつき xy = 中心のx・z、z = 半径
 		DirectX::SimpleMath::Vector4 LeakInfo;
 		DirectX::SimpleMath::Vector4 Leaks[WaterEffectSystem::MaxLeakCount];
 	};
@@ -84,6 +86,9 @@ class Ground :public Object
 
 	// 本描画と深度プリパスで共通のワールド行列（同じ計算にし、深度を一致させている）
 	DirectX::SimpleMath::Matrix MakeWorldMatrix() const;
+	// Init の段階：床の格子の頂点とインデックスを作る／シェーダー・定数バッファ・テクスチャ・マテリアルを作る
+	void BuildFloorGrid();
+	void CreateFloorResources();
 
 	// ---- 水たまりのメッシュ ----
 	// 床の本体は乾いた床として描き、水たまり（マス目1つ）・雨漏り1つ・浸水した範囲を、それぞれの形を覆うメッシュで描き重ねている。
@@ -119,6 +124,11 @@ class Ground :public Object
 	// 細かさごとの、このフレームに描いた水たまりのメッシュの数（デバッグ画面に出す）
 	static constexpr int WaterLevelCount = static_cast<int>(WaterLevel::Near) + 1;
 	int m_DrawnSurfaceCounts[WaterLevelCount] = {};
+	// 水たまりのメッシュを床から浮かせる高さ（約2.5mm）。床と同じ平面だと深度がそろわずちらつくため、わずかに上げている
+	// （Ground.cpp と GroundWaterSurfaces.cpp の両方で使う）
+	static constexpr float WaterSurfaceLift = 0.05f;
+	// 雨漏りの多角形の辺の数（頂点バッファの大きさと、メッシュを作るときの両方で使う）
+	static constexpr int LeakOutlineSegments = 24;
 
 	// 床と同じ高さ・同じUVの、水平な多角形を足している（中心から扇形に三角形を並べる）
 	void AppendWaterPolygon(std::vector<VERTEX_3D>& vertices,
@@ -127,6 +137,9 @@ class Ground :public Object
 	DirectX::SimpleMath::Vector4 m_DrainTrace = DirectX::SimpleMath::Vector4::Zero;
 	// 浸水した水の赤さ（0〜1。1面のループ廊下に押し寄せる水）
 	float m_FloodRedness = 0.0f;
+	CorridorFloodWave m_FloodWave;
+	DirectX::SimpleMath::Vector4 m_FloodInletRect{ 1.0f, 1.0f, 0.0f, 0.0f };
+	float m_FloodInletRedness = 0.0f;
 	void BuildPuddleSurfaces();
 	// 水たまりの置き方か、床の位置・大きさが変わっていたら、マス目の水たまりのメッシュを作り直している
 	void RebuildPuddleSurfacesIfChanged();
@@ -192,7 +205,17 @@ public:
 		m_WaterEffects.SetFloodRegion(minimum, maximum);
 	}
 	// 浸水した水の赤さ（0〜1）を決めている（1面のループ廊下に押し寄せる水。西棟の水は0のまま）
+	void DrawCorridorFloodWave();
 	void SetFloodRedness(float redness) { m_FloodRedness = redness; }
+	void SetCorridorFloodFront(float distance, float strength)
+	{
+		m_FloodWave.SetFront(distance, strength);
+	}
+	void SetCorridorFloodInlet(const DirectX::SimpleMath::Vector4& rect, float redness)
+	{
+		m_FloodInletRect = rect;
+		m_FloodInletRedness = redness;
+	}
 	// 西棟の浸水面の高さと、排水後に湿りが残る柱の位置を設定する。
 	void SetDrainTrace(const DirectX::SimpleMath::Vector2& column, float edgeZ, float progress);
 	// 一歩ごとに、濡れた足跡を残すかを決めている（水の中の一歩なら、その後の数歩に濡れた靴の跡を残す）。

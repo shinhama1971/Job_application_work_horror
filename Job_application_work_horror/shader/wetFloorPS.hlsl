@@ -29,10 +29,11 @@ cbuffer WetFloorBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_WET_F
     float WaterSurfaceLevel;
     // 床一面が水に浸かった範囲（xy = x・zの最小、zw = x・zの最大）。範囲がないときは、最小が最大より大きい値にしている。
     float4 FloodRect;
+    float4 FloodInletRect;
     // 濡れた足跡（WetFootprints::Fill）。x = 数。1つにつき2つ（xy = 位置、z = sin(向き)、w = cos(向き)/ x = 濡れ具合、y = 左右、z = 裸足か）
     float4 FootprintInfo;
     float4 Footprints[FOOTPRINT_COUNT * SIGNAL_LOST_FOOTPRINT_STRIDE];
-    // x = 雨漏りの数、y = 反射の距離による簡略化、z = 浸水した水の赤さ（0〜1。1面のループ廊下に押し寄せる水）。
+    // x = 雨漏りの数、y = 反射の距離による簡略化、z = 主な浸水範囲、w = 右から流入する範囲の水の赤さ（0〜1）。
     // Leaks は xy = 中心のx・z、z = 半径。
     float4 LeakInfo;
     float4 Leaks[LEAK_COUNT];
@@ -196,6 +197,7 @@ float4 main(in LIT_PS_IN input) : SV_Target
     float puddle = 0.0f;
     // 床一面が水に浸かった範囲の濃さ（水を赤くするときに使う）
     float floodAmount = 0.0f;
+    float surfaceFloodRedness = 0.0f;
     [branch]
     if (waterLevel > WATER_LEVEL_DRY_FLOOR)
     {
@@ -209,15 +211,23 @@ float4 main(in LIT_PS_IN input) : SV_Target
             const float2 fromMinimum = input.worldPos.xz - FloodRect.xy;
             const float2 toMaximum = FloodRect.zw - input.worldPos.xz;
             // 押し寄せる赤い水（LeakInfo.z が0より大きい）は、縁を流れるノイズで崩し、波を荒くしている（西棟の水は元のまま）
-            const float turbulence = saturate(LeakInfo.z);
+            surfaceFloodRedness = saturate(LeakInfo.z);
             const float frontNoise = FastValueNoise(
                 input.worldPos.xz * FLOOD_FRONT_NOISE_SCALE + float2(0.0f, WetTime * FLOOD_FRONT_NOISE_SPEED));
-            const float insideDistance = min(
-                min(fromMinimum.x, fromMinimum.y), min(toMaximum.x, toMaximum.y)) -
-                frontNoise * FLOOD_FRONT_NOISE_DEPTH * turbulence;
+            float insideDistance = min(min(fromMinimum.x, fromMinimum.y), min(toMaximum.x, toMaximum.y));
+            // 右から流れ込んだ水と、南へ進んだ水が交差する角でも水面をつなぐ。
+            [branch]
+            if (FloodInletRect.x < FloodInletRect.z)
+            {
+                const float2 inlet = min(input.worldPos.xz - FloodInletRect.xy, FloodInletRect.zw - input.worldPos.xz);
+                const float inletDistance = min(inlet.x, inlet.y);
+                surfaceFloodRedness = inletDistance > insideDistance ? saturate(LeakInfo.w) : surfaceFloodRedness;
+                insideDistance = max(insideDistance, inletDistance);
+            }
+            insideDistance -= frontNoise * FLOOD_FRONT_NOISE_DEPTH * surfaceFloodRedness;
             const float flood = smoothstep(FLOOD_EDGE_START, FLOOD_EDGE_FULL, insideDistance);
             ripplePattern += sin(input.worldPos.x * FLOOD_WAVE_SCALE_X + input.worldPos.z * FLOOD_WAVE_SCALE_Z + WetTime * FLOOD_WAVE_SPEED) *
-                FLOOD_WAVE_STRENGTH * flood * (1.0f - puddle) * (1.0f + turbulence * FLOOD_TURBULENT_WAVE_GAIN);
+                FLOOD_WAVE_STRENGTH * flood * (1.0f - puddle) * (1.0f + surfaceFloodRedness * FLOOD_TURBULENT_WAVE_GAIN);
             puddle = max(puddle, flood);
             floodAmount = flood;
         }
@@ -583,8 +593,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     // 真上から見ると反射は弱い（フレネル）ため、人影が映る所は床の色ごと沈め、水面の黒い人の形として見えるようにしている
     color.rgb *= 1.0f - puddleFigure * saturate(puddle * FIGURE_PUDDLE_GAIN) * FIGURE_PUDDLE_DARKEN;
     // 1面のループ廊下に押し寄せる水は、映った景色ごと赤黒くしている（西棟の水は赤さ0なので、元のまま）
-    const float floodRedness = floodAmount * saturate(LeakInfo.z);
-    color.rgb = lerp(color.rgb, color.rgb * FLOOD_BLOOD_FILTER + FLOOD_BLOOD_TINT, floodRedness);
+    const float floodRedness = floodAmount * surfaceFloodRedness;
+    color.rgb = lerp(color.rgb, color.rgb * FLOOD_WAVE_FILTER + FLOOD_WAVE_TINT, floodRedness);
 
     // 高さの違う霧を重ね、近くの見やすさを保ちながら、遠くの輪郭を分けている。
     // 部屋全体を一様に白くせず、床の近くに霧を集めている。
@@ -609,6 +619,8 @@ float4 main(in LIT_PS_IN input) : SV_Target
     color.rgb = lerp(color.rgb, beforeMist, reflectionStrength * PUDDLE_REFLECTION_MIST_REDUCTION);
     // 天井の照明や非常灯から下へ落ちる光の筋（霧に散った光。horrorMist.hlsli）
     color.rgb += GetLightShafts(input.worldPos, pointLightListOffset, pointLightCount, input.pos.xy);
+    // 赤い濁流の上では、霧と光の筋が足した白い光も水に吸わせ、水面を白っぽいピンクにせず暗い赤に保っている
+    color.rgb = beforeMist + (color.rgb - beforeMist) * lerp(1.0f.xxx, FLOOD_MIST_FILTER, floodRedness);
     color.rgb = ApplyFilmicHorrorGrade(color.rgb, LoopDepth);
 
     // デバッグ表示：1=法線、2=懐中電灯の影、3=照明だけ、4=水たまりの濃さとメッシュの細かさ、5=反射の画像、7=タイルごとの光源の数（6は壁用なので黒）

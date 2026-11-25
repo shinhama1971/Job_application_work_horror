@@ -48,88 +48,7 @@ namespace
 // 原点を中心にした1x1x1の箱（6面）を作り、灰色のコンクリートのマテリアルを用意している
 void Wall::Init()
 {
-    m_Vertices.clear();
-    m_Indices.clear();
-    // 6面 × 4頂点、6面 × 表と裏の2枚 × 2つの三角形 × 3
-    constexpr size_t BoxVertexCount = 24;
-    constexpr size_t BoxIndexCount = 72;
-    m_Vertices.reserve(BoxVertexCount);
-    m_Indices.reserve(BoxIndexCount);
-
-    const Color vertexColor(1.0f, 1.0f, 1.0f, 1.0f);
-
-    // 四角形の面を1枚追加している
-    const auto addFace = [this, &vertexColor](
-        const std::array<Vector3, 4>& positions,
-        const Vector3& normal)
-    {
-        const unsigned int base = static_cast<unsigned int>(m_Vertices.size());
-        const std::array<Vector2, 4> uvs =
-        {
-            Vector2(0.0f, 1.0f),
-            Vector2(0.0f, 0.0f),
-            Vector2(1.0f, 1.0f),
-            Vector2(1.0f, 0.0f)
-        };
-
-        for (size_t i = 0; i < positions.size(); ++i)
-        {
-            VERTEX_3D vertex{};
-            vertex.position = positions[i];
-            vertex.normal = normal;
-            vertex.color = vertexColor;
-            vertex.uv = uvs[i];
-            m_Vertices.push_back(vertex);
-        }
-
-        // 表と裏の両方の頂点の順番を持たせ、どちら側からでも壁が見えるようにしている。
-        // 部屋の配置を調整している途中でも、裏の面が欠けないようにするためである。
-        const unsigned int faceIndices[] =
-        {
-            base + 0, base + 1, base + 2,
-            base + 2, base + 1, base + 3,
-            base + 2, base + 1, base + 0,
-            base + 3, base + 1, base + 2
-        };
-        m_Indices.insert(
-            m_Indices.end(),
-            std::begin(faceIndices),
-            std::end(faceIndices)
-        );
-    };
-
-    // 前・後ろ・右・左・上・下の6面
-    addFace(
-        { Vector3(-0.5f, -0.5f, 0.5f), Vector3(-0.5f, 0.5f, 0.5f),
-          Vector3(0.5f, -0.5f, 0.5f), Vector3(0.5f, 0.5f, 0.5f) },
-        Vector3(0.0f, 0.0f, 1.0f)
-    );
-    addFace(
-        { Vector3(0.5f, -0.5f, -0.5f), Vector3(0.5f, 0.5f, -0.5f),
-          Vector3(-0.5f, -0.5f, -0.5f), Vector3(-0.5f, 0.5f, -0.5f) },
-        Vector3(0.0f, 0.0f, -1.0f)
-    );
-    addFace(
-        { Vector3(0.5f, -0.5f, 0.5f), Vector3(0.5f, 0.5f, 0.5f),
-          Vector3(0.5f, -0.5f, -0.5f), Vector3(0.5f, 0.5f, -0.5f) },
-        Vector3(1.0f, 0.0f, 0.0f)
-    );
-    addFace(
-        { Vector3(-0.5f, -0.5f, -0.5f), Vector3(-0.5f, 0.5f, -0.5f),
-          Vector3(-0.5f, -0.5f, 0.5f), Vector3(-0.5f, 0.5f, 0.5f) },
-        Vector3(-1.0f, 0.0f, 0.0f)
-    );
-    addFace(
-        { Vector3(-0.5f, 0.5f, 0.5f), Vector3(-0.5f, 0.5f, -0.5f),
-          Vector3(0.5f, 0.5f, 0.5f), Vector3(0.5f, 0.5f, -0.5f) },
-        Vector3(0.0f, 1.0f, 0.0f)
-    );
-    addFace(
-        { Vector3(-0.5f, -0.5f, -0.5f), Vector3(-0.5f, -0.5f, 0.5f),
-          Vector3(0.5f, -0.5f, -0.5f), Vector3(0.5f, -0.5f, 0.5f) },
-        Vector3(0.0f, -1.0f, 0.0f)
-    );
-
+    BuildBoxMesh();
     m_VertexBuffer.Create(m_Vertices);
     m_IndexBuffer.Create(m_Indices);
     m_BoxVertices = m_Vertices;
@@ -148,6 +67,88 @@ void Wall::Init()
     m_Material->CreateRequired(m_SurfaceMaterial);
     m_UnlitPartMaterial = std::make_unique<Material>();
     m_UnlitPartMaterial->CreateRequired(m_SurfaceMaterial);
+}
+
+// 1x1x1の箱の6面（前・後ろ・右・左・上・下）の頂点とインデックスを作っている
+void Wall::BuildBoxMesh()
+{
+    m_Vertices.clear();
+    m_Indices.clear();
+    // 6面 × 4頂点、6面 × 表と裏の2枚 × 2つの三角形 × 3
+    constexpr size_t BoxVertexCount = 24;
+    constexpr size_t BoxIndexCount = 72;
+    m_Vertices.reserve(BoxVertexCount);
+    m_Indices.reserve(BoxIndexCount);
+
+    AddBoxFace(
+        { Vector3(-0.5f, -0.5f, 0.5f), Vector3(-0.5f, 0.5f, 0.5f),
+          Vector3(0.5f, -0.5f, 0.5f), Vector3(0.5f, 0.5f, 0.5f) },
+        Vector3(0.0f, 0.0f, 1.0f)
+    );
+    AddBoxFace(
+        { Vector3(0.5f, -0.5f, -0.5f), Vector3(0.5f, 0.5f, -0.5f),
+          Vector3(-0.5f, -0.5f, -0.5f), Vector3(-0.5f, 0.5f, -0.5f) },
+        Vector3(0.0f, 0.0f, -1.0f)
+    );
+    AddBoxFace(
+        { Vector3(0.5f, -0.5f, 0.5f), Vector3(0.5f, 0.5f, 0.5f),
+          Vector3(0.5f, -0.5f, -0.5f), Vector3(0.5f, 0.5f, -0.5f) },
+        Vector3(1.0f, 0.0f, 0.0f)
+    );
+    AddBoxFace(
+        { Vector3(-0.5f, -0.5f, -0.5f), Vector3(-0.5f, 0.5f, -0.5f),
+          Vector3(-0.5f, -0.5f, 0.5f), Vector3(-0.5f, 0.5f, 0.5f) },
+        Vector3(-1.0f, 0.0f, 0.0f)
+    );
+    AddBoxFace(
+        { Vector3(-0.5f, 0.5f, 0.5f), Vector3(-0.5f, 0.5f, -0.5f),
+          Vector3(0.5f, 0.5f, 0.5f), Vector3(0.5f, 0.5f, -0.5f) },
+        Vector3(0.0f, 1.0f, 0.0f)
+    );
+    AddBoxFace(
+        { Vector3(-0.5f, -0.5f, -0.5f), Vector3(-0.5f, -0.5f, 0.5f),
+          Vector3(0.5f, -0.5f, -0.5f), Vector3(0.5f, -0.5f, 0.5f) },
+        Vector3(0.0f, -1.0f, 0.0f)
+    );
+}
+
+// 四角形の面を1枚追加している
+void Wall::AddBoxFace(const std::array<Vector3, 4>& positions, const Vector3& normal)
+{
+    const Color vertexColor(1.0f, 1.0f, 1.0f, 1.0f);
+    const unsigned int base = static_cast<unsigned int>(m_Vertices.size());
+    const std::array<Vector2, 4> uvs =
+    {
+        Vector2(0.0f, 1.0f),
+        Vector2(0.0f, 0.0f),
+        Vector2(1.0f, 1.0f),
+        Vector2(1.0f, 0.0f)
+    };
+
+    for (size_t i = 0; i < positions.size(); ++i)
+    {
+        VERTEX_3D vertex{};
+        vertex.position = positions[i];
+        vertex.normal = normal;
+        vertex.color = vertexColor;
+        vertex.uv = uvs[i];
+        m_Vertices.push_back(vertex);
+    }
+
+    // 表と裏の両方の頂点の順番を持たせ、どちら側からでも壁が見えるようにしている。
+    // 部屋の配置を調整している途中でも、裏の面が欠けないようにするためである。
+    const unsigned int faceIndices[] =
+    {
+        base + 0, base + 1, base + 2,
+        base + 2, base + 1, base + 3,
+        base + 2, base + 1, base + 0,
+        base + 3, base + 1, base + 2
+    };
+    m_Indices.insert(
+        m_Indices.end(),
+        std::begin(faceIndices),
+        std::end(faceIndices)
+    );
 }
 
 // 崩れて現れる・消える途中なら、崩れ具合を進めている（消え終わったら非表示にしている）

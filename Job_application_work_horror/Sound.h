@@ -106,6 +106,10 @@ private:
 	// WAVファイルの中から、指定したチャンクの位置と大きさを探している／その中身を読み込んでいる
 	HRESULT FindChunk(HANDLE, DWORD, DWORD&, DWORD&);
 	HRESULT ReadChunkData(HANDLE, void*, DWORD, DWORD);
+	// Init の段階：COM と XAudio2 とマスタリングボイスを作る／立体音響を準備する／素材1つの WAV を読み込む
+	HRESULT CreateAudioDevice();
+	void SetupSpatialAudio();
+	HRESULT LoadWave(int index);
 
 public:
 	// 聞き手から音源までの間にある、さえぎる物の量（0=さえぎる物なし、1=完全に壁の向こう）を返す関数の型。

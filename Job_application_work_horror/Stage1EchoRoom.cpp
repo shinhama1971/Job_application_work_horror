@@ -94,84 +94,97 @@ void Stage1EchoRoom::Update(float deltaTime, const Vector3& playerPosition, bool
     case State::Waiting:
         break;
     case State::Armed:
-        // 戻った直後に部屋の中へ入ったら暗くしている（しばらく入らなければ、次に戻るときまで待つ）
-        if (!IsInside(playerPosition))
-        {
-            m_ArmTimer += deltaTime;
-            if (m_ArmTimer >= ArmWindowSeconds)
-            {
-                m_State = State::Waiting;
-            }
-        }
-        else
-        {
-            m_State = State::Dark;
-            m_LastPlayerPosition = playerPosition;
-            m_StrideTravel = 0.0f;
-            // 人影は、部屋の奥の2つの隅（北側）のうち、プレイヤーから遠い方に出している
-            const Vector3 left(MinX + FigureCornerInset, FootY, MaxZ - FigureCornerInset);
-            const Vector3 right(MaxX - FigureCornerInset, FootY, MaxZ - FigureCornerInset);
-            m_FigurePosition = Vector3::DistanceSquared(left, playerPosition) > Vector3::DistanceSquared(right, playerPosition)
-                ? left : right;
-            m_FigureTarget = m_FigurePosition;
-            m_FigureStepTimer = FigureStepInterval;
-            cues.push_back({ CueType::Darken, playerPosition });
-        }
+        UpdateArmed(deltaTime, playerPosition, cues);
         break;
     case State::Dark:
-    {
-        if (!IsInside(playerPosition))
-        {
-            Finish(cues);
-            break;
-        }
-        // 歩いた距離が一歩分になるたびに、足元から音の輪を出し、人影にその所を聞かせている
-        m_StrideTravel += Vector2(playerPosition.x - m_LastPlayerPosition.x, playerPosition.z - m_LastPlayerPosition.z).Length();
-        m_LastPlayerPosition = playerPosition;
-        const float stride = running ? RunStride : WalkStride;
-        float figureSpeed = FigureSpeed;
-        if (m_StrideTravel >= stride)
-        {
-            m_StrideTravel = 0.0f;
-            AddPulse(Vector3(playerPosition.x, FootY, playerPosition.z),
-                running ? RunPulseRadius : WalkPulseRadius, running ? RunPulseStrength : WalkPulseStrength);
-            m_FigureTarget = Vector3(playerPosition.x, FootY, playerPosition.z);
-        }
-        if (running)
-        {
-            figureSpeed = FigureRunHeardSpeed;
-        }
-
-        // 人影は、最後に聞いた音の所へ歩いていく（着いたら、次の音を待って立ち止まる）
-        Vector3 toTarget = m_FigureTarget - m_FigurePosition;
-        toTarget.y = 0.0f;
-        const float distanceToTarget = toTarget.Length();
-        if (distanceToTarget > ArriveDistance)
-        {
-            m_FigurePosition += toTarget / distanceToTarget * (std::min)(distanceToTarget, figureSpeed * deltaTime);
-            // 歩いている間だけ、人影の足音も小さな輪になる
-            m_FigureStepTimer -= deltaTime;
-            if (m_FigureStepTimer <= 0.0f)
-            {
-                m_FigureStepTimer += FigureStepInterval;
-                AddPulse(m_FigurePosition, FigurePulseRadius, FigurePulseStrength);
-                cues.push_back({ CueType::FigureStep, m_FigurePosition });
-            }
-        }
-
-        const Vector3 toPlayer = playerPosition - m_FigurePosition;
-        if (Vector2(toPlayer.x, toPlayer.z).Length() <= CatchDistance)
-        {
-            cues.push_back({ CueType::Caught, m_FigurePosition });
-            Finish(cues);
-        }
+        UpdateDark(deltaTime, playerPosition, running, cues);
         break;
-    }
     case State::Finished:
         break;
     }
+    AdvancePulses(deltaTime);
+}
 
-    // 輪を広げ、広がるほど弱めている（一番大きな半径で消える）
+// 戻った直後に部屋の中へ入ったら暗くしている（しばらく入らなければ、次に戻るときまで待つ）
+void Stage1EchoRoom::UpdateArmed(float deltaTime, const Vector3& playerPosition, std::vector<Cue>& cues)
+{
+    if (!IsInside(playerPosition))
+    {
+        m_ArmTimer += deltaTime;
+        if (m_ArmTimer >= ArmWindowSeconds)
+        {
+            m_State = State::Waiting;
+        }
+    }
+    else
+    {
+        m_State = State::Dark;
+        m_LastPlayerPosition = playerPosition;
+        m_StrideTravel = 0.0f;
+        // 人影は、部屋の奥の2つの隅（北側）のうち、プレイヤーから遠い方に出している
+        const Vector3 left(MinX + FigureCornerInset, FootY, MaxZ - FigureCornerInset);
+        const Vector3 right(MaxX - FigureCornerInset, FootY, MaxZ - FigureCornerInset);
+        m_FigurePosition = Vector3::DistanceSquared(left, playerPosition) > Vector3::DistanceSquared(right, playerPosition)
+            ? left : right;
+        m_FigureTarget = m_FigurePosition;
+        m_FigureStepTimer = FigureStepInterval;
+        cues.push_back({ CueType::Darken, playerPosition });
+    }
+}
+
+// 暗い部屋：歩いた距離が一歩分になるたびに足音の輪を出し、人影は最後に聞いた音の所へ歩いてくる
+void Stage1EchoRoom::UpdateDark(float deltaTime, const Vector3& playerPosition, bool running, std::vector<Cue>& cues)
+{
+    if (!IsInside(playerPosition))
+    {
+        Finish(cues);
+        return;
+    }
+    // 歩いた距離が一歩分になるたびに、足元から音の輪を出し、人影にその所を聞かせている
+    m_StrideTravel += Vector2(playerPosition.x - m_LastPlayerPosition.x, playerPosition.z - m_LastPlayerPosition.z).Length();
+    m_LastPlayerPosition = playerPosition;
+    const float stride = running ? RunStride : WalkStride;
+    float figureSpeed = FigureSpeed;
+    if (m_StrideTravel >= stride)
+    {
+        m_StrideTravel = 0.0f;
+        AddPulse(Vector3(playerPosition.x, FootY, playerPosition.z),
+            running ? RunPulseRadius : WalkPulseRadius, running ? RunPulseStrength : WalkPulseStrength);
+        m_FigureTarget = Vector3(playerPosition.x, FootY, playerPosition.z);
+    }
+    if (running)
+    {
+        figureSpeed = FigureRunHeardSpeed;
+    }
+
+    // 人影は、最後に聞いた音の所へ歩いていく（着いたら、次の音を待って立ち止まる）
+    Vector3 toTarget = m_FigureTarget - m_FigurePosition;
+    toTarget.y = 0.0f;
+    const float distanceToTarget = toTarget.Length();
+    if (distanceToTarget > ArriveDistance)
+    {
+        m_FigurePosition += toTarget / distanceToTarget * (std::min)(distanceToTarget, figureSpeed * deltaTime);
+        // 歩いている間だけ、人影の足音も小さな輪になる
+        m_FigureStepTimer -= deltaTime;
+        if (m_FigureStepTimer <= 0.0f)
+        {
+            m_FigureStepTimer += FigureStepInterval;
+            AddPulse(m_FigurePosition, FigurePulseRadius, FigurePulseStrength);
+            cues.push_back({ CueType::FigureStep, m_FigurePosition });
+        }
+    }
+
+    const Vector3 toPlayer = playerPosition - m_FigurePosition;
+    if (Vector2(toPlayer.x, toPlayer.z).Length() <= CatchDistance)
+    {
+        cues.push_back({ CueType::Caught, m_FigurePosition });
+        Finish(cues);
+    }
+}
+
+// 輪を広げ、広がるほど弱めている（一番大きな半径で消える）
+void Stage1EchoRoom::AdvancePulses(float deltaTime)
+{
     for (std::size_t index = 0; index < MaxPulses; ++index)
     {
         Pulse& pulse = m_Pulses[index];

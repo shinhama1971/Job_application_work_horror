@@ -76,6 +76,13 @@ private:
     void DrawFallingDrops(Camera* camera);
     void UpdateFootstepRipples(float deltaTime);
     void DrawWaterRipples(Camera* camera);
+    // Init の段階：水滴の形（十字の板）とマテリアル／波紋の輪の形とマテリアル
+    void BuildDropMesh();
+    void BuildRippleMesh();
+    // DrawWaterRipples の段階：着水のしぶき／広がり具合に合わせた波紋を1つ描く
+    void DrawSplashes(Camera* camera, ID3D11DeviceContext* context);
+    void DrawRipple(ID3D11DeviceContext* context, const DirectX::SimpleMath::Vector3& position,
+        float progress, float radius, float strength);
 
 public:
     // 水たまりのマス目（82x82）の表の範囲。床（x・z が -500〜500）を覆う 16x16 マスにしている。

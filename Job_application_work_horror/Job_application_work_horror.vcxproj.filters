@@ -249,6 +249,9 @@
     <ClCompile Include="Renderer.cpp">
       <Filter>ソース ファイル\Rendering</Filter>
     </ClCompile>
+    <ClCompile Include="RendererPipeline.cpp">
+      <Filter>ソース ファイル\Rendering</Filter>
+    </ClCompile>
     <ClCompile Include="RendererResources.cpp">
       <Filter>ソース ファイル\Rendering</Filter>
     </ClCompile>
@@ -280,6 +283,9 @@
       <Filter>ソース ファイル\Rendering\Effects</Filter>
     </ClCompile>
     <ClCompile Include="PostProcess.cpp">
+      <Filter>ソース ファイル\Rendering\Effects</Filter>
+    </ClCompile>
+    <ClCompile Include="PostProcessBloom.cpp">
       <Filter>ソース ファイル\Rendering\Effects</Filter>
     </ClCompile>
     <ClCompile Include="ReflectionProbe.cpp">
@@ -381,6 +387,9 @@
     <ClCompile Include="StageScene.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
+    <ClCompile Include="StageSceneProgress.cpp">
+      <Filter>ソース ファイル\Scene\Stage1</Filter>
+    </ClCompile>
     <ClCompile Include="StageSceneGuidance.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
@@ -393,6 +402,9 @@
     <ClCompile Include="StageSceneLoop.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
+    <ClCompile Include="StageSceneBreathing.cpp">
+      <Filter>ソース ファイル\Scene\Stage1</Filter>
+    </ClCompile>
     <ClCompile Include="StageSceneScares.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
@@ -400,6 +412,9 @@
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
     <ClCompile Include="StageSurveillanceController.cpp">
+      <Filter>ソース ファイル\Scene\Stage1</Filter>
+    </ClCompile>
+    <ClCompile Include="StageSurveillanceFeeds.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
     <ClCompile Include="MirrorSelf.cpp">
@@ -412,6 +427,9 @@
       <Filter>ソース ファイル\Scene\Stage2</Filter>
     </ClCompile>
     <ClCompile Include="Stage2Scene.cpp">
+      <Filter>ソース ファイル\Scene\Stage2</Filter>
+    </ClCompile>
+    <ClCompile Include="Stage2SceneProgress.cpp">
       <Filter>ソース ファイル\Scene\Stage2</Filter>
     </ClCompile>
     <ClCompile Include="Stage2SceneAtmosphere.cpp">
@@ -495,6 +513,9 @@
     <ClCompile Include="HudScreens.cpp">
       <Filter>ソース ファイル\Ui</Filter>
     </ClCompile>
+    <ClCompile Include="HudStage2.cpp">
+      <Filter>ソース ファイル\Ui</Filter>
+    </ClCompile>
     <ClCompile Include="HudTitle.cpp">
       <Filter>ソース ファイル\Ui</Filter>
     </ClCompile>
@@ -516,7 +537,13 @@
     <ClCompile Include="Ground.cpp">
       <Filter>ソース ファイル\World</Filter>
     </ClCompile>
+    <ClCompile Include="GroundWaterSurfaces.cpp">
+      <Filter>ソース ファイル\World</Filter>
+    </ClCompile>
     <ClCompile Include="GroundRainRipples.cpp">
+      <Filter>ソース ファイル\World</Filter>
+    </ClCompile>
+    <ClCompile Include="CorridorFloodWave.cpp">
       <Filter>ソース ファイル\World</Filter>
     </ClCompile>
     <ClCompile Include="HangingBulb.cpp">
@@ -839,6 +866,9 @@
     <ClInclude Include="Stage1CorridorFlood.h">
       <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
     </ClInclude>
+    <ClInclude Include="CorridorFloodWave.h">
+      <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
+    </ClInclude>
     <ClInclude Include="Stage1StrangeRooms.h">
       <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
     </ClInclude>
@@ -1124,6 +1154,9 @@
     <ClInclude Include="shader\postProcessBuffer.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
+    <ClInclude Include="shader\crtOverlayParts.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
     <ClInclude Include="shader\lightShaftSegment.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
@@ -1179,6 +1212,18 @@
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
     <ClInclude Include="shader\waterDrips.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\corridorFloodWaveConfig.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\corridorFloodWave.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\corridorFloodWaveShape.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="shader\corridorFloodSpray.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
     <ClInclude Include="shader\echoPulse.hlsli">
@@ -1307,6 +1352,18 @@
       <Filter>リソース ファイル\Shader\Pixel</Filter>
     </FxCompile>
     <FxCompile Include="shader\wetFloorPS.hlsl">
+      <Filter>リソース ファイル\Shader\Pixel</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\corridorFloodWavePS.hlsl">
+      <Filter>リソース ファイル\Shader\Pixel</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\corridorFloodWaveVS.hlsl">
+      <Filter>リソース ファイル\Shader\Pixel</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\corridorFloodSprayPS.hlsl">
+      <Filter>リソース ファイル\Shader\Pixel</Filter>
+    </FxCompile>
+    <FxCompile Include="shader\corridorFloodSprayVS.hlsl">
       <Filter>リソース ファイル\Shader\Pixel</Filter>
     </FxCompile>
     <FxCompile Include="shader\hudVS.hlsl">

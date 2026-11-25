@@ -71,6 +71,9 @@ private:
     DirectX::SimpleMath::Vector3 m_GrainAxis = DirectX::SimpleMath::Vector3(0.0f, 1.0f, 0.0f);
     std::vector<VERTEX_3D> m_BoxVertices;
     std::vector<unsigned int> m_BoxIndices;
+    // Init の段階：1x1x1の箱（6面）の頂点とインデックスを作る／四角形の面を1枚（表と裏）足す
+    void BuildBoxMesh();
+    void AddBoxFace(const std::array<DirectX::SimpleMath::Vector3, 4>& positions, const DirectX::SimpleMath::Vector3& normal);
     // モデルの光る部位（レンズ・電球）が始まるインデックス。ここより前（枠・笠・台）は光る色を付けないマテリアルで描いている。
     // 箱と、光る部位のないモデルは0（全体に光る色を付ける）
     unsigned int m_GlowIndexStart = 0;

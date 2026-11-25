@@ -182,6 +182,14 @@ private:
     static constexpr float GlyphAdvance = 6.0f;
     // 文字1つの高さ（文字の大きさの倍率に掛ける。7画素の行）
     static constexpr float GlyphRows = 7.0f;
+
+    // DrawIntro の段階：暗い背景と走査線／受信記録の見出しと3行／中央の「通信途絶」／目的のパネルか飛ばし方
+    void DrawIntroBackdrop(const IntroView& view, float screenWidth, float screenHeight);
+    void DrawIntroTranscript(const IntroView& view, float left, float noise, float noiseStep);
+    void DrawIntroSignalLost(const IntroView& view, float screenWidth, float noise, float noiseStep);
+    void DrawIntroMission(const IntroView& view, float screenWidth, float screenHeight);
+    // 文字列の表示上の幅（文字数 × 大きさ × 1文字の幅）
+    static float TextWidth(std::string_view text, float pixelSize);
     // キャンバスの拡大率（描画解像度の高さ÷864）、キャンバスの幅（画面の縦横比に合わせて変わる）、高さ（常に864）
     static float GetCanvasScale();
     static float GetCanvasWidth();

@@ -192,7 +192,6 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
         return;
     }
 
-    Core::Game* game = Core::Game::GetInstance();
     Player* player = m_Objects.player;
     ShadowMan* shadow = m_Objects.shadow;
     if (player == nullptr || shadow == nullptr)
@@ -210,43 +209,59 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
         return;
     }
 
-    // 追ってくる影は、裸足の濡れた足跡を残していく（左右の足を交互に、歩いた向きに合わせている）
-    {
-        Vector3 moved = shadow->GetPosition() - m_PursuitLastShadowPosition;
-        moved.y = 0.0f;
-        const float travel = moved.Length();
-        m_PursuitLastShadowPosition = shadow->GetPosition();
-        m_PursuitStepDistance += travel;
-        Ground* ground = m_Objects.ground;
-        if (ground != nullptr && travel > MinimumDirectionLength && m_PursuitStepDistance >= FootprintFollower::Stride)
-        {
-            m_PursuitStepDistance -= FootprintFollower::Stride;
-            const float yaw = std::atan2(moved.x, moved.z);
-            const Vector2 right(std::cos(yaw), -std::sin(yaw));
-            const Vector2 position = Vector2(shadow->GetPosition().x, shadow->GetPosition().z) +
-                right * (FootprintFollower::SideOffset * m_PursuitStepSide);
-            ground->AddFootprint(position, yaw, m_PursuitStepSide, true, 1.0f);
-            m_PursuitStepSide = -m_PursuitStepSide;
-        }
-    }
-    // 影が通り過ぎた照明は、ぱちっと消える（背後から闇が迫ってくる）
-    for (CeilingLight* light : m_Objects.lights)
-    {
-        if (light != nullptr && !light->IsForcedOff() &&
-            shadow->GetPosition().z > light->GetPosition().z + PursuitLightPassMargin)
-        {
-            light->SetForcedOff(true);
-            game->PlayAudioCueAt(SOUND_CUE_FLASHLIGHT, light->GetPosition(),
-                PursuitLightOffSound.Pitch, PursuitLightOffSound.Volume);
-        }
-    }
+    LeavePursuitFootprints(*shadow);
+    SwitchOffPassedLights(*shadow);
 
     // 近さ（0〜1）：近いほど1に近づく
     const float proximity = MathUtility::Proximity(horizontalDistance, PursuitNearDistance, PursuitProximityRange);
     const float dangerPulse =
         std::sin(m_VisualTimer * (PursuitPulseSpeedBase + proximity * PursuitPulseSpeedRange)) *
         0.5f + 0.5f;
+    ApplyPursuitScreenEffects(proximity, dangerPulse);
+    PulsePursuitFeedback(deltaTime, proximity);
+}
 
+// 追ってくる影は、裸足の濡れた足跡を残していく（左右の足を交互に、歩いた向きに合わせている）
+void Stage2Scene::LeavePursuitFootprints(const ShadowMan& shadow)
+{
+    Vector3 moved = shadow.GetPosition() - m_PursuitLastShadowPosition;
+    moved.y = 0.0f;
+    const float travel = moved.Length();
+    m_PursuitLastShadowPosition = shadow.GetPosition();
+    m_PursuitStepDistance += travel;
+    Ground* ground = m_Objects.ground;
+    if (ground != nullptr && travel > MinimumDirectionLength && m_PursuitStepDistance >= FootprintFollower::Stride)
+    {
+        m_PursuitStepDistance -= FootprintFollower::Stride;
+        const float yaw = std::atan2(moved.x, moved.z);
+        const Vector2 right(std::cos(yaw), -std::sin(yaw));
+        const Vector2 position = Vector2(shadow.GetPosition().x, shadow.GetPosition().z) +
+            right * (FootprintFollower::SideOffset * m_PursuitStepSide);
+        ground->AddFootprint(position, yaw, m_PursuitStepSide, true, 1.0f);
+        m_PursuitStepSide = -m_PursuitStepSide;
+    }
+}
+
+// 影が通り過ぎた照明は、ぱちっと消える（背後から闇が迫ってくる）
+void Stage2Scene::SwitchOffPassedLights(const ShadowMan& shadow)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    for (CeilingLight* light : m_Objects.lights)
+    {
+        if (light != nullptr && !light->IsForcedOff() &&
+            shadow.GetPosition().z > light->GetPosition().z + PursuitLightPassMargin)
+        {
+            light->SetForcedOff(true);
+            game->PlayAudioCueAt(SOUND_CUE_FLASHLIGHT, light->GetPosition(),
+                PursuitLightOffSound.Pitch, PursuitLightOffSound.Volume);
+        }
+    }
+}
+
+// 影が近いほど、画面を緊張させ、乱し、暗くしている（影を見てしまった罰の間は、さらに暗く乱す）
+void Stage2Scene::ApplyPursuitScreenEffects(float proximity, float dangerPulse)
+{
+    Core::Game* game = Core::Game::GetInstance();
     game->GetPostProcess()->SetCorridorTension(
         PursuitTensionBase + proximity * PursuitTensionRange);
     if (m_FinalDoorReady)
@@ -282,8 +297,11 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
         constexpr float PenaltyExposureRange = 0.06f;
         game->GetPostProcess()->SetExposure(PenaltyMinimumExposure + (1.0f - penalty) * PenaltyExposureRange);
     }
+}
 
-    // 近いほど短い間隔で、振動と画面の脈動を出している
+// 近いほど短い間隔で、振動と画面の脈動を出している
+void Stage2Scene::PulsePursuitFeedback(float deltaTime, float proximity)
+{
     if (!m_FinalSequence.AdvancePursuitPulse(deltaTime))
     {
         return;
@@ -296,7 +314,7 @@ void Stage2Scene::UpdateFinalPursuit(float deltaTime)
         PursuitRumbleBase.Strength + proximity * PursuitRumbleRange.Strength);
     if (proximity > PursuitPulseMinProximity)
     {
-        game->GetPostProcess()->TriggerHorrorPulse(
+        Core::Game::GetInstance()->GetPostProcess()->TriggerHorrorPulse(
             PursuitPulseBase.Strength + proximity * PursuitPulseStrengthRange,
             PursuitPulseBase.Seconds);
     }

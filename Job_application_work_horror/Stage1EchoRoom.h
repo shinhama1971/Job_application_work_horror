@@ -76,6 +76,10 @@ private:
     // 音の輪を1つ足している（空きがなければ、一番弱い輪と入れ替える）
     void AddPulse(const DirectX::SimpleMath::Vector3& origin, float maxRadius, float strength);
     void Finish(std::vector<Cue>& cues);
+    // Update の段階：戻った直後に部屋へ入ったら暗くする／暗い部屋の足音の輪と人影／輪を広げて弱める
+    void UpdateArmed(float deltaTime, const DirectX::SimpleMath::Vector3& playerPosition, std::vector<Cue>& cues);
+    void UpdateDark(float deltaTime, const DirectX::SimpleMath::Vector3& playerPosition, bool running, std::vector<Cue>& cues);
+    void AdvancePulses(float deltaTime);
     static bool IsInside(const DirectX::SimpleMath::Vector3& position);
 
     struct Pulse

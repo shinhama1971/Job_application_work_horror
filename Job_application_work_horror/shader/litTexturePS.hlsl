@@ -185,11 +185,12 @@ static const float DRAIN_DAMP_WETNESS = 0.50f;
 static const float3 ANOMALY_BLOOD_COLOR = float3(0.85f, 0.05f, 0.04f);
 static const float ANOMALY_BLOOD_BLEND = 0.92f;
 static const float ANOMALY_BLOOD_WETNESS = 0.9f;
-// 凹凸の強さ：建物の壁（古さで強める量）と小物（壁の半分）、金属の錆の凹凸の効き方
-static const float BUILDING_BUMP_STRENGTH = 0.72f;
+// 凹凸の強さ：建物の壁（古さで強める量）と小物（塗装した扉や家具は平らに近く、壁の約半分）、金属の錆の凹凸の効き方。
+// 強すぎると、懐中電灯の光で壁が波打ち、金属の扉が叩いたように見えて、本物の打ちっぱなしのコンクリートや塗装した扉に見えなくなる
+static const float BUILDING_BUMP_STRENGTH = 0.45f;
 static const float BUILDING_BUMP_WEATHERING = 0.8f;
-static const float PROP_BUMP_STRENGTH = 0.36f;
-static const float RUST_HEIGHT_SCALE = 0.6f;
+static const float PROP_BUMP_STRENGTH = 0.25f;
+static const float RUST_HEIGHT_SCALE = 0.15f;
 // 点光源：範囲と距離の下限（0で割らないため）、なだらかな当たり方（最低＋当たり方の割合）、横へ残す光の量
 static const float LIGHT_EPSILON = 0.001f;
 static const float SOFT_LAMBERT_BASE = 0.20f;

@@ -275,8 +275,21 @@ void Stage1WestWing::Update(const Player& player, float deltaTime,
     m_NoticeTimer = (std::max)(0.0f, m_NoticeTimer - deltaTime);
     m_TurningTimer = (std::max)(0.0f, m_TurningTimer - deltaTime);
 
-    // --- 進行：鍵を拾ったら扉の鍵を外し、扉が開いたらバルブを回せるようにし、
-    //     水が全部引いたらヒューズを出し、ヒューズを取ったら入口の扉を閉めている
+    UpdateProgress(player, deltaTime, listenerForward, focused, cues);
+    PlayScheduledCues(deltaTime, cues);
+    if (IsInside(position))
+    {
+        UpdateInsideSounds(position, deltaTime, listenerForward, cues);
+    }
+}
+
+// 進行：鍵を拾ったら扉の鍵を外し、扉が開いたらバルブを回せるようにし、
+// 水が全部引いたらヒューズを出し、ヒューズを取ったら入口の扉を閉めている
+void Stage1WestWing::UpdateProgress(const Player& player, float deltaTime,
+    const Vector3& listenerForward, const Interactable* focused,
+    std::vector<AmbientSoundCue>& cues)
+{
+    const Vector3 position = player.GetPosition();
     switch (m_Step)
     {
     case Step::FindKey:
@@ -331,8 +344,11 @@ void Stage1WestWing::Update(const Player& player, float deltaTime,
     default:
         break;
     }
+}
 
-    // --- 予定した物音を、時間が来たものから鳴らしている
+// 予定した物音を、時間が来たものから鳴らしている
+void Stage1WestWing::PlayScheduledCues(float deltaTime, std::vector<AmbientSoundCue>& cues)
+{
     for (ScheduledCue& scheduled : m_Scheduled)
     {
         scheduled.Delay -= deltaTime;
@@ -345,12 +361,12 @@ void Stage1WestWing::Update(const Player& player, float deltaTime,
         std::remove_if(m_Scheduled.begin(), m_Scheduled.end(),
             [](const ScheduledCue& scheduled) { return scheduled.Delay <= 0.0f; }),
         m_Scheduled.end());
+}
 
-    // --- 西棟の中にいる間の物音
-    if (!IsInside(position))
-    {
-        return;
-    }
+// 西棟の中にいる間の物音：初めて入ったときの配管の音、天井から滴る水の音、背後で水の中を歩く音
+void Stage1WestWing::UpdateInsideSounds(const Vector3& position, float deltaTime,
+    const Vector3& listenerForward, std::vector<AmbientSoundCue>& cues)
+{
     m_InsideSeconds += deltaTime;
 
     // 初めて入ったとき、奥の方で配管が一度だけ鳴っている（奥に何かがあると感じさせる）。

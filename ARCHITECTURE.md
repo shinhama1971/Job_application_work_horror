@@ -81,7 +81,7 @@ DDGI と半解像度の光の筋は Game が単一所有し、型の定義は Ga
   視線の外にある場所だけを選び、時間差で鳴らす足音や打音を予約します。鳴らしてよいか（演出中でないか）はSceneが判断して渡します
 - `Stage1CeilingStalker`: 電力が戻った後に一度だけ起きる「天井裏の足音が、照明を消しながら迫ってくる」演出の進行（待機 → 迫る → 追いつかれた暗闇 → 照明が戻る）。
 - `Stage1CorridorStretch`: ループ廊下で振り返ると廊下が伸びて見える演出の進行（振り返っている間だけ伸び、目を離すとゆっくり戻る）。伸ばすのは見え方だけで、`Camera::SetWorldStretchZ` がビュー行列の前に「カメラの位置を中心に z 方向へ拡大する行列」をかけている。光・影・当たり判定は元の位置のまま計算し、ライトカリング・画面上の位置の計算も同じ行列（`GetMainMatrices`）を使うので食い違わない。`IsSphereVisible` も伸ばした後の位置と大きさで判定している。
-- `Stage1CorridorFlood`: 西棟の排水かヒューズ3本の回収の後、南北の廊下の入口を抜けたときに一度だけ起きる、赤い水が押し寄せる演出の進行（待機 → 前触れ → 押し寄せる → 止まる／追いつかれた暗転 → 引いていく）。水の先頭の z を床の浸水範囲（`Ground::SetFloodRegion`）として渡すので、水面・反射・波・足音・水の光の揺らぎは西棟の水と同じ仕組みで描かれる。浸水範囲は1つなので、濁流がある間は廊下が使い、水が引いた後は西棟の現在の水位をもう一度反映する。天井裏の足音は濁流が終わるまで待機する。水の赤さは `Ground::SetFloodRedness` から `wetFloorPS` の `LeakInfo.z` へ渡し、赤いときだけ水の縁を流れるノイズで崩し、波を荒くし、映った景色ごと赤黒くしている（西棟の水は赤さ0なので見た目は変わらない）。
+- `Stage1CorridorFlood`: 西棟の排水かヒューズ3本の回収の後、南北の廊下の入口を抜けたときに一度だけ起きる、赤い水が押し寄せる演出の進行（待機 → 前触れ → 右から流入 → 南へ押し寄せる → 止まる／追いつかれた暗転 → 引いていく）。水の先頭の z を床の浸水範囲（`Ground::SetFloodRegion`）として渡すので、水面・反射・波・足音・水の光の揺らぎは西棟の水と同じ仕組みで描かれる。浸水範囲は1つなので、濁流がある間は廊下が使い、水が引いた後は西棟の現在の水位をもう一度反映する。天井裏の足音は濁流が終わるまで待機する。水の赤さは `Ground::SetFloodRedness` から `wetFloorPS` の `LeakInfo.z` へ渡し、赤いときだけ水の縁を流れるノイズで崩し、波を荒くし、波頭と同じ暗い赤へ寄せている（西棟の水は赤さ0なので見た目は変わらない）。濁流の先頭は `CorridorFloodWave` が床とは別に描画する。捕獲判定と同じ先端座標を送り、頂点シェーダーで56×48の格子を持ち上げる（波の形は `corridorFloodWaveShape.hlsli` にまとめ、波としぶきが同じ形を使う）。波頭は高さ19の丸い山で、上の方を少し前へ倒し、幅の場所ごとに高さがゆっくり揺らぐ。角は南北の廊下の東の壁（x=45）から半径40の円弧で曲がる。波頭と壁際の細い泡は流れるノイズの等高線で作る。水面の法線に細かい揺れを加え、フレネル反射で浅い角度の光沢を強める。右の通路は別の浸水矩形として残す。角の中心線は直線と円弧でつなぐ。波頭からの奥行きごとに中心線上の位置を求め、先頭が曲がった後も後ろの列は右の通路を流れる。流入中は右の通路、合流後は南北の廊下で進行方向に合わせて捕獲を判定する。壁や床の本描画を終えてから波頭を描く。波があるときだけHDR画面を別のテクスチャへ写し、波面の法線からサンプル位置をずらして背景を屈折させる。波の厚みに応じて色ごとの透過率を落とし、背景と水の色を合成する。床の浅い水は従来の深度プリパスを使う。波頭からは、頂点バッファを使わない粒子（`corridorFloodSprayVS`・`PS`、520粒）でしぶきを飛ばす。粒ごとに寿命をずらして繰り返し、今の波頭からの相対的な放物線で動かし、速さの向きに伸ばした四角形にする。水滴と薄い霧の2種類で、懐中電灯の円錐の中だけ照り返す。半透明の合成で、深度は判定するが書き込まない。
 - `Stage1TimeStopRoom`・`Stage1TiltRoom`（`Stage1StrangeRooms.h/.cpp`）: おかしな部屋2つの進行。時間が止まった部屋は「世界の時計」（`Application::GetWorldDeltaTime` = 経過秒 × `SetWorldTimeScale` の速さ）を0へゆっくり下げる。世界の時計を使うのは、止まって見せる物だけ（`Ground` の水面・水滴・波、`CeilingLight` のちらつき、`HangingBulb` の揺れ、`ScreenDustOverlay` と `PostProcess` の時間（画面の粒・光の中の埃）、呼吸する壁）。プレイヤー・人影・演出の進行は普段の経過秒のまま動くので、止まった世界の中を自分と人影だけが動ける。傾く部屋は、入口からの距離でカメラの傾き（`Camera::SetViewRoll`。視線を軸に上の向きを回す）を決め、光の安全地帯の落ち着き（`Stage1SafeLights::GetCalm`）でまっすぐへ戻す。どちらもシーンの始めと終わりで元に戻している。
 - `Stage1EchoRoom`（`Stage1EchoRoom.h/.cpp`）: 音で輪郭が浮かぶ真っ暗な部屋の進行。歩いた距離から一歩ごとに音の輪（中心・半径・強さ。同時に4つまで）を作り、最後に聞いた音へ人影を歩かせる（人影の位置はこのクラスが決め、`ShadowMan::SetExternallyControlled` でプレイヤーの方を向くだけにしている）。音の輪は `Renderer::SetEchoPulses` で部屋の形の定数バッファ（b11）の後ろに毎フレーム書き、送り直した回数（DDGI が光線を当て直す合図）は増やさない。`shader/echoPulse.hlsli` が、広がる球の殻が面を通る所と、通り過ぎた後ろの面の角（法線の `fwidth` が大きい所）を光らせ、`litTexturePS`（壁・小物・扉など）と `wetFloorPS`（床）の最後に足す。懐中電灯は `Player::SetFlashlightBlocked` で点かなくしている（自動撮影の点灯もはじく）。
 - 自分の手：`FirstPersonHands` の定数バッファ `State.w` に手の変わり具合（`StageScene::UpdateHands` が周回とヒューズの数で決め、1秒に0.05ずつ近づける）を入れ、`viewModelSkinPS` が青白さ・手の長さの向きに伸びたまだらな血管・血色の印から広がる黒ずみを描く。怖さ（`ComputeThreatRate`）で、速さの違う2つの揺れを重ねた震えを手の向きに足している。
@@ -458,18 +458,19 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 - `Renderer` はDirectX 11の描画状態とGPUへの設定を担当する描画基盤として維持します。
 - Sceneは個別システムを所有せず、進行を統括する責務を残します。
 - 小さなデータクラスを増やすだけで依存関係が減らない場合は分割しません。
-- 1つの関数が長くなったとき（目安は150行）は、クラスを増やさずに、同じクラスの小さな関数へ切り出します。
+- 1つの関数が長くなったとき（目安は100行）は、クラスを増やさずに、同じクラスの小さな関数へ切り出します。
   元の関数には「何をどの順に行うか」だけを残し、切り出した関数には1つの役割を持たせます（例：`Stage2Scene::AdvanceLoop` は
   `ResetForNextLoop` → `ConfigureClockForLoop` → `PlayLoopStartFeedback` → `UpdateCycleMarks` → 周回ごとの `Apply*LoopChanges`、
   `Hud::Draw` は目的・記録の数・照準・ヒューズ・ゲージ・操作の表示・電池の知らせの7つ、`PropLayoutFile::Load` は1行の命令ごとの `Parse*Line`）。
   切り出すときは処理の順番と乱数を引く回数を変えず、見た目と遊びが前と同じになるようにしています。
-- 1つのファイルも、役割ごとに分けています（目安は800行）。
-  - 1面の演出：`StageSceneEvents.cpp`（進行：電力・出口・物音・壁の文字・危険度・無線）、`StageSceneLoop.cpp`（ループ廊下・伸びる廊下・呼吸する壁）、`StageSceneScares.cpp`（驚かせる演出）。値は `Stage1EventSettings.h` にまとめ、3つのファイルで共有しています。
+- 1つのファイルも、役割ごとに分けています（目安は700行）。
+  - 1面の演出：`StageSceneEvents.cpp`（進行：電力・出口・物音・壁の文字・危険度・無線）、`StageSceneLoop.cpp`（ループ廊下・伸びる廊下・押し寄せる濁流）、`StageSceneBreathing.cpp`（呼吸する壁）、`StageSceneScares.cpp`（驚かせる演出）、`StageSceneProgress.cpp`（毎フレームの進行：時間とヒント・ヒューズ・充電器・出口の扉・画面効果）。値は `Stage1EventSettings.h` にまとめ、3つのファイルで共有しています。
   - 2面の演出：`Stage2SceneHorror.cpp`（最後の追跡・捕まったとき・背後の気配・心拍）と `Stage2SceneAnomalies.cpp`（異変）。値は `Stage2HorrorSettings.h`。
-  - HUD の画面：`HudTitle.cpp`（タイトル・導入）、`HudMenus.cpp`（リザルト・暗証番号・ポーズ）、`HudScreens.cpp`（プレイ中に重ねる画面）。文字描画は `HudGlyphs.cpp`。共通の文字の計算と、導入と無線で同じ「電波が乱れた文字」の値は `HudText.h`。
+  - HUD の画面：`HudTitle.cpp`（タイトル・導入）、`HudMenus.cpp`（リザルト・暗証番号・ポーズ）、`HudScreens.cpp`（プレイ中に重ねる画面：監視映像・章のカード・目的地の方向）、`HudStage2.cpp`（2面の状態・隠れている間の視界・息を潜める表示・無線の字幕）。文字描画は `HudGlyphs.cpp`。共通の文字の計算と、導入と無線で同じ「電波が乱れた文字」の値は `HudText.h`。
   - 自動撮影：道順のデータは `CaptureTours.cpp`（型と段取りの時刻は `CaptureTours.h`）、道順をたどって撮る処理は `CaptureMode.cpp`。地点ごとの計測と集計は `CaptureBenchmark.cpp`。
-  - 2面の処理：周回と時計・偽の扉は `Stage2SceneLoop.cpp`、足音で迫る影とロッカーは `Stage2SceneThreat.cpp`、信号盤は `Stage2ScenePuzzles.cpp`。
-  - シェーダー：`litTexturePS.hlsl` の壁と天井の表面（汚れ・古さ・凹凸・水の筋）は `wallSurface.hlsli`、`wetFloorPS.hlsl` の床の古さ・水たまりの反射・水滴の輪は `floorAgeing.hlsli`・`puddleReflection.hlsli`・`waterDrips.hlsli`。元の場所で読み込んでいるので、コンパイル結果は分ける前と同じです。
+  - 2面の処理：周回と時計・偽の扉は `Stage2SceneLoop.cpp`、足音で迫る影とロッカーは `Stage2SceneThreat.cpp`、信号盤は `Stage2ScenePuzzles.cpp`、毎フレームの進行（時間・進む先の明滅・異変・ロッカー・充電器・証拠品・確認パネル）は `Stage2SceneProgress.cpp`。
+  - 描画の土台：床の水たまり・雨漏り・浸水した範囲のメッシュは `GroundWaterSurfaces.cpp`（床本体は `Ground.cpp`）、描画の状態・定数バッファ・描画先の作成は `RendererPipeline.cpp`（デバイスと毎フレームの処理は `Renderer.cpp`）、ブルームと自動露出は `PostProcessBloom.cpp`（画面効果の本体は `PostProcess.cpp`）、監視カメラの映像の描画と異変は `StageSurveillanceFeeds.cpp`。
+  - シェーダー：`litTexturePS.hlsl` の壁と天井の表面（汚れ・古さ・凹凸・水の筋）は `wallSurface.hlsli`、`wetFloorPS.hlsl` の床の古さ・水たまりの反射・水滴の輪は `floorAgeing.hlsli`・`puddleReflection.hlsli`・`waterDrips.hlsli`。`crtOverlayPS.hlsl` の画面効果の値と小さな関数は `crtOverlayParts.hlsli`。元の場所で読み込んでいるので、コンパイル結果は分ける前と同じです。
 
 ## 検証
 

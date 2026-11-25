@@ -68,16 +68,18 @@ float GetProceduralGrime(float3 worldPosition, float3 worldNormal)
          drip * WALL_GRIME_DRIP_WEIGHT + fineDust * WALL_GRIME_DUST_WEIGHT));
 }
 
-// 壁の凹凸は、離れても大きな左官跡が残るよう、三つの大きさのノイズを組み合わせる。
+// 壁の凹凸は、三つの大きさのノイズを組み合わせる。
+// 打ちっぱなしのコンクリートは、面そのものは平らで、型枠のわずかなゆがみと細かいざらつきがあるだけなので、
+// 大きなうねりは弱くし、細かいざらつきを主にしている（大きなうねりが強いと、懐中電灯の光で壁が肉や漆喰のように波打って見える）。
 static const float WALL_PLASTER_BROAD_SCALE = 0.19f;
 static const float WALL_PLASTER_BROAD_SEED = 3.7f;
-static const float WALL_PLASTER_MID_SCALE = 0.63f;
+static const float WALL_PLASTER_MID_SCALE = 0.9f;
 static const float WALL_PLASTER_MID_SEED = 12.4f;
-static const float WALL_PLASTER_FINE_SCALE = 1.45f;
+static const float WALL_PLASTER_FINE_SCALE = 3.4f;
 static const float WALL_PLASTER_FINE_SEED = 27.1f;
-static const float WALL_PLASTER_BROAD_WEIGHT = 0.52f;
-static const float WALL_PLASTER_MID_WEIGHT = 0.33f;
-static const float WALL_PLASTER_FINE_WEIGHT = 0.15f;
+static const float WALL_PLASTER_BROAD_WEIGHT = 0.12f;
+static const float WALL_PLASTER_MID_WEIGHT = 0.10f;
+static const float WALL_PLASTER_FINE_WEIGHT = 0.07f;
 
 // 壁のざらつき（左官の跡のような凹凸）の高さを計算している
 float GetProceduralSurfaceHeight(float3 worldPosition, float3 worldNormal)

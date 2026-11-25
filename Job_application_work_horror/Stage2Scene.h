@@ -110,6 +110,11 @@ private:
     void StartFinalSequence();
     void UpdateFinalSequence(float deltaTime);
     void UpdateFinalPursuit(float deltaTime);
+    // UpdateFinalPursuit の段階：影の濡れた足跡／影が通り過ぎた照明を消す／近さに合わせた画面の乱れ／振動と画面の脈動
+    void LeavePursuitFootprints(const ShadowMan& shadow);
+    void SwitchOffPassedLights(const ShadowMan& shadow);
+    void ApplyPursuitScreenEffects(float proximity, float dangerPulse);
+    void PulsePursuitFeedback(float deltaTime, float proximity);
     // 捕まった演出を始める／進めて復帰させる
     void StartCaughtSequence(Player& player, CaughtSequence::Reason reason);
     void UpdateCaughtSequence(Player& player, float deltaTime);
@@ -137,6 +142,11 @@ private:
     bool IsRequiredAnomalyFound() const;
     // 見えない影の異変を更新している（携帯ラジオの雑音だけを頼りにやり過ごす）
     void UpdateUnseenPresence(Player& player, float deltaTime);
+    // UpdateUnseenPresence の段階：懐中電灯が影の胸に当たっているか／水たまりの波紋と濡れた足跡／壁と床に落とす影だけの姿／すれ違えたときの演出
+    bool IsUnseenPresenceLit(const Player& player, bool enabled) const;
+    void UpdateUnseenFootsteps(bool enabled, UnseenPresenceAnomaly::Result result);
+    void UpdateUnseenShadow(bool enabled, UnseenPresenceAnomaly::Result result, float deltaTime);
+    void OnUnseenPresencePassed();
     // ノックの異変を更新している／耳を澄ませる位置を返している
     void UpdateKnockingAnomaly(const Player& player, float deltaTime);
     DirectX::SimpleMath::Vector3 GetKnockListenPoint() const;
@@ -183,6 +193,10 @@ private:
     bool IsBehindPresenceAllowed() const;
     // ロッカーに隠れている間の、足音の影の振る舞い。trueを返したらUpdateNoiseThreatを終えている。
     bool UpdateHiddenFromStalker(Player& player, float deltaTime);
+    // UpdateHiddenFromStalker の段階：隠れた瞬間（近すぎれば見つかる、離れていれば探しに来る）／探している影の息づかいとロッカーに触れる音／影があきらめて去る
+    void BeginLockerSearch(Player& player, ShadowMan& shadow);
+    void PlaySearcherPresence(const Player& player, const ShadowMan& shadow, float searcherDistance, float deltaTime);
+    void OnHiddenStalkerLeft(ShadowMan& shadow);
     // 今の危険度（0〜1）を返している。足音の危険度・最後の追跡の影・足音の影までの距離から求めている。
     // includeMistakes が true のときは、1・2周目の観察の間違いの回数も含めている（画面の危険ゲージ用）。
     float ComputeThreatRate(const Player& player, bool includeMistakes) const;

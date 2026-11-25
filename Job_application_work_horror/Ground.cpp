@@ -19,21 +19,10 @@ using namespace DirectX::SimpleMath;
 
 namespace
 {
-	// 水たまりのメッシュを床から浮かせる高さ（約2.5mm）。床と同じ平面だと深度がそろわずちらつくため、わずかに上げている
-	constexpr float WaterSurfaceLift = 0.05f;
-	constexpr float InitialFloodHeight = 1.25f;
-	// 描画グループとデバッグ表示を分ける距離。反射の距離は wetFloorPS が水面の画素ごとに調べる。
-	constexpr float NearWaterDistance = 170.0f;
-	constexpr float MiddleWaterDistance = 340.0f;
-	// 水たまり・雨漏りの多角形の辺の数
-	constexpr int PuddleOutlineSegments = 32;
-	constexpr int LeakOutlineSegments = 24;
 	// 浸水範囲は長方形。水面は中心から各辺に三角形を1枚ずつ張る。
 	constexpr int FloodOutlineSegments = 4;
+	constexpr int FloodRectangleCapacity = 2;
 	constexpr int WaterTriangleVertexCount = 3;
-	// 多角形で覆う水面は、雨漏りの半径より外側まで広げて縁の欠けを防ぐ。
-	constexpr float LeakRadiusMargin = 3.0f;
-	constexpr float LeakOutlineMargin = 0.5f;
 	// 床の格子のマス数（縦横）、床の高さ、1マスの大きさ（全体で1000x1000）
 	constexpr int GridCellCount = 50;
 	constexpr int VerticesPerCell = 6;
@@ -77,6 +66,27 @@ void Ground::Init()
 	m_WaterEffects.Init();
 	m_RippleSimulation.Init();
 
+	BuildFloorGrid();
+	CreateFloorResources();
+
+	// 床の高さを-100にし、1マスを20単位に広げている（全体で1000x1000）
+	m_Position.y = FloorY;
+	m_Scale.x = CellSize;
+	m_Scale.z = CellSize;
+
+	// 雨漏りと浸水した範囲のメッシュの頂点バッファ（毎フレーム書き換えるので、入りきる大きさで先に作っている）
+	m_DynamicSurfaceCapacity = static_cast<unsigned int>(
+		(WaterEffectSystem::MaxLeakCount * LeakOutlineSegments + FloodOutlineSegments * FloodRectangleCapacity) * WaterTriangleVertexCount);
+	m_DynamicSurfaceBuffer.Create(std::vector<VERTEX_3D>(m_DynamicSurfaceCapacity));
+	m_DynamicSurfaces.clear();
+	m_PuddleSurfacesDirty = true;
+}
+
+//=======================================
+// 床の格子：50x50マスの頂点とインデックスを作り、バッファにしている
+//=======================================
+void Ground::BuildFloorGrid()
+{
 	// 頂点データ：1マスを2つの三角形（6頂点）で作り、原点を中心に並べている
 	m_SizeX = GridCellCount;
 	m_SizeZ = GridCellCount;
@@ -168,7 +178,13 @@ void Ground::Init()
 
 	// インデックスバッファを作っている
 	m_IndexBuffer.Create(m_Indices);
+}
 
+//=======================================
+// 床を描く道具：濡れた床のシェーダー・定数バッファ・テクスチャ・マテリアルを作っている
+//=======================================
+void Ground::CreateFloorResources()
+{
 	// 濡れた床のピクセルシェーダーを使うシェーダーを作っている
 	m_Shader.CreateRequired("shader/litTextureVS.hlsl", "shader/wetFloorPS.hlsl");
 
@@ -199,265 +215,6 @@ void Ground::Init()
 	mtrl.Diffuse = Color(1, 1, 1, 1);
 	mtrl.TextureEnable = true;// テクスチャを使う
 	m_Material->CreateRequired(mtrl);
-	// 床の高さを-100にし、1マスを20単位に広げている（全体で1000x1000）
-	m_Position.y = FloorY;
-	m_Scale.x = CellSize;
-	m_Scale.z = CellSize;
-
-	// 雨漏りと浸水した範囲のメッシュの頂点バッファ（毎フレーム書き換えるので、入りきる大きさで先に作っている）
-	m_DynamicSurfaceCapacity = static_cast<unsigned int>(
-		(WaterEffectSystem::MaxLeakCount * LeakOutlineSegments + FloodOutlineSegments) * WaterTriangleVertexCount);
-	m_DynamicSurfaceBuffer.Create(std::vector<VERTEX_3D>(m_DynamicSurfaceCapacity));
-	m_DynamicSurfaces.clear();
-	m_PuddleSurfacesDirty = true;
-}
-
-//=======================================
-// 水たまりのメッシュ
-//=======================================
-void Ground::SetDrainTrace(const Vector2& column, float edgeZ, float progress)
-{
-	const float height = WaterSurfaceLift + (InitialFloodHeight - WaterSurfaceLift) * (1.0f - progress);
-	m_DrainTrace = Vector4(column.x, column.y, edgeZ, height);
-}
-
-void Ground::AppendWaterPolygon(std::vector<VERTEX_3D>& vertices,
-	const std::vector<Vector2>& outline, float extraHeight) const
-{
-	Vector2 center = Vector2::Zero;
-	for (const Vector2& point : outline)
-	{
-		center += point;
-	}
-	center /= static_cast<float>(outline.size());
-	// 床の格子と同じUV（床の1マスでテクスチャ1枚。テクスチャは繰り返して読むので、マスをまたいで続いた値にしている）。
-	// 床は回していないので、ワールドの位置から床の格子の位置へは、移動と拡大を戻すだけで求まる
-	const auto makeVertex = [this, extraHeight](const Vector2& point)
-	{
-		VERTEX_3D vertex{};
-		vertex.position = Vector3(point.x, m_Position.y + WaterSurfaceLift + extraHeight, point.y);
-		vertex.normal = Vector3(0.0f, 1.0f, 0.0f);
-		vertex.color = Color(1.0f, 1.0f, 1.0f, 1.0f);
-		vertex.uv = Vector2(
-			(point.x - m_Position.x) / m_Scale.x + 0.5f,
-			0.5f - (point.y - m_Position.z) / m_Scale.z);
-		return vertex;
-	};
-	for (std::size_t index = 0; index < outline.size(); ++index)
-	{
-		const Vector2& a = outline[index];
-		const Vector2& b = outline[(index + 1) % outline.size()];
-		// 床の格子と同じく、法線が上を向く並び（2辺の外積の y が正）にしている
-		const float upward = (a.y - center.y) * (b.x - center.x) - (a.x - center.x) * (b.y - center.y);
-		vertices.push_back(makeVertex(center));
-		vertices.push_back(makeVertex(upward > 0.0f ? a : b));
-		vertices.push_back(makeVertex(upward > 0.0f ? b : a));
-	}
-}
-
-// マス目の水たまり1つにつき1つ、水たまりの形を覆う楕円の多角形を作っている。
-// puddleMask.hlsli は、楕円の中心からの距離（楕円の半径で割った値）に、ノイズと波形のゆがみ（-0.177〜0.177）を足して岸の線（0.44）を決めている。
-// そのため水たまりと岸は、楕円の距離 0.617 の内側に必ず収まる。多角形が楕円の内側に入る分も見込み、少し大きく（0.645）覆っている
-void Ground::BuildPuddleSurfaces()
-{
-	m_PuddleSurfaceVertices.clear();
-	m_PuddleSurfaces.clear();
-	const WaterEffectSystem::PuddleCellBufferData& data = m_WaterEffects.GetPuddleCellData();
-	constexpr float cellSize = WaterEffectSystem::PuddleCellSize;
-	constexpr float coverRadius = WaterEffectSystem::PuddleCoverRadius;
-	const Vector2 gridOffset(data.GridOffset.x, data.GridOffset.y);
-	std::vector<Vector2> outline(PuddleOutlineSegments);
-	for (int row = 0; row < WaterEffectSystem::PuddleCellCount; ++row)
-	{
-		for (int column = 0; column < WaterEffectSystem::PuddleCellCount; ++column)
-		{
-			const Vector4& cell = data.Cells[static_cast<std::size_t>(row * WaterEffectSystem::PuddleCellCount + column)];
-			if (cell.x < WaterEffectSystem::PuddleCellPresentThreshold)
-			{
-				continue;
-			}
-			// シェーダーと同じ、楕円の向き・半径・中心のずれ
-			const Vector2 randomValue(cell.y, cell.z);
-			const float angle = randomValue.x * DirectX::XM_2PI;
-			const float cosine = std::cos(angle);
-			const float sine = std::sin(angle);
-			const Vector2 axes(WaterEffectSystem::PuddleAxisX + randomValue.x * WaterEffectSystem::PuddleAxisXRange,
-				WaterEffectSystem::PuddleAxisZ + randomValue.y * WaterEffectSystem::PuddleAxisZRange);
-			const Vector2 shift = (randomValue - Vector2(0.5f, 0.5f)) * WaterEffectSystem::PuddleCenterJitter;
-			const Vector2 cellCenter(
-				static_cast<float>(WaterEffectSystem::PuddleCellMin + column) + 0.5f,
-				static_cast<float>(WaterEffectSystem::PuddleCellMin + row) + 0.5f);
-			for (int point = 0; point < PuddleOutlineSegments; ++point)
-			{
-				// 回した楕円の上の点を、シェーダーの回転（rotated = 回転 × マス目の中の位置）を戻して、ワールドの位置にしている
-				const float t = DirectX::XM_2PI * static_cast<float>(point) / static_cast<float>(PuddleOutlineSegments);
-				const float rotatedX = std::cos(t) * axes.x * coverRadius;
-				const float rotatedY = std::sin(t) * axes.y * coverRadius;
-				const Vector2 local(rotatedX * cosine + rotatedY * sine, -rotatedX * sine + rotatedY * cosine);
-				outline[static_cast<std::size_t>(point)] = (cellCenter + shift + local) * cellSize - gridOffset;
-			}
-			WaterSurface surface;
-			surface.Center = (cellCenter + shift) * cellSize - gridOffset;
-			surface.Radius = (std::max)(axes.x, axes.y) * coverRadius * cellSize;
-			surface.VertexStart = static_cast<unsigned int>(m_PuddleSurfaceVertices.size());
-			AppendWaterPolygon(m_PuddleSurfaceVertices, outline);
-			surface.VertexCount = static_cast<unsigned int>(m_PuddleSurfaceVertices.size()) - surface.VertexStart;
-			m_PuddleSurfaces.push_back(surface);
-		}
-	}
-	if (!m_PuddleSurfaceVertices.empty())
-	{
-		m_PuddleSurfaceBuffer.Create(m_PuddleSurfaceVertices);
-	}
-	m_PuddleSurfacesDirty = false;
-	m_PuddleSurfacesPosition = m_Position;
-	m_PuddleSurfacesScale = m_Scale;
-}
-
-void Ground::RebuildPuddleSurfacesIfChanged()
-{
-	if (m_PuddleSurfacesDirty || m_PuddleSurfacesPosition != m_Position || m_PuddleSurfacesScale != m_Scale)
-	{
-		BuildPuddleSurfaces();
-	}
-}
-
-// 雨漏りの水たまり（今の半径の円）と、浸水した範囲（長方形）のメッシュを作っている。
-// 床のシェーダーが雨漏りの水たまりを計算する範囲（半径 + 3）と、浸水した範囲がなめらかに始まる所（0.5外側）を覆っている
-void Ground::BuildDynamicSurfaces()
-{
-	m_DynamicSurfaceVertices.clear();
-	m_DynamicSurfaces.clear();
-	std::vector<Vector2> outline;
-	const std::vector<WaterEffectSystem::Leak>& leaks = m_WaterEffects.GetLeaks();
-	const int leakCount = (std::min)(static_cast<int>(leaks.size()), WaterEffectSystem::MaxLeakCount);
-	const float polygonScale = 1.0f / std::cos(DirectX::XM_PI / static_cast<float>(LeakOutlineSegments));
-	for (int leakIndex = 0; leakIndex < leakCount; ++leakIndex)
-	{
-		const WaterEffectSystem::Leak& leak = leaks[static_cast<std::size_t>(leakIndex)];
-		const float radius = (leak.Radius + LeakRadiusMargin) * polygonScale + LeakOutlineMargin;
-		outline.resize(LeakOutlineSegments);
-		for (int point = 0; point < LeakOutlineSegments; ++point)
-		{
-			const float t = DirectX::XM_2PI * static_cast<float>(point) / static_cast<float>(LeakOutlineSegments);
-			outline[static_cast<std::size_t>(point)] = leak.Center + Vector2(std::cos(t), std::sin(t)) * radius;
-		}
-		WaterSurface surface;
-		surface.Center = leak.Center;
-		surface.Radius = radius;
-		surface.VertexStart = static_cast<unsigned int>(m_DynamicSurfaceVertices.size());
-		AppendWaterPolygon(m_DynamicSurfaceVertices, outline);
-		surface.VertexCount = static_cast<unsigned int>(m_DynamicSurfaceVertices.size()) - surface.VertexStart;
-		m_DynamicSurfaces.push_back(surface);
-	}
-	if (m_WaterEffects.HasFloodRegion())
-	{
-		const Vector2 minimum = m_WaterEffects.GetFloodMin() - Vector2(1.0f, 1.0f);
-		const Vector2 maximum = m_WaterEffects.GetFloodMax() + Vector2(1.0f, 1.0f);
-		if (minimum.x < maximum.x && minimum.y < maximum.y)
-		{
-			outline = { minimum, Vector2(maximum.x, minimum.y), maximum, Vector2(minimum.x, maximum.y) };
-			WaterSurface surface;
-			surface.Center = (minimum + maximum) * 0.5f;
-			surface.Radius = Vector2::Distance(minimum, maximum) * 0.5f;
-			surface.VertexStart = static_cast<unsigned int>(m_DynamicSurfaceVertices.size());
-			const float extraHeight = (std::max)(0.0f, m_DrainTrace.w - WaterSurfaceLift);
-			AppendWaterPolygon(m_DynamicSurfaceVertices, outline, extraHeight);
-			surface.VertexCount = static_cast<unsigned int>(m_DynamicSurfaceVertices.size()) - surface.VertexStart;
-			m_DynamicSurfaces.push_back(surface);
-		}
-	}
-	// 転送に失敗したフレームでは、新しい描画範囲で古い頂点を読まない。
-	if (!m_DynamicSurfaceVertices.empty() && !m_DynamicSurfaceBuffer.Modify(m_DynamicSurfaceVertices))
-	{
-		m_DynamicSurfaces.clear();
-	}
-}
-
-Ground::WaterLevel Ground::SelectWaterLevel(const WaterSurface& surface, Camera* cam) const
-{
-	const Vector3 center(surface.Center.x, m_Position.y, surface.Center.y);
-	// プレイヤーの視点では、画面の外の水たまりを描かない（深度プリパスと本描画で同じ判定になる）。
-	// 監視映像や環境マップのように画角の違う視点では、見えているのに消えることがないよう、画面の外かは調べていない
-	if (cam == Core::Game::GetInstance()->GetCamera() && !cam->IsSphereVisible(center, surface.Radius))
-	{
-		return WaterLevel::DryFloor;
-	}
-	const float distance = (std::max)(0.0f, Vector3::Distance(cam->GetPosition(), center) - surface.Radius);
-	// 比較用の描画設定で「メッシュ（LODなし）」を選んでいるときは、見えている水たまりをすべて一番細かく描く
-	if (distance < NearWaterDistance || Tools::TechDemo::DefaultPuddleMeshMode == Tools::TechDemo::PuddleMeshMode::DetailedMesh)
-	{
-		return WaterLevel::Near;
-	}
-	return distance < MiddleWaterDistance ? WaterLevel::Middle : WaterLevel::Far;
-}
-
-void Ground::DrawWaterSurfaces(Camera* cam, bool depthOnly, WetFloorBuffer* wetFloor)
-{
-	if (m_PuddleSurfaces.empty() && m_DynamicSurfaces.empty())
-	{
-		return;
-	}
-	ID3D11DeviceContext* devicecontext = Renderer::GetDeviceContext();
-	// メッシュの頂点はワールドの位置で作っているので、ワールド行列は単位行列にしている
-	Matrix identity = Matrix::Identity;
-	Renderer::SetWorldMatrix(&identity);
-
-	std::vector<WaterLevel> puddleLevels(m_PuddleSurfaces.size());
-	std::vector<WaterLevel> dynamicLevels(m_DynamicSurfaces.size());
-	for (std::size_t index = 0; index < m_PuddleSurfaces.size(); ++index)
-	{
-		puddleLevels[index] = SelectWaterLevel(m_PuddleSurfaces[index], cam);
-	}
-	for (std::size_t index = 0; index < m_DynamicSurfaces.size(); ++index)
-	{
-		dynamicLevels[index] = SelectWaterLevel(m_DynamicSurfaces[index], cam);
-	}
-	const bool countsForDebug = !depthOnly && cam == Core::Game::GetInstance()->GetCamera();
-	if (countsForDebug)
-	{
-		std::fill(std::begin(m_DrawnSurfaceCounts), std::end(m_DrawnSurfaceCounts), 0);
-	}
-
-	// 細かさごとにまとめて描いている（b10 を書き換えるのは、細かさの数だけ）
-	for (const WaterLevel level : { WaterLevel::Near, WaterLevel::Middle, WaterLevel::Far })
-	{
-		const bool hasPuddle = std::find(puddleLevels.begin(), puddleLevels.end(), level) != puddleLevels.end();
-		const bool hasDynamic = std::find(dynamicLevels.begin(), dynamicLevels.end(), level) != dynamicLevels.end();
-		if (!hasPuddle && !hasDynamic)
-		{
-			continue;
-		}
-		if (!depthOnly && wetFloor != nullptr)
-		{
-			wetFloor->WaterSurfaceLevel = static_cast<float>(level);
-			devicecontext->UpdateSubresource(m_WetFloorBuffer.Get(), 0, nullptr, wetFloor, 0, 0);
-		}
-		const auto drawSurfaces = [&](VertexBuffer<VERTEX_3D>& buffer, const std::vector<WaterSurface>& surfaces,
-			const std::vector<WaterLevel>& levels)
-		{
-			buffer.SetGPU();
-			for (std::size_t index = 0; index < surfaces.size(); ++index)
-			{
-				if (levels[index] == level)
-				{
-					devicecontext->Draw(surfaces[index].VertexCount, surfaces[index].VertexStart);
-					if (countsForDebug)
-					{
-						++m_DrawnSurfaceCounts[static_cast<int>(level)];
-					}
-				}
-			}
-		};
-		if (hasPuddle)
-		{
-			drawSurfaces(m_PuddleSurfaceBuffer, m_PuddleSurfaces, puddleLevels);
-		}
-		if (hasDynamic)
-		{
-			drawSurfaces(m_DynamicSurfaceBuffer, m_DynamicSurfaces, dynamicLevels);
-		}
-	}
 }
 
 //=======================================
@@ -616,6 +373,7 @@ void Ground::Draw(Camera* cam)
 			m_WaterEffects.GetFloodMax().x, m_WaterEffects.GetFloodMax().y)
 		: DirectX::SimpleMath::Vector4(1.0f, 1.0f, 0.0f, 0.0f);
 	// 床に残る濡れた足跡（乾いたものは詰めて、数だけを渡している）
+	wetFloor.FloodInletRect = m_FloodInletRect;
 	m_Footprints.Fill(wetFloor.Footprints, wetFloor.FootprintInfo);
 	// 天井の雨漏りの真下の水たまり（今の半径）
 	const std::vector<WaterEffectSystem::Leak>& leaks = m_WaterEffects.GetLeaks();
@@ -628,7 +386,7 @@ void Ground::Draw(Camera* cam)
 	constexpr auto puddleMeshMode = Tools::TechDemo::DefaultPuddleMeshMode;
 	wetFloor.LeakInfo = DirectX::SimpleMath::Vector4(
 		static_cast<float>(leakCount), puddleMeshMode == Tools::TechDemo::PuddleMeshMode::MeshLod ? 1.0f : 0.0f,
-		m_FloodRedness, 0.0f);
+		m_FloodRedness, m_FloodInletRedness);
 	// 床の本体は乾いた床として描き、水たまりは後でそのメッシュに描き重ねる（DrawWaterSurfaces）。
 	// 比較用の描画設定で「床全体で計算」を選んでいるときは、前の方式（床の全部の画素で水たまりを計算し、メッシュは描かない）にしている
 	const bool drawsPuddleMeshes = puddleMeshMode != Tools::TechDemo::PuddleMeshMode::FullFloor;
@@ -655,6 +413,11 @@ void Ground::Draw(Camera* cam)
 
 	// 天井からの水滴と、足元の波紋を描いている
 	m_WaterEffects.Draw(cam);
+}
+
+void Ground::DrawCorridorFloodWave()
+{
+	m_FloodWave.Draw(m_Position.y + WaterSurfaceLift, m_WetTime);
 }
 
 //=======================================
@@ -702,6 +465,7 @@ void Ground::Uninit()
 {
 	// 次のシーンに水面の光の揺らぎが残らないよう、効果を消している
 	Renderer::SetWaterCaustics(DirectX::SimpleMath::Vector4(1.0f, 1.0f, 0.0f, 0.0f), 0.0f, 0.0f, 0.0f);
+	m_FloodWave.Reset();
 	m_WaterEffects.Uninit();
 	m_RippleSimulation.Uninit();
 	Renderer::SetWaterRipples(nullptr, DirectX::SimpleMath::Vector2::Zero, 0.0f, 0.0f);

@@ -31,7 +31,7 @@ class ForestGrass final : public Object
 {
 public:
     // 葉の本数の上限（範囲が広いときは、この本数に収まるよう密度を下げている）
-    static constexpr std::uint32_t MaxBlades = 600000;
+    static constexpr std::uint32_t MaxBlades = 800000;
 
     void Init() override;
     void Update() override;

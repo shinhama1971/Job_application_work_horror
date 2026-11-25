@@ -25,6 +25,8 @@ namespace
     constexpr float ArrowKeyYawSpeed = 6.0f;
     // 矢印キーの上下回転は左右より遅くし、視点の上下移動を抑える。
     constexpr float ArrowKeyPitchSpeed = 1.8f;
+    // 上下の向きの範囲（約±69度）
+    constexpr float MaxPitch = 1.2f;
     // 視線が真上・真下に近く、右方向を作れないとみなす長さの2乗
     constexpr float MinimumRightLengthSquared = 0.0001f;
 
@@ -55,10 +57,17 @@ void Camera::Init()
 void Camera::Update()
 {
     const float deltaTime = Application::GetDeltaTime();
-    // 上下は約±69度までに制限している。
-    constexpr float MaxPitch = 1.2f;
+    HandleMouseLookToggle();
+    ApplyMouseLook();
+    ApplyControllerLook(deltaTime);
+    ApplyArrowKeyLook(deltaTime);
+    // どの入力で動かしても、上下の向きは同じ範囲に制限している
+    m_CameraPitch = std::clamp(m_CameraPitch, -MaxPitch, MaxPitch);
+}
 
-    // ESCでマウス視点のON/OFFを切り替え、OFFの間はカーソルを表示している
+// ESCでマウス視点のON/OFFを切り替え、OFFの間はカーソルを表示している
+void Camera::HandleMouseLookToggle()
+{
     if (Input::GetKeyTrigger(VK_ESCAPE))
     {
         SetMouseLookEnabled(!m_MouseLookEnable);
@@ -72,8 +81,11 @@ void Camera::Update()
             ShowCursor(TRUE);
         }
     }
+}
 
-    // マウス視点：前フレームからのカーソルの移動量を視点の回転に変えている
+// マウス視点：前フレームからのカーソルの移動量を視点の回転に変えている
+void Camera::ApplyMouseLook()
+{
     const HWND window = Application::GetWindow();
     RECT client{};
     POINT mousePos{};
@@ -111,8 +123,11 @@ void Camera::Update()
     {
         ResetMouseLook();
     }
+}
 
-    // コントローラーの右スティックで視点を回している。十字キーも同じ操作として扱っている
+// コントローラーの右スティックで視点を回している。十字キーも同じ操作として扱っている
+void Camera::ApplyControllerLook(float deltaTime)
+{
     const DirectX::XMFLOAT2 rightStick = Input::GetRightAnalogStick();
     float controllerLookX = rightStick.x;
     float controllerLookY = rightStick.y;
@@ -129,8 +144,11 @@ void Camera::Update()
         StickPitchSpeed * m_LookSensitivityScale * deltaTime;
     m_CameraDirection += controllerLookX * controllerYawSpeed;
     m_CameraPitch += controllerLookY * controllerPitchSpeed;
+}
 
-    // デバッグ用：キーボードの方向キーでも視点を回せるようにしている
+// デバッグ用：キーボードの方向キーでも視点を回せるようにしている
+void Camera::ApplyArrowKeyLook(float deltaTime)
+{
     if (m_ArrowKeyLookEnable)
     {
         if (Input::GetKeyPress(VK_LEFT))
@@ -155,9 +173,6 @@ void Camera::Update()
             m_CameraPitch -= pitchStep;
         }
     }
-
-    // どの入力で動かしても、上下の向きは同じ範囲に制限している
-    m_CameraPitch = std::clamp(m_CameraPitch, -MaxPitch, MaxPitch);
 }
 
 // 描画に使う行列をシェーダーへ設定している（mode 0は3D、それ以外はHUD用の2D）。

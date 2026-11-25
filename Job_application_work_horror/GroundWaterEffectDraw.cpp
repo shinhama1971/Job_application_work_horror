@@ -64,8 +64,16 @@ void WaterEffectSystem::Init()
 	m_RippleVertices.clear();
 	m_FallingDrops.reserve(MaxPuddleDrops);
 	m_FootstepRipples.reserve(MaxFootstepRipples);
+	BuildDropMesh();
+	BuildRippleMesh();
 
-	// 先が細い板を十字に組み、どの角度から見ても小さな水滴に見える形にしている。
+	// 水たまりは、床全体のマス目に乱数で置いている（1面）。2面は Ground::SetPuddleLayout で置き直している
+	BuildPuddles(PuddleLayout{});
+}
+
+// 水滴の形とマテリアル：先が細い板を十字に組み、どの角度から見ても小さな水滴に見える形にしている。
+void WaterEffectSystem::BuildDropMesh()
+{
 	const Color dropColor = DropVertexColor;
 	const float tailWidth = DropTailWidth;
 	const float headWidth = DropHeadWidth;
@@ -113,8 +121,11 @@ void WaterEffectSystem::Init()
 	material.TextureEnable = FALSE;
 	m_DropMaterial = std::make_unique<Material>();
 	m_DropMaterial->CreateRequired(material);
+}
 
-	// 波紋の形：内側の半径0.76・外側の半径1の細い輪を32分割で作っている（表と裏の両面）
+// 波紋の形：内側の半径0.76・外側の半径1の細い輪を32分割で作っている（表と裏の両面）
+void WaterEffectSystem::BuildRippleMesh()
+{
 	const Color rippleColor = RippleVertexColor;
 	constexpr int rippleSegments = RippleSegments;
 	constexpr float innerRadius = RippleInnerRadius;
@@ -154,9 +165,6 @@ void WaterEffectSystem::Init()
 	rippleMaterial.TextureEnable = FALSE;
 	m_RippleMaterial = std::make_unique<Material>();
 	m_RippleMaterial->CreateRequired(rippleMaterial);
-
-	// 水たまりは、床全体のマス目に乱数で置いている（1面）。2面は Ground::SetPuddleLayout で置き直している
-	BuildPuddles(PuddleLayout{});
 }
 
 // 落ちている水滴を、半透明で描いている（画面に映っているものだけ）
@@ -204,11 +212,54 @@ void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 	ID3D11DeviceContext* context = Renderer::GetDeviceContext();
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_DropShader.SetGPU();
+	DrawSplashes(camera, context);
 
+	// 波紋は加算合成で、光が当たったように明るく重ねている
+	Renderer::SetBlendState(BS_ADDITIVE);
+	m_RippleVertexBuffer.SetGPU();
+
+	// 水滴が着水したところの波紋
+	for (const FallingDrop& drop : m_FallingDrops)
+	{
+		if (drop.ImpactTimer <= 0.0f ||
+			!camera->IsSphereVisible(drop.Position, ImpactRippleCullRadius))
+		{
+			continue;
+		}
+		const float progress = 1.0f - drop.ImpactTimer / DropImpactSeconds;
+		DrawRipple(
+			context,
+			Vector3(drop.Position.x, RippleSurfaceY, drop.Position.z),
+			progress,
+			ImpactRippleStartRadius + progress * ImpactRippleGrowth,
+			ImpactRippleStrength);
+	}
+
+	// 足音の波紋（足を下ろした瞬間の小さな輪。そこから広がる波は、波のシミュレーションが描いている）
+	for (const WaterRipple& ripple : m_FootstepRipples)
+	{
+		if (!camera->IsSphereVisible(ripple.Position, ripple.MaxRadius + FootstepRippleCullMargin))
+		{
+			continue;
+		}
+		const float progress = ripple.Age / ripple.Duration;
+		DrawRipple(
+			context,
+			ripple.Position,
+			progress,
+			FootstepRippleStartRadius + progress * ripple.MaxRadius,
+			FootstepRippleStrength);
+	}
+
+	Renderer::SetBlendState(BS_NONE);
+}
+
+// 着水から0.2秒の間、4方向へ小さなしぶきを飛ばしている（水滴の形を小さくして使い回している）
+void WaterEffectSystem::DrawSplashes(Camera* camera, ID3D11DeviceContext* context)
+{
 	Renderer::SetBlendState(BS_ALPHABLEND);
 	m_DropVertexBuffer.SetGPU();
 	m_DropMaterial->SetGPU();
-	// 着水から0.2秒の間、4方向へ小さなしぶきを飛ばしている（水滴の形を小さくして使い回している）
 	for (const FallingDrop& drop : m_FallingDrops)
 	{
 		const float impactAge = DropImpactSeconds - drop.ImpactTimer;
@@ -238,68 +289,29 @@ void WaterEffectSystem::DrawWaterRipples(Camera* camera)
 			context->Draw(static_cast<UINT>(m_DropVertices.size()), 0);
 		}
 	}
+}
 
-	// 波紋は加算合成で、光が当たったように明るく重ねている
-	Renderer::SetBlendState(BS_ADDITIVE);
-	m_RippleVertexBuffer.SetGPU();
-	// 1つの波紋を、広がり具合（progress）に合わせて大きく・薄くして描いている
-	const auto drawRipple = [this, context](
-		const Vector3& position,
-		float progress,
-		float radius,
-		float strength)
-	{
-		const float fade = (1.0f - progress) * strength;
-		MATERIAL material{};
-		material.Diffuse = Color(
-			RippleDiffuse.x * fade, RippleDiffuse.y * fade, RippleDiffuse.z * fade, fade);
-		material.Emission = Color(
-			RippleEmission.x * fade, RippleEmission.y * fade, RippleEmission.z * fade, 0.0f);
-		material.Specular = Color(
-			RippleSpecular.x * fade, RippleSpecular.y * fade, RippleSpecular.z * fade, fade);
-		material.Shininess = RippleShininess;
-		material.TextureEnable = FALSE;
-		m_RippleMaterial->SetMaterial(material);
-		m_RippleMaterial->SetGPU();
+// 1つの波紋を、広がり具合（progress）に合わせて大きく・薄くして描いている
+void WaterEffectSystem::DrawRipple(ID3D11DeviceContext* context, const Vector3& position,
+	float progress, float radius, float strength)
+{
+	const float fade = (1.0f - progress) * strength;
+	MATERIAL material{};
+	material.Diffuse = Color(
+		RippleDiffuse.x * fade, RippleDiffuse.y * fade, RippleDiffuse.z * fade, fade);
+	material.Emission = Color(
+		RippleEmission.x * fade, RippleEmission.y * fade, RippleEmission.z * fade, 0.0f);
+	material.Specular = Color(
+		RippleSpecular.x * fade, RippleSpecular.y * fade, RippleSpecular.z * fade, fade);
+	material.Shininess = RippleShininess;
+	material.TextureEnable = FALSE;
+	m_RippleMaterial->SetMaterial(material);
+	m_RippleMaterial->SetGPU();
 
-		Matrix world = Matrix::CreateScale(radius, 1.0f, radius) *
-			Matrix::CreateTranslation(position);
-		Renderer::SetWorldMatrix(&world);
-		context->Draw(static_cast<UINT>(m_RippleVertices.size()), 0);
-	};
-
-	// 水滴が着水したところの波紋
-	for (const FallingDrop& drop : m_FallingDrops)
-	{
-		if (drop.ImpactTimer <= 0.0f ||
-			!camera->IsSphereVisible(drop.Position, ImpactRippleCullRadius))
-		{
-			continue;
-		}
-		const float progress = 1.0f - drop.ImpactTimer / DropImpactSeconds;
-		drawRipple(
-			Vector3(drop.Position.x, RippleSurfaceY, drop.Position.z),
-			progress,
-			ImpactRippleStartRadius + progress * ImpactRippleGrowth,
-			ImpactRippleStrength);
-	}
-
-	// 足音の波紋（足を下ろした瞬間の小さな輪。そこから広がる波は、波のシミュレーションが描いている）
-	for (const WaterRipple& ripple : m_FootstepRipples)
-	{
-		if (!camera->IsSphereVisible(ripple.Position, ripple.MaxRadius + FootstepRippleCullMargin))
-		{
-			continue;
-		}
-		const float progress = ripple.Age / ripple.Duration;
-		drawRipple(
-			ripple.Position,
-			progress,
-			FootstepRippleStartRadius + progress * ripple.MaxRadius,
-			FootstepRippleStrength);
-	}
-
-	Renderer::SetBlendState(BS_NONE);
+	Matrix world = Matrix::CreateScale(radius, 1.0f, radius) *
+		Matrix::CreateTranslation(position);
+	Renderer::SetWorldMatrix(&world);
+	context->Draw(static_cast<UINT>(m_RippleVertices.size()), 0);
 }
 
 // 水滴と波紋を描いている

@@ -242,13 +242,16 @@
     <ClCompile Include="GameSettings.cpp" />
     <ClCompile Include="PauseMenu.cpp" />
     <ClCompile Include="Ground.cpp" />
+    <ClCompile Include="GroundWaterSurfaces.cpp" />
     <ClCompile Include="GroundRainRipples.cpp" />
+    <ClCompile Include="CorridorFloodWave.cpp" />
     <ClCompile Include="GroundWaterEffects.cpp" />
     <ClCompile Include="GroundWaterEffectDraw.cpp" />
     <ClCompile Include="WaterRippleSimulation.cpp" />
     <ClCompile Include="Hud.cpp" />
     <ClCompile Include="HudGlyphs.cpp" />
     <ClCompile Include="HudScreens.cpp" />
+    <ClCompile Include="HudStage2.cpp" />
     <ClCompile Include="HudTitle.cpp" />
     <ClCompile Include="HudMenus.cpp" />
     <ClCompile Include="Input.cpp" />
@@ -262,7 +265,9 @@
     <ClCompile Include="ReflectionProbe.cpp" />
     <ClCompile Include="ScreenSpaceReflection.cpp" />
     <ClCompile Include="PostProcess.cpp" />
+    <ClCompile Include="PostProcessBloom.cpp" />
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="RendererPipeline.cpp" />
     <ClCompile Include="RendererResources.cpp" />
     <ClCompile Include="RendererState.cpp" />
     <ClCompile Include="RenderTexture.cpp" />
@@ -279,11 +284,13 @@
     <ClCompile Include="PointShadowMap.cpp" />
     <ClCompile Include="Sound.cpp" />
     <ClCompile Include="StageScene.cpp" />
+    <ClCompile Include="StageSceneProgress.cpp" />
     <ClCompile Include="StageSceneGuidance.cpp" />
     <ClCompile Include="Stage1Layout.cpp" />
     <ClCompile Include="Stage1LayoutRooms.cpp" />
     <ClCompile Include="Stage1Objective.cpp" />
     <ClCompile Include="StageSurveillanceController.cpp" />
+    <ClCompile Include="StageSurveillanceFeeds.cpp" />
     <ClCompile Include="Stage1AmbientSounds.cpp" />
     <ClCompile Include="Stage1WallWritings.cpp" />
     <ClCompile Include="FlashlightWriting.cpp" />
@@ -311,10 +318,12 @@
     <ClCompile Include="TechDemo.cpp" />
     <ClCompile Include="StageSceneEvents.cpp" />
     <ClCompile Include="StageSceneLoop.cpp" />
+    <ClCompile Include="StageSceneBreathing.cpp" />
     <ClCompile Include="StageSceneScares.cpp" />
     <ClCompile Include="StageSceneRoomScares.cpp" />
     <ClCompile Include="StageSceneDraw.cpp" />
     <ClCompile Include="Stage2Scene.cpp" />
+    <ClCompile Include="Stage2SceneProgress.cpp" />
     <ClCompile Include="Stage2SceneAtmosphere.cpp" />
     <ClCompile Include="Stage3Scene.cpp" />
     <ClCompile Include="ForestScene.cpp" />
@@ -463,6 +472,7 @@
     <ClInclude Include="Stage1CeilingStalker.h" />
     <ClInclude Include="Stage1CorridorStretch.h" />
     <ClInclude Include="Stage1CorridorFlood.h" />
+    <ClInclude Include="CorridorFloodWave.h" />
     <ClInclude Include="Stage1StrangeRooms.h" />
     <ClInclude Include="Stage1EchoRoom.h" />
     <ClInclude Include="Stage1BreathingGroup.h" />
@@ -545,6 +555,10 @@
     <ClInclude Include="shader\wetFloorMaterialSettings.hlsli" />
     <ClInclude Include="shader\puddleReflection.hlsli" />
     <ClInclude Include="shader\waterDrips.hlsli" />
+    <ClInclude Include="shader\corridorFloodWaveConfig.hlsli" />
+    <ClInclude Include="shader\corridorFloodWave.hlsli" />
+    <ClInclude Include="shader\corridorFloodWaveShape.hlsli" />
+    <ClInclude Include="shader\corridorFloodSpray.hlsli" />
     <ClInclude Include="shader\echoPulse.hlsli" />
     <ClInclude Include="shader\waterCausticsLayout.hlsli" />
     <ClInclude Include="shader\puddleMask.hlsli" />
@@ -565,11 +579,24 @@
     <ClInclude Include="shader\breathingWallDeform.hlsli" />
     <ClInclude Include="shader\computeDispatchConfig.hlsli" />
     <ClInclude Include="shader\postProcessBuffer.hlsli" />
+    <ClInclude Include="shader\crtOverlayParts.hlsli" />
     <ClInclude Include="shader\lightShaftSegment.hlsli" />
     <ClInclude Include="shader\surfaceDetail.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="shader\wetFloorPS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\corridorFloodWavePS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\corridorFloodWaveVS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\corridorFloodSprayPS.hlsl">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="shader\corridorFloodSprayVS.hlsl">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </FxCompile>
     <FxCompile Include="shader\volumetricFlashlightPS.hlsl">

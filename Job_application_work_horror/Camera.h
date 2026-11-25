@@ -27,6 +27,12 @@ private:
     // 方向キーで視点を回すか（技術デモで方向キーを使う間は回さない）
     bool m_ArrowKeyLookEnable = true;
 
+    // Update の段階：ESC でマウス視点を切り替える／マウス・右スティックと十字キー・方向キーで視点を回す
+    void HandleMouseLookToggle();
+    void ApplyMouseLook();
+    void ApplyControllerLook(float deltaTime);
+    void ApplyArrowKeyLook(float deltaTime);
+
     // カメラの位置（プレイヤーの目の高さ）
     DirectX::SimpleMath::Vector3 m_Position =
         DirectX::SimpleMath::Vector3(0.0f, 0.0f, 0.0f);

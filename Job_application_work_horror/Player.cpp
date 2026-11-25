@@ -156,20 +156,8 @@ void Player::Update()
     // Scene::UpdateはObject::Updateより先に呼ばれるため、前フレームの値を
     // Sceneが読んだ後で、今回の足音の大きさを作り直している。
     m_SurfaceNoisePulse = 0.0f;
-    // 階段を自動で上っている間は、操作できない演出の最中でも、歩かせてカメラを段の高さに置いている
-    if (m_Climb.Active)
+    if (UpdateWithoutControl())
     {
-        UpdateStairClimb(Application::GetDeltaTime());
-        return;
-    }
-    if (!m_CanControl)
-    {
-        m_Movement.StopControl();
-        // 操作できない演出の間は、手を下げて画面の外へ出している
-        FirstPersonHands::FrameInput handInput;
-        handInput.DeltaTime = Application::GetDeltaTime();
-        handInput.Lowered = true;
-        m_Hands.Update(handInput);
         return;
     }
 
@@ -218,7 +206,37 @@ void Player::Update()
     }
 #endif
 
-    // 懐中電灯：スイッチと電池、光が当たる面、シェーダーへ渡す光、照り返し
+    UpdateFlashlightCameraAndHands(*cam, yaw, forward, right, walls, deltaTime);
+    UpdateBodyShadow(forward, deltaTime);
+    HandleDebugBatteryKey();
+}
+
+// 操作できない間の更新。階段を自動で上っている間は、演出の最中でも歩かせてカメラを段の高さに置き、
+// ほかの演出の間は、手を下げて画面の外へ出している。どちらかをしたら true を返す
+bool Player::UpdateWithoutControl()
+{
+    if (m_Climb.Active)
+    {
+        UpdateStairClimb(Application::GetDeltaTime());
+        return true;
+    }
+    if (!m_CanControl)
+    {
+        m_Movement.StopControl();
+        FirstPersonHands::FrameInput handInput;
+        handInput.DeltaTime = Application::GetDeltaTime();
+        handInput.Lowered = true;
+        m_Hands.Update(handInput);
+        return true;
+    }
+    return false;
+}
+
+// 懐中電灯（スイッチと電池、光が当たる面、シェーダーへ渡す光、照り返し）、カメラの位置と向き、手の揺れを、この順で更新している
+void Player::UpdateFlashlightCameraAndHands(Camera& camera, float yaw, const Vector3& forward,
+    const Vector3& right, const std::vector<Wall*>& walls, float deltaTime)
+{
+    Camera* cam = &camera;
     const FlashlightSystem::FrameState flashlightState = UpdateFlashlightPower(deltaTime);
     const bool renderFlashlight = flashlightState.render;
     const FlashlightBeam beam = TraceFlashlightBeam(*cam, yaw, walls, flashlightState.visible);
@@ -259,9 +277,6 @@ void Player::Update()
     handInput.Fear = m_HandFear;
     m_Hands.Update(handInput);
     m_FlashlightToggledThisFrame = false;
-
-    UpdateBodyShadow(forward, deltaTime);
-    HandleDebugBatteryKey();
 }
 
 // WASDと左スティックから、移動したい向き（水平）を作っている。

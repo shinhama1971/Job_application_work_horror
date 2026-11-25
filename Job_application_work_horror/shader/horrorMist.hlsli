@@ -18,9 +18,9 @@
 
 // 床の高さ、霧が薄くなる高さ（この高さ上がるごとに約1/3）、濃さ
 #define MIST_HEIGHT_SCALE 13.0f
-#define MIST_DENSITY 0.016f
-// 部屋全体に漂う薄い霧の濃さ（サイレントヒルのように、懐中電灯を向けた先が白くかすみ、遠くまで見通せない）
-#define MIST_AIR_DENSITY 0.0024f
+#define MIST_DENSITY 0.011f
+// 部屋全体に漂う薄い霧の濃さ（サイレントヒルのように、懐中電灯を向けた先が白くかすみ、遠くまで見通せない）。濃すぎると部屋全体が乳白色に濁り、壁や床の質感が見えなくなるので、見通しを少し残している
+#define MIST_AIR_DENSITY 0.0016f
 
 // 2面の周回が深いときは霧を濃くし、非常灯の色を散乱に足す。
 static const float MIST_LOOP_DENSITY_GAIN = 0.85f;

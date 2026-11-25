@@ -53,6 +53,10 @@ public:
     void FillObjectiveInput(Stage1ObjectiveInput& input, const Player& player) const;
 
 private:
+    // 映像を開いてから操作を受け付けるまでの秒数（開いた直後の押し間違いを防いでいる）。
+    // 操作の判定と、映像の画面の操作案内の両方で使う
+    static constexpr float PatrolInputDelay = 0.65f;
+
     // 状態ごとの処理（端末を調べたら映像を開く・映像の操作・現地確認・捕まった後）
     void UpdateState(Player& player, float deltaTime);
     void UpdateViewing(Player& player);

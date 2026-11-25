@@ -1,5 +1,43 @@
 # 作業の引き継ぎ（2026年11月9日）
 
+## 長い関数とファイルの分割（11月26日、Claude Code）
+
+- 120行を超えていた C++ の関数（3面を除く）を、段階ごとの関数に分けた。処理の中身と順番は変えていない。
+  - `Sound::Init`（148行）→ `CreateAudioDevice`・`SetupSpatialAudio`・`LoadWave`。`LoadWave` はどの道で抜けてもファイルを閉じる。最初の COM の初期化に失敗したときも `Uninit` を通るようになった（以前は通らずに戻っていた）。
+  - `Ground::Init`（144行）→ `BuildFloorGrid`・`CreateFloorResources`。
+  - `WaterEffectSystem::BuildPuddles`（144行）→ 無名の名前空間の `PuddleHash21`・`PuddleHash22`・`MakeDropCandidate`・`FillRandomPuddles`（1面・森）・`FillFixedPuddles`（2面）。
+  - `StageScene::SetupBreathingWall`（131行）→ `EnableBreathingWallFaces`・`AttachBreathingFixture`（取り付けのラムダをメンバー関数にした）。
+  - `Stage1CorridorFlood::Update`（131行）→ `UpdateInflow`・`UpdateRushing`・`UpdateCaughtBlackout`・`UpdateRedness`・`PlayRushAt`・`CatchPlayer`。
+  - `Stage1WestWing::Update`（130行）→ `UpdateProgress`・`PlayScheduledCues`・`UpdateInsideSounds`。
+  - `Stage2Scene::UpdateFinalPursuit`（124行）→ `LeavePursuitFootprints`・`SwitchOffPassedLights`・`ApplyPursuitScreenEffects`・`PulsePursuitFeedback`。
+  - `StaticMesh::LoadConverted`（120行）→ 無名の名前空間の `ReadConvertedHeader`・`ReadSubsets`・`AreSubsetsInRange`・`ReadTextureNames`。
+- 続けて、100行を超えていた残りの関数（3面を除く）も分けた。
+  - `ForestEvents::Update` → 街灯・研究所の窓・玄関の灯り・草むらの何か。`Player::Update` → `UpdateWithoutControl`・`UpdateFlashlightCameraAndHands`。`Camera::Update` → マウス視点の切り替え・マウス・スティック・方向キー（`MaxPitch` は無名の名前空間へ）。
+  - `StageScene::Init` → `ResetProgressState`・`SetupStageSystems`。`StageScene::UpdateScareLightSequence` は「非常灯を移す」関数（`MoveEmergencyLight`）で繰り返しをまとめた。`Stage1EchoRoom::Update` → `UpdateArmed`・`UpdateDark`・`AdvancePulses`。
+  - `Stage2Scene::UpdateUnseenPresence` → 照らしているか・足もと・影だけの姿・すれ違えたとき。`Stage2Scene::UpdateHiddenFromStalker` → 隠れた瞬間・探している影の気配・あきらめて去る。
+  - `Hud::DrawIntro` → 背景・受信記録・「通信途絶」・目的のパネル（文字の幅は `Hud::TextWidth`）。`WaterEffectSystem::Init` → 水滴と波紋の形。`WaterEffectSystem::DrawWaterRipples` → しぶき・波紋1つ。`Wall::Init` → `BuildBoxMesh`・`AddBoxFace`。`GpuTimer::TryResolveFrame` → `ResolvePass`・`SeparateBloomFromPostProcess`。
+  - 3面を除くと、100行を超える C++ の関数はない。シェーダーの main（wetFloorPS 530行・litTexturePS 440行・crtOverlayPS 435行）は分けていない。
+- 700行を超えていたファイルも、役割ごとに分けた（新しいファイルは vcxproj と filters に登録済み）。
+  - `Ground.cpp`（770行）→ 水面のメッシュを `GroundWaterSurfaces.cpp` へ。両方で使う `WaterSurfaceLift`・`LeakOutlineSegments` は Ground.h のクラスの定数にした。
+  - `StageScene.cpp`（732行）→ 毎フレームの進行を `StageSceneProgress.cpp` へ。画面効果の基本の強さ3つ（`DistortionBase` など）は StageScene.h へ。
+  - `Stage2Scene.cpp`（741行）→ 毎フレームの進行を `Stage2SceneProgress.cpp` へ。`StageSceneLoop.cpp`（726行）→ 呼吸する壁を `StageSceneBreathing.cpp` へ。
+  - `HudScreens.cpp`（752行）→ 2面の状態・隠れている間の視界・息を潜める表示・無線の字幕を `HudStage2.cpp` へ。`Renderer.cpp`（707行）→ 状態・定数バッファ・描画先の作成を `RendererPipeline.cpp` へ。
+  - `StageSurveillanceController.cpp`（737行）→ 映像の描画と異変を `StageSurveillanceFeeds.cpp` へ（`PatrolInputDelay` はヘッダーのクラスの定数へ）。`PostProcess.cpp`（733行）→ ブルームと自動露出を `PostProcessBloom.cpp` へ。
+  - `crtOverlayPS.hlsl`（793行）→ 値と小さな関数を `crtOverlayParts.hlsli` へ（バイトコードは変更前と同じ）。
+  - 移した関数だけが使う無名の名前空間の定数は一緒に移し、両方で使う値は二重に書かずにヘッダーへ出した。
+  - 分けていないもの：`CaptureMode.cpp`（789行。無名の名前空間の状態を多くの関数で共有している）、`ForestGrass.cpp`（759行。ほかの作業の未コミットの変更がある）、3面。
+- Release・Debug（x64）は警告0。無音の自動撮影を分ける前と画素で比べた。1面→2面の72枚は、タイトル（時刻の表示）と、時間が止まった部屋の1枚の数画素（最大9段階、平均0.003）以外は同じ（明るさで最大1段階の差の画像が数枚）。森の道順の8枚はまったく同じ。
+
+## 1面の濁流の曲がり方・波の形・しぶきと、壁の凹凸（11月24日、Claude Code）
+
+- 角の曲がり方：南北の廊下の東の壁（x=45）から半径40の円弧で曲がるようにした（`corridorFloodWaveConfig.hlsli`）。前は半径24で、内側の岸が半径6でほぼその場で回り、急に向きを変えて見えていた。当たり判定（`Stage1CorridorFlood`）も同じ値から計算している。
+- 波の形：形の計算を `corridorFloodWaveShape.hlsli` にまとめた。高さ19の丸い山、上の方を少し前へ倒す、幅いっぱい（両端は86%から下げる）、幅の場所ごとの高さのむら。格子は56×48。
+- 波の質感：暗い赤で透けて揺らぐ水にし、照り返し・白い泡を強め、縦の筋をまばらにした（`corridorFloodWavePS.hlsl`）。濁流の上では床の霧と光の筋も赤く吸わせ、後ろの水がピンクに見えないようにした（`wetFloorPS.hlsl`）。
+- しぶき：波頭から520粒の水滴と霧を飛ばす（`corridorFloodSprayVS`・`PS`、`CorridorFloodWave::DrawSpray`）。
+- 自動撮影：05w〜05wab を、角が見える廊下の西寄り（-35, 185）から撮るようにした。
+- 壁・扉・家具の凹凸を弱め（`wallSurface.hlsli` の大きなうねり、`litTexturePS.hlsl` の凹凸の強さ・錆の凹凸）、床の白いもやを約3割薄くした（`horrorMist.hlsli`）。2面の壁にも効く。
+- Release・Debug（x64）は警告0。無音の自動撮影で確認した。手動プレイは未確認。扉の細かいへこみが少し残っている。無線の字幕が波に重なる場面がある。
+
 ## 1面の濁流を通常進行で見られるようにする（11月23日、Codex）
 
 - 西棟の排水か、どちらかの経路でヒューズ3本の回収を終え、南北の廊下の入口を越えると発生する。天井裏の足音は濁流が終わるまで待つ。プレイヤーが先に逃げても波は廊下の入口まで進む。

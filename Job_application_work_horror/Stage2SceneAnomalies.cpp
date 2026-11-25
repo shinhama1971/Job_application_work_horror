@@ -537,19 +537,51 @@ void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
 {
     const bool enabled = m_AnomalyPlan.IsRequired(m_LoopCount, Stage2Anomaly::Unseen) &&
         !m_FinalSequence.IsSequenceActive();
-    // 懐中電灯の光が、見えない影の胸のあたりに当たっているか（光の円錐の中心付近で、75より近い）
-    bool lit = false;
-    if (enabled && m_UnseenPresence.IsActive() && player.IsFlashlightOn())
-    {
-        const Camera* camera = Core::Game::GetInstance()->GetCamera();
-        const Vector3 toChest = m_UnseenPresence.GetPosition() + Vector3(0.0f, UnseenChestHeight, 0.0f) - camera->GetPosition();
-        const float distance = toChest.Length();
-        lit = distance > MinimumDirectionLength && distance < UnseenLitDistance &&
-            camera->GetForward().Dot(toChest / distance) > UnseenLitFacing;
-    }
+    const bool lit = IsUnseenPresenceLit(player, enabled);
     const UnseenPresenceAnomaly::Result result = m_UnseenPresence.Update(
         deltaTime, player.GetPosition(), player.IsMovingHorizontally(), player.IsHiding(), enabled, lit);
+    UpdateUnseenFootsteps(enabled, result);
+    UpdateUnseenShadow(enabled, result, deltaTime);
 
+    Core::Game* game = Core::Game::GetInstance();
+    if (m_UnseenPresence.WasNoticedThisFrame())
+    {
+        // 照らして気づかれた：影のいる所から短い息づかいが聞こえ、吊るした裸電球が揺れ、心拍が跳ねる
+        game->PlayAudioCueAt(SOUND_CUE_BREATH, m_UnseenPresence.GetPosition() + Vector3(0.0f, UnseenHeadHeight, 0.0f),
+            UnseenNoticedBreathSound.Pitch, UnseenNoticedBreathSound.Volume);
+        KickHangingBulbs(UnseenNoticedBulbKick);
+        EventFeedback::HorrorPulse(*game->GetPostProcess(), UnseenNoticedPulse);
+        EventFeedback::Rumble(UnseenNoticedRumble);
+    }
+    if (result == UnseenPresenceAnomaly::Result::Caught)
+    {
+        // 捕まった：足音の影に捕まったときと同じく、周回はそのままで入口へ戻している
+        StartCaughtSequence(player, CaughtSequence::Reason::NoiseStalker);
+        return;
+    }
+    if (result == UnseenPresenceAnomaly::Result::Passed)
+    {
+        OnUnseenPresencePassed();
+    }
+}
+
+// 懐中電灯の光が、見えない影の胸のあたりに当たっているか（光の円錐の中心付近で、75より近い）
+bool Stage2Scene::IsUnseenPresenceLit(const Player& player, bool enabled) const
+{
+    if (!enabled || !m_UnseenPresence.IsActive() || !player.IsFlashlightOn())
+    {
+        return false;
+    }
+    const Camera* camera = Core::Game::GetInstance()->GetCamera();
+    const Vector3 toChest = m_UnseenPresence.GetPosition() + Vector3(0.0f, UnseenChestHeight, 0.0f) - camera->GetPosition();
+    const float distance = toChest.Length();
+    return distance > MinimumDirectionLength && distance < UnseenLitDistance &&
+        camera->GetForward().Dot(toChest / distance) > UnseenLitFacing;
+}
+
+// 見えない影の足もと：水たまりの中では波紋と水音、水から出た直後は濡れた足跡を残している
+void Stage2Scene::UpdateUnseenFootsteps(bool enabled, UnseenPresenceAnomaly::Result result)
+{
     // 無効化・捕獲・周回切替時の瞬間移動は歩行距離に数えない。
     Ground* ground = m_Objects.ground;
     if (!enabled || result != UnseenPresenceAnomaly::Result::None || !m_UnseenPresence.IsActive())
@@ -593,8 +625,12 @@ void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
             m_UnseenLastStep = position;
         }
     }
-    // 姿の見えない影の「影だけ」を、壁と床に落としている（天井の照明・揺れる裸電球・懐中電灯の光を、人の形で遮る。
-    // shader/figureShadow.hlsli）。捕まえた直後に奥へ戻る瞬間移動が目立たないよう、そのフレームは消し、0.4秒で上げ下げしている
+}
+
+// 姿の見えない影の「影だけ」を、壁と床に落としている（天井の照明・揺れる裸電球・懐中電灯の光を、人の形で遮る。
+// shader/figureShadow.hlsli）。捕まえた直後に奥へ戻る瞬間移動が目立たないよう、そのフレームは消し、0.4秒で上げ下げしている
+void Stage2Scene::UpdateUnseenShadow(bool enabled, UnseenPresenceAnomaly::Result result, float deltaTime)
+{
     const bool shadowShown = enabled && m_UnseenPresence.IsActive() && result == UnseenPresenceAnomaly::Result::None;
     m_UnseenShadowVisibility = result == UnseenPresenceAnomaly::Result::Caught ? 0.0f
         : shadowShown ? (std::min)(1.0f, m_UnseenShadowVisibility + deltaTime / UnseenShadowFadeSeconds)
@@ -602,29 +638,12 @@ void Stage2Scene::UpdateUnseenPresence(Player& player, float deltaTime)
     Vector3 shadowFoot = m_UnseenPresence.GetPosition();
     shadowFoot.y = PuddleReflectionAnomaly::FloorY;
     Renderer::SetUnseenFigure(shadowFoot, m_UnseenShadowVisibility);
+}
 
+// すれ違えた：通り過ぎた先の照明が一度明滅し、吊るした裸電球が大きく揺れて、雑音が遠ざかっていく
+void Stage2Scene::OnUnseenPresencePassed()
+{
     Core::Game* game = Core::Game::GetInstance();
-    if (m_UnseenPresence.WasNoticedThisFrame())
-    {
-        // 照らして気づかれた：影のいる所から短い息づかいが聞こえ、吊るした裸電球が揺れ、心拍が跳ねる
-        game->PlayAudioCueAt(SOUND_CUE_BREATH, m_UnseenPresence.GetPosition() + Vector3(0.0f, UnseenHeadHeight, 0.0f),
-            UnseenNoticedBreathSound.Pitch, UnseenNoticedBreathSound.Volume);
-        KickHangingBulbs(UnseenNoticedBulbKick);
-        EventFeedback::HorrorPulse(*game->GetPostProcess(), UnseenNoticedPulse);
-        EventFeedback::Rumble(UnseenNoticedRumble);
-    }
-    if (result == UnseenPresenceAnomaly::Result::Caught)
-    {
-        // 捕まった：足音の影に捕まったときと同じく、周回はそのままで入口へ戻している
-        StartCaughtSequence(player, CaughtSequence::Reason::NoiseStalker);
-        return;
-    }
-    if (result != UnseenPresenceAnomaly::Result::Passed)
-    {
-        return;
-    }
-
-    // すれ違えた：通り過ぎた先の照明が一度明滅し、吊るした裸電球が大きく揺れて、雑音が遠ざかっていく
     const Vector3 presencePosition = m_UnseenPresence.GetPosition();
     CeilingLight* passedLight = m_Objects.Light(Stage2NearestLight(presencePosition.z));
     if (passedLight != nullptr)

@@ -137,28 +137,21 @@ namespace
 	}
 }
 
-// 足元の判定とシェーダーで共有する水たまりの表、水滴を落とす場所を作る。
-void WaterEffectSystem::BuildPuddles(const PuddleLayout& layout)
+namespace
 {
-	m_FallingDrops.clear();
-	m_PuddleCellData = PuddleCellBufferData{};
-	m_PuddleCellData.GridOffset = Vector4(layout.GridOffset.x, layout.GridOffset.y, 0.0f, 0.0f);
-
 	// 0〜1の疑似乱数。wetFloorPS.hlslの水たまりと同じ式を使い、見た目と判定の位置をそろえている
-	const auto fraction = [](float value)
+	float PuddleHash21(float x, float y)
 	{
+		const float value = std::sin(x * Hash21FrequencyX + y * Hash21FrequencyY) * HashAmplitude;
 		return value - std::floor(value);
-	};
-	const auto hash21 = [&fraction](float x, float y)
-	{
-		return fraction(std::sin(x * Hash21FrequencyX + y * Hash21FrequencyY) * HashAmplitude);
-	};
-	const auto hash22 = [&hash21](float x, float y)
+	}
+
+	Vector2 PuddleHash22(float x, float y)
 	{
 		return Vector2(
-			hash21(x + Hash22OffsetA.x, y + Hash22OffsetA.y),
-			hash21(x + Hash22OffsetB.x, y + Hash22OffsetB.y));
-	};
+			PuddleHash21(x + Hash22OffsetA.x, y + Hash22OffsetA.y),
+			PuddleHash21(x + Hash22OffsetB.x, y + Hash22OffsetB.y));
+	}
 
 	// 水滴を落とす場所の候補（水たまりがあるマス）
 	struct DropCandidate
@@ -170,81 +163,101 @@ void WaterEffectSystem::BuildPuddles(const PuddleLayout& layout)
 		float DistanceSquared;
 	};
 
-	// 描画する水滴の候補を1つ足している。中心はシェーダーと同じ式で求める。
-	constexpr float cellSize = PuddleCellSize;
-	std::vector<DropCandidate> candidates;
-	const auto addPuddle = [&](int cellX, int cellZ, const Vector2& randomValue)
+	// 水滴の候補を1つ作っている。中心はシェーダーと同じ式で求める。
+	DropCandidate MakeDropCandidate(int cellX, int cellZ, const Vector2& randomValue, const Vector2& gridOffset)
 	{
 		const Vector2 puddleCenter =
 			(Vector2(static_cast<float>(cellX), static_cast<float>(cellZ)) +
 			 Vector2(0.5f, 0.5f) +
-			 (randomValue - Vector2(0.5f, 0.5f)) * PuddleCenterJitter) * cellSize - layout.GridOffset;
+			 (randomValue - Vector2(0.5f, 0.5f)) * WaterEffectSystem::PuddleCenterJitter) * WaterEffectSystem::PuddleCellSize - gridOffset;
 		// 遊ぶ範囲はZの正の方へ少し寄っているため、候補をその中心からの距離順に並べている。
 		// 限られた数の水滴が、マップの端のマスだけで埋まらないようにしている。
 		const Vector2 fromGameplayCenter =
 			puddleCenter - Vector2(0.0f, GameplayCenterZ);
-		candidates.push_back({
+		return {
 			cellX,
 			cellZ,
 			randomValue,
 			puddleCenter,
 			fromGameplayCenter.x * fromGameplayCenter.x +
-			fromGameplayCenter.y * fromGameplayCenter.y });
-	};
+			fromGameplayCenter.y * fromGameplayCenter.y };
+	}
 
-	if (layout.Cells.empty())
+	// 床全体のマス目について、水たまりがあるかと形の乱数を表にし、プレイヤーが通る範囲の水たまりを水滴の候補にしている（1面・森）
+	void FillRandomPuddles(WaterEffectSystem::PuddleCellBufferData& data, const Vector2& gridOffset,
+		std::vector<DropCandidate>& candidates)
 	{
-		// 床全体のマス目について、水たまりがあるかと形の乱数を表にし、シェーダーへ渡している（Ground::Init）
-		for (int row = 0; row < PuddleCellCount; ++row)
+		constexpr int cellCount = WaterEffectSystem::PuddleCellCount;
+		for (int row = 0; row < cellCount; ++row)
 		{
-			for (int column = 0; column < PuddleCellCount; ++column)
+			for (int column = 0; column < cellCount; ++column)
 			{
-				const float cellX = static_cast<float>(PuddleCellMin + column);
-				const float cellZ = static_cast<float>(PuddleCellMin + row);
-				const bool hasPuddle = hash21(cellX + PuddlePresenceOffset.x, cellZ + PuddlePresenceOffset.y) >= PuddleChance;
-				const Vector2 randomValue = hash22(cellX, cellZ);
-				m_PuddleCellData.Cells[row * PuddleCellCount + column] = Vector4(
+				const float cellX = static_cast<float>(WaterEffectSystem::PuddleCellMin + column);
+				const float cellZ = static_cast<float>(WaterEffectSystem::PuddleCellMin + row);
+				const bool hasPuddle = PuddleHash21(cellX + PuddlePresenceOffset.x, cellZ + PuddlePresenceOffset.y) >= WaterEffectSystem::PuddleChance;
+				const Vector2 randomValue = PuddleHash22(cellX, cellZ);
+				data.Cells[row * cellCount + column] = Vector4(
 					hasPuddle ? 1.0f : 0.0f, randomValue.x, randomValue.y, 0.0f);
 			}
 		}
 
-		// 水滴はプレイヤーが通る範囲の水たまりから選ぶ。
 		for (int cellZ = -DropSearchCellRadius; cellZ <= DropSearchCellRadius; ++cellZ)
 		{
 			for (int cellX = -DropSearchCellRadius; cellX <= DropSearchCellRadius; ++cellX)
 			{
-				const float puddleSeed = hash21(
+				const float puddleSeed = PuddleHash21(
 					static_cast<float>(cellX) + PuddlePresenceOffset.x,
 					static_cast<float>(cellZ) + PuddlePresenceOffset.y);
-				if (puddleSeed < PuddleChance)
+				if (puddleSeed < WaterEffectSystem::PuddleChance)
 				{
 					continue;
 				}
-				const Vector2 randomValue = hash22(
+				const Vector2 randomValue = PuddleHash22(
 					static_cast<float>(cellX),
 					static_cast<float>(cellZ));
-				addPuddle(cellX, cellZ, randomValue);
+				candidates.push_back(MakeDropCandidate(cellX, cellZ, randomValue, gridOffset));
 			}
 		}
 	}
-	else
+
+	// 決まったマス目にだけ水たまりを置き、そのすべてを水滴の候補にしている（2面）
+	void FillFixedPuddles(const std::vector<Vector4>& cells, WaterEffectSystem::PuddleCellBufferData& data,
+		const Vector2& gridOffset, std::vector<DropCandidate>& candidates)
 	{
-		// 決まったマス目にだけ水たまりを置いている（2面）。
-		for (const Vector4& cell : layout.Cells)
+		constexpr int cellCount = WaterEffectSystem::PuddleCellCount;
+		for (const Vector4& cell : cells)
 		{
 			const int cellX = static_cast<int>(cell.x);
 			const int cellZ = static_cast<int>(cell.y);
-			const int column = cellX - PuddleCellMin;
-			const int row = cellZ - PuddleCellMin;
-			if (column < 0 || column >= PuddleCellCount || row < 0 || row >= PuddleCellCount)
+			const int column = cellX - WaterEffectSystem::PuddleCellMin;
+			const int row = cellZ - WaterEffectSystem::PuddleCellMin;
+			if (column < 0 || column >= cellCount || row < 0 || row >= cellCount)
 			{
 				continue;
 			}
 			const Vector2 randomValue(cell.z, cell.w);
-			m_PuddleCellData.Cells[row * PuddleCellCount + column] =
+			data.Cells[row * cellCount + column] =
 				Vector4(1.0f, randomValue.x, randomValue.y, 0.0f);
-			addPuddle(cellX, cellZ, randomValue);
+			candidates.push_back(MakeDropCandidate(cellX, cellZ, randomValue, gridOffset));
 		}
+	}
+}
+
+// 足元の判定とシェーダーで共有する水たまりの表、水滴を落とす場所を作る。
+void WaterEffectSystem::BuildPuddles(const PuddleLayout& layout)
+{
+	m_FallingDrops.clear();
+	m_PuddleCellData = PuddleCellBufferData{};
+	m_PuddleCellData.GridOffset = Vector4(layout.GridOffset.x, layout.GridOffset.y, 0.0f, 0.0f);
+
+	std::vector<DropCandidate> candidates;
+	if (layout.Cells.empty())
+	{
+		FillRandomPuddles(m_PuddleCellData, layout.GridOffset, candidates);
+	}
+	else
+	{
+		FillFixedPuddles(layout.Cells, m_PuddleCellData, layout.GridOffset, candidates);
 	}
 
 	std::sort(
@@ -266,7 +279,7 @@ void WaterEffectSystem::BuildPuddles(const PuddleLayout& layout)
 		const Vector2& puddleCenter = candidate.PuddleCenter;
 
 		FallingDrop drop{};
-		drop.Seed = hash21(cellX + DropSeedOffset.x, cellZ + DropSeedOffset.y);
+		drop.Seed = PuddleHash21(cellX + DropSeedOffset.x, cellZ + DropSeedOffset.y);
 		drop.Position = Vector3(
 			puddleCenter.x + (drop.Seed - 0.5f) * DropSpread,
 			DropStartY - randomValue.y * DropStartHeightRange,

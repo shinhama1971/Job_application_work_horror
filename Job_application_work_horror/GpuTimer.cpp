@@ -172,62 +172,14 @@ bool GpuTimer::TryResolveFrame(
     }
     else
     {
-        // 各段階の終わりの時刻から始まりの時刻を引き、GPUの時計の周波数で割ってミリ秒にしている
         for (std::size_t passIndex = 0; passIndex < PassCount; ++passIndex)
         {
-            if (frame.Skipped[passIndex])
-            {
-                resolvedTimings[passIndex].Status = GpuTimingStatus::Skipped;
-                continue;
-            }
-            if (!frame.Issued[passIndex])
-            {
-                resolvedTimings[passIndex].Status = GpuTimingStatus::Invalid;
-                continue;
-            }
-
-            std::uint64_t startTimestamp = 0;
-            std::uint64_t endTimestamp = 0;
-            const HRESULT startResult = context->GetData(
-                frame.Start[passIndex].Get(),
-                &startTimestamp,
-                sizeof(startTimestamp),
-                D3D11_ASYNC_GETDATA_DONOTFLUSH);
-            const HRESULT endResult = context->GetData(
-                frame.End[passIndex].Get(),
-                &endTimestamp,
-                sizeof(endTimestamp),
-                D3D11_ASYNC_GETDATA_DONOTFLUSH);
-            if (startResult == S_FALSE || endResult == S_FALSE)
+            if (!ResolvePass(context, frame, passIndex, disjointData.Frequency, resolvedTimings[passIndex]))
             {
                 return false;
             }
-            if (FAILED(startResult) || FAILED(endResult) ||
-                endTimestamp < startTimestamp)
-            {
-                resolvedTimings[passIndex].Status = GpuTimingStatus::Invalid;
-                continue;
-            }
-
-            resolvedTimings[passIndex].Milliseconds =
-                static_cast<double>(endTimestamp - startTimestamp) * MillisecondsPerSecond /
-                static_cast<double>(disjointData.Frequency);
-            resolvedTimings[passIndex].Status = GpuTimingStatus::Available;
         }
-
-        const std::size_t postProcessIndex = ToIndex(GpuPass::PostProcess);
-        const std::size_t bloomIndex = ToIndex(GpuPass::Bloom);
-        if (resolvedTimings[postProcessIndex].Status ==
-                GpuTimingStatus::Available &&
-            resolvedTimings[bloomIndex].Status == GpuTimingStatus::Available)
-        {
-            // PostProcessのクエリは、画面の取り込み（CopyResource）から最後の全画面の描画までを囲んでいる。
-            // その中に含まれるブルームの時間を引き、2つの項目が重ならない値として表示している。
-            resolvedTimings[postProcessIndex].Milliseconds = (std::max)(
-                0.0,
-                resolvedTimings[postProcessIndex].Milliseconds -
-                resolvedTimings[bloomIndex].Milliseconds);
-        }
+        SeparateBloomFromPostProcess(resolvedTimings);
     }
 
     // 届いた順番が前後しても、より新しいフレームの結果だけを残している
@@ -240,6 +192,68 @@ bool GpuTimer::TryResolveFrame(
     }
     frame.Pending = false;
     return true;
+}
+
+// 段階の終わりの時刻から始まりの時刻を引き、GPUの時計の周波数で割ってミリ秒にしている。
+// 時刻がまだ届いていなければ（S_FALSE）false を返す（読めなかった・飛ばした段階は、状態だけを入れて true）
+bool GpuTimer::ResolvePass(ID3D11DeviceContext* context, const QueryFrame& frame, std::size_t passIndex,
+    std::uint64_t frequency, GpuTiming& timing)
+{
+    if (frame.Skipped[passIndex])
+    {
+        timing.Status = GpuTimingStatus::Skipped;
+        return true;
+    }
+    if (!frame.Issued[passIndex])
+    {
+        timing.Status = GpuTimingStatus::Invalid;
+        return true;
+    }
+
+    std::uint64_t startTimestamp = 0;
+    std::uint64_t endTimestamp = 0;
+    const HRESULT startResult = context->GetData(
+        frame.Start[passIndex].Get(),
+        &startTimestamp,
+        sizeof(startTimestamp),
+        D3D11_ASYNC_GETDATA_DONOTFLUSH);
+    const HRESULT endResult = context->GetData(
+        frame.End[passIndex].Get(),
+        &endTimestamp,
+        sizeof(endTimestamp),
+        D3D11_ASYNC_GETDATA_DONOTFLUSH);
+    if (startResult == S_FALSE || endResult == S_FALSE)
+    {
+        return false;
+    }
+    if (FAILED(startResult) || FAILED(endResult) ||
+        endTimestamp < startTimestamp)
+    {
+        timing.Status = GpuTimingStatus::Invalid;
+        return true;
+    }
+
+    timing.Milliseconds =
+        static_cast<double>(endTimestamp - startTimestamp) * MillisecondsPerSecond /
+        static_cast<double>(frequency);
+    timing.Status = GpuTimingStatus::Available;
+    return true;
+}
+
+// PostProcessのクエリは、画面の取り込み（CopyResource）から最後の全画面の描画までを囲んでいる。
+// その中に含まれるブルームの時間を引き、2つの項目が重ならない値として表示している。
+void GpuTimer::SeparateBloomFromPostProcess(std::array<GpuTiming, PassCount>& timings)
+{
+    const std::size_t postProcessIndex = ToIndex(GpuPass::PostProcess);
+    const std::size_t bloomIndex = ToIndex(GpuPass::Bloom);
+    if (timings[postProcessIndex].Status == GpuTimingStatus::Available &&
+        timings[bloomIndex].Status == GpuTimingStatus::Available)
+    {
+        timings[postProcessIndex].Milliseconds = (std::max)(
+            0.0,
+            timings[postProcessIndex].Milliseconds -
+            timings[bloomIndex].Milliseconds);
+    }
 }
 
 void GpuTimer::BeginFrame(ID3D11DeviceContext* context)

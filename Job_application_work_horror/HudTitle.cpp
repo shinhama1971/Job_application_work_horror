@@ -423,13 +423,27 @@ void Hud::DrawIntro(const IntroView& view)
     const float screenWidth = GetCanvasWidth();
     const float screenHeight = GetCanvasHeight();
     const float noise = (std::clamp)(view.Noise, 0.0f, 1.0f);
-    const auto textWidth = [](std::string_view text, float pixelSize)
-    {
-        return static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * GlyphAdvance;
-    };
     const float noiseStep = std::floor(view.Time * NoiseStepsPerSecond);
 
-    // 玄関から来たら、森での暗転を黒い背景につなぐ。受信記録では後ろの森を暗く沈める。
+    DrawIntroBackdrop(view, screenWidth, screenHeight);
+    const float left = (std::max)(MinimumLeft, screenWidth * LeftRatio);
+    DrawIntroTranscript(view, left, noise, noiseStep);
+    DrawIntroSignalLost(view, screenWidth, noise, noiseStep);
+    DrawIntroMission(view, screenWidth, screenHeight);
+
+    Flush();
+}
+
+float Hud::TextWidth(std::string_view text, float pixelSize)
+{
+    return static_cast<float>(CountDisplayedCharacters(text)) * pixelSize * GlyphAdvance;
+}
+
+// 玄関から来たら、森での暗転を黒い背景につなぐ。受信記録では後ろの森を暗く沈める。
+void Hud::DrawIntroBackdrop(const IntroView& view, float screenWidth, float screenHeight)
+{
+    using namespace SignalTextLayout;
+    using namespace IntroLayout;
     const Color background = view.HideBackdrop
         ? Color(0.0f, 0.0f, 0.0f, 1.0f)
         : Color(BackdropColor.R(), BackdropColor.G(), BackdropColor.B(),
@@ -439,9 +453,13 @@ void Hud::DrawIntro(const IntroView& view)
     {
         AddRectangle(0.0f, y, screenWidth, 1.0f, ScanlineColor);
     }
+}
 
-    // --- 受信記録：見出し（明滅する受信の印つき）と、タイプされる3行
-    const float left = (std::max)(MinimumLeft, screenWidth * LeftRatio);
+// 受信記録：見出し（明滅する受信の印つき）と、タイプされる3行
+void Hud::DrawIntroTranscript(const IntroView& view, float left, float noise, float noiseStep)
+{
+    using namespace SignalTextLayout;
+    using namespace IntroLayout;
     if (view.HeaderAlpha > 0.0f)
     {
         const bool blink = std::fmod(view.Time, 1.0f) < BlinkOn;
@@ -471,27 +489,39 @@ void Hud::DrawIntro(const IntroView& view)
             y += LineSpacing;
         }
     }
-    // 「通信途絶」：中央に赤く出し、色のにじみと横の帯で崩している
-    if (view.SignalLostAlpha > 0.0f)
+}
+
+// 「通信途絶」：中央に赤く出し、色のにじみと横の帯で崩している
+void Hud::DrawIntroSignalLost(const IntroView& view, float screenWidth, float noise, float noiseStep)
+{
+    using namespace SignalTextLayout;
+    using namespace IntroLayout;
+    if (view.SignalLostAlpha <= 0.0f)
     {
-        const float width = textWidth(view.SignalLost, SignalLostPixelSize);
-        const float x = (screenWidth - width) * 0.5f + (NoiseHash(noiseStep) - 0.5f) * SignalLostJitter * noise;
-        AddText(x - SignalLostSplit * noise, SignalLostY, view.SignalLost, SignalLostPixelSize,
-            Faded(SignalLostCyan, noise * view.SignalLostAlpha));
-        AddText(x, SignalLostY, view.SignalLost, SignalLostPixelSize, Faded(SignalLostRed, view.SignalLostAlpha));
-        if (noise > BarNoiseLevel)
+        return;
+    }
+    const float width = TextWidth(view.SignalLost, SignalLostPixelSize);
+    const float x = (screenWidth - width) * 0.5f + (NoiseHash(noiseStep) - 0.5f) * SignalLostJitter * noise;
+    AddText(x - SignalLostSplit * noise, SignalLostY, view.SignalLost, SignalLostPixelSize,
+        Faded(SignalLostCyan, noise * view.SignalLostAlpha));
+    AddText(x, SignalLostY, view.SignalLost, SignalLostPixelSize, Faded(SignalLostRed, view.SignalLostAlpha));
+    if (noise > BarNoiseLevel)
+    {
+        for (int bar = 0; bar < SignalLostBars; ++bar)
         {
-            for (int bar = 0; bar < SignalLostBars; ++bar)
-            {
-                const float seed = noiseStep * BarSeedStep + static_cast<float>(bar) * BarSeedPerBar;
-                AddRectangle(x - BarLeftMargin, SignalLostY + NoiseHash(seed) * SignalLostPixelSize * GlyphRows,
-                    width + BarExtraWidth, BarHeightBase + NoiseHash(seed + 1.0f) * SignalLostBarHeightRange,
-                    SignalLostBarColor);
-            }
+            const float seed = noiseStep * BarSeedStep + static_cast<float>(bar) * BarSeedPerBar;
+            AddRectangle(x - BarLeftMargin, SignalLostY + NoiseHash(seed) * SignalLostPixelSize * GlyphRows,
+                width + BarExtraWidth, BarHeightBase + NoiseHash(seed + 1.0f) * SignalLostBarHeightRange,
+                SignalLostBarColor);
         }
     }
+}
 
-    // --- 目的の画面：中央のパネルに、状況・目的・操作・始める操作を並べている
+// 目的の画面：中央のパネルに、状況・目的・操作・始める操作を並べている（受信記録の間は、右下に飛ばし方を小さく出す）
+void Hud::DrawIntroMission(const IntroView& view, float screenWidth, float screenHeight)
+{
+    using namespace SignalTextLayout;
+    using namespace IntroLayout;
     if (view.MissionAlpha > 0.0f)
     {
         const float alpha = view.MissionAlpha;
@@ -503,7 +533,7 @@ void Hud::DrawIntro(const IntroView& view)
 
         const auto centered = [&](std::string_view text, float size, float y, const Color& color)
         {
-            AddText((screenWidth - textWidth(text, size)) * 0.5f, y, text, size, color);
+            AddText((screenWidth - TextWidth(text, size)) * 0.5f, y, text, size, color);
         };
         centered(view.MissionLead, LeadPixelSize, panelY + LeadY, Faded(LeadColor, alpha));
         centered(view.MissionGoal, GoalPixelSize, panelY + GoalY, Faded(GoalColor, alpha));
@@ -520,11 +550,8 @@ void Hud::DrawIntro(const IntroView& view)
     }
     else if (!view.HideBackdrop)
     {
-        // 受信記録の間は、右下に飛ばし方を小さく出している
         const std::string_view skip = Input::IsControllerConnected() ? "A で飛ばす" : "ENTER で飛ばす";
-        AddText(screenWidth - textWidth(skip, SkipPixelSize) - SkipRightMargin, screenHeight - SkipBottom, skip, SkipPixelSize,
+        AddText(screenWidth - TextWidth(skip, SkipPixelSize) - SkipRightMargin, screenHeight - SkipBottom, skip, SkipPixelSize,
             SkipColor);
     }
-
-    Flush();
 }

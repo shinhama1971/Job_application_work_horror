@@ -85,6 +85,10 @@ private:
     bool TryResolveFrame(
         ID3D11DeviceContext* context,
         QueryFrame& frame);
+    // TryResolveFrame の段階：1つの段階の時間をミリ秒にする（結果が届いていなければ false）／画面効果の時間から、中に含まれるブルームの時間を引く
+    static bool ResolvePass(ID3D11DeviceContext* context, const QueryFrame& frame, std::size_t passIndex,
+        std::uint64_t frequency, GpuTiming& timing);
+    static void SeparateBloomFromPostProcess(std::array<GpuTiming, PassCount>& timings);
 
 public:
     // クエリを作る・解放する

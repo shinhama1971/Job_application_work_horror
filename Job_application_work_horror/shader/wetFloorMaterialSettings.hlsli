@@ -79,9 +79,11 @@
 #define WET_LUMINANCE_LIFT (0.035f)
 #define WET_DEPTH_BLEND (0.38f)
 #define WET_PUDDLE_BLEND (0.84f)
-// 浸水した水を赤くするとき：水面の色（反射を含む）に掛ける色（緑と青を吸う）と、足す暗い赤
-#define FLOOD_BLOOD_FILTER float3(0.55f, 0.05f, 0.04f)
-#define FLOOD_BLOOD_TINT float3(0.020f, 0.001f, 0.001f)
+// 濁流の後ろの浅い水を、屈折する波頭に合わせた暗い赤色にする。
+#define FLOOD_WAVE_FILTER float3(0.43f, 0.092f, 0.075f)
+#define FLOOD_WAVE_TINT float3(0.024f, 0.003f, 0.005f)
+// 濁流の上に霧と光の筋が足す光に掛ける色（緑と青を吸い、赤だけ少し残す）
+#define FLOOD_MIST_FILTER float3(0.45f, 0.08f, 0.07f)
 // 暗くする量：岸の線、水が引いた後の湿り、残った水
 #define SHORE_DARKEN (0.035f)
 #define DRAINED_DAMP_DARKEN (0.24f)

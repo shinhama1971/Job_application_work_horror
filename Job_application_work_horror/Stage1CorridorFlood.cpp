@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "Stage1CorridorFlood.h"
+#include "MathUtility.h"
 
 #include <algorithm>
 #include <cmath>
@@ -20,12 +21,26 @@ namespace
     constexpr float WarningSeconds = 1.6f;
     // 水の先頭が進む速さ（プレイヤーが歩く速さ30より速く、走る速さ約50より遅い）
     constexpr float RushSpeed = 40.0f;
+    // 直線部から円弧に近付く間に減速し、出口では南北の廊下と同じ速度にする。
+    constexpr float InletSpeed = 70.0f;
+    constexpr float InletBrakeDistance = 24.0f;
+    constexpr float BendStart = Stage1CorridorFlood::InletOriginX - SIGNAL_LOST_FLOOD_BEND_START_X;
+    constexpr float BendRadius = SIGNAL_LOST_FLOOD_BEND_RADIUS;
+    constexpr float BendEnd = BendStart + BendRadius * SIGNAL_LOST_FLOOD_QUARTER_TURN;
+    constexpr float BendEndZ = SIGNAL_LOST_FLOOD_BEND_CENTER_Z - BendRadius;
+    // 角に縁のノイズによる乾いた隙間を残さないため、2つの浅い水面を少し重ねる。
+    constexpr float JunctionWaterOverlap = 10.0f;
+    constexpr float InletSoundZ = SIGNAL_LOST_FLOOD_BEND_CENTER_Z;
+    static_assert(InletSoundZ == (Stage1CorridorFlood::InletMinZ + Stage1CorridorFlood::InletMaxZ) * 0.5f);
     // 水が止まる所（南の入口の少し奥。中央ホールへは流れ込まない）
     constexpr float StopZ = Stage1CorridorFlood::CorridorEntranceZ + 2.0f;
     // 追いつかれたとみなす、水の先頭からの距離（先頭より北＝水の中にいる）
     constexpr float CatchMargin = 2.0f;
     // 水が止まってから引き始めるまでの秒数と、引いていく速さ（押し寄せるときより遅い）
     constexpr float HoldSeconds = 4.0f;
+    // 出現時は水が廊下の奥から伸びる間に立ち上がり、停止したときは先端が崩れて床へ戻る。
+    constexpr float CrestRiseDistance = 18.0f;
+    constexpr float CrestCollapseSeconds = 0.85f;
     constexpr float RecedeSpeed = 24.0f;
     // 追いつかれた後の暗転の秒数（この半分の所でプレイヤーを開始地点へ戻している）
     constexpr float CaughtBlackoutSeconds = 2.4f;
@@ -46,6 +61,7 @@ void Stage1CorridorFlood::Reset()
     m_State = State::Idle;
     m_StateTimer = 0.0f;
     m_FrontZ = CorridorEndZ;
+    m_InletDistance = 0.0f;
     m_Redness = 0.0f;
     m_RushSoundTimer = 0.0f;
     m_ForceStart = false;
@@ -61,8 +77,8 @@ void Stage1CorridorFlood::StartWarning(std::vector<Cue>& cues)
     m_State = State::Warning;
     m_StateTimer = 0.0f;
     cues.push_back({ CueType::LightsOut, Vector3::Zero });
-    // 北の角から、轟音が近づいてくる
-    cues.push_back({ CueType::Rush, Vector3(0.0f, SoundY, CorridorEndZ) });
+    // 波が見える前に、右の通路の奥から音が届く。
+    cues.push_back({ CueType::Rush, Vector3(InletOriginX, SoundY, InletSoundZ) });
 }
 
 void Stage1CorridorFlood::Update(float deltaTime, const Vector3& playerPosition, bool ready, bool allowed,
@@ -83,36 +99,17 @@ void Stage1CorridorFlood::Update(float deltaTime, const Vector3& playerPosition,
     case State::Warning:
         if (m_StateTimer >= WarningSeconds)
         {
-            m_State = State::Rushing;
+            m_State = State::Inflow;
             m_StateTimer = 0.0f;
-            m_FrontZ = CorridorEndZ;
             m_RushSoundTimer = 0.0f;
         }
         break;
-    case State::Rushing:
-    {
-        m_FrontZ = (std::max)(StopZ, m_FrontZ - RushSpeed * deltaTime);
-        m_RushSoundTimer -= deltaTime;
-        if (m_RushSoundTimer <= 0.0f)
-        {
-            m_RushSoundTimer += RushSoundInterval;
-            cues.push_back({ CueType::Rush, Vector3(0.0f, SoundY, m_FrontZ) });
-        }
-        const bool insideWidth = playerPosition.x >= CorridorMinX && playerPosition.x <= CorridorMaxX;
-        if (insideWidth && playerPosition.z >= m_FrontZ - CatchMargin && playerPosition.z <= CorridorEndZ)
-        {
-            m_State = State::CaughtBlackout;
-            m_StateTimer = 0.0f;
-            cues.push_back({ CueType::Caught, Vector3(playerPosition.x, SoundY, playerPosition.z) });
-        }
-        else if (m_FrontZ <= StopZ)
-        {
-            // 先に逃げ切っていても、波が入口まで届くのをホールから見えるようにする。
-            m_State = State::Holding;
-            m_StateTimer = 0.0f;
-        }
+    case State::Inflow:
+        UpdateInflow(deltaTime, playerPosition, cues);
         break;
-    }
+    case State::Rushing:
+        UpdateRushing(deltaTime, playerPosition, cues);
+        break;
     case State::Holding:
         if (m_StateTimer >= HoldSeconds)
         {
@@ -122,19 +119,7 @@ void Stage1CorridorFlood::Update(float deltaTime, const Vector3& playerPosition,
         }
         break;
     case State::CaughtBlackout:
-        if (m_StateTimer >= CaughtBlackoutSeconds * RestartPoint &&
-            m_StateTimer - deltaTime < CaughtBlackoutSeconds * RestartPoint)
-        {
-            // 真っ暗な間に、開始地点へ戻し、水も引かせている（明るくなったときには、廊下に水はない）
-            cues.push_back({ CueType::Restart, Vector3::Zero });
-            cues.push_back({ CueType::LightsOn, Vector3::Zero });
-            m_FrontZ = CorridorEndZ;
-        }
-        if (m_StateTimer >= CaughtBlackoutSeconds)
-        {
-            m_State = State::Finished;
-            m_StateTimer = 0.0f;
-        }
+        UpdateCaughtBlackout(deltaTime, cues);
         break;
     case State::Receding:
         m_FrontZ = (std::min)(CorridorEndZ, m_FrontZ + RecedeSpeed * deltaTime);
@@ -147,11 +132,163 @@ void Stage1CorridorFlood::Update(float deltaTime, const Vector3& playerPosition,
         break;
     }
 
-    // 水の赤さ：押し寄せている間・止まっている間は濃くし、それ以外は薄くしている
-    const bool redWater = m_State == State::Rushing || m_State == State::Holding || m_State == State::CaughtBlackout;
+    UpdateRedness(deltaTime);
+}
+
+// 水の音を、決まった間隔でその位置から鳴らす合図を足している
+void Stage1CorridorFlood::PlayRushAt(float deltaTime, float x, float z, std::vector<Cue>& cues)
+{
+    m_RushSoundTimer -= deltaTime;
+    if (m_RushSoundTimer <= 0.0f)
+    {
+        m_RushSoundTimer += RushSoundInterval;
+        cues.push_back({ CueType::Rush, Vector3(x, SoundY, z) });
+    }
+}
+
+// 追いつかれた：暗転を始める
+void Stage1CorridorFlood::CatchPlayer(const Vector3& playerPosition, std::vector<Cue>& cues)
+{
+    m_State = State::CaughtBlackout;
+    m_StateTimer = 0.0f;
+    cues.push_back({ CueType::Caught, playerPosition });
+}
+
+// 右の通路から流れ込み、角を曲がる間：先頭を進め、通路か角でプレイヤーに届いたら追いつく
+void Stage1CorridorFlood::UpdateInflow(float deltaTime, const Vector3& playerPosition, std::vector<Cue>& cues)
+{
+    const float speed = std::lerp(InletSpeed, RushSpeed,
+        MathUtility::SmoothStep01((m_InletDistance - BendStart + InletBrakeDistance) / InletBrakeDistance));
+    const float nextDistance = m_InletDistance + speed * deltaTime;
+    m_InletDistance = (std::min)(BendEnd, nextDistance);
+    const float angle = (std::max)(0.0f, (m_InletDistance - BendStart) / BendRadius);
+    const float frontX = m_InletDistance < BendStart ? InletOriginX - m_InletDistance :
+        SIGNAL_LOST_FLOOD_BEND_START_X - BendRadius * std::sin(angle);
+    const float frontZ = BendEndZ + BendRadius * std::cos(angle);
+    PlayRushAt(deltaTime, frontX, frontZ, cues);
+
+    const bool inBranch = playerPosition.z >= InletMinZ && playerPosition.z <= InletMaxZ &&
+        playerPosition.x >= frontX - CatchMargin && playerPosition.x <= InletOriginX;
+    // 曲がっている間は、波頭の接線に直交する向きで近くのプレイヤーとの前後を測る。
+    const float along = (playerPosition.x - frontX) * std::cos(angle) +
+        (playerPosition.z - frontZ) * std::sin(angle);
+    const bool atJunction = m_InletDistance >= BendStart &&
+        playerPosition.x >= CorridorMinX && playerPosition.x <= CorridorMaxX &&
+        playerPosition.z >= BendEndZ - CatchMargin && playerPosition.z <= InletMaxZ;
+    if (inBranch || (atJunction && along >= -CatchMargin))
+    {
+        CatchPlayer(playerPosition, cues);
+    }
+    else if (m_InletDistance >= BendEnd)
+    {
+        m_State = State::Rushing;
+        m_StateTimer = 0.0f;
+        // 曲がり切ったフレームの残りの距離も、南へ進んだ量に含める。
+        m_FrontZ = BendEndZ - (nextDistance - BendEnd);
+    }
+}
+
+// 南北の廊下を押し寄せる間：先頭を南へ進め、プレイヤーに届いたら追いつき、入口まで来たら止まる
+void Stage1CorridorFlood::UpdateRushing(float deltaTime, const Vector3& playerPosition, std::vector<Cue>& cues)
+{
+    m_FrontZ = (std::max)(StopZ, m_FrontZ - RushSpeed * deltaTime);
+    PlayRushAt(deltaTime, 0.0f, m_FrontZ, cues);
+    const bool insideWidth = playerPosition.x >= CorridorMinX && playerPosition.x <= CorridorMaxX;
+    if (insideWidth && playerPosition.z >= m_FrontZ - CatchMargin && playerPosition.z <= CorridorEndZ)
+    {
+        CatchPlayer(playerPosition, cues);
+    }
+    else if (m_FrontZ <= StopZ)
+    {
+        // 先に逃げ切っていても、波が入口まで届くのをホールから見えるようにする。
+        m_State = State::Holding;
+        m_StateTimer = 0.0f;
+    }
+}
+
+// 追いつかれた後の暗転：真ん中で開始地点へ戻し、終わったら演出を終える
+void Stage1CorridorFlood::UpdateCaughtBlackout(float deltaTime, std::vector<Cue>& cues)
+{
+    if (m_StateTimer >= CaughtBlackoutSeconds * RestartPoint &&
+        m_StateTimer - deltaTime < CaughtBlackoutSeconds * RestartPoint)
+    {
+        // 真っ暗な間に、開始地点へ戻し、水も引かせている（明るくなったときには、廊下に水はない）
+        cues.push_back({ CueType::Restart, Vector3::Zero });
+        cues.push_back({ CueType::LightsOn, Vector3::Zero });
+        m_FrontZ = CorridorEndZ;
+        m_InletDistance = 0.0f;
+    }
+    if (m_StateTimer >= CaughtBlackoutSeconds)
+    {
+        m_State = State::Finished;
+        m_StateTimer = 0.0f;
+    }
+}
+
+// 水の赤さ：押し寄せている間・止まっている間は濃くし、それ以外は薄くしている
+void Stage1CorridorFlood::UpdateRedness(float deltaTime)
+{
+    const bool redWater = m_State == State::Inflow || m_State == State::Rushing ||
+        m_State == State::Holding || m_State == State::CaughtBlackout;
     m_Redness = redWater
         ? (std::min)(1.0f, m_Redness + RednessRiseRate * deltaTime)
         : (std::max)(0.0f, m_Redness - RednessFallRate * deltaTime);
+}
+
+float Stage1CorridorFlood::GetCrestStrength() const
+{
+    if (m_State == State::Holding)
+    {
+        return 1.0f - (std::min)(1.0f, m_StateTimer / CrestCollapseSeconds);
+    }
+    if (IsInletWave())
+    {
+        return MathUtility::SmoothStep01(m_InletDistance / CrestRiseDistance);
+    }
+    if (HasWater() && (m_State == State::Rushing || m_State == State::CaughtBlackout))
+    {
+        return 1.0f;
+    }
+    return 0.0f;
+}
+
+Stage1CorridorFlood::WaveFront Stage1CorridorFlood::GetWaveFront() const
+{
+    const float distance = IsInletWave() ? m_InletDistance : BendEnd + BendEndZ - m_FrontZ;
+    return { distance, GetCrestStrength() };
+}
+
+float Stage1CorridorFlood::GetShallowFrontZ() const
+{
+    if (!IsInletWave()) { return m_FrontZ; }
+    const float angle = (std::max)(0.0f, (m_InletDistance - BendStart) / BendRadius);
+    return std::lerp(CorridorEndZ, BendEndZ, 1.0f - std::cos(angle));
+}
+
+bool Stage1CorridorFlood::IsInletWave() const
+{
+    return m_State == State::Inflow || (m_State == State::CaughtBlackout &&
+        m_FrontZ == CorridorEndZ && m_InletDistance > 0.0f);
+}
+
+float Stage1CorridorFlood::GetInletWaterMinX() const
+{
+    if (IsInletWave())
+    {
+        return (std::max)(CorridorMaxX - JunctionWaterOverlap, InletOriginX - m_InletDistance);
+    }
+    return HasWater() ? CorridorMaxX - JunctionWaterOverlap : CorridorMaxX;
+}
+
+float Stage1CorridorFlood::GetInletWaterMaxX() const
+{
+    if (IsInletWave() || HasWater())
+    {
+        // 南北の廊下から水が引くときは、右の通路の水も角へ戻す。
+        const float drain = MathUtility::SmoothStep01((m_FrontZ - BendEndZ) / (CorridorEndZ - BendEndZ));
+        return IsInletWave() ? InletOriginX : std::lerp(InletOriginX, CorridorMaxX, drain);
+    }
+    return CorridorMaxX;
 }
 
 bool Stage1CorridorFlood::HasWater() const

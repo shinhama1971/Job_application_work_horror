@@ -126,6 +126,10 @@ private:
         const DirectX::SimpleMath::Vector3& forward, const DirectX::SimpleMath::Vector3& right);
     void UpdateBodyShadow(const DirectX::SimpleMath::Vector3& forward, float deltaTime);
     void HandleDebugBatteryKey();
+    // Update の段階：操作できない間（階段・演出）の更新（したら true）／懐中電灯とカメラと手の更新
+    bool UpdateWithoutControl();
+    void UpdateFlashlightCameraAndHands(Camera& camera, float yaw, const DirectX::SimpleMath::Vector3& forward,
+        const DirectX::SimpleMath::Vector3& right, const std::vector<class Wall*>& walls, float deltaTime);
 
 public:
     // ===== 階段を自動で上る演出（1面の最後の扉の先・2面の始まり） =====

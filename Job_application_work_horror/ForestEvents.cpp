@@ -155,9 +155,20 @@ float ForestEvents::DyingBrightness(float elapsed, float seed)
 float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const PropLayoutFile::SpawnedProps& props)
 {
     m_Time += deltaTime;
-    Core::Game* game = Core::Game::GetInstance();
+    UpdatePathLamps(playerPosition, props);
+    UpdateLabWindow(deltaTime, playerPosition, props);
+    UpdatePorchLight(playerPosition, props);
+    const float walkerFear = UpdateWalker(deltaTime, playerPosition);
 
-    // --- 小道の街灯：近いほど不安定にまたたき、通り過ぎると後ろから消える
+    // 恐怖の画面効果は、窓が消えた瞬間に強く出し、3秒ほどで消している
+    m_Fear = (std::max)(0.0f, m_Fear - deltaTime / FearFadeSeconds);
+    return (std::max)(m_Fear * m_Fear * LampFearScale, walkerFear);
+}
+
+// 小道の街灯：近いほど不安定にまたたき、通り過ぎると後ろから消える
+void ForestEvents::UpdatePathLamps(const Vector3& playerPosition, const PropLayoutFile::SpawnedProps& props)
+{
+    Core::Game* game = Core::Game::GetInstance();
     Wall* northLamp = Find(props, m_Lamps[1].Name);
     if (northLamp != nullptr && m_Lamps[0].StartTime < 0.0f &&
         playerPosition.z > northLamp->GetPosition().z + LampPassDistance)
@@ -196,8 +207,11 @@ float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const
         }
         wall->SetEmissionScale(brightness);
     }
+}
 
-    // --- 研究所の2階の窓：研究所が見えてくると、またたいて消える
+// 研究所の2階の窓：研究所が見えてくると、またたいて消える（消えた瞬間に恐怖の画面効果を強く出す）
+void ForestEvents::UpdateLabWindow(float deltaTime, const Vector3& playerPosition, const PropLayoutFile::SpawnedProps& props)
+{
     if (m_WindowOffTimer < 0.0f && playerPosition.z > WindowTriggerZ)
     {
         m_WindowOffTimer = 0.0f;
@@ -215,23 +229,30 @@ float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const
                 if (!m_WindowClickPlayed && elapsed >= LampDyingSeconds)
                 {
                     m_WindowClickPlayed = true;
-                    game->PlayAudioCueAt(SOUND_CUE_FLASHLIGHT, window->GetPosition(), WindowClickPitch, WindowClickVolume);
+                    Core::Game::GetInstance()->PlayAudioCueAt(
+                        SOUND_CUE_FLASHLIGHT, window->GetPosition(), WindowClickPitch, WindowClickVolume);
                     m_Fear = 1.0f;
                 }
             }
         }
         window->SetEmissionScale(brightness);
     }
+}
 
-    // --- 研究所の玄関の灯り：正面まで来ると不安定になる
+// 研究所の玄関の灯り：正面まで来ると不安定になる
+void ForestEvents::UpdatePorchLight(const Vector3& playerPosition, const PropLayoutFile::SpawnedProps& props)
+{
     if (Wall* porch = Find(props, "LabPorchLight"))
     {
         const float instability = std::clamp((playerPosition.z - PorchUnstableZ) / PorchUnstableRange, 0.0f, 1.0f);
         porch->SetEmissionScale(instability > 0.0f
             ? Flicker(m_Time, PorchSeed, PorchMinInstability + instability * PorchInstabilityRange) : 1.0f);
     }
+}
 
-    // --- 草むらを通る「見えない何か」：前方の草むらを、左から右へ横切る
+// 草むらを通る「見えない何か」：前方の草むらを、左から右へ横切る。歩いている間の恐怖の強さを返す
+float ForestEvents::UpdateWalker(float deltaTime, const Vector3& playerPosition)
+{
     float walkerFear = 0.0f;
     if (m_WalkerTime < 0.0f && playerPosition.z > WalkerTriggerZ)
     {
@@ -258,13 +279,10 @@ float ForestEvents::Update(float deltaTime, const Vector3& playerPosition, const
         if (m_NextWalkerStep <= 0.0f)
         {
             m_NextWalkerStep += WalkerStepInterval;
-            game->PlayAudioCueAt(SOUND_CUE_FOREST_STEP, Vector3(m_WalkerPosition.x, playerPosition.y, m_WalkerPosition.y),
-                WalkerStepPitch, WalkerStepVolume);
+            Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_FOREST_STEP,
+                Vector3(m_WalkerPosition.x, playerPosition.y, m_WalkerPosition.y), WalkerStepPitch, WalkerStepVolume);
         }
         walkerFear = WalkerFear * m_WalkerStrength;
     }
-
-    // 恐怖の画面効果は、窓が消えた瞬間に強く出し、3秒ほどで消している
-    m_Fear = (std::max)(0.0f, m_Fear - deltaTime / FearFadeSeconds);
-    return (std::max)(m_Fear * m_Fear * LampFearScale, walkerFear);
+    return walkerFear;
 }

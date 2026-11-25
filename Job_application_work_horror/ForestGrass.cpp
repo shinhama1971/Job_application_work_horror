@@ -62,17 +62,17 @@ namespace
     // 植える密度（1平方単位あたりの候補の数。群れの外の候補は捨てるので、実際はこの半分ほど）
     constexpr float CandidateDensity = 0.75f;
     // 区画の一辺の長さ
-    constexpr float ChunkSize = 40.0f;
+    constexpr float ChunkSize = 50.0f;
     // LOD：カメラから区画の一番近い所までの距離で、葉の細かさを3段に分けている。
     // NearDistance までは全部の葉を5節（曲がりがなめらか）、MiddleDistance までは本数を減らして3節、
     // その先は1節（三角形1枚）で描く。減らした本数の分は葉の幅を広げ（WidthScale）、遠くから見た草むらの濃さを保っている。
     // 区画の切り替わりで草が急に変わって見えないよう、本数は距離に合わせてなめらかに減らしている（Draw）
-    constexpr float NearDistance = 140.0f;
-    constexpr float MiddleDistance = 280.0f;
+    constexpr float NearDistance = 180.0f;
+    constexpr float MiddleDistance = 320.0f;
     // この距離から葉が地面へ縮み始め、FadeEnd で消える（森の闇と霧で、その先はほとんど見えない）。
     // FadeEnd より遠い区画は、描く処理ごと省いている
-    constexpr float FadeStart = 330.0f;
-    constexpr float FadeEnd = 410.0f;
+    constexpr float FadeStart = 370.0f;
+    constexpr float FadeEnd = 450.0f;
     // 頂点シェーダーの t0 は葉、t1 は更新後の状態。
     constexpr UINT GrassVertexResourceCount = 2;
     constexpr std::uint32_t GroupSize = SIGNAL_LOST_GRASS_GROUP_SIZE;
@@ -89,8 +89,8 @@ namespace
     constexpr float ClumpTallStart = 0.40f;
     constexpr float ClumpTallEnd = 0.80f;
     // 葉の高さ（最低＋高い群れで足す分）、幅（最低＋乱数の幅）、傾きの最大、硬さ（最低＋乱数の幅）
-    constexpr float BladeMinHeight = 3.5f;
-    constexpr float BladeTallExtra = 8.5f;
+    constexpr float BladeMinHeight = 11.5f;
+    constexpr float BladeTallExtra = 16.5f;
     constexpr float BladeMinWidth = 0.55f;
     constexpr float BladeWidthRange = 0.55f;
     constexpr float BladeMaxLean = 0.45f;

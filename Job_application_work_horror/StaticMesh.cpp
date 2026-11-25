@@ -260,6 +260,93 @@ void StaticMesh::UpdateModelBounds()
 	m_modelBounds.IsValid = true;
 }
 
+namespace
+{
+	// 変換済みの形式の先頭：印・版・構造体の大きさが今のゲームと同じで、元のモデルの大きさと更新日時も同じかを確かめている
+	bool ReadConvertedHeader(std::ifstream& stream, const SourceStamp& source)
+	{
+		char magic[sizeof(ConvertedMagic)] = {};
+		std::uint32_t version = 0;
+		std::uint32_t vertexSize = 0;
+		std::uint32_t materialSize = 0;
+		SourceStamp saved;
+		return ReadValue(stream, magic) && std::equal(magic, magic + sizeof(magic), ConvertedMagic) &&
+			ReadValue(stream, version) && version == ConvertedVersion &&
+			ReadValue(stream, vertexSize) && vertexSize == sizeof(VERTEX_3D) &&
+			ReadValue(stream, materialSize) && materialSize == sizeof(MATERIAL) &&
+			ReadValue(stream, saved.Size) && saved.Size == source.Size &&
+			ReadValue(stream, saved.WriteTime) && saved.WriteTime == source.WriteTime;
+	}
+
+	// サブセット（名前・描画範囲・材質番号）を数と一緒に読んでいる
+	bool ReadSubsets(std::ifstream& stream, std::uintmax_t fileSize, std::vector<SUBSET>& subsets)
+	{
+		std::uint32_t subsetCount = 0;
+		if (!ReadValue(stream, subsetCount))
+		{
+			return false;
+		}
+		// 名前の長さと、描画範囲・材質番号の固定部分は各サブセットに最低限必要。
+		constexpr std::uintmax_t MinSubsetBytes = sizeof(std::uint32_t) + sizeof(SUBSET::IndexNum) +
+			sizeof(SUBSET::VertexNum) + sizeof(SUBSET::IndexBase) + sizeof(SUBSET::VertexBase) + sizeof(SUBSET::MaterialIdx);
+		if (!HasCacheBytes(stream, fileSize, MinSubsetBytes * subsetCount) || subsetCount > subsets.max_size())
+		{
+			return false;
+		}
+		subsets.resize(subsetCount);
+		for (SUBSET& subset : subsets)
+		{
+			if (!ReadString(stream, fileSize, subset.MtrlName) || !ReadValue(stream, subset.IndexNum) || !ReadValue(stream, subset.VertexNum) ||
+				!ReadValue(stream, subset.IndexBase) || !ReadValue(stream, subset.VertexBase) || !ReadValue(stream, subset.MaterialIdx))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	// インデックスはサブセット内の頂点番号。対応する描画範囲と材質番号が、読んだ配列の中に収まっているかを確かめている
+	bool AreSubsetsInRange(const std::vector<SUBSET>& subsets, const std::vector<VERTEX_3D>& vertices,
+		const std::vector<unsigned int>& indices, const std::vector<MATERIAL>& materials)
+	{
+		for (const auto& subset : subsets)
+		{
+			if (subset.VertexBase > vertices.size() || subset.VertexNum > vertices.size() - subset.VertexBase ||
+				subset.IndexBase > indices.size() || subset.IndexNum > indices.size() - subset.IndexBase ||
+				subset.MaterialIdx >= materials.size())
+			{
+				return false;
+			}
+			for (std::size_t offset = 0; offset < subset.IndexNum; ++offset)
+			{
+				if (indices[static_cast<std::size_t>(subset.IndexBase) + offset] >= subset.VertexNum)
+				{
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	// マテリアルの数だけ、テクスチャの名前を読んでいる
+	bool ReadTextureNames(std::ifstream& stream, std::uintmax_t fileSize, std::size_t count, std::vector<std::string>& texturenames)
+	{
+		if (!HasCacheBytes(stream, fileSize, static_cast<std::uintmax_t>(count) * sizeof(std::uint32_t)))
+		{
+			return false;
+		}
+		texturenames.resize(count);
+		for (std::string& texturename : texturenames)
+		{
+			if (!ReadString(stream, fileSize, texturename))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+}
+
 // 変換済みの形式を読んでいる。並び：印・版・構造体の大きさ・元のモデルの大きさと更新日時・頂点・インデックス・サブセット・マテリアル・テクスチャの名前
 bool StaticMesh::LoadConverted(const std::string& filename, const std::string& texturedirectory)
 {
@@ -280,18 +367,7 @@ bool StaticMesh::LoadConverted(const std::string& filename, const std::string& t
 		return false;
 	}
 	const auto fileSize = static_cast<std::uintmax_t>(end);
-
-	char magic[sizeof(ConvertedMagic)] = {};
-	std::uint32_t version = 0;
-	std::uint32_t vertexSize = 0;
-	std::uint32_t materialSize = 0;
-	SourceStamp saved;
-	if (!ReadValue(stream, magic) || !std::equal(magic, magic + sizeof(magic), ConvertedMagic) ||
-		!ReadValue(stream, version) || version != ConvertedVersion ||
-		!ReadValue(stream, vertexSize) || vertexSize != sizeof(VERTEX_3D) ||
-		!ReadValue(stream, materialSize) || materialSize != sizeof(MATERIAL) ||
-		!ReadValue(stream, saved.Size) || saved.Size != source.Size ||
-		!ReadValue(stream, saved.WriteTime) || saved.WriteTime != source.WriteTime)
+	if (!ReadConvertedHeader(stream, source))
 	{
 		return false;
 	}
@@ -301,59 +377,12 @@ bool StaticMesh::LoadConverted(const std::string& filename, const std::string& t
 	std::vector<SUBSET> subsets;
 	std::vector<MATERIAL> materials;
 	std::vector<std::string> texturenames;
-	std::uint32_t subsetCount = 0;
-	if (!ReadArray(stream, fileSize, vertices) || !ReadArray(stream, fileSize, indices) || !ReadValue(stream, subsetCount))
+	if (!ReadArray(stream, fileSize, vertices) || !ReadArray(stream, fileSize, indices) ||
+		!ReadSubsets(stream, fileSize, subsets) || !ReadArray(stream, fileSize, materials) ||
+		!AreSubsetsInRange(subsets, vertices, indices, materials) ||
+		!ReadTextureNames(stream, fileSize, materials.size(), texturenames))
 	{
 		return false;
-	}
-	// 名前の長さと、描画範囲・材質番号の固定部分は各サブセットに最低限必要。
-	constexpr std::uintmax_t MinSubsetBytes = sizeof(std::uint32_t) + sizeof(SUBSET::IndexNum) +
-		sizeof(SUBSET::VertexNum) + sizeof(SUBSET::IndexBase) + sizeof(SUBSET::VertexBase) + sizeof(SUBSET::MaterialIdx);
-	if (!HasCacheBytes(stream, fileSize, MinSubsetBytes * subsetCount) || subsetCount > subsets.max_size())
-	{
-		return false;
-	}
-	subsets.resize(subsetCount);
-	for (SUBSET& subset : subsets)
-	{
-		if (!ReadString(stream, fileSize, subset.MtrlName) || !ReadValue(stream, subset.IndexNum) || !ReadValue(stream, subset.VertexNum) ||
-			!ReadValue(stream, subset.IndexBase) || !ReadValue(stream, subset.VertexBase) || !ReadValue(stream, subset.MaterialIdx))
-		{
-			return false;
-		}
-	}
-	if (!ReadArray(stream, fileSize, materials))
-	{
-		return false;
-	}
-	// インデックスはサブセット内の頂点番号。対応する描画範囲と材質番号を確かめる。
-	for (const auto& subset : subsets)
-	{
-		if (subset.VertexBase > vertices.size() || subset.VertexNum > vertices.size() - subset.VertexBase ||
-			subset.IndexBase > indices.size() || subset.IndexNum > indices.size() - subset.IndexBase ||
-			subset.MaterialIdx >= materials.size())
-		{
-			return false;
-		}
-		for (std::size_t offset = 0; offset < subset.IndexNum; ++offset)
-		{
-			if (indices[static_cast<std::size_t>(subset.IndexBase) + offset] >= subset.VertexNum)
-			{
-				return false;
-			}
-		}
-	}
-	if (!HasCacheBytes(stream, fileSize, static_cast<std::uintmax_t>(materials.size()) * sizeof(std::uint32_t)))
-	{
-		return false;
-	}
-	texturenames.resize(materials.size());
-	for (std::string& texturename : texturenames)
-	{
-		if (!ReadString(stream, fileSize, texturename))
-		{
-			return false;
-		}
 	}
 
 	// 全部読めてから入れ替えている（途中で失敗したら、Assimpで読み直す）

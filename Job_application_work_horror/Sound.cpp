@@ -95,146 +95,146 @@ HRESULT Sound::Init()
 		return S_OK;
 	}
 
-	HRESULT hr;
+	HRESULT hr = CreateAudioDevice();
+	if (FAILED(hr))
+	{
+		Uninit();
+		return hr;
+	}
+	SetupSpatialAudio();
 
-	HANDLE hFile;
-	DWORD  dwChunkSize;
-	DWORD  dwChunkPosition;
-	DWORD  filetype;
+	// 全部の素材を、WAVファイルから読み込んでいる
+	for (int i = 0; i < SOUND_LABEL_MAX; i++)
+	{
+		hr = LoadWave(i);
+		if (FAILED(hr))
+		{
+			Uninit();
+			return hr;
+		}
+	}
+	return hr;
+}
 
-	// COMを初期化している
-	hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+//=============================================================================
+// COM・XAudio2の本体・最終的に音を出すマスタリングボイスを作っている
+//=============================================================================
+HRESULT Sound::CreateAudioDevice()
+{
+	HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
 	if (FAILED(hr)) {
 		return hr;
 	}
 	m_IsComInitialized = true;
 
-	// XAudio2の本体を作っている
 	// 2番目の引数の動作の設定はWindowsでは使わないため、0を渡している。
 	hr = XAudio2Create(m_pXAudio2.ReleaseAndGetAddressOf(), 0);
 	if (FAILED(hr)) {
-		Uninit();
 		return hr;
 	}
 
-	// 最終的に音を出すマスタリングボイスを作っている
 	// チャンネル数・サンプリング周波数は既定の値にし、PCの出力の設定（ステレオ・5.1chなど）に合わせている。
-	hr = m_pXAudio2->CreateMasteringVoice(&m_pMasteringVoice);
-	if (FAILED(hr)) {
-		Uninit();
+	return m_pXAudio2->CreateMasteringVoice(&m_pMasteringVoice);
+}
+
+//=============================================================================
+// 立体音響（X3DAudio）を準備している
+// 出力先（ステレオ・5.1chなど）のスピーカーの配置に合わせて、音の振り分けを計算させている。
+// 立体音響だけが使えない環境でも、普通の再生は続けられるようにしている。
+//=============================================================================
+void Sound::SetupSpatialAudio()
+{
+	DWORD channelMask = 0;
+	XAUDIO2_VOICE_DETAILS masterDetails{};
+	m_pMasteringVoice->GetVoiceDetails(&masterDetails);
+	m_OutputChannels = masterDetails.InputChannels;
+	// マスクのスピーカー数と実際の出力数が一致するときだけ、振り分け行列を計算する。
+	m_X3DAudioReady = SUCCEEDED(m_pMasteringVoice->GetChannelMask(&channelMask)) &&
+		m_OutputChannels > 0 && m_OutputChannels <= MaxSpatialChannels &&
+		static_cast<UINT32>(std::popcount(channelMask)) == m_OutputChannels &&
+		SUCCEEDED(X3DAudioInitialize(channelMask, X3DAUDIO_SPEED_OF_SOUND, m_X3DAudio));
+}
+
+//=============================================================================
+// 素材1つのWAVファイルを読み込み、再生用のバッファとソースボイスを作っている。
+// 失敗したときは解放をせずに理由を返す（解放は呼び出し側の Init がまとめてする）
+//=============================================================================
+HRESULT Sound::LoadWave(int i)
+{
+	memset(&m_wfx[i], 0, sizeof(WAVEFORMATEXTENSIBLE));
+	memset(&m_buffer[i], 0, sizeof(XAUDIO2_BUFFER));
+
+	HANDLE hFile = CreateFileA(m_param[i].filename, GENERIC_READ, FILE_SHARE_READ, NULL,
+		OPEN_EXISTING, 0, NULL);
+	if (hFile == INVALID_HANDLE_VALUE) {
+		return HRESULT_FROM_WIN32(GetLastError());
+	}
+	// どの道で抜けても、ファイルを必ず閉じる
+	struct FileCloser
+	{
+		HANDLE Handle;
+		~FileCloser() { CloseHandle(Handle); }
+	} closer{ hFile };
+
+	DWORD dwChunkSize = 0;
+	DWORD dwChunkPosition = 0;
+	DWORD filetype = 0;
+
+	// ファイルの形式がWAVEであることを確かめている。
+	HRESULT hr = FindChunk(hFile, RiffChunkId, dwChunkSize, dwChunkPosition);
+	if (FAILED(hr) || hr == S_FALSE)
+	{
+		return FAILED(hr) ? hr : E_FAIL;
+	}
+	hr = ReadChunkData(hFile, &filetype, sizeof(DWORD), dwChunkPosition);
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+	if (filetype != WaveFormatId) {
+		return E_FAIL;
+	}
+
+	// 音声の形式（fmtチャンク）を読み込んでいる
+	hr = FindChunk(hFile, FormatChunkId, dwChunkSize, dwChunkPosition);
+	if (FAILED(hr) || hr == S_FALSE || dwChunkSize < offsetof(WAVEFORMATEX, cbSize) ||
+		dwChunkSize == offsetof(WAVEFORMATEX, cbSize) + 1 || dwChunkSize > sizeof(m_wfx[i]) ||
+		FAILED(ReadChunkData(hFile, &m_wfx[i], dwChunkSize, dwChunkPosition)))
+	{
+		return FAILED(hr) ? hr : E_FAIL;
+	}
+
+	if (dwChunkSize >= sizeof(WAVEFORMATEX) &&
+		m_wfx[i].Format.cbSize > dwChunkSize - sizeof(WAVEFORMATEX))
+	{
+		return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+	}
+
+	// 音声データ（dataチャンク）の中身を、再生用のバッファへ読み込んでいる。
+	hr = FindChunk(hFile, DataChunkId, dwChunkSize, dwChunkPosition);
+	if (FAILED(hr) || hr == S_FALSE || dwChunkSize == 0 || dwChunkSize > XAUDIO2_MAX_BUFFER_BYTES)
+	{
+		return FAILED(hr) ? hr : E_FAIL;
+	}
+	m_DataBuffer[i] = std::make_unique<BYTE[]>(dwChunkSize);
+	hr = ReadChunkData(
+		hFile, m_DataBuffer[i].get(), dwChunkSize, dwChunkPosition);
+	if (FAILED(hr))
+	{
 		return hr;
 	}
 
-	// 立体音響（X3DAudio）を準備している
-	// 出力先（ステレオ・5.1chなど）のスピーカーの配置に合わせて、音の振り分けを計算させている。
-	// 立体音響だけが使えない環境でも、普通の再生は続けられるようにしている。
-	{
-		DWORD channelMask = 0;
-		XAUDIO2_VOICE_DETAILS masterDetails{};
-		m_pMasteringVoice->GetVoiceDetails(&masterDetails);
-		m_OutputChannels = masterDetails.InputChannels;
-		// マスクのスピーカー数と実際の出力数が一致するときだけ、振り分け行列を計算する。
-		m_X3DAudioReady = SUCCEEDED(m_pMasteringVoice->GetChannelMask(&channelMask)) &&
-			m_OutputChannels > 0 && m_OutputChannels <= MaxSpatialChannels &&
-			static_cast<UINT32>(std::popcount(channelMask)) == m_OutputChannels &&
-			SUCCEEDED(X3DAudioInitialize(channelMask, X3DAUDIO_SPEED_OF_SOUND, m_X3DAudio));
-	}
+	// ソースボイスへ渡す再生用のバッファ。ループ指定の素材（環境音）は無限に繰り返している。
+	m_buffer[i].AudioBytes = dwChunkSize;
+	m_buffer[i].pAudioData = m_DataBuffer[i].get();
+	m_buffer[i].Flags = XAUDIO2_END_OF_STREAM;
+	m_buffer[i].LoopCount = m_param[i].bLoop ? XAUDIO2_LOOP_INFINITE : 0;
 
-	// 全部の素材を、WAVファイルから読み込んでいる
-	for (int i = 0; i < SOUND_LABEL_MAX; i++)
-	{
-		memset(&m_wfx[i], 0, sizeof(WAVEFORMATEXTENSIBLE));
-		memset(&m_buffer[i], 0, sizeof(XAUDIO2_BUFFER));
-
-		hFile = CreateFileA(m_param[i].filename, GENERIC_READ, FILE_SHARE_READ, NULL,
-			OPEN_EXISTING, 0, NULL);
-		if (hFile == INVALID_HANDLE_VALUE) {
-			hr = HRESULT_FROM_WIN32(GetLastError());
-			Uninit();
-			return hr;
-		}
-
-		// ファイルの形式がWAVEであることを確かめている。
-		hr = FindChunk(hFile, RiffChunkId, dwChunkSize, dwChunkPosition);
-		if (FAILED(hr) || hr == S_FALSE)
-		{
-			CloseHandle(hFile);
-			Uninit();
-			return FAILED(hr) ? hr : E_FAIL;
-		}
-		hr = ReadChunkData(hFile, &filetype, sizeof(DWORD), dwChunkPosition);
-		if (FAILED(hr))
-		{
-			CloseHandle(hFile);
-			Uninit();
-			return hr;
-		}
-		if (filetype != WaveFormatId) {
-			CloseHandle(hFile);
-			Uninit();
-			return E_FAIL;
-		}
-
-		// 音声の形式（fmtチャンク）を読み込んでいる
-		hr = FindChunk(hFile, FormatChunkId, dwChunkSize, dwChunkPosition);
-		if (FAILED(hr) || hr == S_FALSE || dwChunkSize < offsetof(WAVEFORMATEX, cbSize) ||
-			dwChunkSize == offsetof(WAVEFORMATEX, cbSize) + 1 || dwChunkSize > sizeof(m_wfx[i]) ||
-			FAILED(ReadChunkData(hFile, &m_wfx[i], dwChunkSize, dwChunkPosition)))
-		{
-			CloseHandle(hFile);
-			Uninit();
-			return FAILED(hr) ? hr : E_FAIL;
-		}
-
-		if (dwChunkSize >= sizeof(WAVEFORMATEX) &&
-			m_wfx[i].Format.cbSize > dwChunkSize - sizeof(WAVEFORMATEX))
-		{
-			CloseHandle(hFile);
-			Uninit();
-			return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
-		}
-
-		// 音声データ（dataチャンク）の中身を、再生用のバッファへ読み込んでいる。
-		hr = FindChunk(hFile, DataChunkId, dwChunkSize, dwChunkPosition);
-		if (FAILED(hr) || hr == S_FALSE || dwChunkSize == 0 || dwChunkSize > XAUDIO2_MAX_BUFFER_BYTES)
-		{
-			CloseHandle(hFile);
-			Uninit();
-			return FAILED(hr) ? hr : E_FAIL;
-		}
-		m_DataBuffer[i] = std::make_unique<BYTE[]>(dwChunkSize);
-		hr = ReadChunkData(
-			hFile, m_DataBuffer[i].get(), dwChunkSize, dwChunkPosition);
-		if (FAILED(hr))
-		{
-			CloseHandle(hFile);
-			Uninit();
-			return hr;
-		}
-
-		CloseHandle(hFile);
-
-		// ソースボイスへ渡す再生用のバッファ。ループ指定の素材（環境音）は無限に繰り返している。
-		m_buffer[i].AudioBytes = dwChunkSize;
-		m_buffer[i].pAudioData = m_DataBuffer[i].get();
-		m_buffer[i].Flags = XAUDIO2_END_OF_STREAM;
-		if (m_param[i].bLoop)
-			m_buffer[i].LoopCount = XAUDIO2_LOOP_INFINITE;
-		else
-			m_buffer[i].LoopCount = 0;
-
-		// 素材ごとのソースボイスを作っている
-		hr = m_pXAudio2->CreateSourceVoice(
-			&m_pSourceVoice[i],
-			&(m_wfx[i].Format)
-		);
-		if (FAILED(hr)) {
-			Uninit();
-			return hr;
-		}
-	}
-
-	return hr;
+	// 素材ごとのソースボイスを作っている
+	return m_pXAudio2->CreateSourceVoice(
+		&m_pSourceVoice[i],
+		&(m_wfx[i].Format)
+	);
 }
 
 //=============================================================================

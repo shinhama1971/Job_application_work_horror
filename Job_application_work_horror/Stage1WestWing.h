@@ -126,6 +126,13 @@ private:
     float RandomRange(float minimum, float maximum);
     // 短い知らせを出している
     void ShowNotice(std::string_view text, float seconds);
+    // Update の段階：鍵・扉・排水・ヒューズの進行／予定した物音を鳴らす／西棟の中にいる間の物音
+    void UpdateProgress(const Player& player, float deltaTime,
+        const DirectX::SimpleMath::Vector3& listenerForward, const Interactable* focused,
+        std::vector<AmbientSoundCue>& cues);
+    void PlayScheduledCues(float deltaTime, std::vector<AmbientSoundCue>& cues);
+    void UpdateInsideSounds(const DirectX::SimpleMath::Vector3& position, float deltaTime,
+        const DirectX::SimpleMath::Vector3& listenerForward, std::vector<AmbientSoundCue>& cues);
     // 長押しでバルブを回し、回し終えたらランプを緑にして水の引く先を進めている
     void UpdateValves(const Player& player, float deltaTime,
         const DirectX::SimpleMath::Vector3& listenerForward,

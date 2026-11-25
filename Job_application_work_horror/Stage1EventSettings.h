@@ -348,6 +348,8 @@ namespace Stage1EventSettings
     constexpr RumbleSpec CorridorFloodRushRumble{ 8, 0.16f };
     // 追いつかれたとき：大きな水しぶき（水の中を走る音を低く）と驚かせる音、強い画面の脈打ち、振動
     constexpr EventFeedback::SoundSpec CorridorFloodCaughtSplash{ 0.50f, 1.8f };
+    constexpr float CorridorFloodImpactMoisture = 0.88f;
+    constexpr float CorridorFloodImpactMoistureSeconds = 0.65f;
     constexpr EventFeedback::SoundSpec CorridorFloodCaughtScare{ 0.70f, 1.0f };
     constexpr PulseSpec CorridorFloodCaughtPulse{ 0.95f, 0.9f };
     constexpr RumbleSpec CorridorFloodCaughtRumble{ 24, 0.6f };

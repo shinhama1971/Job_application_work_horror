@@ -242,6 +242,25 @@ void StageScene::StartScareLightSequence()
     }
 }
 
+namespace
+{
+    // 照明があれば、赤い非常灯を点ける・消す（ちらつきの時刻をずらす値も渡す）
+    void SetEmergencyLight(CeilingLight* light, bool on, float offset)
+    {
+        if (light != nullptr)
+        {
+            light->SetEmergencyLight(on, offset);
+        }
+    }
+
+    // 赤い非常灯を、前の照明から次の照明へ移す
+    void MoveEmergencyLight(CeilingLight* from, float fromOffset, CeilingLight* to, float toOffset)
+    {
+        SetEmergencyLight(from, false, fromOffset);
+        SetEmergencyLight(to, true, toOffset);
+    }
+}
+
 // 照明の演出を進めている：赤い非常灯を、入口から廊下の出口へ向かって1つずつ移している
 void StageScene::UpdateScareLightSequence()
 {
@@ -276,67 +295,30 @@ void StageScene::UpdateScareLightSequence()
     switch (m_ScareLightSequence.ConsumePendingBeat())
     {
     case ScareLightSequence::Beat::MiddleCorridor:
-        if (entrance != nullptr)
-        {
-            entrance->SetEmergencyLight(false, StartRoomEmergencyOffset);
-        }
-        if (middle != nullptr)
-        {
-            middle->SetEmergencyLight(true, MiddleChaseEmergencyOffset);
-        }
+        MoveEmergencyLight(entrance, StartRoomEmergencyOffset, middle, MiddleChaseEmergencyOffset);
         EventFeedback::HorrorPulse(*game->GetPostProcess(), ScareChasePulse1);
         EventFeedback::Rumble(ScareChaseRumble1);
         break;
     case ScareLightSequence::Beat::CentralHall:
-        if (middle != nullptr)
-        {
-            middle->SetEmergencyLight(false, MiddleChaseEmergencyOffset);
-        }
-        if (hall != nullptr)
-        {
-            hall->SetEmergencyLight(true, HallChaseEmergencyOffset);
-        }
+        MoveEmergencyLight(middle, MiddleChaseEmergencyOffset, hall, HallChaseEmergencyOffset);
         EventFeedback::HorrorPulse(*game->GetPostProcess(), ScareChasePulse2);
         EventFeedback::Rumble(ScareChaseRumble2);
         break;
     case ScareLightSequence::Beat::NorthCorner:
-        if (hall != nullptr)
-        {
-            hall->SetEmergencyLight(false, HallChaseEmergencyOffset);
-        }
-        if (corner != nullptr)
-        {
-            corner->SetEmergencyLight(true, CornerChaseEmergencyOffset);
-        }
+        MoveEmergencyLight(hall, HallChaseEmergencyOffset, corner, CornerChaseEmergencyOffset);
         EventFeedback::HorrorPulse(*game->GetPostProcess(), ScareChasePulse3);
         EventFeedback::Rumble(ScareChaseRumble3);
         break;
     case ScareLightSequence::Beat::LoopExit:
-        if (corner != nullptr)
-        {
-            corner->SetEmergencyLight(false, CornerChaseEmergencyOffset);
-        }
-        if (loopExit != nullptr)
-        {
-            loopExit->SetEmergencyLight(true, LoopExitChaseEmergencyOffset);
-        }
+        MoveEmergencyLight(corner, CornerChaseEmergencyOffset, loopExit, LoopExitChaseEmergencyOffset);
         EventFeedback::HorrorPulse(*game->GetPostProcess(), ScareChasePulse4);
         EventFeedback::Rumble(ScareChaseRumble4);
         break;
     // 最後の段階で、廊下の照明を赤い非常灯に戻している
     case ScareLightSequence::Beat::RestoreEmergency:
-        if (middle != nullptr)
-        {
-            middle->SetEmergencyLight(true, MiddleFinalEmergencyOffset);
-        }
-        if (hall != nullptr)
-        {
-            hall->SetEmergencyLight(true, HallIdleEmergencyOffset);
-        }
-        if (corner != nullptr)
-        {
-            corner->SetEmergencyLight(true, CornerIdleEmergencyOffset);
-        }
+        SetEmergencyLight(middle, true, MiddleFinalEmergencyOffset);
+        SetEmergencyLight(hall, true, HallIdleEmergencyOffset);
+        SetEmergencyLight(corner, true, CornerIdleEmergencyOffset);
         EventFeedback::Rumble(ScareChaseFinalRumble);
         break;
     case ScareLightSequence::Beat::None:

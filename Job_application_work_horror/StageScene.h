@@ -48,11 +48,19 @@ class CeilingLight;
 class StageScene : public Scene
 {
 private:
+    // 1面の画面効果の基本の強さ：レンズの歪み・色調・レンズの汚れ（Init で設定し、UpdateScreenAtmosphere で廊下の緊張の分を足す）
+    static constexpr float DistortionBase = 0.20f;
+    static constexpr float FilmGradeBase = 0.52f;
+    static constexpr float LensDirtBase = 0.10f;
+
     // 初期化と終了。配置はStage1Layoutに任せ、Uninitでは配置のときに記録した名前の一覧で破棄している。
     void Init();
     void Uninit();
     // 看板・ランプなどの小さな光源を設定している（タイルベースライティングで数を増やせるため）。
     void SetupPracticalLights();
+    // Init の段階：進行と演出の状態をすべて最初に戻す／配置した Object を各仕組みに渡して準備する
+    void ResetProgressState();
+    void SetupStageSystems();
     // 進む先の天井照明を1灯だけ、不規則にちかちかさせている
     void UpdateRouteLights();
     // 進行に合わせて、次に向かう場所の照明の組を選んでいる
@@ -95,6 +103,9 @@ private:
     void UpdateCorridorStretch(const class Player& player, float deltaTime);
     // 呼吸する壁（Stage1EventSettings.h の BreathingWallFaces）を探して格子にし、壁と一緒に動く扉・照明・小物を記録している（配置を読み直したら、もう一度探す）
     void SetupBreathingWall();
+    // SetupBreathingWall の段階：呼吸する壁の面を格子にする／物を一番近い呼吸する壁に取り付ける（取り付けられたら true）
+    void EnableBreathingWallFaces();
+    bool AttachBreathingFixture(class Object& object, const DirectX::SimpleMath::Vector3& anchor);
     void UpdateBreathingFixtures(bool restore = false);
     // 呼吸する壁：組ごとに、周回とヒューズの数で膨らむ量を決め、息を吐くたびに一番近い壁の中から息の音を鳴らす
     void UpdateBreathingWall(float deltaTime);

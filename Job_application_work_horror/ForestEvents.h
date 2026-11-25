@@ -46,6 +46,11 @@ private:
     static float Flicker(float time, float seed, float instability);
     // 消えていく途中の明るさ（消え始めてからの秒数から。速くまたたいた後、0 になる）
     static float DyingBrightness(float elapsed, float seed);
+    // Update の段階：小道の街灯／研究所の2階の窓／玄関の灯り／草むらを通る見えない何か（その恐怖の強さを返す）
+    void UpdatePathLamps(const DirectX::SimpleMath::Vector3& playerPosition, const PropLayoutFile::SpawnedProps& props);
+    void UpdateLabWindow(float deltaTime, const DirectX::SimpleMath::Vector3& playerPosition, const PropLayoutFile::SpawnedProps& props);
+    void UpdatePorchLight(const DirectX::SimpleMath::Vector3& playerPosition, const PropLayoutFile::SpawnedProps& props);
+    float UpdateWalker(float deltaTime, const DirectX::SimpleMath::Vector3& playerPosition);
 
     float m_Time = 0.0f;
     // 街灯：南の街灯（小道で先に通る）と北の街灯。北の街灯を通り過ぎると、南から順に消える

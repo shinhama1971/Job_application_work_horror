@@ -9,6 +9,7 @@
 #include "DDGIVolume.h"
 #include "FigureVolumes.h"
 #include "GpuTimer.h"
+#include "Ground.h"
 #include "LightShafts.h"
 #include "PointShadowMap.h"
 #include "PostProcess.h"
@@ -217,6 +218,14 @@ namespace Core
             game.m_ScreenSpaceReflection->Prepare(game.m_PostProcess->GetCapturedSceneSRV());
         }
         game.DrawMainSceneObjects(stats);
+        // 濁流の波頭は、背後の壁と床を描き終えた画像を屈折させる。
+        if (game.m_CurrentScene == SceneName::Stage)
+        {
+            if (auto* ground = game.GetObj<Ground>("Ground"))
+            {
+                ground->DrawCorridorFloodWave();
+            }
+        }
         game.m_GpuTimer->EndPass(GpuPass::MainScene, context);
         if (useScreenSpaceReflection)
         {

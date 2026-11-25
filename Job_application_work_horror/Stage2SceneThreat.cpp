@@ -153,21 +153,7 @@ bool Stage2Scene::UpdateHiddenFromStalker(Player& player, float deltaTime)
     Core::Game* game = Core::Game::GetInstance();
     if (m_HiddenStalkerTimer < 0.0f)
     {
-        // 隠れた瞬間に影がどれだけ近かったかで、見られていたかを決めている。
-        Vector3 toShadow = noiseShadow->GetPosition() - player.GetPosition();
-        toShadow.y = 0.0f;
-        if (toShadow.Length() <= HidingSeenDistance)
-        {
-            StartCaughtSequence(player, CaughtSequence::Reason::NoiseStalker);
-            return true;
-        }
-        // 見失った影は、辺りを探すように、ロッカーのすぐ前までゆっくり歩いて来る。
-        noiseShadow->EnableChase(HiddenStalkerSearchSpeed, HiddenStalkerStopDistance);
-        m_SearcherSoundTimer = SearcherFirstBreathDelay;
-        m_SearcherTouchedLocker = false;
-        m_HiddenStalkerTimer = HiddenStalkerLingerSeconds;
-        game->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, noiseShadow->GetPosition(),
-            HiddenStalkerArriveSound.Pitch, HiddenStalkerArriveSound.Volume);
+        BeginLockerSearch(player, *noiseShadow);
         return true;
     }
 
@@ -175,22 +161,7 @@ bool Stage2Scene::UpdateHiddenFromStalker(Player& player, float deltaTime)
     Vector3 toSearcher = noiseShadow->GetPosition() - player.GetPosition();
     toSearcher.y = 0.0f;
     const bool searcherNear = toSearcher.Length() <= BreathHold::DangerDistance;
-    // 探している影の気配：近くにいる間は低い息づかいがときどき聞こえ、すぐ前まで来るとロッカーに一度触れる
-    const float searcherDistance = toSearcher.Length();
-    m_SearcherSoundTimer -= deltaTime;
-    if (searcherDistance < SearcherBreathDistance && m_SearcherSoundTimer <= 0.0f)
-    {
-        game->PlayAudioCueAt(SOUND_CUE_BREATH,
-            noiseShadow->GetPosition() + Vector3(0.0f, SearcherBreathHeight, 0.0f),
-            SearcherBreathSound.Pitch, SearcherBreathSound.Volume);
-        m_SearcherSoundTimer = SearcherBreathInterval;
-    }
-    if (!m_SearcherTouchedLocker && searcherDistance < HiddenStalkerStopDistance + SearcherTouchMargin)
-    {
-        game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, player.GetPosition(), SearcherTouchSound.Pitch, SearcherTouchSound.Volume);
-        EventFeedback::Rumble(SearcherTouchRumble);
-        m_SearcherTouchedLocker = true;
-    }
+    PlaySearcherPresence(player, *noiseShadow, toSearcher.Length(), deltaTime);
     const BreathHold::Event breathEvent =
         m_BreathHold.Update(deltaTime, IsBreathHoldPressed(), searcherNear);
     if (breathEvent == BreathHold::Event::Gasped)
@@ -216,8 +187,54 @@ bool Stage2Scene::UpdateHiddenFromStalker(Player& player, float deltaTime)
         return true;
     }
 
-    // 影はあきらめて去っていく。危険度を下げ、しばらく次の影を出さない。
-    noiseShadow->SetActive(false);
+    OnHiddenStalkerLeft(*noiseShadow);
+    return true;
+}
+
+// 隠れた瞬間に影がどれだけ近かったかで、見られていたかを決めている。
+// 見失った影は、辺りを探すように、ロッカーのすぐ前までゆっくり歩いて来る。
+void Stage2Scene::BeginLockerSearch(Player& player, ShadowMan& shadow)
+{
+    Vector3 toShadow = shadow.GetPosition() - player.GetPosition();
+    toShadow.y = 0.0f;
+    if (toShadow.Length() <= HidingSeenDistance)
+    {
+        StartCaughtSequence(player, CaughtSequence::Reason::NoiseStalker);
+        return;
+    }
+    shadow.EnableChase(HiddenStalkerSearchSpeed, HiddenStalkerStopDistance);
+    m_SearcherSoundTimer = SearcherFirstBreathDelay;
+    m_SearcherTouchedLocker = false;
+    m_HiddenStalkerTimer = HiddenStalkerLingerSeconds;
+    Core::Game::GetInstance()->PlayAudioCueAt(SOUND_CUE_FOOTSTEP, shadow.GetPosition(),
+        HiddenStalkerArriveSound.Pitch, HiddenStalkerArriveSound.Volume);
+}
+
+// 探している影の気配：近くにいる間は低い息づかいがときどき聞こえ、すぐ前まで来るとロッカーに一度触れる
+void Stage2Scene::PlaySearcherPresence(const Player& player, const ShadowMan& shadow, float searcherDistance, float deltaTime)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    m_SearcherSoundTimer -= deltaTime;
+    if (searcherDistance < SearcherBreathDistance && m_SearcherSoundTimer <= 0.0f)
+    {
+        game->PlayAudioCueAt(SOUND_CUE_BREATH,
+            shadow.GetPosition() + Vector3(0.0f, SearcherBreathHeight, 0.0f),
+            SearcherBreathSound.Pitch, SearcherBreathSound.Volume);
+        m_SearcherSoundTimer = SearcherBreathInterval;
+    }
+    if (!m_SearcherTouchedLocker && searcherDistance < HiddenStalkerStopDistance + SearcherTouchMargin)
+    {
+        game->PlayAudioCueAt(SOUND_CUE_PIPE_KNOCK, player.GetPosition(), SearcherTouchSound.Pitch, SearcherTouchSound.Volume);
+        EventFeedback::Rumble(SearcherTouchRumble);
+        m_SearcherTouchedLocker = true;
+    }
+}
+
+// 影はあきらめて去っていく。危険度を下げ、しばらく次の影を出さない。
+void Stage2Scene::OnHiddenStalkerLeft(ShadowMan& shadow)
+{
+    Core::Game* game = Core::Game::GetInstance();
+    shadow.SetActive(false);
     m_HiddenStalkerTimer = -1.0f;
     m_NoiseThreatSystem.SetThreat((std::max)(
         0.0f, m_NoiseThreatSystem.GetThreat() - HiddenStalkerLeftThreatDrop));
@@ -227,7 +244,6 @@ bool Stage2Scene::UpdateHiddenFromStalker(Player& player, float deltaTime)
     m_Notices.hiding = Stage2NoticeSeconds;
     EventFeedback::BloomPulse(*game->GetPostProcess(), HiddenStalkerLeftBloom);
     EventFeedback::Rumble(HiddenStalkerLeftRumble);
-    return true;
 }
 
 // 足音の危険度を更新し、高くなったら足音を追う影を出している

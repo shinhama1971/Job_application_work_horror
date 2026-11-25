@@ -4,7 +4,7 @@
 //           水の先頭の位置（床の浸水範囲として Ground へ渡す）、プレイヤーとの位置関係から決める結果
 //
 // ・西棟の排水かヒューズ3本の回収を終えた後、南北の廊下の入口を抜けると濁流が迫る。
-// ・少し間を置いて、北の角から赤い水が南へ押し寄せてくる（歩くより速く、走るより遅い）。
+// ・少し間を置いて、右に曲がる通路から赤い水が流れ込み、角を曲がって南へ押し寄せてくる（歩くより速く、走るより遅い）。
 // ・南の入口（中央ホールへのドア）まで戻れば、水は入口で止まり、しばらくして引いていく。照明も戻る。
 // ・水に追いつかれると、画面が暗転し、開始地点の部屋からやり直しになる（周回の数はそのまま）。
 // 描画・音・照明に依存せず、水の先頭の位置と「いつ何をするか」の合図（Cue）だけを返している。
@@ -12,6 +12,8 @@
 // ============================================================================
 
 #pragma once
+
+#include "shader/corridorFloodWaveConfig.hlsli"
 
 #include <SimpleMath.h>
 
@@ -42,6 +44,10 @@ public:
     static constexpr float CorridorMaxX = 45.0f;
     static constexpr float CorridorEntranceZ = 40.0f;
     static constexpr float CorridorEndZ = 275.0f;
+    // 右の通路の内側。stage1_props.txt の LoopWall3（南）と LoopWall4（北）の間。
+    static constexpr float InletMinZ = 237.0f;
+    static constexpr float InletMaxZ = 273.0f;
+    static constexpr float InletOriginX = SIGNAL_LOST_FLOOD_SOURCE_X;
 
     // 面の始めに戻している（まだ起きていない状態）
     void Reset();
@@ -53,9 +59,16 @@ public:
     void ForceStart();
     bool IsFinished() const { return m_State == State::Finished; }
 
-    // 水があるか（前触れの間は、まだ水はない）と、水の先頭の z（ここから北の角までが水）
-    bool HasWater() const;
-    float GetFrontZ() const { return m_FrontZ; }
+    // 波頭の中心と広がり。中心のyはワールドのzに対応する。
+    struct WaveFront
+    {
+        float Distance;
+        float Strength;
+    };
+    WaveFront GetWaveFront() const;
+    float GetShallowFrontZ() const;
+    float GetInletWaterMinX() const;
+    float GetInletWaterMaxX() const;
     // 水の赤さ（0〜1）。押し寄せ始めると濃くなり、引いていくと薄くなる
     float GetRedness() const { return m_Redness; }
     // 演出の最中か（ほかの物音や演出を止めるため）
@@ -70,6 +83,7 @@ private:
     {
         Idle,
         Warning,
+        Inflow,
         Rushing,
         Holding,
         CaughtBlackout,
@@ -78,10 +92,22 @@ private:
     };
 
     void StartWarning(std::vector<Cue>& cues);
+    // Update の段階：水の音の合図／追いつかれた／流れ込み・押し寄せ・暗転の各状態／水の赤さ
+    void PlayRushAt(float deltaTime, float x, float z, std::vector<Cue>& cues);
+    void CatchPlayer(const DirectX::SimpleMath::Vector3& playerPosition, std::vector<Cue>& cues);
+    void UpdateInflow(float deltaTime, const DirectX::SimpleMath::Vector3& playerPosition, std::vector<Cue>& cues);
+    void UpdateRushing(float deltaTime, const DirectX::SimpleMath::Vector3& playerPosition, std::vector<Cue>& cues);
+    void UpdateCaughtBlackout(float deltaTime, std::vector<Cue>& cues);
+    void UpdateRedness(float deltaTime);
+    float GetCrestStrength() const;
+
+    bool IsInletWave() const;
+    bool HasWater() const;
 
     State m_State = State::Idle;
     float m_StateTimer = 0.0f;
     float m_FrontZ = CorridorEndZ;
+    float m_InletDistance = 0.0f;
     float m_Redness = 0.0f;
     // 水の音を次に鳴らすまでの秒数
     float m_RushSoundTimer = 0.0f;
