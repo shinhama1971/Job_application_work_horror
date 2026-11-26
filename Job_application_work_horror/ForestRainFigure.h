@@ -44,7 +44,7 @@ private:
     DirectX::SimpleMath::Vector3 m_Foot = DirectX::SimpleMath::Vector3::Zero;
     // 懐中電灯で照らし続けている秒数と、恐怖の画面効果の強さ
     float m_LitTime = 0.0f;
+    float m_Fear = 0.0f;
     // 崩れ始めたときの見え方（浮かび上がりきる前に崩れたときは、そこから消していく）
     float m_CollapseFrom = 1.0f;
-    float m_Fear = 0.0f;
 };

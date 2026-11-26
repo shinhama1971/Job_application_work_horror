@@ -375,6 +375,8 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 | 残像 | 1面の `StageScene::UpdateTensionPulse` が、影の近さ（心拍と同じ `ComputeThreatRate`）が0.45〜0.95の間で強める。`PostProcess` は、強さが0より大きい間だけ、約0.16秒ごとに画面の写し（`m_RenderTexture`）をもう1枚の写し（`m_EchoTexture`）へコピーして止めておき、そのたびにずらす向きと乱数の種を変える。消えている間は写しを捨て、次に出るときはまず今の画面を写す（古い場所の景色が出ないように）。`crtOverlayPS.hlsl` が t1 の止めた画面を、ずらして読み、色を抜いて冷たくし、今の画面との差が大きい所ほど濃く重ねる（最大55%）。横の帯ごとに濃さをむらにしている。演出の強さの設定で弱め、自動撮影と計測では出さない。 |
 | 水に呑まれる視界 | 1面の `Stage1CorridorFlood::GetSubmerge`（赤い水に追いつかれてから0.8秒で0→1）を、`StageScene::UpdateCorridorFlood` が `PostProcess::SetSubmerge` へ毎フレーム渡す。b0 の `submerge.x`（水面の高さ）として `crtOverlayPS.hlsl` へ渡し、画面の下から2つの波を重ねた水面の線を上げる。線より下は、景色を縦横に揺らいだ所から読み、明るさだけを赤く染めて深いほど暗い赤へ沈め、列ごとに速さと位置の違う輪の泡を上らせる。線のすぐそばは明るく光らせる。上がりきった後は、暗転（`GetBlackout`）が続く。捕まったことを伝える表示なので、演出の強さの設定では弱めない。 |
 | 一瞬だけ映る別の場所 | 1面の `Stage1FearEvents::GetOtherworld`（0.09秒と0.16秒の2回だけ1）を、`StageScene::UpdateFearEvents` が `PostProcess::SetOtherworld` へ渡す。b0 の `submerge.y`（強さ）と `submerge.z`（映るたびに変える乱数の種）として `crtOverlayPS.hlsl` へ渡し、`GetOtherworldColor`（`crtOverlayParts.hlsli`）で、横の帯ごとに少しずらして読んだ景色の明るさを締めて赤へ移し（暗い所は錆の色）、上から垂れる血の筋（列ごとに出るか・長さを決め、揺らした細い筋の先に丸い溜まり）・飛び散った染み・錆のざらつき・強い周辺の闇を重ねる。ほかの層の上に重ね、映っている間は景色をほぼ置き換える。 |
+| 暗順応とまぶしさ | `autoExposureCS.hlsl` が、慣れた明るさから暗さに慣れた度合い（約6秒で慣れ、約0.6秒で戻る）と、急に明るくなったときのまぶしさを、自動露出のバッファ（[2]・[3]、`SIGNAL_LOST_EXPOSURE_STATE_COUNT` は4）に書く。`exposurePS.hlsl` が `eyeAdaptation.hlsli` の `ApplyEyeAdaptation` で、露出の倍率に加えて、照らされていない暗い所の色を桿体の感じ方に近い青白い明るさへ移し（プルキンエ現象）、まぶしさの間は露出を上げる。CPU へは読み戻さない。 |
+| 恐怖でピントが奪われる | `PostProcess::SetFearFocus`（`ShowFearVision` と森の恐怖が、視界の狭まりと同じ強さで渡す）を、b0 の `depthOfField`（強さ・ピントの距離・射影行列の [2][2] と [3][2]）として `crtOverlayPS.hlsl` へ渡す。深度プリパスの深度（t2。描く間だけ描画先から深度バッファを外す）から奥行きを戻し、画面の中央の5点の平均をピントとして、外れた所を16点の渦巻きで読んでぼかし、`ApplyEyeAdaptation` を掛けて重ねる。 |
 
 ### 懐中電灯の影・濡れた床・水面の光
 
@@ -519,6 +521,8 @@ Debug構成では ImGui の Shader debug view で「Light tiles」を選ぶと�
 `ForestScene::Update` が毎フレーム `ForestEvents::Update` にプレイヤーの足元を渡しています。`ForestEvents` は配置ファイルから作った小物（`PropLayoutFile::SpawnedProps`）を名前で探し、街灯（`PathLampBulb`・`PathLampBulb_1`）・研究所の2階の窓（`LabWindow2F4`）・玄関の灯り（`LabPorchLight`）の明るさを `Wall::SetEmissionScale` で変えています。倍率は `Wall::UploadMaterial` で光る色に、`Wall::CollectPointLights` で点光源の強さに掛けるので、面の光り方と周りの照らし方が一緒に変わります（値が変わったときだけマテリアルを送り直します）。ちらつきは時間だけから決まる式（不安定な時間の中だけ、1秒に14回、途切れるかを乱数で決める）なので、自動撮影では毎回同じ結果になります。窓が消えた瞬間の恐怖の強さを返し、`ForestScene` が `PostProcess::SetFearVision` へ渡しています。
 
 `ForestRainFigure`（`ForestRainFigure.h/.cpp`）は、森の小道に一度だけ立つ「雨で輪郭が浮かぶ人影」の状態（待機 → 浮かぶ → 崩れ落ちる → 消えた）を進め、足元・見え方・崩れ始めてからの秒数を、`ForestScene::Update` が `ForestRain::SetFigure` へ渡しています。`ForestRain::Draw` は、見えている間だけ、雨粒としぶきの後ろに `FigureDropCount`（2400）個を足して `DrawInstanced` し、`RainDrawBuffer`（b9）の `FigureStart`・`FigureVisibility`・`FigureFoot` で、`rainVS.hlsl` の `MakeFigureDrop` が人の形の表面を伝う水の筋と頭・肩のしぶきを作り、ふつうの雨粒は頭と肩の真下で消しています。照らしているかは、目から胸への向きと視線の内積（0.97）と距離で判定しています。
+
+森の稲光は、光っている間だけ `ForestScene::UpdateLightning` が `Game::RequestEventShadowLight` で稲光の位置と光の届く範囲を頼みます。`Game::DrawBulbShadowPass` は、頼まれたフレームは揺れる裸電球より優先して、その位置から `PointShadowMap` の6面を撮ります（頼みは毎フレーム外す。裸電球は画質3だけ、稲光は画質2から）。影を受ける側（`pointShadow.hlsli`）は点光源の位置で照らし合わせるので、壁・岩・樹皮・外壁・地面のうち、稲光の光にだけ影が付きます。`PointShadowMap::BeginFace` は、距離を色として書くため、合成を外して上書きにしています。
 
 森の稲光は `ForestScene` で、研究所の手前から建物の方向を向いたときに始めます（2回まで。2回目は1回目が消えてから5.5秒の後に、玄関まで30の所まで近づいていても起きます）。建物の斜め上から約0.46秒間だけ、`ForestLightning` が既存のタイルベースライティングへ青白い点光源を追加します。画面全体の露出は変えず、玄関からの暗転中と計測モードでは光を出しません。
 

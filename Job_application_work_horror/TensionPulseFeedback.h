@@ -12,7 +12,7 @@
 #include "TensionPulse.h"
 
 // 緊張が高いほど、画面の端から視界が狭まる（PostProcess::SetFearVision）。心拍が聞こえ始める緊張度から効き始め、
-// 0.85 で一番狭くなる。心拍が鳴ったフレームでは、端の闇が一瞬さらに迫る
+// 0.85 で一番狭くなる。心拍が鳴ったフレームでは、端の闇が一瞬さらに迫る。同じ強さで、ピントも浅くなる
 inline void ShowFearVision(const TensionPulse& tension, const TensionPulse::Output& pulse)
 {
     Core::Game* game = Core::Game::GetInstance();
@@ -25,6 +25,8 @@ inline void ShowFearVision(const TensionPulse& tension, const TensionPulse::Outp
         (tension.GetLevel() - TensionPulse::HeartAudibleLevel) /
         (FullFearVisionLevel - TensionPulse::HeartAudibleLevel), 0.0f, 1.0f);
     game->GetPostProcess()->SetFearVision(strength, pulse.beat && strength > 0.0f);
+    // 同じ強さで、見つめている所から外れた奥行きがぼけ、ピントが奪われる（PostProcess::SetFearFocus）
+    game->GetPostProcess()->SetFearFocus(strength);
 }
 
 // 心拍の音を鳴らし（強い緊張なら振動も）、呼吸の音を鳴らしている

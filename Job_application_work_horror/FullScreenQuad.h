@@ -63,9 +63,12 @@ namespace Graphics
             // 水に呑まれる視界（x = 水面の高さ 0〜1。0で画面の下、1で画面の全部が水の中）と、
             // 一瞬だけ映る血まみれの別の場所（y = 強さ 0〜1、z = 映るたびに変わる乱数の種。w は使っていない）
             DirectX::SimpleMath::Vector4 submerge;
+            // 恐怖でピントが奪われる（x = 強さ、y = ピントの距離（0以下なら画面の中央）、zw = 射影行列の [2][2] と [3][2]）
+            DirectX::SimpleMath::Vector4 depthOfField;
         };
 
-        static_assert(sizeof(TimeBuffer) == offsetof(TimeBuffer, submerge) + sizeof(DirectX::SimpleMath::Vector4));
+        static_assert(sizeof(TimeBuffer) == offsetof(TimeBuffer, depthOfField) + sizeof(DirectX::SimpleMath::Vector4));
+        static_assert(offsetof(TimeBuffer, depthOfField) == offsetof(TimeBuffer, submerge) + sizeof(DirectX::SimpleMath::Vector4));
         static_assert(offsetof(TimeBuffer, submerge) == offsetof(TimeBuffer, echo) + sizeof(DirectX::SimpleMath::Vector4));
         static_assert(offsetof(TimeBuffer, presenceWarps) == 80);
         static_assert(offsetof(TimeBuffer, echo) == offsetof(TimeBuffer, presenceWarps) + PresenceWarpCount * sizeof(DirectX::SimpleMath::Vector4));
@@ -136,7 +139,9 @@ namespace Graphics
             const DirectX::SimpleMath::Vector4& echo = DirectX::SimpleMath::Vector4::Zero,
             float submergeLevel = 0.0f,
             float otherworld = 0.0f,
-            float otherworldSeed = 0.0f);
+            float otherworldSeed = 0.0f,
+            const DirectX::SimpleMath::Vector4& depthOfField = DirectX::SimpleMath::Vector4::Zero,
+            ID3D11ShaderResourceView* depthSRV = nullptr);
 
         // HDRの画面（hdrSceneSRV）を、選んだ曲線（Effect::ToneMapMode の番号）で今の描画先へ描いている（上書き）
         void DrawToneMap(ID3D11ShaderResourceView* hdrSceneSRV, unsigned int mode);

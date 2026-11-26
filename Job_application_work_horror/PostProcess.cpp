@@ -10,6 +10,8 @@
 #include "Application.h"
 #include "Utility.h"
 #include "CaptureMode.h"
+#include "Camera.h"
+#include "Game.h"
 #include "shader/computeDispatchConfig.hlsli"
 
 #include <algorithm>
@@ -125,6 +127,9 @@ namespace Effect
         m_SubmergeHold = 0.0f;
         m_Otherworld = 0.0f;
         m_OtherworldHold = 0.0f;
+        m_FearFocus = 0.0f;
+        m_TargetFearFocus = 0.0f;
+        m_FearFocusHold = 0.0f;
         m_EchoCaptureTimer = 0.0f;
         m_EchoValid = false;
         m_EchoCopyRequested = false;
@@ -195,7 +200,7 @@ namespace Effect
         {
             ID3D11Device* device = Renderer::GetDevice();
             D3D11_BUFFER_DESC stateDesc{};
-            constexpr unsigned int stateCount = SIGNAL_LOST_EXPOSURE_GAIN_INDEX + 1;
+            constexpr unsigned int stateCount = SIGNAL_LOST_EXPOSURE_STATE_COUNT;
             stateDesc.ByteWidth = sizeof(float) * stateCount;
             stateDesc.StructureByteStride = sizeof(float);
             stateDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -210,11 +215,11 @@ namespace Effect
             D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
             uavDesc.Format = DXGI_FORMAT_UNKNOWN;
             uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-            uavDesc.Buffer.NumElements = 2;
+            uavDesc.Buffer.NumElements = stateCount;
             D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc{};
             srvDesc.Format = DXGI_FORMAT_UNKNOWN;
             srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-            srvDesc.Buffer.NumElements = 2;
+            srvDesc.Buffer.NumElements = stateCount;
 
             D3D11_BUFFER_DESC paramsDesc{};
             paramsDesc.ByteWidth = sizeof(AutoExposureParams);
@@ -312,6 +317,13 @@ namespace Effect
         {
             m_SubmergeLevel = 0.0f;
         }
+        // 恐怖でピントが奪われる：Scene から渡されなくなったら0へ戻す。ピントが外れていくのも戻るのも、視界の狭まりと同じ速さでなめらかにしている
+        m_FearFocusHold -= deltaTime;
+        if (m_FearFocusHold <= 0.0f)
+        {
+            m_TargetFearFocus = 0.0f;
+        }
+        m_FearFocus += (m_TargetFearFocus - m_FearFocus) * response(FearVisionResponse);
         // 一瞬だけ映る別の場所：Scene から渡されなくなったら、すぐに消す
         m_OtherworldHold -= deltaTime;
         if (m_OtherworldHold <= 0.0f)
@@ -498,6 +510,20 @@ namespace Effect
     }
 
     // ブルームの結果と元の画像を合成し、最後にブラウン管風の効果・色調・光の筋・レンズの汚れを重ねている。
+    DirectX::SimpleMath::Vector4 PostProcess::GetDepthOfFieldParameters(float effectScale) const
+    {
+        Core::Game* game = Core::Game::GetInstance();
+        const float strength = (std::clamp)(m_FearFocus * effectScale, 0.0f, 1.0f);
+        if (strength <= 0.0f || game == nullptr || game->GetCamera() == nullptr)
+        {
+            return DirectX::SimpleMath::Vector4::Zero;
+        }
+        DirectX::SimpleMath::Matrix view;
+        DirectX::SimpleMath::Matrix projection;
+        game->GetCamera()->GetMainMatrices(view, projection);
+        return DirectX::SimpleMath::Vector4(strength, m_FearFocusDistance, projection._33, projection._43);
+    }
+
     void PostProcess::Draw(GpuTimer* gpuTimer)
     {
         if (m_EnableBloom)
@@ -580,7 +606,9 @@ namespace Effect
                 m_EchoOffset.x, m_EchoOffset.y, m_EchoSeed),
             m_SubmergeLevel,
             (std::clamp)(m_Otherworld * effectScale, 0.0f, 1.0f),
-            m_OtherworldSeed);
+            m_OtherworldSeed,
+            GetDepthOfFieldParameters(effectScale),
+            Renderer::GetDepthShaderResourceView());
 
         // 最後に、HDRの画面を曲線で0〜1へ移して、バックバッファへ描いている（自動撮影・計測では --tonemap で曲線を選べる）
         const auto toneMapOverride = Tools::CaptureMode::GetToneMapOverride();

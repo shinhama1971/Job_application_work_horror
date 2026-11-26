@@ -126,6 +126,11 @@ namespace Effect
         float m_Otherworld = 0.0f;
         float m_OtherworldSeed = 0.0f;
         float m_OtherworldHold = 0.0f;
+        // 恐怖でピントが奪われる強さ（今の値と目標）、ピントの距離（0以下なら画面の中央）、渡されなくなってから0へ戻すまでの残り秒数
+        float m_FearFocus = 0.0f;
+        float m_TargetFearFocus = 0.0f;
+        float m_FearFocusDistance = 0.0f;
+        float m_FearFocusHold = 0.0f;
         float m_EchoCaptureTimer = 0.0f;
         bool m_EchoValid = false;
         bool m_EchoCopyRequested = false;
@@ -198,6 +203,8 @@ namespace Effect
         void RunBloom();
         // 描いた画面の明るさを測り、目の慣れの倍率をGPUのバッファへ書いている。
         void RunAutoExposure();
+        // 恐怖でピントが奪われる効果へ渡す値（強さ、ピントの距離、プレイヤー視点の射影行列の [2][2] と [3][2]。深度から奥行きを戻すため）
+        DirectX::SimpleMath::Vector4 GetDepthOfFieldParameters(float effectScale) const;
 
     public:
         // 作業用テクスチャとシェーダーを作る／解放する／値を目標へ近づける
@@ -355,6 +362,15 @@ namespace Effect
 
         // 一瞬だけ、血まみれの同じ場所が映る強さ（0〜1）と、映るたびに変える乱数の種を設定している。
         // Scene が映している間だけ毎フレーム渡し、渡されなくなったら、すぐに消す
+        // 恐怖でピントが奪われる強さ（0〜1）と、ピントを合わせる距離（0以下なら、画面の中央に映っている物の奥行き）を設定している。
+        // Scene が毎フレーム渡し、渡されなくなったら0へ戻す
+        void SetFearFocus(float strength, float focusDistance = 0.0f)
+        {
+            m_TargetFearFocus = (std::clamp)(strength, 0.0f, 1.0f);
+            m_FearFocusDistance = focusDistance;
+            m_FearFocusHold = FearVisionHoldSeconds;
+        }
+
         void SetOtherworld(float strength, float seed)
         {
             m_Otherworld = (std::clamp)(strength, 0.0f, 1.0f);

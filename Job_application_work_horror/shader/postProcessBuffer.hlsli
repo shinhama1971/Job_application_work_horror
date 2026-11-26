@@ -37,6 +37,9 @@ cbuffer TimeBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_POST_EFFE
     // 水に呑まれる視界（x = 水面の高さ 0〜1。0で画面の下、1で画面の全部が水の中。PostProcess::SetSubmerge）と、
     // 一瞬だけ映る血まみれの別の場所（y = 強さ 0〜1、z = 乱数の種。PostProcess::SetOtherworld）
     float4 submerge;
+    // 恐怖でピントが奪われる（x = 強さ 0〜1、y = ピントの距離（0以下なら画面の中央の奥行き）、zw = 射影行列の [2][2] と [3][2]）。
+    // PostProcess::SetFearFocus
+    float4 depthOfField;
 };
 
 #endif

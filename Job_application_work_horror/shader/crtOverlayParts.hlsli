@@ -425,4 +425,71 @@ float3 GetOtherworldColor(float2 uv, float edgeDistance, float seed)
     return color;
 }
 
+// --- 恐怖でピントが奪われる（被写界深度。depthOfField。PostProcess::SetFearFocus）
+// 怖いほど、ピントの合う奥行きが浅くなり、見つめている所（画面の中央の奥行き。決まった的があればその距離）から外れた所がぼける。
+// 深度プリパスの深度（t2）から目からの奥行きを戻し、ピントからの外れ具合でぼかす半径を決め、渦巻き状に並べた点で景色を読んで平均している。
+// ぼかした色は、露出のシェーダーと同じ目の慣れ（eyeAdaptation.hlsli）を掛けて、ぼけた所だけ明るさや色が変わらないようにしている。
+// ピントを測る点（画面の中央からの距離。縦の高さを1とした長さ）、ピントが合っているとみなす奥行きの外れ（ピントの距離に対する割合）と、
+// そこから一番ぼけるまでの幅、ピントの距離の下限、一番大きくぼかす半径（縦の高さを1とした長さ）、ぼかす点の数、渦巻きの角度、ぼけを見せ始める半径の割合
+#define DOF_FOCUS_PROBE_OFFSET 0.03f
+#define DOF_SHARP_ZONE 0.15f
+#define DOF_BLUR_RANGE 0.9f
+#define DOF_MIN_FOCUS 8.0f
+#define DOF_MAX_RADIUS 0.011f
+#define DOF_TAP_COUNT 16
+#define DOF_GOLDEN_ANGLE 2.39996f
+#define DOF_ALPHA_START 0.12f
+// 深度から奥行きを戻すときに、分母が0にならないようにする下限
+#define DOF_MIN_DEPTH_DIVISOR 0.00001f
+
+// 画面の位置 uv の、目からの奥行き（ビュー空間の z）。depthOfField.zw は射影行列の [2][2] と [3][2]
+float GetDepthOfFieldViewDepth(float2 uv)
+{
+    uint width;
+    uint height;
+    DepthTexture.GetDimensions(width, height);
+    const int2 pixel = min(int2(saturate(uv) * float2(width, height)), int2(width, height) - 1);
+    const float depth = DepthTexture.Load(int3(pixel, 0)).r;
+    return depthOfField.w / max(depth - depthOfField.z, DOF_MIN_DEPTH_DIVISOR);
+}
+
+// ピントの合う奥行き：決まった的があればその距離、なければ画面の中央の5点の奥行きの平均
+float GetDepthOfFieldFocus()
+{
+    if (depthOfField.y > 0.0f)
+    {
+        return depthOfField.y;
+    }
+    const float2 offsetX = float2(DOF_FOCUS_PROBE_OFFSET / screenAspect, 0.0f);
+    const float2 offsetY = float2(0.0f, DOF_FOCUS_PROBE_OFFSET);
+    const float2 center = float2(0.5f, 0.5f);
+    return (GetDepthOfFieldViewDepth(center) +
+        GetDepthOfFieldViewDepth(center + offsetX) + GetDepthOfFieldViewDepth(center - offsetX) +
+        GetDepthOfFieldViewDepth(center + offsetY) + GetDepthOfFieldViewDepth(center - offsetY)) * 0.2f;
+}
+
+// ぼかした景色の色（xyz）と、その層の濃さ（w）を返している
+float4 GetDepthOfFieldLayer(float2 uv)
+{
+    const float focus = max(GetDepthOfFieldFocus(), DOF_MIN_FOCUS);
+    const float outOfFocus = abs(GetDepthOfFieldViewDepth(uv) - focus) / focus;
+    const float blur = saturate((outOfFocus - DOF_SHARP_ZONE) / DOF_BLUR_RANGE) * saturate(depthOfField.x);
+    if (blur <= 0.0f)
+    {
+        return 0.0f;
+    }
+    const float radius = blur * DOF_MAX_RADIUS;
+    float3 sum = 0.0f;
+    [unroll]
+    for (int tap = 0; tap < DOF_TAP_COUNT; ++tap)
+    {
+        // 渦巻き状に並べ、中心から外へ均等に広がるようにしている（半径は点の番号の平方根に比例）
+        const float tapRadius = radius * sqrt(((float)tap + 0.5f) / DOF_TAP_COUNT);
+        const float angle = (float)tap * DOF_GOLDEN_ANGLE;
+        const float2 offset = float2(cos(angle) / screenAspect, sin(angle)) * tapRadius;
+        sum += SceneTexture.SampleLevel(LinearSampler, saturate(uv + offset), 0.0f).rgb;
+    }
+    const float3 blurred = ApplyEyeAdaptation(sum / DOF_TAP_COUNT);
+    return float4(blurred, smoothstep(0.0f, DOF_ALPHA_START, blur));
+}
 #endif

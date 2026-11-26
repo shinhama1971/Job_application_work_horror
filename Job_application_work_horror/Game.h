@@ -79,6 +79,10 @@ namespace Core
         std::unique_ptr<Effect::ReflectionProbe> m_EnvironmentProbe;
         // 揺れる裸電球（2面）の影。電球から6方向を撮った「電球からの距離」のキューブマップで、t2 で読ませている
         std::unique_ptr<Effect::PointShadowMap> m_PointShadowMap;
+        // 一瞬だけ強く光る点光源（森の稲光）の影の頼み：位置・光の届く範囲と、このフレームに頼まれたか（描いたら外す）
+        DirectX::SimpleMath::Vector3 m_EventShadowLightPosition = DirectX::SimpleMath::Vector3::Zero;
+        float m_EventShadowLightRange = 0.0f;
+        bool m_EventShadowLightRequested = false;
         // 鏡と水たまりにだけ映る人の形の距離場（3Dテクスチャ）
         std::unique_ptr<Effect::FigureVolumes> m_FigureVolumes;
         // 画面空間の環境遮蔽（SSAO）。本描画の直前に深度プリパスの深度から作り、t15 で読ませている
@@ -405,6 +409,15 @@ namespace Core
         void SetStage2Anomalies(int first, int second) { m_State.SetStage2Anomalies(first, second); }
         int GetStage2FirstAnomaly() const { return m_State.GetStage2FirstAnomaly(); }
         int GetStage2SecondAnomaly() const { return m_State.GetStage2SecondAnomaly(); }
+
+        // 一瞬だけ強く光る点光源（森の稲光など）に、揺れる裸電球と同じ影を付けている（光っている間だけ、Scene が毎フレーム頼む）。
+        // 頼まれたフレームは、裸電球より優先して、その光の位置から6方向の影を撮る。position は点光源と同じ位置にすること
+        void RequestEventShadowLight(const DirectX::SimpleMath::Vector3& position, float range)
+        {
+            m_EventShadowLightPosition = position;
+            m_EventShadowLightRange = range;
+            m_EventShadowLightRequested = true;
+        }
 
         // --- 描画の仕組みへのアクセス。所有権はGameにあり、返すポインタは所有しない ---
         Camera* GetCamera()

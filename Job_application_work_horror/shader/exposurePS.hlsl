@@ -1,6 +1,8 @@
 // ============================================================================
 // シェーダーの役割: 露出（目の慣れ）と暗い部分の持ち上げを計算し、暗い場所でも進める明るさにしている。
 // 露出は、シーンが決めた値に、自動露出（autoExposureCS.hlsl）が画面の明るさから求めた倍率を掛けて使っている。
+// 暗さに目が慣れるほど、照らされていない暗い所から色が抜けて青白い白黒になり（暗順応・プルキンエ現象）、
+// 暗さに慣れた目で急に明るい所を見ると、一瞬まぶしく白く飛ぶ（まぶしさ）。どちらも自動露出のバッファから読んでいる。
 // 定数バッファのスロットと入出力の形は、CPU側の定義と一致させている。
 // ============================================================================
 
@@ -23,6 +25,7 @@ SamplerState sceneSampler : register(s0);
 
 // 自動露出の結果（autoExposureCS.hlslが書いている）。[0]は慣れた明るさ、[1]は露出の倍率
 StructuredBuffer<float> AutoExposureState : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_AUTO_EXPOSURE_TEXTURE_SLOT));
+#include "eyeAdaptation.hlsli"
 
 // 画面内の暗がりは近傍の標本を使って判定する。
 #define EXPOSURE_LOCAL_SAMPLE_OFFSET_TEXELS 5.0f
@@ -77,17 +80,10 @@ float4 main(PS_IN input) : SV_TARGET
             saturate(input.uv - localOffset),
             0.0f).rgb) * EXPOSURE_LOCAL_SAMPLE_WEIGHT;
 
-    // シーンが決めた露出（演出の意図）に、実際の画面の明るさから求めた目の慣れの倍率を掛けている。
-    const float autoGain = AutoExposureState[SIGNAL_LOST_EXPOSURE_GAIN_INDEX];
-    const float adaptedExposure = exposure * (autoGain > 0.0f ? autoGain : 1.0f);
-
-    // HDRターゲットへの加算で C + C*(gain-1) = C*gain とする。1未満の倍率では加算値が負になる。
-    // 驚かせる演出のフラッシュもこの倍率に含め、後から描くUIには掛けない。
-    static const float HORROR_PULSE_EXPOSURE_GAIN = 0.08f;
-    const float eventExposure = horrorPulseStrength * HORROR_PULSE_EXPOSURE_GAIN;
-    const float exposureGain =
-        adaptedExposure + eventExposure - 1.0f;
-    const float3 adaptationLight = scene * exposureGain;
+    // シーンが決めた露出（演出の意図）に、実際の画面の明るさから求めた目の慣れの倍率を掛け、暗順応とまぶしさを加えている（eyeAdaptation.hlsli）。
+    // HDRターゲットへの加算で C + (C' - C) = C' とする。暗くする所では加算値が負になる。
+    const float adaptedExposure = GetAdaptedExposure();
+    const float3 adaptationLight = ApplyEyeAdaptation(scene) - scene;
 
     // 緊張が高まるほど、深い影の一部だけを持ち上げている。これで冷たい霧のように
     // 輪郭が浮かび、光が当たっている面は平らにならない。

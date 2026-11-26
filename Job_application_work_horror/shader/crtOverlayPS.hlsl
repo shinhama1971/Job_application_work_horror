@@ -21,6 +21,10 @@ Texture2D SceneTexture : register(t0);
 // 残像に使う、少し前に写し取って止めておいた画面（PostProcess の m_EchoTexture）
 Texture2D EchoTexture : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_CRT_ECHO_TEXTURE_SLOT));
 SamplerState LinearSampler : register(s0);
+// 深度プリパスの深度（恐怖でピントが奪われる効果）と、自動露出の結果（ぼかした景色に、露出と同じ目の慣れを掛けるため）
+Texture2D<float> DepthTexture : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_CRT_DEPTH_TEXTURE_SLOT));
+StructuredBuffer<float> AutoExposureState : register(SIGNAL_LOST_TEXTURE_REGISTER(SIGNAL_LOST_AUTO_EXPOSURE_TEXTURE_SLOT));
+#include "eyeAdaptation.hlsli"
 
 #include "crtOverlayParts.hlsli"
 
@@ -348,6 +352,17 @@ float4 main(PS_IN input) : SV_TARGET
         overlayColor = (echoColor * echoAlpha + overlayColor * alpha * (1.0f - echoAlpha)) /
             max(echoLayered, CRT_MIN_DIVISOR);
         alpha = echoLayered;
+    }
+
+    // 恐怖でピントが奪われる：怖いほど、見つめている所から奥行きの外れた所がぼける（crtOverlayParts.hlsli）
+    [branch]
+    if (depthOfField.x > CRT_EFFECT_EPSILON)
+    {
+        const float4 focusLayer = GetDepthOfFieldLayer(input.uv);
+        const float layeredAlpha = focusLayer.w + alpha * (1.0f - focusLayer.w);
+        overlayColor = (focusLayer.rgb * focusLayer.w + overlayColor * alpha * (1.0f - focusLayer.w)) /
+            max(layeredAlpha, CRT_MIN_DIVISOR);
+        alpha = layeredAlpha;
     }
 
     // 恐怖で視界が狭まる：緊張が高いほど、画面の端から、ぼけて色の抜けた闇が中央へ迫る。心拍が鳴るたびに一瞬さらに迫る。

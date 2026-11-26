@@ -5,6 +5,9 @@
 // ・画面全体を64x64の格子で読み、1スレッドが4x4点を受け持っている（全画素は読まず、4096点で平均している）。
 // ・明るさの平均は対数で取り、懐中電灯のように一部だけ明るい画面でも、平均が引っ張られすぎないようにしている。
 // ・慣れた明るさと倍率はGPUのバッファに置いたまま更新し、露出のシェーダーが直接読んでいる。
+// ・暗順応：慣れた明るさが暗いほど、ゆっくり（約6秒）暗さに慣れ、明るくなると素早く（約0.6秒）戻る。
+//   人の目は暗い所では色を感じる細胞（錐体）が働かず、青緑に敏感な細胞（桿体）だけで見るため、色が抜けて青白く見える（プルキンエ現象）。
+// ・まぶしさ：暗さに慣れた目で、急に明るい画面（懐中電灯を点けた・稲光）を見たときの度合い。少しずつ消える。
 //   CPUへ読み戻さないため、GPUの処理を待たずに済む。
 // ============================================================================
 
@@ -49,6 +52,15 @@ static const float AUTO_EXPOSURE_MIN_ACCUMULATED_WEIGHT = 0.0001f;
 // 真っ暗な画面でも、露出の比率とべき乗を計算できる範囲に収める。
 static const float AUTO_EXPOSURE_MIN_LUMINANCE = 0.0001f;
 static const float AUTO_EXPOSURE_MIN_RATIO = 0.0001f;
+// 暗順応：慣れた明るさがこれより暗いと慣れ始め、これで一番慣れる。慣れる速さと、明るくなって戻る速さ（1秒あたり）
+static const float DARK_ADAPTATION_START_LUMINANCE = 0.035f;
+static const float DARK_ADAPTATION_FULL_LUMINANCE = 0.008f;
+static const float DARK_ADAPTATION_RISE_RATE = 0.17f;
+static const float DARK_ADAPTATION_FALL_RATE = 1.7f;
+// まぶしさ：今の画面の明るさが、慣れた明るさの何倍（対数の差）を超えるとまぶしく感じ始め、どれだけ超えると一番まぶしいか。消える速さ（1秒あたり）
+static const float DAZZLE_START_LOG_RATIO = 0.9f;
+static const float DAZZLE_FULL_LOG_RATIO = 2.0f;
+static const float DAZZLE_DECAY_RATE = 1.6f;
 // 定数の印（0 か 1）を見るしきい値
 #define AUTO_EXPOSURE_FLAG_THRESHOLD 0.5f
 
@@ -117,9 +129,11 @@ void main(uint3 threadId : SV_GroupThreadID, uint threadIndex : SV_GroupIndex)
     // 前のフレームまでに慣れた明るさから、今の明るさへ近づけている。
     // 明るくなるときは素早く、暗くなるときはゆっくり慣れる（人の目の慣れ方に近づけている）。
     float adaptedLogLuminance = frameLogLuminance;
+    float previousLogLuminance = frameLogLuminance;
     if (ResetAdaptation < AUTO_EXPOSURE_FLAG_THRESHOLD)
     {
         const float previous = ExposureState[SIGNAL_LOST_EXPOSURE_LOG_LUMINANCE_INDEX];
+        previousLogLuminance = previous;
         const float speed = frameLogLuminance > previous ? LightAdaptSpeed : DarkAdaptSpeed;
         const float blend = 1.0f - exp(-DeltaTime * speed);
         adaptedLogLuminance = previous + (frameLogLuminance - previous) * blend;
@@ -135,6 +149,27 @@ void main(uint3 threadId : SV_GroupThreadID, uint threadIndex : SV_GroupIndex)
         gain = 1.0f;
     }
 
+    // 暗順応：慣れた明るさから目標の慣れ具合を決め、暗くなるときはゆっくり、明るくなるときは素早く近づけている
+    const float darkTarget = 1.0f - smoothstep(DARK_ADAPTATION_FULL_LUMINANCE, DARK_ADAPTATION_START_LUMINANCE, adaptedLuminance);
+    float darkAdaptation = darkTarget;
+    float dazzle = 0.0f;
+    if (ResetAdaptation < AUTO_EXPOSURE_FLAG_THRESHOLD)
+    {
+        const float previousDark = ExposureState[SIGNAL_LOST_EXPOSURE_DARK_ADAPTATION_INDEX];
+        const float darkRate = darkTarget > previousDark ? DARK_ADAPTATION_RISE_RATE : DARK_ADAPTATION_FALL_RATE;
+        darkAdaptation = previousDark + (darkTarget - previousDark) * (1.0f - exp(-DeltaTime * darkRate));
+        // まぶしさ：暗さに慣れていた目ほど、急に明るくなったときに強くまぶしい
+        const float suddenLight = smoothstep(DAZZLE_START_LOG_RATIO, DAZZLE_FULL_LOG_RATIO, frameLogLuminance - previousLogLuminance) * previousDark;
+        dazzle = max(suddenLight, ExposureState[SIGNAL_LOST_EXPOSURE_DAZZLE_INDEX] - DeltaTime * DAZZLE_DECAY_RATE);
+    }
+    if (Enabled < AUTO_EXPOSURE_FLAG_THRESHOLD)
+    {
+        darkAdaptation = 0.0f;
+        dazzle = 0.0f;
+    }
+
     ExposureState[SIGNAL_LOST_EXPOSURE_LOG_LUMINANCE_INDEX] = adaptedLogLuminance;
     ExposureState[SIGNAL_LOST_EXPOSURE_GAIN_INDEX] = gain;
+    ExposureState[SIGNAL_LOST_EXPOSURE_DARK_ADAPTATION_INDEX] = saturate(darkAdaptation);
+    ExposureState[SIGNAL_LOST_EXPOSURE_DAZZLE_INDEX] = saturate(dazzle);
 }

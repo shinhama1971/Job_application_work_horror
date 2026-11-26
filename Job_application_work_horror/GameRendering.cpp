@@ -405,9 +405,13 @@ namespace Core
 
     // 揺れる裸電球の影（2面）：カメラに一番近い電球から6方向を撮り、電球からの距離をキューブマップへ書いている。
     // 電球は毎フレーム揺れるので、6面とも毎フレーム描き直している。描く物は懐中電灯の影と同じく、影を落とす物だけで、
+    // （森の稲光が光っている間は、稲光の位置から撮る。Game::RequestEventShadowLight）
     // 光の届く範囲の外の物は省いている。物のDrawShadowが使うシェーダーを、この間だけ距離を書くシェーダーに差し替えている。
     void Game::DrawBulbShadowPass(ID3D11DeviceContext* context, int quality)
     {
+        // 稲光など、一瞬だけ強く光る点光源の影を頼まれたフレームは、そちらを優先している（頼みは1フレームごとに外す）
+        const bool eventLight = m_EventShadowLightRequested;
+        m_EventShadowLightRequested = false;
         const HangingBulb* shadowBulb = nullptr;
         float nearestDistanceSquared = 0.0f;
         for (const HangingBulb* bulb : GetObjects<HangingBulb>())
@@ -421,7 +425,9 @@ namespace Core
             }
         }
 
-        if (shadowBulb == nullptr || quality < GameSettings::HighEffectLevel || !Tools::TechDemo::UseBulbShadow)
+        // 裸電球の影は画質3だけ。稲光は2回だけ一瞬光る見せ場なので、画質2（普通）から付けている
+        const int requiredQuality = eventLight ? GameSettings::StandardEffectLevel : GameSettings::HighEffectLevel;
+        if ((!eventLight && shadowBulb == nullptr) || quality < requiredQuality || !Tools::TechDemo::UseBulbShadow)
         {
             m_ShadowMap->SetPointShadow(DirectX::SimpleMath::Vector3::Zero, 0.0f, false);
             m_PointShadowMap->Unbind();
@@ -430,8 +436,8 @@ namespace Core
         }
 
         m_GpuTimer->BeginPass(GpuPass::BulbShadow, context);
-        const DirectX::SimpleMath::Vector3 lightPosition = shadowBulb->GetBulbPosition();
-        const float lightRange = shadowBulb->GetLightRange();
+        const DirectX::SimpleMath::Vector3 lightPosition = eventLight ? m_EventShadowLightPosition : shadowBulb->GetBulbPosition();
+        const float lightRange = eventLight ? m_EventShadowLightRange : shadowBulb->GetLightRange();
         m_ShadowMap->SetPointShadow(lightPosition, lightRange, true);
         m_ShadowMap->SetShaderOverride(&m_PointShadowMap->GetShader());
         for (int face = 0; face < Effect::CubeMapGeometry::FaceCount; ++face)

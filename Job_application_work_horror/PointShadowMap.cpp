@@ -125,6 +125,10 @@ namespace Effect
 
         ID3D11RenderTargetView* faceView = m_FaceViews[static_cast<size_t>(face)].Get();
         context->OMSetRenderTargets(1, &faceView, m_DepthView.Get());
+        // 距離は色として書くので、前の描画で残った合成の設定（半透明・加算）を外し、上書きにしている
+        // （合成のままだと、消した値「1」に足されたり混ざったりして、距離が書けず、影が出なかった）
+        Renderer::SetBlendState(BS_NONE);
+        Renderer::SetDepthEnable(true);
         // 何も描かれない所は、光の届く範囲の端（1）にしている（＝その向きには影がない）
         const float farthest[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
         context->ClearRenderTargetView(faceView, farthest);

@@ -353,6 +353,12 @@ void ForestScene::UpdateLightning(float deltaTime, const Vector3& forward)
     const float tail = (std::min)(1.0f, (flashSeconds - m_LightningTime) / (flashSeconds - riseSeconds));
     const float flash = rise * tail * tail;
     m_Lightning->SetStrength(LightningStrength * flash);
+    // 光っている間だけ、稲光の位置から影を撮り、木々・岩・研究所の長い影を地面と外壁に一斉に落としている
+    // （揺れる裸電球の影と同じ仕組み。壁・岩・樹皮・地面のシェーダーが、この光にだけ影を付ける）
+    if (flash > 0.0f)
+    {
+        Core::Game::GetInstance()->RequestEventShadowLight(m_Lightning->GetPosition(), LightningRange);
+    }
 
     // 人影は、稲光が明るい間だけ逆光で浮かび、光が弱まると崩れて消える
     m_LightningFigure->SetLightning((std::min)(1.0f, flash * FigureVisibilityGain),
@@ -477,6 +483,8 @@ void ForestScene::Update()
         m_Rain->SetFigure(m_RainFigure.GetFoot(), m_RainFigure.GetVisibility(), m_RainFigure.GetCollapseSeconds());
     }
     game->GetPostProcess()->SetFearVision(fear, fear > m_LastFear + FearSpikeThreshold);
+    // 怖いほど、見つめている所から外れた奥行きがぼける（雨の人影や稲光の人影を見たとき）
+    game->GetPostProcess()->SetFearFocus(fear);
     m_LastFear = fear;
     // 草むらを通る「見えない何か」の足元の草を、草の Compute Shader で押し倒している
     if (m_Grass != nullptr)

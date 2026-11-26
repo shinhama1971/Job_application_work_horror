@@ -1229,6 +1229,9 @@
     <ClInclude Include="shader\litTextureStages.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>
+    <ClInclude Include="shader\eyeAdaptation.hlsli">
+      <Filter>リソース ファイル\Shader\Include</Filter>
+    </ClInclude>
     <ClInclude Include="shader\puddleReflection.hlsli">
       <Filter>リソース ファイル\Shader\Include</Filter>
     </ClInclude>

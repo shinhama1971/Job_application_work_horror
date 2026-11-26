@@ -17,6 +17,7 @@ namespace
     constexpr UINT QuadVertexCount = 4;
     // 残像の少し前の画面を読むテクスチャの番号（crtOverlayPS.hlsl の t1）
     constexpr UINT EchoTextureSlot = SIGNAL_LOST_CRT_ECHO_TEXTURE_SLOT;
+    constexpr UINT DepthTextureSlot = SIGNAL_LOST_CRT_DEPTH_TEXTURE_SLOT;
     // 三角形ストリップの順に、位置とUVで同じ四隅を参照する。
     constexpr UINT TopLeftVertex = 0;
     constexpr UINT TopRightVertex = 1;
@@ -152,7 +153,9 @@ namespace Graphics
         const DirectX::SimpleMath::Vector4& echo,
         float submergeLevel,
         float otherworld,
-        float otherworldSeed)
+        float otherworldSeed,
+        const DirectX::SimpleMath::Vector4& depthOfField,
+        ID3D11ShaderResourceView* depthSRV)
     {
         ID3D11DeviceContext* context =
             Renderer::GetDeviceContext();
@@ -192,6 +195,8 @@ namespace Graphics
         // 少し前の画面がないときは、残像を出さない
         tb.echo = echoSRV != nullptr ? echo : DirectX::SimpleMath::Vector4::Zero;
         tb.submerge = DirectX::SimpleMath::Vector4(submergeLevel, otherworld, otherworldSeed, 0.0f);
+        // 深度が読めないときは、ピントの効果を出さない
+        tb.depthOfField = depthSRV != nullptr ? depthOfField : DirectX::SimpleMath::Vector4::Zero;
         bool presenceWarpActive = false;
         for (const DirectX::SimpleMath::Vector4& warp : tb.presenceWarps)
         {
@@ -260,15 +265,34 @@ namespace Graphics
             lensMoisture > EffectEpsilon || filmGradeStrength > EffectEpsilon ||
             signalInterference > EffectEpsilon || frameHold > FrameHoldThreshold || fearVision > EffectEpsilon ||
             presenceWarpActive || tb.echo.x > EffectEpsilon || submergeLevel > EffectEpsilon ||
-            otherworld > EffectEpsilon)
+            otherworld > EffectEpsilon || tb.depthOfField.x > EffectEpsilon)
         {
             m_OverlayShader.SetGPU();
             Renderer::SetBlendState(BS_ALPHABLEND);
             context->PSSetShaderResources(0, 1, &sceneSRV);
             context->PSSetShaderResources(EchoTextureSlot, 1, &echoSRV);
+            // ピントの効果を出すときは、深度を読むため、描画先から深度バッファを外している（読み取りと書き込みに同時に使えない）
+            const bool useDepth = tb.depthOfField.x > EffectEpsilon;
+            Microsoft::WRL::ComPtr<ID3D11RenderTargetView> currentTarget;
+            Microsoft::WRL::ComPtr<ID3D11DepthStencilView> currentDepth;
+            if (useDepth)
+            {
+                context->OMGetRenderTargets(1, currentTarget.GetAddressOf(), currentDepth.GetAddressOf());
+                ID3D11RenderTargetView* target = currentTarget.Get();
+                context->OMSetRenderTargets(1, &target, nullptr);
+                context->PSSetShaderResources(DepthTextureSlot, 1, &depthSRV);
+                context->PSSetShaderResources(AutoExposureTextureSlot, 1, &autoExposureSRV);
+            }
             context->DrawIndexed(QuadVertexCount, 0, 0);
             context->PSSetShaderResources(0, 1, &nullResource);
             context->PSSetShaderResources(EchoTextureSlot, 1, &nullResource);
+            if (useDepth)
+            {
+                context->PSSetShaderResources(DepthTextureSlot, 1, &nullResource);
+                context->PSSetShaderResources(AutoExposureTextureSlot, 1, &nullResource);
+                ID3D11RenderTargetView* target = currentTarget.Get();
+                context->OMSetRenderTargets(1, &target, currentDepth.Get());
+            }
         }
 
         // ブレンドと深度の設定を元に戻している
