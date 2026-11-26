@@ -298,6 +298,7 @@
     <ClCompile Include="Stage1HiddenRoomEvent.cpp" />
     <ClCompile Include="Stage1SafeLights.cpp" />
     <ClCompile Include="Stage1CeilingStalker.cpp" />
+    <ClCompile Include="Stage1FearEvents.cpp" />
     <ClCompile Include="Stage1CorridorStretch.cpp" />
     <ClCompile Include="Stage1CorridorFlood.cpp" />
     <ClCompile Include="Stage1StrangeRooms.cpp" />
@@ -321,6 +322,7 @@
     <ClCompile Include="StageSceneBreathing.cpp" />
     <ClCompile Include="StageSceneScares.cpp" />
     <ClCompile Include="StageSceneRoomScares.cpp" />
+    <ClCompile Include="StageSceneFearEvents.cpp" />
     <ClCompile Include="StageSceneDraw.cpp" />
     <ClCompile Include="Stage2Scene.cpp" />
     <ClCompile Include="Stage2SceneProgress.cpp" />
@@ -470,6 +472,7 @@
     <ClInclude Include="RoomPathGrid.h" />
     <ClInclude Include="Stage1SafeLights.h" />
     <ClInclude Include="Stage1CeilingStalker.h" />
+    <ClInclude Include="Stage1FearEvents.h" />
     <ClInclude Include="Stage1CorridorStretch.h" />
     <ClInclude Include="Stage1CorridorFlood.h" />
     <ClInclude Include="CorridorFloodWave.h" />

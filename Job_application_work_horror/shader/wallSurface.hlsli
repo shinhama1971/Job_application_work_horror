@@ -238,6 +238,15 @@ static const float WALL_BLOOD_BLEND = 0.92f;
 static const float WALL_SOAKED_DAMP = 0.6f;
 static const float WALL_STREAK_DAMP = 0.4f;
 static const float WALL_BLOOD_DAMP = 0.9f;
+// 1面の部屋の腐り具合（RoomDecay。周回ごとに進む）で、跡を広げる量：垂れ跡が出る列を増やす量、垂れ跡のうち血に変わる列の割合と
+// その乱数のずらし、カビの塊のしきい値を下げる量と壁の途中に残す量を増やす量、床際の水位線を上げる高さ、決まった血の跡を濃くする量
+static const float WALL_DECAY_STREAK_SPREAD = 0.28f;
+static const float WALL_DECAY_BLOOD_SHARE = 0.55f;
+static const float WALL_DECAY_BLOOD_SEED = 57.3f;
+static const float WALL_DECAY_MOLD_SPREAD = 0.18f;
+static const float WALL_DECAY_MOLD_HEIGHT = 0.30f;
+static const float WALL_DECAY_WATER_RISE = 10.0f;
+static const float WALL_DECAY_MARKS_GAIN = 1.4f;
 
 // --- 天井の古さの値（ComputeCeilingAgeing）
 // 天井板の大きさ（12四方）、枠の幅（芯・ぼかし）、板ごとの乱数のずらし、外れ落ちた板の割合のしきい値（7%ほど）
@@ -340,7 +349,8 @@ WallAgeing ComputeWallAgeing(float3 worldPosition, float3 normal, float weight)
     }
 
     // --- 床際の水位線（水がたまっていた跡）。高さは場所によって6〜12で揺らいでいる
-    const float waterLine = WALL_WATER_LINE_BASE + WALL_WATER_LINE_RANGE * FastValueNoise(float2(uv.x * WALL_WATER_LINE_SCALE, WALL_WATER_LINE_SEED));
+    // 部屋が腐っていくほど（RoomDecay）、水の跡は高くまで上がる
+    const float waterLine = WALL_WATER_LINE_BASE + RoomDecay * WALL_DECAY_WATER_RISE + WALL_WATER_LINE_RANGE * FastValueNoise(float2(uv.x * WALL_WATER_LINE_SCALE, WALL_WATER_LINE_SEED));
     const float belowWater = 1.0f - smoothstep(waterLine - WALL_TIDE_MARK_BOTTOM_BLEND, waterLine + WALL_TIDE_MARK_TOP_BLEND, heightFromFloor);
     const float tideMark = exp(-abs(heightFromFloor - waterLine) * WALL_TIDE_MARK_LINE_FALLOFF);
 
@@ -349,8 +359,10 @@ WallAgeing ComputeWallAgeing(float3 worldPosition, float3 normal, float weight)
     const float column = floor(uv.x / streakWidth);
     const float streakSeed = FastHash21(float2(column, WALL_STREAK_SEED));
     float streak = 0.0f;
+    // 部屋が腐っていくほど垂れ跡の列が増え、その一部は錆ではなく血の垂れ跡になる
+    const float bloodStreak = step(FastHash21(float2(column, WALL_DECAY_BLOOD_SEED)), RoomDecay * WALL_DECAY_BLOOD_SHARE);
     [branch]
-    if (streakSeed >= WALL_STREAK_THRESHOLD)
+    if (streakSeed >= WALL_STREAK_THRESHOLD - RoomDecay * WALL_DECAY_STREAK_SPREAD)
     {
         const float streakX = abs(frac(uv.x / streakWidth) - 0.5f);
         const float streakHalfWidth = WALL_STREAK_MIN_HALF_WIDTH + WALL_STREAK_HALF_WIDTH_RANGE * FastHash21(float2(column, WALL_STREAK_WIDTH_SEED));
@@ -363,8 +375,10 @@ WallAgeing ComputeWallAgeing(float3 worldPosition, float3 normal, float weight)
 
     // --- カビ（床際に多く、壁の途中にも固まって生えている）。細かい斑点はなめらかなノイズで丸くにじませている
     // 値ノイズは格子に沿った四角い形が出やすいため、座標を回転させ、大きさの違う2つを混ぜて格子を崩している。
-    const float moldCluster = smoothstep(WALL_MOLD_START, WALL_MOLD_FULL, FastValueNoise(uv * WALL_MOLD_SCALE + WALL_MOLD_SEED));
-    float mold = moldCluster * saturate(exp(-heightFromFloor * WALL_MOLD_HEIGHT_FALLOFF) + WALL_MOLD_HEIGHT_FLOOR);
+    // 部屋が腐っていくほど（RoomDecay）、カビの塊は広がり、壁の高い所まで生える
+    const float moldSpread = RoomDecay * WALL_DECAY_MOLD_SPREAD;
+    const float moldCluster = smoothstep(WALL_MOLD_START - moldSpread, WALL_MOLD_FULL - moldSpread, FastValueNoise(uv * WALL_MOLD_SCALE + WALL_MOLD_SEED));
+    float mold = moldCluster * saturate(exp(-heightFromFloor * WALL_MOLD_HEIGHT_FALLOFF) + WALL_MOLD_HEIGHT_FLOOR + RoomDecay * WALL_DECAY_MOLD_HEIGHT);
     [branch]
     if (moldCluster > 0.0f && footprint < WALL_MOLD_FOOTPRINT_LIMIT)
     {
@@ -390,7 +404,7 @@ WallAgeing ComputeWallAgeing(float3 worldPosition, float3 normal, float weight)
     if (HorrorMarksStrength > 0.0f)
     {
         marks = ComputeHorrorMarks(uv.x, heightFromFloor, planeCoordinate, footprint);
-        marks.blood *= HorrorMarksStrength;
+        marks.blood = saturate(marks.blood * HorrorMarksStrength * (1.0f + RoomDecay * WALL_DECAY_MARKS_GAIN));
         marks.gouge *= HorrorMarksStrength;
     }
 
@@ -402,7 +416,7 @@ WallAgeing ComputeWallAgeing(float3 worldPosition, float3 normal, float weight)
     float3 tint = (WALL_PANEL_TINT_BASE + WALL_PANEL_TINT_RANGE * panelShade).xxx;
     tint = lerp(tint, WALL_SOAKED_COLOR, belowWater * WALL_SOAKED_BLEND);
     tint = lerp(tint, WALL_RUST_COLOR * WALL_TIDE_RUST_DARKEN, tideMark * WALL_TIDE_BLEND);
-    tint = lerp(tint, WALL_RUST_COLOR, streak * WALL_STREAK_BLEND);
+    tint = lerp(tint, lerp(WALL_RUST_COLOR, WALL_BLOOD_COLOR, bloodStreak), streak * WALL_STREAK_BLEND);
     tint = lerp(tint, WALL_MOLD_COLOR, mold * WALL_MOLD_BLEND);
     // 引っかき傷は、汚れた表面が削れて下の明るいコンクリートが見えている。血は赤黒く、青と緑を強く吸う
     tint = lerp(tint, tint * WALL_GOUGE_BRIGHTEN, marks.gouge * WALL_GOUGE_BLEND);

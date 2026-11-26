@@ -60,7 +60,8 @@ namespace Graphics
             DirectX::SimpleMath::Vector4 presenceWarps[PresenceWarpCount];
             // 残像（x = 強さ、yz = ずらす量、w = 乱数の種）
             DirectX::SimpleMath::Vector4 echo;
-            // 水に呑まれる視界（x = 水面の高さ 0〜1。0で画面の下、1で画面の全部が水の中。yzw は使っていない）
+            // 水に呑まれる視界（x = 水面の高さ 0〜1。0で画面の下、1で画面の全部が水の中）と、
+            // 一瞬だけ映る血まみれの別の場所（y = 強さ 0〜1、z = 映るたびに変わる乱数の種。w は使っていない）
             DirectX::SimpleMath::Vector4 submerge;
         };
 
@@ -133,7 +134,9 @@ namespace Graphics
             const DirectX::SimpleMath::Vector4* presenceWarps = nullptr,
             ID3D11ShaderResourceView* echoSRV = nullptr,
             const DirectX::SimpleMath::Vector4& echo = DirectX::SimpleMath::Vector4::Zero,
-            float submergeLevel = 0.0f);
+            float submergeLevel = 0.0f,
+            float otherworld = 0.0f,
+            float otherworldSeed = 0.0f);
 
         // HDRの画面（hdrSceneSRV）を、選んだ曲線（Effect::ToneMapMode の番号）で今の描画先へ描いている（上書き）
         void DrawToneMap(ID3D11ShaderResourceView* hdrSceneSRV, unsigned int mode);

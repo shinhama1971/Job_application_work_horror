@@ -88,6 +88,8 @@ struct StageObjects
     ShadowMan* timeStopFigure = nullptr;
     // 音で輪郭が浮かぶ真っ暗な部屋（開始地点の部屋）で、最後に聞いた音へ歩いていく人影
     ShadowMan* echoFigure = nullptr;
+    // 静かな時間の出来事で、懐中電灯が点き直した瞬間に目の前に立つ人影（Stage1FearEvents）
+    ShadowMan* fearFigure = nullptr;
     ShadowMan* evidenceShadow = nullptr;
     ShadowMan* exitOmen = nullptr;
     // 書類保管室の「照らすと止まる影」（位置はStage1LightStalkerが決めている）

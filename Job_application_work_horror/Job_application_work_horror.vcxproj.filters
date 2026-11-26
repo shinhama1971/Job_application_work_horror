@@ -363,6 +363,9 @@
     <ClCompile Include="Stage1CeilingStalker.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
+    <ClCompile Include="Stage1FearEvents.cpp">
+      <Filter>ソース ファイル\Scene\Stage1</Filter>
+    </ClCompile>
     <ClCompile Include="Stage1CorridorStretch.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
@@ -409,6 +412,9 @@
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
     <ClCompile Include="StageSceneRoomScares.cpp">
+      <Filter>ソース ファイル\Scene\Stage1</Filter>
+    </ClCompile>
+    <ClCompile Include="StageSceneFearEvents.cpp">
       <Filter>ソース ファイル\Scene\Stage1</Filter>
     </ClCompile>
     <ClCompile Include="StageSurveillanceController.cpp">
@@ -858,6 +864,9 @@
       <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
     </ClInclude>
     <ClInclude Include="Stage1CeilingStalker.h">
+      <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
+    </ClInclude>
+    <ClInclude Include="Stage1FearEvents.h">
       <Filter>ヘッダー ファイル\Scene\Stage1</Filter>
     </ClInclude>
     <ClInclude Include="Stage1CorridorStretch.h">

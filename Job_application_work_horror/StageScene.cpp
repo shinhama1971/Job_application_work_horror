@@ -118,6 +118,8 @@ void StageScene::ResetProgressState()
     m_NearEmptyFuseCase = false;
     m_KeypadFuseReturned = false;
     m_WasThirdFuseStage = false;
+    RestoreFearEvents();
+    m_FearEvents.Reset();
     m_StartDoorKnockTimer = StartDoorFirstKnockSeconds;
     m_StartDoorKnocksLeft = 0;
     m_StartDoorKnockEvents = 0;
@@ -397,6 +399,8 @@ void StageScene::Uninit()
     Application::SetWorldTimeScale(1.0f);
     Renderer::SetEchoPulses(nullptr, nullptr, 0);
     Renderer::SetFloodWallStain(DirectX::SimpleMath::Vector4::Zero);
+    Renderer::SetRoomDecay(0.0f);
+    RestoreFearEvents();
     Effect::PostProcess* postProcess = Core::Game::GetInstance()->GetPostProcess();
     postProcess->SetAtmosphere(Effect::PostProcess::DefaultNoiseAmount, Effect::PostProcess::DefaultVignetteStrength);
     postProcess->SetExposure(Effect::PostProcess::DefaultExposure);

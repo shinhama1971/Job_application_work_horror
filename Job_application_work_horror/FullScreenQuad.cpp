@@ -150,7 +150,9 @@ namespace Graphics
         const DirectX::SimpleMath::Vector4* presenceWarps,
         ID3D11ShaderResourceView* echoSRV,
         const DirectX::SimpleMath::Vector4& echo,
-        float submergeLevel)
+        float submergeLevel,
+        float otherworld,
+        float otherworldSeed)
     {
         ID3D11DeviceContext* context =
             Renderer::GetDeviceContext();
@@ -189,7 +191,7 @@ namespace Graphics
         }
         // 少し前の画面がないときは、残像を出さない
         tb.echo = echoSRV != nullptr ? echo : DirectX::SimpleMath::Vector4::Zero;
-        tb.submerge = DirectX::SimpleMath::Vector4(submergeLevel, 0.0f, 0.0f, 0.0f);
+        tb.submerge = DirectX::SimpleMath::Vector4(submergeLevel, otherworld, otherworldSeed, 0.0f);
         bool presenceWarpActive = false;
         for (const DirectX::SimpleMath::Vector4& warp : tb.presenceWarps)
         {
@@ -257,7 +259,8 @@ namespace Graphics
         if (noiseAmount > 0.0f || horrorPulseStrength > EffectEpsilon ||
             lensMoisture > EffectEpsilon || filmGradeStrength > EffectEpsilon ||
             signalInterference > EffectEpsilon || frameHold > FrameHoldThreshold || fearVision > EffectEpsilon ||
-            presenceWarpActive || tb.echo.x > EffectEpsilon || submergeLevel > EffectEpsilon)
+            presenceWarpActive || tb.echo.x > EffectEpsilon || submergeLevel > EffectEpsilon ||
+            otherworld > EffectEpsilon)
         {
             m_OverlayShader.SetGPU();
             Renderer::SetBlendState(BS_ALPHABLEND);

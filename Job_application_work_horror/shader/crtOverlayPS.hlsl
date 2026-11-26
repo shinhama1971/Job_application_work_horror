@@ -431,6 +431,19 @@ float4 main(PS_IN input) : SV_TARGET
         alpha = layeredAlpha;
     }
 
+    // 一瞬だけ映る血まみれの別の場所：同じ景色が、赤黒く錆びて血の垂れた場所として、まばたきのように一瞬だけ映る（crtOverlayParts.hlsli）。
+    // ほかの層の上に重ね、映っている間は景色をほぼ置き換えている
+    [branch]
+    if (submerge.y > CRT_EFFECT_EPSILON)
+    {
+        const float3 otherworldColor = GetOtherworldColor(input.uv, edgeDistance, submerge.z);
+        const float otherworldAlpha = saturate(submerge.y);
+        const float layeredAlpha = otherworldAlpha + alpha * (1.0f - otherworldAlpha);
+        overlayColor = (otherworldColor * otherworldAlpha + overlayColor * alpha * (1.0f - otherworldAlpha)) /
+            max(layeredAlpha, CRT_MIN_DIVISOR);
+        alpha = layeredAlpha;
+    }
+
     // 映画のような色分け：影の部分は冷たい色に、照明の部分は控えめな暖かいにじみを残している。
     // これも半透明の層として重ねているので、
     // 取り込んだ景色が黒で置き換わることはない。

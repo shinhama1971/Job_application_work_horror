@@ -469,4 +469,36 @@ namespace Stage1EventSettings
     constexpr SoundSpec FollowerBreathSound{ 0.85f, 0.45f };
     constexpr PulseSpec FollowerReachedPulse{ 0.30f, 0.40f };
     constexpr RumbleSpec FollowerReachedRumble{ 5, 0.14f };
+
+    // --- 静かな時間の小さな恐怖の出来事（Stage1FearEvents。StageSceneFearEvents.cpp）
+    // 影が近いとき（危険度がこれより上）は起こさない。出来事の後の怯え（0〜1）に掛けて、心拍と視界の狭まりの危険度にする量
+    constexpr float FearEventMaxThreat = 0.15f;
+    constexpr float FearEventThreat = 0.9f;
+    // 扉の向こうのノック：プレイヤーの後ろ（向きとの内積がこれより小さい）で、上から見てこの距離の間にある閉じた扉を叩く。ノックの音量に掛ける量
+    constexpr float FearKnockBehindDot = -0.25f;
+    constexpr float FearKnockMinDistance = 12.0f;
+    constexpr float FearKnockMaxDistance = 50.0f;
+    constexpr float FearKnockVolumeGain = 1.1f;
+    // 懐中電灯：消えるときのスイッチの音、人影を立たせる距離の候補（遠い順。照らして見える所を選ぶ）、照らされているかを調べる高さ、
+    // 人影が見えたときの音・画面の脈打ち・振動、人影が消えるときのちらつき
+    constexpr SoundSpec FearFlashlightOutSound{ 0.82f, 0.9f };
+    constexpr std::array<float, 3> FearFigureDistances{ 16.0f, 12.0f, 9.0f };
+    constexpr float FearFigureLitHeight = ShadowFigureGeometry::ChestHeight;
+    constexpr SoundSpec FearFigureSound{ 0.72f, 1.2f };
+    constexpr PulseSpec FearFigurePulse{ 0.65f, 0.5f };
+    constexpr RumbleSpec FearFigureRumble{ 12, 0.34f };
+    constexpr float FearFigureHideSputterSeconds = 0.3f;
+    // 行く手の照明：前（向きとの内積がこれより大きい）で、上から見てこの距離の間にあり、この明るさより明るい照明を消す。
+    // 消えるときのスイッチの音、点き直すときの明滅
+    constexpr float FearLightAheadDot = 0.7f;
+    constexpr float FearLightMinDistance = 10.0f;
+    constexpr float FearLightMaxDistance = 160.0f;
+    constexpr float FearLightMinBrightness = 0.2f;
+    constexpr SoundSpec FearLightOffSound{ 0.5f, 1.2f };
+    constexpr FlickerSpec FearLightRestoreFlicker{ 0.5f, 0.75f };
+    // 一瞬だけ別の場所：映った瞬間の低い衝撃音と、画面の脈打ち
+    constexpr SoundSpec FearOtherworldSound{ 0.5f, 0.55f };
+    constexpr PulseSpec FearOtherworldPulse{ 0.35f, 0.3f };
+    // 周回ごとに部屋が腐っていく量（1周ごと。1で一番腐った見た目）
+    constexpr float RoomDecayPerLoop = 0.34f;
 }

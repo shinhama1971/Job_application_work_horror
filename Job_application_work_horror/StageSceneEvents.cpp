@@ -249,6 +249,7 @@ bool StageScene::IsAmbientSoundAllowed() const
         m_ExitOmenSequence.GetTimer() <= 0.0f &&
         !m_CeilingStalker.IsActive() &&
         !m_CorridorFlood.IsActive() &&
+        !m_FearEvents.IsActive() &&
         !m_TimeStopRoom.IsActive() &&
         !m_EchoRoom.IsDark() &&
         !powerRestoring &&
@@ -397,7 +398,8 @@ void StageScene::UpdateHands(Player& player, float deltaTime)
 void StageScene::UpdateTensionPulse(const Player& player, float deltaTime)
 {
     // 1面には隠れる場所がないため、隠れている扱いにはしていない。
-    const float threatRate = ComputeThreatRate(player);
+    // 小さな恐怖の出来事の後は、影が近くにいるときと同じように、しばらく心拍と息づかいが荒くなり、視界が狭まる
+    const float threatRate = (std::max)(ComputeThreatRate(player), m_FearEvents.GetFright() * FearEventThreat);
     // 撮影・計測では両効果を省く。影の位置を画面に投影する計算も不要になる。
     if (!Tools::CaptureMode::IsActive())
     {

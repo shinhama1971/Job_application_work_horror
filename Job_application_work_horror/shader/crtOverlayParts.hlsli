@@ -346,4 +346,83 @@ static const float CRT_FILM_WARM_GAIN = 1.35f;
 #define SUBMERGE_BUBBLE_SWAY 0.10f
 
 
+// --- 一瞬だけ映る血まみれの別の場所（otherworld。submerge.y = 強さ、submerge.z = 乱数の種。1面の Stage1FearEvents）
+// まばたきのように0.1秒ほどだけ、同じ景色が、赤黒く錆びて血の垂れた別の場所として映る（サイレントヒルの「裏世界」の考え方）。
+// 景色の明るさを強めに締めて赤へ移し、上から垂れる血の筋・飛び散った染み・錆のざらつき・強い周辺の闇を重ねている。
+// 横の帯ごとのずれ：帯の数、ずらす量の最大
+#define OTHERWORLD_TEAR_BANDS 24.0f
+#define OTHERWORLD_TEAR_SHIFT 0.012f
+// 明るさの締め方（掛ける量と、明るい所を残す曲がり方）と、赤の色・影の錆の色
+#define OTHERWORLD_CONTRAST_GAIN 1.6f
+#define OTHERWORLD_CONTRAST_CURVE 1.35f
+#define OTHERWORLD_LIGHT_COLOR float3(1.05f, 0.16f, 0.09f)
+#define OTHERWORLD_RUST_COLOR float3(0.11f, 0.025f, 0.012f)
+// 上から垂れる血の筋：画面の幅あたりの列の数、筋が出る列の割合、長さ（最小＋乱数の幅。画面の高さを1）、
+// 筋の芯の太さ（列の幅に対する割合）、揺れの細かさと幅、筋の先の丸い溜まりの大きさ、筋の色
+#define OTHERWORLD_DRIP_COLUMNS 70.0f
+#define OTHERWORLD_DRIP_CHANCE 0.62f
+#define OTHERWORLD_DRIP_MIN_LENGTH 0.08f
+#define OTHERWORLD_DRIP_LENGTH_RANGE 0.75f
+#define OTHERWORLD_DRIP_WIDTH 0.18f
+#define OTHERWORLD_DRIP_WOBBLE_FREQUENCY 23.0f
+#define OTHERWORLD_DRIP_WOBBLE 0.12f
+#define OTHERWORLD_DRIP_BEAD 0.011f
+#define OTHERWORLD_DRIP_COLOR float3(0.16f, 0.0f, 0.0f)
+// 飛び散った血の染み：細かさ、染みになるノイズのしきい値（始まり・濃い所）、濃さ
+#define OTHERWORLD_SPLATTER_SCALE 7.0f
+#define OTHERWORLD_SPLATTER_START 0.66f
+#define OTHERWORLD_SPLATTER_FULL 0.80f
+#define OTHERWORLD_SPLATTER_ALPHA 0.85f
+// 錆のざらつき（細かさと強さ）、周辺の闇（始まる距離・暗くなりきる距離）、ちらつきの強さ
+#define OTHERWORLD_GRIT_SCALE 260.0f
+#define OTHERWORLD_GRIT_STRENGTH 0.35f
+#define OTHERWORLD_VIGNETTE_START 0.22f
+#define OTHERWORLD_VIGNETTE_END 0.82f
+#define OTHERWORLD_FLICKER 0.12f
+// 種ごとに筋と染みの場所を変えるときの、種に掛ける大きさ
+#define OTHERWORLD_SEED_SCALE 37.0f
+// 筋の長さの乱数のずらし、揺れの位相に使う一周の角度、ちらつきを変える1秒あたりの回数
+#define OTHERWORLD_DRIP_LENGTH_SEED 5.1f
+#define OTHERWORLD_TWO_PI 6.2831853f
+#define OTHERWORLD_FLICKER_RATE 60.0f
+
+// 一瞬だけ映る別の場所の色を返している。uv は画面の位置、edgeDistance は画面の中心からの距離（周辺減光と同じ）
+float3 GetOtherworldColor(float2 uv, float edgeDistance, float seed)
+{
+    // 古いフィルムが跳んだように、横の帯ごとに少しずらして読んでいる
+    const float band = floor(uv.y * OTHERWORLD_TEAR_BANDS);
+    const float tear = (FastHash21(float2(band, seed)) - 0.5f) * 2.0f * OTHERWORLD_TEAR_SHIFT;
+    const float3 scene = SceneTexture.SampleLevel(LinearSampler, saturate(uv + float2(tear, 0.0f)), 0.0f).rgb;
+    const float luminance = saturate(dot(scene, CRT_LUMINANCE_WEIGHTS) * OTHERWORLD_CONTRAST_GAIN);
+    // 暗い所は錆の色へ沈め、照らされた所だけが赤く浮かぶ
+    float3 color = lerp(OTHERWORLD_RUST_COLOR, OTHERWORLD_LIGHT_COLOR, pow(luminance, OTHERWORLD_CONTRAST_CURVE));
+
+    // 上から垂れる血の筋（列ごとに出るかと長さを決め、少し揺らした細い筋の先に丸い溜まりを付けている）
+    const float seedOffset = seed * OTHERWORLD_SEED_SCALE;
+    const float column = floor(uv.x * OTHERWORLD_DRIP_COLUMNS);
+    const float columnRandom = FastHash21(float2(column, seedOffset));
+    const float dripLength = OTHERWORLD_DRIP_MIN_LENGTH + OTHERWORLD_DRIP_LENGTH_RANGE * FastHash21(float2(column + seedOffset, OTHERWORLD_DRIP_LENGTH_SEED));
+    const float wobble = sin(uv.y * OTHERWORLD_DRIP_WOBBLE_FREQUENCY + columnRandom * OTHERWORLD_TWO_PI) * OTHERWORLD_DRIP_WOBBLE;
+    const float across = abs(frac(uv.x * OTHERWORLD_DRIP_COLUMNS) - 0.5f + wobble);
+    const float core = 1.0f - smoothstep(OTHERWORLD_DRIP_WIDTH * 0.5f, OTHERWORLD_DRIP_WIDTH, across);
+    const float alongDrip = 1.0f - smoothstep(dripLength - OTHERWORLD_DRIP_BEAD, dripLength, uv.y);
+    const float bead = 1.0f - smoothstep(OTHERWORLD_DRIP_BEAD * 0.5f, OTHERWORLD_DRIP_BEAD,
+        length(float2((frac(uv.x * OTHERWORLD_DRIP_COLUMNS) - 0.5f + wobble) / OTHERWORLD_DRIP_COLUMNS * screenAspect, uv.y - dripLength)));
+    const float drip = step(OTHERWORLD_DRIP_CHANCE, columnRandom) * saturate(core * alongDrip + bead);
+    color = lerp(color, OTHERWORLD_DRIP_COLOR, drip);
+
+    // 飛び散った血の染み
+    const float splatter = smoothstep(OTHERWORLD_SPLATTER_START, OTHERWORLD_SPLATTER_FULL,
+        FastValueNoise(float2(uv.x * screenAspect, uv.y) * OTHERWORLD_SPLATTER_SCALE + seedOffset));
+    color = lerp(color, OTHERWORLD_DRIP_COLOR, splatter * OTHERWORLD_SPLATTER_ALPHA);
+
+    // 錆のざらつきと、強い周辺の闇
+    const float grit = FastHash21(floor(uv * OTHERWORLD_GRIT_SCALE) + seedOffset);
+    color *= 1.0f - grit * OTHERWORLD_GRIT_STRENGTH;
+    color *= 1.0f - smoothstep(OTHERWORLD_VIGNETTE_START, OTHERWORLD_VIGNETTE_END, edgeDistance);
+    // 映っている間も、明るさがわずかにちらつく
+    color *= 1.0f - OTHERWORLD_FLICKER * FastHash21(float2(floor(time * OTHERWORLD_FLICKER_RATE), seed));
+    return color;
+}
+
 #endif

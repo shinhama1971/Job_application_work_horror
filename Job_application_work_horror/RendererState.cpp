@@ -59,6 +59,18 @@ void Renderer::SetLoopDepth(float depth)
 	UploadDebugViewBuffer();
 }
 
+// 1面の部屋の腐り具合を0〜1に収めて設定している（変わらなければ送り直さない）
+void Renderer::SetRoomDecay(float decay)
+{
+	const float clamped = decay < 0.0f ? 0.0f : (decay > 1.0f ? 1.0f : decay);
+	if (clamped == m_DebugView.RoomDecay)
+	{
+		return;
+	}
+	m_DebugView.RoomDecay = clamped;
+	UploadDebugViewBuffer();
+}
+
 // 外の森の雨で岩・樹皮・研究所の外壁が濡れる強さと、水の筋の時間を設定している。
 // 値は b7（デバッグ表示と壁の古さの定数バッファ）の、使っていなかった詰め物の場所に入れている。
 // 雨の間は時間が毎フレーム変わるので、毎フレーム送っている（同じ値なら送らない）

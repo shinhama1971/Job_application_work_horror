@@ -122,6 +122,10 @@ namespace Effect
         // 水に呑まれる視界の水面の高さと、渡されなくなってから0へ戻すまでの残り秒数
         float m_SubmergeLevel = 0.0f;
         float m_SubmergeHold = 0.0f;
+        // 一瞬だけ映る血まみれの別の場所の強さ（0〜1）と乱数の種、渡されなくなってから0へ戻すまでの残り秒数
+        float m_Otherworld = 0.0f;
+        float m_OtherworldSeed = 0.0f;
+        float m_OtherworldHold = 0.0f;
         float m_EchoCaptureTimer = 0.0f;
         bool m_EchoValid = false;
         bool m_EchoCopyRequested = false;
@@ -347,6 +351,15 @@ namespace Effect
         {
             m_SubmergeLevel = (std::clamp)(level, 0.0f, 1.0f);
             m_SubmergeHold = FearVisionHoldSeconds;
+        }
+
+        // 一瞬だけ、血まみれの同じ場所が映る強さ（0〜1）と、映るたびに変える乱数の種を設定している。
+        // Scene が映している間だけ毎フレーム渡し、渡されなくなったら、すぐに消す
+        void SetOtherworld(float strength, float seed)
+        {
+            m_Otherworld = (std::clamp)(strength, 0.0f, 1.0f);
+            m_OtherworldSeed = seed;
+            m_OtherworldHold = FearVisionHoldSeconds;
         }
 
         // 影のまわりの空間のゆがみを設定している（xy = 画面の位置 0〜1、z = 半径（縦の高さを1とした長さ）、w = 強さ 0〜1）

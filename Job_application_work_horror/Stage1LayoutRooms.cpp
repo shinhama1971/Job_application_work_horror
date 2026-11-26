@@ -214,6 +214,7 @@ namespace Stage1Layout
         m_Objects.evidenceShadow = CreateHiddenShadow("Stage1EvidenceShadow");
         m_Objects.timeStopFigure = CreateHiddenShadow("Stage1TimeStopFigure");
         m_Objects.echoFigure = CreateHiddenShadow("Stage1EchoFigure");
+        m_Objects.fearFigure = CreateHiddenShadow("Stage1FearFigure");
     }
 
     // 懐中電灯で照らしたときだけ浮かぶ壁の文字を作っている。

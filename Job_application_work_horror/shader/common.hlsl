@@ -72,7 +72,8 @@ cbuffer DebugViewBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_DEBU
     // 外の森の雨で、岩・樹皮・研究所の外壁が濡れる強さ（0〜1）と、水の筋を流す時間（秒）（forestWetness.hlsli。Renderer::SetRainWetness）
     float RainWetness;
     float RainTime;
-    float RainWetnessPadding;
+    // 1面の部屋の腐り具合（0〜1。Renderer::SetRoomDecay）。周回ごとに進み、壁のカビ・垂れ跡・血の跡・水の跡が広がる（wallSurface.hlsli）
+    float RoomDecay;
 };
 
 // 懐中電灯と環境光の定数バッファ（b3）

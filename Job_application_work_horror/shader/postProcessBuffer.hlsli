@@ -34,7 +34,8 @@ cbuffer TimeBuffer : register(SIGNAL_LOST_CBUFFER_REGISTER(SIGNAL_LOST_POST_EFFE
     // 残像（x = 強さ 0〜1、yz = 少し前の画面をずらす量（画面の位置 0〜1 の差）、w = 写し取るたびに変わる乱数の種）。
     // PostProcess::SetEcho。少し前の画面は t1 の EchoTexture
     float4 echo;
-    // 水に呑まれる視界（x = 水面の高さ 0〜1。0で画面の下、1で画面の全部が水の中）。PostProcess::SetSubmerge
+    // 水に呑まれる視界（x = 水面の高さ 0〜1。0で画面の下、1で画面の全部が水の中。PostProcess::SetSubmerge）と、
+    // 一瞬だけ映る血まみれの別の場所（y = 強さ 0〜1、z = 乱数の種。PostProcess::SetOtherworld）
     float4 submerge;
 };
 

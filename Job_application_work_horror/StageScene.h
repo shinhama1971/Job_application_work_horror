@@ -18,6 +18,7 @@
 #include "Stage1CeilingStalker.h"
 #include "Stage1CorridorStretch.h"
 #include "Stage1CorridorFlood.h"
+#include "Stage1FearEvents.h"
 #include "Stage1StrangeRooms.h"
 #include "Stage1EchoRoom.h"
 #include "Stage1BreathingGroup.h"
@@ -143,6 +144,17 @@ private:
     bool UpdateArchiveStalker(class Player& player, float deltaTime);
     // 点が懐中電灯で照らされているか（光の円の中にあり、間に壁や扉がないか）を返している。
     bool IsLitByFlashlight(const class Player& player, const DirectX::SimpleMath::Vector3& target) const;
+    // 静かな時間に起こす小さな恐怖の出来事（扉の向こうのノック・懐中電灯が消えて人影・行く手の照明が消える・一瞬だけ別の場所）と、
+    // 周回ごとに部屋が腐っていく見た目を進めている（StageSceneFearEvents.cpp）
+    void UpdateFearEvents(class Player& player, float deltaTime);
+    // 出来事を起こせるかを調べ、Stage1FearEvents へ渡す入力を作っている
+    Stage1FearEvents::Input BuildFearEventInput(const class Player& player, float deltaTime) const;
+    // 出来事の合図を、音・照明・懐中電灯・人影へ移している
+    void HandleFearEventCue(class Player& player, const Stage1FearEvents::Cue& cue);
+    // 懐中電灯が点き直した瞬間に、目の前（照らされて見える所）へ人影を立たせている
+    void ShowFearFigure(const class Player& player);
+    // 出来事で消した照明を点け直し、懐中電灯と人影を元に戻している（面を離れるときと、最初からやり直すとき）
+    void RestoreFearEvents();
 
     // 配置で作った、進行で使うObject
     StageObjects m_Objects;
@@ -220,6 +232,9 @@ private:
     std::vector<Stage1CorridorFlood::Cue> m_CorridorFloodCues;
     std::vector<class CeilingLight*> m_CorridorFloodLights;
     bool m_CorridorFloodOwnsWater = false;
+    // 静かな時間に起こす小さな恐怖の出来事と、このフレームの合図
+    Stage1FearEvents m_FearEvents;
+    std::vector<Stage1FearEvents::Cue> m_FearEventCues;
     // 濁流の地鳴りで、コントローラーを次に震わせるまでの秒数
     float m_CorridorFloodRumbleTimer = 0.0f;
     // 濁流が壁に残した濡れた跡：水が届いた一番手前の z、赤さ、濃さ（0〜1）

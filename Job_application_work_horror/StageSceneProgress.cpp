@@ -250,6 +250,7 @@ void StageScene::UpdateStageEvents(Player& player, float deltaTime)
     // 西棟がヒューズを出した後に、3本目の手に入れ方を整えている（暗証番号の部屋のヒューズを取っていれば、西棟のヒューズを消す）
     UpdateThirdFuseRoutes();
     UpdateCorridorFlood(player, deltaTime);
+    UpdateFearEvents(player, deltaTime);
     UpdateCeilingReflection(player, deltaTime);
     UpdateRouteLights();
     UpdateTensionPulse(player, deltaTime);

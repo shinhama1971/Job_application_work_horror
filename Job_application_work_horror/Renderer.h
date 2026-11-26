@@ -89,7 +89,8 @@ struct DEBUG_VIEW_BUFFER
     // 外の森の雨で、岩・樹皮・研究所の外壁が濡れる強さ（0〜1）と、水の筋を流す時間（秒）（shader/forestWetness.hlsli。ForestRain が設定する）
     float RainWetness;
     float RainTime;
-    float RainWetnessPadding;
+    // 1面の部屋の腐り具合（0〜1）。周回ごとに進み、壁のカビ・垂れ跡・血の跡・水の跡が広がる（shader/wallSurface.hlsli）
+    float RoomDecay;
 };
 
 static_assert(sizeof(DEBUG_VIEW_BUFFER) == 32, "Debug view buffer must be 32 bytes");
@@ -369,6 +370,8 @@ public:
 	static void SetWallWeathering(float weathering, float horrorMarks = 1.0f);
 	// 2面の周回の深さ（0〜1）を設定している。0ならこれまでと同じ色調と霧
 	static void SetLoopDepth(float depth);
+	// 1面の部屋の腐り具合（0〜1）を設定している（変わらなければ送り直さない）
+	static void SetRoomDecay(float decay);
 	// 外の森の雨で岩・樹皮・研究所の外壁が濡れる強さ（0〜1）と、水の筋を流す時間（秒）を設定している。0なら濡らさない
 	static void SetRainWetness(float wetness, float time);
 	// 部屋の角の暗がりに使う壁の形と、床・天井の高さを設定している。boxCount が0なら暗がりを付けない。
