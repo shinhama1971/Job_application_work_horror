@@ -12,6 +12,7 @@
 #include "Scene.h"
 #include "Hud.h"
 #include "ForestEvents.h"
+#include "ForestRainFigure.h"
 #include "ForestRadio.h"
 #include "InteractionSystem.h"
 #include "PropLayoutFile.h"
@@ -21,6 +22,7 @@
 
 class Player;
 class ForestGrass;
+class ForestRain;
 class Ground;
 class SceneLayoutBuilder;
 class LabEntrance;
@@ -48,6 +50,8 @@ public:
         Player* PlayerObject = nullptr;
         Ground* GroundObject = nullptr;
         ForestGrass* Grass = nullptr;
+        // 雨（RainEnabled が false のときは nullptr）
+        ForestRain* Rain = nullptr;
         PropLayoutFile::SpawnedProps Props;
     };
     // 森の配置ファイルを読んでいる（読めなければ、理由を出して終了している）
@@ -81,6 +85,9 @@ private:
     PropLayoutFile::FileChangeWatcher m_LayoutWatcher;
     Player* m_Player = nullptr;
     ForestGrass* m_Grass = nullptr;
+    // 雨と、雨でだけ輪郭が浮かぶ人影の演出
+    ForestRain* m_Rain = nullptr;
+    ForestRainFigure m_RainFigure;
     Hud m_Hud;
     // 小道の街灯と研究所の灯りの演出と、前のフレームの恐怖の画面効果の強さ（強まった瞬間に心拍の脈を出すため）
     ForestEvents m_Events;

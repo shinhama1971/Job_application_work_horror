@@ -333,6 +333,7 @@
     <ClCompile Include="ForestGrass.cpp" />
     <ClCompile Include="SkyBackdrop.cpp" />
     <ClCompile Include="ForestEvents.cpp" />
+    <ClCompile Include="ForestRainFigure.cpp" />
     <ClCompile Include="ForestBackdrop.cpp" />
     <ClCompile Include="IntroScene.cpp" />
     <ClCompile Include="ForestRain.cpp" />
@@ -505,6 +506,7 @@
     <ClInclude Include="ForestGrass.h" />
     <ClInclude Include="SkyBackdrop.h" />
     <ClInclude Include="ForestEvents.h" />
+    <ClInclude Include="ForestRainFigure.h" />
     <ClInclude Include="ForestBackdrop.h" />
     <ClInclude Include="IntroScene.h" />
     <ClInclude Include="ForestRain.h" />

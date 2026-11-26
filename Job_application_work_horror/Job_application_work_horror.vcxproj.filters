@@ -318,6 +318,9 @@
     <ClCompile Include="ForestEvents.cpp">
       <Filter>ソース ファイル\Scene\Forest</Filter>
     </ClCompile>
+    <ClCompile Include="ForestRainFigure.cpp">
+      <Filter>ソース ファイル\Scene\Forest</Filter>
+    </ClCompile>
     <ClCompile Include="ForestGrass.cpp">
       <Filter>ソース ファイル\Scene\Forest</Filter>
     </ClCompile>
@@ -801,6 +804,9 @@
       <Filter>ヘッダー ファイル\Scene\Forest</Filter>
     </ClInclude>
     <ClInclude Include="ForestEvents.h">
+      <Filter>ヘッダー ファイル\Scene\Forest</Filter>
+    </ClInclude>
+    <ClInclude Include="ForestRainFigure.h">
       <Filter>ヘッダー ファイル\Scene\Forest</Filter>
     </ClInclude>
     <ClInclude Include="ForestGrass.h">

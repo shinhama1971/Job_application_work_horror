@@ -41,11 +41,13 @@ namespace
         float Intensity;
         float SplashRadius;
         std::uint32_t OccluderCount;
-        float Padding[2];
+        std::uint32_t FigureStart;
+        float FigureVisibility;
         Vector4 Occluders[RainMaxOccluders];
         float OccluderBottoms[RainMaxOccluders];
+        Vector4 FigureFoot;
     };
-    static_assert(sizeof(RainDrawParams) == 80 + 16 * RainMaxOccluders + 32, "RainDrawParams must match HLSL layout");
+    static_assert(sizeof(RainDrawParams) == 80 + 16 * RainMaxOccluders + 32 + 16, "RainDrawParams must match HLSL layout");
 
     // 雨の大きさ（目の高さが40なので、1メートル ≒ 24）。秒速およそ9メートルで落ち、北東の風で少し斜めに流れる
     constexpr float FallSpeed = 210.0f;
@@ -215,6 +217,11 @@ void ForestRain::Draw(Camera* camera)
     params.Intensity = StreakIntensityBase + StreakIntensityRange * m_Intensity;
     params.SplashRadius = SplashRadius;
     params.OccluderCount = static_cast<std::uint32_t>(m_ShelterCount);
+    // 雨で輪郭が浮かぶ人影の水は、雨粒としぶきの後ろの番号で描いている（見えていないときは描かない）
+    const std::uint32_t figureCount = m_FigureVisibility > 0.0f ? FigureDropCount : 0u;
+    params.FigureStart = dropCount + splashCount;
+    params.FigureVisibility = m_FigureVisibility;
+    params.FigureFoot = Vector4(m_FigureFoot.x, m_FigureFoot.y, m_FigureFoot.z, m_FigureCollapse);
     for (int index = 0; index < m_ShelterCount; ++index)
     {
         params.Occluders[index] = m_ShelterRects[index];
@@ -235,7 +242,7 @@ void ForestRain::Draw(Camera* camera)
     Renderer::SetBlendState(BS_ADDITIVE);
     Renderer::SetDepthEnable(false);
     // 雨粒1つ・しぶき1つ = 4頂点の四角形1枚
-    context->DrawInstanced(RainQuadVertexCount, dropCount + splashCount, 0, 0);
+    context->DrawInstanced(RainQuadVertexCount, dropCount + splashCount + figureCount, 0, 0);
     Renderer::SetDepthEnable(true);
     Renderer::SetBlendState(BS_NONE);
     context->RSSetState(previousRasterizer.Get());

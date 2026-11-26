@@ -207,6 +207,7 @@ ForestScene::World ForestScene::BuildWorld(SceneLayoutBuilder& builder, const Pr
     if constexpr (RainEnabled)
     {
         ForestRain* rain = builder.Create<ForestRain>("ForestRain");
+        world.Rain = rain;
         rain->SetGroundHeight(world.GroundObject->GetPosition().y);
         rain->SetIntensity(RainStrength);
         world.GroundObject->SetRainIntensity(RainStrength);
@@ -226,6 +227,7 @@ ForestScene::ForestScene()
     m_Player = world.PlayerObject;
     m_GroundY = world.GroundObject->GetPosition().y;
     m_Grass = world.Grass;
+    m_Rain = world.Rain;
     m_LayoutProps = std::move(world.Props);
 
     // 研究所の玄関：扉（配置ファイルの LabDoor）の手前に、「研究所に入る」と調べられる点を置いている
@@ -464,7 +466,16 @@ void ForestScene::Update()
     }
     // 街灯のちらつき・後ろの街灯が消える・研究所の窓の明かりが消える・草むらを何かが通る（ForestEvents）
     // 稲光の人影の恐怖（前のフレームの値）と、強い方を使っている
-    const float fear = (std::max)(m_Events.Update(deltaTime, m_Player->GetPosition(), m_LayoutProps), m_LightningFear);
+    float fear = (std::max)(m_Events.Update(deltaTime, m_Player->GetPosition(), m_LayoutProps), m_LightningFear);
+    // 雨でだけ輪郭が浮かぶ人影（ForestRainFigure）。描画は雨（ForestRain）が、人の形の表面を伝う水としぶきで行う
+    // （計測では、決まった地点の重さを前と比べるため出さない）
+    if (m_Rain != nullptr && !Tools::CaptureMode::IsBenchmark())
+    {
+        Camera* camera = game->GetCamera();
+        fear = (std::max)(fear, m_RainFigure.Update(deltaTime, m_Player->GetPosition(), camera->GetPosition(),
+            camera->GetForward(), m_Player->IsFlashlightOn(), m_GroundY));
+        m_Rain->SetFigure(m_RainFigure.GetFoot(), m_RainFigure.GetVisibility(), m_RainFigure.GetCollapseSeconds());
+    }
     game->GetPostProcess()->SetFearVision(fear, fear > m_LastFear + FearSpikeThreshold);
     m_LastFear = fear;
     // 草むらを通る「見えない何か」の足元の草を、草の Compute Shader で押し倒している

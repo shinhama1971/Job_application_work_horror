@@ -12,6 +12,7 @@
 // ・水たまりに落ちる雨は、Ground の波のシミュレーション（WaterRippleSimulation）へ「おもり」として渡し、
 //   水面に輪を広げている（Ground::SetRainIntensity）。
 // ・深度の判定はするが書き込まないので、木や建物の奥の雨は隠れ、雨どうしは重なって足される。
+// ・雨で輪郭が浮かぶ人影（SetFigure）：姿は描かず、人の形の表面を伝う水の筋と頭と肩のしぶきを足し、真下の雨を止めている。
 // ============================================================================
 
 #pragma once
@@ -30,6 +31,8 @@ public:
     // 雨粒の数と、地面のしぶきの数
     static constexpr std::uint32_t DropCount = 24000;
     static constexpr std::uint32_t SplashCount = 900;
+    // 雨で輪郭が浮かぶ人影の、表面を伝う水の筋と頭と肩のしぶきの数
+    static constexpr std::uint32_t FigureDropCount = 2400;
 
     void Init() override;
     void Update() override;
@@ -43,6 +46,13 @@ public:
     void SetIntensity(float intensity) { m_Intensity = (std::clamp)(intensity, 0.0f, 1.0f); }
     // 地面の高さ（これより下の雨粒は描かない。しぶきはこの高さに出す）
     void SetGroundHeight(float groundY) { m_GroundY = groundY; }
+    // 雨で輪郭が浮かぶ人影（ForestRainFigure）の足元・見え方（0〜1。0 なら描かない）・崩れ始めてからの秒数（0 なら崩れていない）
+    void SetFigure(const DirectX::SimpleMath::Vector3& foot, float visibility, float collapseSeconds)
+    {
+        m_FigureFoot = foot;
+        m_FigureVisibility = (std::clamp)(visibility, 0.0f, 1.0f);
+        m_FigureCollapse = (std::max)(collapseSeconds, 0.0f);
+    }
 
 private:
     // 屋根やひさし（雨が当たらない所）を、置かれている物から集め直している
@@ -61,4 +71,8 @@ private:
     DirectX::SimpleMath::Vector4 m_ShelterRects[MaxShelters];
     float m_ShelterBottoms[MaxShelters] = {};
     int m_ShelterCount = 0;
+    // 雨で輪郭が浮かぶ人影
+    DirectX::SimpleMath::Vector3 m_FigureFoot = DirectX::SimpleMath::Vector3::Zero;
+    float m_FigureVisibility = 0.0f;
+    float m_FigureCollapse = 0.0f;
 };
